@@ -1,0 +1,12 @@
+{
+ "torneo": "Apertura 2026",
+ "jornada_vigente": 2,
+ "actualizado": "2026-08-14",
+ "jornadas": [
+  {
+   "jornada": 2,
+   "archivo": "j02.json",
+   "estado": "sellada"
+  }
+ ]
+}

@@ -1,0 +1,848 @@
+<title>Cerebro Liga MX</title>
+<style>
+/* ==========================================================================
+   Cerebro Liga MX 2026 — hoja de estilos
+   Paleta corporativa GPV. Mobile-first. Sin dependencias externas.
+   ========================================================================== */
+
+:root {
+  /* --- marca GPV (valores exactos del Excel) --- */
+  --verde: #00573f;
+  --dorado: #c9a961;
+  --azul: #1f4e79;
+  --morado: #5b2c6f;
+
+  /* --- neutros con sesgo verde: elegidos, no heredados --- */
+  --fondo: #f4f7f5;
+  --superficie: #ffffff;
+  --superficie-2: #eaf0ec;
+  --borde: #d3ded8;
+  --texto: #12201b;
+  --texto-suave: #55665f;
+
+  /* --- roles derivados --- */
+  --barra-local: var(--verde);
+  --barra-empate: var(--azul);
+  --barra-visita: var(--morado);
+  --acento: var(--dorado);
+  --encabezado: var(--verde);
+  --encabezado-texto: #ffffff;
+
+  /* --- estado (semántico, independiente del acento) --- */
+  --acierto: #1c7a55;
+  --falla: #a4363a;
+  --neutro: #7d8b85;
+
+  --radio: 10px;
+  --sombra: 0 1px 2px rgba(18, 32, 27, .06), 0 4px 14px rgba(18, 32, 27, .05);
+
+  --tipo: Calibri, Carlito, "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
+  --mono: ui-monospace, "Cascadia Mono", Consolas, "SF Mono", Menlo, monospace;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --fondo: #0d1512;
+    --superficie: #16221e;
+    --superficie-2: #1e2d28;
+    --borde: #2c3d37;
+    --texto: #e7efeb;
+    --texto-suave: #9aada5;
+
+    --barra-local: #3f9e78;
+    --barra-empate: #4d84bd;
+    --barra-visita: #9a6bb5;
+    --acento: #d8bd7f;
+    --encabezado: #0a3d2c;
+    --encabezado-texto: #f2f7f4;
+
+    --acierto: #4bb98c;
+    --falla: #d4767a;
+    --neutro: #8b9a94;
+    --sombra: 0 1px 2px rgba(0, 0, 0, .3), 0 4px 14px rgba(0, 0, 0, .25);
+  }
+}
+
+:root[data-theme="dark"] {
+  --fondo: #0d1512;
+  --superficie: #16221e;
+  --superficie-2: #1e2d28;
+  --borde: #2c3d37;
+  --texto: #e7efeb;
+  --texto-suave: #9aada5;
+
+  --barra-local: #3f9e78;
+  --barra-empate: #4d84bd;
+  --barra-visita: #9a6bb5;
+  --acento: #d8bd7f;
+  --encabezado: #0a3d2c;
+  --encabezado-texto: #f2f7f4;
+
+  --acierto: #4bb98c;
+  --falla: #d4767a;
+  --neutro: #8b9a94;
+  --sombra: 0 1px 2px rgba(0, 0, 0, .3), 0 4px 14px rgba(0, 0, 0, .25);
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--fondo);
+  color: var(--texto);
+  font-family: var(--tipo);
+  font-size: 16px;
+  line-height: 1.5;
+  -webkit-text-size-adjust: 100%;
+}
+
+.envoltura {
+  max-width: 44rem;
+  margin: 0 auto;
+  padding: 1.75rem 1rem 4rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.75rem;
+}
+
+/* --------------------------------------------------------------- cabecera */
+
+.cabecera {
+  background: var(--encabezado);
+  color: var(--encabezado-texto);
+  border-bottom: 3px solid var(--acento);
+}
+.cabecera__interior {
+  max-width: 44rem;
+  margin: 0 auto;
+  padding: 1.5rem 1rem 1.35rem;
+}
+.cabecera__marca {
+  font-size: .7rem;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+  color: var(--acento);
+  font-weight: 700;
+  margin: 0 0 .3rem;
+}
+.cabecera h1 {
+  font-size: 1.6rem;
+  line-height: 1.15;
+  margin: 0;
+  font-weight: 700;
+  text-wrap: balance;
+}
+.cabecera__sub {
+  margin: .4rem 0 0;
+  font-size: .95rem;
+  opacity: .88;
+}
+.sello {
+  display: inline-flex;
+  align-items: center;
+  gap: .4rem;
+  margin-top: .8rem;
+  padding: .2rem .6rem;
+  border: 1px solid rgba(201, 169, 97, .55);
+  border-radius: 100px;
+  font-size: .72rem;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  font-weight: 700;
+  color: var(--acento);
+}
+.sello::before {
+  content: "";
+  width: .4rem; height: .4rem;
+  border-radius: 50%;
+  background: var(--acento);
+}
+
+/* ------------------------------------------------------------- resultados */
+
+.seccion__titulo {
+  font-size: .74rem;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: var(--texto-suave);
+  font-weight: 700;
+  margin: 0 0 .75rem;
+  padding-bottom: .4rem;
+  border-bottom: 1px solid var(--borde);
+}
+
+.tarjetero {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+  gap: .6rem;
+}
+.dato {
+  background: var(--superficie);
+  border: 1px solid var(--borde);
+  border-radius: var(--radio);
+  padding: .8rem .9rem;
+  box-shadow: var(--sombra);
+}
+.dato__etiqueta {
+  font-size: .7rem;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--texto-suave);
+  font-weight: 700;
+}
+.dato__valor {
+  font-size: 1.7rem;
+  font-weight: 700;
+  line-height: 1.1;
+  margin-top: .15rem;
+  font-variant-numeric: tabular-nums;
+}
+.dato__nota { font-size: .78rem; color: var(--texto-suave); }
+.dato--malo .dato__valor { color: var(--falla); }
+
+/* --------------------------------------------------------------- partidos */
+
+.partidos { display: flex; flex-direction: column; gap: .8rem; }
+
+.partido {
+  background: var(--superficie);
+  border: 1px solid var(--borde);
+  border-left: 4px solid var(--neutro);
+  border-radius: var(--radio);
+  box-shadow: var(--sombra);
+  overflow: hidden;
+}
+.partido--acierto { border-left-color: var(--acierto); }
+.partido--falla { border-left-color: var(--falla); }
+
+.partido__cuerpo { padding: .9rem 1rem 1rem; }
+
+.partido__meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: .75rem;
+  font-size: .74rem;
+  color: var(--texto-suave);
+  margin-bottom: .55rem;
+}
+.partido__estadio {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.marcador {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+}
+.marcador__equipos { font-size: 1.05rem; font-weight: 700; line-height: 1.25; }
+.marcador__vs { color: var(--texto-suave); font-weight: 400; font-size: .85rem; }
+.marcador__cifras {
+  font-size: 1.6rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: .02em;
+  white-space: nowrap;
+}
+
+/* barra 1X2: el ancho ES la probabilidad */
+.barra {
+  display: flex;
+  height: 1.6rem;
+  border-radius: 5px;
+  overflow: hidden;
+  margin-top: .8rem;
+  background: var(--superficie-2);
+}
+.barra__seg {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: .72rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  min-width: 0;
+  overflow: hidden;
+  position: relative;
+  transition: flex-basis .5s cubic-bezier(.22, .8, .3, 1);
+}
+.barra__seg--local { background: var(--barra-local); }
+.barra__seg--empate { background: var(--barra-empate); }
+.barra__seg--visita { background: var(--barra-visita); }
+/* lo que realmente pasó */
+.barra__seg--ocurrio::after {
+  content: "";
+  position: absolute;
+  inset: 3px;
+  border: 2px solid rgba(255, 255, 255, .95);
+  border-radius: 3px;
+}
+
+.leyenda {
+  display: flex;
+  justify-content: space-between;
+  gap: .5rem;
+  margin-top: .35rem;
+  font-size: .72rem;
+  color: var(--texto-suave);
+}
+.leyenda span { display: inline-flex; align-items: center; gap: .3rem; }
+.punto { width: .55rem; height: .55rem; border-radius: 2px; flex: none; }
+.punto--local { background: var(--barra-local); }
+.punto--empate { background: var(--barra-empate); }
+.punto--visita { background: var(--barra-visita); }
+
+.veredicto {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .4rem .9rem;
+  margin-top: .8rem;
+  padding-top: .7rem;
+  border-top: 1px dashed var(--borde);
+  font-size: .85rem;
+}
+.veredicto b { font-weight: 700; }
+.marca { font-weight: 700; }
+.marca--si { color: var(--acierto); }
+.marca--no { color: var(--falla); }
+
+/* ------------------------------------------------------------- desplegable */
+
+details {
+  border-top: 1px solid var(--borde);
+  background: var(--superficie-2);
+}
+details > summary {
+  cursor: pointer;
+  padding: .6rem 1rem;
+  font-size: .8rem;
+  font-weight: 700;
+  color: var(--texto-suave);
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: .45rem;
+}
+details > summary::-webkit-details-marker { display: none; }
+details > summary::before {
+  content: "▸";
+  transition: transform .15s ease;
+  display: inline-block;
+}
+details[open] > summary::before { transform: rotate(90deg); }
+details > summary:focus-visible {
+  outline: 2px solid var(--acento);
+  outline-offset: -2px;
+}
+
+.detalle { padding: 0 1rem 1rem; }
+
+.capas { display: flex; flex-direction: column; gap: .1rem; }
+.capa {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: .2rem .75rem;
+  padding: .45rem 0;
+  border-bottom: 1px solid var(--borde);
+  font-size: .8rem;
+}
+.capa:last-child { border-bottom: 0; }
+.capa__nombre { font-weight: 700; }
+.capa__detalle {
+  grid-column: 1;
+  color: var(--texto-suave);
+  font-size: .76rem;
+}
+.capa__lam {
+  grid-row: 1 / 3;
+  grid-column: 2;
+  align-self: center;
+  font-family: var(--mono);
+  font-size: .78rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--texto);
+  white-space: nowrap;
+}
+
+.marcadores {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .35rem;
+  margin-top: .9rem;
+}
+.chip {
+  border: 1px solid var(--borde);
+  background: var(--superficie);
+  border-radius: 100px;
+  padding: .2rem .6rem;
+  font-size: .75rem;
+  font-variant-numeric: tabular-nums;
+}
+.chip b { font-weight: 700; }
+
+/* --------------------------------------------------------------- parlays */
+
+.parlay {
+  background: var(--superficie);
+  border: 1px solid var(--borde);
+  border-radius: var(--radio);
+  box-shadow: var(--sombra);
+  overflow: hidden;
+  margin-bottom: .8rem;
+}
+.parlay__cabeza {
+  background: var(--encabezado);
+  color: var(--encabezado-texto);
+  padding: .65rem 1rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: .75rem;
+}
+.parlay__nombre {
+  font-weight: 700;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  font-size: .82rem;
+}
+.parlay__estado {
+  font-size: .7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  padding: .12rem .5rem;
+  border-radius: 100px;
+  background: rgba(255, 255, 255, .14);
+  border: 1px solid rgba(255, 255, 255, .3);
+}
+.parlay__desc {
+  padding: .6rem 1rem 0;
+  font-size: .8rem;
+  color: var(--texto-suave);
+}
+.legs { list-style: none; margin: .6rem 0 0; padding: 0 1rem; }
+.leg {
+  display: grid;
+  grid-template-columns: 1.2rem 1fr auto;
+  gap: .1rem .6rem;
+  align-items: baseline;
+  padding: .5rem 0;
+  border-bottom: 1px solid var(--borde);
+  font-size: .85rem;
+}
+.leg__icono { font-weight: 700; font-size: .9rem; }
+.leg__icono--acierto { color: var(--acierto); }
+.leg__icono--falla { color: var(--falla); }
+.leg__icono--sin_dato { color: var(--neutro); }
+.leg__partido {
+  grid-column: 2;
+  font-size: .74rem;
+  color: var(--texto-suave);
+}
+.leg__prob {
+  grid-row: 1 / 3;
+  grid-column: 3;
+  align-self: center;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+.parlay__pie {
+  display: flex;
+  justify-content: space-between;
+  gap: .75rem;
+  padding: .7rem 1rem;
+  background: var(--superficie-2);
+  font-size: .85rem;
+  font-variant-numeric: tabular-nums;
+}
+.parlay__pie b { font-weight: 700; }
+
+/* ----------------------------------------------------------------- tabla */
+
+.envoltura-tabla { overflow-x: auto; }
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: .87rem;
+  background: var(--superficie);
+  border: 1px solid var(--borde);
+  border-radius: var(--radio);
+  overflow: hidden;
+}
+th, td {
+  padding: .55rem .7rem;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  border-bottom: 1px solid var(--borde);
+  white-space: nowrap;
+}
+th:first-child, td:first-child { text-align: left; }
+thead th {
+  background: var(--encabezado);
+  color: var(--encabezado-texto);
+  font-size: .72rem;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+tbody tr:last-child td { border-bottom: 0; }
+tr.acumulado td { font-weight: 700; background: var(--superficie-2); }
+
+/* ----------------------------------------------------------------- notas */
+
+.nota {
+  background: var(--superficie);
+  border: 1px solid var(--borde);
+  border-left: 3px solid var(--acento);
+  border-radius: var(--radio);
+  padding: .8rem 1rem;
+  font-size: .84rem;
+  color: var(--texto-suave);
+}
+.nota strong { color: var(--texto); }
+.nota p { margin: 0 0 .5rem; }
+.nota p:last-child { margin-bottom: 0; }
+
+.pie {
+  font-size: .75rem;
+  color: var(--texto-suave);
+  border-top: 1px solid var(--borde);
+  padding-top: 1rem;
+}
+.pie p { margin: 0 0 .4rem; }
+.pie code {
+  font-family: var(--mono);
+  font-size: .95em;
+  background: var(--superficie-2);
+  padding: .05rem .3rem;
+  border-radius: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; animation: none !important; }
+}
+
+@media (min-width: 34rem) {
+  .cabecera h1 { font-size: 1.95rem; }
+  .marcador__equipos { font-size: 1.15rem; }
+}
+
+</style>
+
+
+<header class="cabecera">
+  <div class="cabecera__interior">
+    <p class="cabecera__marca">Cerebro Liga MX 2026</p>
+    <h1 id="titulo">Jornada</h1>
+    <p class="cabecera__sub" id="subtitulo"></p>
+    <span class="sello">Pronóstico sellado antes de jugarse</span>
+  </div>
+</header>
+
+<main class="envoltura">
+
+  <section>
+    <h2 class="seccion__titulo">Cómo le fue al modelo</h2>
+    <div class="tarjetero" id="resumen"></div>
+  </section>
+
+  <div class="nota">
+    <p><strong>Una jornada sola no dice mucho.</strong> Con 9 partidos, acertar 4 o acertar 6
+    es la diferencia entre la buena y la mala suerte: el margen de error ronda los ±16 puntos
+    porcentuales. La medida que sirve es la acumulada, y por ahora sólo llevamos dos jornadas.</p>
+  </div>
+
+  <section>
+    <h2 class="seccion__titulo">Partidos</h2>
+    <div class="partidos" id="partidos"></div>
+  </section>
+
+  <section>
+    <h2 class="seccion__titulo">Parlays</h2>
+    <div id="parlays"></div>
+    <div class="nota">
+      <p>La probabilidad combinada <strong>no es un producto simple</strong>: los legs de un
+      mismo partido están correlacionados, así que se suman sobre la distribución conjunta
+      exacta de las dos mitades. Sólo los partidos distintos se multiplican.</p>
+      <p>Los legs de medio tiempo aparecen como <strong>–</strong> porque todavía no
+      capturamos el marcador al descanso de esta jornada. No cambia el resultado: los tres
+      parlays ya habían caído por un leg de tiempo completo.</p>
+    </div>
+  </section>
+
+  <section>
+    <h2 class="seccion__titulo">Desempeño por jornada</h2>
+    <div class="envoltura-tabla">
+      <table>
+        <thead>
+          <tr><th>Jornada</th><th>Aciertos 1X2</th><th>Exactos</th><th>Brier</th></tr>
+        </thead>
+        <tbody id="historico"></tbody>
+      </table>
+    </div>
+    <p class="dato__nota" style="margin-top:.5rem">
+      Brier: <span id="convencion"></span>. Más bajo es mejor.
+      La Jornada 1 no tiene pronóstico sellado: se registra su resultado, no su distribución.
+    </p>
+  </section>
+
+  <footer class="pie">
+    <p id="procedencia"></p>
+    <p><strong>No se modelan:</strong> <span id="nomodelado"></span>. No existe base pública de
+    Liga MX con esos campos, así que el modelo no los inventa.</p>
+    <p>Histórico sellado <code id="huella"></code> · Proyecto actuarial sin fines de lucro.</p>
+  </footer>
+
+</main>
+
+<script>
+const DATOS = {"esquema": "cerebro-ligamx/v1", "torneo": "Apertura 2026", "jornada": 2, "estado": "sellada", "generado": "2026-07-20T00:00:00-06:00", "modelo": {"motor": "Dixon-Coles + Monte Carlo", "simulaciones": 100000, "rho_dc": -0.11, "xi_decaimiento": 0.0038, "prop_goles_1t": 0.4442, "base_local": 1.4853, "base_visita": 1.1535, "historico": {"partidos": 4996, "desde": "2010-07-23", "hasta": "2026-07-18", "sha256": "123ecba21f4f19a5"}}, "partidos": [{"id": "j02-cruz-azul-puebla", "fecha": "2026-07-21", "estadio": "CDMX (adelantado)", "local": "Cruz Azul", "visitante": "Puebla", "lambdas": {"local": 1.825, "visita": 0.48}, "prob": {"local": 0.6926, "empate": 0.2269, "visita": 0.0806}, "pick": "Cruz Azul", "marcador_probable": "1-0", "top_marcadores": [{"marcador": "1-0", "prob": 0.1725}, {"marcador": "2-0", "prob": 0.1662}, {"marcador": "0-0", "prob": 0.1094}, {"marcador": "3-0", "prob": 0.1011}, {"marcador": "1-1", "prob": 0.097}], "bitacora": [{"capa": "Fuerza base (MLE)", "detalle": "ataque Cruz Azul 1.29 × defensa Puebla 0.92 · ataque Puebla 0.64 × defensa Cruz Azul 0.69", "lam": [1.762, 0.51]}, {"capa": "Localía por estadio", "detalle": "CDMX (adelantado) · ×1.02", "lam": [1.797, 0.51]}, {"capa": "Factor escudo", "detalle": "peso institucional de Cruz Azul: ataque rival ÷1.03", "lam": [1.797, 0.495]}, {"capa": "Actualidad de la jornada", "detalle": "Puebla ×0.97 — sin Iker Moreno (suspendido)", "lam": [1.825, 0.48]}], "resultado": {"gl": 2, "gv": 1, "gana": "Cruz Azul", "acerto_1x2": true, "acerto_marcador": false, "brier": 0.1525}}, {"id": "j02-toluca-pumas", "fecha": "2026-07-21", "estadio": "Nemesio Diez (adelantado)", "local": "Toluca", "visitante": "Pumas", "lambdas": {"local": 2.358, "visita": 0.62}, "prob": {"local": 0.7534, "empate": 0.1747, "visita": 0.0719}, "pick": "Toluca", "marcador_probable": "2-0", "top_marcadores": [{"marcador": "2-0", "prob": 0.1415}, {"marcador": "1-0", "prob": 0.1119}, {"marcador": "3-0", "prob": 0.1113}, {"marcador": "2-1", "prob": 0.0877}, {"marcador": "1-1", "prob": 0.0826}], "bitacora": [{"capa": "Fuerza base (MLE)", "detalle": "ataque Toluca 1.54 × defensa Pumas 0.95 · ataque Pumas 0.83 × defensa Toluca 0.64", "lam": [2.186, 0.62]}, {"capa": "Localía por estadio", "detalle": "Nemesio Diez (adelantado) · ×1.10", "lam": [2.405, 0.62]}, {"capa": "Factor escudo", "detalle": "peso institucional de Pumas: ataque rival ÷1.02", "lam": [2.358, 0.62]}], "resultado": {"gl": 1, "gv": 2, "gana": "Pumas", "acerto_1x2": false, "acerto_marcador": false, "brier": 1.4595}}, {"id": "j02-tigres-atletico-san-luis", "fecha": "2026-07-24", "estadio": "Universitario", "local": "Tigres", "visitante": "Atlético San Luis", "lambdas": {"local": 1.459, "visita": 0.905}, "prob": {"local": 0.4839, "empate": 0.2935, "visita": 0.2225}, "pick": "Tigres", "marcador_probable": "1-1", "top_marcadores": [{"marcador": "1-1", "prob": 0.1379}, {"marcador": "1-0", "prob": 0.1235}, {"marcador": "0-0", "prob": 0.1077}, {"marcador": "2-0", "prob": 0.1001}, {"marcador": "2-1", "prob": 0.0906}], "bitacora": [{"capa": "Fuerza base (MLE)", "detalle": "ataque Tigres 0.90 × defensa Atlético San Luis 1.10 · ataque Atlético San Luis 1.07 × defensa Tigres 0.74", "lam": [1.462, 0.909]}, {"capa": "Localía por estadio", "detalle": "Universitario · ×1.05", "lam": [1.535, 0.909]}, {"capa": "Factor escudo", "detalle": "peso institucional de Tigres: ataque rival ÷1.03", "lam": [1.535, 0.882]}, {"capa": "Actualidad de la jornada", "detalle": "Tigres ×0.95 — expulsión en J1 + reestructura post-Gignac", "lam": [1.459, 0.905]}], "resultado": {"gl": 2, "gv": 2, "gana": "Empate", "acerto_1x2": false, "acerto_marcador": false, "brier": 0.7828}}, {"id": "j02-tijuana-leon", "fecha": "2026-07-24", "estadio": "Caliente", "local": "Tijuana", "visitante": "León", "lambdas": {"local": 2.0, "visita": 1.202}, "prob": {"local": 0.5466, "empate": 0.2368, "visita": 0.2165}, "pick": "Tijuana", "marcador_probable": "1-1", "top_marcadores": [{"marcador": "1-1", "prob": 0.1086}, {"marcador": "2-1", "prob": 0.0978}, {"marcador": "2-0", "prob": 0.0814}, {"marcador": "1-0", "prob": 0.0706}, {"marcador": "3-1", "prob": 0.0652}], "bitacora": [{"capa": "Fuerza base (MLE)", "detalle": "ataque Tijuana 1.28 × defensa León 0.99 · ataque León 0.99 × defensa Tijuana 1.05", "lam": [1.886, 1.202]}, {"capa": "Localía por estadio", "detalle": "Caliente · ×1.06", "lam": [2.0, 1.202]}], "resultado": {"gl": 1, "gv": 0, "gana": "Tijuana", "acerto_1x2": true, "acerto_marcador": false, "brier": 0.3085}}, {"id": "j02-atlante-america", "fecha": "2026-07-24", "estadio": "Ciudad de los Deportes", "local": "Atlante", "visitante": "América", "lambdas": {"local": 0.4, "visita": 1.219}, "prob": {"local": 0.1108, "empate": 0.3276, "visita": 0.5617}, "pick": "América", "marcador_probable": "0-1", "top_marcadores": [{"marcador": "0-1", "prob": 0.2309}, {"marcador": "0-0", "prob": 0.2087}, {"marcador": "0-2", "prob": 0.1473}, {"marcador": "1-1", "prob": 0.1072}, {"marcador": "1-0", "prob": 0.0686}], "bitacora": [{"capa": "Fuerza base (MLE)", "detalle": "ataque Atlante 0.66 × defensa América 0.42 · ataque América 1.15 × defensa Atlante 0.96", "lam": [0.416, 1.271]}, {"capa": "Localía por estadio", "detalle": "Ciudad de los Deportes · ×1.02", "lam": [0.424, 1.271]}, {"capa": "Factor escudo", "detalle": "peso institucional de América: ataque rival ÷1.05", "lam": [0.404, 1.271]}, {"capa": "Actualidad de la jornada", "detalle": "Atlante ×0.96 — ascendido; compitió de visita hasta el 90+3", "lam": [0.388, 1.297]}, {"capa": "Actualidad de la jornada", "detalle": "América ×0.94 — sin Zendejas (lesión) ni Cervantes (suspendido); Almada 2do juego", "lam": [0.4, 1.219]}], "resultado": {"gl": 1, "gv": 1, "gana": "Empate", "acerto_1x2": false, "acerto_marcador": false, "brier": 0.7799}}, {"id": "j02-chivas-juarez", "fecha": "2026-07-25", "estadio": "Akron", "local": "Chivas", "visitante": "Juárez", "lambdas": {"local": 1.045, "visita": 0.467}, "prob": {"local": 0.4849, "empate": 0.3655, "visita": 0.1496}, "pick": "Chivas", "marcador_probable": "0-0", "top_marcadores": [{"marcador": "0-0", "prob": 0.2324}, {"marcador": "1-0", "prob": 0.2186}, {"marcador": "2-0", "prob": 0.1204}, {"marcador": "1-1", "prob": 0.1194}, {"marcador": "0-1", "prob": 0.0911}], "bitacora": [{"capa": "Fuerza base (MLE)", "detalle": "ataque Chivas 0.71 × defensa Juárez 0.98 · ataque Juárez 0.60 × defensa Chivas 0.70", "lam": [1.03, 0.486]}, {"capa": "Localía por estadio", "detalle": "Akron · ×1.04", "lam": [1.072, 0.486]}, {"capa": "Factor escudo", "detalle": "peso institucional de Chivas: ataque rival ÷1.03", "lam": [1.072, 0.471]}, {"capa": "Actualidad de la jornada", "detalle": "Chivas ×0.96 — sin Sepúlveda (suspendido); presión tras 0-2 en casa", "lam": [1.029, 0.481]}, {"capa": "Actualidad de la jornada", "detalle": "Juárez ×0.97 — sin Luka Romero (lesión de rodilla en J1)", "lam": [1.045, 0.467]}], "resultado": {"gl": 1, "gv": 0, "gana": "Chivas", "acerto_1x2": true, "acerto_marcador": false, "brier": 0.4213}}, {"id": "j02-santos-atlas", "fecha": "2026-07-25", "estadio": "Corona", "local": "Santos", "visitante": "Atlas", "lambdas": {"local": 1.355, "visita": 1.543}, "prob": {"local": 0.3238, "empate": 0.2713, "visita": 0.4049}, "pick": "Atlas", "marcador_probable": "1-1", "top_marcadores": [{"marcador": "1-1", "prob": 0.1279}, {"marcador": "1-2", "prob": 0.0889}, {"marcador": "2-1", "prob": 0.0781}, {"marcador": "0-1", "prob": 0.0724}, {"marcador": "0-0", "prob": 0.0678}], "bitacora": [{"capa": "Fuerza base (MLE)", "detalle": "ataque Santos 0.82 × defensa Atlas 1.09 · ataque Atlas 1.09 × defensa Santos 1.22", "lam": [1.315, 1.543]}, {"capa": "Localía por estadio", "detalle": "Corona · ×1.03", "lam": [1.355, 1.543]}], "resultado": {"gl": 0, "gv": 1, "gana": "Atlas", "acerto_1x2": true, "acerto_marcador": false, "brier": 0.5326}}, {"id": "j02-necaxa-monterrey", "fecha": "2026-07-26", "estadio": "Victoria", "local": "Necaxa", "visitante": "Monterrey", "lambdas": {"local": 1.475, "visita": 1.521}, "prob": {"local": 0.3549, "empate": 0.2694, "visita": 0.3757}, "pick": "Monterrey", "marcador_probable": "1-1", "top_marcadores": [{"marcador": "1-1", "prob": 0.1245}, {"marcador": "1-2", "prob": 0.0853}, {"marcador": "2-1", "prob": 0.0827}, {"marcador": "0-1", "prob": 0.0637}, {"marcador": "2-2", "prob": 0.0629}], "bitacora": [{"capa": "Fuerza base (MLE)", "detalle": "ataque Necaxa 1.17 × defensa Monterrey 0.84 · ataque Monterrey 1.30 × defensa Necaxa 1.04", "lam": [1.46, 1.552]}, {"capa": "Localía por estadio", "detalle": "Victoria · ×1.02", "lam": [1.489, 1.552]}, {"capa": "Factor escudo", "detalle": "peso institucional de Monterrey: ataque rival ÷1.02", "lam": [1.46, 1.552]}, {"capa": "Actualidad de la jornada", "detalle": "Monterrey ×0.98 — transición Almeyda, pero respondió con triunfo en J1", "lam": [1.475, 1.521]}], "resultado": {"gl": 2, "gv": 1, "gana": "Necaxa", "acerto_1x2": false, "acerto_marcador": false, "brier": 0.6299}}, {"id": "j02-pachuca-queretaro", "fecha": "2026-07-26", "estadio": "Hidalgo", "local": "Pachuca", "visitante": "Querétaro", "lambdas": {"local": 1.712, "visita": 0.553}, "prob": {"local": 0.6474, "empate": 0.247, "visita": 0.1055}, "pick": "Pachuca", "marcador_probable": "1-0", "top_marcadores": [{"marcador": "1-0", "prob": 0.167}, {"marcador": "2-0", "prob": 0.1521}, {"marcador": "0-0", "prob": 0.1147}, {"marcador": "1-1", "prob": 0.1091}, {"marcador": "3-0", "prob": 0.0868}], "bitacora": [{"capa": "Fuerza base (MLE)", "detalle": "ataque Pachuca 1.25 × defensa Querétaro 0.87 · ataque Querétaro 0.62 × defensa Pachuca 0.78", "lam": [1.615, 0.553]}, {"capa": "Localía por estadio", "detalle": "Hidalgo · ×1.06", "lam": [1.712, 0.553]}], "resultado": {"gl": 1, "gv": 2, "gana": "Querétaro", "acerto_1x2": false, "acerto_marcador": false, "brier": 1.2803}}], "parlays": {"recomendado": {"nombre": "Recomendado", "descripcion": "Equilibrio óptimo entre número de picks y seguridad.", "legs": [{"partido": "Chivas vs Juárez", "etiqueta": "Chivas o empate", "prob": 0.8487, "estado": "acierto"}, {"partido": "Tijuana vs León", "etiqueta": "Más de 1.5 goles", "prob": 0.8398, "estado": "falla"}, {"partido": "Tijuana vs León", "etiqueta": "Más de 0.5 goles 2T", "prob": 0.8279, "estado": "sin_dato"}, {"partido": "Atlante vs América", "etiqueta": "Menos de 1.5 goles 1T", "prob": 0.8354, "estado": "sin_dato"}, {"partido": "Atlante vs América", "etiqueta": "Menos de 2.5 goles", "prob": 0.7784, "estado": "acierto"}], "prob_conjunta": 0.4723, "valor_esperado": 2.362, "pego": false}, "seguro": {"nombre": "Seguro", "descripcion": "Los legs más sólidos, uno por partido. Menos premio, más certeza.", "legs": [{"partido": "Chivas vs Juárez", "etiqueta": "Chivas o empate", "prob": 0.8487, "estado": "acierto"}, {"partido": "Tijuana vs León", "etiqueta": "Más de 1.5 goles", "prob": 0.8398, "estado": "falla"}, {"partido": "Atlante vs América", "etiqueta": "Menos de 1.5 goles 1T", "prob": 0.8354, "estado": "sin_dato"}, {"partido": "Toluca vs Pumas", "etiqueta": "No hay empate", "prob": 0.8263, "estado": "acierto"}], "prob_conjunta": 0.492, "valor_esperado": 1.968, "pego": false}, "agresivo": {"nombre": "Agresivo", "descripcion": "Más picks: más premio si pega, menor probabilidad combinada.", "legs": [{"partido": "Chivas vs Juárez", "etiqueta": "Chivas o empate", "prob": 0.8487, "estado": "acierto"}, {"partido": "Tijuana vs León", "etiqueta": "Más de 1.5 goles", "prob": 0.8398, "estado": "falla"}, {"partido": "Atlante vs América", "etiqueta": "Menos de 1.5 goles 1T", "prob": 0.8354, "estado": "sin_dato"}, {"partido": "Tijuana vs León", "etiqueta": "Más de 0.5 goles 2T", "prob": 0.8279, "estado": "sin_dato"}, {"partido": "Toluca vs Pumas", "etiqueta": "No hay empate", "prob": 0.8263, "estado": "acierto"}, {"partido": "Necaxa vs Monterrey", "etiqueta": "Más de 1.5 goles", "prob": 0.8125, "estado": "acierto"}, {"partido": "Tigres vs Atlético San Luis", "etiqueta": "Tigres o empate al descanso", "prob": 0.8075, "estado": "sin_dato"}, {"partido": "Necaxa vs Monterrey", "etiqueta": "Más de 0.5 goles 2T", "prob": 0.807, "estado": "sin_dato"}, {"partido": "Pachuca vs Querétaro", "etiqueta": "Menos de 3.5 goles", "prob": 0.8065, "estado": "acierto"}, {"partido": "Toluca vs Pumas", "etiqueta": "Más de 0.5 goles 2T", "prob": 0.8064, "estado": "sin_dato"}], "prob_conjunta": 0.1853, "valor_esperado": 1.853, "pego": false}}, "desempeno": {"jornada": {"aciertos_1x2": 4, "partidos": 9, "marcadores_exactos": 0, "brier": 0.7053, "parlays_pegados": 0}, "historico": [{"jornada": 1, "aciertos_1x2": 6, "partidos": 9, "marcadores_exactos": 1, "brier": 0.568, "snapshot": false}, {"jornada": 2, "aciertos_1x2": 4, "partidos": 9, "marcadores_exactos": 0, "brier": 0.705, "snapshot": true}], "convencion_brier": "multicategoría (0–2); azar = 0.667"}, "no_modelado": ["tarjetas", "córners", "goleador", "minuto de gol"]};
+/* ==========================================================================
+   Cerebro Liga MX 2026 — render de la jornada
+   Este archivo NO calcula probabilidades: sólo formatea lo que el Cerebro
+   (Python) ya calculó. La fuente de verdad es el modelo.
+   ========================================================================== */
+
+const DIAS = ["dom", "lun", "mar", "mié", "jue", "vie", "sáb"];
+const MESES = ["ene", "feb", "mar", "abr", "may", "jun",
+               "jul", "ago", "sep", "oct", "nov", "dic"];
+
+const pct = (p, d = 1) => (p * 100).toFixed(d) + "%";
+
+function fecha(iso) {
+  const [a, m, d] = iso.split("-").map(Number);
+  const f = new Date(Date.UTC(a, m - 1, d));
+  return `${DIAS[f.getUTCDay()]} ${d} ${MESES[m - 1]}`;
+}
+
+const el = (tag, clase, texto) => {
+  const n = document.createElement(tag);
+  if (clase) n.className = clase;
+  if (texto != null) n.textContent = texto;
+  return n;
+};
+
+/* ------------------------------------------------------------------ barra */
+
+function barra1x2(p, ocurrio) {
+  const barra = el("div", "barra");
+  barra.setAttribute("role", "img");
+  barra.setAttribute("aria-label",
+    `Local ${pct(p.local)}, empate ${pct(p.empate)}, visita ${pct(p.visita)}`);
+
+  [["local", p.local], ["empate", p.empate], ["visita", p.visita]].forEach(([k, v]) => {
+    const s = el("div", `barra__seg barra__seg--${k}`);
+    s.style.flex = `${v} 1 0`;
+    if (k === ocurrio) s.classList.add("barra__seg--ocurrio");
+    if (v >= 0.16) s.textContent = pct(v, 0);
+    barra.appendChild(s);
+  });
+  return barra;
+}
+
+/* --------------------------------------------------------------- partidos */
+
+function tarjetaPartido(p) {
+  const r = p.resultado;
+  const ocurrio = r.gana === "Empate" ? "empate" : (r.gana === p.local ? "local" : "visita");
+
+  const card = el("article", `partido partido--${r.acerto_1x2 ? "acierto" : "falla"}`);
+  const cuerpo = el("div", "partido__cuerpo");
+
+  const meta = el("div", "partido__meta");
+  meta.append(el("span", null, fecha(p.fecha)),
+              el("span", "partido__estadio", p.estadio));
+  cuerpo.appendChild(meta);
+
+  const m = el("div", "marcador");
+  const eq = el("div", "marcador__equipos");
+  eq.append(document.createTextNode(p.local));
+  eq.appendChild(el("div", "marcador__vs", "vs"));
+  eq.append(document.createTextNode(p.visitante));
+  m.appendChild(eq);
+  m.appendChild(el("div", "marcador__cifras", `${r.gl} – ${r.gv}`));
+  cuerpo.appendChild(m);
+
+  cuerpo.appendChild(barra1x2(p.prob, ocurrio));
+
+  const leyenda = el("div", "leyenda");
+  [["local", p.local, p.prob.local], ["empate", "Empate", p.prob.empate],
+   ["visita", p.visitante, p.prob.visita]].forEach(([k, nombre, v]) => {
+    const s = el("span");
+    s.appendChild(el("i", `punto punto--${k}`));
+    s.append(document.createTextNode(`${nombre} ${pct(v)}`));
+    leyenda.appendChild(s);
+  });
+  cuerpo.appendChild(leyenda);
+
+  const ver = el("div", "veredicto");
+  const pick = el("span");
+  pick.append(document.createTextNode("Pick: "));
+  pick.appendChild(el("b", null, p.pick));
+  pick.append(document.createTextNode(" "));
+  pick.appendChild(el("span", `marca marca--${r.acerto_1x2 ? "si" : "no"}`,
+                      r.acerto_1x2 ? "✓" : "✗"));
+  const mar = el("span");
+  mar.append(document.createTextNode("Marcador: "));
+  mar.appendChild(el("b", null, p.marcador_probable));
+  mar.append(document.createTextNode(" "));
+  mar.appendChild(el("span", `marca marca--${r.acerto_marcador ? "si" : "no"}`,
+                     r.acerto_marcador ? "✓" : "✗"));
+  ver.append(pick, mar, el("span", null, `Brier ${r.brier.toFixed(3)}`));
+  cuerpo.appendChild(ver);
+
+  card.appendChild(cuerpo);
+
+  /* --- desplegable: la bitácora --- */
+  const det = el("details");
+  det.appendChild(el("summary", null, "Por qué el modelo dijo esto"));
+  const cont = el("div", "detalle");
+
+  const capas = el("div", "capas");
+  p.bitacora.forEach((b) => {
+    const c = el("div", "capa");
+    c.appendChild(el("div", "capa__nombre", b.capa));
+    c.appendChild(el("div", "capa__lam", `λ ${b.lam[0].toFixed(2)} · ${b.lam[1].toFixed(2)}`));
+    c.appendChild(el("div", "capa__detalle", b.detalle));
+    capas.appendChild(c);
+  });
+  cont.appendChild(capas);
+
+  const marc = el("div", "marcadores");
+  p.top_marcadores.forEach((t) => {
+    const chip = el("span", "chip");
+    chip.appendChild(el("b", null, t.marcador));
+    chip.append(document.createTextNode(" " + pct(t.prob)));
+    marc.appendChild(chip);
+  });
+  cont.appendChild(marc);
+
+  det.appendChild(cont);
+  card.appendChild(det);
+  return card;
+}
+
+/* ---------------------------------------------------------------- parlays */
+
+const ICONO = { acierto: "✓", falla: "✗", sin_dato: "–" };
+
+function tarjetaParlay(p) {
+  const card = el("div", "parlay");
+
+  const cabeza = el("div", "parlay__cabeza");
+  cabeza.appendChild(el("span", "parlay__nombre", p.nombre));
+  cabeza.appendChild(el("span", "parlay__estado",
+    p.pego === false ? "No pegó" : (p.pego ? "Pegó" : "Sin resolver")));
+  card.appendChild(cabeza);
+
+  card.appendChild(el("p", "parlay__desc", p.descripcion));
+
+  const lista = el("ul", "legs");
+  p.legs.forEach((l) => {
+    const li = el("li", "leg");
+    li.appendChild(el("span", `leg__icono leg__icono--${l.estado}`, ICONO[l.estado]));
+    li.appendChild(el("span", null, l.etiqueta));
+    li.appendChild(el("span", "leg__prob", pct(l.prob)));
+    li.appendChild(el("span", "leg__partido",
+      l.estado === "sin_dato" ? `${l.partido} · sin marcador de medio tiempo` : l.partido));
+    lista.appendChild(li);
+  });
+  card.appendChild(lista);
+
+  const pie = el("div", "parlay__pie");
+  pie.appendChild(el("span", null, `${p.legs.length} picks`));
+  const pr = el("span");
+  pr.append(document.createTextNode("Prob. combinada "));
+  pr.appendChild(el("b", null, pct(p.prob_conjunta)));
+  pie.appendChild(pr);
+  card.appendChild(pie);
+  return card;
+}
+
+/* ------------------------------------------------------------------ render */
+
+function render(d) {
+  const j = d.desempeno.jornada;
+
+  document.getElementById("titulo").textContent = `Jornada ${d.jornada}`;
+  document.getElementById("subtitulo").textContent = d.torneo;
+
+  /* tarjetas de resumen */
+  const res = document.getElementById("resumen");
+  const brierMalo = j.brier > 0.667;
+  [
+    ["Aciertos 1X2", `${j.aciertos_1x2}/${j.partidos}`, pct(j.aciertos_1x2 / j.partidos, 0), false],
+    ["Marcador exacto", `${j.marcadores_exactos}/${j.partidos}`, "de 9 partidos", false],
+    ["Brier", j.brier.toFixed(3), brierMalo ? "peor que el azar (0.667)" : "mejor que el azar (0.667)", brierMalo],
+    ["Parlays", `${j.parlays_pegados}/3`, "ninguno pegó", true],
+  ].forEach(([et, val, nota, malo]) => {
+    const c = el("div", "dato" + (malo ? " dato--malo" : ""));
+    c.appendChild(el("div", "dato__etiqueta", et));
+    c.appendChild(el("div", "dato__valor", val));
+    c.appendChild(el("div", "dato__nota", nota));
+    res.appendChild(c);
+  });
+
+  const partidos = document.getElementById("partidos");
+  d.partidos.forEach((p) => partidos.appendChild(tarjetaPartido(p)));
+
+  const parlays = document.getElementById("parlays");
+  ["recomendado", "seguro", "agresivo"].forEach((k) => {
+    if (d.parlays[k]) parlays.appendChild(tarjetaParlay(d.parlays[k]));
+  });
+
+  /* histórico por jornada */
+  const tb = document.getElementById("historico");
+  let ac = 0, pj = 0, ex = 0, sb = 0;
+  d.desempeno.historico.forEach((h) => {
+    ac += h.aciertos_1x2; pj += h.partidos; ex += h.marcadores_exactos; sb += h.brier;
+    const tr = document.createElement("tr");
+    [`Jornada ${h.jornada}`, `${h.aciertos_1x2}/${h.partidos}`,
+     String(h.marcadores_exactos), h.brier.toFixed(3)].forEach((t) => {
+      const td = document.createElement("td");
+      td.textContent = t;
+      tr.appendChild(td);
+    });
+    tb.appendChild(tr);
+  });
+  const tr = document.createElement("tr");
+  tr.className = "acumulado";
+  [`Acumulado`, `${ac}/${pj}`, String(ex),
+   (sb / d.desempeno.historico.length).toFixed(3)].forEach((t) => {
+    const td = document.createElement("td");
+    td.textContent = t;
+    tr.appendChild(td);
+  });
+  tb.appendChild(tr);
+
+  document.getElementById("convencion").textContent = d.desempeno.convencion_brier;
+
+  /* procedencia */
+  const h = d.modelo.historico;
+  document.getElementById("procedencia").innerHTML =
+    `Dixon-Coles con corrección ρ = ${d.modelo.rho_dc} y ${d.modelo.simulaciones.toLocaleString("es-MX")} ` +
+    `simulaciones Monte Carlo por partido. Calibrado por máxima verosimilitud sobre ` +
+    `<b>${h.partidos.toLocaleString("es-MX")} partidos reales</b> (${h.desde} a ${h.hasta}), ` +
+    `con decaimiento temporal ξ = ${d.modelo.xi_decaimiento} por día. ` +
+    `Mitades por adelgazamiento de Poisson con ${pct(d.modelo.prop_goles_1t, 2)} de los goles en el 1T.`;
+  document.getElementById("huella").textContent = h.sha256;
+  document.getElementById("nomodelado").textContent = d.no_modelado.join(", ");
+}
+
+/* Los datos vienen embebidos (vista previa) o del JSON de la jornada. */
+if (typeof DATOS !== "undefined") {
+  render(DATOS);
+} else {
+  fetch("datos/j02.json", { cache: "no-cache" })
+    .then((r) => r.json())
+    .then(render)
+    .catch(() => {
+      document.getElementById("resumen").textContent =
+        "No se pudo cargar la jornada. Recarga la página.";
+    });
+}
+
+</script>

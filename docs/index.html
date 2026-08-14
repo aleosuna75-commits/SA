@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="es-MX">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cerebro Liga MX</title>
+<meta name="description" content="Pronósticos y parlays del Cerebro Liga MX 2026, con el desempeño del modelo jornada por jornada.">
+<link rel="stylesheet" href="estilos.css">
+</head>
+<body>
+
+<header class="cabecera">
+  <div class="cabecera__interior">
+    <p class="cabecera__marca">Cerebro Liga MX 2026</p>
+    <h1 id="titulo">Jornada</h1>
+    <p class="cabecera__sub" id="subtitulo"></p>
+    <span class="sello">Pronóstico sellado antes de jugarse</span>
+  </div>
+</header>
+
+<main class="envoltura">
+
+  <section>
+    <h2 class="seccion__titulo">Cómo le fue al modelo</h2>
+    <div class="tarjetero" id="resumen"></div>
+  </section>
+
+  <div class="nota">
+    <p><strong>Una jornada sola no dice mucho.</strong> Con 9 partidos, acertar 4 o acertar 6
+    es la diferencia entre la buena y la mala suerte: el margen de error ronda los ±16 puntos
+    porcentuales. La medida que sirve es la acumulada, y por ahora sólo llevamos dos jornadas.</p>
+  </div>
+
+  <section>
+    <h2 class="seccion__titulo">Partidos</h2>
+    <div class="partidos" id="partidos"></div>
+  </section>
+
+  <section>
+    <h2 class="seccion__titulo">Parlays</h2>
+    <div id="parlays"></div>
+    <div class="nota">
+      <p>La probabilidad combinada <strong>no es un producto simple</strong>: los legs de un
+      mismo partido están correlacionados, así que se suman sobre la distribución conjunta
+      exacta de las dos mitades. Sólo los partidos distintos se multiplican.</p>
+      <p>Los legs de medio tiempo aparecen como <strong>–</strong> porque todavía no
+      capturamos el marcador al descanso de esta jornada. No cambia el resultado: los tres
+      parlays ya habían caído por un leg de tiempo completo.</p>
+    </div>
+  </section>
+
+  <section>
+    <h2 class="seccion__titulo">Desempeño por jornada</h2>
+    <div class="envoltura-tabla">
+      <table>
+        <thead>
+          <tr><th>Jornada</th><th>Aciertos 1X2</th><th>Exactos</th><th>Brier</th></tr>
+        </thead>
+        <tbody id="historico"></tbody>
+      </table>
+    </div>
+    <p class="dato__nota" style="margin-top:.5rem">
+      Brier: <span id="convencion"></span>. Más bajo es mejor.
+      La Jornada 1 no tiene pronóstico sellado: se registra su resultado, no su distribución.
+    </p>
+  </section>
+
+  <footer class="pie">
+    <p id="procedencia"></p>
+    <p><strong>No se modelan:</strong> <span id="nomodelado"></span>. No existe base pública de
+    Liga MX con esos campos, así que el modelo no los inventa.</p>
+    <p>Histórico sellado <code id="huella"></code> · Proyecto actuarial sin fines de lucro.</p>
+  </footer>
+
+</main>
+
+<script src="app.js"></script>
+</body>
+</html>
