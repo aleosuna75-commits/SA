@@ -49,6 +49,14 @@ auditable con los archivos disponibles.
 | P(gol en 1T) observado 68.9% | 1,411 / 2,047 partidos = **68.93%** |
 | Escala local/visita | media local **1.5164**, visita **1.1593** (2,047 partidos HT) |
 | `historico_ht_ligamx.csv` íntegro | 2,047 filas, **0 inconsistentes** (ningún `hf < h1`) |
+| `historico_ligamx.csv` íntegro | 4,996 filas, 27 equipos, **0 duplicados**, 0 goles no numéricos |
+| **Sin fuga de información** | el histórico termina **2026-07-18**; la J2 arranca el 07-21. Limpio. |
+| Reproducibilidad de la corrida | ratings se mueven **0.27%** al cambiar la fecha de corrida 25 días; la dispersión relativa es **idéntica** a 4 decimales incluso a 3 años |
+
+**Reproduje tu Excel de la J2 desde cero** (Fase 0, ver `golden/`): discrepancia máxima en
+1X2 de **0.0002**, picks y marcadores exactos idénticos, y los tres parlays con las mismas
+patas y las mismas probabilidades combinadas (47.2% / 49.2% / 18.5%). El pipeline corre
+end-to-end en 13 segundos y ya tengo con qué verificar cualquier refactor.
 
 Un detalle que habla bien del modelo: bajo Poisson homogéneo, P(gol en 1T) daría
 1 − e^(−0.4442 × 2.676) = **69.5%**. Tu modelo reporta 68.8% y lo observado es 68.9%. La
@@ -127,22 +135,58 @@ La decisión es tuya y depende del reglamento de tu quiniela: si el concurso cue
 un pick implicado infla el conteo sin aportar información. Yo agregaría un filtro de
 implicación (barato: `P(A∧B) == P(A)` ya lo sabes calcular), pero es tu llamada.
 
-### 3.3 Atlante no está en el histórico y hereda un prior de otra escala
+### 3.3 El prior de Atlante es código muerto, y su defensa la fija la penalización
 
-En `main()`, `ratings.setdefault(e, PRIORS_ILUSTRATIVOS[e])` le da a Atlante `(0.75, 1.22)`
-porque no tiene partidos. El problema es que los ratings del MLE están normalizados a media
-0 en log y los priors ilustrativos están en una escala cualitativa distinta: **un 0.75 del
-prior y un 0.75 del MLE no significan lo mismo.** El partido Atlante vs América de la J2
-(0.11 / 0.33 / 0.56) descansa sobre ese número.
+**Corrijo lo que escribí antes de tener el histórico.** Había supuesto que Atlante caía en
+`ratings.setdefault(e, PRIORS_ILUSTRATIVOS[e])`. Con el CSV en la mano, no es así:
 
-Hay además una decisión de modelación que sólo tú puedes tomar: el comentario dice que
-Atlante es la franquicia ex-Mazatlán, y **Mazatlán sí está en el histórico**
-(`parsear_openfootball.py` lo mapea). ¿Hereda Atlante el historial de Mazatlán, o entra
-como equipo nuevo? Cambia materialmente sus λ.
+**Atlante tiene 139 partidos en el histórico**, así que `fit_dixon_coles` sí le devuelve un
+rating y **el `setdefault` nunca se dispara.** El comentario de la línea 923 —*"equipos sin
+histórico (Atlante) conservan su prior"*— es falso con estos datos: el prior `(0.75, 1.22)`
+es código muerto hoy.
 
-Como mínimo, la web debe marcar esos partidos con una bandera de incertidumbre: *"equipo sin
-histórico: fuerza asumida, no estimada"*. Es exactamente la honestidad de datos que pides
-en el punto 7 de tu prompt.
+El problema real es más fino. De esos 139 partidos, 138 son del Atlante viejo (2010 → abril
+2014) y **uno solo es reciente**: la J1 de este torneo (Necaxa 2-1 Atlante, 2026-07-16). Con
+`XI = 0.0038/día`, doce años pesan `e^(-16.6) ≈ 0`. El peso efectivo queda así:
+
+| Equipo | Peso efectivo | Partidos |
+|---|---|---|
+| América | 8.33 | 622 |
+| Toluca | 7.30 | 565 |
+| Mazatlán | 4.66 | 172 |
+| **Atlante** | **0.90** | **139** |
+
+Atlante se estima con **el equivalente a 0.9 partidos frescos**, contra 6-8 de los demás. Y
+el resultado lo delata: el MLE le da ataque **0.665** (débil, creíble) pero defensa **0.959**
+— *mejor que el promedio de la liga*. Para un recién ascendido eso no es una estimación: es
+la penalización de identificabilidad `1000·(media²)` jalando el parámetro al centro por falta
+de datos.
+
+**Cuánto pesa**, medido sobre el partido que ya publicaste:
+
+| Rating de Atlante | λ (local, visita) | P(local) / P(empate) / P(América) |
+|---|---|---|
+| MLE — lo que corre hoy | (0.401, 1.220) | 0.1109 / 0.3282 / **0.5609** |
+| Prior (0.75, 1.22) — lo que el comentario cree | (0.452, 1.553) | 0.0945 / 0.2680 / **0.6375** |
+
+**7.7 puntos porcentuales** en P(gana América) según cuál de los dos caminos se tome. Hoy se
+toma el primero sin que nadie lo haya decidido.
+
+**Tu decisión ("equipo nuevo, no hereda historia") deja pendiente una segunda pieza.** No
+heredar de Mazatlán ya se cumple: son entidades separadas en el CSV. Pero si Atlante es un
+equipo *nuevo*, tampoco debería heredar al Atlante de 2010-2014 — y al quitar esas filas se
+queda literalmente con **un partido**. Ahí el prior tiene que hacer el trabajo, y la forma
+correcta de mezclarlo no es un `if`, es **credibilidad**: `Z = w / (w + k)` con
+`log(rating) = Z·log(MLE) + (1−Z)·log(prior)`. Con `w ≈ 0.9`, un `k` del orden de 10 deja
+`Z ≈ 8%` (Atlante ≈ prior), y conforme juegue jornadas el peso migra solo hacia el MLE. Es
+Bühlmann de manual y resuelve el caso general: cualquier ascendido futuro entra por la misma
+puerta, sin tocar código.
+
+**Necesito que elijas `k`**, o que me digas si prefieres otro esquema. No lo implemento por
+mi cuenta porque es una decisión de modelación, no un bug.
+
+Aparte de eso, la web debe marcar estos partidos: *"equipo con poco histórico reciente:
+fuerza parcialmente asumida"*. Es la honestidad de datos del punto 7 de tu prompt.
 
 ### 3.4 Cosas menores, para la lista
 
@@ -152,9 +196,11 @@ en el punto 7 de tu prompt.
   con *"base: ataque Cruz Azul 1.21 × defensa Puebla 0.94 → λ 1.83"* y registrar λ antes y
   después de cada capa, no sólo el multiplicador. Así la web puede dibujar la cascada.
 - `fit_dixon_coles` estima la ventaja local (`theta[-1]`), la imprime y **la descarta**:
-  `lambdas_partido` usa `BASE_HOME_GOALS / BASE_AWAY_GOALS` en su lugar. Es defendible y está
-  comentado, pero conviene comparar `exp(theta[-1])` contra `BASE_HOME/BASE_AWAY ≈ 1.31`
-  como chequeo de especificación: si se separan mucho, algo no cuadra.
+  `lambdas_partido` usa `BASE_HOME_GOALS / BASE_AWAY_GOALS` en su lugar. Ya lo medí: el MLE
+  estima **1.222** y producción usa **1.288**, una discrepancia de **5.4%**. No es alarmante
+  y la decisión está comentada, pero conviene dejarlo como chequeo automático de
+  especificación: si algún torneo se separan mucho, es señal de que el modelo y la escala
+  dejaron de hablar el mismo idioma.
 - El estadio está en `FIXTURE` pero no llega al CSV ni al Excel. Es gratis para la web.
 - Los nombres de salida están fijos a la J2 (`Cerebro_LigaMX_J2.xlsx`); con config externa
   se derivan de la jornada.
@@ -331,9 +377,11 @@ Sin editar Python nunca más para operar el modelo.
 
 ## 9. Plan por fases
 
-**Fase 0 — Red de seguridad.** Golden file: corro el modelo hoy, guardo la salida, y exijo
-que todo cambio posterior la reproduzca. Sin esto, "cambios quirúrgicos" es una intención,
-no una garantía. *No toca lógica.*
+**Fase 0 — Red de seguridad. ✅ HECHA.** Golden file en `golden/`: la corrida completa
+reproduce tu Excel de la J2 con discrepancia máxima de 0.0002 en 1X2, mismos picks, mismos
+marcadores y mismos tres parlays. Ya tengo contra qué comparar cualquier cambio. *No tocó
+lógica.* Falta una pieza para que sea reproducible al 100%: fijar la fecha de referencia
+(hoy `fit_dixon_coles` usa `date.today()`), que entra en la Fase 1.
 
 **Fase 1 — Contrato.** `--exportar-json` + `config/jornada.json` + validador de esquema, en
 **una sola pasada** al script (mejor abrir el archivo validado una vez que dos). Aquí entran
@@ -354,14 +402,18 @@ la Fase 0 verde. No es cosmético, pero tampoco urge.
 
 ## 10. Lo que necesito de ti para arrancar
 
-**Bloqueante:**
+**Resueltas:**
 
-1. **`historico_ligamx.csv` no está en la carpeta.** Sin él no puedo correr el modelo ni
-   generar el golden file de la Fase 0. Es el único archivo que me falta.
+- ~~`historico_ligamx.csv`~~ recibido, íntegro y sin fuga. Fase 0 cerrada.
+- ~~¿Atlante hereda de Mazatlán?~~ **No: equipo nuevo.** Decidido por ti.
 
 **Decisiones tuyas (no las tomo yo):**
 
-2. **¿Atlante hereda el historial de Mazatlán?** (§3.3) Cambia sus λ materialmente.
+1. **¿Confirmas la arquitectura de la §1?** Es lo único que bloquea escribir código.
+2. **Atlante, la mitad que quedó abierta (§3.3):** al ser equipo nuevo se queda con **un
+   partido** de histórico efectivo. ¿Qué `k` de credibilidad uso para mezclar con el prior?
+   Mi sugerencia es `k = 10` (≈ un torneo corto), que hoy le daría `Z ≈ 8%`. Si prefieres que
+   simplemente use el prior hasta que acumule N partidos, también sirve — dime cuál.
 3. **¿Filtro de implicación en los parlays?** (§3.2) Depende del reglamento de tu quiniela.
 4. **¿Repo público o privado?** GitHub Pages gratis exige repo público. Eso pone el branding
    GPV y el nombre de la empresa en una URL pública indexable. Para una quiniela interna

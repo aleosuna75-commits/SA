@@ -1,0 +1,178 @@
+[1/2] Calibrando MLE Dixon-Coles con historico_ligamx.csv ...
+      4,996 partidos cargados
+      Escala real -> goles local=1.49  visita=1.15  (total=2.64)
+  [MLE] convergió=True  -loglik=94.9
+  [MLE] ventaja local estimada: x1.222
+
+--- PATRONES HISTÓRICOS DETECTADOS (candidatos a regla) ---
+  * Chiapas NUNCA ha ganado en casa de América (7 partidos)
+  * Veracruz NUNCA ha ganado en casa de América (6 partidos)
+  * Atlas vs Juárez: nunca más de 3 goles (6 partidos)
+  * Atlas vs Pumas: nunca más de 3 goles (15 partidos)
+  * Atlético San Luis vs Monterrey: nunca más de 3 goles (8 partidos)
+  * Chivas NUNCA ha ganado en casa de Chiapas (7 partidos)
+  * Chiapas NUNCA ha ganado de local a Monterrey (7 partidos)
+  * Chivas vs León: nunca más de 3 goles (14 partidos)
+  * Chivas vs Santos: nunca más de 3 goles (15 partidos)
+  * Cruz Azul vs Chiapas: nunca más de 3 goles (7 partidos)
+  * Juárez NUNCA ha ganado en casa de Cruz Azul (6 partidos)
+  * Veracruz NUNCA ha ganado en casa de Cruz Azul (6 partidos)
+  * Juárez NUNCA ha ganado de local a América (6 partidos)
+  * Juárez vs América: nunca más de 3 goles (6 partidos)
+  * Juárez NUNCA ha ganado de local a Chivas (6 partidos)
+  * Juárez NUNCA ha ganado de local a León (6 partidos)
+  * Necaxa NUNCA ha ganado en casa de Juárez (6 partidos)
+  * Juárez vs Querétaro: nunca más de 3 goles (6 partidos)
+  * Juárez NUNCA ha ganado de local a Tigres (6 partidos)
+  * Juárez vs Tijuana: nunca más de 3 goles (6 partidos)
+  * Juárez NUNCA ha ganado en casa de Monterrey (6 partidos)
+  * Veracruz NUNCA ha ganado en casa de Monterrey (7 partidos)
+  * Chiapas NUNCA ha ganado en casa de Morelia (7 partidos)
+  * Morelia vs Chivas: nunca más de 3 goles (10 partidos)
+  * Morelia vs Veracruz: nunca más de 3 goles (7 partidos)
+  * Juárez NUNCA ha ganado en casa de Necaxa (6 partidos)
+  * Necaxa vs Juárez: nunca más de 3 goles (6 partidos)
+  * Necaxa vs Tigres: nunca más de 3 goles (10 partidos)
+  * Chiapas NUNCA ha ganado en casa de Pachuca (7 partidos)
+  * Pachuca vs Chiapas: nunca más de 3 goles (7 partidos)
+  * Tijuana NUNCA ha ganado en casa de Pachuca (14 partidos)
+  * Veracruz NUNCA ha ganado en casa de Pachuca (6 partidos)
+  * Juárez NUNCA ha ganado en casa de Pumas (6 partidos)
+  * Pumas vs Juárez: nunca más de 3 goles (6 partidos)
+  * Pumas vs Veracruz: nunca más de 3 goles (8 partidos)
+  * Querétaro vs Veracruz: nunca más de 3 goles (7 partidos)
+  * Santos vs Chivas: nunca más de 3 goles (16 partidos)
+  * Mazatlán NUNCA ha ganado en casa de Santos (6 partidos)
+  * Atlético San Luis NUNCA ha ganado en casa de Tigres (7 partidos)
+  * Veracruz NUNCA ha ganado en casa de Tigres (6 partidos)
+  * Tijuana vs Chiapas: nunca más de 3 goles (6 partidos)
+  * Veracruz NUNCA ha ganado en casa de Toluca (6 partidos)
+  * Veracruz vs Monterrey: nunca más de 3 goles (6 partidos)
+  * Veracruz NUNCA ha ganado de local a Tigres (7 partidos)
+  * Tijuana NUNCA ha ganado en casa de Veracruz (6 partidos)
+[2/2] Simulando Jornada 2 · Apertura 2026 ...
+
+==============================================================================
+  CEREBRO LIGA MX 2026 — PRONÓSTICO JORNADA 2 · APERTURA 2026
+  100,000 simulaciones Monte Carlo por partido | Dixon-Coles rho=-0.11
+==============================================================================
+
+  2026-07-21 | Cruz Azul vs Puebla  (CDMX (adelantado))
+    lambda_local=1.83  lambda_visita=0.48
+    P(local)=69.3%   P(empate)=22.7%   P(visita)= 8.1%
+    >> PICK QUINIELA: Cruz Azul            | MARCADOR EXACTO: 1-0
+    Top marcadores: 1-0 (17.2%)  2-0 (16.6%)  0-0 (10.9%)  3-0 (10.1%)  1-1 (9.7%)
+      · localía Cruz Azul: x1.02
+      · escudo Cruz Azul: rival /1.03
+      · actualidad Puebla: x0.97 (sin Iker Moreno (suspendido))
+
+  2026-07-21 | Toluca vs Pumas  (Nemesio Diez (adelantado))
+    lambda_local=2.36  lambda_visita=0.62
+    P(local)=75.3%   P(empate)=17.5%   P(visita)= 7.2%
+    >> PICK QUINIELA: Toluca               | MARCADOR EXACTO: 2-0
+    Top marcadores: 2-0 (14.2%)  1-0 (11.2%)  3-0 (11.1%)  2-1 (8.8%)  1-1 (8.3%)
+      · localía Toluca: x1.10
+      · escudo Pumas: rival /1.02
+
+  2026-07-24 | Tigres vs Atlético San Luis  (Universitario)
+    lambda_local=1.46  lambda_visita=0.91
+    P(local)=48.4%   P(empate)=29.4%   P(visita)=22.3%
+    >> PICK QUINIELA: Tigres               | MARCADOR EXACTO: 1-1
+    Top marcadores: 1-1 (13.8%)  1-0 (12.4%)  0-0 (10.8%)  2-0 (10.0%)  2-1 (9.1%)
+      · localía Tigres: x1.05
+      · escudo Tigres: rival /1.03
+      · actualidad Tigres: x0.95 (expulsión en J1 + reestructura post-Gignac)
+
+  2026-07-24 | Tijuana vs León  (Caliente)
+    lambda_local=2.00  lambda_visita=1.20
+    P(local)=54.7%   P(empate)=23.7%   P(visita)=21.7%
+    >> PICK QUINIELA: Tijuana              | MARCADOR EXACTO: 1-1
+    Top marcadores: 1-1 (10.9%)  2-1 (9.8%)  2-0 (8.1%)  1-0 (7.1%)  3-1 (6.5%)
+      · localía Tijuana: x1.06
+
+  2026-07-24 | Atlante vs América  (Ciudad de los Deportes)
+    lambda_local=0.40  lambda_visita=1.22
+    P(local)=11.1%   P(empate)=32.8%   P(visita)=56.2%
+    >> PICK QUINIELA: América              | MARCADOR EXACTO: 0-1
+    Top marcadores: 0-1 (23.1%)  0-0 (20.9%)  0-2 (14.7%)  1-1 (10.7%)  1-0 (6.9%)
+      · localía Atlante: x1.02
+      · escudo América: rival /1.05
+      · actualidad Atlante: x0.96 (ascendido; compitió de visita hasta el 90+3)
+      · actualidad América: x0.94 (sin Zendejas (lesión) ni Cervantes (suspendido); Almada 2do juego)
+
+  2026-07-25 | Chivas vs Juárez  (Akron)
+    lambda_local=1.04  lambda_visita=0.47
+    P(local)=48.5%   P(empate)=36.5%   P(visita)=15.0%
+    >> PICK QUINIELA: Chivas               | MARCADOR EXACTO: 0-0
+    Top marcadores: 0-0 (23.2%)  1-0 (21.9%)  2-0 (12.0%)  1-1 (11.9%)  0-1 (9.1%)
+      · localía Chivas: x1.04
+      · escudo Chivas: rival /1.03
+      · actualidad Chivas: x0.96 (sin Sepúlveda (suspendido); presión tras 0-2 en casa)
+      · actualidad Juárez: x0.97 (sin Luka Romero (lesión de rodilla en J1))
+
+  2026-07-25 | Santos vs Atlas  (Corona)
+    lambda_local=1.35  lambda_visita=1.54
+    P(local)=32.4%   P(empate)=27.1%   P(visita)=40.5%
+    >> PICK QUINIELA: Atlas                | MARCADOR EXACTO: 1-1
+    Top marcadores: 1-1 (12.8%)  1-2 (8.9%)  2-1 (7.8%)  0-1 (7.2%)  0-0 (6.8%)
+      · localía Santos: x1.03
+
+  2026-07-26 | Necaxa vs Monterrey  (Victoria)
+    lambda_local=1.47  lambda_visita=1.52
+    P(local)=35.5%   P(empate)=26.9%   P(visita)=37.6%
+    >> PICK QUINIELA: Monterrey            | MARCADOR EXACTO: 1-1
+    Top marcadores: 1-1 (12.4%)  1-2 (8.5%)  2-1 (8.3%)  0-1 (6.4%)  2-2 (6.3%)
+      · localía Necaxa: x1.02
+      · escudo Monterrey: rival /1.02
+      · actualidad Monterrey: x0.98 (transición Almeyda, pero respondió con triunfo en J1)
+
+  2026-07-26 | Pachuca vs Querétaro  (Hidalgo)
+    lambda_local=1.71  lambda_visita=0.55
+    P(local)=64.7%   P(empate)=24.7%   P(visita)=10.6%
+    >> PICK QUINIELA: Pachuca              | MARCADOR EXACTO: 1-0
+    Top marcadores: 1-0 (16.7%)  2-0 (15.2%)  0-0 (11.5%)  1-1 (10.9%)  3-0 (8.7%)
+      · localía Pachuca: x1.06
+
+  [OK] Pronóstico exportado a: pronostico_j2_apertura2026.csv
+
+==============================================================================
+  PARLAYS — MEJOR COMBINACIÓN DE LA JORNADA
+==============================================================================
+
+  PARLAY RECOMENDADO (equilibrio picks vs. seguridad)
+    Partido                         Selección                   Prob.
+    Chivas vs Juárez                Chivas o empate            84.9%
+    Tijuana vs León                 Más de 1.5 goles           84.0%
+    Tijuana vs León                 Más de 0.5 goles 2T        82.8%
+    Atlante vs América              Menos de 1.5 goles 1T      83.5%
+    Atlante vs América              Menos de 2.5 goles         77.8%
+    → 5 picks | Prob. combinada: 47.2% | Valor esperado: 2.36
+
+  PARLAY SEGURO (máxima probabilidad)
+    Partido                         Selección                   Prob.
+    Chivas vs Juárez                Chivas o empate            84.9%
+    Tijuana vs León                 Más de 1.5 goles           84.0%
+    Atlante vs América              Menos de 1.5 goles 1T      83.5%
+    Toluca vs Pumas                 No hay empate              82.6%
+    → 4 picks | Prob. combinada: 49.2% | Valor esperado: 1.97
+
+  PARLAY AGRESIVO (más picks, más premio)
+    Partido                         Selección                   Prob.
+    Chivas vs Juárez                Chivas o empate            84.9%
+    Tijuana vs León                 Más de 1.5 goles           84.0%
+    Atlante vs América              Menos de 1.5 goles 1T      83.5%
+    Tijuana vs León                 Más de 0.5 goles 2T        82.8%
+    Toluca vs Pumas                 No hay empate              82.6%
+    Necaxa vs Monterrey             Más de 1.5 goles           81.3%
+    Tigres vs Atlético San Luis     Tigres o empate al descanso 80.8%
+    Necaxa vs Monterrey             Más de 0.5 goles 2T        80.7%
+    Pachuca vs Querétaro            Menos de 3.5 goles         80.7%
+    Toluca vs Pumas                 Más de 0.5 goles 2T        80.6%
+    → 10 picks | Prob. combinada: 18.5% | Valor esperado: 1.85
+  [Excel] Workbook GPV guardado: Cerebro_LigaMX_J2.xlsx
+
+------------------------------------------------------------------------------
+  Recuerda: los priors son ILUSTRATIVOS. Para el modelo de concurso,
+  carga el CSV histórico (10 años) y el MLE recalibra todo + mina
+  patrones H2H automáticamente con minar_patrones().
+------------------------------------------------------------------------------
