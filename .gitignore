@@ -1,0 +1,13 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Temporales de Office / OneDrive
+~$*
+*.tmp
+
+# Datos descargados por el extractor (se regeneran)
+world-master/
+world.tar.gz

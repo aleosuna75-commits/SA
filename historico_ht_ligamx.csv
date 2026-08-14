@@ -1,0 +1,2048 @@
+﻿fecha,local,visitante,h1,a1,hf,af,fase
+2018-07-20,Atlas,Querétaro,0,0,0,0,regular
+2018-07-20,Veracruz,Pumas,0,2,0,2,regular
+2018-07-21,Cruz Azul,Puebla,0,0,3,0,regular
+2018-07-21,Pachuca,Monterrey,0,0,0,1,regular
+2018-07-21,Tigres,León,1,0,2,0,regular
+2018-07-21,Tijuana,Chivas,0,0,2,1,regular
+2018-07-22,Santos,Lobos BUAP,0,1,2,1,regular
+2018-07-22,Necaxa,América,1,0,2,1,regular
+2018-07-22,Toluca,Morelia,0,0,2,0,regular
+2018-07-27,Morelia,Santos,0,0,3,1,regular
+2018-07-27,Puebla,Toluca,2,1,2,1,regular
+2018-07-28,América,Atlas,2,0,3,0,regular
+2018-07-28,Chivas,Cruz Azul,0,0,0,1,regular
+2018-07-28,Querétaro,Pachuca,0,0,1,0,regular
+2018-07-29,Lobos BUAP,Veracruz,1,0,2,0,regular
+2018-07-29,Tigres,Tijuana,0,0,1,0,regular
+2018-07-29,León,Monterrey,0,0,0,2,regular
+2018-07-29,Pumas,Necaxa,1,1,5,3,regular
+2018-08-03,Veracruz,Morelia,1,1,2,2,regular
+2018-08-03,Atlas,Pumas,0,2,0,3,regular
+2018-08-04,Pachuca,América,0,1,1,3,regular
+2018-08-04,Cruz Azul,Tigres,0,0,1,0,regular
+2018-08-04,Monterrey,Querétaro,1,1,2,1,regular
+2018-08-04,Necaxa,Lobos BUAP,0,0,1,0,regular
+2018-08-05,Toluca,Chivas,1,1,2,2,regular
+2018-08-05,Santos,Puebla,1,0,2,0,regular
+2018-08-05,Tijuana,León,0,0,1,1,regular
+2018-08-10,Morelia,Necaxa,1,0,2,1,regular
+2018-08-10,Puebla,Veracruz,0,0,1,2,regular
+2018-08-11,Lobos BUAP,Atlas,0,0,0,0,regular
+2018-08-11,León,Querétaro,2,0,4,0,regular
+2018-08-11,Tigres,Toluca,1,0,1,2,regular
+2018-08-11,América,Monterrey,1,0,3,0,regular
+2018-08-12,Chivas,Santos,1,1,1,2,regular
+2018-08-12,Tijuana,Cruz Azul,0,0,1,1,regular
+2018-08-12,Pumas,Pachuca,0,0,0,0,regular
+2018-08-17,Atlas,Morelia,0,1,0,1,regular
+2018-08-17,Veracruz,Chivas,0,2,0,2,regular
+2018-08-18,Cruz Azul,León,2,0,3,0,regular
+2018-08-18,Pachuca,Lobos BUAP,0,0,3,0,regular
+2018-08-18,Necaxa,Puebla,0,1,2,2,regular
+2018-08-18,Querétaro,América,0,1,1,1,regular
+2018-08-18,Monterrey,Pumas,1,0,1,0,regular
+2018-08-19,Santos,Tigres,1,0,3,1,regular
+2018-08-19,Toluca,Tijuana,2,0,3,0,regular
+2018-08-21,Pumas,Querétaro,0,1,0,1,regular
+2018-08-21,Puebla,Atlas,1,0,2,0,regular
+2018-08-21,Chivas,Necaxa,1,0,1,0,regular
+2018-08-21,Morelia,Pachuca,1,0,1,1,regular
+2018-08-22,Cruz Azul,Toluca,1,0,1,0,regular
+2018-08-22,León,América,1,0,2,0,regular
+2018-08-22,Tigres,Veracruz,1,0,4,0,regular
+2018-08-22,Lobos BUAP,Monterrey,0,1,1,2,regular
+2018-08-22,Tijuana,Santos,0,0,2,2,regular
+2018-08-24,Atlas,Chivas,0,0,0,1,regular
+2018-08-25,Pachuca,Puebla,0,0,2,0,regular
+2018-08-25,América,Pumas,1,1,2,2,regular
+2018-08-25,Veracruz,Tijuana,1,0,1,0,regular
+2018-08-25,Necaxa,Tigres,0,0,1,1,regular
+2018-08-25,Monterrey,Morelia,2,1,2,2,regular
+2018-08-26,Toluca,León,1,2,1,2,regular
+2018-08-26,Santos,Cruz Azul,0,0,1,1,regular
+2018-08-26,Querétaro,Lobos BUAP,1,0,2,0,regular
+2018-08-31,Morelia,Querétaro,0,1,1,4,regular
+2018-08-31,Puebla,Monterrey,0,1,2,1,regular
+2018-08-31,Tijuana,Necaxa,0,0,1,0,regular
+2018-09-01,León,Pumas,1,1,1,2,regular
+2018-09-01,Tigres,Atlas,0,1,3,1,regular
+2018-09-01,Chivas,Pachuca,1,2,1,3,regular
+2018-09-01,Cruz Azul,Veracruz,1,0,4,1,regular
+2018-09-02,Lobos BUAP,América,0,1,0,2,regular
+2018-09-02,Toluca,Santos,1,1,2,1,regular
+2018-09-14,Veracruz,Toluca,0,2,2,3,regular
+2018-09-15,Querétaro,Puebla,0,0,0,1,regular
+2018-09-15,Pachuca,Tigres,1,0,1,1,regular
+2018-09-15,América,Morelia,1,0,2,1,regular
+2018-09-15,Necaxa,Cruz Azul,1,0,2,0,regular
+2018-09-15,Monterrey,Chivas,0,1,2,4,regular
+2018-09-16,Santos,León,1,0,3,0,regular
+2018-09-16,Atlas,Tijuana,0,0,0,1,regular
+2018-09-16,Pumas,Lobos BUAP,1,0,4,2,regular
+2018-09-21,Puebla,América,1,2,2,3,regular
+2018-09-21,Morelia,Pumas,0,0,0,0,regular
+2018-09-22,Toluca,Necaxa,0,1,3,2,regular
+2018-09-22,León,Lobos BUAP,0,0,0,1,regular
+2018-09-22,Cruz Azul,Atlas,1,0,2,0,regular
+2018-09-22,Tijuana,Pachuca,0,0,1,0,regular
+2018-09-23,Santos,Veracruz,0,0,1,1,regular
+2018-09-23,Tigres,Monterrey,0,0,0,0,regular
+2018-09-23,Chivas,Querétaro,0,0,1,1,regular
+2018-09-28,Veracruz,León,0,1,0,4,regular
+2018-09-28,Atlas,Toluca,1,0,2,0,regular
+2018-09-29,Pachuca,Cruz Azul,3,1,3,1,regular
+2018-09-29,Necaxa,Santos,0,1,0,1,regular
+2018-09-29,Monterrey,Tijuana,1,0,3,0,regular
+2018-09-29,Querétaro,Tigres,0,0,0,2,regular
+2018-09-30,Pumas,Puebla,2,0,2,2,regular
+2018-09-30,Lobos BUAP,Morelia,1,0,3,1,regular
+2018-09-30,América,Chivas,0,0,1,1,regular
+2018-10-05,Veracruz,Necaxa,0,0,0,0,regular
+2018-10-05,Santos,Atlas,1,0,3,1,regular
+2018-10-06,León,Morelia,0,0,1,2,regular
+2018-10-06,Tigres,América,1,1,2,3,regular
+2018-10-06,Chivas,Pumas,1,1,1,2,regular
+2018-10-06,Tijuana,Querétaro,1,0,1,1,regular
+2018-10-06,Cruz Azul,Monterrey,1,1,2,1,regular
+2018-10-07,Toluca,Pachuca,1,1,2,1,regular
+2018-10-07,Puebla,Lobos BUAP,0,1,2,2,regular
+2018-10-19,Atlas,Veracruz,2,2,4,3,regular
+2018-10-20,Querétaro,Cruz Azul,0,0,2,0,regular
+2018-10-20,Pachuca,Santos,1,0,1,1,regular
+2018-10-20,América,Tijuana,2,0,3,0,regular
+2018-10-20,Necaxa,León,0,1,0,2,regular
+2018-10-20,Monterrey,Toluca,0,0,2,1,regular
+2018-10-21,Pumas,Tigres,2,2,3,3,regular
+2018-10-21,Morelia,Puebla,0,0,2,0,regular
+2018-10-21,Lobos BUAP,Chivas,1,0,1,1,regular
+2018-10-26,Santos,Monterrey,1,0,1,0,regular
+2018-10-26,Veracruz,Pachuca,0,1,2,3,regular
+2018-10-27,Tigres,Lobos BUAP,0,1,2,2,regular
+2018-10-27,Chivas,Morelia,1,0,1,2,regular
+2018-10-27,Cruz Azul,América,0,0,0,0,regular
+2018-10-27,Tijuana,Pumas,0,0,0,1,regular
+2018-10-27,Necaxa,Atlas,0,1,2,2,regular
+2018-10-28,León,Puebla,0,2,0,4,regular
+2018-10-28,Toluca,Querétaro,1,0,4,0,regular
+2018-11-02,Morelia,Tigres,0,0,0,2,regular
+2018-11-02,Puebla,Chivas,0,2,2,2,regular
+2018-11-03,América,Toluca,1,1,1,1,regular
+2018-11-03,Monterrey,Veracruz,1,0,2,0,regular
+2018-11-03,Lobos BUAP,Tijuana,1,0,3,1,regular
+2018-11-03,Pachuca,Necaxa,3,0,6,2,regular
+2018-11-04,Pumas,Cruz Azul,0,1,1,2,regular
+2018-11-04,Querétaro,Santos,1,0,2,1,regular
+2018-11-04,Atlas,León,0,0,0,0,regular
+2018-11-09,Atlas,Pachuca,0,0,0,0,regular
+2018-11-09,Veracruz,Querétaro,2,0,2,2,regular
+2018-11-10,Cruz Azul,Lobos BUAP,2,1,2,1,regular
+2018-11-10,León,Chivas,0,0,0,1,regular
+2018-11-10,Tigres,Puebla,4,1,6,1,regular
+2018-11-10,Necaxa,Monterrey,0,1,1,1,regular
+2018-11-10,Tijuana,Morelia,0,1,2,3,regular
+2018-11-11,Santos,América,0,0,1,1,regular
+2018-11-11,Toluca,Pumas,0,1,0,1,regular
+2018-11-23,Puebla,Tijuana,0,0,0,0,regular
+2018-11-23,Morelia,Cruz Azul,0,0,0,2,regular
+2018-11-24,Querétaro,Necaxa,1,0,1,0,regular
+2018-11-24,Pachuca,León,1,1,1,1,regular
+2018-11-24,América,Veracruz,3,1,4,1,regular
+2018-11-24,Chivas,Tigres,0,0,0,1,regular
+2018-11-24,Monterrey,Atlas,1,0,3,1,regular
+2018-11-25,Lobos BUAP,Toluca,1,0,2,0,regular
+2018-11-25,Pumas,Santos,0,1,1,1,regular
+2018-11-28,Monterrey,Santos,0,0,1,0,liguilla
+2018-11-28,Querétaro,Cruz Azul,0,1,0,2,liguilla
+2018-11-29,Tigres,Pumas,0,1,2,1,liguilla
+2018-11-29,Toluca,América,1,2,2,2,liguilla
+2018-12-01,Santos,Monterrey,0,0,0,2,liguilla
+2018-12-01,Cruz Azul,Querétaro,1,0,1,1,liguilla
+2018-12-02,Pumas,Tigres,0,0,3,1,liguilla
+2018-12-02,América,Toluca,2,0,3,2,liguilla
+2018-12-05,Monterrey,Cruz Azul,1,0,1,0,liguilla
+2018-12-06,Pumas,América,0,1,1,1,liguilla
+2018-12-08,Cruz Azul,Monterrey,0,0,1,0,liguilla
+2018-12-09,América,Pumas,3,1,6,1,liguilla
+2018-12-13,América,Cruz Azul,0,0,0,0,liguilla
+2018-12-16,Cruz Azul,América,0,0,0,2,liguilla
+2019-01-04,Morelia,Toluca,1,2,1,3,regular
+2019-01-04,Puebla,Cruz Azul,1,1,1,1,regular
+2019-01-05,Monterrey,Pachuca,1,0,5,0,regular
+2019-01-05,León,Tigres,1,1,2,2,regular
+2019-01-05,Chivas,Tijuana,0,0,2,0,regular
+2019-01-05,Querétaro,Atlas,1,1,1,2,regular
+2019-01-06,Pumas,Veracruz,0,0,0,0,regular
+2019-01-06,Lobos BUAP,Santos,0,0,2,0,regular
+2019-01-11,Veracruz,Lobos BUAP,0,0,0,1,regular
+2019-01-11,Atlas,América,0,0,1,2,regular
+2019-01-12,Tijuana,Tigres,0,0,0,3,regular
+2019-01-12,Monterrey,León,0,0,2,2,regular
+2019-01-12,Cruz Azul,Chivas,0,0,0,1,regular
+2019-01-12,Pachuca,Querétaro,0,0,3,0,regular
+2019-01-12,Necaxa,Pumas,1,0,2,1,regular
+2019-01-13,Toluca,Puebla,1,0,2,0,regular
+2019-01-13,Santos,Morelia,0,0,1,0,regular
+2019-01-18,Morelia,Veracruz,0,0,2,0,regular
+2019-01-18,Puebla,Santos,1,1,1,1,regular
+2019-01-19,Tigres,Cruz Azul,0,1,0,1,regular
+2019-01-19,Querétaro,Monterrey,1,0,1,2,regular
+2019-01-19,América,Pachuca,1,0,3,0,regular
+2019-01-20,Pumas,Atlas,2,0,2,2,regular
+2019-01-20,Lobos BUAP,Necaxa,2,1,2,3,regular
+2019-01-20,Chivas,Toluca,0,0,1,0,regular
+2019-01-20,León,Tijuana,0,1,0,1,regular
+2019-01-25,Veracruz,Puebla,0,1,0,1,regular
+2019-01-25,Atlas,Lobos BUAP,1,0,3,1,regular
+2019-01-26,Necaxa,Morelia,0,0,0,0,regular
+2019-01-26,Cruz Azul,Tijuana,1,0,1,0,regular
+2019-01-26,Monterrey,América,1,1,3,2,regular
+2019-01-26,Pachuca,Pumas,0,0,1,0,regular
+2019-01-27,Toluca,Tigres,0,1,0,1,regular
+2019-01-27,Querétaro,León,0,3,0,4,regular
+2019-01-27,Santos,Chivas,1,0,1,0,regular
+2019-02-01,Morelia,Atlas,0,0,1,2,regular
+2019-02-01,Puebla,Necaxa,1,2,1,4,regular
+2019-02-02,Tijuana,Toluca,1,0,2,0,regular
+2019-02-02,América,Querétaro,1,0,2,0,regular
+2019-02-02,León,Cruz Azul,2,0,2,0,regular
+2019-02-02,Tigres,Santos,1,1,2,1,regular
+2019-02-03,Lobos BUAP,Pachuca,0,0,1,1,regular
+2019-02-03,Pumas,Monterrey,0,1,1,1,regular
+2019-02-04,Chivas,Veracruz,0,0,0,0,regular
+2019-02-08,Veracruz,Tigres,0,0,0,2,regular
+2019-02-08,Atlas,Puebla,1,1,1,2,regular
+2019-02-09,Pachuca,Morelia,0,0,2,0,regular
+2019-02-09,Monterrey,Lobos BUAP,2,0,4,0,regular
+2019-02-09,Querétaro,Pumas,0,1,0,2,regular
+2019-02-09,América,León,0,1,0,3,regular
+2019-02-09,Necaxa,Chivas,0,1,3,3,regular
+2019-02-10,Toluca,Cruz Azul,0,1,1,1,regular
+2019-02-10,Santos,Tijuana,0,1,1,1,regular
+2019-02-15,Morelia,Monterrey,1,1,2,3,regular
+2019-02-15,Puebla,Pachuca,0,1,1,1,regular
+2019-02-15,Tijuana,Veracruz,2,0,3,0,regular
+2019-02-16,Chivas,Atlas,2,0,3,0,regular
+2019-02-16,Cruz Azul,Santos,1,1,1,2,regular
+2019-02-16,León,Toluca,0,0,3,0,regular
+2019-02-16,Tigres,Necaxa,1,0,3,2,regular
+2019-02-17,Lobos BUAP,Querétaro,1,1,3,1,regular
+2019-02-17,Pumas,América,0,0,1,0,regular
+2019-02-22,Veracruz,Cruz Azul,1,0,1,1,regular
+2019-02-22,Atlas,Tigres,0,0,0,1,regular
+2019-02-23,Querétaro,Morelia,0,0,3,0,regular
+2019-02-23,América,Lobos BUAP,1,0,3,0,regular
+2019-02-23,Monterrey,Puebla,0,0,0,0,regular
+2019-02-23,Necaxa,Tijuana,0,0,1,2,regular
+2019-02-23,Pachuca,Chivas,1,1,3,1,regular
+2019-02-24,Pumas,León,0,2,1,3,regular
+2019-02-24,Santos,Toluca,3,0,4,0,regular
+2019-03-01,Morelia,América,1,0,2,2,regular
+2019-03-01,Tijuana,Atlas,2,0,3,1,regular
+2019-03-02,Cruz Azul,Necaxa,0,1,2,1,regular
+2019-03-02,León,Santos,0,0,3,0,regular
+2019-03-02,Tigres,Pachuca,3,0,3,0,regular
+2019-03-02,Chivas,Monterrey,0,1,0,2,regular
+2019-03-03,Lobos BUAP,Pumas,1,0,2,1,regular
+2019-03-03,Toluca,Veracruz,1,1,3,1,regular
+2019-03-04,Puebla,Querétaro,1,0,1,0,regular
+2019-03-05,América,Necaxa,1,0,1,3,regular
+2019-03-08,Atlas,Cruz Azul,0,1,0,2,regular
+2019-03-08,Veracruz,Santos,1,1,2,2,regular
+2019-03-09,Pachuca,Tijuana,2,0,4,0,regular
+2019-03-09,América,Puebla,0,0,1,0,regular
+2019-03-09,Monterrey,Tigres,1,0,1,1,regular
+2019-03-09,Necaxa,Toluca,0,0,1,1,regular
+2019-03-09,Querétaro,Chivas,0,0,0,0,regular
+2019-03-10,Lobos BUAP,León,0,1,0,1,regular
+2019-03-10,Pumas,Morelia,0,1,2,2,regular
+2019-03-15,Puebla,Pumas,0,0,1,0,regular
+2019-03-15,Morelia,Lobos BUAP,1,1,1,1,regular
+2019-03-16,Chivas,América,0,1,0,2,regular
+2019-03-16,Tigres,Querétaro,2,0,4,1,regular
+2019-03-16,Tijuana,Monterrey,0,0,1,0,regular
+2019-03-16,Cruz Azul,Pachuca,2,0,4,1,regular
+2019-03-17,Toluca,Atlas,1,0,2,0,regular
+2019-03-17,Santos,Necaxa,0,1,1,2,regular
+2019-03-17,León,Veracruz,2,0,2,0,regular
+2019-03-29,Atlas,Santos,0,0,1,0,regular
+2019-03-29,Morelia,León,2,0,2,3,regular
+2019-03-30,América,Tigres,1,0,3,0,regular
+2019-03-30,Pachuca,Toluca,2,1,3,2,regular
+2019-03-30,Monterrey,Cruz Azul,1,0,2,2,regular
+2019-03-30,Necaxa,Veracruz,1,0,2,0,regular
+2019-03-30,Querétaro,Tijuana,0,0,1,0,regular
+2019-03-31,Pumas,Chivas,2,1,2,1,regular
+2019-03-31,Lobos BUAP,Puebla,0,3,0,4,regular
+2019-04-05,Puebla,Morelia,0,1,1,1,regular
+2019-04-05,Veracruz,Atlas,0,0,0,1,regular
+2019-04-06,Cruz Azul,Querétaro,1,0,3,0,regular
+2019-04-06,León,Necaxa,2,0,2,1,regular
+2019-04-06,Tigres,Pumas,1,0,2,0,regular
+2019-04-06,Chivas,Lobos BUAP,0,0,0,1,regular
+2019-04-06,Tijuana,América,1,2,3,2,regular
+2019-04-07,Santos,Pachuca,0,0,0,0,regular
+2019-04-07,Toluca,Monterrey,1,0,5,1,regular
+2019-04-12,Puebla,León,0,2,0,3,regular
+2019-04-12,Atlas,Necaxa,0,1,1,2,regular
+2019-04-13,Pachuca,Veracruz,6,1,9,2,regular
+2019-04-13,Morelia,Chivas,1,0,1,0,regular
+2019-04-13,Querétaro,Toluca,0,0,0,0,regular
+2019-04-14,Lobos BUAP,Tigres,0,0,0,3,regular
+2019-04-14,América,Cruz Azul,0,0,0,0,regular
+2019-04-14,Monterrey,Santos,1,0,4,0,regular
+2019-04-14,Pumas,Tijuana,0,0,1,0,regular
+2019-04-19,Veracruz,Monterrey,0,0,0,1,regular
+2019-04-19,Tijuana,Lobos BUAP,1,1,1,2,regular
+2019-04-20,León,Atlas,1,0,5,2,regular
+2019-04-20,Cruz Azul,Pumas,1,0,2,1,regular
+2019-04-20,Tigres,Morelia,0,2,3,3,regular
+2019-04-20,Chivas,Puebla,1,2,1,3,regular
+2019-04-20,Necaxa,Pachuca,1,1,2,2,regular
+2019-04-21,Santos,Querétaro,2,0,2,1,regular
+2019-04-21,Toluca,América,1,1,3,2,regular
+2019-04-26,Puebla,Tigres,0,1,1,1,regular
+2019-04-26,Morelia,Tijuana,1,1,1,4,regular
+2019-04-27,América,Santos,1,0,1,0,regular
+2019-04-27,Monterrey,Necaxa,2,1,2,2,regular
+2019-04-27,Chivas,León,0,0,2,1,regular
+2019-04-27,Pachuca,Atlas,0,0,1,0,regular
+2019-04-28,Lobos BUAP,Cruz Azul,1,2,1,4,regular
+2019-04-28,Querétaro,Veracruz,1,0,2,1,regular
+2019-04-28,Pumas,Toluca,1,0,2,2,regular
+2019-05-03,Veracruz,América,0,1,0,2,regular
+2019-05-04,Cruz Azul,Morelia,0,1,1,1,regular
+2019-05-04,León,Pachuca,1,0,2,1,regular
+2019-05-04,Tigres,Chivas,1,0,2,1,regular
+2019-05-04,Necaxa,Querétaro,0,0,1,0,regular
+2019-05-04,Tijuana,Puebla,0,0,4,0,regular
+2019-05-05,Atlas,Monterrey,1,0,2,0,regular
+2019-05-05,Santos,Pumas,3,1,5,2,regular
+2019-05-05,Toluca,Lobos BUAP,1,0,4,0,regular
+2019-05-08,Tijuana,León,0,1,1,3,liguilla
+2019-05-08,Pachuca,Tigres,1,1,1,1,liguilla
+2019-05-09,América,Cruz Azul,2,1,3,1,liguilla
+2019-05-09,Necaxa,Monterrey,1,0,1,0,liguilla
+2019-05-11,Tigres,Pachuca,0,0,1,1,liguilla
+2019-05-11,León,Tijuana,2,1,2,1,liguilla
+2019-05-12,Monterrey,Necaxa,1,0,1,0,liguilla
+2019-05-12,Cruz Azul,América,0,0,1,0,liguilla
+2019-05-15,Monterrey,Tigres,1,0,1,0,liguilla
+2019-05-16,América,León,0,0,0,1,liguilla
+2019-05-18,Tigres,Monterrey,1,0,1,0,liguilla
+2019-05-19,León,América,0,1,0,1,liguilla
+2019-05-23,Tigres,León,1,0,1,0,liguilla
+2019-05-26,León,Tigres,0,0,0,0,liguilla
+2019-07-19,Atlas,Juárez,0,0,1,0,regular
+2019-07-19,Puebla,Tijuana,1,1,1,3,regular
+2019-07-20,Atlético San Luis,Pumas,0,0,0,2,regular
+2019-07-20,Pachuca,León,0,2,1,3,regular
+2019-07-20,América,Monterrey,2,2,4,2,regular
+2019-07-20,Tigres,Morelia,3,0,4,2,regular
+2019-07-20,Necaxa,Cruz Azul,0,0,0,0,regular
+2019-07-21,Santos,Chivas,1,0,3,0,regular
+2019-07-21,Toluca,Querétaro,0,0,0,2,regular
+2019-07-26,Morelia,Atlas,0,0,0,1,regular
+2019-07-26,Veracruz,Pachuca,2,1,3,3,regular
+2019-07-27,Cruz Azul,Toluca,0,0,1,1,regular
+2019-07-27,Tijuana,Querétaro,1,0,1,1,regular
+2019-07-27,León,América,0,0,0,0,regular
+2019-07-28,Atlético San Luis,Monterrey,1,0,1,0,regular
+2019-07-28,Santos,Juárez,0,0,3,0,regular
+2019-07-28,Chivas,Tigres,1,0,2,0,regular
+2019-07-28,Pumas,Necaxa,1,0,2,0,regular
+2019-08-02,Puebla,Chivas,1,1,1,1,regular
+2019-08-02,Atlas,Santos,0,1,1,2,regular
+2019-08-03,América,Tijuana,0,0,3,1,regular
+2019-08-03,Pachuca,Morelia,0,1,1,2,regular
+2019-08-03,Necaxa,Veracruz,1,0,7,0,regular
+2019-08-03,Monterrey,León,1,2,3,2,regular
+2019-08-03,Querétaro,Cruz Azul,1,0,3,0,regular
+2019-08-04,Juárez,Toluca,1,0,2,0,regular
+2019-08-04,Pumas,Tigres,0,0,0,1,regular
+2019-08-09,Morelia,Monterrey,0,0,0,1,regular
+2019-08-09,Veracruz,Atlas,1,0,1,2,regular
+2019-08-09,Tijuana,Pumas,1,0,1,0,regular
+2019-08-10,Cruz Azul,Juárez,0,0,2,0,regular
+2019-08-10,Tigres,Necaxa,3,1,3,1,regular
+2019-08-10,Chivas,Atlético San Luis,1,0,3,0,regular
+2019-08-10,Querétaro,Pachuca,0,1,2,1,regular
+2019-08-11,Santos,Puebla,2,1,4,1,regular
+2019-08-11,Toluca,América,0,0,0,1,regular
+2019-08-16,Atlas,Cruz Azul,0,2,1,3,regular
+2019-08-16,Puebla,Pachuca,0,2,0,4,regular
+2019-08-17,Atlético San Luis,Tigres,0,0,1,1,regular
+2019-08-17,León,Chivas,2,1,4,3,regular
+2019-08-17,América,Morelia,0,0,1,0,regular
+2019-08-17,Monterrey,Toluca,1,0,2,0,regular
+2019-08-18,Necaxa,Santos,0,0,3,0,regular
+2019-08-18,Juárez,Querétaro,0,0,0,2,regular
+2019-08-18,Pumas,Veracruz,0,0,2,0,regular
+2019-08-23,Morelia,Pumas,1,0,2,0,regular
+2019-08-23,Santos,Monterrey,2,0,2,1,regular
+2019-08-23,Veracruz,Atlético San Luis,1,1,1,2,regular
+2019-08-24,Querétaro,León,0,1,0,4,regular
+2019-08-24,Pachuca,Atlas,2,0,3,1,regular
+2019-08-24,Cruz Azul,Puebla,0,0,1,1,regular
+2019-08-24,Tigres,América,1,0,1,1,regular
+2019-08-25,Chivas,Necaxa,0,2,1,2,regular
+2019-08-25,Toluca,Tijuana,1,0,2,0,regular
+2019-08-27,Veracruz,Querétaro,0,3,0,5,regular
+2019-08-27,Atlético San Luis,Morelia,1,0,1,1,regular
+2019-08-27,Atlas,Tigres,0,0,1,1,regular
+2019-08-27,América,Pachuca,0,0,1,1,regular
+2019-08-28,Necaxa,Toluca,1,1,1,1,regular
+2019-08-28,Tijuana,Cruz Azul,1,2,3,2,regular
+2019-08-28,León,Santos,1,1,2,2,regular
+2019-08-29,Puebla,Juárez,0,1,2,1,regular
+2019-08-29,Monterrey,Pumas,1,0,2,0,regular
+2019-08-30,Atlas,América,1,0,3,0,regular
+2019-08-30,Morelia,Veracruz,0,0,1,0,regular
+2019-08-31,Necaxa,Tijuana,1,2,3,2,regular
+2019-08-31,Tigres,León,0,1,1,1,regular
+2019-08-31,Pachuca,Atlético San Luis,0,0,0,2,regular
+2019-08-31,Cruz Azul,Chivas,1,1,1,1,regular
+2019-09-01,Querétaro,Puebla,1,0,1,1,regular
+2019-09-01,Juárez,Monterrey,1,0,1,0,regular
+2019-09-01,Pumas,Toluca,0,0,2,1,regular
+2019-09-13,Puebla,Atlético San Luis,1,2,1,3,regular
+2019-09-13,Veracruz,Cruz Azul,0,0,0,0,regular
+2019-09-13,Tijuana,Tigres,0,1,1,1,regular
+2019-09-14,León,Juárez,0,1,3,1,regular
+2019-09-14,Chivas,Atlas,0,0,1,0,regular
+2019-09-14,América,Pumas,0,0,1,1,regular
+2019-09-14,Monterrey,Necaxa,0,1,0,2,regular
+2019-09-15,Santos,Pachuca,1,2,2,2,regular
+2019-09-15,Toluca,Morelia,0,0,0,2,regular
+2019-09-20,Atlas,Toluca,0,1,0,1,regular
+2019-09-20,Morelia,Chivas,1,0,1,0,regular
+2019-09-21,Atlético San Luis,Santos,2,2,2,3,regular
+2019-09-21,Necaxa,León,0,1,2,4,regular
+2019-09-21,Monterrey,Puebla,2,0,3,2,regular
+2019-09-21,Pachuca,Tijuana,3,0,4,1,regular
+2019-09-21,América,Querétaro,1,1,2,2,regular
+2019-09-22,Juárez,Veracruz,2,0,2,0,regular
+2019-09-22,Pumas,Cruz Azul,0,0,1,1,regular
+2019-09-24,Tigres,Puebla,0,0,0,1,regular
+2019-09-24,Chivas,Pachuca,1,1,2,4,regular
+2019-09-24,León,Atlas,0,1,1,1,regular
+2019-09-24,Querétaro,Necaxa,0,0,1,2,regular
+2019-09-25,Juárez,América,1,0,1,1,regular
+2019-09-25,Santos,Veracruz,1,0,5,0,regular
+2019-09-25,Cruz Azul,Monterrey,0,0,1,1,regular
+2019-09-25,Tijuana,Morelia,2,1,3,2,regular
+2019-09-26,Toluca,Atlético San Luis,1,0,3,1,regular
+2019-09-27,Atlas,Querétaro,1,0,2,0,regular
+2019-09-27,Puebla,León,1,0,2,1,regular
+2019-09-28,Necaxa,Juárez,0,0,0,0,regular
+2019-09-28,Monterrey,Tigres,0,0,0,2,regular
+2019-09-28,América,Chivas,2,0,4,1,regular
+2019-09-28,Pachuca,Cruz Azul,1,0,2,0,regular
+2019-09-29,Pumas,Santos,0,0,2,0,regular
+2019-09-29,Atlético San Luis,Tijuana,0,0,2,3,regular
+2019-09-29,Veracruz,Toluca,0,0,1,1,regular
+2019-10-04,Morelia,Necaxa,2,0,2,3,regular
+2019-10-05,León,Veracruz,0,0,1,1,regular
+2019-10-05,Cruz Azul,América,1,2,5,2,regular
+2019-10-05,Tigres,Santos,2,0,4,0,regular
+2019-10-05,Chivas,Pumas,1,0,1,1,regular
+2019-10-05,Tijuana,Atlas,1,1,2,2,regular
+2019-10-06,Juárez,Atlético San Luis,1,1,1,2,regular
+2019-10-06,Querétaro,Monterrey,2,1,2,1,regular
+2019-10-06,Toluca,Puebla,0,0,1,1,regular
+2019-10-18,Puebla,Atlas,0,0,0,1,regular
+2019-10-18,Veracruz,Tigres,0,3,1,3,regular
+2019-10-18,Santos,Tijuana,3,0,4,1,regular
+2019-10-19,Pachuca,Juárez,0,0,0,1,regular
+2019-10-19,Necaxa,América,0,0,2,2,regular
+2019-10-19,Cruz Azul,Morelia,1,1,2,3,regular
+2019-10-20,Atlético San Luis,Querétaro,0,2,0,2,regular
+2019-10-20,Monterrey,Chivas,1,1,1,1,regular
+2019-10-20,Pumas,León,1,1,1,2,regular
+2019-10-25,Morelia,Santos,2,1,2,2,regular
+2019-10-25,Tijuana,Veracruz,0,0,2,0,regular
+2019-10-25,Atlas,Necaxa,0,0,0,2,regular
+2019-10-26,América,Puebla,0,0,2,0,regular
+2019-10-26,León,Atlético San Luis,1,2,3,2,regular
+2019-10-26,Tigres,Cruz Azul,0,1,1,1,regular
+2019-10-26,Querétaro,Pumas,2,0,3,0,regular
+2019-10-27,Juárez,Chivas,1,0,1,2,regular
+2019-10-27,Toluca,Pachuca,0,0,2,0,regular
+2019-10-29,Santos,Querétaro,1,0,1,0,regular
+2019-10-29,Veracruz,Puebla,0,0,1,0,regular
+2019-10-29,Atlético San Luis,América,0,0,0,1,regular
+2019-10-29,Pumas,Atlas,1,1,5,1,regular
+2019-10-30,Chivas,Tijuana,0,1,0,1,regular
+2019-10-30,Tigres,Toluca,0,0,1,0,regular
+2019-10-30,Pachuca,Monterrey,1,2,2,3,regular
+2019-10-31,Cruz Azul,León,0,0,1,0,regular
+2019-10-31,Morelia,Juárez,2,0,6,1,regular
+2019-11-01,Atlas,Atlético San Luis,1,0,1,2,regular
+2019-11-01,Puebla,Pumas,0,0,1,1,regular
+2019-11-02,Querétaro,Tigres,0,0,0,0,regular
+2019-11-02,América,Santos,1,0,1,2,regular
+2019-11-02,Monterrey,Veracruz,0,0,1,1,regular
+2019-11-02,Necaxa,Pachuca,0,1,1,2,regular
+2019-11-03,Juárez,Tijuana,1,0,3,0,regular
+2019-11-03,León,Morelia,1,1,1,1,regular
+2019-11-03,Toluca,Chivas,1,2,1,3,regular
+2019-11-08,Veracruz,América,0,3,0,5,regular
+2019-11-08,Tijuana,Monterrey,0,1,0,4,regular
+2019-11-08,Morelia,Puebla,1,1,3,2,regular
+2019-11-09,Atlético San Luis,Necaxa,0,1,0,2,regular
+2019-11-09,Tigres,Pachuca,0,0,0,0,regular
+2019-11-09,Chivas,Querétaro,3,0,3,2,regular
+2019-11-09,León,Toluca,1,0,4,0,regular
+2019-11-10,Santos,Cruz Azul,2,0,3,1,regular
+2019-11-10,Pumas,Juárez,1,0,1,1,regular
+2019-11-22,Tijuana,León,0,1,1,2,regular
+2019-11-22,Puebla,Necaxa,3,0,3,0,regular
+2019-11-23,Querétaro,Morelia,0,0,3,1,regular
+2019-11-23,Cruz Azul,Atlético San Luis,1,1,3,1,regular
+2019-11-23,Monterrey,Atlas,2,0,2,0,regular
+2019-11-23,Pachuca,Pumas,1,0,2,0,regular
+2019-11-23,Chivas,Veracruz,0,1,3,1,regular
+2019-11-24,Toluca,Santos,2,2,2,2,regular
+2019-11-24,Juárez,Tigres,0,1,1,2,regular
+2019-11-27,Necaxa,Querétaro,0,0,3,0,liguilla
+2019-11-27,Morelia,León,2,2,3,3,liguilla
+2019-11-28,América,Tigres,1,0,1,2,liguilla
+2019-11-28,Monterrey,Santos,2,2,5,2,liguilla
+2019-11-30,Querétaro,Necaxa,2,0,2,3,liguilla
+2019-11-30,León,Morelia,0,0,1,2,liguilla
+2019-12-01,Tigres,América,0,3,2,4,liguilla
+2019-12-01,Santos,Monterrey,1,0,1,1,liguilla
+2019-12-04,Monterrey,Necaxa,1,0,2,1,liguilla
+2019-12-07,Necaxa,Monterrey,0,0,0,1,liguilla
+2019-12-08,América,Morelia,2,0,2,0,liguilla
+2019-12-08,Morelia,América,0,2,0,2,liguilla
+2019-12-26,Monterrey,América,1,1,2,1,liguilla
+2019-12-29,América,Monterrey,2,0,2,1,liguilla
+2020-01-10,Tijuana,Santos,1,0,2,1,regular
+2020-01-10,Morelia,Toluca,0,1,0,1,regular
+2020-01-11,Cruz Azul,Atlas,1,1,1,2,regular
+2020-01-11,Chivas,Juárez,2,0,2,0,regular
+2020-01-11,León,Querétaro,2,1,3,1,regular
+2020-01-11,Tigres,Atlético San Luis,0,0,0,0,regular
+2020-01-12,Pumas,Pachuca,1,0,2,1,regular
+2020-01-16,Juárez,Pumas,3,2,4,4,regular
+2020-01-17,Atlético San Luis,Cruz Azul,1,0,2,1,regular
+2020-01-17,Atlas,Puebla,0,1,0,1,regular
+2020-01-18,Pachuca,Chivas,0,0,0,0,regular
+2020-01-18,Monterrey,Morelia,1,1,2,2,regular
+2020-01-18,América,Tigres,0,0,1,0,regular
+2020-01-19,Santos,León,0,1,3,2,regular
+2020-01-19,Querétaro,Tijuana,2,0,3,0,regular
+2020-01-19,Toluca,Necaxa,2,1,2,3,regular
+2020-01-24,Puebla,Querétaro,0,0,0,1,regular
+2020-01-24,Tijuana,América,0,0,0,0,regular
+2020-01-25,León,Pachuca,2,0,3,0,regular
+2020-01-25,Cruz Azul,Santos,1,0,3,0,regular
+2020-01-25,Tigres,Atlas,1,0,2,1,regular
+2020-01-25,Chivas,Toluca,1,0,2,2,regular
+2020-01-26,Juárez,Morelia,1,0,3,0,regular
+2020-01-26,Necaxa,Atlético San Luis,0,1,1,1,regular
+2020-01-26,Pumas,Monterrey,0,0,1,0,regular
+2020-01-31,Atlético San Luis,Chivas,0,2,2,2,regular
+2020-01-31,Atlas,Tijuana,1,0,2,1,regular
+2020-02-01,América,Juárez,0,2,1,3,regular
+2020-02-01,Monterrey,Querétaro,0,1,1,2,regular
+2020-02-01,Morelia,León,1,1,1,2,regular
+2020-02-01,Santos,Pumas,0,0,1,1,regular
+2020-02-01,Necaxa,Puebla,1,0,2,0,regular
+2020-02-01,Pachuca,Tigres,0,0,2,0,regular
+2020-02-02,Toluca,Cruz Azul,2,2,3,3,regular
+2020-02-04,Puebla,América,0,0,0,1,regular
+2020-02-05,Necaxa,Monterrey,1,1,2,2,regular
+2020-02-06,Atlas,Morelia,0,1,1,3,regular
+2020-02-07,Tijuana,Toluca,0,0,1,1,regular
+2020-02-07,Puebla,Santos,0,1,2,2,regular
+2020-02-08,Cruz Azul,Pachuca,0,0,3,1,regular
+2020-02-08,Tigres,Chivas,0,0,3,0,regular
+2020-02-08,León,Monterrey,1,1,3,1,regular
+2020-02-09,Querétaro,América,1,1,1,2,regular
+2020-02-09,Juárez,Necaxa,1,1,2,1,regular
+2020-02-09,Pumas,Atlético San Luis,2,0,4,0,regular
+2020-02-14,Atlético San Luis,León,1,1,3,1,regular
+2020-02-14,Morelia,Tijuana,1,0,1,1,regular
+2020-02-15,Toluca,Pumas,2,1,2,3,regular
+2020-02-15,América,Atlas,1,0,2,0,regular
+2020-02-15,Monterrey,Juárez,1,1,1,1,regular
+2020-02-15,Chivas,Cruz Azul,1,2,1,2,regular
+2020-02-15,Pachuca,Puebla,1,0,1,0,regular
+2020-02-16,Necaxa,Querétaro,1,2,2,3,regular
+2020-02-16,Santos,Tigres,1,0,2,1,regular
+2020-02-21,Puebla,Toluca,1,0,2,0,regular
+2020-02-21,Tijuana,Chivas,0,1,0,1,regular
+2020-02-21,Atlas,Pachuca,0,0,0,2,regular
+2020-02-22,León,Necaxa,1,0,2,1,regular
+2020-02-22,Cruz Azul,Tigres,1,0,2,1,regular
+2020-02-22,Monterrey,América,0,1,0,1,regular
+2020-02-23,Querétaro,Atlético San Luis,0,1,0,1,regular
+2020-02-23,Juárez,Santos,0,1,1,2,regular
+2020-02-23,Pumas,Morelia,1,0,1,2,regular
+2020-02-28,Toluca,Monterrey,0,0,2,0,regular
+2020-02-28,Morelia,Cruz Azul,0,2,2,4,regular
+2020-02-28,Tijuana,Puebla,0,0,0,1,regular
+2020-02-28,Atlético San Luis,Juárez,0,3,0,3,regular
+2020-02-29,Pachuca,Querétaro,1,0,1,1,regular
+2020-02-29,América,Necaxa,0,2,0,3,regular
+2020-02-29,Tigres,Pumas,1,0,3,0,regular
+2020-03-01,Santos,Atlas,1,0,1,0,regular
+2020-03-01,Chivas,León,0,0,2,0,regular
+2020-03-06,Querétaro,Toluca,0,1,1,1,regular
+2020-03-06,Pumas,América,1,1,3,3,regular
+2020-03-06,Puebla,Tigres,0,0,0,0,regular
+2020-03-07,Cruz Azul,Tijuana,1,1,4,2,regular
+2020-03-07,Pachuca,Santos,1,0,1,0,regular
+2020-03-07,Atlas,Chivas,0,2,1,2,regular
+2020-03-07,Monterrey,Atlético San Luis,1,0,2,2,regular
+2020-03-08,Necaxa,Morelia,1,2,1,2,regular
+2020-03-08,Juárez,León,1,0,1,4,regular
+2020-03-13,Tijuana,Pachuca,1,1,3,2,regular
+2020-03-13,Morelia,Querétaro,1,0,4,0,regular
+2020-03-14,Atlético San Luis,Puebla,0,1,0,1,regular
+2020-03-14,Tigres,Juárez,0,1,3,2,regular
+2020-03-14,León,Pumas,2,1,3,1,regular
+2020-03-14,Chivas,Monterrey,1,0,1,1,regular
+2020-03-15,Santos,Necaxa,1,1,2,1,regular
+2020-03-15,América,Cruz Azul,0,0,0,1,regular
+2020-03-15,Toluca,Atlas,1,1,2,3,regular
+2020-07-24,Necaxa,Tigres,0,2,0,3,regular
+2020-07-25,Tijuana,Atlas,1,1,3,1,regular
+2020-07-25,Cruz Azul,Santos,1,0,2,0,regular
+2020-07-25,Chivas,León,0,0,0,0,regular
+2020-07-26,Pumas,Querétaro,1,0,3,2,regular
+2020-07-27,Pachuca,América,0,0,1,2,regular
+2020-07-27,Mazatlán,Puebla,1,1,1,4,regular
+2020-07-27,Atlético San Luis,Juárez,1,0,1,1,regular
+2020-07-28,Monterrey,Toluca,2,0,3,1,regular
+2020-07-31,Puebla,Cruz Azul,0,0,1,1,regular
+2020-07-31,Juárez,Necaxa,0,0,1,0,regular
+2020-08-01,América,Tijuana,1,0,4,0,regular
+2020-08-01,Tigres,Pachuca,0,0,1,1,regular
+2020-08-02,Toluca,Atlético San Luis,2,1,3,2,regular
+2020-08-02,Querétaro,Mazatlán,0,0,1,1,regular
+2020-08-02,Santos,Chivas,1,0,2,0,regular
+2020-08-03,León,Monterrey,0,0,1,0,regular
+2020-08-03,Atlas,Pumas,0,1,1,2,regular
+2020-08-06,Tijuana,Tigres,0,0,0,0,regular
+2020-08-06,Pachuca,Querétaro,1,0,1,0,regular
+2020-08-07,Necaxa,América,0,1,1,1,regular
+2020-08-07,Mazatlán,Toluca,2,1,2,1,regular
+2020-08-08,Monterrey,Santos,1,1,2,2,regular
+2020-08-08,Chivas,Puebla,0,0,0,1,regular
+2020-08-08,Cruz Azul,León,1,0,2,0,regular
+2020-08-09,Atlético San Luis,Atlas,1,1,1,1,regular
+2020-08-09,Pumas,Juárez,0,0,1,1,regular
+2020-08-11,Pachuca,León,0,0,0,1,regular
+2020-08-11,Tigres,Puebla,2,0,2,1,regular
+2020-08-11,Necaxa,Mazatlán,1,0,1,0,regular
+2020-08-12,Querétaro,Cruz Azul,1,0,1,0,regular
+2020-08-12,Juárez,Chivas,0,0,0,2,regular
+2020-08-12,Pumas,Monterrey,1,0,1,1,regular
+2020-08-12,Tijuana,Atlético San Luis,0,1,0,2,regular
+2020-08-13,América,Santos,3,0,3,1,regular
+2020-08-13,Atlas,Toluca,1,1,1,2,regular
+2020-08-14,Puebla,Pachuca,0,0,0,1,regular
+2020-08-15,Cruz Azul,Juárez,1,1,3,2,regular
+2020-08-15,Mazatlán,Pumas,0,0,0,0,regular
+2020-08-15,Monterrey,Necaxa,0,0,1,1,regular
+2020-08-15,Chivas,Atlético San Luis,0,0,2,1,regular
+2020-08-16,Toluca,Tigres,1,1,3,2,regular
+2020-08-16,Santos,Atlas,0,0,0,0,regular
+2020-08-16,Querétaro,América,1,0,4,1,regular
+2020-08-17,León,Tijuana,0,1,2,1,regular
+2020-08-21,Juárez,León,0,0,0,0,regular
+2020-08-21,Necaxa,Santos,0,1,2,1,regular
+2020-08-22,Atlas,Querétaro,1,0,1,0,regular
+2020-08-22,Tigres,Pumas,0,0,1,1,regular
+2020-08-22,América,Monterrey,0,2,1,3,regular
+2020-08-23,Atlético San Luis,Cruz Azul,1,2,1,3,regular
+2020-08-23,Tijuana,Puebla,1,0,1,0,regular
+2020-08-23,Toluca,Chivas,0,0,1,0,regular
+2020-08-24,Pachuca,Mazatlán,2,1,4,3,regular
+2020-08-28,Mazatlán,Tigres,0,0,1,1,regular
+2020-08-28,Puebla,Toluca,2,1,4,1,regular
+2020-08-29,Atlético San Luis,América,1,1,1,2,regular
+2020-08-29,Chivas,Pachuca,0,0,0,0,regular
+2020-08-29,Cruz Azul,Necaxa,1,0,3,0,regular
+2020-08-30,Santos,Querétaro,1,1,2,1,regular
+2020-08-30,Monterrey,Juárez,0,1,2,1,regular
+2020-08-30,Pumas,Tijuana,1,0,3,0,regular
+2020-08-31,León,Atlas,2,1,2,1,regular
+2020-09-02,América,Mazatlán,0,0,3,1,regular
+2020-09-03,Pachuca,Atlético San Luis,2,0,3,1,regular
+2020-09-03,Querétaro,Toluca,2,0,4,1,regular
+2020-09-04,Tijuana,Monterrey,1,1,2,1,regular
+2020-09-04,Juárez,Santos,0,0,1,1,regular
+2020-09-04,Necaxa,León,0,1,0,2,regular
+2020-09-05,Atlas,Cruz Azul,0,0,1,0,regular
+2020-09-05,Tigres,Chivas,0,1,1,3,regular
+2020-09-05,Pumas,Puebla,2,1,4,1,regular
+2020-09-08,Atlético San Luis,Necaxa,0,1,2,1,regular
+2020-09-08,Toluca,Juárez,0,0,0,1,regular
+2020-09-08,Monterrey,Atlas,0,0,1,1,regular
+2020-09-08,Chivas,Querétaro,1,0,1,1,regular
+2020-09-08,Puebla,América,2,0,2,3,regular
+2020-09-09,Cruz Azul,Pachuca,0,0,1,0,regular
+2020-09-09,Mazatlán,Tijuana,1,0,1,0,regular
+2020-09-09,Santos,Pumas,0,1,1,2,regular
+2020-09-09,León,Tigres,1,0,1,1,regular
+2020-09-11,Juárez,Puebla,1,0,1,0,regular
+2020-09-11,Necaxa,Chivas,0,0,1,2,regular
+2020-09-12,Atlas,Mazatlán,0,0,1,1,regular
+2020-09-12,Tigres,Santos,1,0,2,0,regular
+2020-09-12,América,Toluca,1,1,1,1,regular
+2020-09-13,Querétaro,León,0,1,2,3,regular
+2020-09-13,Tijuana,Cruz Azul,1,0,1,2,regular
+2020-09-13,Pumas,Atlético San Luis,1,0,3,0,regular
+2020-09-14,Pachuca,Monterrey,0,1,1,1,regular
+2020-09-18,Necaxa,Puebla,0,1,0,1,regular
+2020-09-18,Mazatlán,Cruz Azul,1,1,2,3,regular
+2020-09-19,Tigres,Querétaro,0,0,3,0,regular
+2020-09-19,América,Chivas,1,0,1,0,regular
+2020-09-19,Atlas,Pachuca,0,0,0,1,regular
+2020-09-20,Toluca,Santos,0,1,1,2,regular
+2020-09-20,Atlético San Luis,Monterrey,1,2,1,2,regular
+2020-09-21,León,Pumas,1,0,2,0,regular
+2020-09-24,Pachuca,Toluca,0,0,0,0,regular
+2020-09-25,Puebla,Querétaro,1,2,3,3,regular
+2020-09-25,Juárez,Atlas,0,1,0,1,regular
+2020-09-26,Chivas,Mazatlán,2,1,2,1,regular
+2020-09-26,Pumas,Necaxa,0,1,1,1,regular
+2020-09-26,Monterrey,Tigres,0,1,0,2,regular
+2020-09-27,Cruz Azul,América,0,0,0,0,regular
+2020-09-27,Atlético San Luis,León,0,1,0,2,regular
+2020-09-30,Tijuana,Juárez,1,1,2,1,regular
+2020-10-02,Puebla,Santos,0,2,0,2,regular
+2020-10-02,León,Mazatlán,0,0,2,1,regular
+2020-10-03,Atlas,Necaxa,0,0,0,1,regular
+2020-10-03,Tigres,Atlético San Luis,0,0,3,0,regular
+2020-10-03,América,Pumas,1,1,2,2,regular
+2020-10-04,Tijuana,Chivas,0,0,0,0,regular
+2020-10-04,Toluca,Cruz Azul,1,0,2,0,regular
+2020-10-04,Juárez,Pachuca,0,1,1,1,regular
+2020-10-04,Querétaro,Monterrey,0,0,1,2,regular
+2020-10-11,Santos,Tijuana,2,0,2,0,regular
+2020-10-15,Atlético San Luis,Querétaro,1,0,2,1,regular
+2020-10-16,Mazatlán,Juárez,3,1,3,2,regular
+2020-10-16,Necaxa,Tijuana,1,0,2,0,regular
+2020-10-17,Monterrey,Puebla,2,0,3,1,regular
+2020-10-17,Chivas,Atlas,2,0,3,2,regular
+2020-10-17,Cruz Azul,Tigres,0,0,0,2,regular
+2020-10-18,Santos,Pachuca,1,1,1,1,regular
+2020-10-18,Pumas,Toluca,0,0,1,0,regular
+2020-10-19,León,América,2,2,3,2,regular
+2020-10-23,Puebla,León,0,0,1,2,regular
+2020-10-24,Querétaro,Necaxa,0,1,0,1,regular
+2020-10-24,Tigres,Juárez,0,0,1,1,regular
+2020-10-24,Mazatlán,Monterrey,0,2,1,2,regular
+2020-10-24,América,Atlas,0,0,1,0,regular
+2020-10-25,Chivas,Cruz Azul,0,1,0,2,regular
+2020-10-25,Santos,Atlético San Luis,1,1,2,1,regular
+2020-10-25,Toluca,Tijuana,2,0,2,0,regular
+2020-10-26,Pachuca,Pumas,1,1,1,1,regular
+2020-10-29,Atlético San Luis,Mazatlán,0,5,0,5,regular
+2020-10-30,Tijuana,Pachuca,0,1,0,2,regular
+2020-10-30,Juárez,Querétaro,0,0,1,0,regular
+2020-10-30,Necaxa,Toluca,1,1,3,2,regular
+2020-10-31,Atlas,Puebla,0,1,0,1,regular
+2020-10-31,Pumas,Chivas,1,2,2,2,regular
+2020-10-31,Monterrey,Cruz Azul,0,0,1,0,regular
+2020-11-01,América,Tigres,1,0,3,1,regular
+2020-11-02,León,Santos,0,1,2,1,regular
+2020-11-06,Juárez,América,1,0,1,1,regular
+2020-11-06,Puebla,Atlético San Luis,1,0,1,0,regular
+2020-11-07,Pachuca,Necaxa,0,0,0,1,regular
+2020-11-07,Tigres,Atlas,1,0,1,1,regular
+2020-11-07,Cruz Azul,Pumas,0,0,1,2,regular
+2020-11-07,Chivas,Monterrey,0,1,3,1,regular
+2020-11-08,Toluca,León,1,1,2,2,regular
+2020-11-08,Santos,Mazatlán,0,0,4,0,regular
+2020-11-08,Querétaro,Tijuana,1,0,2,2,regular
+2020-11-21,Chivas,Necaxa,0,0,1,0,liguilla
+2020-11-21,Santos,Pachuca,0,1,0,3,liguilla
+2020-11-22,Monterrey,Puebla,1,0,2,2,liguilla
+2020-11-22,Tigres,Toluca,2,0,2,1,liguilla
+2020-11-25,Chivas,América,0,0,1,0,liguilla
+2020-11-25,Puebla,León,2,1,2,1,liguilla
+2020-11-26,Pachuca,Pumas,0,1,0,1,liguilla
+2020-11-26,Tigres,Cruz Azul,0,1,1,3,liguilla
+2020-11-28,León,Puebla,2,0,2,0,liguilla
+2020-11-28,América,Chivas,0,1,1,2,liguilla
+2020-11-29,Cruz Azul,Tigres,0,0,0,1,liguilla
+2020-11-29,Pumas,Pachuca,0,0,0,0,liguilla
+2020-12-02,Chivas,León,0,1,1,1,liguilla
+2020-12-03,Cruz Azul,Pumas,3,0,4,0,liguilla
+2020-12-05,León,Chivas,1,0,1,0,liguilla
+2020-12-06,Pumas,Cruz Azul,3,0,4,0,liguilla
+2020-12-10,Pumas,León,0,0,1,1,liguilla
+2020-12-13,León,Pumas,1,0,2,0,liguilla
+2021-01-08,Puebla,Chivas,1,0,1,1,regular
+2021-01-08,Tijuana,Pumas,0,0,0,0,regular
+2021-01-08,Mazatlán,Necaxa,2,1,3,2,regular
+2021-01-09,Tigres,León,1,0,2,0,regular
+2021-01-09,América,Atlético San Luis,1,0,2,1,regular
+2021-01-09,Atlas,Monterrey,0,2,0,2,regular
+2021-01-10,Santos,Cruz Azul,0,0,1,0,regular
+2021-01-10,Toluca,Querétaro,2,1,3,1,regular
+2021-01-11,Pachuca,Juárez,0,1,1,1,regular
+2021-01-15,Juárez,Tijuana,0,0,0,0,regular
+2021-01-15,Necaxa,Atlético San Luis,0,0,1,0,regular
+2021-01-16,Chivas,Toluca,1,1,1,1,regular
+2021-01-16,Cruz Azul,Puebla,0,1,0,1,regular
+2021-01-16,Monterrey,América,1,0,1,0,regular
+2021-01-17,Santos,Tigres,0,0,2,0,regular
+2021-01-17,Querétaro,Atlas,0,0,1,0,regular
+2021-01-17,Pumas,Mazatlán,1,0,3,0,regular
+2021-01-18,León,Pachuca,0,0,0,0,regular
+2021-01-21,Atlético San Luis,Chivas,2,0,3,1,regular
+2021-01-22,Mazatlán,Santos,0,0,0,0,regular
+2021-01-22,Puebla,Tijuana,0,1,0,1,regular
+2021-01-23,Atlas,Tigres,0,1,0,2,regular
+2021-01-24,Toluca,Necaxa,1,0,2,0,regular
+2021-01-24,Querétaro,Pumas,2,0,2,0,regular
+2021-01-25,Pachuca,Cruz Azul,0,0,0,1,regular
+2021-01-26,América,Juárez,1,0,2,0,regular
+2021-01-28,Tigres,Necaxa,1,1,1,1,regular
+2021-01-29,Mazatlán,Pachuca,1,0,1,0,regular
+2021-01-30,Tijuana,Toluca,3,1,3,2,regular
+2021-01-30,Chivas,Juárez,0,2,1,2,regular
+2021-01-30,Cruz Azul,Querétaro,3,1,4,1,regular
+2021-01-31,Pumas,Atlas,0,0,0,0,regular
+2021-01-31,Santos,América,0,1,1,1,regular
+2021-02-01,León,Atlético San Luis,0,0,3,1,regular
+2021-02-02,Puebla,Monterrey,0,0,0,0,regular
+2021-02-04,Atlético San Luis,Tijuana,1,2,2,2,regular
+2021-02-04,Querétaro,Pachuca,2,0,3,1,regular
+2021-02-05,Necaxa,Cruz Azul,0,2,0,2,regular
+2021-02-06,Atlas,Santos,0,1,1,1,regular
+2021-02-06,Monterrey,Pumas,1,0,1,0,regular
+2021-02-06,América,Puebla,0,0,1,0,regular
+2021-02-07,Toluca,Mazatlán,3,0,4,1,regular
+2021-02-08,León,Chivas,0,2,1,3,regular
+2021-02-12,Mazatlán,Atlético San Luis,0,2,0,3,regular
+2021-02-12,Tijuana,León,1,0,2,0,regular
+2021-02-12,Puebla,Juárez,2,0,4,0,regular
+2021-02-13,Chivas,Necaxa,1,1,2,2,regular
+2021-02-13,América,Querétaro,1,1,2,1,regular
+2021-02-14,Santos,Monterrey,0,0,1,0,regular
+2021-02-14,Toluca,Pumas,0,0,1,0,regular
+2021-02-15,Pachuca,Atlas,0,1,0,1,regular
+2021-02-17,Tigres,Cruz Azul,0,1,0,2,regular
+2021-02-18,Atlético San Luis,Santos,1,0,1,0,regular
+2021-02-19,Necaxa,Monterrey,0,1,1,1,regular
+2021-02-19,Juárez,Mazatlán,0,0,1,0,regular
+2021-02-20,Cruz Azul,Toluca,2,2,3,2,regular
+2021-02-21,Querétaro,Puebla,0,0,1,1,regular
+2021-02-21,Pumas,León,0,0,0,1,regular
+2021-02-21,Tigres,Tijuana,2,0,3,2,regular
+2021-02-22,Pachuca,Chivas,0,1,1,1,regular
+2021-02-25,Atlético San Luis,Tigres,1,1,2,2,regular
+2021-02-26,Puebla,Necaxa,0,0,1,0,regular
+2021-02-26,Mazatlán,Querétaro,2,0,3,0,regular
+2021-02-27,Toluca,Atlas,0,0,0,0,regular
+2021-02-27,León,Cruz Azul,0,0,0,1,regular
+2021-02-27,América,Pachuca,2,0,2,0,regular
+2021-02-28,Santos,Juárez,2,0,3,2,regular
+2021-02-28,Monterrey,Tijuana,1,0,1,1,regular
+2021-02-28,Chivas,Pumas,2,1,2,1,regular
+2021-03-02,Tigres,Toluca,0,0,0,1,regular
+2021-03-02,Atlas,Atlético San Luis,1,1,3,1,regular
+2021-03-02,León,Puebla,1,0,1,2,regular
+2021-03-03,Tijuana,América,0,0,0,2,regular
+2021-03-03,Juárez,Monterrey,1,2,1,6,regular
+2021-03-03,Cruz Azul,Mazatlán,0,0,1,0,regular
+2021-03-03,Querétaro,Chivas,1,1,2,2,regular
+2021-03-04,Necaxa,Pachuca,1,1,2,2,regular
+2021-03-04,Pumas,Santos,0,0,1,0,regular
+2021-03-05,Atlético San Luis,Toluca,0,0,0,0,regular
+2021-03-05,Puebla,Tigres,1,1,1,1,regular
+2021-03-06,Mazatlán,Chivas,1,1,1,1,regular
+2021-03-06,Monterrey,Querétaro,2,1,2,1,regular
+2021-03-06,Atlas,Juárez,1,0,2,0,regular
+2021-03-06,América,León,1,1,2,1,regular
+2021-03-07,Santos,Necaxa,1,0,3,1,regular
+2021-03-07,Pumas,Cruz Azul,0,0,0,1,regular
+2021-03-08,Pachuca,Tijuana,2,1,2,1,regular
+2021-03-10,Monterrey,León,0,1,1,1,regular
+2021-03-12,Puebla,Atlas,0,0,0,1,regular
+2021-03-12,Juárez,Pumas,1,0,1,1,regular
+2021-03-13,Tigres,Mazatlán,0,1,1,2,regular
+2021-03-13,Cruz Azul,Monterrey,1,0,1,0,regular
+2021-03-13,Tijuana,Santos,0,1,0,1,regular
+2021-03-14,Querétaro,Atlético San Luis,2,0,2,1,regular
+2021-03-14,Toluca,Pachuca,0,0,0,2,regular
+2021-03-14,Chivas,América,0,1,0,3,regular
+2021-03-15,León,Necaxa,2,0,3,1,regular
+2021-03-18,Pachuca,Tigres,0,0,1,0,regular
+2021-03-19,Necaxa,Juárez,0,0,1,0,regular
+2021-03-19,Mazatlán,América,0,0,0,1,regular
+2021-03-20,Tijuana,Querétaro,3,1,3,1,regular
+2021-03-20,Atlético San Luis,Pumas,0,0,0,1,regular
+2021-03-20,Cruz Azul,Atlas,1,1,3,2,regular
+2021-03-21,Santos,León,1,1,1,2,regular
+2021-03-21,Toluca,Puebla,1,0,4,4,regular
+2021-04-02,Puebla,Mazatlán,1,1,3,1,regular
+2021-04-02,Juárez,Cruz Azul,0,0,0,1,regular
+2021-04-03,América,Necaxa,1,1,2,1,regular
+2021-04-03,Atlas,Tijuana,1,0,1,0,regular
+2021-04-03,Monterrey,Atlético San Luis,0,0,2,0,regular
+2021-04-04,León,Toluca,0,1,2,1,regular
+2021-04-04,Querétaro,Tigres,0,0,0,1,regular
+2021-04-04,Pumas,Pachuca,0,1,2,2,regular
+2021-04-04,Chivas,Santos,0,1,1,1,regular
+2021-04-09,Necaxa,Pumas,0,0,0,1,regular
+2021-04-09,Juárez,Atlético San Luis,1,0,2,1,regular
+2021-04-10,Cruz Azul,Chivas,0,0,1,0,regular
+2021-04-10,Atlas,León,0,1,1,3,regular
+2021-04-10,Tigres,América,0,1,1,3,regular
+2021-04-11,Tijuana,Mazatlán,2,1,2,3,regular
+2021-04-11,Querétaro,Santos,1,0,1,0,regular
+2021-04-11,Toluca,Monterrey,0,0,1,2,regular
+2021-04-12,Pachuca,Puebla,0,1,1,3,regular
+2021-04-14,Juárez,Tigres,0,0,2,3,regular
+2021-04-16,Mazatlán,Atlas,0,0,0,0,regular
+2021-04-16,Necaxa,Querétaro,0,0,0,0,regular
+2021-04-17,América,Cruz Azul,1,0,1,1,regular
+2021-04-17,Atlético San Luis,Puebla,0,1,1,4,regular
+2021-04-17,Chivas,Tijuana,0,0,2,0,regular
+2021-04-18,Pumas,Tigres,0,0,0,0,regular
+2021-04-18,Santos,Toluca,2,0,3,1,regular
+2021-04-18,Monterrey,Pachuca,0,0,0,1,regular
+2021-04-19,León,Juárez,0,0,2,0,regular
+2021-04-21,Monterrey,Chivas,0,1,1,2,regular
+2021-04-23,Tijuana,Necaxa,0,0,1,0,regular
+2021-04-23,Mazatlán,León,1,2,4,3,regular
+2021-04-23,Puebla,Pumas,0,0,0,0,regular
+2021-04-24,Cruz Azul,Atlético San Luis,2,1,3,2,regular
+2021-04-24,Atlas,Chivas,0,0,0,1,regular
+2021-04-24,Tigres,Monterrey,1,1,2,1,regular
+2021-04-25,Querétaro,Juárez,0,0,1,0,regular
+2021-04-25,Toluca,América,2,0,3,1,regular
+2021-04-26,Pachuca,Santos,0,0,1,0,regular
+2021-04-29,Atlético San Luis,Pachuca,1,2,1,5,regular
+2021-04-30,Juárez,Toluca,0,0,1,0,regular
+2021-04-30,Necaxa,Atlas,1,2,1,5,regular
+2021-05-01,Chivas,Tigres,0,0,0,0,regular
+2021-05-01,León,Querétaro,1,0,2,1,regular
+2021-05-01,Cruz Azul,Tijuana,1,0,1,1,regular
+2021-05-01,Monterrey,Mazatlán,1,0,1,0,regular
+2021-05-02,Pumas,América,0,0,0,1,regular
+2021-05-02,Santos,Puebla,0,0,0,0,regular
+2021-05-08,Santos,Querétaro,2,0,5,0,liguilla
+2021-05-08,Atlas,Tigres,0,0,1,0,liguilla
+2021-05-09,León,Toluca,1,1,2,2,liguilla
+2021-05-09,Pachuca,Chivas,0,1,4,2,liguilla
+2021-05-12,Atlas,Puebla,0,0,1,0,liguilla
+2021-05-12,Toluca,Cruz Azul,1,1,2,1,liguilla
+2021-05-13,Santos,Monterrey,0,1,2,1,liguilla
+2021-05-13,Pachuca,América,1,1,3,1,liguilla
+2021-05-15,Puebla,Atlas,0,0,1,0,liguilla
+2021-05-15,Cruz Azul,Toluca,1,1,3,1,liguilla
+2021-05-16,América,Pachuca,2,1,4,2,liguilla
+2021-05-16,Monterrey,Santos,1,0,1,1,liguilla
+2021-05-19,Pachuca,Cruz Azul,0,0,0,0,liguilla
+2021-05-20,Santos,Puebla,2,0,3,0,liguilla
+2021-05-22,Cruz Azul,Pachuca,0,0,1,0,liguilla
+2021-05-23,Puebla,Santos,0,0,1,0,liguilla
+2021-05-27,Santos,Cruz Azul,0,0,0,1,liguilla
+2021-05-30,Cruz Azul,Santos,0,1,1,1,liguilla
+2021-07-22,Querétaro,América,0,0,0,0,regular
+2021-07-23,Juárez,Toluca,1,1,1,3,regular
+2021-07-23,Necaxa,Santos,0,2,0,3,regular
+2021-07-24,Pachuca,León,0,0,4,0,regular
+2021-07-24,Chivas,Atlético San Luis,0,1,1,2,regular
+2021-07-25,Monterrey,Puebla,0,0,1,1,regular
+2021-07-25,Tijuana,Tigres,0,1,1,2,regular
+2021-07-25,Pumas,Atlas,0,0,0,0,regular
+2021-07-26,Cruz Azul,Mazatlán,0,1,0,2,regular
+2021-07-30,Mazatlán,Pachuca,1,1,2,1,regular
+2021-07-30,Puebla,Chivas,0,0,0,2,regular
+2021-07-31,América,Necaxa,1,0,2,1,regular
+2021-07-31,Monterrey,Pumas,1,0,2,0,regular
+2021-07-31,Atlas,Juárez,0,0,2,0,regular
+2021-07-31,León,Tijuana,1,0,2,1,regular
+2021-08-01,Santos,Cruz Azul,0,0,1,1,regular
+2021-08-01,Toluca,Tigres,1,1,3,1,regular
+2021-08-02,Atlético San Luis,Querétaro,1,0,1,1,regular
+2021-08-05,Querétaro,León,0,1,0,1,regular
+2021-08-06,Mazatlán,Monterrey,1,1,1,1,regular
+2021-08-06,Necaxa,Cruz Azul,1,1,1,2,regular
+2021-08-06,Tijuana,Toluca,0,1,0,2,regular
+2021-08-07,América,Puebla,1,0,2,0,regular
+2021-08-07,Tigres,Santos,0,1,1,1,regular
+2021-08-07,Chivas,Juárez,1,1,2,2,regular
+2021-08-08,Pumas,Atlético San Luis,1,2,1,3,regular
+2021-08-09,Pachuca,Atlas,0,1,0,1,regular
+2021-08-12,Atlético San Luis,Necaxa,0,1,0,2,regular
+2021-08-13,Juárez,Tijuana,1,1,1,1,regular
+2021-08-13,Puebla,Tigres,1,0,1,1,regular
+2021-08-14,Pumas,Querétaro,0,0,0,0,regular
+2021-08-14,León,Mazatlán,1,0,3,0,regular
+2021-08-14,Cruz Azul,Toluca,3,0,4,0,regular
+2021-08-14,Monterrey,Pachuca,1,0,3,1,regular
+2021-08-15,Santos,Chivas,0,0,0,0,regular
+2021-08-15,Atlas,América,0,0,0,1,regular
+2021-08-17,Tigres,Querétaro,1,0,3,0,regular
+2021-08-17,Necaxa,Pumas,1,0,3,0,regular
+2021-08-17,Tijuana,Puebla,1,0,1,1,regular
+2021-08-17,Toluca,Mazatlán,2,2,2,2,regular
+2021-08-18,Cruz Azul,Monterrey,0,0,1,1,regular
+2021-08-18,Santos,Atlas,0,1,1,1,regular
+2021-08-18,Chivas,León,0,1,0,3,regular
+2021-08-18,Juárez,América,1,1,1,2,regular
+2021-08-20,Mazatlán,Tigres,0,0,0,3,regular
+2021-08-21,Atlas,Toluca,0,0,0,0,regular
+2021-08-21,León,Santos,0,1,1,1,regular
+2021-08-21,Atlético San Luis,Cruz Azul,0,0,0,0,regular
+2021-08-21,Monterrey,Chivas,0,0,0,0,regular
+2021-08-22,Necaxa,Juárez,0,0,1,0,regular
+2021-08-22,Pumas,Puebla,0,0,2,0,regular
+2021-08-22,América,Tijuana,0,0,2,0,regular
+2021-08-22,Querétaro,Pachuca,0,1,0,2,regular
+2021-08-27,Mazatlán,Atlético San Luis,1,1,2,2,regular
+2021-08-27,Puebla,Querétaro,0,0,1,0,regular
+2021-08-27,Tijuana,Monterrey,1,2,2,2,regular
+2021-08-28,León,América,1,1,1,1,regular
+2021-08-28,Chivas,Necaxa,1,0,2,1,regular
+2021-08-28,Tigres,Atlas,1,0,1,1,regular
+2021-08-29,Cruz Azul,Pachuca,0,1,1,1,regular
+2021-08-29,Toluca,Pumas,1,1,2,1,regular
+2021-08-29,Santos,Juárez,0,0,2,0,regular
+2021-09-10,Puebla,Atlético San Luis,0,1,2,2,regular
+2021-09-10,Juárez,Cruz Azul,2,1,2,1,regular
+2021-09-10,Tijuana,Santos,1,0,2,1,regular
+2021-09-11,Atlas,Monterrey,0,1,2,1,regular
+2021-09-11,Tigres,León,1,2,2,2,regular
+2021-09-11,América,Mazatlán,1,0,2,0,regular
+2021-09-12,Querétaro,Necaxa,2,0,3,0,regular
+2021-09-12,Pumas,Chivas,0,0,0,0,regular
+2021-09-13,Pachuca,Toluca,1,1,1,2,regular
+2021-09-16,Atlético San Luis,Tijuana,3,1,4,1,regular
+2021-09-17,Necaxa,Atlas,0,2,0,3,regular
+2021-09-18,Chivas,Pachuca,0,0,1,0,regular
+2021-09-18,León,Juárez,0,0,0,1,regular
+2021-09-18,Toluca,América,2,1,3,1,regular
+2021-09-18,Mazatlán,Pumas,1,0,2,2,regular
+2021-09-19,Santos,Puebla,0,0,1,1,regular
+2021-09-19,Cruz Azul,Querétaro,1,0,2,0,regular
+2021-09-19,Monterrey,Tigres,1,0,2,0,regular
+2021-09-21,Juárez,Atlético San Luis,1,0,1,0,regular
+2021-09-22,Monterrey,Toluca,1,0,2,0,regular
+2021-09-23,Pachuca,Necaxa,1,0,1,0,regular
+2021-09-24,Tijuana,Mazatlán,0,0,0,0,regular
+2021-09-24,Puebla,Cruz Azul,1,1,1,1,regular
+2021-09-25,América,Chivas,0,0,0,0,regular
+2021-09-25,Tigres,Pumas,0,0,0,0,regular
+2021-09-25,Atlas,León,1,0,2,0,regular
+2021-09-26,Toluca,Atlético San Luis,1,2,1,2,regular
+2021-09-26,Santos,Monterrey,0,0,1,2,regular
+2021-09-28,Necaxa,Tijuana,0,0,3,0,regular
+2021-09-28,Mazatlán,Juárez,2,0,3,1,regular
+2021-09-28,Atlas,Puebla,0,1,0,1,regular
+2021-09-28,Pachuca,América,1,1,1,1,regular
+2021-09-29,Querétaro,Chivas,0,0,1,0,regular
+2021-09-29,Atlético San Luis,Tigres,0,1,0,3,regular
+2021-10-01,Puebla,Pachuca,1,1,1,2,regular
+2021-10-01,Juárez,Monterrey,2,1,3,1,regular
+2021-10-02,León,Atlético San Luis,0,0,0,0,regular
+2021-10-02,Santos,Mazatlán,1,0,1,0,regular
+2021-10-02,Chivas,Atlas,0,1,0,1,regular
+2021-10-03,América,Pumas,1,0,2,0,regular
+2021-10-03,Tigres,Necaxa,0,0,0,0,regular
+2021-10-03,Tijuana,Cruz Azul,0,1,0,1,regular
+2021-10-03,Toluca,Querétaro,0,0,1,1,regular
+2021-10-08,Juárez,Querétaro,0,0,0,0,regular
+2021-10-14,Querétaro,Tijuana,0,1,1,1,regular
+2021-10-15,Mazatlán,Atlas,1,0,1,0,regular
+2021-10-15,Necaxa,Puebla,0,0,0,1,regular
+2021-10-16,Cruz Azul,Tigres,1,1,1,1,regular
+2021-10-16,Atlético San Luis,América,0,0,0,1,regular
+2021-10-16,Monterrey,León,0,1,0,1,regular
+2021-10-16,Pachuca,Santos,0,0,1,1,regular
+2021-10-17,Pumas,Juárez,0,0,1,0,regular
+2021-10-17,Chivas,Toluca,1,0,2,0,regular
+2021-10-19,Atlas,Cruz Azul,0,0,0,0,regular
+2021-10-19,América,Santos,0,0,2,1,regular
+2021-10-19,Querétaro,Monterrey,1,0,1,0,regular
+2021-10-19,Puebla,Mazatlán,0,0,2,0,regular
+2021-10-20,Tijuana,Chivas,0,0,0,0,regular
+2021-10-20,Tigres,Pachuca,2,0,3,0,regular
+2021-10-20,León,Pumas,0,1,1,2,regular
+2021-10-20,Toluca,Necaxa,0,0,1,1,regular
+2021-10-22,Mazatlán,Querétaro,0,1,2,1,regular
+2021-10-23,Chivas,Cruz Azul,0,1,1,1,regular
+2021-10-23,América,Tigres,0,0,1,0,regular
+2021-10-23,Monterrey,Necaxa,0,0,0,1,regular
+2021-10-23,Puebla,León,0,0,0,1,regular
+2021-10-24,Pachuca,Juárez,0,1,1,1,regular
+2021-10-24,Santos,Toluca,1,0,2,2,regular
+2021-10-24,Pumas,Tijuana,1,0,3,1,regular
+2021-10-24,Atlético San Luis,Atlas,0,4,2,6,regular
+2021-10-28,Atlas,Tijuana,0,1,0,2,regular
+2021-10-29,Juárez,Puebla,0,0,0,2,regular
+2021-10-29,Necaxa,Mazatlán,1,0,2,1,regular
+2021-10-30,Pachuca,Pumas,0,1,1,1,regular
+2021-10-30,Querétaro,Santos,0,2,2,3,regular
+2021-10-30,Tigres,Chivas,1,0,2,1,regular
+2021-10-31,Toluca,León,0,0,0,0,regular
+2021-10-31,Atlético San Luis,Monterrey,0,1,1,1,regular
+2021-10-31,Cruz Azul,América,1,0,2,1,regular
+2021-11-03,Pachuca,Atlético San Luis,0,0,0,0,regular
+2021-11-03,Cruz Azul,León,0,1,0,1,regular
+2021-11-04,Atlas,Querétaro,0,0,2,0,regular
+2021-11-04,Pumas,Santos,0,1,0,3,regular
+2021-11-05,Mazatlán,Chivas,0,0,0,1,regular
+2021-11-05,Puebla,Toluca,0,0,1,0,regular
+2021-11-06,León,Necaxa,1,0,3,0,regular
+2021-11-06,América,Monterrey,0,0,0,0,regular
+2021-11-06,Tigres,Juárez,1,0,3,0,regular
+2021-11-06,Tijuana,Pachuca,1,1,3,2,regular
+2021-11-07,Santos,Atlético San Luis,0,0,0,0,regular
+2021-11-07,Pumas,Cruz Azul,1,3,4,3,regular
+2021-11-20,Puebla,Chivas,1,1,2,2,liguilla
+2021-11-20,Santos,Atlético San Luis,0,0,2,0,liguilla
+2021-11-21,Toluca,Pumas,0,1,1,2,liguilla
+2021-11-21,Cruz Azul,Monterrey,1,2,1,4,liguilla
+2021-11-24,Monterrey,Atlas,0,0,0,0,liguilla
+2021-11-24,Pumas,América,0,0,0,0,liguilla
+2021-11-25,Santos,Tigres,2,0,2,1,liguilla
+2021-11-25,Puebla,León,1,1,2,1,liguilla
+2021-11-27,América,Pumas,1,2,1,3,liguilla
+2021-11-27,Atlas,Monterrey,1,0,1,1,liguilla
+2021-11-28,León,Puebla,1,0,2,0,liguilla
+2021-11-28,Tigres,Santos,0,0,1,0,liguilla
+2021-12-01,Tigres,León,0,0,2,1,liguilla
+2021-12-02,Pumas,Atlas,0,1,0,1,liguilla
+2021-12-04,León,Tigres,1,1,2,1,liguilla
+2021-12-05,Atlas,Pumas,0,0,0,1,liguilla
+2021-12-09,León,Atlas,1,1,3,2,liguilla
+2021-12-12,Atlas,León,0,0,1,0,liguilla
+2022-01-06,Atlético San Luis,Pachuca,0,0,0,2,regular
+2022-01-07,Puebla,América,1,1,1,1,regular
+2022-01-07,Juárez,Necaxa,1,0,2,1,regular
+2022-01-08,Cruz Azul,Tijuana,1,0,2,0,regular
+2022-01-08,Monterrey,Querétaro,0,0,0,0,regular
+2022-01-09,Chivas,Mazatlán,3,0,3,0,regular
+2022-01-10,Pumas,Toluca,1,0,5,0,regular
+2022-01-12,Santos,Tigres,0,0,1,1,regular
+2022-01-14,Necaxa,Monterrey,0,3,0,4,regular
+2022-01-14,Querétaro,Pumas,1,2,1,3,regular
+2022-01-15,Atlas,Atlético San Luis,0,0,1,0,regular
+2022-01-15,Tigres,Puebla,0,2,0,2,regular
+2022-01-15,Cruz Azul,Juárez,1,0,1,0,regular
+2022-01-15,Tijuana,León,0,1,1,1,regular
+2022-01-16,Toluca,Santos,1,1,3,1,regular
+2022-01-16,Pachuca,Chivas,2,0,2,1,regular
+2022-01-19,León,Atlas,1,0,1,1,regular
+2022-01-20,Atlético San Luis,Juárez,0,0,0,1,regular
+2022-01-21,Mazatlán,Toluca,1,0,1,2,regular
+2022-01-22,Chivas,Querétaro,1,1,1,1,regular
+2022-01-22,León,Pachuca,1,1,2,1,regular
+2022-01-22,América,Atlas,0,0,0,2,regular
+2022-01-22,Monterrey,Cruz Azul,0,1,2,2,regular
+2022-01-23,Pumas,Tigres,1,0,1,2,regular
+2022-01-23,Santos,Necaxa,1,1,1,4,regular
+2022-01-28,Puebla,Tijuana,0,1,3,1,regular
+2022-02-05,América,Atlético San Luis,0,1,2,3,regular
+2022-02-05,Necaxa,Pachuca,0,2,1,3,regular
+2022-02-05,Tijuana,Pumas,0,0,1,0,regular
+2022-02-06,Querétaro,Puebla,0,2,0,2,regular
+2022-02-06,Atlas,Santos,2,0,2,1,regular
+2022-02-06,Tigres,Mazatlán,2,0,4,3,regular
+2022-02-07,León,Cruz Azul,0,1,0,1,regular
+2022-02-09,Juárez,Chivas,1,1,1,3,regular
+2022-02-11,Puebla,Atlas,0,0,1,1,regular
+2022-02-11,Mazatlán,Tijuana,1,0,2,0,regular
+2022-02-12,Santos,América,2,2,2,3,regular
+2022-02-12,Cruz Azul,Necaxa,1,0,1,2,regular
+2022-02-12,Atlético San Luis,Toluca,0,1,0,1,regular
+2022-02-12,Chivas,Tigres,0,2,1,3,regular
+2022-02-13,Pumas,León,2,1,2,1,regular
+2022-02-14,Pachuca,Querétaro,2,1,2,2,regular
+2022-02-16,Mazatlán,América,2,0,2,1,regular
+2022-02-18,Juárez,Santos,0,0,0,0,regular
+2022-02-18,Puebla,Monterrey,1,0,1,0,regular
+2022-02-18,Tijuana,Necaxa,0,0,1,1,regular
+2022-02-19,León,Chivas,1,0,2,1,regular
+2022-02-19,Tigres,Atlético San Luis,0,0,2,1,regular
+2022-02-19,Querétaro,Mazatlán,0,0,2,0,regular
+2022-02-20,Toluca,Cruz Azul,1,1,1,4,regular
+2022-02-20,América,Pachuca,0,2,1,3,regular
+2022-02-20,Atlas,Pumas,0,0,0,0,regular
+2022-02-24,Pachuca,Mazatlán,2,1,3,1,regular
+2022-02-24,Querétaro,Toluca,1,0,1,1,regular
+2022-02-25,Juárez,Tigres,0,3,2,3,regular
+2022-02-25,Tijuana,Atlas,2,0,2,0,regular
+2022-02-25,Necaxa,León,0,1,0,1,regular
+2022-02-26,Pumas,América,0,0,0,0,regular
+2022-02-26,Chivas,Puebla,2,0,2,3,regular
+2022-02-26,Monterrey,Atlético San Luis,0,1,0,2,regular
+2022-02-27,Cruz Azul,Santos,0,1,1,2,regular
+2022-03-01,León,Monterrey,0,0,0,0,regular
+2022-03-01,Toluca,Tijuana,1,1,1,2,regular
+2022-03-01,Puebla,Juárez,0,0,1,1,regular
+2022-03-01,América,Querétaro,1,0,1,1,regular
+2022-03-01,Mazatlán,Necaxa,0,0,0,0,regular
+2022-03-02,Santos,Pumas,1,1,3,2,regular
+2022-03-02,Tigres,Cruz Azul,2,1,2,2,regular
+2022-03-02,Atlas,Pachuca,0,0,0,1,regular
+2022-03-02,Atlético San Luis,Chivas,2,0,2,2,regular
+2022-03-04,Necaxa,Toluca,0,1,0,1,regular
+2022-03-04,Juárez,León,0,0,0,1,regular
+2022-03-05,Chivas,Santos,0,0,1,0,regular
+2022-03-05,Cruz Azul,Puebla,1,2,1,3,regular
+2022-03-05,Monterrey,América,1,1,2,1,regular
+2022-03-11,Juárez,Atlas,0,1,1,2,regular
+2022-03-11,Necaxa,Querétaro,1,0,1,0,regular
+2022-03-11,Monterrey,Mazatlán,2,0,2,1,regular
+2022-03-12,Cruz Azul,Pumas,1,1,2,1,regular
+2022-03-12,Chivas,América,0,0,0,0,regular
+2022-03-12,León,Tigres,0,2,0,3,regular
+2022-03-13,Santos,Tijuana,1,0,4,0,regular
+2022-03-13,Atlético San Luis,Puebla,1,0,2,1,regular
+2022-03-13,Toluca,Pachuca,0,1,0,3,regular
+2022-03-15,Monterrey,Juárez,0,0,3,0,regular
+2022-03-17,Querétaro,Atlético San Luis,0,0,2,1,regular
+2022-03-18,Puebla,Santos,0,0,2,2,regular
+2022-03-19,Tigres,Monterrey,0,0,2,0,regular
+2022-03-19,Pachuca,Cruz Azul,1,0,1,0,regular
+2022-03-19,Pumas,Necaxa,0,2,1,3,regular
+2022-03-20,Mazatlán,León,0,2,1,2,regular
+2022-03-20,Tijuana,Juárez,0,0,1,0,regular
+2022-03-20,Atlas,Chivas,0,0,1,1,regular
+2022-03-20,América,Toluca,3,0,3,0,regular
+2022-03-26,Pumas,Mazatlán,0,0,1,1,regular
+2022-04-01,Atlético San Luis,Mazatlán,0,0,1,0,regular
+2022-04-02,Juárez,Pumas,0,0,0,1,regular
+2022-04-02,Necaxa,América,0,0,0,1,regular
+2022-04-02,Cruz Azul,Atlas,1,0,1,0,regular
+2022-04-03,Santos,Pachuca,1,0,3,1,regular
+2022-04-03,Toluca,Puebla,2,1,2,1,regular
+2022-04-03,León,Querétaro,0,1,1,1,regular
+2022-04-03,Tigres,Tijuana,0,0,2,0,regular
+2022-04-06,Tijuana,Atlético San Luis,0,0,1,1,regular
+2022-04-06,Toluca,Monterrey,1,2,2,2,regular
+2022-04-07,Pachuca,Tigres,0,0,2,1,regular
+2022-04-07,Atlas,Necaxa,1,0,2,1,regular
+2022-04-08,Puebla,Pumas,2,1,2,2,regular
+2022-04-08,Mazatlán,Cruz Azul,1,0,1,1,regular
+2022-04-09,Atlético San Luis,León,1,0,2,0,regular
+2022-04-09,América,Juárez,2,0,3,0,regular
+2022-04-09,Monterrey,Santos,0,0,1,0,regular
+2022-04-09,Toluca,Chivas,0,0,1,1,regular
+2022-04-10,Querétaro,Tigres,0,0,0,1,regular
+2022-04-11,Pachuca,Tijuana,0,0,0,0,regular
+2022-04-13,Chivas,Monterrey,1,1,1,3,regular
+2022-04-14,Atlas,Mazatlán,0,2,1,2,regular
+2022-04-15,Juárez,Pachuca,1,1,1,2,regular
+2022-04-15,Tijuana,América,1,2,1,3,regular
+2022-04-15,Necaxa,Atlético San Luis,3,1,4,2,regular
+2022-04-16,Santos,Querétaro,0,0,1,1,regular
+2022-04-16,Tigres,Toluca,0,0,3,0,regular
+2022-04-16,Cruz Azul,Chivas,0,0,0,1,regular
+2022-04-16,León,Puebla,0,1,0,1,regular
+2022-04-17,Pumas,Monterrey,0,0,2,0,regular
+2022-04-19,Pachuca,Puebla,1,0,1,0,regular
+2022-04-19,Necaxa,Tigres,2,0,2,0,regular
+2022-04-19,Chivas,Tijuana,1,1,2,1,regular
+2022-04-19,Toluca,Juárez,0,0,0,1,regular
+2022-04-19,Mazatlán,Santos,1,0,1,0,regular
+2022-04-20,América,León,1,0,2,0,regular
+2022-04-20,Monterrey,Atlas,0,0,0,0,regular
+2022-04-20,Atlético San Luis,Pumas,1,0,2,0,regular
+2022-04-21,Querétaro,Cruz Azul,0,0,0,1,regular
+2022-04-22,Puebla,Necaxa,0,0,0,1,regular
+2022-04-22,Juárez,Mazatlán,0,1,0,2,regular
+2022-04-23,Tigres,América,0,1,0,2,regular
+2022-04-23,Chivas,Pumas,2,0,3,1,regular
+2022-04-23,Pachuca,Monterrey,1,0,3,0,regular
+2022-04-24,Toluca,Atlas,1,2,2,4,regular
+2022-04-24,Cruz Azul,Atlético San Luis,0,1,0,1,regular
+2022-04-24,Santos,León,0,0,1,1,regular
+2022-04-24,Tijuana,Querétaro,2,0,2,2,regular
+2022-04-29,Mazatlán,Puebla,0,0,2,1,regular
+2022-04-29,Necaxa,Chivas,0,0,0,1,regular
+2022-04-30,Atlas,Tigres,0,0,1,1,regular
+2022-04-30,Monterrey,Tijuana,1,0,2,0,regular
+2022-04-30,América,Cruz Azul,0,0,0,0,regular
+2022-04-30,Querétaro,Juárez,2,0,4,0,regular
+2022-05-01,Pumas,Pachuca,0,0,2,0,regular
+2022-05-01,Atlético San Luis,Santos,0,0,1,3,regular
+2022-05-01,León,Toluca,3,3,4,4,regular
+2022-05-07,Monterrey,Atlético San Luis,1,0,2,2,liguilla
+2022-05-07,Cruz Azul,Necaxa,0,0,1,1,liguilla
+2022-05-08,Chivas,Pumas,1,1,4,1,liguilla
+2022-05-08,Puebla,Mazatlán,2,1,2,2,liguilla
+2022-05-10,Puebla,América,0,0,1,1,liguilla
+2022-05-11,Atlético San Luis,Pachuca,1,1,2,2,liguilla
+2022-05-12,Chivas,Atlas,0,2,1,2,liguilla
+2022-05-12,Cruz Azul,Tigres,0,1,0,1,liguilla
+2022-05-14,América,Puebla,1,1,3,2,liguilla
+2022-05-14,Pachuca,Atlético San Luis,0,0,3,2,liguilla
+2022-05-15,Tigres,Cruz Azul,0,1,0,1,liguilla
+2022-05-15,Atlas,Chivas,1,0,1,1,liguilla
+2022-05-18,Atlas,Tigres,1,0,3,0,liguilla
+2022-05-19,América,Pachuca,0,0,1,1,liguilla
+2022-05-21,Tigres,Atlas,0,1,4,2,liguilla
+2022-05-22,Pachuca,América,2,0,3,0,liguilla
+2022-05-26,Atlas,Pachuca,1,0,2,0,liguilla
+2022-05-29,Pachuca,Atlas,2,1,2,1,liguilla
+2022-07-01,Mazatlán,Puebla,0,2,2,4,regular
+2022-07-02,Necaxa,Toluca,1,2,1,3,regular
+2022-07-02,Chivas,Juárez,0,0,0,0,regular
+2022-07-02,Tigres,Cruz Azul,0,1,2,3,regular
+2022-07-02,América,Atlas,0,0,0,0,regular
+2022-07-03,Atlético San Luis,León,0,1,1,2,regular
+2022-07-03,Santos,Monterrey,2,2,4,3,regular
+2022-07-03,Pumas,Tijuana,0,1,1,1,regular
+2022-07-04,Pachuca,Querétaro,1,0,2,0,regular
+2022-07-08,Mazatlán,Tigres,0,1,0,1,regular
+2022-07-08,Tijuana,Juárez,0,0,0,2,regular
+2022-07-08,Puebla,Santos,1,0,1,0,regular
+2022-07-09,Chivas,Atlético San Luis,0,1,0,1,regular
+2022-07-09,Monterrey,América,1,2,3,2,regular
+2022-07-09,Cruz Azul,Pachuca,0,2,1,2,regular
+2022-07-09,León,Pumas,0,2,3,3,regular
+2022-07-10,Querétaro,Necaxa,1,1,1,2,regular
+2022-07-10,Toluca,Atlas,3,1,3,2,regular
+2022-07-13,América,Toluca,0,0,1,0,regular
+2022-07-15,Puebla,León,1,0,1,1,regular
+2022-07-15,Juárez,Querétaro,1,1,1,1,regular
+2022-07-16,Santos,Chivas,0,0,1,1,regular
+2022-07-16,Atlas,Cruz Azul,1,1,3,2,regular
+2022-07-17,Atlético San Luis,Monterrey,0,0,0,1,regular
+2022-07-17,Tigres,Tijuana,0,0,1,0,regular
+2022-07-17,Pumas,Necaxa,1,0,1,0,regular
+2022-07-18,Pachuca,Mazatlán,0,0,1,1,regular
+2022-07-20,Chivas,León,0,0,0,0,regular
+2022-07-21,Querétaro,Monterrey,0,1,0,3,regular
+2022-07-22,Necaxa,Juárez,1,0,1,0,regular
+2022-07-22,Mazatlán,Atlético San Luis,1,1,1,1,regular
+2022-07-23,Toluca,Santos,2,0,2,1,regular
+2022-07-23,Cruz Azul,Puebla,2,2,2,2,regular
+2022-07-23,Tijuana,América,1,0,2,0,regular
+2022-07-23,Tigres,Atlas,2,0,2,0,regular
+2022-07-24,Pachuca,Pumas,0,0,0,0,regular
+2022-07-26,Monterrey,Puebla,1,0,1,0,regular
+2022-07-26,Juárez,Tigres,0,1,0,1,regular
+2022-07-26,Atlético San Luis,Cruz Azul,0,0,0,0,regular
+2022-07-26,León,Toluca,0,0,0,1,regular
+2022-07-26,Atlas,Tijuana,1,2,1,2,regular
+2022-07-27,Necaxa,Pachuca,1,0,2,0,regular
+2022-07-27,Querétaro,Chivas,1,1,2,2,regular
+2022-07-27,Pumas,Mazatlán,0,0,1,1,regular
+2022-07-29,Juárez,Toluca,0,0,1,1,regular
+2022-07-30,Cruz Azul,Necaxa,1,0,1,0,regular
+2022-07-30,Tigres,Querétaro,1,1,2,1,regular
+2022-07-30,Puebla,Atlético San Luis,0,0,0,0,regular
+2022-07-30,Tijuana,Mazatlán,0,0,2,0,regular
+2022-07-30,Chivas,Pachuca,0,0,0,0,regular
+2022-07-31,León,América,1,1,3,2,regular
+2022-07-31,Pumas,Monterrey,1,1,1,1,regular
+2022-07-31,Santos,Atlas,0,0,1,0,regular
+2022-08-02,Toluca,Puebla,0,1,1,1,regular
+2022-08-03,Juárez,Atlético San Luis,0,1,1,1,regular
+2022-08-04,Atlas,Querétaro,0,1,3,1,regular
+2022-08-05,Mazatlán,Chivas,0,0,2,1,regular
+2022-08-06,Santos,Cruz Azul,1,0,4,0,regular
+2022-08-06,Monterrey,León,3,0,5,1,regular
+2022-08-07,Pachuca,Tigres,1,0,2,0,regular
+2022-08-07,América,Juárez,0,0,2,1,regular
+2022-08-07,Toluca,Tijuana,1,1,3,1,regular
+2022-08-07,Atlético San Luis,Necaxa,1,2,1,2,regular
+2022-08-11,Querétaro,Atlético San Luis,0,0,1,1,regular
+2022-08-12,Tijuana,Puebla,1,1,3,3,regular
+2022-08-12,Necaxa,Monterrey,1,0,1,2,regular
+2022-08-13,Pumas,América,0,1,0,3,regular
+2022-08-13,Chivas,Atlas,0,0,1,1,regular
+2022-08-13,León,Mazatlán,0,3,0,3,regular
+2022-08-14,Tigres,Santos,1,0,2,0,regular
+2022-08-14,Cruz Azul,Toluca,1,2,2,3,regular
+2022-08-16,Puebla,Necaxa,1,0,2,2,regular
+2022-08-16,Atlas,Juárez,0,0,0,1,regular
+2022-08-16,Mazatlán,Querétaro,0,0,1,1,regular
+2022-08-17,Toluca,Monterrey,1,0,1,1,regular
+2022-08-17,Pachuca,América,0,1,0,3,regular
+2022-08-17,Cruz Azul,Tijuana,1,1,1,2,regular
+2022-08-18,Santos,León,1,1,2,1,regular
+2022-08-18,Atlético San Luis,Pumas,1,2,3,2,regular
+2022-08-19,Necaxa,Chivas,0,2,0,4,regular
+2022-08-20,Juárez,Mazatlán,0,1,1,1,regular
+2022-08-20,América,Cruz Azul,3,0,7,0,regular
+2022-08-20,Querétaro,Tijuana,1,0,2,0,regular
+2022-08-20,Atlas,Puebla,1,1,1,1,regular
+2022-08-20,Monterrey,Tigres,0,0,0,0,regular
+2022-08-21,Atlético San Luis,Toluca,1,0,1,0,regular
+2022-08-21,Pumas,Santos,0,3,1,5,regular
+2022-08-21,Pachuca,León,0,0,1,0,regular
+2022-08-23,Chivas,Monterrey,0,0,1,0,regular
+2022-08-23,Querétaro,América,0,0,0,1,regular
+2022-08-24,Pumas,Tigres,0,0,1,1,regular
+2022-08-25,Pachuca,Atlas,0,0,3,1,regular
+2022-08-25,Tijuana,Santos,0,0,0,2,regular
+2022-08-26,Mazatlán,América,1,2,1,3,regular
+2022-08-26,Puebla,Juárez,1,1,2,2,regular
+2022-08-27,Chivas,Pumas,3,1,3,1,regular
+2022-08-27,Cruz Azul,Querétaro,1,0,2,1,regular
+2022-08-27,Tigres,Necaxa,0,0,0,0,regular
+2022-08-28,Santos,Atlético San Luis,1,0,4,1,regular
+2022-08-28,León,Atlas,1,1,4,2,regular
+2022-08-28,Toluca,Pachuca,0,2,1,4,regular
+2022-08-28,Tijuana,Monterrey,0,0,0,3,regular
+2022-09-01,Atlético San Luis,Tijuana,0,0,0,0,regular
+2022-09-01,Querétaro,Puebla,1,0,1,1,regular
+2022-09-02,Necaxa,León,3,0,3,2,regular
+2022-09-02,Juárez,Cruz Azul,0,2,2,2,regular
+2022-09-03,América,Tigres,2,1,2,1,regular
+2022-09-03,Atlas,Pumas,0,0,0,0,regular
+2022-09-03,Pachuca,Santos,0,0,2,0,regular
+2022-09-03,Monterrey,Mazatlán,0,0,0,0,regular
+2022-09-04,Toluca,Chivas,0,0,0,0,regular
+2022-09-06,América,Atlético San Luis,1,0,3,0,regular
+2022-09-06,Santos,Necaxa,1,0,3,1,regular
+2022-09-06,León,Juárez,0,0,1,0,regular
+2022-09-06,Monterrey,Cruz Azul,2,1,3,2,regular
+2022-09-07,Tijuana,Chivas,0,0,1,2,regular
+2022-09-07,Pumas,Querétaro,1,1,4,1,regular
+2022-09-07,Tigres,Toluca,1,0,3,1,regular
+2022-09-07,Mazatlán,Atlas,1,0,1,0,regular
+2022-09-07,Puebla,Pachuca,1,0,2,2,regular
+2022-09-09,Juárez,Monterrey,0,0,0,1,regular
+2022-09-10,Toluca,Pumas,0,1,2,2,regular
+2022-09-10,Chivas,Puebla,0,0,1,0,regular
+2022-09-10,Tigres,León,0,1,0,1,regular
+2022-09-10,Necaxa,América,1,0,1,2,regular
+2022-09-10,Querétaro,Santos,2,1,3,3,regular
+2022-09-11,Atlas,Atlético San Luis,1,0,1,3,regular
+2022-09-11,Cruz Azul,Mazatlán,2,0,2,0,regular
+2022-09-11,Pachuca,Tijuana,2,0,6,1,regular
+2022-09-13,Chivas,Tigres,0,2,1,4,regular
+2022-09-14,América,Santos,1,2,3,3,regular
+2022-09-14,Juárez,Pachuca,2,1,2,1,regular
+2022-09-15,Cruz Azul,León,0,0,2,1,regular
+2022-09-16,Puebla,Tigres,2,1,2,1,regular
+2022-09-16,Mazatlán,Toluca,1,0,1,1,regular
+2022-09-17,Monterrey,Atlas,0,0,2,0,regular
+2022-09-17,América,Chivas,1,0,2,1,regular
+2022-09-18,Tijuana,Necaxa,1,1,1,1,regular
+2022-09-18,Atlético San Luis,Pachuca,1,1,1,2,regular
+2022-09-18,Santos,Juárez,1,0,2,0,regular
+2022-09-18,León,Querétaro,2,1,3,1,regular
+2022-09-18,Pumas,Cruz Azul,0,2,1,2,regular
+2022-09-23,Necaxa,Mazatlán,1,2,2,2,regular
+2022-09-23,Puebla,Pumas,2,0,2,1,regular
+2022-09-30,Puebla,América,0,1,1,2,regular
+2022-09-30,Juárez,Pumas,2,1,3,1,regular
+2022-10-01,Monterrey,Pachuca,0,0,0,0,regular
+2022-10-01,Atlas,Necaxa,0,0,1,0,regular
+2022-10-01,Cruz Azul,Chivas,1,0,2,1,regular
+2022-10-01,Atlético San Luis,Tigres,0,0,0,3,regular
+2022-10-02,Santos,Mazatlán,0,0,3,0,regular
+2022-10-02,León,Tijuana,0,0,2,2,regular
+2022-10-02,Toluca,Querétaro,2,0,4,1,regular
+2022-10-08,Tigres,Necaxa,0,0,2,0,liguilla
+2022-10-08,Cruz Azul,León,0,0,1,0,liguilla
+2022-10-09,Puebla,Chivas,0,0,1,1,liguilla
+2022-10-09,Toluca,Juárez,1,0,3,0,liguilla
+2022-10-12,Cruz Azul,Monterrey,0,0,0,0,liguilla
+2022-10-12,Puebla,América,1,2,1,6,liguilla
+2022-10-13,Tigres,Pachuca,0,0,1,0,liguilla
+2022-10-13,Toluca,Santos,2,2,4,3,liguilla
+2022-10-15,América,Puebla,2,1,5,1,liguilla
+2022-10-15,Monterrey,Cruz Azul,1,0,3,0,liguilla
+2022-10-16,Santos,Toluca,0,0,1,2,liguilla
+2022-10-16,Pachuca,Tigres,1,0,2,1,liguilla
+2022-10-19,Toluca,América,2,0,2,1,liguilla
+2022-10-20,Pachuca,Monterrey,2,2,5,2,liguilla
+2022-10-22,América,Toluca,1,1,1,1,liguilla
+2022-10-23,Monterrey,Pachuca,0,0,0,1,liguilla
+2022-10-27,Toluca,Pachuca,0,4,1,5,liguilla
+2022-10-30,Pachuca,Toluca,1,1,3,1,liguilla
+2023-01-06,Necaxa,Atlético San Luis,0,0,2,3,regular
+2023-01-07,Monterrey,Chivas,0,0,0,1,regular
+2023-01-07,América,Querétaro,0,0,0,0,regular
+2023-01-08,Pumas,Juárez,0,1,2,1,regular
+2023-01-08,Santos,Tigres,0,1,0,3,regular
+2023-01-08,Tijuana,Cruz Azul,1,0,1,1,regular
+2023-01-09,Pachuca,Puebla,2,1,5,1,regular
+2023-01-12,Atlas,Mazatlán,0,0,2,1,regular
+2023-01-13,Atlético San Luis,Chivas,0,0,0,0,regular
+2023-01-13,Puebla,Querétaro,1,0,2,0,regular
+2023-01-14,Juárez,Tijuana,2,0,3,0,regular
+2023-01-14,Cruz Azul,Monterrey,1,1,2,3,regular
+2023-01-14,Toluca,América,2,1,2,2,regular
+2023-01-14,Santos,Pumas,1,0,3,0,regular
+2023-01-15,Tigres,Pachuca,1,1,4,1,regular
+2023-01-16,León,Necaxa,0,1,2,1,regular
+2023-01-20,Tijuana,Tigres,1,0,1,1,regular
+2023-01-20,Mazatlán,Santos,0,1,1,2,regular
+2023-01-21,Chivas,Toluca,1,0,1,2,regular
+2023-01-21,Necaxa,Cruz Azul,1,0,1,0,regular
+2023-01-21,Monterrey,Atlético San Luis,2,0,3,1,regular
+2023-01-21,América,Puebla,1,0,2,2,regular
+2023-01-22,Pachuca,Juárez,1,0,4,1,regular
+2023-01-22,Pumas,León,2,1,4,1,regular
+2023-01-22,Querétaro,Atlas,2,2,3,3,regular
+2023-01-26,Atlas,Santos,0,1,2,2,regular
+2023-01-27,Puebla,Monterrey,1,0,1,2,regular
+2023-01-27,Tijuana,Pumas,0,0,0,0,regular
+2023-01-28,América,Mazatlán,4,0,6,0,regular
+2023-01-28,Juárez,Chivas,0,2,1,2,regular
+2023-01-28,Tigres,Atlético San Luis,0,0,0,0,regular
+2023-01-29,Pachuca,Necaxa,1,0,2,1,regular
+2023-01-29,Toluca,León,0,0,0,0,regular
+2023-02-01,Atlas,Toluca,0,0,0,0,regular
+2023-02-02,Atlético San Luis,Puebla,0,0,2,0,regular
+2023-02-03,Necaxa,Tijuana,0,1,1,1,regular
+2023-02-03,Mazatlán,Juárez,1,1,2,3,regular
+2023-02-04,Cruz Azul,Tigres,0,1,0,1,regular
+2023-02-04,Santos,América,2,1,2,2,regular
+2023-02-04,León,Pachuca,0,1,0,1,regular
+2023-02-05,Monterrey,Toluca,2,0,2,1,regular
+2023-02-05,Chivas,Querétaro,0,0,1,1,regular
+2023-02-05,Pumas,Atlas,2,1,2,2,regular
+2023-02-09,Querétaro,León,0,2,0,3,regular
+2023-02-09,Atlas,Monterrey,0,0,0,2,regular
+2023-02-10,Puebla,Mazatlán,3,0,3,1,regular
+2023-02-10,Tijuana,Atlético San Luis,0,0,1,0,regular
+2023-02-11,Tigres,Pumas,3,1,4,2,regular
+2023-02-11,Pachuca,Chivas,0,1,1,1,regular
+2023-02-11,América,Necaxa,1,0,2,1,regular
+2023-02-11,Juárez,Santos,0,1,3,1,regular
+2023-02-12,Toluca,Cruz Azul,1,1,3,1,regular
+2023-02-14,Atlético San Luis,América,1,2,1,3,regular
+2023-02-14,Tigres,Juárez,0,0,0,0,regular
+2023-02-14,León,Puebla,0,0,2,0,regular
+2023-02-15,Necaxa,Pumas,2,1,3,1,regular
+2023-02-15,Monterrey,Querétaro,2,0,2,0,regular
+2023-02-15,Chivas,Tijuana,1,1,2,1,regular
+2023-02-16,Mazatlán,Pachuca,0,1,2,3,regular
+2023-02-17,Juárez,León,0,0,0,0,regular
+2023-02-17,Puebla,Cruz Azul,0,1,1,3,regular
+2023-02-18,Pumas,Chivas,0,2,1,2,regular
+2023-02-18,Atlas,Tigres,0,1,0,1,regular
+2023-02-18,Monterrey,Necaxa,0,0,2,1,regular
+2023-02-18,Atlético San Luis,Santos,1,0,1,1,regular
+2023-02-19,Querétaro,Mazatlán,1,0,1,1,regular
+2023-02-19,Pachuca,Toluca,0,1,1,2,regular
+2023-02-19,América,Tijuana,1,0,2,1,regular
+2023-02-22,Cruz Azul,Atlas,0,0,1,0,regular
+2023-02-23,Santos,Toluca,0,2,0,5,regular
+2023-02-24,Necaxa,Querétaro,1,0,1,1,regular
+2023-02-24,Mazatlán,Pumas,1,0,1,2,regular
+2023-02-25,Atlas,América,1,2,2,2,regular
+2023-02-25,Tigres,Chivas,0,2,1,2,regular
+2023-02-25,Cruz Azul,Juárez,1,0,1,0,regular
+2023-02-26,Tijuana,Pachuca,2,0,2,0,regular
+2023-02-26,Toluca,Atlético San Luis,2,0,2,0,regular
+2023-02-26,Santos,Puebla,2,0,3,2,regular
+2023-02-27,León,Monterrey,1,0,1,1,regular
+2023-03-03,Tijuana,Atlas,1,1,1,1,regular
+2023-03-03,Mazatlán,Cruz Azul,1,1,3,1,regular
+2023-03-03,Necaxa,Tigres,0,1,0,1,regular
+2023-03-04,Monterrey,Juárez,1,0,3,0,regular
+2023-03-04,Chivas,Santos,2,0,2,0,regular
+2023-03-04,León,Atlético San Luis,0,0,2,0,regular
+2023-03-04,América,Pachuca,0,3,0,3,regular
+2023-03-05,Pumas,Puebla,1,2,2,4,regular
+2023-03-05,Querétaro,Toluca,1,0,1,0,regular
+2023-03-10,Puebla,Chivas,1,0,1,0,regular
+2023-03-10,Atlético San Luis,Querétaro,0,0,2,0,regular
+2023-03-11,Tigres,América,0,1,0,2,regular
+2023-03-11,Cruz Azul,Pumas,0,0,1,0,regular
+2023-03-11,Atlas,León,0,1,0,1,regular
+2023-03-12,Santos,Tijuana,1,1,3,2,regular
+2023-03-12,Juárez,Necaxa,0,0,1,1,regular
+2023-03-12,Toluca,Mazatlán,2,1,4,1,regular
+2023-03-12,Pachuca,Monterrey,1,1,1,2,regular
+2023-03-17,Tijuana,Toluca,0,3,3,3,regular
+2023-03-17,Puebla,Atlas,0,2,0,4,regular
+2023-03-17,Mazatlán,Necaxa,0,1,0,1,regular
+2023-03-18,Tigres,Monterrey,0,0,0,1,regular
+2023-03-18,Cruz Azul,Atlético San Luis,0,0,1,0,regular
+2023-03-18,Chivas,América,0,3,2,4,regular
+2023-03-19,Pumas,Pachuca,0,0,0,2,regular
+2023-03-19,Querétaro,Juárez,1,0,2,2,regular
+2023-03-19,León,Santos,3,0,4,1,regular
+2023-03-24,Mazatlán,León,1,1,1,2,regular
+2023-03-29,Querétaro,Cruz Azul,0,1,2,2,regular
+2023-03-31,Juárez,Puebla,0,0,0,2,regular
+2023-03-31,Necaxa,Santos,0,0,0,0,regular
+2023-04-01,Pachuca,Cruz Azul,0,1,0,2,regular
+2023-04-01,América,León,0,1,2,2,regular
+2023-04-01,Monterrey,Tijuana,3,0,4,0,regular
+2023-04-01,Atlas,Chivas,2,2,3,3,regular
+2023-04-02,Atlético San Luis,Mazatlán,1,0,2,1,regular
+2023-04-02,Querétaro,Pumas,0,0,1,0,regular
+2023-04-02,Toluca,Tigres,2,0,3,2,regular
+2023-04-07,Puebla,Toluca,0,2,1,2,regular
+2023-04-07,Tijuana,Querétaro,0,1,1,2,regular
+2023-04-08,León,Cruz Azul,0,0,0,0,regular
+2023-04-08,Tigres,Mazatlán,0,2,1,2,regular
+2023-04-08,América,Monterrey,1,1,2,1,regular
+2023-04-08,Chivas,Necaxa,0,0,1,0,regular
+2023-04-09,Santos,Pachuca,1,2,1,4,regular
+2023-04-09,Juárez,Atlas,1,1,1,1,regular
+2023-04-09,Pumas,Atlético San Luis,2,1,3,1,regular
+2023-04-13,Atlético San Luis,Juárez,1,0,2,0,regular
+2023-04-14,Necaxa,Puebla,0,0,1,1,regular
+2023-04-14,Mazatlán,Tijuana,1,1,1,2,regular
+2023-04-15,León,Chivas,0,0,0,2,regular
+2023-04-15,Cruz Azul,América,1,1,1,3,regular
+2023-04-15,Atlas,Pachuca,3,0,4,1,regular
+2023-04-16,Pumas,Toluca,3,1,3,1,regular
+2023-04-16,Querétaro,Tigres,0,0,0,0,regular
+2023-04-16,Monterrey,Santos,1,1,1,2,regular
+2023-04-20,Tigres,Puebla,0,0,1,0,regular
+2023-04-21,Necaxa,Atlas,0,3,1,3,regular
+2023-04-21,Tijuana,León,0,0,0,0,regular
+2023-04-21,Mazatlán,Monterrey,0,1,0,2,regular
+2023-04-22,Pachuca,Atlético San Luis,0,1,2,1,regular
+2023-04-22,Chivas,Cruz Azul,0,1,2,1,regular
+2023-04-22,América,Pumas,0,0,1,1,regular
+2023-04-23,Santos,Querétaro,0,0,0,2,regular
+2023-04-23,Toluca,Juárez,1,0,1,1,regular
+2023-04-28,Juárez,América,0,1,0,1,regular
+2023-04-29,Atlético San Luis,Atlas,0,0,0,0,regular
+2023-04-29,Monterrey,Pumas,4,1,4,1,regular
+2023-04-29,Chivas,Mazatlán,2,1,4,1,regular
+2023-04-29,Cruz Azul,Santos,2,0,3,2,regular
+2023-04-29,Puebla,Tijuana,2,1,5,2,regular
+2023-04-30,Toluca,Necaxa,1,0,3,0,regular
+2023-04-30,Querétaro,Pachuca,0,1,0,1,regular
+2023-04-30,León,Tigres,2,0,3,0,regular
+2023-05-06,Pachuca,Santos,3,2,4,4,liguilla
+2023-05-06,Cruz Azul,Atlas,0,1,0,1,liguilla
+2023-05-07,Tigres,Puebla,0,0,1,0,liguilla
+2023-05-07,León,Atlético San Luis,1,3,1,3,liguilla
+2023-05-10,Atlético San Luis,América,1,3,1,3,liguilla
+2023-05-10,Santos,Monterrey,0,0,0,0,liguilla
+2023-05-11,Tigres,Toluca,3,1,4,1,liguilla
+2023-05-11,Atlas,Chivas,1,0,1,0,liguilla
+2023-05-13,Monterrey,Santos,1,0,2,0,liguilla
+2023-05-13,América,Atlético San Luis,0,2,1,2,liguilla
+2023-05-14,Chivas,Atlas,0,0,1,0,liguilla
+2023-05-14,Toluca,Tigres,2,0,3,1,liguilla
+2023-05-17,Tigres,Monterrey,0,1,1,1,liguilla
+2023-05-18,Chivas,América,0,0,0,1,liguilla
+2023-05-20,Monterrey,Tigres,0,0,0,1,liguilla
+2023-05-21,América,Chivas,0,1,1,3,liguilla
+2023-05-25,Tigres,Chivas,0,0,0,0,liguilla
+2023-05-28,Chivas,Tigres,2,0,2,2,liguilla
+2023-06-30,Mazatlán,Pachuca,0,1,1,1,regular
+2023-06-30,Tijuana,Pumas,1,1,2,3,regular
+2023-06-30,América,Juárez,1,0,1,2,regular
+2023-07-01,Atlético San Luis,Monterrey,0,1,1,1,regular
+2023-07-01,Tigres,Puebla,0,0,1,1,regular
+2023-07-01,Atlas,Cruz Azul,1,0,2,0,regular
+2023-07-02,Santos,Querétaro,0,0,0,2,regular
+2023-07-02,Toluca,Necaxa,0,0,0,0,regular
+2023-07-03,León,Chivas,1,1,1,2,regular
+2023-07-07,Necaxa,Tijuana,0,0,1,1,regular
+2023-07-07,Puebla,Santos,2,2,2,3,regular
+2023-07-08,Cruz Azul,Toluca,0,1,0,2,regular
+2023-07-08,Chivas,Atlético San Luis,2,1,3,1,regular
+2023-07-08,Juárez,Tigres,0,1,1,1,regular
+2023-07-09,Monterrey,Atlas,1,0,1,0,regular
+2023-07-09,Pumas,Mazatlán,0,0,0,0,regular
+2023-07-10,León,Pachuca,3,0,4,0,regular
+2023-07-13,Chivas,Necaxa,1,0,2,0,regular
+2023-07-13,Santos,Atlas,0,0,0,0,regular
+2023-07-14,Mazatlán,Monterrey,0,0,0,3,regular
+2023-07-14,Tijuana,Cruz Azul,0,1,2,1,regular
+2023-07-15,Atlético San Luis,Querétaro,2,1,4,1,regular
+2023-07-15,América,Puebla,2,0,3,0,regular
+2023-07-15,Tigres,León,1,0,1,0,regular
+2023-07-16,Pachuca,Pumas,1,1,1,1,regular
+2023-07-16,Toluca,Juárez,1,1,2,4,regular
+2023-08-18,León,Mazatlán,0,1,2,1,regular
+2023-08-18,Pumas,Toluca,1,1,1,1,regular
+2023-08-18,Puebla,Atlético San Luis,0,1,1,2,regular
+2023-08-18,Juárez,Chivas,0,1,1,1,regular
+2023-08-20,Querétaro,Pachuca,1,0,1,1,regular
+2023-08-20,Cruz Azul,Santos,2,1,2,2,regular
+2023-08-20,América,Atlas,1,1,1,1,regular
+2023-08-20,Necaxa,Tigres,0,1,0,3,regular
+2023-08-22,Mazatlán,Puebla,0,0,1,0,regular
+2023-08-22,Chivas,Tijuana,0,0,1,0,regular
+2023-08-22,Juárez,Pumas,3,0,4,1,regular
+2023-08-23,América,Necaxa,2,1,3,2,regular
+2023-08-23,Atlético San Luis,León,1,0,3,0,regular
+2023-08-23,Pachuca,Cruz Azul,0,0,1,0,regular
+2023-08-25,Tijuana,Mazatlán,1,1,1,1,regular
+2023-08-25,Puebla,Juárez,1,0,1,0,regular
+2023-08-26,Santos,Chivas,0,0,2,1,regular
+2023-08-26,América,León,0,0,1,1,regular
+2023-08-26,Atlas,Toluca,0,0,0,0,regular
+2023-08-27,Necaxa,Querétaro,0,0,0,1,regular
+2023-08-27,Monterrey,Cruz Azul,1,1,1,2,regular
+2023-08-27,Pumas,Tigres,0,0,2,1,regular
+2023-08-28,Pachuca,Atlético San Luis,0,0,0,2,regular
+2023-08-30,Toluca,Monterrey,1,0,1,0,regular
+2023-08-30,Querétaro,Atlas,0,1,1,2,regular
+2023-08-30,Tigres,Santos,1,1,3,2,regular
+2023-09-01,Juárez,Mazatlán,2,1,3,1,regular
+2023-09-01,Puebla,Tijuana,2,0,3,0,regular
+2023-09-02,Cruz Azul,América,1,3,2,3,regular
+2023-09-02,León,Necaxa,0,1,1,1,regular
+2023-09-02,Santos,Pumas,2,1,2,1,regular
+2023-09-02,Tigres,Querétaro,2,0,5,0,regular
+2023-09-03,Toluca,Pachuca,2,0,5,0,regular
+2023-09-03,Atlético San Luis,Atlas,1,0,2,0,regular
+2023-09-03,Chivas,Monterrey,0,2,1,2,regular
+2023-09-15,Mazatlán,Cruz Azul,2,0,2,2,regular
+2023-09-15,Tijuana,Toluca,2,0,2,1,regular
+2023-09-16,Necaxa,Juárez,1,1,1,1,regular
+2023-09-16,Monterrey,León,2,1,3,1,regular
+2023-09-16,América,Chivas,2,0,4,0,regular
+2023-09-17,Pumas,Atlético San Luis,0,1,3,2,regular
+2023-09-17,Atlas,Tigres,2,0,2,0,regular
+2023-09-17,Querétaro,Puebla,0,1,1,1,regular
+2023-09-18,Pachuca,Santos,1,0,3,2,regular
+2023-09-20,Querétaro,América,1,0,1,2,regular
+2023-09-22,Atlético San Luis,Mazatlán,2,0,3,2,regular
+2023-09-22,Puebla,Pumas,0,1,0,2,regular
+2023-09-22,Juárez,Atlas,0,1,1,2,regular
+2023-09-23,Chivas,Pachuca,0,0,0,0,regular
+2023-09-23,León,Tijuana,0,0,1,0,regular
+2023-09-23,Tigres,Monterrey,1,0,3,0,regular
+2023-09-24,Santos,Necaxa,0,1,2,5,regular
+2023-09-24,Toluca,América,0,1,1,1,regular
+2023-09-24,Cruz Azul,Querétaro,1,0,1,3,regular
+2023-09-26,Chivas,Mazatlán,0,2,1,3,regular
+2023-09-28,Atlas,Puebla,1,2,2,3,regular
+2023-09-29,Atlético San Luis,Cruz Azul,0,0,1,2,regular
+2023-09-29,Tijuana,Juárez,1,1,5,1,regular
+2023-09-29,Querétaro,León,0,1,1,1,regular
+2023-09-30,Pachuca,Necaxa,1,1,1,1,regular
+2023-09-30,América,Pumas,0,0,1,0,regular
+2023-09-30,Mazatlán,Tigres,1,1,2,3,regular
+2023-10-01,Toluca,Chivas,0,0,1,1,regular
+2023-10-03,Puebla,Monterrey,1,1,1,1,regular
+2023-10-03,América,Pachuca,1,0,4,0,regular
+2023-10-04,Tigres,Toluca,1,1,2,2,regular
+2023-10-04,Santos,Tijuana,1,1,2,1,regular
+2023-10-04,Necaxa,Cruz Azul,0,1,1,3,regular
+2023-10-04,Pumas,Querétaro,2,0,4,0,regular
+2023-10-06,Mazatlán,América,1,0,1,2,regular
+2023-10-07,Pachuca,Tigres,1,1,1,1,regular
+2023-10-07,Chivas,Atlas,1,1,4,1,regular
+2023-10-07,Monterrey,Juárez,2,0,3,1,regular
+2023-10-07,Cruz Azul,Pumas,1,1,1,4,regular
+2023-10-08,Necaxa,Puebla,0,2,1,2,regular
+2023-10-08,Tijuana,Atlético San Luis,1,0,2,1,regular
+2023-10-08,Santos,León,0,1,0,2,regular
+2023-10-08,Toluca,Querétaro,1,1,3,1,regular
+2023-10-20,Puebla,Chivas,0,1,0,2,regular
+2023-10-20,Atlas,Mazatlán,1,2,1,3,regular
+2023-10-20,Juárez,Pachuca,0,0,0,1,regular
+2023-10-21,León,Toluca,1,0,1,0,regular
+2023-10-21,Tigres,Cruz Azul,0,1,2,1,regular
+2023-10-21,América,Santos,3,2,4,3,regular
+2023-10-21,Querétaro,Tijuana,0,0,1,0,regular
+2023-10-22,Pumas,Monterrey,0,0,0,1,regular
+2023-10-22,Atlético San Luis,Necaxa,2,0,4,0,regular
+2023-10-24,León,Atlas,0,1,1,1,regular
+2023-10-25,Monterrey,Tijuana,2,0,3,1,regular
+2023-10-25,Juárez,Atlético San Luis,2,0,3,2,regular
+2023-10-27,Necaxa,Pumas,0,0,1,0,regular
+2023-10-27,Mazatlán,Querétaro,0,0,3,0,regular
+2023-10-28,Cruz Azul,León,1,0,1,0,regular
+2023-10-28,Pachuca,Puebla,1,1,1,1,regular
+2023-10-28,Monterrey,América,0,3,0,3,regular
+2023-10-28,Chivas,Tigres,0,1,0,4,regular
+2023-10-29,Tijuana,Atlas,1,0,2,0,regular
+2023-10-29,Toluca,Atlético San Luis,1,0,3,1,regular
+2023-10-29,Santos,Juárez,2,1,5,1,regular
+2023-10-31,León,Pumas,0,1,1,1,regular
+2023-10-31,Toluca,Puebla,0,0,0,1,regular
+2023-10-31,Querétaro,Chivas,0,2,1,2,regular
+2023-10-31,Monterrey,Necaxa,1,0,3,0,regular
+2023-11-01,Atlas,Pachuca,0,1,0,2,regular
+2023-11-01,Cruz Azul,Juárez,1,0,2,0,regular
+2023-11-01,Atlético San Luis,América,0,1,0,1,regular
+2023-11-01,Mazatlán,Santos,2,1,3,1,regular
+2023-11-01,Tijuana,Tigres,2,0,2,0,regular
+2023-11-03,Puebla,León,1,3,5,4,regular
+2023-11-04,Chivas,Cruz Azul,0,0,1,0,regular
+2023-11-04,Tigres,Atlético San Luis,0,0,2,2,regular
+2023-11-04,América,Tijuana,0,0,3,0,regular
+2023-11-04,Pachuca,Monterrey,0,2,0,2,regular
+2023-11-05,Pumas,Atlas,1,0,3,0,regular
+2023-11-05,Necaxa,Mazatlán,2,0,4,0,regular
+2023-11-05,Santos,Toluca,1,0,3,1,regular
+2023-11-05,Juárez,Querétaro,0,1,0,3,regular
+2023-11-08,Monterrey,Santos,1,0,3,0,regular
+2023-11-10,Mazatlán,Toluca,0,0,1,0,regular
+2023-11-10,Tijuana,Pachuca,1,0,2,3,regular
+2023-11-10,Atlas,Necaxa,0,0,0,0,regular
+2023-11-11,Atlético San Luis,Santos,0,2,0,2,regular
+2023-11-11,Querétaro,Monterrey,0,0,0,0,regular
+2023-11-11,Pumas,Chivas,1,0,1,0,regular
+2023-11-11,Tigres,América,0,0,0,0,regular
+2023-11-12,León,Juárez,2,1,2,1,regular
+2023-11-12,Cruz Azul,Puebla,1,1,1,2,regular
+2023-11-23,Santos,Mazatlán,1,0,2,1,liguilla
+2023-11-23,Atlético San Luis,León,2,1,3,2,liguilla
+2023-11-26,León,Santos,2,0,3,2,liguilla
+2023-11-29,Atlético San Luis,Monterrey,1,0,1,0,liguilla
+2023-11-29,León,América,2,1,2,2,liguilla
+2023-11-30,Chivas,Pumas,1,0,1,0,liguilla
+2023-11-30,Puebla,Tigres,1,1,2,2,liguilla
+2023-12-02,América,León,0,0,2,0,liguilla
+2023-12-02,Monterrey,Atlético San Luis,1,0,1,1,liguilla
+2023-12-03,Tigres,Puebla,2,0,3,0,liguilla
+2023-12-03,Pumas,Chivas,2,0,3,0,liguilla
+2023-12-06,Atlético San Luis,América,0,2,0,5,liguilla
+2023-12-07,Pumas,Tigres,0,0,0,1,liguilla
+2023-12-09,América,Atlético San Luis,0,0,0,2,liguilla
+2023-12-10,Tigres,Pumas,1,1,1,1,liguilla
+2023-12-14,Tigres,América,0,0,1,1,liguilla
+2023-12-17,América,Tigres,0,0,0,0,liguilla
+2024-01-12,Querétaro,Toluca,1,0,2,2,regular
+2024-01-12,Mazatlán,Atlético San Luis,0,0,0,1,regular
+2024-01-13,Chivas,Santos,0,0,1,1,regular
+2024-01-13,Monterrey,Puebla,0,0,2,0,regular
+2024-01-13,Tijuana,América,0,0,0,2,regular
+2024-01-13,Cruz Azul,Pachuca,0,0,0,1,regular
+2024-01-14,Pumas,Juárez,0,0,1,0,regular
+2024-01-14,Necaxa,Atlas,0,1,2,1,regular
+2024-01-17,León,Tigres,0,0,1,2,regular
+2024-01-19,Atlético San Luis,Pumas,1,0,3,1,regular
+2024-01-19,Juárez,Cruz Azul,0,0,0,0,regular
+2024-01-19,Puebla,Necaxa,0,0,1,2,regular
+2024-01-20,Toluca,Mazatlán,1,1,4,1,regular
+2024-01-20,América,Querétaro,0,0,2,0,regular
+2024-01-20,Atlas,Tijuana,0,0,0,0,regular
+2024-01-21,Santos,Monterrey,0,1,0,2,regular
+2024-01-21,Tigres,Chivas,0,0,1,0,regular
+2024-01-24,Juárez,América,0,1,0,2,regular
+2024-01-24,Monterrey,Querétaro,1,0,1,1,regular
+2024-01-24,Atlético San Luis,Tigres,1,0,1,2,regular
+2024-01-26,Puebla,Toluca,1,1,1,1,regular
+2024-01-26,Tijuana,Chivas,1,0,1,1,regular
+2024-01-27,Necaxa,América,0,0,0,0,regular
+2024-01-27,Monterrey,Atlético San Luis,2,1,3,1,regular
+2024-01-27,Cruz Azul,Mazatlán,2,1,2,1,regular
+2024-01-27,León,Santos,0,1,3,2,regular
+2024-01-28,Atlas,Juárez,2,0,2,1,regular
+2024-01-28,Pumas,Pachuca,2,1,3,1,regular
+2024-01-28,Querétaro,Tigres,1,0,1,1,regular
+2024-01-30,Cruz Azul,Tijuana,0,0,1,0,regular
+2024-01-30,Mazatlán,León,2,1,2,2,regular
+2024-01-30,Santos,Puebla,0,0,3,0,regular
+2024-01-30,Chivas,Toluca,2,2,3,2,regular
+2024-01-31,Pumas,Necaxa,1,0,2,2,regular
+2024-01-31,Pachuca,Atlas,3,2,4,3,regular
+2024-02-02,Querétaro,Cruz Azul,1,3,1,3,regular
+2024-02-02,Puebla,Mazatlán,1,1,3,2,regular
+2024-02-03,Toluca,León,3,0,4,1,regular
+2024-02-03,Juárez,Necaxa,1,1,2,2,regular
+2024-02-03,Tigres,Pumas,1,0,2,2,regular
+2024-02-03,Pachuca,Tijuana,2,1,3,2,regular
+2024-02-03,América,Monterrey,1,1,1,1,regular
+2024-02-04,Atlético San Luis,Chivas,0,1,0,2,regular
+2024-02-04,Atlas,Santos,2,0,3,0,regular
+2024-02-07,Pachuca,León,1,2,3,2,regular
+2024-02-09,Tijuana,Querétaro,1,1,1,1,regular
+2024-02-09,Mazatlán,Atlas,0,0,2,0,regular
+2024-02-10,Necaxa,Toluca,2,1,3,3,regular
+2024-02-10,Chivas,Juárez,1,0,2,1,regular
+2024-02-10,León,América,0,0,0,1,regular
+2024-02-10,Cruz Azul,Atlético San Luis,1,0,3,0,regular
+2024-02-10,Monterrey,Pachuca,2,0,3,2,regular
+2024-02-10,Santos,Tigres,0,2,0,3,regular
+2024-02-11,Pumas,Puebla,0,0,3,0,regular
+2024-02-14,Atlas,Pumas,0,0,0,0,regular
+2024-02-16,Querétaro,Necaxa,1,0,1,1,regular
+2024-02-16,Mazatlán,Chivas,0,1,2,2,regular
+2024-02-17,Atlético San Luis,Tijuana,1,2,3,3,regular
+2024-02-17,Cruz Azul,Tigres,0,0,1,0,regular
+2024-02-17,Pachuca,América,0,0,2,1,regular
+2024-02-18,Monterrey,Toluca,0,0,0,0,regular
+2024-02-18,Atlas,León,0,0,0,1,regular
+2024-02-18,Pumas,Santos,2,0,3,0,regular
+2024-02-20,Necaxa,Chivas,1,0,1,0,regular
+2024-02-20,Puebla,Pachuca,1,1,1,4,regular
+2024-02-21,León,Cruz Azul,0,2,2,3,regular
+2024-02-21,Toluca,Santos,0,0,1,0,regular
+2024-02-21,América,Mazatlán,0,1,2,2,regular
+2024-02-23,Juárez,Monterrey,0,0,0,3,regular
+2024-02-23,Necaxa,Pachuca,1,0,1,1,regular
+2024-02-23,Puebla,Querétaro,0,0,0,2,regular
+2024-02-24,Tigres,Atlas,1,0,1,1,regular
+2024-02-24,América,Cruz Azul,1,0,1,0,regular
+2024-02-24,Chivas,Pumas,0,0,3,1,regular
+2024-02-24,León,Atlético San Luis,0,0,1,0,regular
+2024-02-25,Toluca,Tijuana,0,0,2,0,regular
+2024-02-25,Santos,Mazatlán,0,0,1,0,regular
+2024-02-27,Querétaro,Atlético San Luis,2,0,4,1,regular
+2024-02-28,Tigres,Juárez,0,0,1,0,regular
+2024-02-28,Tijuana,Monterrey,0,0,1,1,regular
+2024-03-01,Mazatlán,Necaxa,0,0,2,1,regular
+2024-03-01,Querétaro,Santos,0,0,0,1,regular
+2024-03-01,Atlético San Luis,Puebla,2,0,4,0,regular
+2024-03-02,Atlas,América,1,2,1,5,regular
+2024-03-02,Toluca,Tigres,0,1,2,1,regular
+2024-03-02,Pachuca,Juárez,0,0,3,2,regular
+2024-03-02,Cruz Azul,Chivas,3,0,3,0,regular
+2024-03-03,Monterrey,Pumas,0,0,3,0,regular
+2024-03-03,Tijuana,León,0,0,1,1,regular
+2024-03-08,Puebla,Atlas,1,2,2,2,regular
+2024-03-08,Juárez,Toluca,1,1,1,1,regular
+2024-03-08,Necaxa,Atlético San Luis,2,1,3,1,regular
+2024-03-09,América,Tigres,1,0,2,0,regular
+2024-03-09,Chivas,León,0,1,1,2,regular
+2024-03-09,Pachuca,Querétaro,0,1,1,2,regular
+2024-03-09,Santos,Cruz Azul,1,0,3,0,regular
+2024-03-10,Pumas,Tijuana,2,1,3,3,regular
+2024-03-10,Monterrey,Mazatlán,2,0,2,1,regular
+2024-03-15,Querétaro,Juárez,1,0,1,0,regular
+2024-03-15,Tijuana,Santos,0,1,2,2,regular
+2024-03-16,Cruz Azul,Necaxa,1,2,1,2,regular
+2024-03-16,León,Puebla,1,0,2,1,regular
+2024-03-16,Tigres,Mazatlán,2,0,5,1,regular
+2024-03-16,Chivas,América,0,0,0,0,regular
+2024-03-17,Toluca,Pumas,2,0,3,0,regular
+2024-03-17,Atlas,Monterrey,0,1,1,2,regular
+2024-03-17,Atlético San Luis,Pachuca,1,0,2,1,regular
+2024-03-23,Juárez,Puebla,1,1,4,3,regular
+2024-03-29,América,Atlético San Luis,0,0,2,1,regular
+2024-03-29,Mazatlán,Tijuana,1,0,2,0,regular
+2024-03-29,Puebla,Tigres,1,0,2,3,regular
+2024-03-30,Pachuca,Toluca,1,3,2,3,regular
+2024-03-30,Monterrey,Chivas,0,0,0,2,regular
+2024-03-30,Pumas,Cruz Azul,0,0,0,0,regular
+2024-03-31,Necaxa,León,0,0,1,2,regular
+2024-03-31,Juárez,Santos,0,0,2,1,regular
+2024-03-31,Atlas,Querétaro,2,1,2,3,regular
+2024-04-05,Mazatlán,Pumas,0,1,0,4,regular
+2024-04-05,Tijuana,Necaxa,1,1,2,3,regular
+2024-04-06,Tigres,Pachuca,0,0,0,3,regular
+2024-04-06,Chivas,Puebla,1,0,3,2,regular
+2024-04-06,Cruz Azul,Monterrey,0,0,2,1,regular
+2024-04-06,Santos,América,0,0,1,1,regular
+2024-04-06,León,Querétaro,0,1,0,2,regular
+2024-04-07,Toluca,Atlas,2,0,4,1,regular
+2024-04-08,Atlético San Luis,Juárez,2,2,2,3,regular
+2024-04-12,Querétaro,Mazatlán,0,1,0,2,regular
+2024-04-12,Necaxa,Santos,1,0,2,0,regular
+2024-04-12,Puebla,Cruz Azul,0,0,0,1,regular
+2024-04-13,América,Toluca,3,1,5,1,regular
+2024-04-13,Monterrey,Tigres,1,2,3,3,regular
+2024-04-13,Pachuca,Chivas,0,1,0,1,regular
+2024-04-14,Pumas,León,0,0,1,0,regular
+2024-04-14,Juárez,Tijuana,0,0,0,1,regular
+2024-04-14,Atlas,Atlético San Luis,1,1,2,1,regular
+2024-04-19,Mazatlán,Juárez,0,0,0,2,regular
+2024-04-19,Atlético San Luis,Toluca,1,2,1,5,regular
+2024-04-19,Tijuana,Puebla,0,1,3,1,regular
+2024-04-20,Tigres,Necaxa,0,1,5,2,regular
+2024-04-20,Chivas,Querétaro,0,0,2,0,regular
+2024-04-20,Santos,Pachuca,0,0,0,2,regular
+2024-04-20,Pumas,América,1,1,2,1,regular
+2024-04-20,León,Monterrey,1,0,2,0,regular
+2024-04-21,Cruz Azul,Atlas,1,2,2,2,regular
+2024-04-26,Querétaro,Pumas,0,0,1,1,regular
+2024-04-26,Puebla,América,1,2,1,2,regular
+2024-04-27,Juárez,León,1,0,1,1,regular
+2024-04-27,Tigres,Tijuana,1,0,4,1,regular
+2024-04-27,Toluca,Cruz Azul,0,1,0,1,regular
+2024-04-27,Pachuca,Mazatlán,0,0,1,1,regular
+2024-04-27,Atlas,Chivas,0,0,0,1,regular
+2024-04-28,Santos,Atlético San Luis,0,2,0,3,regular
+2024-04-28,Necaxa,Monterrey,0,0,2,5,regular
+2024-05-02,Pachuca,Pumas,0,0,0,0,liguilla
+2024-05-02,Necaxa,Querétaro,0,0,1,1,liguilla
+2024-05-05,Pachuca,Necaxa,0,0,2,1,liguilla
+2024-05-08,Pachuca,América,1,1,1,1,liguilla
+2024-05-08,Chivas,Toluca,0,0,1,0,liguilla
+2024-05-09,Tigres,Monterrey,1,1,1,2,liguilla
+2024-05-09,Pumas,Cruz Azul,0,1,0,2,liguilla
+2024-05-11,América,Pachuca,0,1,1,1,liguilla
+2024-05-11,Toluca,Chivas,0,0,0,0,liguilla
+2024-05-12,Monterrey,Tigres,0,1,1,1,liguilla
+2024-05-12,Cruz Azul,Pumas,0,0,2,2,liguilla
+2024-05-15,Chivas,América,0,0,0,0,liguilla
+2024-05-16,Monterrey,Cruz Azul,0,1,0,1,liguilla
+2024-05-18,América,Chivas,0,0,1,0,liguilla
+2024-05-19,Cruz Azul,Monterrey,0,0,1,2,liguilla
+2024-05-23,Cruz Azul,América,1,1,1,1,liguilla
+2024-05-26,América,Cruz Azul,0,0,1,0,liguilla
+2024-07-05,Querétaro,Tijuana,0,1,1,2,regular
+2024-07-05,Juárez,Atlas,1,0,2,2,regular
+2024-07-05,Puebla,Santos,0,0,1,0,regular
+2024-07-06,Atlético San Luis,América,1,1,2,1,regular
+2024-07-06,Tigres,Necaxa,1,0,1,0,regular
+2024-07-06,Chivas,Toluca,0,0,0,0,regular
+2024-07-06,Cruz Azul,Mazatlán,0,0,1,0,regular
+2024-07-07,Pachuca,Monterrey,0,1,0,1,regular
+2024-07-07,Pumas,León,2,1,4,1,regular
+2024-07-12,América,Querétaro,2,1,3,1,regular
+2024-07-12,Mazatlán,Atlético San Luis,0,0,2,2,regular
+2024-07-12,Tijuana,Chivas,1,0,4,2,regular
+2024-07-12,Atlas,Tigres,1,0,1,1,regular
+2024-07-13,León,Pachuca,0,0,0,0,regular
+2024-07-13,Santos,Pumas,1,1,1,1,regular
+2024-07-13,Toluca,Juárez,2,0,3,2,regular
+2024-07-13,Monterrey,Cruz Azul,0,2,0,4,regular
+2024-07-13,Necaxa,Puebla,2,0,4,1,regular
+2024-07-16,Querétaro,Chivas,0,1,0,2,regular
+2024-07-16,Atlas,Santos,0,0,1,0,regular
+2024-07-16,Pachuca,Atlético San Luis,1,0,2,0,regular
+2024-07-16,Puebla,León,1,1,2,2,regular
+2024-07-16,Cruz Azul,Tijuana,2,0,3,0,regular
+2024-07-17,Juárez,Pumas,1,0,1,2,regular
+2024-07-17,Toluca,Mazatlán,2,0,3,0,regular
+2024-07-17,Tigres,América,0,0,1,0,regular
+2024-07-17,Necaxa,Monterrey,0,0,0,1,regular
+2024-07-19,Puebla,Atlas,0,2,1,2,regular
+2024-07-19,Atlético San Luis,Tijuana,1,1,1,1,regular
+2024-07-20,Chivas,Mazatlán,0,0,2,0,regular
+2024-07-20,Santos,Tigres,0,0,0,3,regular
+2024-07-20,Monterrey,Querétaro,1,0,2,1,regular
+2024-07-20,Cruz Azul,Toluca,0,1,1,1,regular
+2024-07-20,Juárez,América,1,1,1,2,regular
+2024-07-21,León,Necaxa,0,1,1,1,regular
+2024-07-21,Pumas,Pachuca,1,0,2,0,regular
+2024-08-16,Puebla,Monterrey,0,1,1,2,regular
+2024-08-18,Tijuana,Santos,2,1,3,1,regular
+2024-08-18,Atlético San Luis,Querétaro,2,0,4,0,regular
+2024-08-23,Tijuana,Monterrey,1,2,2,2,regular
+2024-08-23,Querétaro,Cruz Azul,0,1,0,2,regular
+2024-08-23,Mazatlán,Pachuca,3,0,3,0,regular
+2024-08-24,América,Puebla,0,0,0,1,regular
+2024-08-24,Tigres,Chivas,0,0,1,1,regular
+2024-08-24,Atlas,Pumas,1,0,2,1,regular
+2024-08-24,Necaxa,Juárez,1,0,3,0,regular
+2024-08-24,León,Santos,1,1,1,1,regular
+2024-08-25,Toluca,Atlético San Luis,1,1,2,1,regular
+2024-08-30,Tijuana,León,1,1,2,1,regular
+2024-08-30,Atlético San Luis,Atlas,1,0,2,1,regular
+2024-08-30,Mazatlán,Puebla,1,1,1,1,regular
+2024-08-31,Cruz Azul,América,2,1,4,1,regular
+2024-08-31,Chivas,Juárez,4,0,5,0,regular
+2024-08-31,Monterrey,Toluca,0,1,1,2,regular
+2024-08-31,Pachuca,Querétaro,0,1,1,1,regular
+2024-09-01,Santos,Necaxa,0,1,3,2,regular
+2024-09-01,Pumas,Tigres,1,2,1,3,regular
+2024-09-13,Puebla,Querétaro,1,0,2,1,regular
+2024-09-13,Tigres,Atlético San Luis,0,0,1,0,regular
+2024-09-13,Necaxa,Pumas,0,0,2,0,regular
+2024-09-13,Juárez,Mazatlán,0,0,1,0,regular
+2024-09-13,Atlas,Pachuca,2,0,2,0,regular
+2024-09-14,León,Cruz Azul,1,1,1,2,regular
+2024-09-14,América,Chivas,1,0,1,0,regular
+2024-09-14,Santos,Monterrey,0,1,0,2,regular
+2024-09-14,Toluca,Tijuana,1,0,4,0,regular
+2024-09-17,América,Atlas,1,0,3,0,regular
+2024-09-17,Pumas,Puebla,0,0,1,0,regular
+2024-09-17,Querétaro,Tigres,1,0,1,0,regular
+2024-09-17,Atlético San Luis,Cruz Azul,2,1,3,1,regular
+2024-09-17,Pachuca,Toluca,0,1,2,2,regular
+2024-09-18,Chivas,León,1,0,2,0,regular
+2024-09-18,Mazatlán,Necaxa,0,0,0,0,regular
+2024-09-18,Monterrey,Juárez,1,0,3,2,regular
