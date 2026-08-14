@@ -430,4 +430,73 @@ la Fase 0 verde. No es cosmético, pero tampoco urge.
 
 ---
 
-**Dime qué cambias de esto y arranco por la Fase 0.**
+## 11. Actualización de datos al 14-ago-2026 y el asunto Leagues Cup
+
+### 11.1 Liga MX: hecho
+
+`historico_ligamx.csv` pasó de 4,996 a **5,014 partidos** (hasta 2026-08-02) con las jornadas
+2 y 3. Verifiqué cada resultado contra **dos fuentes independientes** y coinciden 9/9 en ambas
+jornadas; además, la J1 que ya tenías coincide 9/9 con la fuente pública, lo que confirma que
+estamos leyendo el mismo universo. Es un refresco de datos puro: misma competencia, mismo
+esquema, cero cambios de modelo.
+
+La J2 ya está calificada en `desempeno/j02.md`: **4/9 en quiniela, 0 marcadores exactos,
+Brier 0.705** — peor que el azar (0.667) — y **los tres parlays fallaron** por el mismo leg
+("Más de 1.5 goles" en Tijuana-León, que quedó 1-0). Acumulado J1+J2: 10/18, Brier 0.637.
+
+### 11.2 Leagues Cup: los datos están listos, la decisión es tuya
+
+Bajé los **54 partidos** de la fase de liga (4-13 agosto) a `leagues_cup_2026.csv`, con
+columna `competencia` y marcador de tiempo reglamentario (los penales no se registran, mismo
+criterio que ya usa `parsear_openfootball.py` con el a.e.t.).
+
+**No los mezclé con el histórico, y aquí está por qué, medido:**
+
+En Leagues Cup **cada equipo de Liga MX juega sólo contra MLS**, tres partidos. Meter esas
+filas al CSV agrega **18 equipos de MLS** al universo del MLE, y `fit_dixon_coles` normaliza
+ataque y defensa a media 0 **sobre todos los equipos del archivo**. Como MLS salió con ataque
+medio 1.042 contra 0.891 de Liga MX, esa normalización ahora abarca las dos ligas y arrastra
+a todo el bloque mexicano.
+
+Efecto sobre los ratings de Liga MX: **13.3% de desviación media, hasta 56.5%.**
+
+Y lo que de verdad importa, el efecto sobre las probabilidades publicables:
+
+| | |
+|---|---|
+| Diferencia media en probabilidad | **7.0 puntos porcentuales** |
+| Diferencia máxima | **21.9 pp** (Atlante vs América) |
+| Picks de quiniela que cambian | **2 de 9** |
+
+Eso no es ruido: es una decisión de modelación con consecuencias visibles para tus colegas.
+
+**Mi recomendación: todavía no.** No porque Leagues Cup no informe —informa, y mucho: son 54
+partidos competitivos con plantel actual, justo en medio del torneo— sino porque hoy entraría
+por la puerta equivocada. Para aprovecharlo bien hace falta que el modelo distinga
+competencia y liga: un término de nivel por liga que absorba la brecha MLS-Liga MX, para que
+el cruce informe sobre la **fuerza relativa** sin mover el cero de la escala mexicana. Eso es
+Fase 1-2 de trabajo, no un `cat` de dos CSV. Si aun así quieres mezclarlos ya, dímelo y lo
+hago — pero con la advertencia escrita en el JSON de la jornada, porque los números se mueven.
+
+### 11.3 Lo urgente: Atlante ya está rompiendo el modelo
+
+El §3.3 dejó de ser teórico. Con la J3 dentro, el MLE le da a Atlante:
+
+**ataque 1.5324 — el más alto de toda la Liga MX, por encima de Toluca (1.4627).**
+
+Un recién ascendido como mejor ataque del torneo, con **peso efectivo 2.77** contra 7.5-10 de
+los demás. Viene de empatar con América y ganar 3-2 en Cruz Azul en sus primeros tres juegos.
+Es exactamente el caso de credibilidad que te planteé, sólo que ahora apunta en la dirección
+contraria a la de hace tres semanas — lo cual confirma que el problema no es el signo, es la
+varianza: **el rating de Atlante se mueve violentamente con cada partido porque no hay nada
+que lo ancle.**
+
+Si generas la J4 hoy, sale con Atlante de favorito en más de un partido. Por eso la §10.2
+—elegir `k`— dejó de ser una pregunta de diseño y es lo primero que hay que arreglar.
+
+Nota operativa: `FIXTURE`, `JORNADA_ACTUAL` y `AJUSTES_JORNADA` siguen apuntando a la J2. Para
+pronosticar la J4 hay que editarlos a mano, que es justo lo que `config/jornada.json` elimina.
+
+---
+
+**Dime qué cambias de esto y sigo.**

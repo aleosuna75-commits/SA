@@ -15,7 +15,11 @@ reproducir estos números; si no, el refactor está mal.
 | | |
 |---|---|
 | Modelo | `cerebro_ligamx_2026.py`, md5 `a69b14a000b3a3f8d246515f21949e8c` |
-| Histórico | `historico_ligamx.csv`, 4,996 partidos, 2010-07-23 → 2026-07-18 |
+| Histórico | **`golden/historico_ligamx_4996.csv`**, 4,996 partidos, 2010-07-23 → 2026-07-18 |
+
+> El `historico_ligamx.csv` de la raíz **ya no sirve para reproducir este golden**: se le
+> agregaron la J2 y la J3 (5,014 partidos, hasta 2026-08-02). La copia congelada de 4,996
+> filas vive aquí al lado justamente para que la línea base siga siendo verificable.
 | Fecha de referencia | **2026-08-14** (ver aviso abajo) |
 | Duración | ~13 s |
 | MLE | convergió, ventaja local estimada ×1.222 |
