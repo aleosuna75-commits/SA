@@ -611,21 +611,31 @@ tr.acumulado td { font-weight: 700; background: var(--superficie-2); }
 
 .insignia {
   flex: none;
-  width: 1.55rem; height: 1.55rem;
+  width: 1.7rem; height: 1.7rem;
   border-radius: 50%;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: .55rem;
-  font-weight: 700;
-  letter-spacing: .02em;
   position: relative;
   overflow: hidden;
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .18);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .18), 0 1px 2px rgba(18, 32, 27, .18);
 }
-.insignia--sm { width: 1.35rem; height: 1.35rem; font-size: .5rem; }
+.insignia--sm { width: 1.45rem; height: 1.45rem; }
+.insignia__disco {
+  width: 78%; height: 78%;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: .5rem;
+  font-weight: 700;
+  letter-spacing: .01em;
+  line-height: 1;
+}
+.insignia--sm .insignia__disco { font-size: .46rem; }
 .insignia img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
-.insignia--escudo { background: transparent !important; box-shadow: none; font-size: 0; }
+.insignia--escudo { background: none !important; box-shadow: none; }
+.insignia--escudo .insignia__disco { display: none; }
 
 .equipo { display: flex; align-items: center; gap: .45rem; }
 .equipo__nombre { font-weight: 700; }
