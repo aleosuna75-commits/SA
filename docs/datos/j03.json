@@ -3,7 +3,7 @@
  "torneo": "Apertura 2026",
  "jornada": 3,
  "origen": "reconstruido",
- "nota_origen": "No se publicó pronóstico para esta jornada. Reconstruido fuera de muestra: calibrado sólo con partidos anteriores al 31-jul. Sin ajustes de actualidad capturados.",
+ "nota_origen": "No se publicó pronóstico para esta jornada. Reconstruido fuera de muestra: calibrado sólo con partidos anteriores al 31-jul.",
  "estado": "sellada",
  "corte_calibracion": "2026-07-31",
  "modelo": {
@@ -17,7 +17,7 @@
    "activa": true,
    "k": 4,
    "p": 3,
-   "_nota": "Z = w^p/(w^p + k^p) hacia PRIORS_ILUSTRATIVOS. Ver analisis/credibilidad.md. Con k=10,p=1 se reproduce la variante que costaba 0.0037 de Brier."
+   "_nota": "Z = w^p/(w^p + k^p) hacia PRIORS_ILUSTRATIVOS. Ver analisis/credibilidad.md."
   },
   "historico": {
    "partidos": 5005,
@@ -464,7 +464,7 @@
   {
    "id": "j03-queretaro-tigres",
    "fecha": "2026-08-01",
-   "estadio": "Corregidora",
+   "estadio": "La Corregidora",
    "local": "Querétaro",
    "visitante": "Tigres",
    "lambdas": {
@@ -511,7 +511,7 @@
     },
     {
      "capa": "Localía por estadio",
-     "detalle": "Corregidora · ×1.01",
+     "detalle": "La Corregidora · ×1.01",
      "lam": [
       0.933,
       0.968
@@ -614,7 +614,7 @@
   {
    "id": "j03-leon-pachuca",
    "fecha": "2026-08-01",
-   "estadio": "León",
+   "estadio": "Nou Camp",
    "local": "León",
    "visitante": "Pachuca",
    "lambdas": {
@@ -661,7 +661,7 @@
     },
     {
      "capa": "Localía por estadio",
-     "detalle": "León · ×1.03",
+     "detalle": "Nou Camp · ×1.03",
      "lam": [
       1.213,
       1.301

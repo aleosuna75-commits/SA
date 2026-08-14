@@ -1,36 +1,181 @@
 {
  "torneo": "Apertura 2026",
  "jornada_vigente": 4,
+ "actualizado": "2026-08-14T21:29:05",
+ "formato": {
+  "equipos": 18,
+  "jornadas": 17,
+  "clasifican": 8,
+  "play_in": false,
+  "_calendario": "El PDF oficial de Liga MX publica sede y horario de las 17 jornadas, pero los emparejamientos de la J11 en adelante aún no son públicos. Al ser round-robin simple, el CONJUNTO de partidos restantes sí está determinado y es lo que usa la proyección de campeón.",
+  "_fuente_calendario": "PDF oficial Liga MX, Apertura 2026 (fechas y sedes de las 17 jornadas)"
+ },
  "jornadas": [
   {
+   "jornada": 1,
+   "fechas": "16, 17, 18 DE JULIO",
+   "archivo": "j01.json",
+   "estado": "sellada",
+   "origen": "reconstruido",
+   "resumen": {
+    "aciertos_1x2": 5,
+    "partidos": 9,
+    "marcadores_exactos": 1,
+    "brier": 0.5567,
+    "parlays_pegados": 0
+   }
+  },
+  {
    "jornada": 2,
+   "fechas": "21, 24, 25, 26 DE JULIO",
    "archivo": "j02.json",
    "estado": "sellada",
-   "origen": "publicado"
+   "origen": "publicado",
+   "resumen": {
+    "aciertos_1x2": 4,
+    "partidos": 9,
+    "marcadores_exactos": 0,
+    "brier": 0.7053,
+    "parlays_pegados": 0
+   }
   },
   {
    "jornada": 3,
+   "fechas": "31 DE JULIO, 1, 2 DE AGOSTO",
    "archivo": "j03.json",
    "estado": "sellada",
-   "origen": "reconstruido"
+   "origen": "reconstruido",
+   "resumen": {
+    "aciertos_1x2": 5,
+    "partidos": 9,
+    "marcadores_exactos": 0,
+    "brier": 0.6214,
+    "parlays_pegados": 0
+   }
   },
   {
    "jornada": 4,
+   "fechas": "15, 16, 17 DE AGOSTO",
    "archivo": "j04.json",
    "estado": "vigente",
-   "origen": "vigente"
+   "origen": "vigente",
+   "resumen": null
+  },
+  {
+   "jornada": 5,
+   "fechas": "21, 22, 23 DE AGOSTO",
+   "archivo": "j05.json",
+   "estado": "vigente",
+   "origen": "programada",
+   "resumen": null
+  },
+  {
+   "jornada": 6,
+   "fechas": "28, 29, 30 DE AGOSTO",
+   "archivo": "j06.json",
+   "estado": "vigente",
+   "origen": "programada",
+   "resumen": null
+  },
+  {
+   "jornada": 7,
+   "fechas": "4, 5, 6 DE SEPTIEMBRE",
+   "archivo": "j07.json",
+   "estado": "vigente",
+   "origen": "programada",
+   "resumen": null
+  },
+  {
+   "jornada": 8,
+   "fechas": "11, 12, 13 DE SEPTIEMBRE",
+   "archivo": "j08.json",
+   "estado": "vigente",
+   "origen": "programada",
+   "resumen": null
+  },
+  {
+   "jornada": 9,
+   "fechas": "18, 19, 20 DE SEPTIEMBRE",
+   "archivo": "j09.json",
+   "estado": "vigente",
+   "origen": "programada",
+   "resumen": null
+  },
+  {
+   "jornada": 10,
+   "fechas": "25, 26, 27 DE SEPTIEMBRE",
+   "archivo": "j10.json",
+   "estado": "vigente",
+   "origen": "programada",
+   "resumen": null
+  },
+  {
+   "jornada": 11,
+   "fechas": "9, 10, 11 DE OCTUBRE",
+   "archivo": null,
+   "estado": "sin_calendario",
+   "origen": "programada",
+   "resumen": null
+  },
+  {
+   "jornada": 12,
+   "fechas": "16, 17, 18 DE OCTUBRE",
+   "archivo": null,
+   "estado": "sin_calendario",
+   "origen": "programada",
+   "resumen": null
+  },
+  {
+   "jornada": 13,
+   "fechas": "DOBLE  - 20, 21 DE OCTUBRE",
+   "archivo": null,
+   "estado": "sin_calendario",
+   "origen": "programada",
+   "resumen": null
+  },
+  {
+   "jornada": 14,
+   "fechas": "23, 24, 25 DE OCTUBRE",
+   "archivo": null,
+   "estado": "sin_calendario",
+   "origen": "programada",
+   "resumen": null
+  },
+  {
+   "jornada": 15,
+   "fechas": "30, 31 DE OCTUBRE, 1 DE NOVIEMBRE",
+   "archivo": null,
+   "estado": "sin_calendario",
+   "origen": "programada",
+   "resumen": null
+  },
+  {
+   "jornada": 16,
+   "fechas": "6, 7, 8 DE NOVIEMBRE",
+   "archivo": null,
+   "estado": "sin_calendario",
+   "origen": "programada",
+   "resumen": null
+  },
+  {
+   "jornada": 17,
+   "fechas": "20, 21, 22 DE NOVIEMBRE",
+   "archivo": null,
+   "estado": "sin_calendario",
+   "origen": "programada",
+   "resumen": null
   }
  ],
  "desempeno": {
   "por_jornada": [
    {
     "jornada": 1,
-    "aciertos_1x2": 6,
+    "aciertos_1x2": 5,
     "partidos": 9,
     "marcadores_exactos": 1,
-    "brier": 0.568,
-    "origen": "publicado",
-    "nota": "sin snapshot: se registra el resultado, no la distribución"
+    "brier": 0.5567,
+    "parlays_pegados": 0,
+    "origen": "reconstruido"
    },
    {
     "jornada": 2,
@@ -52,10 +197,10 @@
    }
   ],
   "acumulado": {
-   "aciertos_1x2": 15,
+   "aciertos_1x2": 14,
    "partidos": 27,
    "marcadores_exactos": 1,
-   "brier": 0.6316
+   "brier": 0.6278
   },
   "convencion_brier": "multicategoría (0–2); azar = 0.667"
  }

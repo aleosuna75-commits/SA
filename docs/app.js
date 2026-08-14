@@ -1,5 +1,5 @@
 /* ==========================================================================
-   Cerebro Liga MX 2026 — render de jornadas
+   Cerebro Liga MX 2026 — índice de jornadas, jornada y proyección de campeón
    Este archivo NO calcula probabilidades: sólo formatea lo que el Cerebro
    (Python) ya calculó. La fuente de verdad es el modelo.
    ========================================================================== */
@@ -9,12 +9,10 @@ const MESES = ["ene", "feb", "mar", "abr", "may", "jun",
                "jul", "ago", "sep", "oct", "nov", "dic"];
 
 const pct = (p, d = 1) => (p * 100).toFixed(d) + "%";
-
-function fecha(iso) {
+const fecha = (iso) => {
   const [a, m, d] = iso.split("-").map(Number);
   return `${DIAS[new Date(Date.UTC(a, m - 1, d)).getUTCDay()]} ${d} ${MESES[m - 1]}`;
-}
-
+};
 const el = (tag, clase, texto) => {
   const n = document.createElement(tag);
   if (clase) n.className = clase;
@@ -24,9 +22,10 @@ const el = (tag, clase, texto) => {
 const vaciar = (n) => { while (n.firstChild) n.removeChild(n.firstChild); };
 
 const ORIGEN = {
-  publicado: ["Pronóstico sellado antes de jugarse", "sello--ok"],
+  publicado:    ["Pronóstico sellado antes de jugarse", "sello--ok"],
   reconstruido: ["Reconstruido fuera de muestra", "sello--aviso"],
-  vigente: ["Por jugarse", "sello--vivo"],
+  vigente:      ["Por jugarse", "sello--vivo"],
+  programada:   ["Calendario confirmado", "sello--aviso"],
 };
 
 /* ------------------------------------------------------------------ barra */
@@ -52,7 +51,6 @@ function tarjetaPartido(p) {
   const r = p.resultado;
   const ocurrio = r ? (r.gana === "Empate" ? "empate"
                                            : (r.gana === p.local ? "local" : "visita")) : null;
-
   const card = el("article",
     "partido " + (r ? (r.acerto_1x2 ? "partido--acierto" : "partido--falla")
                     : "partido--pendiente"));
@@ -64,9 +62,13 @@ function tarjetaPartido(p) {
 
   const m = el("div", "marcador");
   const eq = el("div", "marcador__equipos");
-  eq.append(document.createTextNode(p.local));
-  eq.appendChild(el("div", "marcador__vs", "vs"));
-  eq.append(document.createTextNode(p.visitante));
+  [p.local, p.visitante].forEach((t, i) => {
+    const fila = el("div", "equipo");
+    fila.appendChild(insignia(t));
+    fila.appendChild(el("span", "equipo__nombre", t));
+    eq.appendChild(fila);
+    if (i === 0) eq.appendChild(el("div", "marcador__vs", "vs"));
+  });
   m.appendChild(eq);
   if (r) {
     m.appendChild(el("div", "marcador__cifras", `${r.gl} – ${r.gv}`));
@@ -100,7 +102,6 @@ function tarjetaPartido(p) {
                         r.acerto_1x2 ? "✓" : "✗"));
   }
   ver.appendChild(pick);
-
   const mar = el("span");
   mar.append(document.createTextNode("Marcador: "));
   mar.appendChild(el("b", null, p.marcador_probable));
@@ -114,7 +115,6 @@ function tarjetaPartido(p) {
   cuerpo.appendChild(ver);
 
   if (p.incertidumbre) cuerpo.appendChild(el("p", "aviso", "⚠ " + p.incertidumbre));
-
   card.appendChild(cuerpo);
 
   const det = el("details");
@@ -154,7 +154,6 @@ function tarjetaParlay(p) {
     p.pego === false ? "No pegó" : (p.pego ? "Pegó" : "Por jugarse")));
   card.appendChild(cabeza);
   card.appendChild(el("p", "parlay__desc", p.descripcion));
-
   const lista = el("ul", "legs");
   p.legs.forEach((l) => {
     const li = el("li", "leg");
@@ -166,7 +165,6 @@ function tarjetaParlay(p) {
     lista.appendChild(li);
   });
   card.appendChild(lista);
-
   const pie = el("div", "parlay__pie");
   pie.appendChild(el("span", null, `${p.legs.length} picks`));
   const pr = el("span");
@@ -177,7 +175,7 @@ function tarjetaParlay(p) {
   return card;
 }
 
-/* ------------------------------------------------------------------ render */
+/* ------------------------------------------------------------ vista jornada */
 
 function pintaJornada(d) {
   document.getElementById("titulo").textContent = `Jornada ${d.jornada}`;
@@ -187,43 +185,38 @@ function pintaJornada(d) {
   const sello = document.getElementById("sello");
   sello.textContent = txt;
   sello.className = "sello " + clase;
+  sello.hidden = false;
 
-  const notaOrigen = document.getElementById("nota-origen");
-  notaOrigen.textContent = d.nota_origen || "";
-  notaOrigen.hidden = !d.nota_origen;
+  const nota = document.getElementById("nota-origen");
+  nota.textContent = d.nota_origen || "";
+  nota.hidden = !d.nota_origen;
 
-  /* resumen de la jornada */
   const res = document.getElementById("resumen");
   vaciar(res);
-  const tituloRes = document.getElementById("titulo-resumen");
+  const tit = document.getElementById("titulo-resumen");
   if (d.resumen) {
-    tituloRes.textContent = "Cómo le fue al modelo";
+    tit.textContent = "Cómo le fue al modelo";
     const j = d.resumen, malo = j.brier > 0.667;
-    [["Aciertos 1X2", `${j.aciertos_1x2}/${j.partidos}`,
-      pct(j.aciertos_1x2 / j.partidos, 0), false],
+    [["Aciertos 1X2", `${j.aciertos_1x2}/${j.partidos}`, pct(j.aciertos_1x2 / j.partidos, 0), false],
      ["Marcador exacto", `${j.marcadores_exactos}/${j.partidos}`, "de 9 partidos", false],
-     ["Brier", j.brier.toFixed(3),
-      malo ? "peor que el azar (0.667)" : "mejor que el azar (0.667)", malo],
-     ["Parlays", `${j.parlays_pegados}/3`,
-      j.parlays_pegados ? "" : "ninguno pegó", j.parlays_pegados === 0],
-    ].forEach(([et, val, nota, m]) => {
+     ["Brier", j.brier.toFixed(3), malo ? "peor que el azar (0.667)" : "mejor que el azar (0.667)", malo],
+     ["Parlays", `${j.parlays_pegados}/3`, j.parlays_pegados ? "" : "ninguno pegó", j.parlays_pegados === 0],
+    ].forEach(([e2, v, n2, m]) => {
       const c = el("div", "dato" + (m ? " dato--malo" : ""));
-      c.appendChild(el("div", "dato__etiqueta", et));
-      c.appendChild(el("div", "dato__valor", val));
-      c.appendChild(el("div", "dato__nota", nota));
+      c.append(el("div", "dato__etiqueta", e2), el("div", "dato__valor", v),
+               el("div", "dato__nota", n2));
       res.appendChild(c);
     });
   } else {
-    tituloRes.textContent = "Jornada por jugarse";
+    tit.textContent = "Jornada por jugarse";
     const h = d.modelo.historico;
     [["Partidos", String(d.partidos.length), "aún sin resultado", false],
      ["Calibrado con", h.partidos.toLocaleString("es-MX"), `partidos, hasta ${fecha(h.hasta)}`, false],
      ["Corte", fecha(d.corte_calibracion), "no ve nada posterior", true],
-    ].forEach(([et, val, nota, texto]) => {
-      const c = el("div", "dato" + (texto ? " dato--texto" : ""));
-      c.appendChild(el("div", "dato__etiqueta", et));
-      c.appendChild(el("div", "dato__valor", val));
-      c.appendChild(el("div", "dato__nota", nota));
+    ].forEach(([e2, v, n2, t]) => {
+      const c = el("div", "dato" + (t ? " dato--texto" : ""));
+      c.append(el("div", "dato__etiqueta", e2), el("div", "dato__valor", v),
+               el("div", "dato__nota", n2));
       res.appendChild(c);
     });
   }
@@ -238,37 +231,96 @@ function pintaJornada(d) {
     if (d.parlays[k]) parlays.appendChild(tarjetaParlay(d.parlays[k]));
   });
 
-  /* procedencia */
   const h = d.modelo.historico, cr = d.modelo.credibilidad || {};
   document.getElementById("procedencia").innerHTML =
     `Dixon-Coles con corrección ρ = ${d.modelo.rho_dc} sobre la malla exacta de marcadores. ` +
     `Calibrado por máxima verosimilitud con <b>${h.partidos.toLocaleString("es-MX")} partidos reales</b> ` +
     `(${h.desde} a ${h.hasta}), decaimiento temporal ξ = ${d.modelo.xi_decaimiento} por día. ` +
     `Corte de calibración: <b>${d.corte_calibracion}</b> — el modelo no ve ningún partido posterior. ` +
-    (cr.activa ? `Credibilidad Z = w³/(w³+${cr.k}³) hacia el prior para equipos con poco histórico. ` : "") +
-    `Mitades por adelgazamiento de Poisson con ${pct(d.modelo.prop_goles_1t, 2)} de los goles en el 1T.`;
-  document.getElementById("nomodelado").textContent = d.no_modelado.join(", ");
+    (cr.activa ? `Credibilidad Z = w³/(w³+${cr.k}³) hacia el prior para equipos con poco histórico. ` : "");
 }
 
-function pintaIndice(idx, actual, alCambiar) {
-  const nav = document.getElementById("jornadas");
-  vaciar(nav);
+/* -------------------------------------------------------------- vista índice */
+
+function pintaIndice(idx, proy, ir) {
+  document.getElementById("titulo").textContent = idx.torneo;
+  document.getElementById("subtitulo").textContent =
+    `${idx.formato.jornadas} jornadas · ${idx.formato.equipos} equipos · ` +
+    `clasifican ${idx.formato.clasifican}`;
+  document.getElementById("sello").hidden = true;
+
+  /* --- campeón --- */
+  const cont = document.getElementById("campeon");
+  vaciar(cont);
+  if (proy) {
+    const max = proy.equipos[0].campeon || 1;
+    proy.equipos.slice(0, 8).forEach((t) => {
+      const f = el("div", "candidato");
+      f.appendChild(insignia(t.equipo, "sm"));
+      f.appendChild(el("span", "candidato__nombre", t.equipo));
+      const barra = el("div", "candidato__barra");
+      const relleno = el("div", "candidato__relleno");
+      relleno.style.width = `${Math.max(2, (t.campeon / max) * 100)}%`;
+      barra.appendChild(relleno);
+      f.appendChild(barra);
+      f.appendChild(el("span", "candidato__pct", pct(t.campeon)));
+      f.appendChild(el("span", "candidato__extra", `clasifica ${pct(t.clasifica, 0)}`));
+      cont.appendChild(f);
+    });
+    document.getElementById("campeon-nota").textContent =
+      `${proy.simulaciones.toLocaleString("es-MX")} simulaciones del torneo completo ` +
+      `(${proy.partidos_restantes} partidos por jugar más la liguilla). ${proy.supuesto}`;
+  }
+
+  /* --- las 17 jornadas --- */
+  const lista = document.getElementById("lista-jornadas");
+  vaciar(lista);
   idx.jornadas.forEach((j) => {
-    const b = el("button", "tab" + (j.jornada === actual ? " tab--activa" : ""),
-                 `J${j.jornada}`);
-    b.type = "button";
-    b.setAttribute("aria-pressed", String(j.jornada === actual));
-    if (j.estado === "vigente") b.appendChild(el("i", "tab__vivo"));
-    b.addEventListener("click", () => alCambiar(j.jornada));
-    nav.appendChild(b);
+    const clickable = !!j.archivo;
+    const fila = el(clickable ? "button" : "div",
+                    "jfila" + (j.jornada === idx.jornada_vigente ? " jfila--vigente" : "")
+                            + (clickable ? "" : " jfila--muda"));
+    if (clickable) {
+      fila.type = "button";
+      fila.addEventListener("click", () => ir(j.jornada));
+    }
+    fila.appendChild(el("span", "jfila__n", `J${j.jornada}`));
+    const med = el("span", "jfila__medio");
+    med.appendChild(el("span", "jfila__fechas", (j.fechas || "").toLowerCase()));
+    const est = j.resumen
+      ? `${j.resumen.aciertos_1x2}/${j.resumen.partidos} aciertos · Brier ${j.resumen.brier.toFixed(3)}`
+      : (j.estado === "sin_calendario" ? "emparejamientos aún no publicados"
+                                       : "pronóstico listo");
+    med.appendChild(el("span", "jfila__estado", est));
+    fila.appendChild(med);
+    if (j.jornada === idx.jornada_vigente) fila.appendChild(el("span", "etiqueta", "vigente"));
+    else if (j.resumen) fila.appendChild(el("span", "etiqueta etiqueta--ok", "jugada"));
+    lista.appendChild(fila);
   });
+
+  /* --- desempeño --- */
+  const ac = document.getElementById("acumulado");
+  vaciar(ac);
+  const a = idx.desempeno.acumulado;
+  if (a.partidos) {
+    const malo = a.brier > 0.667;
+    [["Aciertos 1X2", `${a.aciertos_1x2}/${a.partidos}`, pct(a.aciertos_1x2 / a.partidos, 0), false],
+     ["Marcador exacto", String(a.marcadores_exactos), `de ${a.partidos} partidos`, false],
+     ["Brier acumulado", a.brier.toFixed(3), malo ? "peor que el azar" : "mejor que el azar (0.667)", malo],
+    ].forEach(([e2, v, n2, m]) => {
+      const c = el("div", "dato" + (m ? " dato--malo" : ""));
+      c.append(el("div", "dato__etiqueta", e2), el("div", "dato__valor", v),
+               el("div", "dato__nota", n2));
+      ac.appendChild(c);
+    });
+  }
 
   const tb = document.getElementById("historico");
   vaciar(tb);
   idx.desempeno.por_jornada.forEach((h) => {
     const tr = document.createElement("tr");
-    const et = `Jornada ${h.jornada}` + (h.origen === "reconstruido" ? " *" : "");
-    [et, `${h.aciertos_1x2}/${h.partidos}`, String(h.marcadores_exactos),
+    [`Jornada ${h.jornada}${h.origen === "reconstruido" ? " *" : ""}`,
+     `${h.aciertos_1x2}/${h.partidos}`, String(h.marcadores_exactos),
      h.brier.toFixed(3)].forEach((t) => {
       const td = document.createElement("td");
       td.textContent = t;
@@ -276,46 +328,82 @@ function pintaIndice(idx, actual, alCambiar) {
     });
     tb.appendChild(tr);
   });
-  const a = idx.desempeno.acumulado;
-  const tr = document.createElement("tr");
-  tr.className = "acumulado";
-  ["Acumulado", `${a.aciertos_1x2}/${a.partidos}`, String(a.marcadores_exactos),
-   a.brier.toFixed(3)].forEach((t) => {
-    const td = document.createElement("td");
-    td.textContent = t;
-    tr.appendChild(td);
-  });
-  tb.appendChild(tr);
-
+  if (a.partidos) {
+    const tr = document.createElement("tr");
+    tr.className = "acumulado";
+    ["Acumulado", `${a.aciertos_1x2}/${a.partidos}`, String(a.marcadores_exactos),
+     a.brier.toFixed(3)].forEach((t) => {
+      const td = document.createElement("td");
+      td.textContent = t;
+      tr.appendChild(td);
+    });
+    tb.appendChild(tr);
+  }
   document.getElementById("convencion").textContent = idx.desempeno.convencion_brier;
+  document.getElementById("procedencia").innerHTML =
+    "Modelo Dixon-Coles calibrado por máxima verosimilitud sobre el histórico real de Liga MX, " +
+    "con decaimiento temporal y credibilidad para equipos con poco histórico. Cada jornada se " +
+    "calibra <b>sólo con partidos anteriores a su fecha</b>, así que ningún pronóstico ve " +
+    "resultados posteriores a sí mismo.";
 }
 
 /* ------------------------------------------------------------------ arranque */
 
-function iniciar(idx, cargar) {
-  let actual = idx.jornada_vigente;
+const VISTA_I = document.getElementById("vista-indice");
+const VISTA_J = document.getElementById("vista-jornada");
+const VOLVER = document.getElementById("volver");
 
-  const ir = (n) => {
+function arranca(cargarIndice, cargarJornada, cargarProy, autorefresco) {
+  let idx = null, proy = null, actual = null;
+
+  const alIndice = () => {
+    actual = null;
+    VISTA_J.hidden = true; VISTA_I.hidden = false; VOLVER.hidden = true;
+    pintaIndice(idx, proy, irJornada);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+  const irJornada = (n) => {
     actual = n;
-    pintaIndice(idx, actual, ir);
-    Promise.resolve(cargar(n)).then((d) => {
+    Promise.resolve(cargarJornada(n)).then((d) => {
+      VISTA_I.hidden = true; VISTA_J.hidden = false; VOLVER.hidden = false;
       pintaJornada(d);
       window.scrollTo({ top: 0, behavior: "smooth" });
     });
   };
-  ir(actual);
+  VOLVER.addEventListener("click", alIndice);
+
+  const sello = (i) => {
+    document.getElementById("actualizado").textContent =
+      (i.actualizado || "").replace("T", " ").slice(0, 16) || "—";
+  };
+
+  Promise.all([cargarIndice(), cargarProy()]).then(([i, p]) => {
+    idx = i; proy = p; sello(i);
+    alIndice();
+
+    /* Autoactualización: revisa el índice cada minuto y sólo repinta si el
+       generador publicó algo nuevo. Es lo que hace que, al subir resultados,
+       las pantallas ya abiertas se enteren solas. */
+    if (autorefresco) {
+      setInterval(() => {
+        cargarIndice().then((nuevo) => {
+          if (!nuevo || nuevo.actualizado === idx.actualizado) return;
+          idx = nuevo; sello(nuevo);
+          cargarProy().then((np) => { proy = np; });
+          if (actual === null) pintaIndice(idx, proy, irJornada);
+          else irJornada(actual);
+        }).catch(() => {});
+      }, 60000);
+    }
+  });
 }
 
 if (typeof DATOS !== "undefined") {
-  /* vista previa de un solo archivo: todo viene embebido */
-  iniciar(DATOS.indice, (n) => DATOS.jornadas[String(n)]);
+  arranca(() => DATOS.indice, (n) => DATOS.jornadas[String(n)], () => DATOS.proyeccion, false);
 } else {
-  fetch("datos/indice.json", { cache: "no-cache" })
-    .then((r) => r.json())
-    .then((idx) => iniciar(idx, (n) =>
-      fetch(`datos/j${String(n).padStart(2, "0")}.json`).then((r) => r.json())))
-    .catch(() => {
-      document.getElementById("resumen").textContent =
-        "No se pudieron cargar las jornadas. Recarga la página.";
-    });
+  const j = (u) => fetch(u, { cache: "no-cache" }).then((r) => r.json());
+  arranca(() => j("datos/indice.json"),
+          (n) => j(`datos/j${String(n).padStart(2, "0")}.json`),
+          () => j("datos/proyeccion.json").catch(() => null),
+          true);
 }

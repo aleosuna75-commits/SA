@@ -17,15 +17,19 @@ DOCS = Path(__file__).resolve().parent
 def main():
     html = (DOCS / "index.html").read_text(encoding="utf-8")
     css = (DOCS / "estilos.css").read_text(encoding="utf-8")
-    js = (DOCS / "app.js").read_text(encoding="utf-8")
+    js = ((DOCS / "equipos.js").read_text(encoding="utf-8") + "\n"
+          + (DOCS / "app.js").read_text(encoding="utf-8"))
     idx = json.loads((DOCS / "datos" / "indice.json").read_text(encoding="utf-8"))
     jornadas = {str(j["jornada"]):
                 json.loads((DOCS / "datos" / j["archivo"]).read_text(encoding="utf-8"))
-                for j in idx["jornadas"]}
-    datos = {"indice": idx, "jornadas": jornadas}
+                for j in idx["jornadas"] if j.get("archivo")}
+    proy_f = DOCS / "datos" / "proyeccion.json"
+    datos = {"indice": idx, "jornadas": jornadas,
+             "proyeccion": json.loads(proy_f.read_text(encoding="utf-8"))
+                           if proy_f.is_file() else None}
 
     cuerpo = re.search(r"<body>(.*)</body>", html, re.S).group(1)
-    cuerpo = re.sub(r'\s*<script src="app\.js"></script>', "", cuerpo)
+    cuerpo = re.sub(r'\s*<script src="(app|equipos)\.js"></script>', "", cuerpo)
     titulo = re.search(r"<title>(.*?)</title>", html, re.S).group(1)
 
     salida = (

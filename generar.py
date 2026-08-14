@@ -271,6 +271,60 @@ def genera_jornada(bloque, historico_todo, cfg_modelo, torneo):
     return doc
 
 
+#  ¿Cuántos partidos de local tiene cada equipo en todo el torneo? Sale de contar
+#  sedes en el calendario oficial: nueve equipos tienen 9 y nueve tienen 8, y la
+#  suma da 153, que es el total de partidos del torneo. No es un supuesto.
+NUEVE_LOCALES = {"Atlas", "Atlético San Luis", "Chivas", "Juárez", "Necaxa",
+                 "Pumas", "Querétaro", "Santos", "Tijuana"}
+
+
+def proyeccion_campeon(cfg, historico):
+    """Simula lo que falta del torneo con los ratings del día."""
+    import itertools
+    import proyeccion as P
+
+    reg = [p for p in historico if p["fase"] == "regular"]
+    C.BASE_HOME_GOALS = sum(p["gl"] for p in reg) / len(reg)
+    C.BASE_AWAY_GOALS = sum(p["gv"] for p in reg) / len(reg)
+    hoy = historico[-1]["fecha"]
+    crudos = C.fit_dixon_coles(historico, hoy=hoy)
+    for e in C.EQUIPOS:
+        crudos.setdefault(e, C.PRIORS_ILUSTRATIVOS[e])
+    ratings, _ = aplicar_credibilidad(crudos, pesos(historico, hoy),
+                                      cfg["modelo"].get("credibilidad", {}))
+
+    jugados, programados, locales = [], set(), {}
+    for bloque in cfg["jornadas"]:
+        for p in bloque["partidos"]:
+            programados.add(frozenset((p["local"], p["visitante"])))
+            locales[p["local"]] = locales.get(p["local"], 0) + 1
+            if p.get("resultado"):
+                jugados.append((p["local"], p["visitante"], *p["resultado"]))
+
+    restantes = [tuple(sorted(par)) for par in
+                 ({frozenset(c) for c in itertools.combinations(C.EQUIPOS, 2)} - programados)]
+    loc_rest = {e: (9 if e in NUEVE_LOCALES else 8) - locales.get(e, 0) for e in C.EQUIPOS}
+
+    cfg_p = cfg["modelo"].get("proyeccion", {})
+    filas = P.simular(C.EQUIPOS, jugados, restantes, loc_rest, ratings,
+                      n_sims=cfg_p.get("simulaciones", 20000),
+                      semilla=cfg_p.get("semilla", 20260814))
+    return {
+        "torneo": cfg["torneo"],
+        "simulaciones": cfg_p.get("simulaciones", 20000),
+        "partidos_jugados": len(jugados),
+        "partidos_restantes": len(restantes),
+        "clasifican": cfg["formato"]["clasifican"],
+        "equipos": filas,
+        "supuesto": ("El calendario oficial publica sede y horario de las 17 jornadas, pero "
+                     "los emparejamientos de la J11 en adelante no son públicos. Al ser "
+                     "round-robin simple, el conjunto de partidos restantes y las localías de "
+                     "cada equipo sí están determinados; lo único desconocido es quién es "
+                     "local en cada pareja concreta, y eso se integra sorteando calendarios "
+                     "válidos en vez de asumir uno."),
+    }
+
+
 def main():
     ap = argparse.ArgumentParser(description="Genera los JSON de jornada del Cerebro")
     ap.add_argument("--jornada", type=int, help="Sólo esta jornada")
@@ -289,7 +343,7 @@ def main():
             if ruta.is_file():
                 d = json.loads(ruta.read_text(encoding="utf-8"))
                 resumenes.append((d, bloque))
-                if d["estado"] != "sellada":
+                if d["estado"] != "sellada" and vigente is None:
                     vigente = n
             continue
         print(f"[J{n}] origen={bloque['origen']} ...")
@@ -301,31 +355,51 @@ def main():
               f" · estado {doc['estado']}"
               + (f" · {r['aciertos_1x2']}/{r['partidos']} aciertos, Brier {r['brier']}" if r else ""))
         resumenes.append((doc, bloque))
-        if doc["estado"] != "sellada":
+        if doc["estado"] != "sellada" and vigente is None:
             vigente = n
 
+    # --- proyección de campeón ---
+    proy = proyeccion_campeon(cfg, historico)
+    (SALIDA / "proyeccion.json").write_text(
+        json.dumps(proy, ensure_ascii=False, indent=1), encoding="utf-8")
+    print(f"proyeccion.json · {proy['simulaciones']:,} simulaciones · "
+          f"favorito {proy['equipos'][0]['equipo']} {proy['equipos'][0]['campeon']:.1%}")
+
     # --- índice + desempeño acumulado ---
-    hist = [{"jornada": 1, "aciertos_1x2": 6, "partidos": 9, "marcadores_exactos": 1,
-             "brier": 0.568, "origen": "publicado",
-             "nota": "sin snapshot: se registra el resultado, no la distribución"}]
+    hist = []
     for doc, _ in sorted(resumenes, key=lambda t: t[0]["jornada"]):
         if doc["resumen"]:
             hist.append({"jornada": doc["jornada"], **doc["resumen"], "origen": doc["origen"]})
 
     con_brier = [h for h in hist if h.get("brier") is not None]
+    generadas = {d["jornada"]: d for d, _ in resumenes}
+    listado = []
+    for n in range(1, cfg["formato"]["jornadas"] + 1):
+        fila = {"jornada": n, "fechas": cfg["calendario_oficial"].get(str(n))}
+        if n in generadas:
+            d = generadas[n]
+            fila.update({"archivo": f"j{n:02d}.json", "estado": d["estado"],
+                         "origen": d["origen"],
+                         "resumen": d["resumen"]})
+        else:
+            fila.update({"archivo": None, "estado": "sin_calendario", "origen": "programada",
+                         "resumen": None})
+        listado.append(fila)
+
     indice = {
         "torneo": cfg["torneo"],
-        "jornada_vigente": vigente or max(d["jornada"] for d, _ in resumenes),
-        "jornadas": [{"jornada": d["jornada"], "archivo": f"j{d['jornada']:02d}.json",
-                      "estado": d["estado"], "origen": d["origen"]}
-                     for d, _ in sorted(resumenes, key=lambda t: t[0]["jornada"])],
+        "jornada_vigente": vigente or max(generadas),
+        "actualizado": datetime.now().replace(microsecond=0).isoformat(),
+        "formato": cfg["formato"],
+        "jornadas": listado,
         "desempeno": {
             "por_jornada": hist,
             "acumulado": {
                 "aciertos_1x2": sum(h["aciertos_1x2"] for h in hist),
                 "partidos": sum(h["partidos"] for h in hist),
                 "marcadores_exactos": sum(h["marcadores_exactos"] for h in hist),
-                "brier": round(sum(h["brier"] for h in con_brier) / len(con_brier), 4),
+                "brier": round(sum(h["brier"] for h in con_brier) / len(con_brier), 4)
+                         if con_brier else None,
             },
             "convencion_brier": "multicategoría (0–2); azar = 0.667",
         },

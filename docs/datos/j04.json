@@ -3,7 +3,7 @@
  "torneo": "Apertura 2026",
  "jornada": 4,
  "origen": "vigente",
- "nota_origen": "Sin ajustes de actualidad capturados: lesiones y suspensiones de la semana los cargas tú en 'ajustes'.",
+ "nota_origen": "Sin ajustes de actualidad capturados: las lesiones y suspensiones de la semana las cargas tú en 'ajustes'.",
  "estado": "vigente",
  "corte_calibracion": "2026-08-15",
  "modelo": {
@@ -17,7 +17,7 @@
    "activa": true,
    "k": 4,
    "p": 3,
-   "_nota": "Z = w^p/(w^p + k^p) hacia PRIORS_ILUSTRATIVOS. Ver analisis/credibilidad.md. Con k=10,p=1 se reproduce la variante que costaba 0.0037 de Brier."
+   "_nota": "Z = w^p/(w^p + k^p) hacia PRIORS_ILUSTRATIVOS. Ver analisis/credibilidad.md."
   },
   "historico": {
    "partidos": 5014,
@@ -579,7 +579,7 @@
   {
    "id": "j04-santos-chivas",
    "fecha": "2026-08-16",
-   "estadio": "Corona",
+   "estadio": "TSM Corona",
    "local": "Santos",
    "visitante": "Chivas",
    "lambdas": {
@@ -626,7 +626,7 @@
     },
     {
      "capa": "Localía por estadio",
-     "detalle": "Corona · ×1.03",
+     "detalle": "TSM Corona · ×1.03",
      "lam": [
       0.711,
       1.023

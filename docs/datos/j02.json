@@ -17,7 +17,7 @@
    "activa": true,
    "k": 4,
    "p": 3,
-   "_nota": "Z = w^p/(w^p + k^p) hacia PRIORS_ILUSTRATIVOS. Ver analisis/credibilidad.md. Con k=10,p=1 se reproduce la variante que costaba 0.0037 de Brier."
+   "_nota": "Z = w^p/(w^p + k^p) hacia PRIORS_ILUSTRATIVOS. Ver analisis/credibilidad.md."
   },
   "historico": {
    "partidos": 4996,
@@ -247,7 +247,7 @@
   {
    "id": "j02-cruz-azul-puebla",
    "fecha": "2026-07-21",
-   "estadio": "Estadio Banorte (adelantado)",
+   "estadio": "Estadio Banorte",
    "local": "Cruz Azul",
    "visitante": "Puebla",
    "lambdas": {
@@ -294,7 +294,7 @@
     },
     {
      "capa": "Localía por estadio",
-     "detalle": "Estadio Banorte (adelantado) · ×1.02",
+     "detalle": "Estadio Banorte · ×1.02",
      "lam": [
       1.899,
       0.543
@@ -330,7 +330,7 @@
   {
    "id": "j02-toluca-pumas",
    "fecha": "2026-07-21",
-   "estadio": "Nemesio Díez (adelantado)",
+   "estadio": "Nemesio Díez",
    "local": "Toluca",
    "visitante": "Pumas",
    "lambdas": {
@@ -377,7 +377,7 @@
     },
     {
      "capa": "Localía por estadio",
-     "detalle": "Nemesio Díez (adelantado) · ×1.10",
+     "detalle": "Nemesio Díez · ×1.10",
      "lam": [
       2.385,
       0.651
@@ -555,7 +555,7 @@
   {
    "id": "j02-atlante-america",
    "fecha": "2026-07-24",
-   "estadio": "Ciudad de los Deportes",
+   "estadio": "Estadio Banorte",
    "local": "Atlante",
    "visitante": "América",
    "lambdas": {
@@ -602,7 +602,7 @@
     },
     {
      "capa": "Localía por estadio",
-     "detalle": "Ciudad de los Deportes · ×1.02",
+     "detalle": "Estadio Banorte · ×1.02",
      "lam": [
       0.512,
       1.598
@@ -737,7 +737,7 @@
   {
    "id": "j02-santos-atlas",
    "fecha": "2026-07-25",
-   "estadio": "Corona",
+   "estadio": "TSM Corona",
    "local": "Santos",
    "visitante": "Atlas",
    "lambdas": {
@@ -784,7 +784,7 @@
     },
     {
      "capa": "Localía por estadio",
-     "detalle": "Corona · ×1.03",
+     "detalle": "TSM Corona · ×1.03",
      "lam": [
       1.355,
       1.474

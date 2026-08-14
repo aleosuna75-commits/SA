@@ -1,15 +1,125 @@
 {
  "torneo": "Apertura 2026",
  "_lee_esto": "Para publicar una jornada: agrega su bloque con el fixture, corre generar.py y publica. Cuando se juegue, llena 'resultado' de cada partido y vuelve a correr: el pronóstico ya sellado NO se recalcula.",
+ "formato": {
+  "equipos": 18,
+  "jornadas": 17,
+  "clasifican": 8,
+  "play_in": false,
+  "_calendario": "El PDF oficial de Liga MX publica sede y horario de las 17 jornadas, pero los emparejamientos de la J11 en adelante aún no son públicos. Al ser round-robin simple, el CONJUNTO de partidos restantes sí está determinado y es lo que usa la proyección de campeón.",
+  "_fuente_calendario": "PDF oficial Liga MX, Apertura 2026 (fechas y sedes de las 17 jornadas)"
+ },
  "modelo": {
   "credibilidad": {
    "activa": true,
    "k": 4,
    "p": 3,
-   "_nota": "Z = w^p/(w^p + k^p) hacia PRIORS_ILUSTRATIVOS. Ver analisis/credibilidad.md. Con k=10,p=1 se reproduce la variante que costaba 0.0037 de Brier."
+   "_nota": "Z = w^p/(w^p + k^p) hacia PRIORS_ILUSTRATIVOS. Ver analisis/credibilidad.md."
+  },
+  "proyeccion": {
+   "simulaciones": 20000,
+   "semilla": 20260814
   }
  },
  "jornadas": [
+  {
+   "jornada": 1,
+   "origen": "reconstruido",
+   "partidos": [
+    {
+     "fecha": "2026-07-16",
+     "local": "Necaxa",
+     "visitante": "Atlante",
+     "estadio": "Victoria",
+     "resultado": [
+      2,
+      1
+     ]
+    },
+    {
+     "fecha": "2026-07-16",
+     "local": "Tijuana",
+     "visitante": "Tigres",
+     "estadio": "Caliente",
+     "resultado": [
+      3,
+      1
+     ]
+    },
+    {
+     "fecha": "2026-07-17",
+     "local": "Atlético San Luis",
+     "visitante": "Cruz Azul",
+     "estadio": "Libertad Financiera",
+     "resultado": [
+      2,
+      3
+     ]
+    },
+    {
+     "fecha": "2026-07-17",
+     "local": "León",
+     "visitante": "Atlas",
+     "estadio": "Nou Camp",
+     "resultado": [
+      2,
+      3
+     ]
+    },
+    {
+     "fecha": "2026-07-17",
+     "local": "Juárez",
+     "visitante": "Puebla",
+     "estadio": "Olímpico Benito Juárez",
+     "resultado": [
+      0,
+      1
+     ]
+    },
+    {
+     "fecha": "2026-07-18",
+     "local": "Pumas",
+     "visitante": "Pachuca",
+     "estadio": "Olímpico Universitario",
+     "resultado": [
+      0,
+      3
+     ]
+    },
+    {
+     "fecha": "2026-07-18",
+     "local": "Monterrey",
+     "visitante": "Santos",
+     "estadio": "BBVA",
+     "resultado": [
+      3,
+      2
+     ]
+    },
+    {
+     "fecha": "2026-07-18",
+     "local": "Chivas",
+     "visitante": "Toluca",
+     "estadio": "Akron",
+     "resultado": [
+      0,
+      2
+     ]
+    },
+    {
+     "fecha": "2026-07-18",
+     "local": "Querétaro",
+     "visitante": "América",
+     "estadio": "La Corregidora",
+     "resultado": [
+      0,
+      1
+     ]
+    }
+   ],
+   "ajustes": {},
+   "nota": "No se publicó pronóstico para esta jornada. Reconstruido fuera de muestra: calibrado sólo con partidos anteriores al 16-jul."
+  },
   {
    "jornada": 2,
    "origen": "publicado",
@@ -18,7 +128,7 @@
      "fecha": "2026-07-21",
      "local": "Cruz Azul",
      "visitante": "Puebla",
-     "estadio": "Estadio Banorte (adelantado)",
+     "estadio": "Estadio Banorte",
      "resultado": [
       2,
       1
@@ -28,7 +138,7 @@
      "fecha": "2026-07-21",
      "local": "Toluca",
      "visitante": "Pumas",
-     "estadio": "Nemesio Díez (adelantado)",
+     "estadio": "Nemesio Díez",
      "resultado": [
       1,
       2
@@ -58,7 +168,7 @@
      "fecha": "2026-07-24",
      "local": "Atlante",
      "visitante": "América",
-     "estadio": "Ciudad de los Deportes",
+     "estadio": "Estadio Banorte",
      "resultado": [
       1,
       1
@@ -78,7 +188,7 @@
      "fecha": "2026-07-25",
      "local": "Santos",
      "visitante": "Atlas",
-     "estadio": "Corona",
+     "estadio": "TSM Corona",
      "resultado": [
       0,
       1
@@ -175,7 +285,7 @@
      "fecha": "2026-08-01",
      "local": "Querétaro",
      "visitante": "Tigres",
-     "estadio": "Corregidora",
+     "estadio": "La Corregidora",
      "resultado": [
       3,
       2
@@ -195,7 +305,7 @@
      "fecha": "2026-08-01",
      "local": "León",
      "visitante": "Pachuca",
-     "estadio": "León",
+     "estadio": "Nou Camp",
      "resultado": [
       1,
       0
@@ -233,7 +343,7 @@
     }
    ],
    "ajustes": {},
-   "nota": "No se publicó pronóstico para esta jornada. Reconstruido fuera de muestra: calibrado sólo con partidos anteriores al 31-jul. Sin ajustes de actualidad capturados."
+   "nota": "No se publicó pronóstico para esta jornada. Reconstruido fuera de muestra: calibrado sólo con partidos anteriores al 31-jul."
   },
   {
    "jornada": 4,
@@ -278,7 +388,7 @@
      "fecha": "2026-08-16",
      "local": "Santos",
      "visitante": "Chivas",
-     "estadio": "Corona",
+     "estadio": "TSM Corona",
      "resultado": null
     },
     {
@@ -304,7 +414,452 @@
     }
    ],
    "ajustes": {},
-   "nota": "Sin ajustes de actualidad capturados: lesiones y suspensiones de la semana los cargas tú en 'ajustes'."
+   "nota": "Sin ajustes de actualidad capturados: las lesiones y suspensiones de la semana las cargas tú en 'ajustes'."
+  },
+  {
+   "jornada": 5,
+   "origen": "programada",
+   "partidos": [
+    {
+     "fecha": "2026-08-21",
+     "local": "Puebla",
+     "visitante": "Santos",
+     "estadio": "Cuauhtémoc",
+     "resultado": null
+    },
+    {
+     "fecha": "2026-08-21",
+     "local": "Juárez",
+     "visitante": "América",
+     "estadio": "Olímpico Benito Juárez",
+     "resultado": null
+    },
+    {
+     "fecha": "2026-08-22",
+     "local": "Querétaro",
+     "visitante": "Toluca",
+     "estadio": "La Corregidora",
+     "resultado": null
+    },
+    {
+     "fecha": "2026-08-22",
+     "local": "Chivas",
+     "visitante": "Tijuana",
+     "estadio": "Akron",
+     "resultado": null
+    },
+    {
+     "fecha": "2026-08-22",
+     "local": "León",
+     "visitante": "Monterrey",
+     "estadio": "Nou Camp",
+     "resultado": null
+    },
+    {
+     "fecha": "2026-08-22",
+     "local": "Tigres",
+     "visitante": "Atlante",
+     "estadio": "Universitario",
+     "resultado": null
+    },
+    {
+     "fecha": "2026-08-22",
+     "local": "Cruz Azul",
+     "visitante": "Atlas",
+     "estadio": "Estadio Banorte",
+     "resultado": null
+    },
+    {
+     "fecha": "2026-08-23",
+     "local": "Atlético San Luis",
+     "visitante": "Pachuca",
+     "estadio": "Libertad Financiera",
+     "resultado": null
+    },
+    {
+     "fecha": "2026-08-23",
+     "local": "Pumas",
+     "visitante": "Necaxa",
+     "estadio": "Olímpico Universitario",
+     "resultado": null
+    }
+   ],
+   "ajustes": {},
+   "nota": "Calendario oficial confirmado. El pronóstico se recalcula solo al acercarse la fecha."
+  },
+  {
+   "jornada": 6,
+   "origen": "programada",
+   "partidos": [
+    {
+     "fecha": "2026-08-28",
+     "local": "Necaxa",
+     "visitante": "Cruz Azul",
+     "estadio": "Victoria",
+     "resultado": null
+    },
+    {
+     "fecha": "2026-08-28",
+     "local": "Atlante",
+     "visitante": "León",
+     "estadio": "Estadio Banorte",
+     "resultado": null
+    },
+    {
+     "fecha": "2026-08-28",
+     "local": "Tijuana",
+     "visitante": "Pumas",
+     "estadio": "Caliente",
+     "resultado": null
+    },
+    {
+     "fecha": "2026-08-29",
+     "local": "Atlas",
+     "visitante": "Querétaro",
+     "estadio": "Jalisco",
+     "resultado": null
+    },
+    {
+     "fecha": "2026-08-29",
+     "local": "Pachuca",
+     "visitante": "Chivas",
+     "estadio": "Hidalgo",
+     "resultado": null
+    },
+    {
+     "fecha": "2026-08-29",
+     "local": "América",
+     "visitante": "Puebla",
+     "estadio": "Estadio Banorte",
+     "resultado": null
+    },
+    {
+     "fecha": "2026-08-29",
+     "local": "Santos",
+     "visitante": "Tigres",
+     "estadio": "TSM Corona",
+     "resultado": null
+    },
+    {
+     "fecha": "2026-08-30",
+     "local": "Toluca",
+     "visitante": "Juárez",
+     "estadio": "Nemesio Díez",
+     "resultado": null
+    },
+    {
+     "fecha": "2026-08-30",
+     "local": "Monterrey",
+     "visitante": "Atlético San Luis",
+     "estadio": "BBVA",
+     "resultado": null
+    }
+   ],
+   "ajustes": {},
+   "nota": "Calendario oficial confirmado. El pronóstico se recalcula solo al acercarse la fecha."
+  },
+  {
+   "jornada": 7,
+   "origen": "programada",
+   "partidos": [
+    {
+     "fecha": "2026-09-04",
+     "local": "Puebla",
+     "visitante": "Toluca",
+     "estadio": "Cuauhtémoc",
+     "resultado": null
+    },
+    {
+     "fecha": "2026-09-04",
+     "local": "Juárez",
+     "visitante": "Pachuca",
+     "estadio": "Olímpico Benito Juárez",
+     "resultado": null
+    },
+    {
+     "fecha": "2026-09-05",
+     "local": "Atlético San Luis",
+     "visitante": "Chivas",
+     "estadio": "Libertad Financiera",
+     "resultado": null
+    },
+    {
+     "fecha": "2026-09-05",
+     "local": "Querétaro",
+     "visitante": "Monterrey",
+     "estadio": "La Corregidora",
+     "resultado": null
+    },
+    {
+     "fecha": "2026-09-05",
+     "local": "Tigres",
+     "visitante": "Necaxa",
+     "estadio": "Universitario",
+     "resultado": null
+    },
+    {
+     "fecha": "2026-09-05",
+     "local": "América",
+     "visitante": "Tijuana",
+     "estadio": "Estadio Banorte",
+     "resultado": null
+    },
+    {
+     "fecha": "2026-09-05",
+     "local": "Atlas",
+     "visitante": "Atlante",
+     "estadio": "Jalisco",
+     "resultado": null
+    },
+    {
+     "fecha": "2026-09-06",
+     "local": "Pumas",
+     "visitante": "León",
+     "estadio": "Olímpico Universitario",
+     "resultado": null
+    },
+    {
+     "fecha": "2026-09-06",
+     "local": "Cruz Azul",
+     "visitante": "Santos",
+     "estadio": "Estadio Banorte",
+     "resultado": null
+    }
+   ],
+   "ajustes": {},
+   "nota": "Calendario oficial confirmado. El pronóstico se recalcula solo al acercarse la fecha."
+  },
+  {
+   "jornada": 8,
+   "origen": "programada",
+   "partidos": [
+    {
+     "fecha": "2026-09-11",
+     "local": "Necaxa",
+     "visitante": "Puebla",
+     "estadio": "Victoria",
+     "resultado": null
+    },
+    {
+     "fecha": "2026-09-11",
+     "local": "Atlante",
+     "visitante": "Pachuca",
+     "estadio": "Estadio Banorte",
+     "resultado": null
+    },
+    {
+     "fecha": "2026-09-11",
+     "local": "Tijuana",
+     "visitante": "Querétaro",
+     "estadio": "Caliente",
+     "resultado": null
+    },
+    {
+     "fecha": "2026-09-12",
+     "local": "León",
+     "visitante": "Atlético San Luis",
+     "estadio": "Nou Camp",
+     "resultado": null
+    },
+    {
+     "fecha": "2026-09-12",
+     "local": "Toluca",
+     "visitante": "Atlas",
+     "estadio": "Nemesio Díez",
+     "resultado": null
+    },
+    {
+     "fecha": "2026-09-12",
+     "local": "Cruz Azul",
+     "visitante": "América",
+     "estadio": "Estadio Banorte",
+     "resultado": null
+    },
+    {
+     "fecha": "2026-09-13",
+     "local": "Santos",
+     "visitante": "Juárez",
+     "estadio": "TSM Corona",
+     "resultado": null
+    },
+    {
+     "fecha": "2026-09-13",
+     "local": "Chivas",
+     "visitante": "Pumas",
+     "estadio": "Akron",
+     "resultado": null
+    },
+    {
+     "fecha": "2026-09-13",
+     "local": "Monterrey",
+     "visitante": "Tigres",
+     "estadio": "BBVA",
+     "resultado": null
+    }
+   ],
+   "ajustes": {},
+   "nota": "Calendario oficial confirmado. El pronóstico se recalcula solo al acercarse la fecha."
+  },
+  {
+   "jornada": 9,
+   "origen": "programada",
+   "partidos": [
+    {
+     "fecha": "2026-09-18",
+     "local": "Puebla",
+     "visitante": "Atlante",
+     "estadio": "Cuauhtémoc",
+     "resultado": null
+    },
+    {
+     "fecha": "2026-09-18",
+     "local": "Juárez",
+     "visitante": "Tigres",
+     "estadio": "Olímpico Benito Juárez",
+     "resultado": null
+    },
+    {
+     "fecha": "2026-09-19",
+     "local": "Atlas",
+     "visitante": "Pumas",
+     "estadio": "Jalisco",
+     "resultado": null
+    },
+    {
+     "fecha": "2026-09-19",
+     "local": "Atlético San Luis",
+     "visitante": "Necaxa",
+     "estadio": "Libertad Financiera",
+     "resultado": null
+    },
+    {
+     "fecha": "2026-09-19",
+     "local": "Monterrey",
+     "visitante": "Cruz Azul",
+     "estadio": "BBVA",
+     "resultado": null
+    },
+    {
+     "fecha": "2026-09-19",
+     "local": "América",
+     "visitante": "Chivas",
+     "estadio": "Estadio Banorte",
+     "resultado": null
+    },
+    {
+     "fecha": "2026-09-20",
+     "local": "Pachuca",
+     "visitante": "Tijuana",
+     "estadio": "Hidalgo",
+     "resultado": null
+    },
+    {
+     "fecha": "2026-09-20",
+     "local": "Toluca",
+     "visitante": "Santos",
+     "estadio": "Nemesio Díez",
+     "resultado": null
+    },
+    {
+     "fecha": "2026-09-20",
+     "local": "Querétaro",
+     "visitante": "León",
+     "estadio": "La Corregidora",
+     "resultado": null
+    }
+   ],
+   "ajustes": {},
+   "nota": "Calendario oficial confirmado. El pronóstico se recalcula solo al acercarse la fecha."
+  },
+  {
+   "jornada": 10,
+   "origen": "programada",
+   "partidos": [
+    {
+     "fecha": "2026-09-25",
+     "local": "Atlante",
+     "visitante": "Monterrey",
+     "estadio": "Estadio Banorte",
+     "resultado": null
+    },
+    {
+     "fecha": "2026-09-25",
+     "local": "Tijuana",
+     "visitante": "Atlas",
+     "estadio": "Caliente",
+     "resultado": null
+    },
+    {
+     "fecha": "2026-09-26",
+     "local": "Chivas",
+     "visitante": "Querétaro",
+     "estadio": "Akron",
+     "resultado": null
+    },
+    {
+     "fecha": "2026-09-26",
+     "local": "Santos",
+     "visitante": "Pachuca",
+     "estadio": "TSM Corona",
+     "resultado": null
+    },
+    {
+     "fecha": "2026-09-26",
+     "local": "Tigres",
+     "visitante": "Puebla",
+     "estadio": "Universitario",
+     "resultado": null
+    },
+    {
+     "fecha": "2026-09-26",
+     "local": "Cruz Azul",
+     "visitante": "Toluca",
+     "estadio": "Estadio Banorte",
+     "resultado": null
+    },
+    {
+     "fecha": "2026-09-27",
+     "local": "Pumas",
+     "visitante": "Atlético San Luis",
+     "estadio": "Olímpico Universitario",
+     "resultado": null
+    },
+    {
+     "fecha": "2026-09-27",
+     "local": "León",
+     "visitante": "Juárez",
+     "estadio": "Nou Camp",
+     "resultado": null
+    },
+    {
+     "fecha": "2026-09-27",
+     "local": "Necaxa",
+     "visitante": "América",
+     "estadio": "Victoria",
+     "resultado": null
+    }
+   ],
+   "ajustes": {},
+   "nota": "Calendario oficial confirmado. El pronóstico se recalcula solo al acercarse la fecha."
   }
- ]
+ ],
+ "calendario_oficial": {
+  "1": "16, 17, 18 DE JULIO",
+  "2": "21, 24, 25, 26 DE JULIO",
+  "3": "31 DE JULIO, 1, 2 DE AGOSTO",
+  "4": "15, 16, 17 DE AGOSTO",
+  "5": "21, 22, 23 DE AGOSTO",
+  "6": "28, 29, 30 DE AGOSTO",
+  "7": "4, 5, 6 DE SEPTIEMBRE",
+  "8": "11, 12, 13 DE SEPTIEMBRE",
+  "9": "18, 19, 20 DE SEPTIEMBRE",
+  "10": "25, 26, 27 DE SEPTIEMBRE",
+  "11": "9, 10, 11 DE OCTUBRE",
+  "12": "16, 17, 18 DE OCTUBRE",
+  "13": "DOBLE  - 20, 21 DE OCTUBRE",
+  "14": "23, 24, 25 DE OCTUBRE",
+  "15": "30, 31 DE OCTUBRE, 1 DE NOVIEMBRE",
+  "16": "6, 7, 8 DE NOVIEMBRE",
+  "17": "20, 21, 22 DE NOVIEMBRE"
+ }
 }

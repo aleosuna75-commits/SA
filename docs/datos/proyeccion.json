@@ -1,0 +1,190 @@
+{
+ "torneo": "Apertura 2026",
+ "simulaciones": 20000,
+ "partidos_jugados": 27,
+ "partidos_restantes": 63,
+ "clasifican": 8,
+ "equipos": [
+  {
+   "equipo": "América",
+   "campeon": 0.438,
+   "finalista": 0.6172,
+   "clasifica": 0.9555,
+   "lider": 0.3443,
+   "puntos_esperados": 20.2,
+   "pts_actuales": 7,
+   "pj": 3
+  },
+  {
+   "equipo": "Toluca",
+   "campeon": 0.2215,
+   "finalista": 0.3977,
+   "clasifica": 0.8602,
+   "lider": 0.1495,
+   "puntos_esperados": 18.1,
+   "pts_actuales": 6,
+   "pj": 3
+  },
+  {
+   "equipo": "Cruz Azul",
+   "campeon": 0.1056,
+   "finalista": 0.2505,
+   "clasifica": 0.8142,
+   "lider": 0.1066,
+   "puntos_esperados": 17.8,
+   "pts_actuales": 6,
+   "pj": 3
+  },
+  {
+   "equipo": "Monterrey",
+   "campeon": 0.0689,
+   "finalista": 0.1659,
+   "clasifica": 0.6596,
+   "lider": 0.0556,
+   "puntos_esperados": 16.2,
+   "pts_actuales": 6,
+   "pj": 3
+  },
+  {
+   "equipo": "Pumas",
+   "campeon": 0.0428,
+   "finalista": 0.127,
+   "clasifica": 0.7176,
+   "lider": 0.0654,
+   "puntos_esperados": 16.6,
+   "pts_actuales": 6,
+   "pj": 3
+  },
+  {
+   "equipo": "Tijuana",
+   "campeon": 0.0427,
+   "finalista": 0.1387,
+   "clasifica": 0.8121,
+   "lider": 0.1116,
+   "puntos_esperados": 17.8,
+   "pts_actuales": 7,
+   "pj": 3
+  },
+  {
+   "equipo": "Necaxa",
+   "campeon": 0.0389,
+   "finalista": 0.1285,
+   "clasifica": 0.7694,
+   "lider": 0.0829,
+   "puntos_esperados": 17.4,
+   "pts_actuales": 6,
+   "pj": 3
+  },
+  {
+   "equipo": "Querétaro",
+   "campeon": 0.0127,
+   "finalista": 0.0602,
+   "clasifica": 0.6789,
+   "lider": 0.0499,
+   "puntos_esperados": 16.4,
+   "pts_actuales": 6,
+   "pj": 3
+  },
+  {
+   "equipo": "Pachuca",
+   "campeon": 0.008,
+   "finalista": 0.0232,
+   "clasifica": 0.1957,
+   "lider": 0.0032,
+   "puntos_esperados": 11.8,
+   "pts_actuales": 3,
+   "pj": 3
+  },
+  {
+   "equipo": "Chivas",
+   "campeon": 0.0063,
+   "finalista": 0.0218,
+   "clasifica": 0.2581,
+   "lider": 0.005,
+   "puntos_esperados": 12.9,
+   "pts_actuales": 4,
+   "pj": 3
+  },
+  {
+   "equipo": "Atlas",
+   "campeon": 0.0044,
+   "finalista": 0.0236,
+   "clasifica": 0.4343,
+   "lider": 0.0149,
+   "puntos_esperados": 14.6,
+   "pts_actuales": 6,
+   "pj": 3
+  },
+  {
+   "equipo": "Atlético San Luis",
+   "campeon": 0.0036,
+   "finalista": 0.0159,
+   "clasifica": 0.269,
+   "lider": 0.0034,
+   "puntos_esperados": 12.6,
+   "pts_actuales": 2,
+   "pj": 3
+  },
+  {
+   "equipo": "Atlante",
+   "campeon": 0.0024,
+   "finalista": 0.013,
+   "clasifica": 0.2841,
+   "lider": 0.0051,
+   "puntos_esperados": 13.0,
+   "pts_actuales": 4,
+   "pj": 3
+  },
+  {
+   "equipo": "León",
+   "campeon": 0.0022,
+   "finalista": 0.0096,
+   "clasifica": 0.1211,
+   "lider": 0.0008,
+   "puntos_esperados": 11.2,
+   "pts_actuales": 3,
+   "pj": 3
+  },
+  {
+   "equipo": "Tigres",
+   "campeon": 0.0015,
+   "finalista": 0.0046,
+   "clasifica": 0.0477,
+   "lider": 0.0001,
+   "puntos_esperados": 9.2,
+   "pts_actuales": 1,
+   "pj": 3
+  },
+  {
+   "equipo": "Puebla",
+   "campeon": 0.0003,
+   "finalista": 0.0026,
+   "clasifica": 0.1171,
+   "lider": 0.0015,
+   "puntos_esperados": 11.0,
+   "pts_actuales": 4,
+   "pj": 3
+  },
+  {
+   "equipo": "Juárez",
+   "campeon": 0.0,
+   "finalista": 0.0,
+   "clasifica": 0.0026,
+   "lider": 0.0,
+   "puntos_esperados": 5.4,
+   "pts_actuales": 0,
+   "pj": 3
+  },
+  {
+   "equipo": "Santos",
+   "campeon": 0.0,
+   "finalista": 0.0,
+   "clasifica": 0.0029,
+   "lider": 0.0,
+   "puntos_esperados": 5.8,
+   "pts_actuales": 0,
+   "pj": 3
+  }
+ ],
+ "supuesto": "El calendario oficial publica sede y horario de las 17 jornadas, pero los emparejamientos de la J11 en adelante no son públicos. Al ser round-robin simple, el conjunto de partidos restantes y las localías de cada equipo sí están determinados; lo único desconocido es quién es local en cada pareja concreta, y eso se integra sorteando calendarios válidos en vez de asumir uno."
+}

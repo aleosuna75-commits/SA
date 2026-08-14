@@ -1,0 +1,986 @@
+{
+ "esquema": "cerebro-ligamx/v1",
+ "torneo": "Apertura 2026",
+ "jornada": 9,
+ "origen": "programada",
+ "nota_origen": "Calendario oficial confirmado. El pronóstico se recalcula solo al acercarse la fecha.",
+ "estado": "vigente",
+ "corte_calibracion": "2026-09-18",
+ "modelo": {
+  "motor": "Dixon-Coles + malla exacta",
+  "rho_dc": -0.11,
+  "xi_decaimiento": 0.0038,
+  "prop_goles_1t": 0.4442,
+  "base_local": 1.4849,
+  "base_visita": 1.1542,
+  "credibilidad": {
+   "activa": true,
+   "k": 4,
+   "p": 3,
+   "_nota": "Z = w^p/(w^p + k^p) hacia PRIORS_ILUSTRATIVOS. Ver analisis/credibilidad.md."
+  },
+  "historico": {
+   "partidos": 5014,
+   "desde": "2010-07-23",
+   "hasta": "2026-08-02"
+  }
+ },
+ "credibilidad_equipos": {
+  "América": {
+   "w": 8.94,
+   "Z": 0.918,
+   "mle": [
+    1.1184,
+    0.4082
+   ],
+   "usado": [
+    1.1265,
+    0.4336
+   ]
+  },
+  "Atlas": {
+   "w": 6.76,
+   "Z": 0.828,
+   "mle": [
+    0.8838,
+    1.0529
+   ],
+   "usado": [
+    0.8865,
+    1.0575
+   ]
+  },
+  "Atlante": {
+   "w": 2.43,
+   "Z": 0.182,
+   "mle": [
+    1.5159,
+    0.8478
+   ],
+   "usado": [
+    0.8527,
+    1.1417
+   ]
+  },
+  "Atlético San Luis": {
+   "w": 7.06,
+   "Z": 0.846,
+   "mle": [
+    0.9565,
+    1.0422
+   ],
+   "usado": [
+    0.9508,
+    1.0434
+   ]
+  },
+  "Cruz Azul": {
+   "w": 8.0,
+   "Z": 0.889,
+   "mle": [
+    1.3165,
+    0.8593
+   ],
+   "usado": [
+    1.3124,
+    0.8501
+   ]
+  },
+  "Chivas": {
+   "w": 6.93,
+   "Z": 0.839,
+   "mle": [
+    0.6548,
+    0.705
+   ],
+   "usado": [
+    0.7141,
+    0.7307
+   ]
+  },
+  "Juárez": {
+   "w": 6.68,
+   "Z": 0.823,
+   "mle": [
+    0.5505,
+    1.2828
+   ],
+   "usado": [
+    0.5981,
+    1.2444
+   ]
+  },
+  "León": {
+   "w": 7.02,
+   "Z": 0.844,
+   "mle": [
+    0.834,
+    0.87
+   ],
+   "usado": [
+    0.8553,
+    0.8919
+   ]
+  },
+  "Monterrey": {
+   "w": 8.19,
+   "Z": 0.896,
+   "mle": [
+    1.23,
+    0.8148
+   ],
+   "usado": [
+    1.2247,
+    0.8233
+   ]
+  },
+  "Necaxa": {
+   "w": 6.97,
+   "Z": 0.841,
+   "mle": [
+    1.1755,
+    0.958
+   ],
+   "usado": [
+    1.1364,
+    0.9721
+   ]
+  },
+  "Pachuca": {
+   "w": 7.33,
+   "Z": 0.86,
+   "mle": [
+    1.0223,
+    0.8381
+   ],
+   "usado": [
+    1.0261,
+    0.8529
+   ]
+  },
+  "Puebla": {
+   "w": 6.56,
+   "Z": 0.815,
+   "mle": [
+    0.6455,
+    0.9738
+   ],
+   "usado": [
+    0.6717,
+    1.0122
+   ]
+  },
+  "Pumas": {
+   "w": 7.32,
+   "Z": 0.86,
+   "mle": [
+    1.1679,
+    0.9422
+   ],
+   "usado": [
+    1.1395,
+    0.9501
+   ]
+  },
+  "Querétaro": {
+   "w": 6.54,
+   "Z": 0.814,
+   "mle": [
+    0.9026,
+    0.9355
+   ],
+   "usado": [
+    0.8825,
+    0.9722
+   ]
+  },
+  "Santos": {
+   "w": 6.61,
+   "Z": 0.818,
+   "mle": [
+    0.6192,
+    1.287
+   ],
+   "usado": [
+    0.6516,
+    1.2669
+   ]
+  },
+  "Tigres": {
+   "w": 7.84,
+   "Z": 0.883,
+   "mle": [
+    1.0065,
+    0.9867
+   ],
+   "usado": [
+    1.0295,
+    0.9655
+   ]
+  },
+  "Tijuana": {
+   "w": 6.88,
+   "Z": 0.836,
+   "mle": [
+    1.0028,
+    0.8434
+   ],
+   "usado": [
+    0.9939,
+    0.8701
+   ]
+  },
+  "Toluca": {
+   "w": 8.02,
+   "Z": 0.89,
+   "mle": [
+    1.447,
+    0.725
+   ],
+   "usado": [
+    1.436,
+    0.7329
+   ]
+  }
+ },
+ "partidos": [
+  {
+   "id": "j09-puebla-atlante",
+   "fecha": "2026-09-18",
+   "estadio": "Cuauhtémoc",
+   "local": "Puebla",
+   "visitante": "Atlante",
+   "lambdas": {
+    "local": 1.15,
+    "visita": 0.996
+   },
+   "prob": {
+    "local": 0.3771,
+    "empate": 0.324,
+    "visita": 0.2989
+   },
+   "pick": "Puebla",
+   "marcador_probable": "1-1",
+   "top_marcadores": [
+    {
+     "marcador": "1-1",
+     "prob": 0.1487
+    },
+    {
+     "marcador": "0-0",
+     "prob": 0.1317
+    },
+    {
+     "marcador": "1-0",
+     "prob": 0.1197
+    },
+    {
+     "marcador": "0-1",
+     "prob": 0.1017
+    },
+    {
+     "marcador": "2-0",
+     "prob": 0.0773
+    }
+   ],
+   "bitacora": [
+    {
+     "capa": "Fuerza base (MLE)",
+     "detalle": "ataque Puebla 0.67 × defensa Atlante 1.14 · ataque Atlante 0.85 × defensa Puebla 1.01",
+     "lam": [
+      1.139,
+      0.996
+     ]
+    },
+    {
+     "capa": "Localía por estadio",
+     "detalle": "Cuauhtémoc · ×1.01",
+     "lam": [
+      1.15,
+      0.996
+     ]
+    }
+   ],
+   "resultado": null,
+   "incertidumbre": "Atlante: poco histórico reciente, fuerza parcialmente asumida"
+  },
+  {
+   "id": "j09-juarez-tigres",
+   "fecha": "2026-09-18",
+   "estadio": "Olímpico Benito Juárez",
+   "local": "Juárez",
+   "visitante": "Tigres",
+   "lambdas": {
+    "local": 0.874,
+    "visita": 1.479
+   },
+   "prob": {
+    "local": 0.209,
+    "empate": 0.291,
+    "visita": 0.5
+   },
+   "pick": "Tigres",
+   "marcador_probable": "1-1",
+   "top_marcadores": [
+    {
+     "marcador": "1-1",
+     "prob": 0.1364
+    },
+    {
+     "marcador": "0-1",
+     "prob": 0.1271
+    },
+    {
+     "marcador": "0-0",
+     "prob": 0.1086
+    },
+    {
+     "marcador": "0-2",
+     "prob": 0.104
+    },
+    {
+     "marcador": "1-2",
+     "prob": 0.0909
+    }
+   ],
+   "bitacora": [
+    {
+     "capa": "Fuerza base (MLE)",
+     "detalle": "ataque Juárez 0.60 × defensa Tigres 0.97 · ataque Tigres 1.03 × defensa Juárez 1.24",
+     "lam": [
+      0.857,
+      1.479
+     ]
+    },
+    {
+     "capa": "Localía por estadio",
+     "detalle": "Olímpico Benito Juárez · ×1.05",
+     "lam": [
+      0.9,
+      1.479
+     ]
+    },
+    {
+     "capa": "Factor escudo",
+     "detalle": "peso institucional de Tigres: ataque rival ÷1.03",
+     "lam": [
+      0.874,
+      1.479
+     ]
+    }
+   ],
+   "resultado": null,
+   "incertidumbre": null
+  },
+  {
+   "id": "j09-atlas-pumas",
+   "fecha": "2026-09-19",
+   "estadio": "Jalisco",
+   "local": "Atlas",
+   "visitante": "Pumas",
+   "lambdas": {
+    "local": 1.251,
+    "visita": 1.391
+   },
+   "prob": {
+    "local": 0.3234,
+    "empate": 0.288,
+    "visita": 0.3886
+   },
+   "pick": "Pumas",
+   "marcador_probable": "1-1",
+   "top_marcadores": [
+    {
+     "marcador": "1-1",
+     "prob": 0.1376
+    },
+    {
+     "marcador": "1-2",
+     "prob": 0.0862
+    },
+    {
+     "marcador": "0-1",
+     "prob": 0.0855
+    },
+    {
+     "marcador": "0-0",
+     "prob": 0.0849
+    },
+    {
+     "marcador": "2-1",
+     "prob": 0.0775
+    }
+   ],
+   "bitacora": [
+    {
+     "capa": "Fuerza base (MLE)",
+     "detalle": "ataque Atlas 0.89 × defensa Pumas 0.95 · ataque Pumas 1.14 × defensa Atlas 1.06",
+     "lam": [
+      1.251,
+      1.391
+     ]
+    },
+    {
+     "capa": "Localía por estadio",
+     "detalle": "Jalisco · ×1.02",
+     "lam": [
+      1.276,
+      1.391
+     ]
+    },
+    {
+     "capa": "Factor escudo",
+     "detalle": "peso institucional de Pumas: ataque rival ÷1.02",
+     "lam": [
+      1.251,
+      1.391
+     ]
+    }
+   ],
+   "resultado": null,
+   "incertidumbre": null
+  },
+  {
+   "id": "j09-atletico-san-luis-necaxa",
+   "fecha": "2026-09-19",
+   "estadio": "Libertad Financiera",
+   "local": "Atlético San Luis",
+   "visitante": "Necaxa",
+   "lambdas": {
+    "local": 1.414,
+    "visita": 1.369
+   },
+   "prob": {
+    "local": 0.3702,
+    "empate": 0.28,
+    "visita": 0.3497
+   },
+   "pick": "Atlético San Luis",
+   "marcador_probable": "1-1",
+   "top_marcadores": [
+    {
+     "marcador": "1-1",
+     "prob": 0.1329
+    },
+    {
+     "marcador": "2-1",
+     "prob": 0.0846
+    },
+    {
+     "marcador": "1-2",
+     "prob": 0.0819
+    },
+    {
+     "marcador": "0-0",
+     "prob": 0.0751
+    },
+    {
+     "marcador": "1-0",
+     "prob": 0.0743
+    }
+   ],
+   "bitacora": [
+    {
+     "capa": "Fuerza base (MLE)",
+     "detalle": "ataque Atlético San Luis 0.95 × defensa Necaxa 0.97 · ataque Necaxa 1.14 × defensa Atlético San Luis 1.04",
+     "lam": [
+      1.372,
+      1.369
+     ]
+    },
+    {
+     "capa": "Localía por estadio",
+     "detalle": "Libertad Financiera · ×1.03",
+     "lam": [
+      1.414,
+      1.369
+     ]
+    }
+   ],
+   "resultado": null,
+   "incertidumbre": null
+  },
+  {
+   "id": "j09-monterrey-cruz-azul",
+   "fecha": "2026-09-19",
+   "estadio": "BBVA",
+   "local": "Monterrey",
+   "visitante": "Cruz Azul",
+   "lambdas": {
+    "local": 1.576,
+    "visita": 1.223
+   },
+   "prob": {
+    "local": 0.4426,
+    "empate": 0.2742,
+    "visita": 0.2831
+   },
+   "pick": "Monterrey",
+   "marcador_probable": "1-1",
+   "top_marcadores": [
+    {
+     "marcador": "1-1",
+     "prob": 0.1302
+    },
+    {
+     "marcador": "2-1",
+     "prob": 0.0925
+    },
+    {
+     "marcador": "1-0",
+     "prob": 0.0831
+    },
+    {
+     "marcador": "2-0",
+     "prob": 0.0756
+    },
+    {
+     "marcador": "0-0",
+     "prob": 0.0738
+    }
+   ],
+   "bitacora": [
+    {
+     "capa": "Fuerza base (MLE)",
+     "detalle": "ataque Monterrey 1.22 × defensa Cruz Azul 0.85 · ataque Cruz Azul 1.31 × defensa Monterrey 0.82",
+     "lam": [
+      1.546,
+      1.247
+     ]
+    },
+    {
+     "capa": "Localía por estadio",
+     "detalle": "BBVA · ×1.05",
+     "lam": [
+      1.623,
+      1.247
+     ]
+    },
+    {
+     "capa": "Factor escudo",
+     "detalle": "peso institucional de Monterrey: ataque rival ÷1.02",
+     "lam": [
+      1.623,
+      1.223
+     ]
+    },
+    {
+     "capa": "Factor escudo",
+     "detalle": "peso institucional de Cruz Azul: ataque rival ÷1.03",
+     "lam": [
+      1.576,
+      1.223
+     ]
+    }
+   ],
+   "resultado": null,
+   "incertidumbre": null
+  },
+  {
+   "id": "j09-america-chivas",
+   "fecha": "2026-09-19",
+   "estadio": "Estadio Banorte",
+   "local": "América",
+   "visitante": "Chivas",
+   "lambdas": {
+    "local": 1.222,
+    "visita": 0.34
+   },
+   "prob": {
+    "local": 0.5813,
+    "empate": 0.3255,
+    "visita": 0.0932
+   },
+   "pick": "América",
+   "marcador_probable": "1-0",
+   "top_marcadores": [
+    {
+     "marcador": "1-0",
+     "prob": 0.2466
+    },
+    {
+     "marcador": "0-0",
+     "prob": 0.2192
+    },
+    {
+     "marcador": "2-0",
+     "prob": 0.1566
+    },
+    {
+     "marcador": "1-1",
+     "prob": 0.0968
+    },
+    {
+     "marcador": "3-0",
+     "prob": 0.0638
+    }
+   ],
+   "bitacora": [
+    {
+     "capa": "Fuerza base (MLE)",
+     "detalle": "ataque América 1.13 × defensa Chivas 0.73 · ataque Chivas 0.71 × defensa América 0.43",
+     "lam": [
+      1.222,
+      0.357
+     ]
+    },
+    {
+     "capa": "Localía por estadio",
+     "detalle": "Estadio Banorte · ×1.03",
+     "lam": [
+      1.259,
+      0.357
+     ]
+    },
+    {
+     "capa": "Factor escudo",
+     "detalle": "peso institucional de América: ataque rival ÷1.05",
+     "lam": [
+      1.259,
+      0.34
+     ]
+    },
+    {
+     "capa": "Factor escudo",
+     "detalle": "peso institucional de Chivas: ataque rival ÷1.03",
+     "lam": [
+      1.222,
+      0.34
+     ]
+    }
+   ],
+   "resultado": null,
+   "incertidumbre": null
+  },
+  {
+   "id": "j09-pachuca-tijuana",
+   "fecha": "2026-09-20",
+   "estadio": "Hidalgo",
+   "local": "Pachuca",
+   "visitante": "Tijuana",
+   "lambdas": {
+    "local": 1.405,
+    "visita": 0.978
+   },
+   "prob": {
+    "local": 0.4541,
+    "empate": 0.2977,
+    "visita": 0.2482
+   },
+   "pick": "Pachuca",
+   "marcador_probable": "1-1",
+   "top_marcadores": [
+    {
+     "marcador": "1-1",
+     "prob": 0.1407
+    },
+    {
+     "marcador": "1-0",
+     "prob": 0.1156
+    },
+    {
+     "marcador": "0-0",
+     "prob": 0.1062
+    },
+    {
+     "marcador": "2-0",
+     "prob": 0.091
+    },
+    {
+     "marcador": "2-1",
+     "prob": 0.0891
+    }
+   ],
+   "bitacora": [
+    {
+     "capa": "Fuerza base (MLE)",
+     "detalle": "ataque Pachuca 1.03 × defensa Tijuana 0.87 · ataque Tijuana 0.99 × defensa Pachuca 0.85",
+     "lam": [
+      1.326,
+      0.978
+     ]
+    },
+    {
+     "capa": "Localía por estadio",
+     "detalle": "Hidalgo · ×1.06",
+     "lam": [
+      1.405,
+      0.978
+     ]
+    }
+   ],
+   "resultado": null,
+   "incertidumbre": null
+  },
+  {
+   "id": "j09-toluca-santos",
+   "fecha": "2026-09-20",
+   "estadio": "Nemesio Díez",
+   "local": "Toluca",
+   "visitante": "Santos",
+   "lambdas": {
+    "local": 2.972,
+    "visita": 0.551
+   },
+   "prob": {
+    "local": 0.8503,
+    "empate": 0.1123,
+    "visita": 0.0374
+   },
+   "pick": "Toluca",
+   "marcador_probable": "2-0",
+   "top_marcadores": [
+    {
+     "marcador": "2-0",
+     "prob": 0.1304
+    },
+    {
+     "marcador": "3-0",
+     "prob": 0.1291
+    },
+    {
+     "marcador": "4-0",
+     "prob": 0.0959
+    },
+    {
+     "marcador": "1-0",
+     "prob": 0.0824
+    },
+    {
+     "marcador": "2-1",
+     "prob": 0.0719
+    }
+   ],
+   "bitacora": [
+    {
+     "capa": "Fuerza base (MLE)",
+     "detalle": "ataque Toluca 1.44 × defensa Santos 1.27 · ataque Santos 0.65 × defensa Toluca 0.73",
+     "lam": [
+      2.701,
+      0.551
+     ]
+    },
+    {
+     "capa": "Localía por estadio",
+     "detalle": "Nemesio Díez · ×1.10",
+     "lam": [
+      2.972,
+      0.551
+     ]
+    }
+   ],
+   "resultado": null,
+   "incertidumbre": null
+  },
+  {
+   "id": "j09-queretaro-leon",
+   "fecha": "2026-09-20",
+   "estadio": "La Corregidora",
+   "local": "Querétaro",
+   "visitante": "León",
+   "lambdas": {
+    "local": 1.18,
+    "visita": 0.96
+   },
+   "prob": {
+    "local": 0.3945,
+    "empate": 0.3231,
+    "visita": 0.2824
+   },
+   "pick": "Querétaro",
+   "marcador_probable": "1-1",
+   "top_marcadores": [
+    {
+     "marcador": "1-1",
+     "prob": 0.1479
+    },
+    {
+     "marcador": "0-0",
+     "prob": 0.1323
+    },
+    {
+     "marcador": "1-0",
+     "prob": 0.1242
+    },
+    {
+     "marcador": "0-1",
+     "prob": 0.0982
+    },
+    {
+     "marcador": "2-0",
+     "prob": 0.082
+    }
+   ],
+   "bitacora": [
+    {
+     "capa": "Fuerza base (MLE)",
+     "detalle": "ataque Querétaro 0.88 × defensa León 0.89 · ataque León 0.86 × defensa Querétaro 0.97",
+     "lam": [
+      1.169,
+      0.96
+     ]
+    },
+    {
+     "capa": "Localía por estadio",
+     "detalle": "La Corregidora · ×1.01",
+     "lam": [
+      1.18,
+      0.96
+     ]
+    }
+   ],
+   "resultado": null,
+   "incertidumbre": null
+  }
+ ],
+ "parlays": {
+  "recomendado": {
+   "nombre": "Recomendado",
+   "descripcion": "Equilibrio óptimo entre número de picks y seguridad.",
+   "legs": [
+    {
+     "partido": "América vs Chivas",
+     "etiqueta": "Menos de 1.5 goles 1T",
+     "prob": 0.8444,
+     "estado": "pendiente"
+    },
+    {
+     "partido": "América vs Chivas",
+     "etiqueta": "Menos de 2.5 goles",
+     "prob": 0.793,
+     "estado": "pendiente"
+    },
+    {
+     "partido": "Querétaro vs León",
+     "etiqueta": "Menos de 3.5 goles",
+     "prob": 0.831,
+     "estado": "pendiente"
+    },
+    {
+     "partido": "Querétaro vs León",
+     "etiqueta": "León menos de 1.5",
+     "prob": 0.7506,
+     "estado": "pendiente"
+    },
+    {
+     "partido": "Puebla vs Atlante",
+     "etiqueta": "Menos de 3.5 goles",
+     "prob": 0.8298,
+     "estado": "pendiente"
+    },
+    {
+     "partido": "Puebla vs Atlante",
+     "etiqueta": "Menos de 1.5 goles 1T",
+     "prob": 0.75,
+     "estado": "pendiente"
+    }
+   ],
+   "prob_conjunta": 0.3572,
+   "valor_esperado": 2.143,
+   "pego": null
+  },
+  "seguro": {
+   "nombre": "Seguro",
+   "descripcion": "Los legs más sólidos, uno por partido. Menos premio, más certeza.",
+   "legs": [
+    {
+     "partido": "América vs Chivas",
+     "etiqueta": "Menos de 1.5 goles 1T",
+     "prob": 0.8444,
+     "estado": "pendiente"
+    },
+    {
+     "partido": "Querétaro vs León",
+     "etiqueta": "Menos de 3.5 goles",
+     "prob": 0.831,
+     "estado": "pendiente"
+    },
+    {
+     "partido": "Puebla vs Atlante",
+     "etiqueta": "Menos de 3.5 goles",
+     "prob": 0.8298,
+     "estado": "pendiente"
+    },
+    {
+     "partido": "Juárez vs Tigres",
+     "etiqueta": "Empate o Tigres al descanso",
+     "prob": 0.8151,
+     "estado": "pendiente"
+    }
+   ],
+   "prob_conjunta": 0.4746,
+   "valor_esperado": 1.898,
+   "pego": null
+  },
+  "agresivo": {
+   "nombre": "Agresivo",
+   "descripcion": "Más picks: más premio si pega, menor probabilidad combinada.",
+   "legs": [
+    {
+     "partido": "América vs Chivas",
+     "etiqueta": "Menos de 1.5 goles 1T",
+     "prob": 0.8444,
+     "estado": "pendiente"
+    },
+    {
+     "partido": "Querétaro vs León",
+     "etiqueta": "Menos de 3.5 goles",
+     "prob": 0.831,
+     "estado": "pendiente"
+    },
+    {
+     "partido": "Puebla vs Atlante",
+     "etiqueta": "Menos de 3.5 goles",
+     "prob": 0.8298,
+     "estado": "pendiente"
+    },
+    {
+     "partido": "Juárez vs Tigres",
+     "etiqueta": "Empate o Tigres al descanso",
+     "prob": 0.8151,
+     "estado": "pendiente"
+    },
+    {
+     "partido": "Toluca vs Santos",
+     "etiqueta": "Toluca anota 2+",
+     "prob": 0.7965,
+     "estado": "pendiente"
+    },
+    {
+     "partido": "América vs Chivas",
+     "etiqueta": "Menos de 2.5 goles",
+     "prob": 0.793,
+     "estado": "pendiente"
+    },
+    {
+     "partido": "Juárez vs Tigres",
+     "etiqueta": "Empate o Tigres",
+     "prob": 0.791,
+     "estado": "pendiente"
+    },
+    {
+     "partido": "Toluca vs Santos",
+     "etiqueta": "Gol en el 1er tiempo",
+     "prob": 0.7898,
+     "estado": "pendiente"
+    },
+    {
+     "partido": "Pachuca vs Tijuana",
+     "etiqueta": "Pachuca o empate al descanso",
+     "prob": 0.7891,
+     "estado": "pendiente"
+    }
+   ],
+   "prob_conjunta": 0.2014,
+   "valor_esperado": 1.813,
+   "pego": null
+  }
+ },
+ "resumen": null,
+ "no_modelado": [
+  "tarjetas",
+  "córners",
+  "goleador",
+  "minuto de gol"
+ ]
+}
