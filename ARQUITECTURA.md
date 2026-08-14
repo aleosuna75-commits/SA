@@ -497,6 +497,53 @@ Si generas la J4 hoy, sale con Atlante de favorito en más de un partido. Por es
 Nota operativa: `FIXTURE`, `JORNADA_ACTUAL` y `AJUSTES_JORNADA` siguen apuntando a la J2. Para
 pronosticar la J4 hay que editarlos a mano, que es justo lo que `config/jornada.json` elimina.
 
+### 11.4 Decidido: Atlante SÍ conserva su histórico 2010-2014
+
+Registrado. **No hubo nada que hacer:** esas 138 filas siempre estuvieron en el CSV y nunca
+las quité, así que el modelo ya las estaba usando. Atlante queda como el club histórico que
+regresa, sin heredar nada de Mazatlán.
+
+**Pero hay que decirlo claro: esta decisión no cambia un solo número.**
+
+| | |
+|---|---|
+| Atlante 2010-2014 | 138 partidos, peso efectivo **0.00000108** |
+| Atlante 2026 (J1-J3) | 3 partidos, peso efectivo **2.77075631** |
+| Aporte del histórico viejo | **0.000039%** |
+
+Con `XI = 0.0038/día` (vida media 6 meses), un partido de abril de 2014 pesa
+`e^(-0.0038 × 4493) = 3.85 × 10⁻⁸`. Doce años de historia son, numéricamente, cero. **El
+ataque de Atlante sigue en 1.5324, el más alto de la liga.** La decisión de identidad del
+club y el problema de credibilidad son cosas distintas, y resolver la primera no toca la
+segunda.
+
+Si lo que buscabas era *anclar* a Atlante, hay dos instrumentos y no son equivalentes:
+
+**a) Bajar `XI` para que la historia vieja cuente.** Para que el bloque 2010-2014 fuera apenas
+el 10% del peso de Atlante haría falta `XI = 0.00119` (vida media **1.6 años**); para que
+fuera la mitad, `XI = 0.00075` (**2.5 años**). Es una palanca **global**: cambiaría la
+calibración de los 18 equipos y contradice el diseño de ~6 meses de vida media, que es
+justamente lo que hace que el modelo reaccione a la forma actual. **No lo recomiendo.**
+
+**b) Credibilidad sobre el peso real.** Sólo actúa donde faltan datos y deja intacto al resto
+de la liga. Con `w = 2.77`:
+
+| k | Z | ataque | defensa | Atlante vs América (L/E/V) |
+|---|---|---|---|---|
+| — | 1.000 | **1.5324** | 0.8389 | 0.285 / 0.343 / 0.373 ← hoy |
+| 5 | 0.357 | 0.9676 | 1.0675 | 0.143 / 0.310 / 0.547 |
+| **10** | **0.217** | **0.8758** | **1.1248** | **0.121 / 0.296 / 0.583** |
+| 20 | 0.122 | 0.8181 | 1.1657 | 0.107 / 0.285 / 0.607 |
+| 40 | 0.065 | 0.7855 | 1.1908 | 0.100 / 0.279 / 0.621 |
+
+Con `k = 10` Atlante deja de ser el mejor ataque del torneo y queda donde uno esperaría a un
+ascendido, y conforme juegue jornadas el peso migra solo hacia sus datos reales. Sigo
+recomendando ese valor.
+
+**Pendiente menor:** el comentario de la línea 110 del modelo dice que Atlante es la
+*"franquicia ex-Mazatlán"*. Con tu decisión eso ya no aplica y conviene corregirlo, o dentro
+de seis meses va a confundir.
+
 ---
 
 **Dime qué cambias de esto y sigo.**
