@@ -14,21 +14,23 @@
     <p class="cabecera__marca">Cerebro Liga MX 2026</p>
     <h1 id="titulo">Jornada</h1>
     <p class="cabecera__sub" id="subtitulo"></p>
-    <span class="sello">Pronóstico sellado antes de jugarse</span>
+    <span class="sello" id="sello"></span>
+    <nav class="jornadas" id="jornadas" aria-label="Jornadas"></nav>
   </div>
 </header>
 
 <main class="envoltura">
 
   <section>
-    <h2 class="seccion__titulo">Cómo le fue al modelo</h2>
+    <h2 class="seccion__titulo" id="titulo-resumen">Cómo le fue al modelo</h2>
     <div class="tarjetero" id="resumen"></div>
+    <p class="nota-origen" id="nota-origen" hidden></p>
   </section>
 
   <div class="nota">
     <p><strong>Una jornada sola no dice mucho.</strong> Con 9 partidos, acertar 4 o acertar 6
     es la diferencia entre la buena y la mala suerte: el margen de error ronda los ±16 puntos
-    porcentuales. La medida que sirve es la acumulada, y por ahora sólo llevamos dos jornadas.</p>
+    porcentuales. La medida que sirve es la acumulada, abajo.</p>
   </div>
 
   <section>
@@ -61,7 +63,9 @@
     </div>
     <p class="dato__nota" style="margin-top:.5rem">
       Brier: <span id="convencion"></span>. Más bajo es mejor.
-      La Jornada 1 no tiene pronóstico sellado: se registra su resultado, no su distribución.
+      La Jornada 1 no tiene snapshot: se registra su resultado, no su distribución.
+      Las marcadas con <strong>*</strong> se reconstruyeron después, con datos anteriores a
+      la jornada: son honestas fuera de muestra, pero no se publicaron antes de jugarse.
     </p>
   </section>
 

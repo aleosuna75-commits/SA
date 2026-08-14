@@ -1,0 +1,310 @@
+{
+ "torneo": "Apertura 2026",
+ "_lee_esto": "Para publicar una jornada: agrega su bloque con el fixture, corre generar.py y publica. Cuando se juegue, llena 'resultado' de cada partido y vuelve a correr: el pronóstico ya sellado NO se recalcula.",
+ "modelo": {
+  "credibilidad": {
+   "activa": true,
+   "k": 4,
+   "p": 3,
+   "_nota": "Z = w^p/(w^p + k^p) hacia PRIORS_ILUSTRATIVOS. Ver analisis/credibilidad.md. Con k=10,p=1 se reproduce la variante que costaba 0.0037 de Brier."
+  }
+ },
+ "jornadas": [
+  {
+   "jornada": 2,
+   "origen": "publicado",
+   "partidos": [
+    {
+     "fecha": "2026-07-21",
+     "local": "Cruz Azul",
+     "visitante": "Puebla",
+     "estadio": "Estadio Banorte (adelantado)",
+     "resultado": [
+      2,
+      1
+     ]
+    },
+    {
+     "fecha": "2026-07-21",
+     "local": "Toluca",
+     "visitante": "Pumas",
+     "estadio": "Nemesio Díez (adelantado)",
+     "resultado": [
+      1,
+      2
+     ]
+    },
+    {
+     "fecha": "2026-07-24",
+     "local": "Tigres",
+     "visitante": "Atlético San Luis",
+     "estadio": "Universitario",
+     "resultado": [
+      2,
+      2
+     ]
+    },
+    {
+     "fecha": "2026-07-24",
+     "local": "Tijuana",
+     "visitante": "León",
+     "estadio": "Caliente",
+     "resultado": [
+      1,
+      0
+     ]
+    },
+    {
+     "fecha": "2026-07-24",
+     "local": "Atlante",
+     "visitante": "América",
+     "estadio": "Ciudad de los Deportes",
+     "resultado": [
+      1,
+      1
+     ]
+    },
+    {
+     "fecha": "2026-07-25",
+     "local": "Chivas",
+     "visitante": "Juárez",
+     "estadio": "Akron",
+     "resultado": [
+      1,
+      0
+     ]
+    },
+    {
+     "fecha": "2026-07-25",
+     "local": "Santos",
+     "visitante": "Atlas",
+     "estadio": "Corona",
+     "resultado": [
+      0,
+      1
+     ]
+    },
+    {
+     "fecha": "2026-07-26",
+     "local": "Necaxa",
+     "visitante": "Monterrey",
+     "estadio": "Victoria",
+     "resultado": [
+      2,
+      1
+     ]
+    },
+    {
+     "fecha": "2026-07-26",
+     "local": "Pachuca",
+     "visitante": "Querétaro",
+     "estadio": "Hidalgo",
+     "resultado": [
+      1,
+      2
+     ]
+    }
+   ],
+   "ajustes": {
+    "América": {
+     "fuerza": 0.94,
+     "nota": "sin Zendejas (lesión) ni Cervantes (suspendido); Almada 2do juego"
+    },
+    "Chivas": {
+     "fuerza": 0.96,
+     "nota": "sin Sepúlveda (suspendido); presión tras 0-2 en casa"
+    },
+    "Puebla": {
+     "fuerza": 0.97,
+     "nota": "sin Iker Moreno (suspendido)"
+    },
+    "Juárez": {
+     "fuerza": 0.97,
+     "nota": "sin Luka Romero (lesión de rodilla en J1)"
+    },
+    "Tigres": {
+     "fuerza": 0.95,
+     "nota": "expulsión en J1 + reestructura post-Gignac"
+    },
+    "Monterrey": {
+     "fuerza": 0.98,
+     "nota": "transición Almeyda, pero respondió con triunfo en J1"
+    },
+    "Atlante": {
+     "fuerza": 0.96,
+     "nota": "ascendido; compitió de visita hasta el 90+3"
+    }
+   },
+   "nota": "Pronóstico publicado antes de jugarse. Snapshot sellado: sus probabilidades no se recalculan nunca."
+  },
+  {
+   "jornada": 3,
+   "origen": "reconstruido",
+   "partidos": [
+    {
+     "fecha": "2026-07-31",
+     "local": "Puebla",
+     "visitante": "Chivas",
+     "estadio": "Cuauhtémoc",
+     "resultado": [
+      1,
+      1
+     ]
+    },
+    {
+     "fecha": "2026-07-31",
+     "local": "Atlético San Luis",
+     "visitante": "Tijuana",
+     "estadio": "Libertad Financiera",
+     "resultado": [
+      0,
+      0
+     ]
+    },
+    {
+     "fecha": "2026-07-31",
+     "local": "Juárez",
+     "visitante": "Pumas",
+     "estadio": "Olímpico Benito Juárez",
+     "resultado": [
+      1,
+      5
+     ]
+    },
+    {
+     "fecha": "2026-08-01",
+     "local": "Querétaro",
+     "visitante": "Tigres",
+     "estadio": "Corregidora",
+     "resultado": [
+      3,
+      2
+     ]
+    },
+    {
+     "fecha": "2026-08-01",
+     "local": "Atlas",
+     "visitante": "Monterrey",
+     "estadio": "Jalisco",
+     "resultado": [
+      0,
+      2
+     ]
+    },
+    {
+     "fecha": "2026-08-01",
+     "local": "León",
+     "visitante": "Pachuca",
+     "estadio": "León",
+     "resultado": [
+      1,
+      0
+     ]
+    },
+    {
+     "fecha": "2026-08-01",
+     "local": "Cruz Azul",
+     "visitante": "Atlante",
+     "estadio": "Estadio Banorte",
+     "resultado": [
+      2,
+      3
+     ]
+    },
+    {
+     "fecha": "2026-08-02",
+     "local": "América",
+     "visitante": "Santos",
+     "estadio": "Estadio Banorte",
+     "resultado": [
+      3,
+      0
+     ]
+    },
+    {
+     "fecha": "2026-08-02",
+     "local": "Toluca",
+     "visitante": "Necaxa",
+     "estadio": "Nemesio Díez",
+     "resultado": [
+      3,
+      1
+     ]
+    }
+   ],
+   "ajustes": {},
+   "nota": "No se publicó pronóstico para esta jornada. Reconstruido fuera de muestra: calibrado sólo con partidos anteriores al 31-jul. Sin ajustes de actualidad capturados."
+  },
+  {
+   "jornada": 4,
+   "origen": "vigente",
+   "partidos": [
+    {
+     "fecha": "2026-08-15",
+     "local": "Atlante",
+     "visitante": "Toluca",
+     "estadio": "Estadio Banorte",
+     "resultado": null
+    },
+    {
+     "fecha": "2026-08-15",
+     "local": "Monterrey",
+     "visitante": "Juárez",
+     "estadio": "BBVA",
+     "resultado": null
+    },
+    {
+     "fecha": "2026-08-15",
+     "local": "Atlas",
+     "visitante": "Tigres",
+     "estadio": "Jalisco",
+     "resultado": null
+    },
+    {
+     "fecha": "2026-08-16",
+     "local": "Pumas",
+     "visitante": "Querétaro",
+     "estadio": "Olímpico Universitario",
+     "resultado": null
+    },
+    {
+     "fecha": "2026-08-16",
+     "local": "América",
+     "visitante": "Atlético San Luis",
+     "estadio": "Estadio Banorte",
+     "resultado": null
+    },
+    {
+     "fecha": "2026-08-16",
+     "local": "Santos",
+     "visitante": "Chivas",
+     "estadio": "Corona",
+     "resultado": null
+    },
+    {
+     "fecha": "2026-08-16",
+     "local": "Tijuana",
+     "visitante": "Cruz Azul",
+     "estadio": "Caliente",
+     "resultado": null
+    },
+    {
+     "fecha": "2026-08-17",
+     "local": "Necaxa",
+     "visitante": "León",
+     "estadio": "Victoria",
+     "resultado": null
+    },
+    {
+     "fecha": "2026-08-17",
+     "local": "Pachuca",
+     "visitante": "Puebla",
+     "estadio": "Hidalgo",
+     "resultado": null
+    }
+   ],
+   "ajustes": {},
+   "nota": "Sin ajustes de actualidad capturados: lesiones y suspensiones de la semana los cargas tú en 'ajustes'."
+  }
+ ]
+}

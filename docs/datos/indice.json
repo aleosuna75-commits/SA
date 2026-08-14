@@ -1,12 +1,62 @@
 {
  "torneo": "Apertura 2026",
- "jornada_vigente": 2,
- "actualizado": "2026-08-14",
+ "jornada_vigente": 4,
  "jornadas": [
   {
    "jornada": 2,
    "archivo": "j02.json",
-   "estado": "sellada"
+   "estado": "sellada",
+   "origen": "publicado"
+  },
+  {
+   "jornada": 3,
+   "archivo": "j03.json",
+   "estado": "sellada",
+   "origen": "reconstruido"
+  },
+  {
+   "jornada": 4,
+   "archivo": "j04.json",
+   "estado": "vigente",
+   "origen": "vigente"
   }
- ]
+ ],
+ "desempeno": {
+  "por_jornada": [
+   {
+    "jornada": 1,
+    "aciertos_1x2": 6,
+    "partidos": 9,
+    "marcadores_exactos": 1,
+    "brier": 0.568,
+    "origen": "publicado",
+    "nota": "sin snapshot: se registra el resultado, no la distribución"
+   },
+   {
+    "jornada": 2,
+    "aciertos_1x2": 4,
+    "partidos": 9,
+    "marcadores_exactos": 0,
+    "brier": 0.7053,
+    "parlays_pegados": 0,
+    "origen": "publicado"
+   },
+   {
+    "jornada": 3,
+    "aciertos_1x2": 5,
+    "partidos": 9,
+    "marcadores_exactos": 0,
+    "brier": 0.6214,
+    "parlays_pegados": 0,
+    "origen": "reconstruido"
+   }
+  ],
+  "acumulado": {
+   "aciertos_1x2": 15,
+   "partidos": 27,
+   "marcadores_exactos": 1,
+   "brier": 0.6316
+  },
+  "convencion_brier": "multicategoría (0–2); azar = 0.667"
+ }
 }

@@ -153,8 +153,83 @@ body {
   content: "";
   width: .4rem; height: .4rem;
   border-radius: 50%;
-  background: var(--acento);
+  background: currentColor;
 }
+.sello--vivo { color: #ffffff; border-color: rgba(255, 255, 255, .5); }
+.sello--vivo::before { animation: latido 2s ease-in-out infinite; }
+@keyframes latido { 0%, 100% { opacity: 1; } 50% { opacity: .25; } }
+
+/* pestañas de jornada */
+.jornadas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .4rem;
+  margin-top: 1rem;
+}
+.tab {
+  font: inherit;
+  font-weight: 700;
+  font-size: .85rem;
+  color: var(--encabezado-texto);
+  background: rgba(255, 255, 255, .1);
+  border: 1px solid rgba(255, 255, 255, .28);
+  border-radius: 100px;
+  padding: .3rem .9rem;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: .35rem;
+}
+.tab:hover { background: rgba(255, 255, 255, .2); }
+.tab:focus-visible { outline: 2px solid var(--acento); outline-offset: 2px; }
+.tab--activa {
+  background: var(--acento);
+  border-color: var(--acento);
+  color: #12201b;
+}
+.tab__vivo {
+  width: .4rem; height: .4rem;
+  border-radius: 50%;
+  background: currentColor;
+  animation: latido 2s ease-in-out infinite;
+}
+
+.nota-origen {
+  margin: .7rem 0 0;
+  font-size: .8rem;
+  color: var(--texto-suave);
+  font-style: italic;
+}
+.aviso {
+  margin: .7rem 0 0;
+  font-size: .78rem;
+  color: var(--texto-suave);
+  background: var(--superficie-2);
+  border-radius: 6px;
+  padding: .4rem .6rem;
+}
+.marcador__pron {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: .05rem;
+  white-space: nowrap;
+}
+.marcador__pron-et {
+  font-size: .62rem;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  font-weight: 700;
+  color: var(--texto-suave);
+}
+.marcador__pron-num {
+  font-size: 1.35rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--texto-suave);
+  line-height: 1.05;
+}
+.partido--pendiente { border-left-color: var(--acento); }
 
 /* ------------------------------------------------------------- resultados */
 
@@ -196,6 +271,7 @@ body {
   font-variant-numeric: tabular-nums;
 }
 .dato__nota { font-size: .78rem; color: var(--texto-suave); }
+.dato--texto .dato__valor { font-size: 1.05rem; padding: .32rem 0; }
 .dato--malo .dato__valor { color: var(--falla); }
 
 /* --------------------------------------------------------------- partidos */

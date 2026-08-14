@@ -18,7 +18,11 @@ def main():
     html = (DOCS / "index.html").read_text(encoding="utf-8")
     css = (DOCS / "estilos.css").read_text(encoding="utf-8")
     js = (DOCS / "app.js").read_text(encoding="utf-8")
-    datos = json.loads((DOCS / "datos" / "j02.json").read_text(encoding="utf-8"))
+    idx = json.loads((DOCS / "datos" / "indice.json").read_text(encoding="utf-8"))
+    jornadas = {str(j["jornada"]):
+                json.loads((DOCS / "datos" / j["archivo"]).read_text(encoding="utf-8"))
+                for j in idx["jornadas"]}
+    datos = {"indice": idx, "jornadas": jornadas}
 
     cuerpo = re.search(r"<body>(.*)</body>", html, re.S).group(1)
     cuerpo = re.sub(r'\s*<script src="app\.js"></script>', "", cuerpo)

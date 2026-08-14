@@ -383,14 +383,14 @@ marcadores y mismos tres parlays. Ya tengo contra qué comparar cualquier cambio
 lógica.* Falta una pieza para que sea reproducible al 100%: fijar la fecha de referencia
 (hoy `fit_dixon_coles` usa `date.today()`), que entra en la Fase 1.
 
-**Fase 1 — Contrato.** `--exportar-json` + `config/jornada.json` + validador de esquema, en
-**una sola pasada** al script (mejor abrir el archivo validado una vez que dos). Aquí entran
-también los arreglos 3.1 y 3.4. El Excel debe seguir saliendo idéntico salvo los decimales
-que cambian por pasar de MC a exacto. *La web todavía no existe.*
+**Fase 1 — Contrato. ✅ HECHA.** `config/jornadas.json` + `generar.py`. El modelo no se tocó:
+el generador lo importa y le pone encima el corte de calibración, la credibilidad y la
+exportación. Los arreglos 3.1 (1X2 exacto) y 3.4 (bitácora estructurada) ya están dentro.
 
-**Fase 2 — Web.** Sitio estático: jornada actual, parlays, bitácora colapsable. Publicable.
+**Fase 2 — Web. ✅ HECHA.** `docs/` con navegación entre jornadas, parlays y bitácora.
 
-**Fase 3 — Desempeño.** Sellado de resultados, Brier/RPS/aciertos, navegación entre jornadas.
+**Fase 3 — Desempeño. ✅ EN PIE.** Sellado automático, Brier por jornada y acumulado.
+Falta RPS y capturar el marcador de medio tiempo para poder calificar los legs de mitades.
 
 **Fase 4 — Opcional.** Separar `motor/` (Dixon-Coles, joint de mitades, parlays — agnóstico
 de liga) de `ligas/ligamx/` (nombres, estadios, escudo, H2H) para que el Cerebro Mundial
@@ -543,6 +543,37 @@ recomendando ese valor.
 **Pendiente menor:** el comentario de la línea 110 del modelo dice que Atlante es la
 *"franquicia ex-Mazatlán"*. Con tu decisión eso ya no aplica y conviene corregirlo, o dentro
 de seis meses va a confundir.
+
+---
+
+## 12. Estado al 14-ago-2026
+
+El sistema ya es dinámico. `config/jornadas.json` es lo único que se edita cada semana;
+`generar.py` hace el resto.
+
+**Dos garantías que hacen esto seguro de correr sin supervisión:**
+
+1. **Corte automático.** Cada jornada se calibra sólo con partidos anteriores a su primera
+   fecha. Se validó solo: la J2 calibró con exactamente 4,996 partidos, el histórico sellado
+   original. Da igual cuánto histórico se acumule después — es imposible que un pronóstico
+   vea resultados posteriores a sí mismo.
+2. **Sellado.** Una jornada `publicado` nunca se recalcula: sólo se le agregan resultados.
+
+| Jornada | Origen | Estado | Aciertos | Brier |
+|---|---|---|---|---|
+| 1 | publicado | sellada | 6/9 | 0.568 |
+| 2 | publicado | sellada | 4/9 | 0.705 |
+| 3 | reconstruido fuera de muestra | sellada | 5/9 | 0.621 |
+| 4 | vigente | por jugarse | — | — |
+| **Acumulado** | | | **15/27** | **0.632** |
+
+**Credibilidad activada** con `Z = w³/(w³+4³)` (§4 de `analisis/credibilidad.md`): Atlante
+`Z = 0.247`, su ataque pasa de 1.5159 a 0.8926, y todos los demás quedan entre 0.87 y 0.94,
+o sea prácticamente intactos. Se cambia en una línea del config; con `k=10, p=1` reproduces
+la variante que medía 0.0037 peor de Brier.
+
+**Pendiente tuyo:** los `ajustes` de la J4 están vacíos. Las lesiones y suspensiones de la
+semana no las puedo saber, y no las invento.
 
 ---
 
