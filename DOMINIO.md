@@ -1,30 +1,71 @@
-# Publicar en alepicks.com
+# Publicar el sitio: opciones
 
-Sí se puede, y GitHub Pages lo soporta **gratis, con HTTPS incluido** (certificado
-Let's Encrypt que se renueva solo).
+## Resumen
 
-**Verificado el 15-ago-2026: `alepicks.com` está libre.** No está registrado — NXDOMAIN en
-DNS y 404 en el registro de Verisign. Si lo quieres, agárralo, porque eso cambia.
+| Opción | Dirección | Costo | Tiempo |
+|---|---|---|---|
+| **Netlify** (recomendada) | `alepicks.netlify.app` | **gratis** | ~3 min |
+| GitHub Pages | `aleosuna75-commits.github.io/SA/` | gratis | ~2 min |
+| Dominio propio | `alepicks.com` | ~$12 USD/año | ~1 h + espera de DNS |
 
-## Lo único que cuesta dinero
-
-El dominio: **~$10-15 USD al año** en cualquier registrador (Cloudflare lo vende casi a
-precio de costo; Namecheap, GoDaddy y Google/Squarespace también sirven). Todo lo demás
-—hosting, HTTPS, ancho de banda— sigue siendo gratis. Es el único gasto del proyecto.
+Verificado el 15-ago-2026: **`alepicks.netlify.app` está libre** (Netlify responde 404, o sea
+nadie tomó ese nombre) y **`alepicks.com` no está registrado** (RDAP 404, DNS NXDOMAIN).
 
 ---
 
-## Orden de los pasos
+## Opción recomendada: Netlify, gratis y con tu nombre
 
-Hazlos en este orden. Si montas el dominio antes de que el sitio funcione, después no sabes
-qué está fallando.
+Te deja en **https://alepicks.netlify.app**, se actualiza solo con cada `git push` igual que
+Pages, y no depende del permiso de GitHub que bloqueó la activación automática.
 
-### 1. Primero, que funcione en github.io
+1. Entra a **https://app.netlify.com** y crea cuenta con **Sign up with GitHub**.
+2. *Add new site* → *Import an existing project* → **GitHub** → autoriza → elige el
+   repositorio **SA**.
+3. Configura así:
+
+   | Campo | Valor |
+   |---|---|
+   | Branch to deploy | `claude/new-session-i9lrt6` |
+   | Build command | *(déjalo vacío)* |
+   | Publish directory | `docs` |
+
+4. *Deploy site*. Te da una dirección fea tipo `random-name-123.netlify.app`.
+5. *Site configuration* → *Change site name* → escribe **`alepicks`** → guardar.
+
+Listo: **https://alepicks.netlify.app**
+
+A partir de ahí, cada `git push` que toque `docs/` republica solo. Si algún día compras
+`alepicks.com`, Netlify también lo conecta y te da el HTTPS gratis.
+
+### Alternativa aún más rápida, sin repositorio
+
+**https://app.netlify.com/drop** — arrastras `docs/vista_previa.html` y te da URL al
+instante. Sirve para pasar la página hoy mismo, pero hay que volver a arrastrarla cada
+jornada. Para uso continuo, mejor la opción de arriba.
+
+---
+
+## Opción B: GitHub Pages
+
+Queda en `https://aleosuna75-commits.github.io/SA/`. Gratis, pero la dirección es más fea.
 
 **https://github.com/aleosuna75-commits/SA/settings/pages** → *Source*: **Deploy from a
 branch** → rama `claude/new-session-i9lrt6`, carpeta `/docs` → *Save*.
 
-Comprueba que abre **https://aleosuna75-commits.github.io/SA/**. Hasta que eso jale, no sigas.
+> Se intentó activar esto desde un workflow de Actions y GitHub lo rechazó
+> (`Resource not accessible by integration`): el token de Actions no puede crear el sitio de
+> Pages la primera vez. Ese clic tiene que ser manual.
+
+---
+
+## Opción C: alepicks.com, el dominio propio
+
+Es el único que cuesta: **~$10-15 USD al año**. Todo lo demás (hosting, HTTPS, ancho de
+banda) sigue gratis. Hazlo en este orden o no vas a saber qué está fallando.
+
+### 1. Primero, que el sitio funcione en algún lado
+
+Netlify u Opción B, arriba. Hasta que eso jale, no sigas.
 
 ### 2. Registra el dominio
 
