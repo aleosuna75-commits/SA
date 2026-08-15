@@ -17,8 +17,10 @@ DOCS = Path(__file__).resolve().parent
 def main():
     html = (DOCS / "index.html").read_text(encoding="utf-8")
     css = (DOCS / "estilos.css").read_text(encoding="utf-8")
-    js = ((DOCS / "equipos.js").read_text(encoding="utf-8") + "\n"
-          + (DOCS / "app.js").read_text(encoding="utf-8"))
+    # el orden importa: equipos define los colores que usa estadios, y estadio
+    # define la clase Escenario que usa app
+    js = "\n".join((DOCS / n).read_text(encoding="utf-8")
+                   for n in ("equipos.js", "estadio.js", "estadios.js", "app.js"))
     idx = json.loads((DOCS / "datos" / "indice.json").read_text(encoding="utf-8"))
     jornadas = {str(j["jornada"]):
                 json.loads((DOCS / "datos" / j["archivo"]).read_text(encoding="utf-8"))
@@ -29,7 +31,7 @@ def main():
                            if proy_f.is_file() else None}
 
     cuerpo = re.search(r"<body>(.*)</body>", html, re.S).group(1)
-    cuerpo = re.sub(r'\s*<script src="(app|equipos)\.js"></script>', "", cuerpo)
+    cuerpo = re.sub(r'\s*<script src="(app|equipos|estadio|estadios)\.js"></script>', "", cuerpo)
     titulo = re.search(r"<title>(.*?)</title>", html, re.S).group(1)
 
     salida = (

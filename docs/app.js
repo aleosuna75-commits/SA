@@ -347,6 +347,86 @@ function pintaIndice(idx, proy, ir) {
     "resultados posteriores a sí mismo.";
 }
 
+/* --------------------------------------------------------- escenario aéreo */
+
+const MENOS_MOVIMIENTO =
+  matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+/* La cámara descansa un poco atrás para que el inmueble se vea alrededor del
+   contenido, no sólo el círculo central. */
+/* En reposo la cámara queda lo bastante cerca para que las gradas llenen los
+   costados; si se aleja más, el inmueble queda tapado por la columna de
+   contenido y el fondo se pierde. */
+const REPOSO = { x: 0, y: 0, escala: 1.18, giro: 0 };
+
+const escena = new Escenario(document.getElementById("escenario"));
+let sedeActual = null;
+
+let relojSede = null;
+function pintaSede(e) {
+  const placa = document.getElementById("sede");
+  document.getElementById("sede-nombre").textContent = e.nombre;
+  document.getElementById("sede-datos").textContent =
+    `${e.ciudad} · ${e.altitud.toLocaleString("es-MX")} m · ` +
+    `${e.capacidad.toLocaleString("es-MX")} lugares`;
+  placa.classList.remove("guardada");
+  clearTimeout(relojSede);
+  relojSede = setTimeout(() => placa.classList.add("guardada"), 4200);
+}
+
+/* Entrada: toma aérea alta que desciende hasta el círculo central del Azteca.
+   De ahí emerge el índice. */
+function entrada(alAsentar) {
+  sedeActual = ESTADIO_INICIAL;
+  escena.ponEstadio(sedeActual, true);
+  pintaSede(sedeActual);
+
+  if (MENOS_MOVIMIENTO) {
+    escena.cam = { ...REPOSO };
+    escena.pinta();
+    document.body.classList.add("asentado");
+    alAsentar();
+    return;
+  }
+
+  escena.cam = { x: 70, y: -46, escala: 0.11, giro: -0.55 };
+  escena.opacidad = 1;
+  escena.pinta();
+
+  // primero baja al centro de la cancha...
+  escena.anima({ x: 0, y: 0, escala: 1.9, giro: 0 }, 2600, suave.salida, () => {
+    // ...y retrocede lo justo para dejar sitio al contenido
+    escena.anima(REPOSO, 900, suave.entradaSalida);
+  });
+
+  setTimeout(() => {
+    document.body.classList.add("asentado");
+    alAsentar();
+  }, 1750);
+}
+
+/* Cambio de jornada: vuelo a otro estadio de la liga. */
+function vuelaAOtroEstadio() {
+  const destino = estadioAlAzar(sedeActual);
+  sedeActual = destino;
+
+  if (MENOS_MOVIMIENTO) {
+    escena.ponEstadio(destino, true);
+    pintaSede(destino);
+    return;
+  }
+  const giro = (Math.random() - 0.5) * 0.7;
+  document.body.classList.add("volando");
+  escena.anima({ escala: 0.34, giro, opacidad: 0.2 }, 700, suave.entradaSalida, () => {
+    escena.ponEstadio(destino, false);
+    pintaSede(destino);
+    escena.cam.giro = -giro;
+    escena.anima({ ...REPOSO, opacidad: 1 }, 1250, suave.salida, () => {
+      document.body.classList.remove("volando");
+    });
+  });
+}
+
 /* ------------------------------------------------------------------ arranque */
 
 const VISTA_I = document.getElementById("vista-indice");
@@ -362,8 +442,10 @@ function arranca(cargarIndice, cargarJornada, cargarProy, autorefresco) {
     pintaIndice(idx, proy, irJornada);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
-  const irJornada = (n) => {
+  const irJornada = (n, mismoLugar) => {
+    const cambia = actual !== n;
     actual = n;
+    if (cambia && !mismoLugar) vuelaAOtroEstadio();
     Promise.resolve(cargarJornada(n)).then((d) => {
       VISTA_I.hidden = true; VISTA_J.hidden = false; VOLVER.hidden = false;
       pintaJornada(d);
@@ -379,7 +461,8 @@ function arranca(cargarIndice, cargarJornada, cargarProy, autorefresco) {
 
   Promise.all([cargarIndice(), cargarProy()]).then(([i, p]) => {
     idx = i; proy = p; sello(i);
-    alIndice();
+    pintaIndice(idx, proy, irJornada);
+    entrada(() => { VISTA_J.hidden = true; VISTA_I.hidden = false; VOLVER.hidden = true; });
 
     /* Autoactualización: revisa el índice cada minuto y sólo repinta si el
        generador publicó algo nuevo. Es lo que hace que, al subir resultados,
@@ -391,7 +474,7 @@ function arranca(cargarIndice, cargarJornada, cargarProy, autorefresco) {
           idx = nuevo; sello(nuevo);
           cargarProy().then((np) => { proy = np; });
           if (actual === null) pintaIndice(idx, proy, irJornada);
-          else irJornada(actual);
+          else irJornada(actual, true);
         }).catch(() => {});
       }, 60000);
     }

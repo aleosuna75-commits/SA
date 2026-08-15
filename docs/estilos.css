@@ -747,3 +747,108 @@ tr.acumulado td { font-weight: 700; background: var(--superficie-2); }
   white-space: nowrap;
 }
 .etiqueta--ok { border-color: var(--borde); color: var(--texto-suave); }
+
+
+/* ==================================================== escenario de fondo */
+
+#escenario {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: -2;
+  display: block;
+}
+/* El velo toma el color de FONDO del tema, no un negro fijo: si no, en tema
+   claro el texto oscuro queda sobre un fondo oscuro y no se lee nada. */
+#velo {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity .8s ease;
+  background: linear-gradient(180deg,
+    color-mix(in srgb, var(--fondo) 55%, transparent) 0%,
+    color-mix(in srgb, var(--fondo) 86%, transparent) 18%,
+    color-mix(in srgb, var(--fondo) 95%, transparent) 46%,
+    var(--fondo) 100%);
+}
+body.asentado #velo { opacity: 1; }
+
+/* Durante el vuelo entre estadios el velo se abre y el contenido se retira,
+   para que el cambio de sede se vea. */
+body.volando #velo { opacity: .18; }
+body.volando main,
+body.volando .pie { opacity: .12; transition: opacity .5s ease; }
+body.volando .cabecera { opacity: .55; }
+
+/* En pantallas anchas la columna no cubre todo: ahí el estadio se asoma. */
+@media (min-width: 62rem) {
+  #velo {
+    background:
+      linear-gradient(90deg,
+        transparent 0%,
+        color-mix(in srgb, var(--fondo) 55%, transparent) 12%,
+        var(--fondo) 22%, var(--fondo) 78%,
+        color-mix(in srgb, var(--fondo) 55%, transparent) 88%,
+        transparent 100%),
+      linear-gradient(180deg,
+        color-mix(in srgb, var(--fondo) 20%, transparent) 0%,
+        color-mix(in srgb, var(--fondo) 55%, transparent) 40%,
+        color-mix(in srgb, var(--fondo) 70%, transparent) 100%);
+  }
+}
+
+/* el contenido emerge del centro de la cancha */
+.cabecera, main, .pie {
+  opacity: 0;
+  transform: scale(.965);
+  transition: opacity .9s ease, transform .9s cubic-bezier(.22,.9,.28,1);
+}
+body.asentado .cabecera,
+body.asentado main,
+body.asentado .pie { opacity: 1; transform: none; }
+
+/* placa con la sede en pantalla */
+#sede {
+  position: fixed;
+  left: 50%;
+  bottom: 1.1rem;
+  transform: translateX(-50%);
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: .1rem;
+  padding: .4rem .95rem;
+  border-radius: 100px;
+  background: rgba(9,20,16,.62);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(201,169,97,.35);
+  color: #f2f7f4;
+  text-align: center;
+  opacity: 0;
+  transition: opacity .7s ease;
+  pointer-events: none;
+  max-width: calc(100% - 2rem);
+}
+body.asentado #sede { opacity: 1; }
+/* Anuncia la sede y se quita de encima: no vale la pena tapar contenido. */
+body.asentado #sede.guardada { opacity: 0; }
+#sede b { font-size: .82rem; font-weight: 700; letter-spacing: .01em; }
+#sede span { font-size: .68rem; opacity: .78; font-variant-numeric: tabular-nums; }
+
+/* Con el fondo detrás, las superficies necesitan algo de opacidad propia
+   para que el texto siga siendo legible. */
+/* La cabecera deja ver el estadio detrás del verde institucional. */
+body.asentado .cabecera {
+  background: color-mix(in srgb, var(--encabezado) 88%, transparent);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cabecera, main, .pie, #velo, #sede { transition: none !important; }
+}

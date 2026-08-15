@@ -750,8 +750,120 @@ tr.acumulado td { font-weight: 700; background: var(--superficie-2); }
 }
 .etiqueta--ok { border-color: var(--borde); color: var(--texto-suave); }
 
+
+/* ==================================================== escenario de fondo */
+
+#escenario {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: -2;
+  display: block;
+}
+/* El velo toma el color de FONDO del tema, no un negro fijo: si no, en tema
+   claro el texto oscuro queda sobre un fondo oscuro y no se lee nada. */
+#velo {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity .8s ease;
+  background: linear-gradient(180deg,
+    color-mix(in srgb, var(--fondo) 55%, transparent) 0%,
+    color-mix(in srgb, var(--fondo) 86%, transparent) 18%,
+    color-mix(in srgb, var(--fondo) 95%, transparent) 46%,
+    var(--fondo) 100%);
+}
+body.asentado #velo { opacity: 1; }
+
+/* Durante el vuelo entre estadios el velo se abre y el contenido se retira,
+   para que el cambio de sede se vea. */
+body.volando #velo { opacity: .18; }
+body.volando main,
+body.volando .pie { opacity: .12; transition: opacity .5s ease; }
+body.volando .cabecera { opacity: .55; }
+
+/* En pantallas anchas la columna no cubre todo: ahí el estadio se asoma. */
+@media (min-width: 62rem) {
+  #velo {
+    background:
+      linear-gradient(90deg,
+        transparent 0%,
+        color-mix(in srgb, var(--fondo) 55%, transparent) 12%,
+        var(--fondo) 22%, var(--fondo) 78%,
+        color-mix(in srgb, var(--fondo) 55%, transparent) 88%,
+        transparent 100%),
+      linear-gradient(180deg,
+        color-mix(in srgb, var(--fondo) 20%, transparent) 0%,
+        color-mix(in srgb, var(--fondo) 55%, transparent) 40%,
+        color-mix(in srgb, var(--fondo) 70%, transparent) 100%);
+  }
+}
+
+/* el contenido emerge del centro de la cancha */
+.cabecera, main, .pie {
+  opacity: 0;
+  transform: scale(.965);
+  transition: opacity .9s ease, transform .9s cubic-bezier(.22,.9,.28,1);
+}
+body.asentado .cabecera,
+body.asentado main,
+body.asentado .pie { opacity: 1; transform: none; }
+
+/* placa con la sede en pantalla */
+#sede {
+  position: fixed;
+  left: 50%;
+  bottom: 1.1rem;
+  transform: translateX(-50%);
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: .1rem;
+  padding: .4rem .95rem;
+  border-radius: 100px;
+  background: rgba(9,20,16,.62);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(201,169,97,.35);
+  color: #f2f7f4;
+  text-align: center;
+  opacity: 0;
+  transition: opacity .7s ease;
+  pointer-events: none;
+  max-width: calc(100% - 2rem);
+}
+body.asentado #sede { opacity: 1; }
+/* Anuncia la sede y se quita de encima: no vale la pena tapar contenido. */
+body.asentado #sede.guardada { opacity: 0; }
+#sede b { font-size: .82rem; font-weight: 700; letter-spacing: .01em; }
+#sede span { font-size: .68rem; opacity: .78; font-variant-numeric: tabular-nums; }
+
+/* Con el fondo detrás, las superficies necesitan algo de opacidad propia
+   para que el texto siga siendo legible. */
+/* La cabecera deja ver el estadio detrás del verde institucional. */
+body.asentado .cabecera {
+  background: color-mix(in srgb, var(--encabezado) 88%, transparent);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cabecera, main, .pie, #velo, #sede { transition: none !important; }
+}
+
 </style>
 
+
+<canvas id="escenario" aria-hidden="true"></canvas>
+<div id="velo" aria-hidden="true"></div>
+<div id="sede" aria-hidden="true">
+  <b id="sede-nombre"></b>
+  <span id="sede-datos"></span>
+</div>
 
 <header class="cabecera">
   <div class="cabecera__interior">
@@ -930,6 +1042,468 @@ function el2(t, c, x) {
   n.className = c;
   if (x != null) n.textContent = x;
   return n;
+}
+
+/* ==========================================================================
+   Escenario: vista aérea de un estadio, dibujada por código.
+
+   No hay fotos ni imágenes externas. Todo se genera con Canvas a partir de los
+   datos reales de cada inmueble —altitud, capacidad, forma de la planta,
+   cobertura de techo y el entorno que lo rodea—, así que el sitio sigue pesando
+   lo mismo y funciona sin conexión.
+
+   Unidades: metros. La cancha mide 105 × 68 y todo lo demás se mide contra
+   ella, que es lo que da la escala correcta entre un estadio y otro.
+   ========================================================================== */
+
+const CANCHA_L = 105;
+const CANCHA_A = 68;
+
+/* --- paletas de entorno: la topografía alrededor del estadio --- */
+const TERRENOS = {
+  altiplano: { suelo: "#6d6a52", alt: "#7c7960", calle: "#8b8874", edificio: "#8e8b76", bruma: "#b9c4bf" },
+  templado:  { suelo: "#5f6b4b", alt: "#6d7a56", calle: "#87897a", edificio: "#8a8c7c", bruma: "#aebfae" },
+  arido:     { suelo: "#8a7457", alt: "#9a8263", calle: "#9d9079", edificio: "#a2947c", bruma: "#d3c4ad" },
+  costero:   { suelo: "#8f8467", alt: "#a09472", calle: "#9b9782", edificio: "#a89c80", bruma: "#c6cfc8" },
+  calido:    { suelo: "#8f7a5c", alt: "#9e8868", calle: "#9a9080", edificio: "#a09482", bruma: "#cfc3ab" },
+};
+
+/* Ruido determinista: mismo estadio, misma ciudad dibujada siempre. */
+function semilla(txt) {
+  let h = 2166136261;
+  for (let i = 0; i < txt.length; i++) {
+    h ^= txt.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return () => {
+    h += 0x6d2b79f5;
+    let t = h;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/* Superelipse: n=2 da un óvalo, n alto da un rectángulo redondeado.
+   Es lo que permite que el Azteca se vea ovalado y el BBVA rectangular. */
+function trazaSuperelipse(ctx, a, b, n, pasos = 160) {
+  ctx.beginPath();
+  for (let i = 0; i <= pasos; i++) {
+    const t = (i / pasos) * Math.PI * 2;
+    const c = Math.cos(t), s = Math.sin(t);
+    const x = Math.sign(c) * a * Math.pow(Math.abs(c), 2 / n);
+    const y = Math.sign(s) * b * Math.pow(Math.abs(s), 2 / n);
+    i ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
+  }
+  ctx.closePath();
+}
+
+function rgb(hex) {
+  const n = parseInt(hex.slice(1), 16);
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+}
+/* Mezcla dos colores. Sirve para desaturar: las gradas vistas desde el aire
+   nunca se ven tan vivas como el uniforme. */
+function mezcla(a, b, t) {
+  const A = rgb(a), B = rgb(b);
+  return `rgb(${A.map((v, i) => Math.round(v + (B[i] - v) * t)).join(",")})`;
+}
+
+function aclara(hex, f) {
+  const n = parseInt(hex.slice(1), 16);
+  const r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
+  const m = (v) => Math.round(f > 0 ? v + (255 - v) * f : v * (1 + f));
+  return `rgb(${m(r)},${m(g)},${m(b)})`;
+}
+
+class Escenario {
+  constructor(lienzo) {
+    this.lienzo = lienzo;
+    this.ctx = lienzo.getContext("2d");
+    this.cam = { x: 0, y: 0, escala: 1, giro: 0 };
+    this.estadio = null;
+    this.anim = null;
+    this.opacidad = 1;
+    this.redimensiona();
+    addEventListener("resize", () => { this.redimensiona(); this.pinta(); });
+  }
+
+  redimensiona() {
+    const d = Math.min(devicePixelRatio || 1, 2);
+    const { clientWidth: w, clientHeight: h } = this.lienzo;
+    this.lienzo.width = Math.max(1, Math.round(w * d));
+    this.lienzo.height = Math.max(1, Math.round(h * d));
+    this.dpr = d;
+    this.w = w;
+    this.h = h;
+  }
+
+  /* Escala tal que la cancha ocupe una fracción del ancho visible. */
+  escalaBase() {
+    return (Math.min(this.w, this.h * 1.35) / (CANCHA_L * 2.6));
+  }
+
+  pinta() {
+    const ctx = this.ctx;
+    const e = this.estadio;
+    ctx.save();
+    ctx.scale(this.dpr, this.dpr);
+    ctx.clearRect(0, 0, this.w, this.h);
+    if (!e) { ctx.restore(); return; }
+
+    const T = TERRENOS[e.clima] || TERRENOS.templado;
+    ctx.fillStyle = T.suelo;
+    ctx.fillRect(0, 0, this.w, this.h);
+
+    ctx.globalAlpha = this.opacidad;
+    ctx.translate(this.w / 2, this.h / 2);
+    ctx.rotate(this.cam.giro);
+    const s = this.escalaBase() * this.cam.escala;
+    ctx.scale(s, s);
+    ctx.translate(-this.cam.x, -this.cam.y);
+
+    this.ciudad(ctx, e, T);
+    this.inmueble(ctx, e, T);
+
+    ctx.restore();
+    this.vineta(T);
+  }
+
+  /* Manzanas y avenidas alrededor: da sensación de altura y de ciudad real. */
+  ciudad(ctx, e, T) {
+    const r = semilla(e.nombre);
+    const alcance = 900;
+    ctx.save();
+    ctx.fillStyle = T.alt;
+    for (let i = 0; i < 26; i++) {
+      const x = (r() - 0.5) * alcance * 2;
+      const y = (r() - 0.5) * alcance * 2;
+      const w = 60 + r() * 190, h = 60 + r() * 190;
+      if (Math.abs(x) < 320 && Math.abs(y) < 260) continue;
+      ctx.globalAlpha = 0.5 * this.opacidad;
+      ctx.fillRect(x, y, w, h);
+    }
+    ctx.globalAlpha = 0.75 * this.opacidad;
+    ctx.strokeStyle = T.calle;
+    ctx.lineWidth = 14;
+    for (let i = 0; i < 7; i++) {
+      const p = (r() - 0.5) * alcance * 1.8;
+      ctx.beginPath();
+      if (r() > 0.5) { ctx.moveTo(-alcance, p); ctx.lineTo(alcance, p); }
+      else { ctx.moveTo(p, -alcance); ctx.lineTo(p, alcance); }
+      ctx.stroke();
+    }
+    ctx.globalAlpha = 0.55 * this.opacidad;
+    ctx.fillStyle = T.edificio;
+    for (let i = 0; i < 60; i++) {
+      const x = (r() - 0.5) * alcance * 2;
+      const y = (r() - 0.5) * alcance * 2;
+      if (Math.abs(x) < 300 && Math.abs(y) < 240) continue;
+      const w = 18 + r() * 46, h = 18 + r() * 46;
+      ctx.fillRect(x, y, w, h);
+    }
+    /* estacionamiento anular */
+    ctx.globalAlpha = 0.5 * this.opacidad;
+    ctx.fillStyle = T.calle;
+    trazaSuperelipse(ctx, e.rx * 1.55, e.ry * 1.55, e.n);
+    trazaSuperelipse(ctx, e.rx * 1.04, e.ry * 1.04, e.n);
+    ctx.fill("evenodd");
+    ctx.restore();
+  }
+
+  inmueble(ctx, e, T) {
+    const r = semilla(e.nombre + "|estructura");
+    const grada = e.rx - e.pitchRx;
+    ctx.save();
+
+    /* sombra proyectada sobre el terreno */
+    ctx.globalAlpha = 0.32 * this.opacidad;
+    ctx.fillStyle = "#000";
+    ctx.save();
+    ctx.translate(grada * 0.16, grada * 0.22);
+    trazaSuperelipse(ctx, e.rx * 1.03, e.ry * 1.03, e.n);
+    ctx.fill();
+    ctx.restore();
+    ctx.globalAlpha = this.opacidad;
+
+    /* fachada exterior */
+    ctx.fillStyle = mezcla(e.color1, "#3a3f3c", 0.68);
+    trazaSuperelipse(ctx, e.rx, e.ry, e.n);
+    ctx.fill();
+
+    /* Gradas por anillos concéntricos, que es como se leen desde el aire:
+       tres tiras de butacas separadas por pasillos, no rebanadas de pastel. */
+    const base = mezcla(e.color1, "#6a6f6c", 0.5);
+    const alterno = mezcla(e.color2, "#6a6f6c", 0.55);
+    const anillos = e.capacidad > 45000 ? 3 : 2;
+    const dentro = 0.1;                   // deja ver el pasillo interior
+    for (let k = 0; k < anillos; k++) {
+      const f0 = 1 - dentro - (k * (1 - dentro * 2)) / anillos;
+      const f1 = 1 - dentro - ((k + 1) * (1 - dentro * 2)) / anillos;
+      const rx0 = e.pitchRx + grada * f0, ry0 = e.pitchRy + grada * f0 * 0.94;
+      const rx1 = e.pitchRx + grada * f1, ry1 = e.pitchRy + grada * f1 * 0.94;
+      ctx.fillStyle = k === 1 ? alterno : mezcla(base, "#000", k * 0.12);
+      trazaSuperelipse(ctx, rx0, ry0, e.n);
+      trazaSuperelipse(ctx, rx1, ry1, e.n);
+      ctx.fill("evenodd");
+      /* pasillo entre anillos */
+      ctx.strokeStyle = "rgba(255,255,255,.16)";
+      ctx.lineWidth = grada * 0.035;
+      trazaSuperelipse(ctx, rx1, ry1, e.n);
+      ctx.stroke();
+    }
+
+    /* vomitorios: cortes radiales finos, no bloques de color */
+    ctx.save();
+    ctx.globalAlpha = 0.5 * this.opacidad;
+    ctx.strokeStyle = "rgba(15,20,18,.85)";
+    ctx.lineWidth = grada * 0.035;
+    const cortes = Math.max(18, Math.round(e.capacidad / 2600));
+    for (let i = 0; i < cortes; i++) {
+      const a = (i / cortes) * Math.PI * 2 + r() * 0.02;
+      const c = Math.cos(a), s = Math.sin(a);
+      const pr = (fx, fy) => [
+        Math.sign(c) * fx * Math.pow(Math.abs(c), 2 / e.n),
+        Math.sign(s) * fy * Math.pow(Math.abs(s), 2 / e.n)];
+      const [x0, y0] = pr(e.pitchRx + grada * 0.1, (e.pitchRy + grada * 0.1) * 0.99);
+      const [x1, y1] = pr(e.rx * 0.985, e.ry * 0.985);
+      ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke();
+    }
+    ctx.restore();
+
+    /* voladizo del techo: sombra sobre las butacas de arriba */
+    if (e.techo !== "ninguno") {
+      const cobertura = e.techo === "total" ? 0.55 : 0.34;
+      ctx.globalAlpha = (e.techo === "total" ? 0.78 : 0.6) * this.opacidad;
+      ctx.fillStyle = mezcla(e.color1, "#22262a", 0.82);
+      trazaSuperelipse(ctx, e.rx, e.ry, e.n);
+      trazaSuperelipse(ctx, e.rx - grada * cobertura,
+                       e.ry - grada * cobertura * 0.94, e.n);
+      ctx.fill("evenodd");
+      ctx.globalAlpha = this.opacidad;
+    }
+
+    /* perímetro de servicio alrededor de la cancha */
+    ctx.fillStyle = mezcla(T.calle, "#2e332f", 0.45);
+    trazaSuperelipse(ctx, e.pitchRx, e.pitchRy, Math.min(e.n, 3.2));
+    ctx.fill();
+
+    this.cancha(ctx);
+    if (e.techo !== "total") this.torres(ctx, e);
+    ctx.restore();
+  }
+
+  cancha(ctx) {
+    const L = CANCHA_L / 2, A = CANCHA_A / 2;
+    ctx.save();
+    ctx.fillStyle = "#3f7a3d";
+    ctx.fillRect(-L - 5, -A - 5, CANCHA_L + 10, CANCHA_A + 10);
+
+    /* franjas de corte */
+    const franjas = 12;
+    for (let i = 0; i < franjas; i++) {
+      ctx.fillStyle = i % 2 ? "#478a44" : "#3d7439";
+      ctx.fillRect(-L + (i * CANCHA_L) / franjas, -A, CANCHA_L / franjas, CANCHA_A);
+    }
+
+    ctx.strokeStyle = "rgba(255,255,255,.86)";
+    ctx.lineWidth = 0.5;
+    ctx.strokeRect(-L, -A, CANCHA_L, CANCHA_A);
+    ctx.beginPath(); ctx.moveTo(0, -A); ctx.lineTo(0, A); ctx.stroke();
+    ctx.beginPath(); ctx.arc(0, 0, 9.15, 0, Math.PI * 2); ctx.stroke();
+    ctx.beginPath(); ctx.arc(0, 0, 0.9, 0, Math.PI * 2);
+    ctx.fillStyle = "rgba(255,255,255,.9)"; ctx.fill();
+
+    [-1, 1].forEach((d) => {
+      ctx.strokeRect(d * L, -20.16, -d * 16.5, 40.32);   // área grande
+      ctx.strokeRect(d * L, -9.16, -d * 5.5, 18.32);     // área chica
+      ctx.beginPath(); ctx.arc(d * (L - 11), 0, 0.7, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath();
+      ctx.arc(d * (L - 11), 0, 9.15, d > 0 ? Math.PI * 0.72 : -Math.PI * 0.28,
+              d > 0 ? Math.PI * 1.28 : Math.PI * 0.28);
+      ctx.stroke();
+      ctx.fillStyle = "rgba(255,255,255,.75)";
+      ctx.fillRect(d * L, -3.66, d * 1.6, 7.32);          // portería
+      ctx.fillStyle = "rgba(255,255,255,.9)";
+    });
+    ctx.restore();
+  }
+
+  torres(ctx, e) {
+    ctx.save();
+    ctx.globalAlpha = 0.9 * this.opacidad;
+    const puntos = [[0.72, 0.72], [-0.72, 0.72], [0.72, -0.72], [-0.72, -0.72]];
+    puntos.forEach(([fx, fy]) => {
+      const x = e.rx * fx * 1.02, y = e.ry * fy * 1.02;
+      ctx.fillStyle = "rgba(255,255,255,.5)";
+      ctx.beginPath(); ctx.arc(x, y, 5.5, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = "rgba(255,255,240,.95)";
+      ctx.beginPath(); ctx.arc(x, y, 2.4, 0, Math.PI * 2); ctx.fill();
+    });
+    ctx.restore();
+  }
+
+  /* Bruma en los bordes: da profundidad y despeja el centro para el texto. */
+  vineta(T) {
+    const ctx = this.ctx;
+    ctx.save();
+    ctx.scale(this.dpr, this.dpr);
+    const g = ctx.createRadialGradient(this.w / 2, this.h * 0.42, Math.min(this.w, this.h) * 0.15,
+                                       this.w / 2, this.h * 0.42, Math.max(this.w, this.h) * 0.78);
+    g.addColorStop(0, "rgba(0,0,0,0)");
+    g.addColorStop(0.55, "rgba(0,0,0,.14)");
+    g.addColorStop(1, "rgba(0,0,0,.52)");
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, this.w, this.h);
+    ctx.restore();
+  }
+
+  /* ------------------------------------------------------------ animación */
+
+  detener() {
+    if (this.anim) cancelAnimationFrame(this.anim);
+    this.anim = null;
+  }
+
+  anima(destino, ms, suavizado, alTerminar) {
+    this.detener();
+    const ini = { ...this.cam, opacidad: this.opacidad };
+    const t0 = performance.now();
+    const paso = (t) => {
+      const u = Math.min(1, (t - t0) / ms);
+      const k = suavizado(u);
+      for (const p of ["x", "y", "escala", "giro"]) {
+        if (destino[p] !== undefined) this.cam[p] = ini[p] + (destino[p] - ini[p]) * k;
+      }
+      if (destino.opacidad !== undefined) {
+        this.opacidad = ini.opacidad + (destino.opacidad - ini.opacidad) * k;
+      }
+      this.pinta();
+      if (u < 1) this.anim = requestAnimationFrame(paso);
+      else { this.anim = null; if (alTerminar) alTerminar(); }
+    };
+    this.anim = requestAnimationFrame(paso);
+  }
+
+  ponEstadio(e, inmediato) {
+    this.estadio = e;
+    if (inmediato) this.pinta();
+  }
+}
+
+const suave = {
+  salida: (u) => 1 - Math.pow(1 - u, 3),
+  entradaSalida: (u) => (u < 0.5 ? 4 * u * u * u : 1 - Math.pow(-2 * u + 2, 3) / 2),
+};
+
+/* ==========================================================================
+   Los 16 inmuebles de la Liga MX.
+
+   Cada uno se dibuja a partir de sus datos reales: la capacidad define qué tan
+   gruesas son las gradas, la forma de la planta define si se ve ovalado o
+   rectangular, el techo define el voladizo, y el entorno define la topografía
+   y los colores del terreno alrededor.
+
+   El Estadio Banorte aparece una sola vez aunque lo compartan tres clubes.
+   ========================================================================== */
+
+const ESTADIOS = [
+  { nombre: "Estadio Banorte", ciudad: "Ciudad de México", equipos: ["América", "Cruz Azul", "Atlante"],
+    altitud: 2240, capacidad: 83264, techo: "parcial", forma: "ovalado", clima: "altiplano",
+    nota: "El coloso de Santa Úrsula, antes Azteca. Aire a 2,240 m." },
+
+  { nombre: "Estadio Akron", ciudad: "Zapopan", equipos: ["Chivas"],
+    altitud: 1560, capacidad: 49850, techo: "parcial", forma: "ovalado", clima: "templado",
+    nota: "El volcán de Zapopan, hundido en el terreno." },
+
+  { nombre: "Estadio BBVA", ciudad: "Guadalupe, N.L.", equipos: ["Monterrey"],
+    altitud: 500, capacidad: 53500, techo: "total", forma: "rectangular", clima: "calido",
+    nota: "El Gigante de Acero, con el Cerro de la Silla al fondo." },
+
+  { nombre: "Estadio Universitario", ciudad: "San Nicolás, N.L.", equipos: ["Tigres"],
+    altitud: 500, capacidad: 41615, techo: "parcial", forma: "rectangular", clima: "calido",
+    nota: "El Volcán. De los ambientes más cerrados de la liga." },
+
+  { nombre: "Estadio Nemesio Díez", ciudad: "Toluca", equipos: ["Toluca"],
+    altitud: 2660, capacidad: 30000, techo: "parcial", forma: "rectangular", clima: "altiplano",
+    nota: "La Bombonera. La altura más castigadora del torneo." },
+
+  { nombre: "Estadio Hidalgo", ciudad: "Pachuca", equipos: ["Pachuca"],
+    altitud: 2400, capacidad: 30000, techo: "parcial", forma: "rectangular", clima: "altiplano",
+    nota: "Altura y viento en la Bella Airosa." },
+
+  { nombre: "Estadio Olímpico Universitario", ciudad: "Ciudad de México", equipos: ["Pumas"],
+    altitud: 2280, capacidad: 62000, techo: "ninguno", forma: "ovalado", clima: "altiplano",
+    nota: "Pista de atletismo, cráter de lava y pasto natural." },
+
+  { nombre: "Estadio Corregidora", ciudad: "Querétaro", equipos: ["Querétaro"],
+    altitud: 1820, capacidad: 33162, techo: "parcial", forma: "ovalado", clima: "altiplano",
+    nota: "La Corregidora, sobre una loma al poniente de la ciudad." },
+
+  { nombre: "Estadio Jalisco", ciudad: "Guadalajara", equipos: ["Atlas"],
+    altitud: 1560, capacidad: 55020, techo: "parcial", forma: "ovalado", clima: "templado",
+    nota: "El coloso de la colonia Independencia." },
+
+  { nombre: "Estadio Caliente", ciudad: "Tijuana", equipos: ["Tijuana"],
+    altitud: 30, capacidad: 33333, techo: "parcial", forma: "rectangular", clima: "costero",
+    nota: "Pasto sintético y el viaje más largo de la liga." },
+
+  { nombre: "Estadio Cuauhtémoc", ciudad: "Puebla", equipos: ["Puebla"],
+    altitud: 2160, capacidad: 51726, techo: "parcial", forma: "ovalado", clima: "altiplano",
+    nota: "A la sombra del Popocatépetl." },
+
+  { nombre: "Estadio Victoria", ciudad: "Aguascalientes", equipos: ["Necaxa"],
+    altitud: 1880, capacidad: 25000, techo: "parcial", forma: "rectangular", clima: "arido",
+    nota: "El más compacto del altiplano." },
+
+  { nombre: "Estadio TSM Corona", ciudad: "Torreón", equipos: ["Santos"],
+    altitud: 1120, capacidad: 30000, techo: "parcial", forma: "rectangular", clima: "arido",
+    nota: "En pleno desierto lagunero, con calor de 40 grados." },
+
+  { nombre: "Estadio Nou Camp", ciudad: "León", equipos: ["León"],
+    altitud: 1800, capacidad: 31297, techo: "parcial", forma: "ovalado", clima: "templado",
+    nota: "La casa de La Fiera desde 1967." },
+
+  { nombre: "Estadio Olímpico Benito Juárez", ciudad: "Ciudad Juárez", equipos: ["Juárez"],
+    altitud: 1120, capacidad: 19703, techo: "ninguno", forma: "rectangular", clima: "arido",
+    nota: "El más pequeño y el más caluroso: desierto de Chihuahua." },
+
+  { nombre: "Estadio Libertad Financiera", ciudad: "San Luis Potosí", equipos: ["Atlético San Luis"],
+    altitud: 1860, capacidad: 25709, techo: "parcial", forma: "rectangular", clima: "arido",
+    nota: "Antes Alfonso Lastras, en el altiplano potosino." },
+];
+
+/* Geometría derivada: de los datos reales a lo que se dibuja. */
+function preparaEstadio(e) {
+  const eq = (typeof EQUIPOS !== "undefined" && EQUIPOS[e.equipos[0]]) || null;
+  // la cancha más el perímetro de servicio
+  const pitchRx = 105 / 2 + 13;
+  const pitchRy = 68 / 2 + 12;
+  // más aforo, gradas más profundas — proporción real contra la cancha
+  const grada = 22 + Math.sqrt(e.capacidad) * 0.16;
+  // la planta: óvalo, herradura o rectángulo redondeado
+  const n = e.forma === "rectangular" ? 4.6 : e.forma === "herradura" ? 3.0 : 2.15;
+  return {
+    ...e,
+    pitchRx, pitchRy, n,
+    rx: pitchRx + grada,
+    ry: pitchRy + grada * 0.92,
+    color1: eq ? eq.c1 : "#2f4a3d",
+    color2: eq ? eq.c2 : "#cfd6d1",
+  };
+}
+
+const ESCENARIOS = ESTADIOS.map(preparaEstadio);
+const POR_EQUIPO = {};
+ESCENARIOS.forEach((e) => e.equipos.forEach((t) => { POR_EQUIPO[t] = e; }));
+
+/* El Azteca abre siempre: es donde arranca el recorrido. */
+const ESTADIO_INICIAL = ESCENARIOS[0];
+
+/* Un estadio al azar, evitando repetir el que ya está en pantalla. */
+function estadioAlAzar(excepto) {
+  const opciones = ESCENARIOS.filter((e) => e !== excepto);
+  return opciones[Math.floor(Math.random() * opciones.length)];
 }
 
 /* ==========================================================================
@@ -1281,6 +1855,86 @@ function pintaIndice(idx, proy, ir) {
     "resultados posteriores a sí mismo.";
 }
 
+/* --------------------------------------------------------- escenario aéreo */
+
+const MENOS_MOVIMIENTO =
+  matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+/* La cámara descansa un poco atrás para que el inmueble se vea alrededor del
+   contenido, no sólo el círculo central. */
+/* En reposo la cámara queda lo bastante cerca para que las gradas llenen los
+   costados; si se aleja más, el inmueble queda tapado por la columna de
+   contenido y el fondo se pierde. */
+const REPOSO = { x: 0, y: 0, escala: 1.18, giro: 0 };
+
+const escena = new Escenario(document.getElementById("escenario"));
+let sedeActual = null;
+
+let relojSede = null;
+function pintaSede(e) {
+  const placa = document.getElementById("sede");
+  document.getElementById("sede-nombre").textContent = e.nombre;
+  document.getElementById("sede-datos").textContent =
+    `${e.ciudad} · ${e.altitud.toLocaleString("es-MX")} m · ` +
+    `${e.capacidad.toLocaleString("es-MX")} lugares`;
+  placa.classList.remove("guardada");
+  clearTimeout(relojSede);
+  relojSede = setTimeout(() => placa.classList.add("guardada"), 4200);
+}
+
+/* Entrada: toma aérea alta que desciende hasta el círculo central del Azteca.
+   De ahí emerge el índice. */
+function entrada(alAsentar) {
+  sedeActual = ESTADIO_INICIAL;
+  escena.ponEstadio(sedeActual, true);
+  pintaSede(sedeActual);
+
+  if (MENOS_MOVIMIENTO) {
+    escena.cam = { ...REPOSO };
+    escena.pinta();
+    document.body.classList.add("asentado");
+    alAsentar();
+    return;
+  }
+
+  escena.cam = { x: 70, y: -46, escala: 0.11, giro: -0.55 };
+  escena.opacidad = 1;
+  escena.pinta();
+
+  // primero baja al centro de la cancha...
+  escena.anima({ x: 0, y: 0, escala: 1.9, giro: 0 }, 2600, suave.salida, () => {
+    // ...y retrocede lo justo para dejar sitio al contenido
+    escena.anima(REPOSO, 900, suave.entradaSalida);
+  });
+
+  setTimeout(() => {
+    document.body.classList.add("asentado");
+    alAsentar();
+  }, 1750);
+}
+
+/* Cambio de jornada: vuelo a otro estadio de la liga. */
+function vuelaAOtroEstadio() {
+  const destino = estadioAlAzar(sedeActual);
+  sedeActual = destino;
+
+  if (MENOS_MOVIMIENTO) {
+    escena.ponEstadio(destino, true);
+    pintaSede(destino);
+    return;
+  }
+  const giro = (Math.random() - 0.5) * 0.7;
+  document.body.classList.add("volando");
+  escena.anima({ escala: 0.34, giro, opacidad: 0.2 }, 700, suave.entradaSalida, () => {
+    escena.ponEstadio(destino, false);
+    pintaSede(destino);
+    escena.cam.giro = -giro;
+    escena.anima({ ...REPOSO, opacidad: 1 }, 1250, suave.salida, () => {
+      document.body.classList.remove("volando");
+    });
+  });
+}
+
 /* ------------------------------------------------------------------ arranque */
 
 const VISTA_I = document.getElementById("vista-indice");
@@ -1296,8 +1950,10 @@ function arranca(cargarIndice, cargarJornada, cargarProy, autorefresco) {
     pintaIndice(idx, proy, irJornada);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
-  const irJornada = (n) => {
+  const irJornada = (n, mismoLugar) => {
+    const cambia = actual !== n;
     actual = n;
+    if (cambia && !mismoLugar) vuelaAOtroEstadio();
     Promise.resolve(cargarJornada(n)).then((d) => {
       VISTA_I.hidden = true; VISTA_J.hidden = false; VOLVER.hidden = false;
       pintaJornada(d);
@@ -1313,7 +1969,8 @@ function arranca(cargarIndice, cargarJornada, cargarProy, autorefresco) {
 
   Promise.all([cargarIndice(), cargarProy()]).then(([i, p]) => {
     idx = i; proy = p; sello(i);
-    alIndice();
+    pintaIndice(idx, proy, irJornada);
+    entrada(() => { VISTA_J.hidden = true; VISTA_I.hidden = false; VOLVER.hidden = true; });
 
     /* Autoactualización: revisa el índice cada minuto y sólo repinta si el
        generador publicó algo nuevo. Es lo que hace que, al subir resultados,
@@ -1325,7 +1982,7 @@ function arranca(cargarIndice, cargarJornada, cargarProy, autorefresco) {
           idx = nuevo; sello(nuevo);
           cargarProy().then((np) => { proy = np; });
           if (actual === null) pintaIndice(idx, proy, irJornada);
-          else irJornada(actual);
+          else irJornada(actual, true);
         }).catch(() => {});
       }, 60000);
     }
