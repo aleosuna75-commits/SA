@@ -1400,82 +1400,100 @@ const suave = {
    Los 16 inmuebles de la Liga MX.
 
    Cada uno se dibuja a partir de sus datos reales: la capacidad define qué tan
-   gruesas son las gradas, la forma de la planta define si se ve ovalado o
-   rectangular, el techo define el voladizo, y el entorno define la topografía
-   y los colores del terreno alrededor.
+   profundas son las gradas y cuántos anillos tiene, la forma de la planta
+   define si se ve ovalado o rectangular, el techo define el voladizo, y el
+   entorno define la topografía y los colores del terreno alrededor.
 
    El Estadio Banorte aparece una sola vez aunque lo compartan tres clubes.
 
-   Sobre las cifras: altitud y capacidad son las de referencia habitual de cada
-   inmueble. Sólo alimentan el dibujo y la placa informativa —ni el modelo ni
-   los pronósticos las usan—, así que un ajuste fino de capacidad no mueve
-   ningún número del Cerebro.
+   PROCEDENCIA: datos verificados contra fuentes públicas. Donde las fuentes se
+   contradicen queda anotado en `confianza` y en la nota; el caso típico es la
+   capacidad, que cambia con cada remodelación y que cada fuente reporta
+   distinto. Estas cifras sólo alimentan el dibujo y la placa informativa: ni el
+   modelo ni los pronósticos las usan, así que un aforo corrido por unos
+   cientos de lugares no mueve ningún número del Cerebro.
    ========================================================================== */
 
 const ESTADIOS = [
   { nombre: "Estadio Banorte", ciudad: "Ciudad de México", equipos: ["América", "Cruz Azul", "Atlante"],
-    altitud: 2240, capacidad: 83264, techo: "parcial", forma: "ovalado", clima: "altiplano",
-    nota: "El coloso de Santa Úrsula, antes Azteca. Aire a 2,240 m." },
+    altitud: 2240, capacidad: 87523, techo: "parcial", forma: "ovalado", clima: "altiplano",
+    confianza: "alta",
+    nota: "Ex Azteca. Reabrió en marzo de 2026 tras la remodelación; el único que comparten tres clubes." },
 
   { nombre: "Estadio Akron", ciudad: "Zapopan", equipos: ["Chivas"],
-    altitud: 1560, capacidad: 49850, techo: "parcial", forma: "ovalado", clima: "templado",
-    nota: "El volcán de Zapopan, hundido en el terreno." },
+    altitud: 1670, capacidad: 46355, techo: "parcial", forma: "ovalado", clima: "templado",
+    confianza: "media",
+    nota: "Berma de pasto que emula un volcán, con la cubierta flotando como nube." },
 
   { nombre: "Estadio BBVA", ciudad: "Guadalupe, N.L.", equipos: ["Monterrey"],
-    altitud: 500, capacidad: 53500, techo: "total", forma: "rectangular", clima: "calido",
-    nota: "El Gigante de Acero, con el Cerro de la Silla al fondo." },
+    altitud: 500, capacidad: 53500, techo: "parcial", forma: "rectangular", clima: "arido",
+    confianza: "media",
+    nota: "El Gigante de Acero: la grada sur baja a propósito para enmarcar el Cerro de la Silla." },
 
   { nombre: "Estadio Universitario", ciudad: "San Nicolás, N.L.", equipos: ["Tigres"],
-    altitud: 500, capacidad: 41615, techo: "parcial", forma: "rectangular", clima: "calido",
-    nota: "El Volcán. De los ambientes más cerrados de la liga." },
+    altitud: 515, capacidad: 41886, techo: "ninguno", forma: "ovalado", clima: "arido",
+    confianza: "media",
+    nota: "El Volcán: tazón de concreto continuo, gradas empinadas y ni un metro de techo." },
 
   { nombre: "Estadio Nemesio Díez", ciudad: "Toluca", equipos: ["Toluca"],
-    altitud: 2660, capacidad: 30000, techo: "parcial", forma: "rectangular", clima: "altiplano",
-    nota: "La Bombonera. La altura más castigadora del torneo." },
+    altitud: 2670, capacidad: 30000, techo: "total", forma: "rectangular", clima: "altiplano",
+    confianza: "alta",
+    nota: "La Bombonera, el más alto de la liga. Las cuatro tribunas techadas con una trabe de 115 m." },
 
   { nombre: "Estadio Hidalgo", ciudad: "Pachuca", equipos: ["Pachuca"],
-    altitud: 2400, capacidad: 30000, techo: "parcial", forma: "rectangular", clima: "altiplano",
-    nota: "Altura y viento en la Bella Airosa." },
+    altitud: 2390, capacidad: 25922, techo: "parcial", forma: "ovalado", clima: "altiplano",
+    confianza: "media",
+    nota: "El Huracán, por los vientos de Pachuca. Techo sólo en las tribunas laterales." },
 
   { nombre: "Estadio Olímpico Universitario", ciudad: "Ciudad de México", equipos: ["Pumas"],
-    altitud: 2280, capacidad: 62000, techo: "ninguno", forma: "ovalado", clima: "altiplano",
-    nota: "Pista de atletismo, cráter de lava y pasto natural." },
+    altitud: 2292, capacidad: 58445, techo: "ninguno", forma: "ovalado", clima: "altiplano",
+    confianza: "alta",
+    nota: "Cuenco elíptico hundido en la lava del Pedregal. Sede olímpica en 1968." },
 
-  { nombre: "Estadio Corregidora", ciudad: "Querétaro", equipos: ["Querétaro"],
-    altitud: 1820, capacidad: 33162, techo: "parcial", forma: "ovalado", clima: "altiplano",
-    nota: "La Corregidora, sobre una loma al poniente de la ciudad." },
+  { nombre: "Estadio La Corregidora", ciudad: "Querétaro", equipos: ["Querétaro"],
+    altitud: 1875, capacidad: 34107, techo: "ninguno", forma: "ovalado", clima: "altiplano",
+    confianza: "media",
+    nota: "El Coloso del Cimatario: óvalo de tres niveles completamente cerrados." },
 
   { nombre: "Estadio Jalisco", ciudad: "Guadalajara", equipos: ["Atlas"],
-    altitud: 1560, capacidad: 55020, techo: "parcial", forma: "ovalado", clima: "templado",
-    nota: "El coloso de la colonia Independencia." },
+    altitud: 1527, capacidad: 55020, techo: "parcial", forma: "ovalado", clima: "templado",
+    confianza: "media",
+    nota: "Anillo de lámina de 1970 que cubre la tribuna alta en todo el contorno." },
 
   { nombre: "Estadio Caliente", ciudad: "Tijuana", equipos: ["Tijuana"],
-    altitud: 30, capacidad: 33333, techo: "parcial", forma: "rectangular", clima: "costero",
-    nota: "Pasto sintético y el viaje más largo de la liga." },
+    altitud: 65, capacidad: 27333, techo: "parcial", forma: "rectangular", clima: "costero",
+    confianza: "media",
+    nota: "El único con pasto sintético, y aún sin terminar: sólo la tribuna poniente tiene techo." },
 
   { nombre: "Estadio Cuauhtémoc", ciudad: "Puebla", equipos: ["Puebla"],
     altitud: 2160, capacidad: 51726, techo: "parcial", forma: "ovalado", clima: "altiplano",
-    nota: "A la sombra del Popocatépetl." },
+    confianza: "alta",
+    nota: "De Ramírez Vázquez, sede en 1970 y 1986. El ETFE azul y blanco es fachada, no cubierta." },
 
   { nombre: "Estadio Victoria", ciudad: "Aguascalientes", equipos: ["Necaxa"],
-    altitud: 1880, capacidad: 25000, techo: "parcial", forma: "rectangular", clima: "arido",
-    nota: "El más compacto del altiplano." },
+    altitud: 1885, capacidad: 23851, techo: "parcial", forma: "ovalado", clima: "altiplano",
+    confianza: "media",
+    nota: "Tazón girado en diagonal, con velaria ondulada salvo en la cabecera sur." },
 
-  { nombre: "Estadio TSM Corona", ciudad: "Torreón", equipos: ["Santos"],
-    altitud: 1120, capacidad: 30000, techo: "parcial", forma: "rectangular", clima: "arido",
-    nota: "En pleno desierto lagunero, con calor de 40 grados." },
+  { nombre: "Estadio Corona", ciudad: "Torreón", equipos: ["Santos"],
+    altitud: 1120, capacidad: 30000, techo: "parcial", forma: "ovalado", clima: "arido",
+    confianza: "alta",
+    nota: "El Templo del Desierto: un solo nivel continuo en pleno Desierto Chihuahuense." },
 
-  { nombre: "Estadio Nou Camp", ciudad: "León", equipos: ["León"],
-    altitud: 1800, capacidad: 31297, techo: "parcial", forma: "ovalado", clima: "templado",
-    nota: "La casa de La Fiera desde 1967." },
+  { nombre: "Estadio León", ciudad: "León", equipos: ["León"],
+    altitud: 1802, capacidad: 31297, techo: "parcial", forma: "ovalado", clima: "altiplano",
+    confianza: "baja",
+    nota: "Le dicen Nou Camp desde 1967, aunque nunca fue nombre oficial. Aforo en disputa." },
 
   { nombre: "Estadio Olímpico Benito Juárez", ciudad: "Ciudad Juárez", equipos: ["Juárez"],
-    altitud: 1120, capacidad: 19703, techo: "ninguno", forma: "rectangular", clima: "arido",
-    nota: "El más pequeño y el más caluroso: desierto de Chihuahua." },
+    altitud: 1125, capacidad: 19703, techo: "parcial", forma: "ovalado", clima: "arido",
+    confianza: "baja",
+    nota: "El aforo más chico de la liga y todavía con pista de atletismo. Cifras en disputa." },
 
   { nombre: "Estadio Libertad Financiera", ciudad: "San Luis Potosí", equipos: ["Atlético San Luis"],
-    altitud: 1860, capacidad: 25709, techo: "parcial", forma: "rectangular", clima: "arido",
-    nota: "Antes Alfonso Lastras, en el altiplano potosino." },
+    altitud: 1860, capacidad: 25709, techo: "ninguno", forma: "ovalado", clima: "altiplano",
+    confianza: "media",
+    nota: "Ex Alfonso Lastras. Le dicen el hoyo: hundido bajo el nivel de calle, sin anillo superior." },
 ];
 
 /* Geometría derivada: de los datos reales a lo que se dibuja. */
