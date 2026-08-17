@@ -40,6 +40,9 @@ Reglas implementadas (las que pediste):
 
 5. Todas las OFERTAS de los renglones nuevos se ponen en CERO.
 
+5b. Los renglones nuevos se pintan: VERDE PISTACHE los que quedaron completos y
+   AMARILLO el que requiere tu criterio (confianza baja o algún aviso).
+
 6. Las columnas de fórmula (A = Llave, Q = Llave 2) se escriben como fórmula,
    igual que el resto de la hoja, y se regeneran para TODOS los renglones para
    que sigan apuntando a su propio renglón después del recorrido.
@@ -113,6 +116,20 @@ OFERTA_NUEVOS = 0
 #          nuevo se pega debajo de ellos (aunque estén más arriba en la hoja).
 # False -> siempre se va al final del bloque del mes.
 AGRUPAR_POR_CEDENTE = True
+
+# --- Semáforo de los renglones nuevos -----------------------------------------
+# Los renglones que se insertan se pintan para que los ubiques de inmediato:
+#   verde pistache -> quedaron completos, no requieren criterio
+#   amarillo       -> falta tu criterio (confianza baja o hubo algún aviso)
+# Ponlo en False si prefieres que salgan sin color. Para quitarlo después en
+# Excel: selecciona los renglones -> Color de relleno -> Sin relleno.
+RESALTAR_NUEVOS = True
+COLOR_LISTO = "D8E4BC"     # verde pistache
+COLOR_REVISAR = "FFFF00"   # amarillo
+
+# Llaves que quieres forzar en amarillo aunque el script las haya resuelto sin
+# avisos (por ejemplo, porque tú ya sabes que hay que revisarlas).
+REVISAR_A_MANO: set[str] = set()
 
 # Hojas de la Consulta.
 HOJAS_VALIDACION = {"P": "ValidacionProp", "NP": "ValidacionNoProp"}
@@ -303,6 +320,19 @@ class Pendiente:
     orden: int = 0                    # orden de captura dentro de la misma ancla
     fila_final: Any = None            # fila que ocupó en el archivo de salida
     avisos: list[str] = field(default_factory=list)
+
+    @property
+    def requiere_revision(self) -> bool:
+        """True -> se pinta de amarillo; False -> verde pistache."""
+        return (self.llave in REVISAR_A_MANO
+                or self.confianza in ("", "BAJA")
+                or bool(self.avisos))
+
+    @property
+    def color(self) -> str | None:
+        if not RESALTAR_NUEVOS:
+            return None
+        return COLOR_REVISAR if self.requiere_revision else COLOR_LISTO
 
 
 _RE_ID_ANTERIOR = re.compile(
@@ -759,6 +789,67 @@ class CadenasCompartidas:
         return re.sub(r'\b(count|uniqueCount)="(\d+)"', _sube, salida, count=2)
 
 
+class Estilos:
+    """Lector / escritor de xl/styles.xml.
+
+    Sirve para pintar los renglones nuevos sin tocar el formato de nadie más:
+    por cada estilo que ya existía se deriva uno idéntico pero con relleno de
+    color, y sólo las celdas nuevas apuntan al derivado.
+    """
+
+    _RE_FILL = re.compile(r"<fill\b[^>]*?(?:/>|>.*?</fill>)", re.S)
+    _RE_XF = re.compile(r"<xf\b[^>]*?(?:/>|>.*?</xf>)", re.S)
+
+    def __init__(self, xml: str):
+        self.xml = xml
+        self._bloque_fills = re.search(r"<fills\b[^>]*>.*?</fills>", xml, re.S).group(0)
+        self._bloque_xfs = re.search(r"<cellXfs\b[^>]*>.*?</cellXfs>", xml, re.S).group(0)
+        self.fills = self._RE_FILL.findall(self._bloque_fills)
+        self.xfs = self._RE_XF.findall(self._bloque_xfs)
+        self._cache: dict[tuple[int, str], int] = {}
+        self.modificado = False
+
+    def fill_solido(self, rgb: str) -> int:
+        xml = (f'<fill><patternFill patternType="solid">'
+               f'<fgColor rgb="FF{rgb.upper()}"/><bgColor indexed="64"/>'
+               f"</patternFill></fill>")
+        if xml in self.fills:
+            return self.fills.index(xml)
+        self.fills.append(xml)
+        self.modificado = True
+        return len(self.fills) - 1
+
+    def estilo_con_color(self, estilo_base: str | None, rgb: str) -> str:
+        """Regresa el id de un estilo igual al base pero con relleno `rgb`."""
+        base = int(estilo_base) if estilo_base else 0
+        clave = (base, rgb.upper())
+        if clave in self._cache:
+            return str(self._cache[clave])
+        fill = self.fill_solido(rgb)
+        xf = self.xfs[base] if base < len(self.xfs) else '<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>'
+        if re.search(r'\bfillId="\d+"', xf):
+            xf = re.sub(r'\bfillId="\d+"', f'fillId="{fill}"', xf, count=1)
+        else:
+            xf = xf.replace("<xf ", f'<xf fillId="{fill}" ', 1)
+        if 'applyFill="1"' not in xf:
+            xf = xf.replace("<xf ", '<xf applyFill="1" ', 1)
+        if xf in self.xfs:
+            nuevo = self.xfs.index(xf)
+        else:
+            self.xfs.append(xf)
+            nuevo = len(self.xfs) - 1
+        self.modificado = True
+        self._cache[clave] = nuevo
+        return str(nuevo)
+
+    def serializar(self) -> str | None:
+        if not self.modificado:
+            return None
+        fills = f'<fills count="{len(self.fills)}">' + "".join(self.fills) + "</fills>"
+        xfs = f'<cellXfs count="{len(self.xfs)}">' + "".join(self.xfs) + "</cellXfs>"
+        return self.xml.replace(self._bloque_fills, fills, 1).replace(self._bloque_xfs, xfs, 1)
+
+
 def escribir_salida(ruta_origen: str, ruta_salida: str, hoja: str,
                     pendientes: list[Pendiente], catalogo: list[FilaCatalogo]) -> None:
     print(f"[5/5] Escribiendo {os.path.basename(ruta_salida)} ...")
@@ -773,6 +864,7 @@ def escribir_salida(ruta_origen: str, ruta_salida: str, hoja: str,
     cadenas = CadenasCompartidas(
         partes["xl/sharedStrings.xml"].decode("utf-8") if "xl/sharedStrings.xml" in partes else None
     )
+    estilos = Estilos(partes["xl/styles.xml"].decode("utf-8"))
 
     ini = sheet_xml.index("<sheetData")
     fin = sheet_xml.index("</sheetData>") + len("</sheetData>")
@@ -813,7 +905,8 @@ def escribir_salida(ruta_origen: str, ruta_salida: str, hoja: str,
 
         for i, p in enumerate(a_insertar.get(r, [])):
             fila_nueva = nuevo_num + 1 + i
-            xml, agregadas = _renglon_nuevo(p, renglon, por_num, fila_nueva, cadenas, info_catalogo)
+            xml, agregadas = _renglon_nuevo(p, renglon, por_num, fila_nueva,
+                                            cadenas, estilos, info_catalogo)
             celdas_texto_nuevas += agregadas
             salida.append(xml)
             p.fila_final = fila_nueva
@@ -832,6 +925,11 @@ def escribir_salida(ruta_origen: str, ruta_salida: str, hoja: str,
     nuevo_sst = cadenas.serializar(celdas_texto_nuevas)
     if nuevo_sst is not None:
         partes["xl/sharedStrings.xml"] = nuevo_sst.encode("utf-8")
+
+    # --- styles.xml: los estilos derivados con el color del semáforo -------
+    nuevo_estilos = estilos.serializar()
+    if nuevo_estilos is not None:
+        partes["xl/styles.xml"] = nuevo_estilos.encode("utf-8")
 
     # --- workbook.xml: _FilterDatabase + recálculo al abrir ----------------
     partes["xl/workbook.xml"] = _ajustar_workbook(
@@ -890,7 +988,7 @@ def _valor_formula(clave: str, info: FilaCatalogo | None) -> str | None:
 
 
 def _renglon_nuevo(p: Pendiente, ancla: Renglon, por_num: dict[int, Renglon],
-                   num: int, cadenas: CadenasCompartidas,
+                   num: int, cadenas: CadenasCompartidas, estilos: Estilos,
                    info_catalogo: dict[int, FilaCatalogo]) -> tuple[str, int]:
     """Arma el XML del renglón nuevo: formato del renglón de arriba, datos de la
     Consulta y de la plantilla."""
@@ -898,11 +996,16 @@ def _renglon_nuevo(p: Pendiente, ancla: Renglon, por_num: dict[int, Renglon],
     info_plantilla = info_catalogo.get(p.plantilla)
     celdas: dict[int, str] = {}
     agregadas = 0
+    color = p.color
 
-    # estilo por default del renglón ancla (el de arriba), como cuando insertas
-    # una fila en Excel
+    # Estilo por default del renglón ancla (el de arriba), como cuando insertas
+    # una fila en Excel; si hay semáforo, se usa el mismo estilo pero relleno de
+    # color en las columnas de datos (A:W).
     def estilo(col: int) -> str | None:
-        return ancla.estilo(col, plantilla.estilo(col))
+        base = ancla.estilo(col, plantilla.estilo(col))
+        if color and col <= ULTIMA_COL_DATOS:
+            return estilos.estilo_con_color(base, color)
+        return base
 
     valores_consulta = {
         "COR": p.cor, "CIA": p.cia, "CONTRATO": p.contrato,
@@ -1031,20 +1134,27 @@ def imprimir_reporte(pendientes: list[Pendiente], catalogo: list[FilaCatalogo]) 
     print("=" * 110)
     print("RESUMEN DE MOVIMIENTOS")
     print("=" * 110)
-    encabezado = f"{'LLAVE':<20}{'MES':<8}{'FILA':<7}{'CONF.':<8}{'IDENTIFICACIÓN':<38}ORIGEN"
-    print(encabezado)
+    print(f"{'LLAVE':<20}{'MES':<8}{'FILA':<7}{'COLOR':<11}{'CONF.':<8}"
+          f"{'IDENTIFICACIÓN':<38}ORIGEN")
     print("-" * 110)
     for p in sorted(pendientes, key=lambda x: (x.mes or 0, x.llave)):
-        fila = getattr(p, "fila_final", None)
         ident = info[p.plantilla].ident if p.plantilla in info else "—"
-        print(f"{p.llave:<20}{p.mes or '—':<8}{fila or '—':<7}{p.confianza:<8}"
-              f"{ident[:36]:<38}{p.motivo[:60]}")
+        if not RESALTAR_NUEVOS:
+            color = "—"
+        else:
+            color = "AMARILLO" if p.requiere_revision else "pistache"
+        print(f"{p.llave:<20}{p.mes or '—':<8}{p.fila_final or '—':<7}{color:<11}"
+              f"{p.confianza:<8}{ident[:36]:<38}{p.motivo[:60]}")
         for aviso in p.avisos:
             print(f"{'':<20}  ⚠  {aviso}")
     print("-" * 110)
-    revisar = [p for p in pendientes if p.confianza in ("BAJA", "") or p.avisos]
+    revisar = [p for p in pendientes if p.requiere_revision]
+    listos = len(pendientes) - len(revisar)
+    if RESALTAR_NUEVOS:
+        print(f"\nVerde pistache ({COLOR_LISTO}): {listos} renglón(es) que quedaron completos.")
     if revisar:
-        print(f"\n⚠  {len(revisar)} renglón(es) que conviene revisar a mano: "
+        etiqueta = f"Amarillo ({COLOR_REVISAR})" if RESALTAR_NUEVOS else "Pendientes"
+        print(f"{etiqueta}: {len(revisar)} renglón(es) que requieren tu criterio: "
               + ", ".join(p.llave for p in revisar))
     print()
 
