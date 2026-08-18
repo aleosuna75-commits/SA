@@ -383,13 +383,20 @@ CedF_Nombres = traducir_dataframe(CedF_Ordenado, catalogos)
 
 
 #%% Generacion de los archivos de Excel (mismo formato para ambas versiones)
-def generar_libro(tabla, fileName_Retro, version_nombres=False, hoja_sudamerica=False):
+# En la hoja de America del Sur: True copia solo los renglones de la region
+# (archivo mucho mas ligero); False copia la hoja completa y oculta los demas,
+# dejando el filtro reversible desde Excel.
+SOLO_RENGLONES_FILTRADOS = False
+def generar_libro(tabla, fileName_Retro, version_nombres=False, hoja_sudamerica=False,
+                  solo_renglones_filtrados=SOLO_RENGLONES_FILTRADOS):
     """Escribe la tabla en Excel con el formato de siempre.
 
     version_nombres=True solo amplia las columnas que quedaron con texto largo
     despues de traducir las claves.
     hoja_sudamerica=True agrega una copia de la hoja con el filtro de Excel
     puesto en los paises de America del Sur.
+    solo_renglones_filtrados=True copia unicamente los renglones de la region,
+    para que el archivo no pese de mas.
     """
     tabla.to_excel(fileName_Retro, index=False)
 
@@ -568,7 +575,8 @@ def generar_libro(tabla, fileName_Retro, version_nombres=False, hoja_sudamerica=
 
     #Copia de la hoja con el filtro de America del Sur ya aplicado
     if hoja_sudamerica:
-        _, visibles = agregar_hoja_filtrada(Ident_RetroEsp)
+        _, visibles = agregar_hoja_filtrada(
+            Ident_RetroEsp, solo_renglones_filtrados=solo_renglones_filtrados)
         print(f"Hoja 'América del Sur': {visibles:,} renglones visibles con el filtro")
 
     #%%Guarda el archivo nuevo

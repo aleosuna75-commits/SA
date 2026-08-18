@@ -94,7 +94,17 @@ de la región.
 Para desactivar la pestaña: `generar_libro(..., hoja_sudamerica=False)` en los
 scripts, o `AGREGAR_RESUMEN_SUDAMERICA = False` en el convertidor.
 
-Como la hoja se duplica completa, el archivo pesa aproximadamente el doble.
+### Copia completa o compacta
+
+Como la hoja se duplica, el archivo crece. La constante `SOLO_RENGLONES_FILTRADOS`
+(en cada script y en el convertidor) decide cómo:
+
+| Valor | Qué hace | Cuándo conviene |
+|---|---|---|
+| `False` | Copia la hoja completa y oculta los renglones de fuera de la región. El filtro se puede quitar o ampliar desde Excel. | Facultativo (~1,300 renglones). |
+| `True` | Copia únicamente los renglones de la región. Se ve igual, pero en esa hoja ya no se puede quitar el filtro para ver otras regiones — la hoja original sigue completa. | Proporcional (~30,000 renglones): baja el archivo de 34 MB a menos de 1 MB. |
+
+Viene en `False` en el script de facultativo y en `True` en el de proporcional.
 
 ### Resumen calculado (opcional, no se genera por omisión)
 

@@ -407,8 +407,63 @@ def agregar_hoja_resumen(libro, resumen, titulo="América del Sur"):
 # ---------------------------------------------------------------------------
 # Hoja de America del Sur: copia de la hoja de datos con el filtro de Excel
 # ---------------------------------------------------------------------------
+def _indice_columna_pais(hoja, encabezado_pais, fila_encabezados):
+    encabezados = [celda.value for celda in hoja[fila_encabezados]]
+    if encabezado_pais not in encabezados:
+        raise ValueError(f"No se encontro la columna '{encabezado_pais}' en la hoja {hoja.title}.")
+    return encabezados.index(encabezado_pais)   # base 0, igual que el filtro
+
+
+def _copia_compacta(libro, origen, titulo, columna_pais, fila_encabezados):
+    """Copia la hoja quedandose solo con los renglones de America del Sur.
+
+    Se usa cuando la hoja es muy grande y duplicarla completa haria el archivo
+    inmanejable. El formato queda igual; lo que cambia es que los renglones de
+    otras regiones no se copian (siguen en la hoja original).
+    """
+    copia = libro.create_sheet(title=titulo)
+
+    for letra, dimension in origen.column_dimensions.items():
+        destino = copia.column_dimensions[letra]
+        destino.width = dimension.width
+        destino.hidden = dimension.hidden
+
+    # max_row / max_column se recalculan recorriendo la hoja, asi que se leen
+    # una sola vez y no dentro del ciclo.
+    ultima_fila = origen.max_row
+    ultima_columna = origen.max_column
+
+    fila_destino = 0
+    copiadas = 0
+    for fila_origen in range(1, ultima_fila + 1):
+        es_encabezado = fila_origen <= fila_encabezados
+        if not es_encabezado:
+            valor_pais = origen.cell(row=fila_origen, column=columna_pais + 1).value
+            if not es_sudamerica(valor_pais):
+                continue
+            copiadas += 1
+        fila_destino += 1
+        for columna in range(1, ultima_columna + 1):
+            celda_origen = origen.cell(row=fila_origen, column=columna)
+            celda_destino = copia.cell(row=fila_destino, column=columna)
+            celda_destino.value = celda_origen.value
+            if celda_origen.has_style:
+                celda_destino._style = celda_origen._style
+        if origen.row_dimensions[fila_origen].height is not None:
+            copia.row_dimensions[fila_destino].height = origen.row_dimensions[fila_origen].height
+
+    # Las bandas de encabezado se combinan al final: una celda combinada es de
+    # solo lectura y no dejaria copiar los valores.
+    for rango in origen.merged_cells.ranges:
+        if rango.max_row <= fila_encabezados:
+            copia.merge_cells(str(rango))
+
+    return copia, copiadas
+
+
 def agregar_hoja_filtrada(libro, hoja_origen='Sheet1', titulo='América del Sur',
-                          encabezado_pais='Paises Cubiertos', fila_encabezados=2):
+                          encabezado_pais='Paises Cubiertos', fila_encabezados=2,
+                          solo_renglones_filtrados=False):
     """Copia la hoja de la consulta y le deja aplicado el filtro de Excel por
     los paises de America del Sur.
 
@@ -417,33 +472,42 @@ def agregar_hoja_filtrada(libro, hoja_origen='Sheet1', titulo='América del Sur'
     filtro puesto y los renglones que no son de America del Sur salen ocultos.
     El filtro es de Excel, asi que se puede quitar o ampliar desde la flechita
     de la columna sin perder informacion.
+
+    solo_renglones_filtrados=True copia unicamente los renglones de la region en
+    lugar de ocultar el resto. Se ve igual y el archivo pesa mucho menos, pero en
+    esa hoja ya no se puede quitar el filtro para ver otras regiones (para eso
+    esta la hoja original, que sigue completa). Conviene para el proporcional,
+    que trae decenas de miles de renglones.
     """
     if titulo in libro.sheetnames:
         del libro[titulo]
 
     origen = libro[hoja_origen] if hoja_origen in libro.sheetnames else libro.worksheets[0]
-    copia = libro.copy_worksheet(origen)
-    copia.title = titulo
+    columna = _indice_columna_pais(origen, encabezado_pais, fila_encabezados)
+
+    if solo_renglones_filtrados:
+        copia, visibles = _copia_compacta(libro, origen, titulo, columna, fila_encabezados)
+    else:
+        copia = libro.copy_worksheet(origen)
+        copia.title = titulo
+        visibles = None
 
     # copy_worksheet no arrastra la vista ni el filtro: se replican a mano
     copia.sheet_view.showGridLines = origen.sheet_view.showGridLines
     copia.freeze_panes = origen.freeze_panes
     copia.auto_filter.ref = origen.auto_filter.ref
 
-    encabezados = [celda.value for celda in copia[fila_encabezados]]
-    if encabezado_pais not in encabezados:
-        raise ValueError(f"No se encontro la columna '{encabezado_pais}' en la hoja {hoja_origen}.")
-    columna = encabezados.index(encabezado_pais)   # base 0, igual que el filtro
-
     valores = set()
-    visibles = 0
+    contadas = 0
     for fila in range(fila_encabezados + 1, copia.max_row + 1):
         valor = copia.cell(row=fila, column=columna + 1).value
         if es_sudamerica(valor):
             valores.add(str(valor))
-            visibles += 1
-        else:
+            contadas += 1
+        elif not solo_renglones_filtrados:
             copia.row_dimensions[fila].hidden = True
+    if visibles is None:
+        visibles = contadas
 
     # Filtro de Excel sobre la columna de paises, con los valores de la region
     copia.auto_filter.add_filter_column(columna, sorted(valores), blank=False)

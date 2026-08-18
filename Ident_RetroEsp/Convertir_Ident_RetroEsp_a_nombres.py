@@ -48,6 +48,9 @@ FILA_ENCABEZADOS = 2         # la fila 1 trae las bandas CEDIDO / TOMADO / MOVIM
 ENCABEZADOS_SI_NO = ('Negocio MGA (Prop)',)
 ANCHO_MINIMO_TRADUCIDAS = 28
 AGREGAR_RESUMEN_SUDAMERICA = True   # copia de la hoja con el filtro de America del Sur
+# True copia solo los renglones de la region (archivo mucho mas ligero); False
+# copia la hoja completa y oculta los demas renglones, dejando el filtro reversible.
+SOLO_RENGLONES_FILTRADOS = False
 
 
 def ruta_salida(ruta, sufijo=SUFIJO):
@@ -57,7 +60,8 @@ def ruta_salida(ruta, sufijo=SUFIJO):
 
 def convertir(ruta_entrada, ruta_salida_final=None, hoja_datos=HOJA_DATOS,
               hoja_catalogo=HOJA_CATALOGO, fila_encabezados=FILA_ENCABEZADOS,
-              agregar_resumen=AGREGAR_RESUMEN_SUDAMERICA):
+              agregar_resumen=AGREGAR_RESUMEN_SUDAMERICA,
+              solo_renglones_filtrados=SOLO_RENGLONES_FILTRADOS):
     """Genera la version con nombres del archivo indicado y regresa su ruta."""
     ruta_salida_final = ruta_salida_final or ruta_salida(ruta_entrada)
 
@@ -109,8 +113,9 @@ def convertir(ruta_entrada, ruta_salida_final=None, hoja_datos=HOJA_DATOS,
 
     #Copia de la hoja con el filtro de Excel de America del Sur ya aplicado
     if agregar_resumen:
-        _, visibles = agregar_hoja_filtrada(libro, hoja.title,
-                                            fila_encabezados=fila_encabezados)
+        _, visibles = agregar_hoja_filtrada(
+            libro, hoja.title, fila_encabezados=fila_encabezados,
+            solo_renglones_filtrados=solo_renglones_filtrados)
         print(f"  Hoja 'América del Sur': {visibles:,} renglones visibles con el filtro")
 
     libro.save(ruta_salida_final)
