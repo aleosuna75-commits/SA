@@ -31,6 +31,13 @@ misma columna y sin cambiar el layout:
 
 Las listas se traducen completas: `60, 71` → `General, Terremoto y Erupción Volcánica`.
 
+Hay claves de ramo que solo están dadas de alta en el catálogo de subramos
+(30 `Accidentes Personales General`, 70 `Catastróficos en General`), así que el
+catálogo de ramos se completa con el de subramos cuando la clave no existe
+(`CATALOGO_RESPALDO` en `catalogo_nombres.py`). Al terminar la corrida se
+imprimen cuáles se resolvieron por esa vía, para poder darlas de alta en su
+propio catálogo.
+
 Lo que **no** se toca: No. Contrato, Ident Contrato, No. Oferta, Endoso, Año de
 Vigencia, importes, porcentajes y validaciones. El nombre del cedente ya venía
 resuelto desde antes (columna `Cedente`), y `No. Cedente` se deja como número
@@ -47,7 +54,6 @@ como `70 (sin catálogo)` y al terminar la corrida se imprime el listado
 completo para poder darlas de alta. En la corrida contra los archivos actuales
 salieron:
 
-- **Ramo**: 30, 70
 - **Territorio**: 6
 - **País**: 0, 158, 164, 168, 169, 170, 171
 - **Corredor**: 462, 463, 468, 470, 474, 475, 476, 477, 479, 483, 490, 495, 496, 498

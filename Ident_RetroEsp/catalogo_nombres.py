@@ -41,6 +41,15 @@ FORMATO_CLAVE_DESCONOCIDA = "{clave} (sin catálogo)"
 # poder reportarlas al final de la corrida.
 CLAVES_SIN_CATALOGO = {}
 
+# Catalogos que se completan con otro cuando la clave no existe.
+# Hay claves de ramo (30 Accidentes Personales General, 70 Catastroficos en
+# General) que solo estan dadas de alta en el catalogo de subramos.
+CATALOGO_RESPALDO = {'Ramo': 'Subramo'}
+
+# Claves que se completaron con el catalogo de respaldo, y cuales se usaron.
+CLAVES_DE_RESPALDO = {}
+CLAVES_USADAS_DE_RESPALDO = {}
+
 
 def _normaliza_texto(valor):
     """Quita acentos y espacios sobrantes para poder comparar encabezados."""
@@ -111,6 +120,23 @@ def cargar_catalogos_desde_filas(filas):
 
         catalogos[nombre] = catalogo
 
+    _aplicar_respaldos(catalogos)
+    return catalogos
+
+
+def _aplicar_respaldos(catalogos):
+    """Completa un catalogo con las claves que solo existen en otro."""
+    CLAVES_DE_RESPALDO.clear()
+    for destino, origen in CATALOGO_RESPALDO.items():
+        catalogo_destino = catalogos.get(destino, {})
+        catalogo_origen = catalogos.get(origen, {})
+        agregadas = set()
+        for clave, descripcion in catalogo_origen.items():
+            if clave not in catalogo_destino:
+                catalogo_destino[clave] = descripcion
+                agregadas.add(clave)
+        catalogos[destino] = catalogo_destino
+        CLAVES_DE_RESPALDO[destino] = agregadas
     return catalogos
 
 
@@ -163,6 +189,8 @@ def traducir(valor, catalogo, conservar_clave_desconocida=True, separador=', ',
             if not conservar_clave_desconocida:
                 continue
             nombre = formato.format(clave=parte)
+        elif nombre_catalogo and clave in CLAVES_DE_RESPALDO.get(nombre_catalogo, ()):
+            CLAVES_USADAS_DE_RESPALDO.setdefault(nombre_catalogo, set()).add(clave)
         if nombre not in traducidas:
             traducidas.append(nombre)
 
@@ -173,10 +201,22 @@ def traducir(valor, catalogo, conservar_clave_desconocida=True, separador=', ',
 
 
 def reporte_claves_sin_catalogo():
-    """Texto con las claves que no se encontraron, para revisar el catalogo."""
+    """Texto con las claves que no se encontraron y las que se resolvieron con
+    el catalogo de respaldo, para poder revisar el catalogo."""
+    lineas = []
+
+    if CLAVES_USADAS_DE_RESPALDO:
+        lineas.append("Claves resueltas con otro catálogo (conviene darlas de alta en el suyo):")
+        for nombre in sorted(CLAVES_USADAS_DE_RESPALDO):
+            claves = sorted(CLAVES_USADAS_DE_RESPALDO[nombre], key=lambda z: (len(z), z))
+            origen = CATALOGO_RESPALDO.get(nombre, '')
+            lineas.append(f"  - {nombre} (tomadas de {origen}): {', '.join(claves)}")
+
     if not CLAVES_SIN_CATALOGO:
-        return "Todas las claves se encontraron en el catálogo."
-    lineas = ["Claves que NO estan en el catálogo (revisar 'Catálogo consulta ident_retroesp.xlsx'):"]
+        lineas.append("Todas las claves se encontraron en el catálogo.")
+        return "\n".join(lineas)
+
+    lineas.append("Claves que NO estan en el catálogo (revisar 'Catálogo consulta ident_retroesp.xlsx'):")
     for nombre in sorted(CLAVES_SIN_CATALOGO):
         claves = sorted(CLAVES_SIN_CATALOGO[nombre], key=lambda z: (len(z), z))
         lineas.append(f"  - {nombre}: {', '.join(claves)}")
