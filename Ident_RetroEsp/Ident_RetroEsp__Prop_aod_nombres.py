@@ -22,7 +22,7 @@ if _carpeta_script not in sys.path:
     sys.path.insert(0, _carpeta_script)
 from catalogo_nombres import (cargar_catalogos, traducir_dataframe,
                               reporte_claves_sin_catalogo, COLUMNAS_A_CATALOGO)
-from resumen_sudamerica import construir_resumen, agregar_hoja_resumen
+from resumen_sudamerica import agregar_hoja_filtrada
 
 warnings.filterwarnings('ignore')
 start_time = time.perf_counter()
@@ -539,21 +539,15 @@ xFolder = r"C:\Users\asunad\OneDrive - GPV\Planeación Financiera RPAT - Reporti
 catalogos = cargar_catalogos(f"{xFolder}\\Catálogo consulta ident_retroesp.xlsx")
 CedF_Nombres = traducir_dataframe(CedF_Ordenado, catalogos)
 
-#%% Resumen de America del Sur para la Junta de Planeacion
-# Asegurado, pais, cedente, corredor, prima al 100%, % de retrocesion y fee de
-# Patria. Con solo_facultativo=True se dejan unicamente los negocios tomados
-# facultativos; por omision van todos y se filtra con 'Tipo Reaseguro'.
-Resumen_Sudamerica = construir_resumen(CedF_Nombres, solo_facultativo=False)
-print(f"Renglones de América del Sur en el resumen: {len(Resumen_Sudamerica)}")
 
 #%% Generacion de los archivos de Excel (mismo formato para ambas versiones)
-def generar_libro(tabla, fileName_Retro, version_nombres=False, resumen=None):
+def generar_libro(tabla, fileName_Retro, version_nombres=False, hoja_sudamerica=False):
     """Escribe la tabla en Excel con el formato de siempre.
 
     version_nombres=True solo amplia las columnas que quedaron con texto largo
     despues de traducir las claves.
-    resumen: DataFrame del resumen de America del Sur; si viene, se agrega como
-    pestana adicional.
+    hoja_sudamerica=True agrega una copia de la hoja con el filtro de Excel
+    puesto en los paises de America del Sur.
     """
     tabla.to_excel(fileName_Retro, index=False)
 
@@ -731,9 +725,10 @@ def generar_libro(tabla, fileName_Retro, version_nombres=False, resumen=None):
                 if (ws.column_dimensions[letra].width or 0) < 30:
                     ws.column_dimensions[letra].width = 30
 
-    #Pestana con el resumen de America del Sur
-    if resumen is not None and len(resumen):
-        agregar_hoja_resumen(Ident_RetroEsp, resumen)
+    #Copia de la hoja con el filtro de America del Sur ya aplicado
+    if hoja_sudamerica:
+        _, visibles = agregar_hoja_filtrada(Ident_RetroEsp)
+        print(f"Hoja 'América del Sur': {visibles:,} renglones visibles con el filtro")
 
     #%%Guarda el archivo nuevo
     Ident_RetroEsp.save(fileName_Retro)
@@ -744,7 +739,7 @@ def generar_libro(tabla, fileName_Retro, version_nombres=False, resumen=None):
 #%% Se generan las dos versiones: la de claves (la de siempre) y la de nombres
 generar_libro(CedF_Ordenado, f"{xFolder}\\Ident_RetroEsp_Propv2.xlsm")
 generar_libro(CedF_Nombres, f"{xFolder}\\Ident_RetroEsp_Propv2_nombres.xlsm",
-              version_nombres=True, resumen=Resumen_Sudamerica)
+              version_nombres=True, hoja_sudamerica=True)
 
 #Claves que no estan dadas de alta en el catalogo (si las hay, conviene agregarlas)
 print(reporte_claves_sin_catalogo())

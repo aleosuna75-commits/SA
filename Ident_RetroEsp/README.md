@@ -75,41 +75,31 @@ no necesita `pyodbc` ni conexión a la base.
 
 ## Pestaña `América del Sur`
 
-El archivo `_nombres` trae una tercera pestaña con el resumen que pidió la línea
-para la Junta de Planeación. Primero van las columnas solicitadas —Asegurado,
-País, Cedente, Corredor, Prima al 100%, % de Retrocesión, % Fee Patria y Fee
-Patria— y atrás el soporte para amarrar cada cifra.
+El archivo `_nombres` trae una tercera pestaña que es **una copia exacta de la
+hoja de datos** —mismos encabezados, bandas CEDIDO/TOMADO/MOVIMIENTOS, colores,
+anchos, formatos y paneles inmovilizados— con el **filtro de Excel ya aplicado**
+en la columna `Paises Cubiertos` sobre los países de América del Sur.
 
-Se incluyen todos los renglones cuyo país cubierto es sudamericano
-(`PAISES_SUDAMERICA` en `resumen_sudamerica.py`), sin importar el tipo de negocio
-tomado; para dejar solo facultativo, `construir_resumen(..., solo_facultativo=True)`
-o filtrar la columna `Tipo Reaseguro`.
+Es un filtro normal de Excel: los renglones que no son de la región quedan
+ocultos, pero siguen ahí. Desde la flechita de la columna se puede quitar el
+filtro, agregar países o combinarlo con otras columnas (por ejemplo
+`Tipo Reaseguro` = FACULTATIVO DAÑOS), sin perder nada.
 
-### De dónde sale cada cifra
+La lista de países está en `PAISES_SUDAMERICA`, dentro de `resumen_sudamerica.py`:
+Argentina, Bolivia, Brasil, Chile, Colombia, Ecuador (y Quito, que está dado de
+alta como país aparte), Guyana, Guyana Francesa, Paraguay, Perú, Surinam,
+Uruguay y Venezuela. Un renglón entra si **alguno** de sus países cubiertos es
+de la región.
 
-- **Prima al 100%**, en este orden: la prima esperada al 100% del no proporcional;
-  el EPI al 100% de fianzas; o, si no hay ninguna, se estima como
-  *prima de Patria ÷ % de participación de Patria* (% de aceptación en facultativo
-  daños, % Patria en proporcional). La columna `Base de la Prima al 100%` dice
-  cuál se usó en cada renglón.
-- **Prima Tomada Patria**: movimiento contable de primas del reaseguro tomado
-  (cuenta 318, moneda nacional, acumulado). Si el contrato aún no tiene
-  movimientos, se usa la prima esperada de Patria del no proporcional; lo indica
-  `Base de la Prima Patria`.
-- **% Retrocesión**: `PrcRetro` del cuadro de retro.
-- **% Fee Patria**: sobrecomisión sobre prima bruta del contrato de retrocesión
-  (`ComPrimBruta`). **Fee Patria** = prima retrocedida estimada × ese porcentaje.
+Para desactivar la pestaña: `generar_libro(..., hoja_sudamerica=False)` en los
+scripts, o `AGREGAR_RESUMEN_SUDAMERICA = False` en el convertidor.
 
-### Dos advertencias antes de presentarlo
+Como la hoja se duplica completa, el archivo pesa aproximadamente el doble.
 
-1. El movimiento contable está a nivel **contrato-año**, no por riesgo. Cuando
-   `Riesgos en la llave contable` es mayor a 1, la prima corresponde a todos esos
-   riesgos juntos y no al asegurado del renglón. (Si `aMOV_Mov` tiene el número
-   de oferta, agregarlo a la llave dejaría la prima por riesgo.)
-2. Un mismo contrato tomado aparece en varios renglones cuando se retrocede a más
-   de un contrato de retro. Para sumar sin duplicar, filtrar
-   `Primer renglón de la llave` = Sí.
+### Resumen calculado (opcional, no se genera por omisión)
 
-En el archivo proporcional el `% Fee Patria` viene en cero en casi todos los
-contratos, así que el fee sale vacío: esa comisión no está capturada en
-`ComPrimBruta` para esos contratos.
+`resumen_sudamerica.py` conserva `construir_resumen()` y `agregar_hoja_resumen()`,
+que arman una hoja ejecutiva con asegurado, país, cedente, corredor, prima al
+100%, % de retrocesión y fee de Patria (la prima al 100% del facultativo y del
+proporcional es estimada: prima contable ÷ % de participación de Patria). No se
+usa en el flujo actual; queda disponible por si se vuelve a pedir.

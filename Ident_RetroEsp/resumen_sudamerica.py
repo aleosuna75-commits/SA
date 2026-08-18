@@ -402,3 +402,49 @@ def agregar_hoja_resumen(libro, resumen, titulo="América del Sur"):
     hoja.freeze_panes = 'E3'
     hoja.sheet_view.showGridLines = False
     return hoja
+
+
+# ---------------------------------------------------------------------------
+# Hoja de America del Sur: copia de la hoja de datos con el filtro de Excel
+# ---------------------------------------------------------------------------
+def agregar_hoja_filtrada(libro, hoja_origen='Sheet1', titulo='América del Sur',
+                          encabezado_pais='Paises Cubiertos', fila_encabezados=2):
+    """Copia la hoja de la consulta y le deja aplicado el filtro de Excel por
+    los paises de America del Sur.
+
+    Queda exactamente igual que la hoja original (mismos encabezados, colores,
+    anchos y formatos); lo unico que cambia es que la columna de paises trae el
+    filtro puesto y los renglones que no son de America del Sur salen ocultos.
+    El filtro es de Excel, asi que se puede quitar o ampliar desde la flechita
+    de la columna sin perder informacion.
+    """
+    if titulo in libro.sheetnames:
+        del libro[titulo]
+
+    origen = libro[hoja_origen] if hoja_origen in libro.sheetnames else libro.worksheets[0]
+    copia = libro.copy_worksheet(origen)
+    copia.title = titulo
+
+    # copy_worksheet no arrastra la vista ni el filtro: se replican a mano
+    copia.sheet_view.showGridLines = origen.sheet_view.showGridLines
+    copia.freeze_panes = origen.freeze_panes
+    copia.auto_filter.ref = origen.auto_filter.ref
+
+    encabezados = [celda.value for celda in copia[fila_encabezados]]
+    if encabezado_pais not in encabezados:
+        raise ValueError(f"No se encontro la columna '{encabezado_pais}' en la hoja {hoja_origen}.")
+    columna = encabezados.index(encabezado_pais)   # base 0, igual que el filtro
+
+    valores = set()
+    visibles = 0
+    for fila in range(fila_encabezados + 1, copia.max_row + 1):
+        valor = copia.cell(row=fila, column=columna + 1).value
+        if es_sudamerica(valor):
+            valores.add(str(valor))
+            visibles += 1
+        else:
+            copia.row_dimensions[fila].hidden = True
+
+    # Filtro de Excel sobre la columna de paises, con los valores de la region
+    copia.auto_filter.add_filter_column(columna, sorted(valores), blank=False)
+    return copia, visibles
