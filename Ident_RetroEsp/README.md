@@ -10,7 +10,8 @@ archivo de siempre (con claves), genera un archivo gemelo con el sufijo
 |---|---|
 | `Ident_RetroEsp__Prop_aod_nombres.py` | Consulta de retrocesión **proporcional**. Genera `Ident_RetroEsp_Propv2.xlsm` y `Ident_RetroEsp_Propv2_nombres.xlsm`. |
 | `Ident_RetroEsp__Fac_aod_nombres.py` | Consulta de retrocesión **facultativa**. Genera `Ident_RetroEsp_Facv2.xlsm` y `Ident_RetroEsp_Facv2_nombres.xlsm`. |
-| `catalogo_nombres.py` | Módulo con la traducción clave → nombre. Lo usan los tres scripts. **Debe estar en la misma carpeta.** |
+| `catalogo_nombres.py` | Módulo con la traducción clave → nombre. **Debe estar en la misma carpeta.** |
+| `resumen_sudamerica.py` | Módulo que arma la pestaña `América del Sur`. **Debe estar en la misma carpeta.** |
 | `Convertir_Ident_RetroEsp_a_nombres.py` | Convierte un archivo ya generado a su versión `_nombres` **sin volver a correr la consulta a SIREC**. |
 
 ## Qué se traduce
@@ -65,3 +66,44 @@ Si se prefiere ver la clave pelada, en `catalogo_nombres.py` se cambia
 
 Requisitos: los mismos de siempre (`pandas`, `openpyxl`, `pyodbc`); el convertidor
 no necesita `pyodbc` ni conexión a la base.
+
+## Pestaña `América del Sur`
+
+El archivo `_nombres` trae una tercera pestaña con el resumen que pidió la línea
+para la Junta de Planeación. Primero van las columnas solicitadas —Asegurado,
+País, Cedente, Corredor, Prima al 100%, % de Retrocesión, % Fee Patria y Fee
+Patria— y atrás el soporte para amarrar cada cifra.
+
+Se incluyen todos los renglones cuyo país cubierto es sudamericano
+(`PAISES_SUDAMERICA` en `resumen_sudamerica.py`), sin importar el tipo de negocio
+tomado; para dejar solo facultativo, `construir_resumen(..., solo_facultativo=True)`
+o filtrar la columna `Tipo Reaseguro`.
+
+### De dónde sale cada cifra
+
+- **Prima al 100%**, en este orden: la prima esperada al 100% del no proporcional;
+  el EPI al 100% de fianzas; o, si no hay ninguna, se estima como
+  *prima de Patria ÷ % de participación de Patria* (% de aceptación en facultativo
+  daños, % Patria en proporcional). La columna `Base de la Prima al 100%` dice
+  cuál se usó en cada renglón.
+- **Prima Tomada Patria**: movimiento contable de primas del reaseguro tomado
+  (cuenta 318, moneda nacional, acumulado). Si el contrato aún no tiene
+  movimientos, se usa la prima esperada de Patria del no proporcional; lo indica
+  `Base de la Prima Patria`.
+- **% Retrocesión**: `PrcRetro` del cuadro de retro.
+- **% Fee Patria**: sobrecomisión sobre prima bruta del contrato de retrocesión
+  (`ComPrimBruta`). **Fee Patria** = prima retrocedida estimada × ese porcentaje.
+
+### Dos advertencias antes de presentarlo
+
+1. El movimiento contable está a nivel **contrato-año**, no por riesgo. Cuando
+   `Riesgos en la llave contable` es mayor a 1, la prima corresponde a todos esos
+   riesgos juntos y no al asegurado del renglón. (Si `aMOV_Mov` tiene el número
+   de oferta, agregarlo a la llave dejaría la prima por riesgo.)
+2. Un mismo contrato tomado aparece en varios renglones cuando se retrocede a más
+   de un contrato de retro. Para sumar sin duplicar, filtrar
+   `Primer renglón de la llave` = Sí.
+
+En el archivo proporcional el `% Fee Patria` viene en cero en casi todos los
+contratos, así que el fee sale vacío: esa comisión no está capturada en
+`ComPrimBruta` para esos contratos.

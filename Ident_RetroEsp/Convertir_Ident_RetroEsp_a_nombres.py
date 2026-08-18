@@ -20,6 +20,8 @@ import os
 import sys
 import time
 
+import pandas as pd
+
 from openpyxl import load_workbook
 from openpyxl.utils import get_column_letter
 
@@ -27,8 +29,9 @@ try:
     from catalogo_nombres import (cargar_catalogos_desde_filas, traducir,
                                   traducir_si_no, reporte_claves_sin_catalogo,
                                   ENCABEZADOS_A_CATALOGO, _normaliza_texto)
-except ImportError:
-    sys.exit("Falta el archivo catalogo_nombres.py en la misma carpeta que este script.")
+    from resumen_sudamerica import construir_resumen, agregar_hoja_resumen
+except ImportError as detalle:
+    sys.exit(f"Falta un modulo en la misma carpeta que este script ({detalle}).")
 
 # ---------------------------------------------------------------------------
 # Parametros
@@ -46,6 +49,8 @@ HOJA_CATALOGO = "Catálogo"   # hoja con las claves y sus descripciones
 FILA_ENCABEZADOS = 2         # la fila 1 trae las bandas CEDIDO / TOMADO / MOVIMIENTOS
 ENCABEZADOS_SI_NO = ('Negocio MGA (Prop)',)
 ANCHO_MINIMO_TRADUCIDAS = 28
+AGREGAR_RESUMEN_SUDAMERICA = True   # pestana con el resumen de America del Sur
+SOLO_FACULTATIVO = False            # True deja solo los tomados facultativos
 
 
 def ruta_salida(ruta, sufijo=SUFIJO):
@@ -54,7 +59,9 @@ def ruta_salida(ruta, sufijo=SUFIJO):
 
 
 def convertir(ruta_entrada, ruta_salida_final=None, hoja_datos=HOJA_DATOS,
-              hoja_catalogo=HOJA_CATALOGO, fila_encabezados=FILA_ENCABEZADOS):
+              hoja_catalogo=HOJA_CATALOGO, fila_encabezados=FILA_ENCABEZADOS,
+              agregar_resumen=AGREGAR_RESUMEN_SUDAMERICA,
+              solo_facultativo=SOLO_FACULTATIVO):
     """Genera la version con nombres del archivo indicado y regresa su ruta."""
     ruta_salida_final = ruta_salida_final or ruta_salida(ruta_entrada)
 
@@ -103,6 +110,16 @@ def convertir(ruta_entrada, ruta_salida_final=None, hoja_datos=HOJA_DATOS,
         ancho_actual = hoja.column_dimensions[letra].width or 0
         if ancho_actual < ANCHO_MINIMO_TRADUCIDAS:
             hoja.column_dimensions[letra].width = ANCHO_MINIMO_TRADUCIDAS
+
+    #Pestana con el resumen de America del Sur, ya con los nombres traducidos
+    if agregar_resumen:
+        encabezados = [celda.value for celda in hoja[fila_encabezados]]
+        datos = list(hoja.iter_rows(min_row=fila_encabezados + 1, values_only=True))
+        tabla = pd.DataFrame([list(fila) for fila in datos], columns=encabezados)
+        resumen = construir_resumen(tabla, solo_facultativo=solo_facultativo)
+        if len(resumen):
+            agregar_hoja_resumen(libro, resumen)
+        print(f"  Resumen América del Sur: {len(resumen):,} renglones")
 
     libro.save(ruta_salida_final)
     columnas = [get_column_letter(c) for c, _, _, _ in columnas_traducidas]
