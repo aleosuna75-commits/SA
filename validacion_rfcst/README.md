@@ -10,8 +10,10 @@ columnas U:W), para Planeación Financiera.
 python VAL_RFCST26.py
 ```
 
-El script busca `Inputs/BD_RFCST_26_act.xlsx` (o cualquier `BD_RFCST*.xlsx` en
-`Inputs/` o junto al script). Para correrlo contra la carpeta de OneDrive,
+`VAL_RFCST26.py` es autocontenido: es el unico archivo que necesitas copiar.
+Busca `Inputs/BD_RFCST_26_act.xlsx` (o cualquier `BD_RFCST*.xlsx` en `Inputs/`
+o junto al script) y escribe los resultados en `Outputs/`, siempre relativo a
+la carpeta donde vive el script, sin importar desde donde lo ejecutes. Para correrlo contra la carpeta de OneDrive,
 ajustar la variable `xFolder` al inicio del script.
 
 Requiere: `pandas`, `numpy`, `openpyxl`, `xlsxwriter`. Para instalarlos:
