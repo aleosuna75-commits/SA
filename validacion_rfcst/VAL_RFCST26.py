@@ -26,6 +26,22 @@ from datetime import datetime
 import numpy as np
 import pandas as pd
 
+# Verificacion temprana de dependencias: mejor avisar aqui
+# que tronar despues de procesar toda la base
+_faltantes = []
+
+for _modulo, _paquete in (("openpyxl", "openpyxl"), ("xlsxwriter", "xlsxwriter")):
+    try:
+        __import__(_modulo)
+    except ImportError:
+        _faltantes.append(_paquete)
+
+if _faltantes:
+    raise SystemExit(
+        "Faltan paquetes requeridos: " + ", ".join(_faltantes) + "\n"
+        "Instalalos con:  pip install " + " ".join(_faltantes)
+    )
+
 # =====================================================
 # CONFIGURACION
 # =====================================================

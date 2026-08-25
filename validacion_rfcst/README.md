@@ -14,7 +14,14 @@ El script busca `Inputs/BD_RFCST_26_act.xlsx` (o cualquier `BD_RFCST*.xlsx` en
 `Inputs/` o junto al script). Para correrlo contra la carpeta de OneDrive,
 ajustar la variable `xFolder` al inicio del script.
 
-Requiere: `pandas`, `numpy`, `openpyxl`, `xlsxwriter`.
+Requiere: `pandas`, `numpy`, `openpyxl`, `xlsxwriter`. Para instalarlos:
+
+```
+pip install -r requirements.txt
+```
+
+Si falta alguno, el script avisa al inicio con el comando exacto en vez de
+tronar a medio proceso.
 
 ## Salidas (carpeta `Outputs/`)
 
