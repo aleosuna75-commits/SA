@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Validación RFCST 2026</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; margin: 0; }
+  body {
+    background: #0d0d0d; color: #ffffff;
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    padding: 26px 30px 40px;
+  }
+  header { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap;
+            margin-bottom: 20px; }
+  h1 { font-size: 21px; font-weight: 650; }
+  header .sub { color: #898781; font-size: 12.5px; }
+  .grid { display: grid; gap: 14px; }
+  .kpis { grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); }
+  .card {
+    background: #1a1a19; border: 1px solid rgba(255,255,255,0.10);
+    border-radius: 12px; padding: 16px 18px;
+  }
+  .kpi .t { color: #c3c2b7; font-size: 12px; margin-bottom: 8px;
+             display: flex; align-items: center; gap: 7px; }
+  .kpi .t i { width: 22px; height: 22px; border-radius: 6px; display: inline-flex;
+               align-items: center; justify-content: center; font-style: normal;
+               font-size: 12px; background: rgba(57,135,229,.16); }
+  .kpi .v { font-size: 26px; font-weight: 650; letter-spacing: -0.02em; }
+  .kpi .d { font-size: 12px; margin-top: 7px; color: #c3c2b7; }
+  .kpi .d b { font-weight: 600; padding: 2px 7px; border-radius: 999px;
+               font-size: 11.5px; }
+  .up   { color: #7dd87d; background: rgba(12,163,12,.14); }
+  .down { color: #f09a9a; background: rgba(208,59,59,.16); }
+  .warn { color: #fab219; background: rgba(250,178,25,.13); }
+  section { margin-top: 14px; }
+  .card h2 { font-size: 13.5px; font-weight: 600; color: #c3c2b7;
+              margin-bottom: 4px; }
+  .card .nota { font-size: 11.5px; color: #898781; margin-bottom: 10px; }
+  .dos { grid-template-columns: 2.1fr 1fr; align-items: stretch; }
+  @media (max-width: 900px) { .dos { grid-template-columns: 1fr; } }
+  svg { width: 100%; height: auto; display: block; }
+  .tick, .donut-l { fill: #898781; font-size: 10.5px;
+    font-family: system-ui, sans-serif; font-variant-numeric: tabular-nums; }
+  .cat { fill: #c3c2b7; font-size: 11px; font-family: system-ui, sans-serif; }
+  .vlabel { fill: #c3c2b7; font-size: 10px; font-family: system-ui, sans-serif;
+             font-variant-numeric: tabular-nums; }
+  .donut-n { fill: #ffffff; font-size: 26px; font-weight: 650;
+              font-family: system-ui, sans-serif; }
+  .bar { transition: opacity .12s; }
+  svg:hover .bar { opacity: .45; }
+  svg .bar:hover { opacity: 1; }
+  .legend { display: flex; gap: 16px; flex-wrap: wrap; margin: 4px 0 10px; }
+  .lg { color: #c3c2b7; font-size: 11.5px; display: inline-flex;
+         align-items: center; gap: 6px; }
+  .lg i { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+  .donut-wrap { display: flex; flex-direction: column; align-items: center;
+                 gap: 6px; }
+  .donut-wrap svg { max-width: 210px; }
+  .dl { width: 100%; font-size: 12px; color: #c3c2b7; }
+  .dl div { display: flex; justify-content: space-between; padding: 5px 2px;
+             border-bottom: 1px solid #2c2c2a; }
+  .dl div:last-child { border-bottom: none; }
+  .dl i { width: 10px; height: 10px; border-radius: 3px; display: inline-block;
+           margin-right: 7px; }
+  .dl .n { font-variant-numeric: tabular-nums; color: #ffffff; }
+  table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  th { text-align: left; color: #898781; font-weight: 500; font-size: 11px;
+        padding: 7px 10px; border-bottom: 1px solid #383835;
+        white-space: nowrap; }
+  td { padding: 7.5px 10px; border-bottom: 1px solid #2c2c2a;
+        white-space: nowrap; }
+  tr:last-child td { border-bottom: none; }
+  tbody tr:hover { background: rgba(255,255,255,.03); }
+  .num { text-align: right; font-variant-numeric: tabular-nums; }
+  th.num { text-align: right; }
+  .motivo { color: #c3c2b7; white-space: normal; max-width: 260px; }
+  .chip { font-size: 10.5px; font-weight: 600; padding: 2px 8px;
+           border-radius: 999px; }
+  .chip.rojo { color: #f09a9a; background: rgba(208,59,59,.16); }
+  .chip.amarillo { color: #fab219; background: rgba(250,178,25,.13); }
+  .chip.verde { color: #7dd87d; background: rgba(12,163,12,.14); }
+  .chip.gris { color: #898781; background: rgba(137,135,129,.15); }
+  .nivel { font-size: 10.5px; font-weight: 700; padding: 2px 8px;
+            border-radius: 5px; }
+  .nivel.critico { color: #f09a9a; background: rgba(208,59,59,.18); }
+  .nivel.alto { color: #fab219; background: rgba(250,178,25,.14); }
+  .nivel.medio { color: #9ec5f4; background: rgba(57,135,229,.14); }
+  .nivel.bajo { color: #7dd87d; background: rgba(12,163,12,.14); }
+  .insight { background: linear-gradient(90deg, rgba(57,135,229,.10),
+              rgba(57,135,229,.03)); border: 1px solid rgba(57,135,229,.25);
+              border-radius: 12px; padding: 14px 18px; font-size: 13px;
+              line-height: 1.55; color: #c3c2b7; }
+  .insight b { color: #ffffff; }
+  .scroll { overflow-x: auto; }
+  footer { margin-top: 18px; color: #898781; font-size: 11px; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Validación RFCST 2026 · 7+5</h1>
+  <span class="sub">Corte Julio 2026 · BD_RFCST_26_act.xlsx ·
+    generado 25/08/2026 15:57</span>
+</header>
+
+<div class="grid kpis">
+  <div class="card kpi">
+    <div class="t"><i>&#128181;</i>Prima Forecast 2026</div>
+    <div class="v">1,127.6 M</div>
+    <div class="d"><b class="up">+50.7%</b>
+      vs Ppto 2026 (748.1 M)</div>
+  </div>
+  <div class="card kpi">
+    <div class="t"><i>&#128200;</i>Crecimiento vs Real 2025</div>
+    <div class="v">+163.4%</div>
+    <div class="d">Real 2025: 428.0 M · Real Jul 26: 662.8 M</div>
+  </div>
+  <div class="card kpi">
+    <div class="t"><i>&#9202;</i>Incremento Ago-Dic implícito</div>
+    <div class="v">464.7 M</div>
+    <div class="d"><b class="warn">+29.3%</b>
+      vs esperado (359.5 M)</div>
+  </div>
+  <div class="card kpi">
+    <div class="t"><i>&#9888;</i>Contratos con alerta</div>
+    <div class="v">1,899</div>
+    <div class="d"><b class="down">242 rojos</b> · 1,657 amarillos ·
+      166 con FCST &lt; Real Jul</div>
+  </div>
+</div>
+
+<section class="grid dos">
+  <div class="card">
+    <h2>Primas por línea de negocio</h2>
+    <div class="nota">Forecast acumulado a Dic 2026 vs presupuesto anual y cierre real 2025 (USD)</div>
+    <div class="legend"><span class="lg"><i style="background:#3987e5"></i>Forecast 2026</span><span class="lg"><i style="background:#d95926"></i>Ppto 2026</span><span class="lg"><i style="background:#199e70"></i>Real 2025</span></div><svg viewBox="0 0 980 320" role="img" aria-label="Barras por linea de negocio"><line x1="56" y1="274.0" x2="968" y2="274.0" stroke="#2c2c2a" stroke-width="1"/><text x="48" y="277.5" text-anchor="end" class="tick">0 M</text><line x1="56" y1="209.0" x2="968" y2="209.0" stroke="#2c2c2a" stroke-width="1"/><text x="48" y="212.5" text-anchor="end" class="tick">100 M</text><line x1="56" y1="144.0" x2="968" y2="144.0" stroke="#2c2c2a" stroke-width="1"/><text x="48" y="147.5" text-anchor="end" class="tick">200 M</text><line x1="56" y1="79.0" x2="968" y2="79.0" stroke="#2c2c2a" stroke-width="1"/><text x="48" y="82.5" text-anchor="end" class="tick">300 M</text><line x1="56" y1="14.0" x2="968" y2="14.0" stroke="#2c2c2a" stroke-width="1"/><text x="48" y="17.5" text-anchor="end" class="tick">400 M</text><text x="113.0" y="292" text-anchor="middle" class="cat">4001</text><path d="M 72.0 274.0 L 72.0 135.3 Q 72.0 131.3 76.0 131.3 L 94.0 131.3 Q 98.0 131.3 98.0 135.3 L 98.0 274.0 Z" fill="#3987e5" class="bar"><title>4001 · Forecast 2026: 219.6 M</title></path><text x="85.0" y="126.3" text-anchor="middle" class="vlabel">220 M</text><path d="M 100.0 274.0 L 100.0 133.8 Q 100.0 129.8 104.0 129.8 L 122.0 129.8 Q 126.0 129.8 126.0 133.8 L 126.0 274.0 Z" fill="#d95926" class="bar"><title>4001 · Ppto 2026: 221.8 M</title></path><path d="M 128.0 274.0 L 128.0 150.7 Q 128.0 146.7 132.0 146.7 L 150.0 146.7 Q 154.0 146.7 154.0 150.7 L 154.0 274.0 Z" fill="#199e70" class="bar"><title>4001 · Real 2025: 195.8 M</title></path><text x="227.0" y="292" text-anchor="middle" class="cat">4002</text><path d="M 186.0 274.0 L 186.0 233.1 Q 186.0 229.1 190.0 229.1 L 208.0 229.1 Q 212.0 229.1 212.0 233.1 L 212.0 274.0 Z" fill="#3987e5" class="bar"><title>4002 · Forecast 2026: 69.1 M</title></path><text x="199.0" y="224.1" text-anchor="middle" class="vlabel">69 M</text><path d="M 214.0 274.0 L 214.0 257.9 Q 214.0 253.9 218.0 253.9 L 236.0 253.9 Q 240.0 253.9 240.0 257.9 L 240.0 274.0 Z" fill="#d95926" class="bar"><title>4002 · Ppto 2026: 30.9 M</title></path><path d="M 242.0 274.0 L 242.0 262.1 Q 242.0 258.1 246.0 258.1 L 264.0 258.1 Q 268.0 258.1 268.0 262.1 L 268.0 274.0 Z" fill="#199e70" class="bar"><title>4002 · Real 2025: 24.5 M</title></path><text x="341.0" y="292" text-anchor="middle" class="cat">4003</text><path d="M 300.0 274.0 L 300.0 214.5 Q 300.0 210.5 304.0 210.5 L 322.0 210.5 Q 326.0 210.5 326.0 214.5 L 326.0 274.0 Z" fill="#3987e5" class="bar"><title>4003 · Forecast 2026: 97.7 M</title></path><text x="313.0" y="205.5" text-anchor="middle" class="vlabel">98 M</text><path d="M 328.0 274.0 L 328.0 224.0 Q 328.0 220.0 332.0 220.0 L 350.0 220.0 Q 354.0 220.0 354.0 224.0 L 354.0 274.0 Z" fill="#d95926" class="bar"><title>4003 · Ppto 2026: 83.1 M</title></path><path d="M 356.0 274.0 L 356.0 159.0 Q 356.0 155.0 360.0 155.0 L 378.0 155.0 Q 382.0 155.0 382.0 159.0 L 382.0 274.0 Z" fill="#199e70" class="bar"><title>4003 · Real 2025: 183.1 M</title></path><text x="455.0" y="292" text-anchor="middle" class="cat">4004</text><path d="M 414.0 274.0 L 414.0 111.5 Q 414.0 107.5 418.0 107.5 L 436.0 107.5 Q 440.0 107.5 440.0 111.5 L 440.0 274.0 Z" fill="#3987e5" class="bar"><title>4004 · Forecast 2026: 256.2 M</title></path><text x="427.0" y="102.5" text-anchor="middle" class="vlabel">256 M</text><text x="569.0" y="292" text-anchor="middle" class="cat">4005</text><path d="M 528.0 274.0 L 528.0 201.6 Q 528.0 197.6 532.0 197.6 L 550.0 197.6 Q 554.0 197.6 554.0 201.6 L 554.0 274.0 Z" fill="#3987e5" class="bar"><title>4005 · Forecast 2026: 117.5 M</title></path><text x="541.0" y="192.6" text-anchor="middle" class="vlabel">118 M</text><path d="M 556.0 274.0 L 556.0 210.1 Q 556.0 206.1 560.0 206.1 L 578.0 206.1 Q 582.0 206.1 582.0 210.1 L 582.0 274.0 Z" fill="#d95926" class="bar"><title>4005 · Ppto 2026: 104.5 M</title></path><text x="683.0" y="292" text-anchor="middle" class="cat">4006</text><path d="M 642.0 274.0 L 642.0 69.2 Q 642.0 65.2 646.0 65.2 L 664.0 65.2 Q 668.0 65.2 668.0 69.2 L 668.0 274.0 Z" fill="#3987e5" class="bar"><title>4006 · Forecast 2026: 321.2 M</title></path><text x="655.0" y="60.2" text-anchor="middle" class="vlabel">321 M</text><path d="M 670.0 274.0 L 670.0 119.6 Q 670.0 115.6 674.0 115.6 L 692.0 115.6 Q 696.0 115.6 696.0 119.6 L 696.0 274.0 Z" fill="#d95926" class="bar"><title>4006 · Ppto 2026: 243.6 M</title></path><text x="797.0" y="292" text-anchor="middle" class="cat">4008</text><path d="M 756.0 274.0 L 756.0 258.5 Q 756.0 254.5 760.0 254.5 L 778.0 254.5 Q 782.0 254.5 782.0 258.5 L 782.0 274.0 Z" fill="#3987e5" class="bar"><title>4008 · Forecast 2026: 30.1 M</title></path><text x="769.0" y="249.5" text-anchor="middle" class="vlabel">30 M</text><path d="M 784.0 274.0 L 784.0 259.3 Q 784.0 255.3 788.0 255.3 L 806.0 255.3 Q 810.0 255.3 810.0 259.3 L 810.0 274.0 Z" fill="#d95926" class="bar"><title>4008 · Ppto 2026: 28.8 M</title></path><path d="M 812.0 274.0 L 812.0 262.1 Q 812.0 258.1 816.0 258.1 L 834.0 258.1 Q 838.0 258.1 838.0 262.1 L 838.0 274.0 Z" fill="#199e70" class="bar"><title>4008 · Real 2025: 24.5 M</title></path><text x="911.0" y="292" text-anchor="middle" class="cat">4008-Agro</text><path d="M 870.0 274.0 L 870.0 267.4 Q 870.0 263.4 874.0 263.4 L 892.0 263.4 Q 896.0 263.4 896.0 267.4 L 896.0 274.0 Z" fill="#3987e5" class="bar"><title>4008-Agro · Forecast 2026: 16.2 M</title></path><path d="M 898.0 274.0 L 898.0 255.0 Q 898.0 251.0 902.0 251.0 L 920.0 251.0 Q 924.0 251.0 924.0 255.0 L 924.0 274.0 Z" fill="#d95926" class="bar"><title>4008-Agro · Ppto 2026: 35.4 M</title></path><line x1="56" y1="274" x2="968" y2="274" stroke="#383835" stroke-width="1"/></svg>
+  </div>
+  <div class="card donut-wrap">
+    <h2>Semáforo de contratos</h2>
+    <svg viewBox="0 0 230 230" role="img" aria-label="Distribucion de semaforos"><path d="M 116.92 27.02 A 88.00 88.00 0 0 1 187.34 165.11" fill="none" stroke="#0ca30c" stroke-width="30" stroke-linecap="butt" class="bar"><title>Verde: 1,022 (35.0%)</title></path><path d="M 185.09 168.21 A 88.00 88.00 0 1 1 69.58 39.63" fill="none" stroke="#fab219" stroke-width="30" stroke-linecap="butt" class="bar"><title>Amarillo: 1,657 (56.7%)</title></path><path d="M 72.91 37.72 A 88.00 88.00 0 0 1 113.08 27.02" fill="none" stroke="#d03b3b" stroke-width="30" stroke-linecap="butt" class="bar"><title>Rojo: 242 (8.3%)</title></path><text x="115.0" y="111.0" text-anchor="middle" class="donut-n">2,921</text><text x="115.0" y="131.0" text-anchor="middle" class="donut-l">contratos</text></svg>
+    <div class="dl">
+      <div><span><i style="background:#0ca30c"></i>&#10003; Verde — sin alertas</span><span class="n">1,022</span></div>
+      <div><span><i style="background:#fab219"></i>&#9679; Amarillo — revisar</span><span class="n">1,657</span></div>
+      <div><span><i style="background:#d03b3b"></i>&#9650; Rojo — inconsistencia</span><span class="n">242</span></div>
+    </div>
+  </div>
+</section>
+
+<section class="card">
+  <h2>Incremento Ago-Dic 2026: forecast vs esperado</h2>
+  <div class="nota">Esperado = Ppto Ago-Dic 2026 × nivel de ejecución Ene-Jul
+    (Real Jul / Ppto Ene-Jul). Referencia: real del mismo periodo 2025. LN 4004
+    no tiene ppto Ene-Jul, por lo que no se calcula esperado.</div>
+  <div class="legend"><span class="lg"><i style="background:#3987e5"></i>Incremento FCST Ago-Dic</span><span class="lg"><i style="background:#d95926"></i>Esperado (Ppto Ago-Dic × ejecucion)</span><span class="lg"><i style="background:#199e70"></i>Real Ago-Dic 2025</span></div><svg viewBox="0 0 980 300" role="img" aria-label="Barras por linea de negocio"><line x1="56" y1="254.0" x2="968" y2="254.0" stroke="#2c2c2a" stroke-width="1"/><text x="48" y="257.5" text-anchor="end" class="tick">0 M</text><line x1="56" y1="194.0" x2="968" y2="194.0" stroke="#2c2c2a" stroke-width="1"/><text x="48" y="197.5" text-anchor="end" class="tick">50 M</text><line x1="56" y1="134.0" x2="968" y2="134.0" stroke="#2c2c2a" stroke-width="1"/><text x="48" y="137.5" text-anchor="end" class="tick">100 M</text><line x1="56" y1="74.0" x2="968" y2="74.0" stroke="#2c2c2a" stroke-width="1"/><text x="48" y="77.5" text-anchor="end" class="tick">150 M</text><line x1="56" y1="14.0" x2="968" y2="14.0" stroke="#2c2c2a" stroke-width="1"/><text x="48" y="17.5" text-anchor="end" class="tick">200 M</text><text x="113.0" y="272" text-anchor="middle" class="cat">4001</text><path d="M 72.0 254.0 L 72.0 148.0 Q 72.0 144.0 76.0 144.0 L 94.0 144.0 Q 98.0 144.0 98.0 148.0 L 98.0 254.0 Z" fill="#3987e5" class="bar"><title>4001 · Incremento FCST Ago-Dic: 91.7 M</title></path><text x="85.0" y="139.0" text-anchor="middle" class="vlabel">92 M</text><path d="M 100.0 254.0 L 100.0 176.4 Q 100.0 172.4 104.0 172.4 L 122.0 172.4 Q 126.0 172.4 126.0 176.4 L 126.0 254.0 Z" fill="#d95926" class="bar"><title>4001 · Esperado (Ppto Ago-Dic × ejecucion): 68.0 M</title></path><path d="M 128.0 254.0 L 128.0 165.0 Q 128.0 161.0 132.0 161.0 L 150.0 161.0 Q 154.0 161.0 154.0 165.0 L 154.0 254.0 Z" fill="#199e70" class="bar"><title>4001 · Real Ago-Dic 2025: 77.5 M</title></path><text x="227.0" y="272" text-anchor="middle" class="cat">4002</text><path d="M 186.0 254.0 L 186.0 217.0 Q 186.0 213.0 190.0 213.0 L 208.0 213.0 Q 212.0 213.0 212.0 217.0 L 212.0 254.0 Z" fill="#3987e5" class="bar"><title>4002 · Incremento FCST Ago-Dic: 34.2 M</title></path><text x="199.0" y="208.0" text-anchor="middle" class="vlabel">34 M</text><path d="M 214.0 254.0 L 214.0 233.4 Q 214.0 229.4 218.0 229.4 L 236.0 229.4 Q 240.0 229.4 240.0 233.4 L 240.0 254.0 Z" fill="#d95926" class="bar"><title>4002 · Esperado (Ppto Ago-Dic × ejecucion): 20.5 M</title></path><path d="M 242.0 254.0 L 242.0 246.8 Q 242.0 242.8 246.0 242.8 L 264.0 242.8 Q 268.0 242.8 268.0 246.8 L 268.0 254.0 Z" fill="#199e70" class="bar"><title>4002 · Real Ago-Dic 2025: 9.4 M</title></path><text x="341.0" y="272" text-anchor="middle" class="cat">4003</text><path d="M 300.0 254.0 L 300.0 225.9 Q 300.0 221.9 304.0 221.9 L 322.0 221.9 Q 326.0 221.9 326.0 225.9 L 326.0 254.0 Z" fill="#3987e5" class="bar"><title>4003 · Incremento FCST Ago-Dic: 26.7 M</title></path><text x="313.0" y="216.9" text-anchor="middle" class="vlabel">27 M</text><path d="M 328.0 254.0 L 328.0 211.1 Q 328.0 207.1 332.0 207.1 L 350.0 207.1 Q 354.0 207.1 354.0 211.1 L 354.0 254.0 Z" fill="#d95926" class="bar"><title>4003 · Esperado (Ppto Ago-Dic × ejecucion): 39.1 M</title></path><path d="M 356.0 254.0 L 356.0 164.4 Q 356.0 160.4 360.0 160.4 L 378.0 160.4 Q 382.0 160.4 382.0 164.4 L 382.0 254.0 Z" fill="#199e70" class="bar"><title>4003 · Real Ago-Dic 2025: 78.0 M</title></path><text x="455.0" y="272" text-anchor="middle" class="cat">4004</text><path d="M 414.0 254.0 L 414.0 130.1 Q 414.0 126.1 418.0 126.1 L 436.0 126.1 Q 440.0 126.1 440.0 130.1 L 440.0 254.0 Z" fill="#3987e5" class="bar"><title>4004 · Incremento FCST Ago-Dic: 106.6 M</title></path><text x="427.0" y="121.1" text-anchor="middle" class="vlabel">107 M</text><text x="569.0" y="272" text-anchor="middle" class="cat">4005</text><path d="M 528.0 254.0 L 528.0 216.6 Q 528.0 212.6 532.0 212.6 L 550.0 212.6 Q 554.0 212.6 554.0 216.6 L 554.0 254.0 Z" fill="#3987e5" class="bar"><title>4005 · Incremento FCST Ago-Dic: 34.5 M</title></path><text x="541.0" y="207.6" text-anchor="middle" class="vlabel">34 M</text><path d="M 556.0 254.0 L 556.0 207.2 Q 556.0 203.2 560.0 203.2 L 578.0 203.2 Q 582.0 203.2 582.0 207.2 L 582.0 254.0 Z" fill="#d95926" class="bar"><title>4005 · Esperado (Ppto Ago-Dic × ejecucion): 42.3 M</title></path><text x="683.0" y="272" text-anchor="middle" class="cat">4006</text><path d="M 642.0 254.0 L 642.0 72.9 Q 642.0 68.9 646.0 68.9 L 664.0 68.9 Q 668.0 68.9 668.0 72.9 L 668.0 254.0 Z" fill="#3987e5" class="bar"><title>4006 · Incremento FCST Ago-Dic: 154.3 M</title></path><text x="655.0" y="63.9" text-anchor="middle" class="vlabel">154 M</text><path d="M 670.0 254.0 L 670.0 150.4 Q 670.0 146.4 674.0 146.4 L 692.0 146.4 Q 696.0 146.4 696.0 150.4 L 696.0 254.0 Z" fill="#d95926" class="bar"><title>4006 · Esperado (Ppto Ago-Dic × ejecucion): 89.7 M</title></path><text x="797.0" y="272" text-anchor="middle" class="cat">4008</text><path d="M 756.0 254.0 L 756.0 245.9 Q 756.0 241.9 760.0 241.9 L 778.0 241.9 Q 782.0 241.9 782.0 245.9 L 782.0 254.0 Z" fill="#3987e5" class="bar"><title>4008 · Incremento FCST Ago-Dic: 10.1 M</title></path><text x="769.0" y="236.9" text-anchor="middle" class="vlabel">10 M</text><path d="M 784.0 254.0 L 784.0 240.3 Q 784.0 236.3 788.0 236.3 L 806.0 236.3 Q 810.0 236.3 810.0 240.3 L 810.0 254.0 Z" fill="#d95926" class="bar"><title>4008 · Esperado (Ppto Ago-Dic × ejecucion): 14.7 M</title></path><path d="M 812.0 254.0 L 812.0 246.8 Q 812.0 242.8 816.0 242.8 L 834.0 242.8 Q 838.0 242.8 838.0 246.8 L 838.0 254.0 Z" fill="#199e70" class="bar"><title>4008 · Real Ago-Dic 2025: 9.4 M</title></path><text x="911.0" y="272" text-anchor="middle" class="cat">4008-Agro</text><path d="M 870.0 254.0 L 870.0 249.9 Q 870.0 245.9 874.0 245.9 L 892.0 245.9 Q 896.0 245.9 896.0 249.9 L 896.0 254.0 Z" fill="#3987e5" class="bar"><title>4008-Agro · Incremento FCST Ago-Dic: 6.7 M</title></path><path d="M 898.0 254.0 L 898.0 251.8 Q 898.0 247.8 902.0 247.8 L 920.0 247.8 Q 924.0 247.8 924.0 251.8 L 924.0 254.0 Z" fill="#d95926" class="bar"><title>4008-Agro · Esperado (Ppto Ago-Dic × ejecucion): 5.2 M</title></path><line x1="56" y1="254" x2="968" y2="254" stroke="#383835" stroke-width="1"/></svg>
+</section>
+
+<section class="card scroll">
+  <h2>Resumen por línea de negocio</h2>
+  <div class="nota">Ordenado por score de riesgo (0-100). Índices calculados sobre agregados.</div>
+  <table>
+    <thead><tr>
+      <th>LN</th><th class="num">Prima FCST</th><th class="num">vs Ppto</th>
+      <th class="num">vs Real 25</th><th class="num">Desv. inc. Ago-Dic</th><th>Semáforo</th>
+      <th class="num">% Sin FCST</th><th>Semáforo</th>
+      <th class="num">Alertas</th><th class="num">Score</th><th>Riesgo</th>
+    </tr></thead>
+    <tbody><tr><td>LN 4006</td><td class='num'>321.2 M</td><td class='num'>+31.8%</td><td class='num'>s/d</td><td class='num'>+72.0%</td><td><span class="chip rojo">&#9650; ROJO</span></td><td class='num'>54.0%</td><td><span class="chip verde">&#10003; VERDE</span></td><td class='num'>201 / 214</td><td class='num'>75</td><td><span class='nivel alto'>ALTO</span></td></tr><tr><td>LN 4004</td><td class='num'>256.2 M</td><td class='num'>s/d</td><td class='num'>s/d</td><td class='num'>s/d</td><td><span class="chip gris">– SIN DATO</span></td><td class='num'>56.1%</td><td><span class="chip verde">&#10003; VERDE</span></td><td class='num'>379 / 480</td><td class='num'>71</td><td><span class='nivel alto'>ALTO</span></td></tr><tr><td>LN 4002</td><td class='num'>69.1 M</td><td class='num'>+123.6%</td><td class='num'>+181.8%</td><td class='num'>+66.8%</td><td><span class="chip rojo">&#9650; ROJO</span></td><td class='num'>23.2%</td><td><span class="chip verde">&#10003; VERDE</span></td><td class='num'>66 / 115</td><td class='num'>63</td><td><span class='nivel alto'>ALTO</span></td></tr><tr><td>LN 4005</td><td class='num'>117.5 M</td><td class='num'>+12.4%</td><td class='num'>s/d</td><td class='num'>-18.5%</td><td><span class="chip verde">&#10003; VERDE</span></td><td class='num'>53.4%</td><td><span class="chip verde">&#10003; VERDE</span></td><td class='num'>648 / 774</td><td class='num'>53</td><td><span class='nivel medio'>MEDIO</span></td></tr><tr><td>LN 4003</td><td class='num'>97.7 M</td><td class='num'>+17.6%</td><td class='num'>-46.6%</td><td class='num'>-31.6%</td><td><span class="chip amarillo">&#9679; AMARILLO</span></td><td class='num'>32.6%</td><td><span class="chip verde">&#10003; VERDE</span></td><td class='num'>357 / 384</td><td class='num'>51</td><td><span class='nivel medio'>MEDIO</span></td></tr><tr><td>LN 4008</td><td class='num'>30.1 M</td><td class='num'>+4.5%</td><td class='num'>+22.7%</td><td class='num'>-31.4%</td><td><span class="chip amarillo">&#9679; AMARILLO</span></td><td class='num'>58.1%</td><td><span class="chip verde">&#10003; VERDE</span></td><td class='num'>22 / 81</td><td class='num'>38</td><td><span class='nivel bajo'>BAJO</span></td></tr><tr><td>LN 4001</td><td class='num'>219.6 M</td><td class='num'>-1.0%</td><td class='num'>+12.1%</td><td class='num'>+34.9%</td><td><span class="chip amarillo">&#9679; AMARILLO</span></td><td class='num'>31.3%</td><td><span class="chip verde">&#10003; VERDE</span></td><td class='num'>213 / 721</td><td class='num'>36</td><td><span class='nivel bajo'>BAJO</span></td></tr><tr><td>LN 4008-Agro</td><td class='num'>16.2 M</td><td class='num'>-54.1%</td><td class='num'>&gt;999%</td><td class='num'>+29.5%</td><td><span class="chip amarillo">&#9679; AMARILLO</span></td><td class='num'>-64.4%</td><td><span class="chip amarillo">&#9679; AMARILLO</span></td><td class='num'>137 / 152</td><td class='num'>18</td><td><span class='nivel bajo'>BAJO</span></td></tr></tbody>
+  </table>
+</section>
+
+<section class="card scroll">
+  <h2>Top excepciones (semáforo rojo)</h2>
+  <div class="nota">Contratos con mayor impacto en prima. Detalle completo en VAL_RFCST26.xlsx → Excepciones.</div>
+  <table>
+    <thead><tr>
+      <th>LN</th><th>Compañía</th><th>País</th><th>Tipo</th>
+      <th class="num">Real Jul 26</th><th class="num">FCST Dic 26</th>
+      <th class="num">Inc. Ago-Dic</th><th>Motivo</th>
+    </tr></thead>
+    <tbody><tr><td>LN 4006</td><td>Palomar Excess and Surplus Insurance C</td><td>Cono Sur</td><td>Proporcional</td><td class='num'>-5.15 M</td><td class='num'>-5.15 M</td><td class='num'>0.00 M</td><td class='motivo'>Prima negativa</td></tr><tr><td>LN 4005</td><td>Seguros Alianza, S.A.</td><td>Ecuador</td><td>Proporcional</td><td class='num'>1.47 M</td><td class='num'>3.31 M</td><td class='num'>1.84 M</td><td class='motivo'>Siniestralidad &gt; 100% · Desv. incremento</td></tr><tr><td>LN 4006</td><td>Palomar Excess and Surplus Insurance C</td><td>Cono Sur</td><td>Proporcional</td><td class='num'>3.70 M</td><td class='num'>0.54 M</td><td class='num'>-3.16 M</td><td class='motivo'>FCST &lt; Real Jul</td></tr><tr><td>LN 4005</td><td>Austral Resseguradora, S.A.</td><td>Brasil</td><td>Proporcional</td><td class='num'>2.17 M</td><td class='num'>2.50 M</td><td class='num'>0.33 M</td><td class='motivo'>Siniestralidad &gt; 100% · Desv. incremento</td></tr><tr><td>LN 4001</td><td>Seguros El Potosi, S. A.</td><td>México</td><td>Proporcional</td><td class='num'>1.23 M</td><td class='num'>2.32 M</td><td class='num'>1.09 M</td><td class='motivo'>Siniestralidad &gt; 100%</td></tr><tr><td>LN 4001</td><td>El Aguila, Compañia de Seguros, S.A. d</td><td>México</td><td>Proporcional</td><td class='num'>0.62 M</td><td class='num'>1.87 M</td><td class='num'>1.25 M</td><td class='motivo'>Siniestralidad &gt; 100% · Desv. incremento</td></tr><tr><td>LN 4003</td><td>Allseg seguradora S/A</td><td>Brasil</td><td>Proporcional</td><td class='num'>2.38 M</td><td class='num'>0.91 M</td><td class='num'>-1.47 M</td><td class='motivo'>FCST &lt; Real Jul · Desv. incremento</td></tr><tr><td>LN 4005</td><td>La Meridional Compañia Argentina de Se</td><td>Argentina</td><td>Proporcional</td><td class='num'>1.25 M</td><td class='num'>0.00 M</td><td class='num'>-1.25 M</td><td class='motivo'>FCST &lt; Real Jul · FCST en cero</td></tr><tr><td>LN 4003</td><td>Sombrero Seguros S.A.</td><td>Brasil</td><td>Proporcional</td><td class='num'>1.19 M</td><td class='num'>0.00 M</td><td class='num'>-1.19 M</td><td class='motivo'>FCST &lt; Real Jul · FCST en cero</td></tr><tr><td>LN 4003</td><td>Aseguradora Porvenir S.A. </td><td>Chile</td><td>Proporcional</td><td class='num'>0.02 M</td><td class='num'>1.00 M</td><td class='num'>0.98 M</td><td class='motivo'>Siniestralidad &gt; 100%</td></tr><tr><td>LN 4008</td><td>Compañía de Seguros Generales Continen</td><td>Chile</td><td>Facultativo</td><td class='num'>0.64 M</td><td class='num'>0.81 M</td><td class='num'>0.17 M</td><td class='motivo'>Siniestralidad &gt; 100% · Desv. incremento</td></tr><tr><td>LN 4003</td><td>Fairfax Brasil Seguros Corporativos S.</td><td>Brasil</td><td>Proporcional</td><td class='num'>0.75 M</td><td class='num'>0.00 M</td><td class='num'>-0.75 M</td><td class='motivo'>FCST &lt; Real Jul · FCST en cero · Desv. incremento</td></tr></tbody>
+  </table>
+</section>
+
+<section class="insight">&#128161; El RFCST 2026 proyecta <b>1,127.6 M</b> de prima, <b>+50.7%</b> sobre el presupuesto anual y <b>+163.4%</b> contra el cierre real 2025. El incremento implicito Ago-Dic (464.7 M) esta <b>+29.3%</b> respecto al esperado ajustando el ppto Ago-Dic por el nivel de ejecucion a julio (359.5 M), y equivale a 2.7x el real del mismo periodo 2025 (174.2 M). <b>166</b> contratos reportan forecast menor al real de julio (V1) y la LN con mayor score de riesgo es <b>LN 4006</b> (ALTO, score 75).</section>
+
+<footer>Validación automática VAL_RFCST26.py · Planeación Financiera ·
+  cifras en dólares · V1: consistencia acumulada · V2: incremento vs ppto ajustado ·
+  V3: coherencia vs 2025 · V4: índices vs factores · V5: vs ppto anual · V6: calidad de datos</footer>
+
+</body>
+</html>
