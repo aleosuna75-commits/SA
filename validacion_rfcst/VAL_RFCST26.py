@@ -67,7 +67,7 @@ xOutputs = os.path.join(xFolder, "Outputs")
 
 os.makedirs(xOutputs, exist_ok=True)
 
-archivo = os.path.join(xInputs, "BD_RFCST.xlsx")
+archivo = os.path.join(xInputs, "BD_RFCST_26_act.xlsx")
 
 if not os.path.exists(archivo):
     candidatos = [
@@ -84,7 +84,6 @@ if not os.path.exists(archivo):
     archivo = candidatos[0]
 
 HOJA = "BD_RFCST26"
-FILA_ENCABEZADO = 1          # los encabezados estan en la fila 2 del Excel
 TOL = 1.0                    # tolerancia en USD para comparaciones
 MATERIALIDAD = 10_000        # USD: contratos por debajo no escalan a ROJO
 
@@ -115,12 +114,39 @@ SUFIJOS = ["0726", "1226", "08-1226", "PPTO1226",
 
 print(f"Leyendo {archivo} ...")
 
-df = pd.read_excel(archivo, sheet_name=HOJA, header=FILA_ENCABEZADO)
+# La base original trae los encabezados en la fila 5 y otras
+# versiones en la fila 2: se detecta buscando la celda "LN"
+_crudo = pd.read_excel(archivo, sheet_name=HOJA, header=None, nrows=8)
+
+fila_encabezado = None
+for _i in range(len(_crudo)):
+    if any(str(v).strip() == "LN" for v in _crudo.iloc[_i]):
+        fila_encabezado = _i
+        break
+
+if fila_encabezado is None:
+    raise ValueError(f"No se encontro la fila de encabezados (columna LN) en {HOJA}")
+
+df = pd.read_excel(archivo, sheet_name=HOJA, header=fila_encabezado)
 
 df.columns = [str(c).strip() for c in df.columns]
 
+# Formato original: la primera 'Compañía' es el nombre de la
+# cedente y 'Compañía.1' su numero
+if "Compañía_Nombre" not in df.columns:
+    df = df.rename(columns={"Compañía": "Compañía_Nombre", "Compañía.1": "Compañía"})
+
 df = df[df["LN"].notna()].copy()
 df["LN"] = df["LN"].astype(str).str.strip()
+
+# La base original no trae el incremento Ago-Dic en columnas
+# propias: se deriva como acumulado Dic menos acumulado Jul
+for _m in MEDIDAS:
+    if f"{_m} 08-1226" not in df.columns:
+        df[f"{_m} 08-1226"] = (
+            pd.to_numeric(df[f"{_m} 1226"], errors="coerce").fillna(0)
+            - pd.to_numeric(df[f"{_m} 0726"], errors="coerce").fillna(0)
+        )
 
 # =====================================================
 # LIMPIEZA
@@ -892,9 +918,10 @@ for medida, corto, icono, bueno_arriba in INFO_MEDIDAS:
   <h3 class="med">{medida} · {corto}</h3>
   <div class="grid kpis">
     {_kpi(icono, f"{medida} Forecast 2026", _fmt_m(g['fcst']),
-          _badge(g['var_ppto'], bueno_arriba, f"vs Ppto 2026 ({_fmt_m(g['ppto'])})"))}
+          _badge(g['var_ppto'], bueno_arriba, f"vs Ppto 2026 ({_fmt_m(g['ppto'])})"),
+          f"Real a Jul 26: {_fmt_m(g['a0726'])}")}
     {_kpi("&#128200;", "Crecimiento vs Real 2025", _fmt_pct(g['crec25'], signo=True),
-          f"Real 2025: {_fmt_m(g['real25'])} · Real Jul 26: {_fmt_m(g['a0726'])}")}
+          f"FCST Dic 26 ({_fmt_m(g['fcst'])}) vs cierre Real 2025 ({_fmt_m(g['real25'])})")}
     {_kpi("&#9202;", "Incremento Ago-Dic", _fmt_m(g['inc']),
           _badge(g['desv_inc'], bueno_arriba, f"vs esperado ({_fmt_m(g['esperado'])})"),
           f"Real Ago-Dic 2025: {_fmt_m(g['real0812'])}")}
@@ -908,7 +935,7 @@ sec1_psc = f"""
           _badge(PSC['var_ppto'], True, f"vs Ppto 2026 ({_fmt_m(PSC['ppto'])})"),
           f"Real 2025: {_fmt_m(PSC['real25'])}")}
     {_kpi("&#128200;", "Crecimiento P-S-C vs Real 2025", _fmt_pct(PSC['crec25'], signo=True),
-          f"Real 2025: {_fmt_m(PSC['real25'])} · Inc. Ago-Dic: {_fmt_m(PSC['inc'])}")}
+          f"P-S-C FCST ({_fmt_m(PSC['fcst'])}) vs Real 2025 ({_fmt_m(PSC['real25'])})")}
     {_kpi("&#128202;", "%P-S-C Forecast 2026", _fmt_pct(PCT_PSC['fcst']),
           _badge(PCT_PSC['fcst'] - PCT_PSC['ppto'], True, "pts vs Ppto"),
           f"Ppto 2026: {_fmt_pct(PCT_PSC['ppto'])} · Real 2025: {_fmt_pct(PCT_PSC['real25'])}")}
@@ -1583,10 +1610,11 @@ function renderCard(card) {
   document.getElementById('kpi_' + card).innerHTML =
     '<div class="card kpi"><div class="t"><i>&#128181;</i>Prima Forecast 2026</div>' +
     '<div class="v">' + fmtM(p.fcst) + '</div><div class="d">' +
-    badge(varPpto === null ? null : varPpto - 1, true, 'vs Ppto (' + fmtM(p.ppto) + ')') + '</div></div>' +
+    badge(varPpto === null ? null : varPpto - 1, true, 'vs Ppto (' + fmtM(p.ppto) + ')') + '</div>' +
+    '<div class="d">Real a Jul 26: ' + fmtM(p.a0726) + '</div></div>' +
     '<div class="card kpi"><div class="t"><i>&#128200;</i>Crecimiento vs Real 2025</div>' +
     '<div class="v">' + fmtPct(crec === null ? null : crec - 1, true) + '</div>' +
-    '<div class="d">Real 2025: ' + fmtM(p.r25) + ' · Real Jul 26: ' + fmtM(p.a0726) + '</div></div>' +
+    '<div class="d">FCST (' + fmtM(p.fcst) + ') vs Real 2025 (' + fmtM(p.r25) + ')</div></div>' +
     '<div class="card kpi"><div class="t"><i>&#9202;</i>Incremento Ago-Dic</div>' +
     '<div class="v">' + fmtM(p.inc) + '</div><div class="d">' +
     badge(desvInc === null ? null : desvInc - 1, true, 'vs esperado (' + fmtM(esperado) + ')') + '</div></div>' +
