@@ -67,21 +67,45 @@ xOutputs = os.path.join(xFolder, "Outputs")
 
 os.makedirs(xOutputs, exist_ok=True)
 
-archivo = os.path.join(xInputs, "BD_RFCST_26_act.xlsx")
+ARCHIVO_BASE = "BD_RFCST_26_act.xlsx"
 
-if not os.path.exists(archivo):
-    candidatos = [
-        os.path.join(carpeta, f)
-        for carpeta in (xInputs, xFolder)
-        if os.path.isdir(carpeta)
-        for f in os.listdir(carpeta)
-        if f.startswith("BD_RFCST") and f.endswith(".xlsx")
-    ]
+# Seleccion del input, en este orden:
+#   1. El nombre exacto de la base oficial, en Inputs o junto al script
+#   2. Si no existe, la BD_RFCST*.xlsx mas reciente (por fecha de
+#      modificacion), avisando cuales otras se ignoraron
+archivo = None
+
+for carpeta in (xInputs, xFolder):
+    ruta = os.path.join(carpeta, ARCHIVO_BASE)
+    if os.path.exists(ruta):
+        archivo = ruta
+        break
+
+if archivo is None:
+    candidatos = sorted(
+        {
+            os.path.join(carpeta, f)
+            for carpeta in (xInputs, xFolder)
+            if os.path.isdir(carpeta)
+            for f in os.listdir(carpeta)
+            if f.startswith("BD_RFCST") and f.endswith(".xlsx")
+            and not f.startswith("~$")
+        },
+        key=os.path.getmtime,
+        reverse=True,
+    )
     if not candidatos:
         raise FileNotFoundError(
-            f"No se encontro BD_RFCST*.xlsx en {xInputs} ni en {xFolder}"
+            f"No se encontro {ARCHIVO_BASE} ni BD_RFCST*.xlsx en {xInputs} ni en {xFolder}"
         )
     archivo = candidatos[0]
+    if len(candidatos) > 1:
+        print(f"AVISO: no se encontro {ARCHIVO_BASE} y hay varias bases BD_RFCST*.xlsx.")
+        print("Se usa la mas reciente; elimina o renombra las viejas si no es la correcta:")
+        for c in candidatos:
+            marca = "->" if c == archivo else "  "
+            fecha = datetime.fromtimestamp(os.path.getmtime(c)).strftime("%d/%m/%Y %H:%M")
+            print(f"  {marca} {os.path.basename(c)}  (modificada {fecha})")
 
 HOJA = "BD_RFCST26"
 TOL = 1.0                    # tolerancia en USD para comparaciones
