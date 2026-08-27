@@ -127,7 +127,7 @@
 
 <header class="top">
   <h1>Validación RFCST 2026 · 7+5</h1>
-  <span class="sub">Corte Julio 2026 · BD_RFCST.xlsx · generado 27/08/2026 01:21</span>
+  <span class="sub">Corte Julio 2026 · BD_RFCST.xlsx · generado 27/08/2026 01:25</span>
   <nav class="secs">
     <a href="#sec-general">General</a>
     <a href="#sec-ln">Línea de Negocio</a>
@@ -665,10 +665,10 @@ function renderCard(card) {
     '<table><thead><tr><th>LN</th><th class="num">Registros</th>' +
     '<th class="num">Prima FCST</th><th class="num">vs Ppto</th>' +
     '<th class="num">vs Real 25</th><th class="num">Desv. inc. Ago-Dic</th><th>Semáforo</th>' +
-    '<th class="num">% Sin FCST</th><th class="num">Alertas</th></tr></thead><tbody>' +
+    '<th class="num">% Sin FCST</th><th class="num">%P-S-C</th><th class="num">Alertas</th></tr></thead><tbody>' +
     lns.map(ln => {
       const sub = rows.filter(r => r[1] === ln);
-      const o = sums(sub, 0), so = sums(sub, 1);
+      const o = sums(sub, 0), so = sums(sub, 1), co = sums(sub, 2);
       const vp = ratio(o.fcst, o.ppto), cr = o.r25 && Math.abs(o.r25) > DATA.cfg.materialidad
         ? o.fcst / o.r25 - 1 : null;
       const re = ratio(o.a0726, o.p0107);
@@ -682,6 +682,7 @@ function renderCard(card) {
         '<td class="num">' + fmtPct(di === null ? null : di - 1, true) + '</td>' +
         '<td>' + chipDesv(di === null ? null : di - 1) + '</td>' +
         '<td class="num">' + fmtPct(ratio(so.fcst, o.fcst)) + '</td>' +
+        '<td class="num">' + fmtPct(ratio(o.fcst - so.fcst - co.fcst, o.fcst)) + '</td>' +
         '<td class="num">' + al + ' / ' + sub.length + '</td></tr>';
     }).join('') + '</tbody></table>' :
     '<div class="vacio">Sin datos con los filtros aplicados.</div>';

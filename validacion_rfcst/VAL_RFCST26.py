@@ -317,6 +317,26 @@ def resumen_por(claves):
 
     r["Pct_Alerta"] = r["Contratos_Alerta"] / r["Contratos"]
 
+    # Metricas estilo ANA_RFCST: variaciones y gaps de las tres
+    # medidas, indices vs ppto, y P-S-C (resultado tecnico sin
+    # reservas ni gastos, por eso el nombre neutro)
+    r["Var_Siniestros_PPTO"] = _ratio(r["S_1226"], r["S_PPTO"]) - 1
+    r["Var_Costos_PPTO"] = _ratio(r["C_1226"], r["C_PPTO"]) - 1
+    r["Gap_Siniestros"] = r["S_1226"] - r["S_PPTO"]
+    r["Gap_Costos"] = r["C_1226"] - r["C_PPTO"]
+
+    r["Ind_Sin_PPTO"] = _ratio(r["S_PPTO"], r["P_PPTO"])
+    r["Ind_Cos_PPTO"] = _ratio(r["C_PPTO"], r["P_PPTO"])
+    r["Var_Ind_Sin"] = r["Ind_Sin_FCST"] - r["Ind_Sin_PPTO"]
+    r["Var_Ind_Cos"] = r["Ind_Cos_FCST"] - r["Ind_Cos_PPTO"]
+
+    r["P_S_C"] = r["P_1226"] - r["S_1226"] - r["C_1226"]
+    r["Pct_P_S_C"] = _ratio(r["P_S_C"], r["P_1226"])
+    r["P_S_C_PPTO"] = r["P_PPTO"] - r["S_PPTO"] - r["C_PPTO"]
+    r["Pct_P_S_C_PPTO"] = _ratio(r["P_S_C_PPTO"], r["P_PPTO"])
+    r["P_S_C_1225"] = r["P_1225"] - r["S_1225"] - r["C_1225"]
+    r["Pct_P_S_C_1225"] = _ratio(r["P_S_C_1225"], r["P_1225"])
+
     return r
 
 
@@ -380,11 +400,35 @@ def semaforo_costos(x):
         return "VERDE"
 
 
-for tabla in (resumen, resumen_tiporea, resumen_fuente, resumen_card, resumen_pais):
+def aplicar_semaforos(tabla):
     tabla["Semaforo_Inc"] = tabla["Desv_Inc_AgoDic"].apply(semaforo_desviacion)
     tabla["Semaforo_Sin"] = tabla["Ind_Sin_FCST"].apply(semaforo_sin)
     tabla["Semaforo_Costos"] = tabla["Ind_Cos_FCST"].apply(semaforo_costos)
     tabla["Semaforo_vs_25"] = tabla["Crec_AgoDic_vs_25"].apply(semaforo_desviacion)
+    return tabla
+
+
+# Cortes adicionales estilo ANA_RFCST (por nivel de agrupacion)
+resumen_ln_corredor = resumen_por(["LN", "Corredor"])
+resumen_ln_compania = resumen_por(["LN", "Compañía_Nombre"])
+resumen_ln_binder = resumen_por(["LN", "Binder Ppto"])
+resumen_ln_contrato = resumen_por(["LN", "Num Contrato"])
+
+for tabla in (resumen, resumen_tiporea, resumen_fuente, resumen_card, resumen_pais,
+              resumen_ln_corredor, resumen_ln_compania, resumen_ln_binder,
+              resumen_ln_contrato):
+    aplicar_semaforos(tabla)
+
+# Participacion de cada LN en la prima y en el gap (estilo ANA)
+resumen["Participacion_Prima"] = resumen["P_1226"] / resumen["P_1226"].sum()
+resumen["Participacion_Gap"] = (
+    resumen["Gap_Primas"].abs() / resumen["Gap_Primas"].abs().sum()
+)
+
+# Pareto del gap vs ppto por LN y compania
+pareto_gap = resumen_ln_compania.sort_values("Gap_Primas", ascending=False).copy()
+pareto_gap["Gap_Acumulado"] = pareto_gap["Gap_Primas"].cumsum()
+pareto_gap["Pct_Acum_Gap"] = pareto_gap["Gap_Acumulado"] / pareto_gap["Gap_Primas"].sum()
 
 df["Semaforo_Inc"] = df["Desv_Inc_AgoDic"].apply(semaforo_desviacion)
 df["Semaforo_Sin"] = df["Ind_Sin_FCST"].apply(semaforo_sin)
@@ -678,6 +722,10 @@ cols_resumen = [
     "Cumplimiento_PPTO", "Gap_Primas", "Crec_vs_Real25", "Crec_AgoDic_vs_25",
     "Ind_Sin_FCST", "Ind_Sin_Real25", "Semaforo_Sin",
     "Ind_Cos_FCST", "Ind_Cos_Real25", "Semaforo_Costos",
+    "Var_Siniestros_PPTO", "Var_Costos_PPTO", "Gap_Siniestros", "Gap_Costos",
+    "Var_Ind_Sin", "Var_Ind_Cos", "P_S_C", "Pct_P_S_C",
+    "Pct_P_S_C_PPTO", "Pct_P_S_C_1225",
+    "Participacion_Prima", "Participacion_Gap",
     "Contratos_Alerta", "Pct_Alerta", "Score_Total", "Nivel_Riesgo", "Ranking",
 ]
 
@@ -721,8 +769,9 @@ with pd.ExcelWriter(salida_xlsx, engine="xlsxwriter") as writer:
             if serie.dtype.kind in "fi":
                 es_pct = any(
                     k in nombre_l
-                    for k in ("desv", "var %", "crec", "pct", "cumplimiento",
-                              "ind_", "ind.", "incr.", "ratio", "score", "%p-s-c")
+                    for k in ("desv", "var %", "var_", "crec", "pct", "cumplimiento",
+                              "ind_", "ind.", "incr.", "ratio", "score", "%p-s-c",
+                              "participacion")
                 )
                 ws.set_column(j, j, 12, fmt_pct if es_pct else fmt_moneda)
             else:
@@ -750,6 +799,17 @@ with pd.ExcelWriter(salida_xlsx, engine="xlsxwriter") as writer:
     exportar(resumen_tiporea, "Resumen_LN_TipoRea")
     exportar(resumen_fuente, "Resumen_Fuente")
     exportar(resumen_pais, "Resumen_Pais")
+    exportar(resumen_ln_corredor, "Resumen_LN_Corredor")
+    exportar(resumen_ln_compania, "Resumen_LN_Compania")
+    exportar(resumen_ln_binder, "Resumen_LN_Binder")
+    exportar(resumen_ln_contrato, "Resumen_LN_Contrato")
+
+    cols_pareto = [
+        "LN", "Compañía_Nombre", "Contratos", "P_1226", "P_PPTO",
+        "Gap_Primas", "Gap_Acumulado", "Pct_Acum_Gap", "Var_Primas_PPTO",
+        "P_S_C", "Pct_P_S_C", "Semaforo_Inc", "Semaforo_Sin",
+    ]
+    exportar(pareto_gap[cols_pareto], "Pareto_Gap")
     exportar(excepciones[cols_detalle].head(500), "Excepciones")
     exportar(df[cols_detalle], "Detalle_Validaciones")
     exportar(parametros, "Parametros")
@@ -1586,10 +1646,10 @@ function renderCard(card) {
     '<table><thead><tr><th>LN</th><th class="num">Registros</th>' +
     '<th class="num">Prima FCST</th><th class="num">vs Ppto</th>' +
     '<th class="num">vs Real 25</th><th class="num">Desv. inc. Ago-Dic</th><th>Semáforo</th>' +
-    '<th class="num">% Sin FCST</th><th class="num">Alertas</th></tr></thead><tbody>' +
+    '<th class="num">% Sin FCST</th><th class="num">%P-S-C</th><th class="num">Alertas</th></tr></thead><tbody>' +
     lns.map(ln => {
       const sub = rows.filter(r => r[1] === ln);
-      const o = sums(sub, 0), so = sums(sub, 1);
+      const o = sums(sub, 0), so = sums(sub, 1), co = sums(sub, 2);
       const vp = ratio(o.fcst, o.ppto), cr = o.r25 && Math.abs(o.r25) > DATA.cfg.materialidad
         ? o.fcst / o.r25 - 1 : null;
       const re = ratio(o.a0726, o.p0107);
@@ -1603,6 +1663,7 @@ function renderCard(card) {
         '<td class="num">' + fmtPct(di === null ? null : di - 1, true) + '</td>' +
         '<td>' + chipDesv(di === null ? null : di - 1) + '</td>' +
         '<td class="num">' + fmtPct(ratio(so.fcst, o.fcst)) + '</td>' +
+        '<td class="num">' + fmtPct(ratio(o.fcst - so.fcst - co.fcst, o.fcst)) + '</td>' +
         '<td class="num">' + al + ' / ' + sub.length + '</td></tr>';
     }).join('') + '</tbody></table>' :
     '<div class="vacio">Sin datos con los filtros aplicados.</div>';
