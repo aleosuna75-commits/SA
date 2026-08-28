@@ -1992,9 +1992,8 @@ DATA.charts.forEach(c => groupedBars(c.el, c.cats, c.series, c.fmt));
 // ------- Seccion 3: filtros interactivos -------
 const FDEF = {
   0: [[1, 'LN'], [2, 'Tipo Reaseguro'], [3, 'País'], [4, 'Corredor'],
-      [14, 'N° Cedente'], [5, 'Compañía'], [6, 'Contrato']],
-  1: [[1, 'LN'], [2, 'Tipo Reaseguro'], [3, 'País'], [14, 'N° Cedente'],
-      [5, 'Cedente']],
+      [14, 'Compañía'], [6, 'Contrato']],
+  1: [[1, 'LN'], [2, 'Tipo Reaseguro'], [3, 'País'], [14, 'Compañía']],
   2: [[1, 'LN'], [2, 'Tipo Reaseguro'], [3, 'País'], [5, 'Compañía (MGA)'], [7, 'Binder']],
 };
 const state = {0: {m: 0, exc: 2, f: {}}, 1: {m: 0, exc: 2, f: {}}, 2: {m: 0, exc: 2, f: {}}};

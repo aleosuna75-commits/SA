@@ -34,9 +34,11 @@ Además del presupuesto (abajo), los **reales 2025 globales** salen del archivo
 `Comisiones USD`, con `Periodo` AAAAMM para separar Ago-Dic), porque
 `BD_RFCST26` solo trae el real ya devengado contra el forecast. Si el archivo no
 está junto al script o en `Inputs/`, se avisa y se usan los reales de
-`BD_RFCST26`. El filtro **N° Cedente** de las secciones Contrato y Cedente liga
-el número con su nombre usando `Catalogo*.xlsx` (hoja `Valores`, columnas `Ced`
-y `CedenteRP`); sin catálogo, los nombres se derivan de la propia base.
+`BD_RFCST26`. El filtro **Compañía** de las secciones Contrato y Cedente
+filtra por número de cedente mostrando `número · nombre` (con el nombre ligado
+desde `Catalogo*.xlsx`, hoja `Valores`, columnas `Ced` y `CedenteRP`), lo que
+distingue cedentes homónimas; sin catálogo, los nombres se derivan de la propia
+base.
 
 ## Fuente del presupuesto
 
