@@ -161,6 +161,25 @@ MESES_ENEJUL = [1, 2, 3, 4, 5, 6, 7]
 # Ponerlo en True para comparar solo contra LN con forecast.
 PPTO_SOLO_LN_CON_FCST = False
 
+# Base opcional con TODOS los reales 2025 (la BD_RFCST26 solo
+# trae el real ya devengado contra el forecast). Alimenta las
+# cifras globales de Real 2025, igual que Ppto2026 con el ppto.
+ARCHIVO_REALES = "BDFCST26"          # prefijo del archivo .xlsx
+HOJA_REALES = "BD"
+COL_REALES = {
+    "Primas": "Primas USD",
+    "Siniestros": "Siniestros USD",
+    "Costos": "Comisiones USD",
+}
+ANIO_REALES = 2025
+
+# Catalogo de cedentes (numero -> nombre) para el filtro
+# N° Cedente del dashboard
+ARCHIVO_CATALOGO = "Catalogo"        # prefijo del archivo .xlsx
+HOJA_CATALOGO = "Valores"
+COL_CAT_NUM = "Ced"
+COL_CAT_NOMBRE = "CedenteRP"
+
 # Medidas y sufijos de columnas de la base
 MEDIDAS = ["Primas", "Siniestros", "Costos"]
 SUFIJOS = ["0726", "1226", "08-1226", "PPTO1226",
@@ -760,6 +779,133 @@ def _fmt_m_pre(v):
     return f"{v / 1e6:,.1f} M"
 
 
+def _buscar_archivo(prefijo):
+    """Primer .xlsx cuyo nombre empiece con el prefijo, en Inputs
+    o junto al script (el mas reciente si hay varios)."""
+    candidatos = sorted(
+        {
+            os.path.join(carpeta, f)
+            for carpeta in (xInputs, xFolder)
+            if os.path.isdir(carpeta)
+            for f in os.listdir(carpeta)
+            if f.startswith(prefijo) and f.endswith(".xlsx")
+            and not f.startswith("~$")
+        },
+        key=os.path.getmtime,
+        reverse=True,
+    )
+    return candidatos[0] if candidatos else None
+
+
+def cargar_reales25():
+    """Reales 2025 completos desde BDFCST26 (anual y Ago-Dic por
+    medida). None si el archivo no esta disponible."""
+
+    ruta = _buscar_archivo(ARCHIVO_REALES)
+
+    if ruta is None:
+        print(f"AVISO: no se encontro {ARCHIVO_REALES}*.xlsx; los reales 2025")
+        print("       globales usaran los de BD_RFCST26 (solo lo devengado")
+        print("       contra el forecast).")
+        return None
+
+    try:
+        crudo = pd.read_excel(ruta, sheet_name=HOJA_REALES, header=None, nrows=8)
+    except ValueError:
+        print(f"AVISO: {os.path.basename(ruta)} no tiene la hoja '{HOJA_REALES}'; "
+              "se usan los reales de BD_RFCST26.")
+        return None
+
+    fila = None
+    for i in range(len(crudo)):
+        if any(str(x).strip() == "Periodo" for x in crudo.iloc[i]):
+            fila = i
+            break
+
+    if fila is None:
+        print(f"AVISO: en '{HOJA_REALES}' de {os.path.basename(ruta)} no se "
+              "encontro la columna 'Periodo'; se usan los reales de BD_RFCST26.")
+        return None
+
+    b = pd.read_excel(ruta, sheet_name=HOJA_REALES, header=fila)
+    b.columns = [str(c).strip() for c in b.columns]
+
+    faltantes = [c for c in COL_REALES.values() if c not in b.columns]
+    if faltantes:
+        print(f"AVISO: a '{HOJA_REALES}' le faltan columnas {faltantes}; "
+              "se usan los reales de BD_RFCST26.")
+        return None
+
+    per = pd.to_numeric(b["Periodo"], errors="coerce")
+    b = b[(per // 100) == ANIO_REALES]
+    mes = per % 100
+
+    reales = {}
+    for medida, col in COL_REALES.items():
+        vals = pd.to_numeric(b[col], errors="coerce").fillna(0)
+        reales[medida] = {
+            "anual": float(vals.sum()),
+            "agodic": float(vals[mes.isin(MESES_AGODIC)].sum()),
+        }
+
+    print(f"Reales 2025 completos ({os.path.basename(ruta)}):")
+    for medida, d in reales.items():
+        print(f"  {medida}: anual {d['anual'] / 1e6:,.1f} M · "
+              f"Ago-Dic {d['agodic'] / 1e6:,.1f} M")
+
+    return reales
+
+
+def cargar_catalogo_cedentes():
+    """Diccionario numero de cedente -> nombre, desde el catalogo.
+    Si no esta, se arma con los nombres de la propia base."""
+
+    ruta = _buscar_archivo(ARCHIVO_CATALOGO)
+
+    if ruta is not None:
+        try:
+            crudo = pd.read_excel(ruta, sheet_name=HOJA_CATALOGO, header=None,
+                                  nrows=6)
+            fila = None
+            for i in range(len(crudo)):
+                if any(str(x).strip() == COL_CAT_NUM for x in crudo.iloc[i]):
+                    fila = i
+                    break
+            if fila is not None:
+                c = pd.read_excel(ruta, sheet_name=HOJA_CATALOGO, header=fila)
+                c.columns = [str(x).strip() for x in c.columns]
+                if COL_CAT_NUM in c.columns and COL_CAT_NOMBRE in c.columns:
+                    num = pd.to_numeric(c[COL_CAT_NUM], errors="coerce")
+                    ok = num.notna() & c[COL_CAT_NOMBRE].notna()
+                    cat = {
+                        str(int(k)): str(v).strip()
+                        for k, v in zip(num[ok], c.loc[ok, COL_CAT_NOMBRE])
+                    }
+                    print(f"Catalogo de cedentes: {len(cat):,} numeros "
+                          f"({os.path.basename(ruta)})")
+                    return cat
+            print(f"AVISO: no se pudo leer el catalogo de {os.path.basename(ruta)}; "
+                  "se usan los nombres de la propia base.")
+        except Exception as e:
+            print(f"AVISO: error leyendo el catalogo ({e}); se usan los "
+                  "nombres de la propia base.")
+
+    cat = {}
+    nums = pd.to_numeric(df["Compañía"], errors="coerce")
+    for num, nombre in zip(nums, df["Compañía_Nombre"]):
+        if pd.notna(num) and pd.notna(nombre):
+            cat.setdefault(str(int(num)), str(nombre).strip())
+    print(f"Catalogo de cedentes: {len(cat):,} numeros (derivado de la base)")
+    return cat
+
+
+REAL2025 = cargar_reales25()
+
+FUENTE_REALES = ("BDFCST26 (2025 completo)" if REAL2025
+                 else "BD_RFCST26 (solo devengado)")
+
+CATALOGO_CED = cargar_catalogo_cedentes()
+
 print("Presupuesto 2026 completo:")
 _res_ppto = cargar_ppto2026(archivo, set(df["LN"].unique()))
 
@@ -804,6 +950,12 @@ def global_medida(sub, m):
         if "agodic" in PPTO2026[m]:
             g["ppto0812"] = PPTO2026[m]["agodic"]
             g["ppto0107"] = PPTO2026[m]["enejul"]
+
+    # Los reales 2025 globales salen de la base completa BDFCST26:
+    # la BD_RFCST26 solo trae el real ya devengado contra forecast
+    if REAL2025 and m in REAL2025:
+        g["real25"] = REAL2025[m]["anual"]
+        g["real0812"] = REAL2025[m]["agodic"]
 
     g["var_ppto"] = g["fcst"] / g["ppto"] - 1 if abs(g["ppto"]) > TOL else float("nan")
     g["crec25"] = g["fcst"] / g["real25"] - 1 if abs(g["real25"]) > TOL else float("nan")
@@ -936,7 +1088,8 @@ resumen_global = pd.DataFrame(filas_global)
 
 parametros = pd.DataFrame({
     "Parametro": [
-        "Archivo fuente", "Hoja", "Fuente ppto global", "Fecha de corte",
+        "Archivo fuente", "Hoja", "Fuente ppto global",
+        "Fuente reales 2025 globales", "Fecha de corte",
         "Tolerancia (USD)",
         "Materialidad (USD)",
         "Umbral amarillo desviaciones", "Umbral rojo desviaciones",
@@ -948,7 +1101,8 @@ parametros = pd.DataFrame({
         "Generado por", "Fecha de ejecucion",
     ],
     "Valor": [
-        os.path.basename(archivo), HOJA, FUENTE_PPTO, "Julio 2026", TOL,
+        os.path.basename(archivo), HOJA, FUENTE_PPTO, FUENTE_REALES,
+        "Julio 2026", TOL,
         MATERIALIDAD,
         UMBRAL_AMARILLO, UMBRAL_ROJO,
         IND_SIN_AMARILLO, IND_SIN_ROJO,
@@ -960,6 +1114,7 @@ parametros = pd.DataFrame({
     "Descripcion": [
         "Base compartida por Suscripcion", "Pestana con el detalle por contrato",
         "De donde salen las cifras globales de presupuesto",
+        "De donde salen los reales 2025 globales",
         "Real acumulado 7 meses (7+5)",
         "Diferencias menores a este monto no generan alerta",
         "Contratos con prima menor a este monto no escalan a ROJO",
@@ -1206,8 +1361,7 @@ insight = (
     f"{gp['inc'] / gp['real0812']:,.1f}x el real del mismo periodo 2025 "
     f"({_fmt_m(gp['real0812'])}). La siniestralidad del forecast es "
     f"<b>{_fmt_pct(GLOB['Siniestros']['fcst'] / gp['fcst'])}</b> y el P-S-C queda en "
-    f"<b>{_fmt_m(PSC['fcst'])}</b> ({_fmt_pct(PCT_PSC['fcst'])} de la prima). "
-    f"<b>{n_v1:,}</b> contratos reportan forecast menor al real de julio (V1)."
+    f"<b>{_fmt_m(PSC['fcst'])}</b> ({_fmt_pct(PCT_PSC['fcst'])} de la prima)."
 )
 
 # =====================================================
@@ -1341,19 +1495,41 @@ def _txt(v):
 
 
 def _motivos(row):
+    """Causas de alerta del contrato. Para ROJO las inconsistencias
+    duras; para AMARILLO las alertas suaves que lo pusieron ahi."""
+    if row["Semaforo_Global"] == "ROJO":
+        m = []
+        if row["F_V1_Primas"]:
+            m.append("FCST < Real Jul")
+        if row["F_V1_Cuadre"]:
+            m.append("Descuadre Ago-Dic")
+        if row["F_V6_PrimaNegativa"]:
+            m.append("Prima negativa")
+        if row["F_V6_FcstCero"]:
+            m.append("FCST en cero")
+        if row["F_V6_SinExcede100"]:
+            m.append("Siniestralidad > 100%")
+        if row["Semaforo_Inc"] == "ROJO":
+            m.append("Desv. incremento")
+        return " · ".join(m)
+
     m = []
-    if row["F_V1_Primas"]:
-        m.append("FCST < Real Jul")
-    if row["F_V1_Cuadre"]:
-        m.append("Descuadre Ago-Dic")
-    if row["F_V6_PrimaNegativa"]:
-        m.append("Prima negativa")
-    if row["F_V6_FcstCero"]:
-        m.append("FCST en cero")
-    if row["F_V6_SinExcede100"]:
-        m.append("Siniestralidad > 100%")
-    if row["Semaforo_Inc"] == "ROJO":
-        m.append("Desv. incremento")
+    if row["F_V1_Siniestros"]:
+        m.append("Siniestros FCST < Real Jul")
+    if row["F_V1_Costos"]:
+        m.append("Costos FCST < Real Jul")
+    if row["Semaforo_Inc"] != "VERDE":
+        m.append(f"Desv. incremento > {UMBRAL_AMARILLO:.0%}")
+    if row["F_V6_SinNegativo"]:
+        m.append("Siniestros negativos")
+    elif row["Semaforo_Sin"] == "AMARILLO":
+        m.append(f"Siniestralidad > {IND_SIN_AMARILLO:.0%}")
+    if row["Semaforo_Costos"] != "VERDE":
+        m.append(f"Costos > {IND_COS_AMARILLO:.0%}")
+    if row["F_V6_SinPpto"]:
+        m.append("Prima sin ppto")
+    if row["F_V6_SinFactores"]:
+        m.append("Sin factores")
     return " · ".join(m)
 
 
@@ -1377,12 +1553,14 @@ for _, row in df.iterrows():
         card, _txt(row["LN"]), _txt(row["Tipo Reaseguro"]), _txt(row["País"]),
         _txt(row["Corredor"]), _txt(row["Compañía_Nombre"]),
         _txt(row["Num Contrato"]), _txt(row["Binder Ppto"]),
-        sem, _motivos(row) if sem == 2 else "", round(imp),
+        sem, _motivos(row) if sem >= 1 else "", round(imp),
         medidas_arr[0], medidas_arr[1], medidas_arr[2],
+        _txt(row["Compañía"]),
     ])
 
 DATA_JS = {
     "rows": rows_js,
+    "cat": CATALOGO_CED,
     "charts": charts_cfg,
     "cfg": {
         "umbralAmarillo": UMBRAL_AMARILLO,
@@ -1444,8 +1622,14 @@ for idx, nombre, sec_id, desc, t_alerta in sec3_defs:
     <div id="rs_{idx}"></div>
   </div>
   <div class="card scroll">
-    <h2>Top excepciones (semáforo rojo)</h2>
-    <div class="nota">Con los filtros aplicados. Detalle completo en VAL_RFCST26.xlsx → Excepciones.</div>
+    <div class="chart-head">
+      <h2>Top excepciones</h2>
+      <div class="toggle" id="tglx_{idx}">
+        <button data-s="2" class="on">&#9650; Rojo</button>
+        <button data-s="1">&#9679; Amarillo</button>
+      </div>
+    </div>
+    <div class="nota">Con los filtros aplicados, ordenadas por impacto en prima. El motivo explica por qué cada registro está en ese semáforo. Detalle completo en VAL_RFCST26.xlsx → Excepciones.</div>
     <div id="ex_{idx}"></div>
   </div>
 </section>""")
@@ -1619,7 +1803,7 @@ PLANTILLA = """<!doctype html>
 <section id="sec-general" class="bloque">
   <div class="sec-head"><h2 class="sec-title">General</h2>
     <span class="sub">Totalidad de las líneas de negocio · cifras en dólares ·
-      presupuesto de __FUENTE_PPTO__</span></div>
+      presupuesto de __FUENTE_PPTO__ · reales 2025 de __FUENTE_REALES__</span></div>
 __SEC1__
 __SEC1PSC__
   <div class="insight">&#128161; __INSIGHT__</div>
@@ -1808,11 +1992,12 @@ DATA.charts.forEach(c => groupedBars(c.el, c.cats, c.series, c.fmt));
 // ------- Seccion 3: filtros interactivos -------
 const FDEF = {
   0: [[1, 'LN'], [2, 'Tipo Reaseguro'], [3, 'País'], [4, 'Corredor'],
-      [5, 'Compañía'], [6, 'Contrato']],
-  1: [[1, 'LN'], [2, 'Tipo Reaseguro'], [3, 'País'], [5, 'Cedente']],
+      [14, 'N° Cedente'], [5, 'Compañía'], [6, 'Contrato']],
+  1: [[1, 'LN'], [2, 'Tipo Reaseguro'], [3, 'País'], [14, 'N° Cedente'],
+      [5, 'Cedente']],
   2: [[1, 'LN'], [2, 'Tipo Reaseguro'], [3, 'País'], [5, 'Compañía (MGA)'], [7, 'Binder']],
 };
-const state = {0: {m: 0, f: {}}, 1: {m: 0, f: {}}, 2: {m: 0, f: {}}};
+const state = {0: {m: 0, exc: 2, f: {}}, 1: {m: 0, exc: 2, f: {}}, 2: {m: 0, exc: 2, f: {}}};
 
 function rowsFor(card, skip) {
   return DATA.rows.filter(r => {
@@ -1833,10 +2018,15 @@ function buildFilters(card) {
     const opts = [...new Set(rowsFor(card, k).map(r => String(r[k])).filter(v => v !== ''))]
       .sort((a, b) => a.localeCompare(b, 'es', {numeric: true}));
     const cur = state[card].f[k] || '';
+    // El filtro de numero de cedente liga el numero con su nombre
+    // de catalogo para distinguir homonimos
+    const rotulo = k === 14
+      ? (o => o + (DATA.cat[o] ? ' · ' + DATA.cat[o] : ''))
+      : (o => o);
     html += '<div class="flt"><label>' + label + '</label>' +
       '<select data-k="' + k + '"><option value="">(Todos)</option>' +
       opts.map(o => '<option value="' + esc(o) + '"' + (o === cur ? ' selected' : '') + '>' +
-        esc(o) + '</option>').join('') + '</select></div>';
+        esc(rotulo(o)) + '</option>').join('') + '</select></div>';
   });
   html += '<button class="flt-reset" type="button">Limpiar filtros</button>';
   cont.innerHTML = html;
@@ -1967,8 +2157,9 @@ function renderCard(card) {
     }).join('') + '</tbody></table>' :
     '<div class="vacio">Sin datos con los filtros aplicados.</div>';
 
-  // Top excepciones
-  const exc = rows.filter(r => r[8] === 2).sort((a, b) => b[10] - a[10]).slice(0, 10);
+  // Top excepciones (rojo o amarillo segun el toggle)
+  const sev = state[card].exc;
+  const exc = rows.filter(r => r[8] === sev).sort((a, b) => b[10] - a[10]).slice(0, 10);
   document.getElementById('ex_' + card).innerHTML = exc.length ?
     '<table><thead><tr><th>LN</th><th>Entidad</th><th>País</th><th>Tipo</th>' +
     '<th class="num">Real Jul 26</th><th class="num">FCST Dic 26</th>' +
@@ -1979,7 +2170,8 @@ function renderCard(card) {
       '<td class="num">' + fmtM(r[11][2]) + '</td>' +
       '<td class="motivo">' + esc(r[9] || 'Revisión') + '</td></tr>').join('') +
     '</tbody></table>' :
-    '<div class="vacio">Sin excepciones rojas con los filtros aplicados.</div>';
+    '<div class="vacio">Sin excepciones ' + (sev === 2 ? 'rojas' : 'amarillas') +
+    ' con los filtros aplicados.</div>';
 }
 
 [0, 1, 2].forEach(card => {
@@ -1987,6 +2179,14 @@ function renderCard(card) {
     btn.addEventListener('click', () => {
       state[card].m = +btn.dataset.m;
       document.querySelectorAll('#tgl_' + card + ' button')
+        .forEach(b => b.classList.toggle('on', b === btn));
+      renderCard(card);
+    });
+  });
+  document.querySelectorAll('#tglx_' + card + ' button').forEach(btn => {
+    btn.addEventListener('click', () => {
+      state[card].exc = +btn.dataset.s;
+      document.querySelectorAll('#tglx_' + card + ' button')
         .forEach(b => b.classList.toggle('on', b === btn));
       renderCard(card);
     });
@@ -2030,6 +2230,7 @@ html = (
     PLANTILLA
     .replace("__ARCHIVO__", os.path.basename(archivo))
     .replace("__FUENTE_PPTO__", FUENTE_PPTO)
+    .replace("__FUENTE_REALES__", FUENTE_REALES)
     .replace("__GENERADO__", datetime.now().strftime("%d/%m/%Y %H:%M"))
     .replace("__SEC1PSC__", sec1_psc)
     .replace("__SEC1__", "".join(sec1_bloques))
