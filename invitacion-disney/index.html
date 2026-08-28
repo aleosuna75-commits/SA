@@ -39,6 +39,26 @@
     .star{animation:none;opacity:.5}
   }
 
+  /* =================== SCENE 0 · THE SPELL (locked) =================== */
+  /* the unlock check runs before paint, so the right scene shows with no flash */
+  :root.unlocked #scene0{opacity:0;visibility:hidden;pointer-events:none}
+  :root:not(.unlocked) #scene1{opacity:0;visibility:hidden;pointer-events:none}
+  #scene0{flex-direction:column;gap:clamp(16px,3.4vh,26px);padding:24px 20px;text-align:center}
+  .spell-hourglass{width:clamp(64px,17vw,84px);color:var(--gold);filter:drop-shadow(0 6px 16px rgba(217,164,65,.35))}
+  .spell-sand{animation:sift 3.6s ease-in-out infinite}
+  @keyframes sift{0%,100%{opacity:.35}50%{opacity:1}}
+  @media (prefers-reduced-motion: reduce){.spell-sand{animation:none;opacity:.8}}
+  .spell-title{font-family:"Great Vibes",cursive;font-weight:400;font-size:clamp(2rem,8.5vw,2.7rem);color:var(--gold-soft);line-height:1.15;text-wrap:balance}
+  .spell-text{font-size:clamp(1.04rem,4vw,1.18rem);line-height:1.5;color:rgba(251,245,233,.86);max-width:30ch}
+  .spell-text em{color:var(--teal);font-style:normal}
+  .spell-when{
+    font-family:Cinzel,serif;font-size:clamp(.66rem,2.6vw,.78rem);letter-spacing:.2em;text-transform:uppercase;
+    color:var(--gold-soft);border-top:1px solid rgba(217,164,65,.5);border-bottom:1px solid rgba(217,164,65,.5);
+    padding:8px 6px;line-height:1.8;
+  }
+  #scene0 .cd-lab{color:rgba(239,217,167,.75)}
+  #scene0 .cd-num{box-shadow:inset 0 0 0 1px rgba(217,164,65,.6), 0 8px 18px rgba(0,0,0,.4)}
+
   /* =================== SCENE 1 · ENVELOPE =================== */
   #scene1{flex-direction:column;gap:26px;padding:20px}
   .arrival{font-family:Cinzel, "Cormorant Garamond", serif;font-size:clamp(.72rem,2.8vw,.9rem);letter-spacing:.32em;text-transform:uppercase;color:var(--gold-soft);text-align:center}
@@ -249,6 +269,29 @@
   @keyframes drift{0%,100%{transform:translateY(0) rotate(0)}50%{transform:translateY(-26px) rotate(20deg)}}
   @media (prefers-reduced-motion: reduce){.floaty{animation:none}}
 </style>
+
+<script>
+  /* 28 de agosto de 2026, 12:00 pm en el centro de México (UTC-6) */
+  var UNLOCK_AT = Date.UTC(2026, 7, 28, 18, 0, 0);
+  /* ?ensayo en la URL abre la carta antes de tiempo, para probarla */
+  var PREVIEW = /[?&]ensayo\b/.test(location.search);
+  if (PREVIEW || Date.now() >= UNLOCK_AT) document.documentElement.classList.add('unlocked');
+</script>
+
+<!-- ══════════ SCENE 0 · THE SPELL (locked until noon) ══════════ -->
+<div class="scene" id="scene0">
+  <div class="stars" aria-hidden="true"></div>
+  <svg class="spell-hourglass" viewBox="0 0 60 80" fill="none" stroke="currentColor" stroke-width="3" aria-hidden="true">
+    <path d="M12 6h36M12 74h36" stroke-linecap="round"/>
+    <path d="M16 6v12c0 8 14 14 14 22 0 8-14 14-14 22v12M44 6v12c0 8-14 14-14 22 0 8 14 14 14 22v12"/>
+    <path class="spell-sand" d="M22 12h16c0 6-8 10-8 14s8 8 8 14H22c0-6 8-10 8-14s-8-8-8-14z" fill="currentColor" stroke="none"/>
+  </svg>
+  <h1 class="spell-title">Un hechizo sella<br>esta carta</h1>
+  <p class="spell-text">Solo podrá abrirse cuando el reloj del reino marque el <em>mediodía</em>.</p>
+  <p class="spell-when">Viernes 28 de agosto<br>12:00 pm · hora del centro de México</p>
+  <div class="countdown" id="cd-unlock" aria-live="off"></div>
+  <p class="hint">Vuelve en ese momento, princesa ✨</p>
+</div>
 
 <!-- ══════════ SCENE 1 · THE LETTER ══════════ -->
 <div class="scene" id="scene1">
@@ -524,4 +567,29 @@
   }
   tick();
   setInterval(tick,250);
+
+  /* ---------- el hechizo: abre la carta al llegar el mediodía ---------- */
+  const cdUnlock=document.getElementById('cd-unlock');
+  cdUnlock.innerHTML=LABELS.map(l=>`<div class="cd-cell"><div class="cd-num">--</div><div class="cd-lab">${l}</div></div>`).join('');
+  function tickUnlock(){
+    let ms=UNLOCK_AT-Date.now();
+    if(ms<=0){ reveal(); return; }
+    const d=Math.floor(ms/864e5); ms-=d*864e5;
+    const hh=Math.floor(ms/36e5); ms-=hh*36e5;
+    const mm=Math.floor(ms/6e4);  ms-=mm*6e4;
+    const ss=Math.floor(ms/1e3);
+    const nums=[d,hh,mm,ss].map(n=>String(n).padStart(2,'0'));
+    cdUnlock.querySelectorAll('.cd-num').forEach((el,i)=>{ if(el.textContent!==nums[i]) el.textContent=nums[i]; });
+  }
+  let revealed=false;
+  function reveal(){
+    if(revealed)return; revealed=true;
+    clearInterval(unlockTimer);
+    document.documentElement.classList.add('unlocked');
+  }
+  let unlockTimer=null;
+  if(!document.documentElement.classList.contains('unlocked')){
+    tickUnlock();
+    unlockTimer=setInterval(tickUnlock,250);
+  }
 </script>
