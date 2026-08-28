@@ -27,19 +27,34 @@ pip install -r requirements.txt
 Si falta alguno, el script avisa al inicio con el comando exacto en vez de
 tronar a medio proceso.
 
+## Fuente del presupuesto
+
+Las **cifras globales** (sección General) toman el presupuesto de la hoja
+`Ppto2026` del mismo libro, porque `BD_RFCST26` solo trae presupuesto de los
+contratos que ya registraron prima y subestima el total. El script detecta la
+hoja, la fila de encabezados, la columna de ejercicio (para acotar a 2026) y la
+de periodo (para separar Ago-Dic), e imprime en consola lo que encontró. Si la
+hoja no está, avisa y usa el presupuesto de `BD_RFCST26`. La fuente utilizada se
+muestra en el subtítulo de la sección General y en la hoja `Parametros`.
+
+Los nombres de columna se configuran al inicio del script (`COL_PPTO`,
+`COLS_ANIO`, `COLS_PERIODO`). Las **gráficas por línea de negocio** siguen
+usando el presupuesto de `BD_RFCST26` sin cambios.
+
 ## Salidas (carpeta `Outputs/`)
 
 | Archivo | Contenido |
 |---|---|
 | `VAL_RFCST26.xlsx` | Dashboard de KPIs, `Resumen_Global` con P/S/C y P-S-C (para el correo del reporte), resumen por LN (con semáforos, score, ranking, variaciones y gaps de las tres medidas, P-S-C/%P-S-C y participaciones, estilo ANA_RFCST), cortes por cardinalidad, LN×Tipo Rea, fuente, país, corredor, compañía, binder y contrato, `Pareto_Gap` por LN×compañía, excepciones, detalle contrato por contrato con todos los flags, y la hoja `Parametros` con los umbrales usados |
-| `Dashboard_RFCST26.html` | Dashboard PRISMA (abrir en el navegador, no requiere internet). **General**: KPIs de Primas / Siniestros / Costos (FCST vs Ppto, crecimiento vs Real 2025, incremento Ago-Dic) y bloque P-S-C / %P-S-C con su nota. **Línea de Negocio**: las mismas vistas por LN en gráficas. **Contrato / Cedente / MGA**: filtros interactivos en cascada (LN, tipo de reaseguro, país, corredor, compañía, contrato o binder según el nivel) que actualizan la gráfica FCST 26 vs Ppto 26 vs Real 25, el semáforo, las entidades con alerta, el resumen por LN y el top de excepciones |
+| `Dashboard_RFCST26.html` | Dashboard PRISMA (abrir en el navegador, no requiere internet). **General**: KPIs de Primas / Siniestros / Costos (FCST vs Ppto, crecimiento vs Real 2025, incremento Ago-Dic) y bloque P-S-C / %P-S-C con su nota. **Línea de Negocio**: las mismas vistas por LN en gráficas. **Contrato / Cedente / MGA**: filtros interactivos en cascada (LN, tipo de reaseguro, país, corredor, compañía, contrato o binder según el nivel) que actualizan la gráfica FCST 26 vs Ppto 26 vs Real 25, el semáforo, las entidades con alerta, el resumen por LN y el top de excepciones.
+Incluye un botón al final que imprime en PDF únicamente la sección **Línea de Negocio**, en tema claro y A4 horizontal |
 
 ## Validaciones
 
 | # | Validación | Lógica |
 |---|---|---|
 | V1 | Consistencia acumulada | El forecast a Dic 2026 no puede ser menor al real con corte a Julio 2026 (el acumulado nunca decrece), y el incremento Ago-Dic que trae la base debe cuadrar con (Dic − Jul) |
-| V2 | Incremento Ago-Dic vs Ppto ajustado | Incremento implícito (FCST − Real Jul) comparado con el ppto Ago-Dic escalado por el nivel de ejecución Ene-Jul (Real Jul / Ppto Ene-Jul). Si a julio llevamos el doble de lo presupuestado, es razonable esperar ~el doble en Ago-Dic |
+| V2 | Incremento Ago-Dic vs Ppto Ago-Dic | El incremento que el forecast proyecta para agosto-diciembre se compara contra lo presupuestado para ese mismo periodo. El nivel de ejecución Ene-Jul se conserva como columna de contexto (`Ratio_Ejecucion`) |
 | V3 | Coherencia vs Reales 2025 | Crecimiento del forecast vs cierre 2025 y del incremento Ago-Dic vs el mismo periodo 2025, comparado contra el factor de incremento del Ppto |
 | V4 | Índices técnicos vs factores | Siniestralidad y costos implícitos del forecast contra los factores históricos y de presupuesto (AS:AY) |
 | V5 | Forecast vs Ppto anual | Cumplimiento, variación y gap contra el presupuesto 2026 año completo |

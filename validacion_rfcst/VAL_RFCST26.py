@@ -122,10 +122,33 @@ IND_COS_AMARILLO = 0.35      # costo de adquisicion
 IND_COS_ROJO = 0.50
 
 # Ponderaciones del score de riesgo
-PESO_INC = 0.30              # desviacion incremento Ago-Dic vs esperado
+PESO_INC = 0.30              # desviacion incremento Ago-Dic vs ppto
 PESO_SIN = 0.30              # siniestralidad forecast
 PESO_COS = 0.15              # costos forecast
 PESO_V25 = 0.25              # desviacion crecimiento vs factor Ppto
+
+# Hoja opcional con el presupuesto 2026 completo. La base
+# BD_RFCST26 solo trae presupuesto de los contratos que ya
+# registraron prima, por eso las CIFRAS GLOBALES toman el ppto
+# de esta hoja (los contratos presupuestados sin prima aun se
+# capturaron manualmente ahi). Las graficas por LN siguen
+# usando el ppto de BD_RFCST26.
+HOJA_PPTO = "Ppto2026"
+
+# Nombres de columna en la hoja Ppto2026 (ajustar si cambian)
+COL_PPTO = {
+    "Primas": "PmasEmi",
+    "Siniestros": "SinOcurr",
+    "Costos": "CostosAdq",
+}
+
+# Columnas candidatas para acotar el presupuesto al ejercicio
+# 2026 y para separar el periodo Ago-Dic
+ANIO_PPTO = 2026
+COLS_ANIO = ["0FISCYEAR", "FISCYEAR", "Ejercicio", "Año", "Anio", "Year", "AñoCont"]
+COLS_PERIODO = ["0FISCPER", "FISCPER", "Periodo", "Período", "Mes", "Month", "PerCont"]
+MESES_AGODIC = [8, 9, 10, 11, 12]
+MESES_ENEJUL = [1, 2, 3, 4, 5, 6, 7]
 
 # Medidas y sufijos de columnas de la base
 MEDIDAS = ["Primas", "Siniestros", "Costos"]
@@ -243,18 +266,16 @@ df["F_V1_Cuadre"] = (
 )
 
 # =====================================================
-# V2. INCREMENTO AGO-DIC vs PPTO AGO-DIC AJUSTADO
+# V2. INCREMENTO AGO-DIC vs PPTO AGO-DIC
 # =====================================================
-# Si al corte de julio llevamos X% del ppto Ene-Jul, el
-# incremento esperado Ago-Dic es el ppto Ago-Dic escalado
-# por ese mismo nivel de ejecucion.
+# El incremento que Suscripcion proyecta para Ago-Dic se
+# compara contra lo presupuestado para ese mismo periodo.
+# El ratio de ejecucion Ene-Jul se conserva como contexto.
 
 df["Ratio_Ejecucion"] = _ratio(df["Primas 0726"], df["Primas PPTO01-0726"])
 
-df["Inc_Esperado_AgoDic"] = df["Primas PPTO08-1226"] * df["Ratio_Ejecucion"]
-
 df["Desv_Inc_AgoDic"] = _ratio(
-    df["Inc_Primas_AgoDic"], df["Inc_Esperado_AgoDic"]
+    df["Inc_Primas_AgoDic"], df["Primas PPTO08-1226"]
 ) - 1
 
 # =====================================================
@@ -348,8 +369,7 @@ def resumen_por(claves):
     # Indices y desviaciones recalculados sobre agregados
     # (no promedio de razones)
     r["Ratio_Ejecucion"] = _ratio(r["P_0726"], r["P_PPTO_0107"])
-    r["Inc_Esperado"] = r["P_PPTO_0812"] * r["Ratio_Ejecucion"]
-    r["Desv_Inc_AgoDic"] = _ratio(r["P_Inc"], r["Inc_Esperado"]) - 1
+    r["Desv_Inc_AgoDic"] = _ratio(r["P_Inc"], r["P_PPTO_0812"]) - 1
 
     r["Cumplimiento_PPTO"] = _ratio(r["P_1226"], r["P_PPTO"])
     r["Var_Primas_PPTO"] = r["Cumplimiento_PPTO"] - 1
@@ -574,6 +594,133 @@ excepciones["Impacto"] = (
 excepciones = excepciones.sort_values("Impacto", ascending=False)
 
 # =====================================================
+# PRESUPUESTO 2026 COMPLETO (hoja Ppto2026)
+# =====================================================
+# Solo alimenta las cifras GLOBALES. Si la hoja no existe
+# se avisa y se usa el ppto de BD_RFCST26.
+
+
+def _buscar_columna(cols, candidatas):
+    """Devuelve la primera columna cuyo nombre coincida (sin
+    distinguir mayusculas ni acentos de mas) con las candidatas."""
+    norm = {str(c).strip().upper(): c for c in cols}
+    for cand in candidatas:
+        if cand.strip().upper() in norm:
+            return norm[cand.strip().upper()]
+    return None
+
+
+def _meses_de(serie):
+    """Deriva el mes (1-12) de una columna de periodo, aceptando
+    1-12, AAAAMM y fechas."""
+    if pd.api.types.is_datetime64_any_dtype(serie):
+        return serie.dt.month
+
+    num = pd.to_numeric(serie, errors="coerce")
+
+    if num.notna().sum() == 0:
+        return None
+
+    maximo = num.max()
+
+    if maximo <= 12:
+        return num
+    if maximo >= 100_000:          # AAAAMM
+        return num % 100
+    if maximo <= 12_12:            # AAMM u otro compacto
+        return num % 100
+
+    return None
+
+
+def cargar_ppto2026(ruta):
+
+    try:
+        crudo = pd.read_excel(ruta, sheet_name=HOJA_PPTO, header=None, nrows=12)
+    except ValueError:
+        print(f"AVISO: el libro no tiene la hoja '{HOJA_PPTO}'.")
+        print("       Las cifras globales usaran el ppto de BD_RFCST26,")
+        print("       que solo cubre contratos con prima registrada.")
+        return None
+
+    col_primas = COL_PPTO["Primas"]
+
+    fila = None
+    for i in range(len(crudo)):
+        if any(str(v).strip() == col_primas for v in crudo.iloc[i]):
+            fila = i
+            break
+
+    if fila is None:
+        print(f"AVISO: en la hoja '{HOJA_PPTO}' no se encontro la columna "
+              f"'{col_primas}'; se usa el ppto de BD_RFCST26.")
+        return None
+
+    p = pd.read_excel(ruta, sheet_name=HOJA_PPTO, header=fila)
+    p.columns = [str(c).strip() for c in p.columns]
+
+    faltantes = [c for c in COL_PPTO.values() if c not in p.columns]
+    if faltantes:
+        print(f"AVISO: a la hoja '{HOJA_PPTO}' le faltan columnas {faltantes}; "
+              "se usa el ppto de BD_RFCST26.")
+        return None
+
+    filas_totales = len(p)
+
+    # Acotar al ejercicio presupuestado
+    col_anio = _buscar_columna(p.columns, COLS_ANIO)
+    if col_anio is not None:
+        anios = pd.to_numeric(p[col_anio], errors="coerce")
+        p = p[anios == ANIO_PPTO]
+        print(f"  {HOJA_PPTO}: filtrado {col_anio} = {ANIO_PPTO} "
+              f"({len(p):,} de {filas_totales:,} filas)")
+    else:
+        print(f"  AVISO: en '{HOJA_PPTO}' no se encontro columna de ejercicio "
+              f"{COLS_ANIO}; se suman las {filas_totales:,} filas de la hoja.")
+        print("         Verifica que la hoja solo contenga el presupuesto 2026.")
+
+    # Separar Ago-Dic
+    col_periodo = _buscar_columna(p.columns, COLS_PERIODO)
+    meses = _meses_de(p[col_periodo]) if col_periodo is not None else None
+
+    if meses is None and col_periodo is not None:
+        print(f"  AVISO: no se pudo interpretar el periodo de '{col_periodo}'.")
+
+    ppto = {}
+
+    for medida, col in COL_PPTO.items():
+        vals = pd.to_numeric(p[col], errors="coerce").fillna(0)
+        d = {"anual": float(vals.sum())}
+        if meses is not None:
+            d["agodic"] = float(vals[meses.isin(MESES_AGODIC)].sum())
+            d["enejul"] = float(vals[meses.isin(MESES_ENEJUL)].sum())
+        ppto[medida] = d
+
+    if meses is not None:
+        print(f"  {HOJA_PPTO}: periodo tomado de '{col_periodo}' "
+              "(Ago-Dic y Ene-Jul disponibles)")
+    else:
+        print(f"  AVISO: sin columna de periodo en '{HOJA_PPTO}'; el ppto "
+              "Ago-Dic global se toma de BD_RFCST26.")
+
+    for medida, d in ppto.items():
+        detalle = f"anual {d['anual'] / 1e6:,.1f} M"
+        if "agodic" in d:
+            detalle += f" · Ago-Dic {d['agodic'] / 1e6:,.1f} M"
+        print(f"  {HOJA_PPTO} · {medida}: {detalle}")
+
+    return ppto
+
+
+print("Presupuesto 2026 completo:")
+PPTO2026 = cargar_ppto2026(archivo)
+
+FUENTE_PPTO = (
+    f"hoja {HOJA_PPTO} (presupuesto completo)" if PPTO2026
+    else "BD_RFCST26 (solo contratos con prima)"
+)
+
+# =====================================================
 # GLOBALES POR MEDIDA (P / S / C y P-S-C)
 # =====================================================
 
@@ -589,20 +736,29 @@ def global_medida(sub, m):
         "real25": sub[f"{m} 1225"].sum(),
         "real0812": sub[f"{m} 08-1225"].sum(),
     }
+    # El presupuesto global sale de la hoja Ppto2026 cuando esta
+    # disponible: BD_RFCST26 solo trae ppto de contratos que ya
+    # registraron prima y subestima el presupuesto real
+    if PPTO2026 and m in PPTO2026:
+        g["ppto"] = PPTO2026[m]["anual"]
+        if "agodic" in PPTO2026[m]:
+            g["ppto0812"] = PPTO2026[m]["agodic"]
+            g["ppto0107"] = PPTO2026[m]["enejul"]
+
     g["var_ppto"] = g["fcst"] / g["ppto"] - 1 if abs(g["ppto"]) > TOL else float("nan")
     g["crec25"] = g["fcst"] / g["real25"] - 1 if abs(g["real25"]) > TOL else float("nan")
-    ratio = g["a0726"] / g["ppto0107"] if abs(g["ppto0107"]) > TOL else float("nan")
-    g["esperado"] = g["ppto0812"] * ratio
-    g["desv_inc"] = (g["inc"] / g["esperado"] - 1
-                     if not math.isnan(g["esperado"]) and abs(g["esperado"]) > TOL
-                     else float("nan"))
+
+    # El incremento Ago-Dic se compara contra lo presupuestado
+    # para ese mismo periodo
+    g["desv_inc"] = (g["inc"] / g["ppto0812"] - 1
+                     if abs(g["ppto0812"]) > TOL else float("nan"))
     return g
 
 
 GLOB = {m: global_medida(df, m) for m in MEDIDAS}
 
 PSC = {k: GLOB["Primas"][k] - GLOB["Siniestros"][k] - GLOB["Costos"][k]
-       for k in ("a0726", "fcst", "inc", "ppto", "real25", "real0812")}
+       for k in ("a0726", "fcst", "inc", "ppto", "ppto0812", "real25", "real0812")}
 PSC["var_ppto"] = PSC["fcst"] / PSC["ppto"] - 1 if abs(PSC["ppto"]) > TOL else float("nan")
 PSC["crec25"] = PSC["fcst"] / PSC["real25"] - 1 if abs(PSC["real25"]) > TOL else float("nan")
 
@@ -636,7 +792,7 @@ dashboard = pd.DataFrame({
         "Cumplimiento FCST vs PPTO",
         "Crecimiento FCST vs Real 2025",
         "Incremento Ago-Dic",
-        "Incremento esperado Ago-Dic (ppto ajustado)",
+        "Ppto Ago-Dic 2026",
         "Desviacion incremento Ago-Dic",
         "Real Ago-Dic 2025 (referencia)",
         "Siniestralidad FCST",
@@ -660,7 +816,7 @@ dashboard = pd.DataFrame({
         gp["fcst"] / gp["ppto"],
         gp["crec25"],
         gp["inc"],
-        gp["esperado"],
+        gp["ppto0812"],
         gp["desv_inc"],
         gp["real0812"],
         GLOB["Siniestros"]["fcst"] / gp["fcst"],
@@ -694,7 +850,7 @@ for nombre, g in [("Primas", GLOB["Primas"]), ("Siniestros", GLOB["Siniestros"])
         "Var $ vs Real25": g["fcst"] - g["real25"],
         "Var % vs Real25": g["crec25"],
         "Inc. Ago-Dic": g["inc"],
-        "Esperado Ago-Dic": g.get("esperado", float("nan")),
+        "Ppto Ago-Dic": g.get("ppto0812", float("nan")),
         "Real Ago-Dic 25": g["real0812"],
     })
 
@@ -708,7 +864,7 @@ filas_global.append({
     "Var $ vs Real25": float("nan"),
     "Var % vs Real25": PCT_PSC["fcst"] - PCT_PSC["real25"],
     "Inc. Ago-Dic": float("nan"),
-    "Esperado Ago-Dic": float("nan"),
+    "Ppto Ago-Dic": float("nan"),
     "Real Ago-Dic 25": float("nan"),
 })
 
@@ -720,7 +876,8 @@ resumen_global = pd.DataFrame(filas_global)
 
 parametros = pd.DataFrame({
     "Parametro": [
-        "Archivo fuente", "Hoja", "Fecha de corte", "Tolerancia (USD)",
+        "Archivo fuente", "Hoja", "Fuente ppto global", "Fecha de corte",
+        "Tolerancia (USD)",
         "Materialidad (USD)",
         "Umbral amarillo desviaciones", "Umbral rojo desviaciones",
         "Siniestralidad amarilla", "Siniestralidad roja",
@@ -731,7 +888,7 @@ parametros = pd.DataFrame({
         "Generado por", "Fecha de ejecucion",
     ],
     "Valor": [
-        os.path.basename(archivo), HOJA, "Julio 2026", TOL,
+        os.path.basename(archivo), HOJA, FUENTE_PPTO, "Julio 2026", TOL,
         MATERIALIDAD,
         UMBRAL_AMARILLO, UMBRAL_ROJO,
         IND_SIN_AMARILLO, IND_SIN_ROJO,
@@ -742,6 +899,7 @@ parametros = pd.DataFrame({
     ],
     "Descripcion": [
         "Base compartida por Suscripcion", "Pestana con el detalle por contrato",
+        "De donde salen las cifras globales de presupuesto",
         "Real acumulado 7 meses (7+5)",
         "Diferencias menores a este monto no generan alerta",
         "Contratos con prima menor a este monto no escalan a ROJO",
@@ -751,7 +909,7 @@ parametros = pd.DataFrame({
         "Ind. siniestralidad FCST > umbral marca ROJO",
         "Ind. costos FCST > umbral marca AMARILLO",
         "Ind. costos FCST > umbral marca ROJO",
-        "V2: incremento vs ppto Ago-Dic ajustado por ejecucion",
+        "V2: incremento Ago-Dic vs lo presupuestado en ese periodo",
         "V4: siniestralidad implicita del forecast",
         "V4: costos implicitos del forecast",
         "V3: incremento Ago-Dic vs mismo periodo 2025",
@@ -768,7 +926,7 @@ salida_xlsx = os.path.join(xOutputs, "VAL_RFCST26.xlsx")
 
 cols_resumen = [
     "LN", "Contratos", "P_0726", "P_1226", "P_PPTO", "P_1225",
-    "P_Inc", "Inc_Esperado", "Desv_Inc_AgoDic", "Semaforo_Inc",
+    "P_Inc", "P_PPTO_0812", "Desv_Inc_AgoDic", "Semaforo_Inc",
     "Cumplimiento_PPTO", "Gap_Primas", "Crec_vs_Real25", "Crec_AgoDic_vs_25",
     "Ind_Sin_FCST", "Ind_Sin_Real25", "Semaforo_Sin",
     "Ind_Cos_FCST", "Ind_Cos_Real25", "Semaforo_Costos",
@@ -783,8 +941,7 @@ cols_detalle = ["Cardinalidad"] + columnas_dim + [
     "Primas 0726", "Primas 1226", "Primas 08-1226", "Primas PPTO1226",
     "Primas PPTO08-1226", "Primas PPTO01-0726", "Primas 1225", "Primas 08-1225",
     "Siniestros 1226", "Costos 1226",
-    "Ratio_Ejecucion", "Inc_Esperado_AgoDic",
-    "Desv_Inc_AgoDic", "Crec_vs_Real25", "Crec_AgoDic_vs_25",
+    "Ratio_Ejecucion", "Desv_Inc_AgoDic", "Crec_vs_Real25", "Crec_AgoDic_vs_25",
     "Ind_Sin_FCST", "Ind_Cos_FCST", "Var_Primas_PPTO",
 ] + flags + ["Num_Flags", "Semaforo_Inc", "Semaforo_Sin", "Semaforo_Costos", "Semaforo_Global"]
 
@@ -947,7 +1104,8 @@ for medida, corto, icono, bueno_arriba in INFO_MEDIDAS:
     {_kpi("&#128200;", "Crecimiento vs Real 2025", _fmt_pct(g['crec25'], signo=True),
           f"FCST Dic 26 ({_fmt_m(g['fcst'])}) vs cierre Real 2025 ({_fmt_m(g['real25'])})")}
     {_kpi("&#9202;", "Incremento Ago-Dic", _fmt_m(g['inc']),
-          _badge(g['desv_inc'], bueno_arriba, f"vs esperado ({_fmt_m(g['esperado'])})"),
+          _badge(g['desv_inc'], bueno_arriba,
+                 f"vs Ppto Ago-Dic ({_fmt_m(g['ppto0812'])})"),
           f"Real Ago-Dic 2025: {_fmt_m(g['real0812'])}")}
   </div>"""
     sec1_bloques.append(bloque)
@@ -963,9 +1121,6 @@ sec1_psc = f"""
     {_kpi("&#128202;", "%P-S-C Forecast 2026", _fmt_pct(PCT_PSC['fcst']),
           _badge(PCT_PSC['fcst'] - PCT_PSC['ppto'], True, "pts vs Ppto"),
           f"Ppto 2026: {_fmt_pct(PCT_PSC['ppto'])} · Real 2025: {_fmt_pct(PCT_PSC['real25'])}")}
-    {_kpi("&#9888;", "Contratos con alerta", f"{n_rojo + n_amarillo:,}",
-          f'<b class="down">{n_rojo:,} rojos</b> · {n_amarillo:,} amarillos',
-          f"{n_v1:,} con FCST &lt; Real Jul")}
   </div>
   <div class="ast">* Falta el incremento a la reserva y los costos de cobertura.</div>"""
 
@@ -974,9 +1129,9 @@ insight = (
     f"<b>{_fmt_pct(gp['var_ppto'], signo=True)}</b> sobre el presupuesto anual y "
     f"<b>{_fmt_pct(gp['crec25'], signo=True)}</b> contra el cierre real 2025. "
     f"El incremento Ago-Dic ({_fmt_m(gp['inc'])}) esta "
-    f"<b>{_fmt_pct(gp['desv_inc'], signo=True)}</b> respecto al esperado ajustando "
-    f"el ppto Ago-Dic por el nivel de ejecucion a julio ({_fmt_m(gp['esperado'])}), "
-    f"y equivale a {gp['inc'] / gp['real0812']:,.1f}x el real del mismo periodo 2025 "
+    f"<b>{_fmt_pct(gp['desv_inc'], signo=True)}</b> contra lo presupuestado para "
+    f"ese periodo ({_fmt_m(gp['ppto0812'])}), y equivale a "
+    f"{gp['inc'] / gp['real0812']:,.1f}x el real del mismo periodo 2025 "
     f"({_fmt_m(gp['real0812'])}). La siniestralidad del forecast es "
     f"<b>{_fmt_pct(GLOB['Siniestros']['fcst'] / gp['fcst'])}</b> y el P-S-C queda en "
     f"<b>{_fmt_m(PSC['fcst'])}</b> ({_fmt_pct(PCT_PSC['fcst'])} de la prima). "
@@ -1013,14 +1168,12 @@ for medida, corto, _, _ in INFO_MEDIDAS:
             {"n": "Real 2025", "c": S3, "v": _vals(r_ln[f"{corto}_1225"])},
         ],
     })
-    ratio_m = _ratio(r_ln[f"{corto}_0726"], r_ln[f"{corto}_PPTO_0107"])
-    esperado_m = pd.Series(r_ln[f"{corto}_PPTO_0812"].to_numpy() * ratio_m)
     charts_cfg.append({
         "el": f"ch_{corto}_inc", "fmt": "m",
         "cats": LNS,
         "series": [
             {"n": "Incremento FCST Ago-Dic", "c": S1, "v": _vals(r_ln[f"{corto}_Inc"])},
-            {"n": "Esperado (Ppto Ago-Dic × ejecucion)", "c": S2, "v": _vals(esperado_m)},
+            {"n": "Ppto Ago-Dic 2026", "c": S2, "v": _vals(r_ln[f"{corto}_PPTO_0812"])},
             {"n": "Real Ago-Dic 2025", "c": S3, "v": _vals(r_ln[f"{corto}_0812_25"])},
         ],
     })
@@ -1078,7 +1231,7 @@ for corto, medida, t_niv, t_inc in TITULOS_S2:
     </div>
     <div class="card">
       <h2>{t_inc}</h2>
-      <div class="nota">Esperado = Ppto Ago-Dic × nivel de ejecución Ene-Jul de la medida. Referencia: real Ago-Dic 2025.</div>
+      <div class="nota">Incremento que proyecta el forecast para Ago-Dic 2026 vs lo presupuestado para ese mismo periodo. Referencia: real Ago-Dic 2025.</div>
       <div id="ch_{corto}_inc"></div>
     </div>
   </div>""")
@@ -1352,6 +1505,39 @@ PLANTILLA = """<!doctype html>
   .vacio { color: #898781; font-size: 12.5px; padding: 18px 4px; }
   footer { margin-top: 22px; color: #898781; font-size: 11px; line-height: 1.6; }
   .cardinal { border-top: 1px solid #2c2c2a; padding-top: 20px; margin-top: 30px; }
+  .print-head { display: none; }
+  .acciones { display: flex; justify-content: center; margin-top: 28px; }
+  .btn-print { background: rgba(57,135,229,.16); color: #9ec5f4;
+    border: 1px solid rgba(57,135,229,.35); border-radius: 10px; padding: 11px 20px;
+    font-size: 13px; font-family: inherit; cursor: pointer; display: inline-flex;
+    align-items: center; gap: 9px; }
+  .btn-print:hover { background: rgba(57,135,229,.26); color: #ffffff; }
+
+  /* Impresion: solo la seccion Linea de Negocio, en claro */
+  @media print {
+    @page { size: A4 landscape; margin: 10mm; }
+    /* el lienzo hereda color-scheme: dark y pintaria los margenes en negro */
+    :root { color-scheme: light !important; }
+    html { background: #ffffff !important; }
+    body.print-ln { background: #ffffff !important; color: #111111 !important;
+      padding: 0 !important; }
+    body.print-ln > *:not(#sec-ln) { display: none !important; }
+    body.print-ln #sec-ln { display: block !important; margin: 0 !important; }
+    body.print-ln .sec-head { display: none !important; }
+    body.print-ln .print-head { display: block; margin-bottom: 12px; }
+    body.print-ln .print-head h2 { font-size: 15px; font-weight: 650; color: #111111; }
+    body.print-ln .print-head span { font-size: 10.5px; color: #555555; }
+    body.print-ln .card { background: #ffffff !important; border: 1px solid #cccccc !important;
+      break-inside: avoid; page-break-inside: avoid; }
+    body.print-ln h3.med { color: #1a5eb0 !important; break-after: avoid;
+      page-break-after: avoid; margin-top: 12px; }
+    body.print-ln .card h2 { color: #111111 !important; }
+    body.print-ln .card .nota, body.print-ln .lg, body.print-ln .ast { color: #444444 !important; }
+    body.print-ln .tick { fill: #555555 !important; }
+    body.print-ln .cat, body.print-ln .vlabel { fill: #222222 !important; }
+    body.print-ln .dos2 { grid-template-columns: 1fr 1fr !important; }
+    * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+  }
 </style>
 </head>
 <body>
@@ -1370,19 +1556,30 @@ PLANTILLA = """<!doctype html>
 
 <section id="sec-general" class="bloque">
   <div class="sec-head"><h2 class="sec-title">General</h2>
-    <span class="sub">Totalidad de las líneas de negocio · cifras en dólares</span></div>
+    <span class="sub">Totalidad de las líneas de negocio · cifras en dólares ·
+      presupuesto de __FUENTE_PPTO__</span></div>
 __SEC1__
 __SEC1PSC__
   <div class="insight">&#128161; __INSIGHT__</div>
 </section>
 
 <section id="sec-ln" class="bloque">
+  <div class="print-head">
+    <h2>Validación RFCST 2026 · 7+5 — Línea de Negocio</h2>
+    <span>Corte Julio 2026 · __ARCHIVO__ · generado __GENERADO__ · cifras en dólares</span>
+  </div>
   <div class="sec-head"><h2 class="sec-title">Línea de Negocio</h2>
     <span class="sub">Mismas vistas, por LN · cifras en dólares</span></div>
 __SEC2__
 </section>
 
 __SEC3__
+
+<div class="acciones">
+  <button type="button" class="btn-print" id="btn-print-ln">
+    &#128424; Imprimir sección Línea de Negocio en PDF
+  </button>
+</div>
 
 <footer>Validación automática VAL_RFCST26.py · Planeación Financiera · cifras en dólares ·
 V1: consistencia acumulada y cuadre Ago-Dic · V2: incremento vs ppto ajustado ·
@@ -1626,9 +1823,7 @@ function renderCard(card) {
   // KPIs
   const p = sums(rows, 0), s = sums(rows, 1);
   const varPpto = ratio(p.fcst, p.ppto), crec = ratio(p.fcst, p.r25);
-  const rEj = ratio(p.a0726, p.p0107);
-  const esperado = rEj === null ? null : p.p0812 * rEj;
-  const desvInc = esperado === null ? null : ratio(p.inc, esperado);
+  const desvInc = ratio(p.inc, p.p0812);
   const nR = rows.filter(r => r[8] === 2).length;
   const nA = rows.filter(r => r[8] === 1).length;
   document.getElementById('kpi_' + card).innerHTML =
@@ -1641,7 +1836,8 @@ function renderCard(card) {
     '<div class="d">FCST (' + fmtM(p.fcst) + ') vs Real 2025 (' + fmtM(p.r25) + ')</div></div>' +
     '<div class="card kpi"><div class="t"><i>&#9202;</i>Incremento Ago-Dic</div>' +
     '<div class="v">' + fmtM(p.inc) + '</div><div class="d">' +
-    badge(desvInc === null ? null : desvInc - 1, true, 'vs esperado (' + fmtM(esperado) + ')') + '</div></div>' +
+    badge(desvInc === null ? null : desvInc - 1, true,
+      'vs Ppto Ago-Dic (' + fmtM(p.p0812) + ')') + '</div></div>' +
     '<div class="card kpi"><div class="t"><i>&#9888;</i>Registros con alerta</div>' +
     '<div class="v">' + (nR + nA).toLocaleString('en-US') + '</div>' +
     '<div class="d"><b class="down">' + nR.toLocaleString('en-US') + ' rojos</b> · ' +
@@ -1704,9 +1900,7 @@ function renderCard(card) {
       const o = sums(sub, 0), so = sums(sub, 1), co = sums(sub, 2);
       const vp = ratio(o.fcst, o.ppto), cr = o.r25 && Math.abs(o.r25) > DATA.cfg.materialidad
         ? o.fcst / o.r25 - 1 : null;
-      const re = ratio(o.a0726, o.p0107);
-      const esp = re === null ? null : o.p0812 * re;
-      const di = esp === null ? null : ratio(o.inc, esp);
+      const di = ratio(o.inc, o.p0812);
       const al = sub.filter(r => r[8] > 0).length;
       return '<tr><td>LN ' + esc(ln) + '</td><td class="num">' + sub.length + '</td>' +
         '<td class="num">' + fmtM(o.fcst) + '</td>' +
@@ -1747,6 +1941,17 @@ function renderCard(card) {
   renderCard(card);
 });
 
+// Imprimir solo la seccion Linea de Negocio
+const btnPrint = document.getElementById('btn-print-ln');
+function finPrint() { document.body.classList.remove('print-ln'); }
+btnPrint.addEventListener('click', () => {
+  document.body.classList.add('print-ln');
+  window.addEventListener('afterprint', finPrint, {once: true});
+  window.print();
+  // Respaldo por si el navegador no dispara afterprint
+  setTimeout(finPrint, 1500);
+});
+
 // Resalta la seccion activa en la navegacion
 const secciones = ['sec-general', 'sec-ln', 'sec-contrato', 'sec-cedente', 'sec-mga'];
 const links = document.querySelectorAll('nav.secs a');
@@ -1771,6 +1976,7 @@ salida_html = os.path.join(xOutputs, "Dashboard_RFCST26.html")
 html = (
     PLANTILLA
     .replace("__ARCHIVO__", os.path.basename(archivo))
+    .replace("__FUENTE_PPTO__", FUENTE_PPTO)
     .replace("__GENERADO__", datetime.now().strftime("%d/%m/%Y %H:%M"))
     .replace("__SEC1PSC__", sec1_psc)
     .replace("__SEC1__", "".join(sec1_bloques))
