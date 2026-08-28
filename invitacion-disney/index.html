@@ -271,8 +271,8 @@
 </style>
 
 <script>
-  /* 28 de agosto de 2026, 12:00 pm en el centro de México (UTC-6) */
-  var UNLOCK_AT = Date.UTC(2026, 7, 28, 18, 0, 0);
+  /* primer segundo del 28 de agosto de 2026, centro de México (UTC-6) */
+  var UNLOCK_AT = Date.UTC(2026, 7, 28, 6, 0, 0);
   /* ?ensayo en la URL abre la carta antes de tiempo, para probarla */
   var PREVIEW = /[?&]ensayo\b/.test(location.search);
   if (PREVIEW || Date.now() >= UNLOCK_AT) document.documentElement.classList.add('unlocked');
@@ -287,10 +287,10 @@
     <path class="spell-sand" d="M22 12h16c0 6-8 10-8 14s8 8 8 14H22c0-6 8-10 8-14s-8-8-8-14z" fill="currentColor" stroke="none"/>
   </svg>
   <h1 class="spell-title">Un hechizo sella<br>esta carta</h1>
-  <p class="spell-text">Solo podrá abrirse cuando el reloj del reino marque el <em>mediodía</em>.</p>
-  <p class="spell-when">Viernes 28 de agosto<br>12:00 pm · hora del centro de México</p>
+  <p class="spell-text">Solo podrá abrirse en el <em>primer segundo</em> de tu día.</p>
+  <p class="spell-when">Viernes 28 de agosto · 12:00 am<br>hora del centro de México</p>
   <div class="countdown" id="cd-unlock" aria-live="off"></div>
-  <p class="hint">Vuelve en ese momento, princesa ✨</p>
+  <p class="hint">Vuelve cuando empiece tu cumpleaños ✨</p>
 </div>
 
 <!-- ══════════ SCENE 1 · THE LETTER ══════════ -->
