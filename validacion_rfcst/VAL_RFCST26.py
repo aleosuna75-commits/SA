@@ -143,12 +143,20 @@ COL_PPTO = {
 }
 
 # Columnas candidatas para acotar el presupuesto al ejercicio
-# 2026 y para separar el periodo Ago-Dic
+# 2026, separar el periodo Ago-Dic y empatar la linea de negocio
 ANIO_PPTO = 2026
-COLS_ANIO = ["0FISCYEAR", "FISCYEAR", "Ejercicio", "Año", "Anio", "Year", "AñoCont"]
-COLS_PERIODO = ["0FISCPER", "FISCPER", "Periodo", "Período", "Mes", "Month", "PerCont"]
+COLS_ANIO = ["AñoPpto", "0FISCYEAR", "FISCYEAR", "Ejercicio", "Año", "Anio", "Year"]
+COLS_PERIODO = ["MesPpto", "0FISCPER", "FISCPER", "Periodo", "Período", "Mes", "Month"]
+# LN2 trae la apertura fina (incluye LN04008-Agro) y empata con
+# la columna LN del forecast; LineaNegocio es la version agrupada
+COLS_LN_PPTO = ["LN2", "LíneaNegocio", "LineaNegocio"]
 MESES_AGODIC = [8, 9, 10, 11, 12]
 MESES_ENEJUL = [1, 2, 3, 4, 5, 6, 7]
+
+# El presupuesto global se acota a las LN que si traen forecast:
+# comparar contra LN sin forecast (p.ej. LN04009) haria ver al
+# RFCST artificialmente corto. Las excluidas se reportan aparte.
+PPTO_SOLO_LN_CON_FCST = True
 
 # Medidas y sufijos de columnas de la base
 MEDIDAS = ["Primas", "Siniestros", "Costos"]
@@ -633,7 +641,7 @@ def _meses_de(serie):
     return None
 
 
-def cargar_ppto2026(ruta):
+def cargar_ppto2026(ruta, lns_forecast):
 
     try:
         crudo = pd.read_excel(ruta, sheet_name=HOJA_PPTO, header=None, nrows=12)
@@ -666,6 +674,7 @@ def cargar_ppto2026(ruta):
         return None
 
     filas_totales = len(p)
+    excluidas = []
 
     # Acotar al ejercicio presupuestado
     col_anio = _buscar_columna(p.columns, COLS_ANIO)
@@ -678,6 +687,33 @@ def cargar_ppto2026(ruta):
         print(f"  AVISO: en '{HOJA_PPTO}' no se encontro columna de ejercicio "
               f"{COLS_ANIO}; se suman las {filas_totales:,} filas de la hoja.")
         print("         Verifica que la hoja solo contenga el presupuesto 2026.")
+
+    # Acotar a las lineas de negocio que si traen forecast
+    col_ln = _buscar_columna(p.columns, COLS_LN_PPTO)
+
+    if col_ln is not None:
+        ln_map = (p[col_ln].astype(str).str.strip()
+                  .str.replace(r"^LN0*", "", regex=True))
+        fuera = sorted(set(ln_map.unique()) - set(lns_forecast))
+
+        if fuera:
+            det = p.loc[ln_map.isin(fuera)].copy()
+            det["_LN"] = ln_map[ln_map.isin(fuera)]
+            agg = det.groupby("_LN")[list(COL_PPTO.values())].sum()
+            for ln, fila in agg.iterrows():
+                excluidas.append({
+                    "LN": ln,
+                    **{m: float(fila[c]) for m, c in COL_PPTO.items()},
+                })
+
+        if PPTO_SOLO_LN_CON_FCST and fuera:
+            p = p[ln_map.isin(lns_forecast)]
+            resumen_fuera = ", ".join(
+                f"{e['LN']} ({e['Primas'] / 1e6:,.1f} M)" for e in excluidas)
+            print(f"  {HOJA_PPTO}: excluidas por no tener forecast -> {resumen_fuera}")
+    else:
+        print(f"  AVISO: en '{HOJA_PPTO}' no se encontro columna de linea de "
+              f"negocio {COLS_LN_PPTO}; se usan todas las LN de la hoja.")
 
     # Separar Ago-Dic
     col_periodo = _buscar_columna(p.columns, COLS_PERIODO)
@@ -709,16 +745,35 @@ def cargar_ppto2026(ruta):
             detalle += f" · Ago-Dic {d['agodic'] / 1e6:,.1f} M"
         print(f"  {HOJA_PPTO} · {medida}: {detalle}")
 
-    return ppto
+    return ppto, excluidas
+
+
+def _fmt_m_pre(v):
+    return f"{v / 1e6:,.1f} M"
 
 
 print("Presupuesto 2026 completo:")
-PPTO2026 = cargar_ppto2026(archivo)
+_res_ppto = cargar_ppto2026(archivo, set(df["LN"].unique()))
 
-FUENTE_PPTO = (
-    f"hoja {HOJA_PPTO} (presupuesto completo)" if PPTO2026
-    else "BD_RFCST26 (solo contratos con prima)"
-)
+PPTO2026, PPTO_EXCLUIDAS = _res_ppto if _res_ppto else (None, [])
+
+if PPTO2026:
+    FUENTE_PPTO = f"hoja {HOJA_PPTO}"
+    if PPTO_EXCLUIDAS and PPTO_SOLO_LN_CON_FCST:
+        FUENTE_PPTO += ", solo LN con forecast"
+else:
+    FUENTE_PPTO = "BD_RFCST26 (solo contratos con prima)"
+
+# Nota visible cuando hay LN presupuestadas sin forecast
+NOTA_PPTO = ""
+if PPTO_EXCLUIDAS and PPTO_SOLO_LN_CON_FCST:
+    _txt = " · ".join(
+        f"<b>LN{e['LN']}</b> {_fmt_m_pre(e['Primas'])}" for e in PPTO_EXCLUIDAS)
+    NOTA_PPTO = (
+        '<div class="aviso">&#9888; El presupuesto global compara solo las líneas '
+        'que ya traen forecast. Presupuestado sin forecast en el RFCST: '
+        f'{_txt}.</div>'
+    )
 
 # =====================================================
 # GLOBALES POR MEDIDA (P / S / C y P-S-C)
@@ -1019,6 +1074,14 @@ with pd.ExcelWriter(salida_xlsx, engine="xlsxwriter") as writer:
     exportar(pareto_gap[cols_pareto], "Pareto_Gap")
     exportar(excepciones[cols_detalle].head(500), "Excepciones")
     exportar(df[cols_detalle], "Detalle_Validaciones")
+    if PPTO_EXCLUIDAS:
+        fuera = pd.DataFrame(PPTO_EXCLUIDAS)
+        fuera = fuera.rename(columns={
+            "Primas": "Ppto Primas", "Siniestros": "Ppto Siniestros",
+            "Costos": "Ppto Costos"})
+        fuera["Nota"] = "Presupuestada sin forecast en el RFCST"
+        exportar(fuera, "Ppto_Sin_Forecast")
+
     exportar(parametros, "Parametros")
 
 print(f"Excel generado: {salida_xlsx}")
@@ -1505,6 +1568,10 @@ PLANTILLA = """<!doctype html>
   .vacio { color: #898781; font-size: 12.5px; padding: 18px 4px; }
   footer { margin-top: 22px; color: #898781; font-size: 11px; line-height: 1.6; }
   .cardinal { border-top: 1px solid #2c2c2a; padding-top: 20px; margin-top: 30px; }
+  .aviso { background: rgba(250,178,25,.10); border: 1px solid rgba(250,178,25,.30);
+    border-radius: 10px; padding: 11px 15px; font-size: 12.5px; color: #c3c2b7;
+    margin-bottom: 14px; }
+  .aviso b { color: #fab219; }
   .print-head { display: none; }
   .acciones { display: flex; justify-content: center; margin-top: 28px; }
   .btn-print { background: rgba(57,135,229,.16); color: #9ec5f4;
@@ -1558,6 +1625,7 @@ PLANTILLA = """<!doctype html>
   <div class="sec-head"><h2 class="sec-title">General</h2>
     <span class="sub">Totalidad de las líneas de negocio · cifras en dólares ·
       presupuesto de __FUENTE_PPTO__</span></div>
+__NOTA_PPTO__
 __SEC1__
 __SEC1PSC__
   <div class="insight">&#128161; __INSIGHT__</div>
@@ -1977,6 +2045,7 @@ html = (
     PLANTILLA
     .replace("__ARCHIVO__", os.path.basename(archivo))
     .replace("__FUENTE_PPTO__", FUENTE_PPTO)
+    .replace("__NOTA_PPTO__", NOTA_PPTO)
     .replace("__GENERADO__", datetime.now().strftime("%d/%m/%Y %H:%M"))
     .replace("__SEC1PSC__", sec1_psc)
     .replace("__SEC1__", "".join(sec1_bloques))

@@ -121,6 +121,10 @@
   .vacio { color: #898781; font-size: 12.5px; padding: 18px 4px; }
   footer { margin-top: 22px; color: #898781; font-size: 11px; line-height: 1.6; }
   .cardinal { border-top: 1px solid #2c2c2a; padding-top: 20px; margin-top: 30px; }
+  .aviso { background: rgba(250,178,25,.10); border: 1px solid rgba(250,178,25,.30);
+    border-radius: 10px; padding: 11px 15px; font-size: 12.5px; color: #c3c2b7;
+    margin-bottom: 14px; }
+  .aviso b { color: #fab219; }
   .print-head { display: none; }
   .acciones { display: flex; justify-content: center; margin-top: 28px; }
   .btn-print { background: rgba(57,135,229,.16); color: #9ec5f4;
@@ -160,7 +164,7 @@
 
 <header class="top">
   <h1>Validación RFCST 2026 · 7+5</h1>
-  <span class="sub">Corte Julio 2026 · BD_RFCST_26_act.xlsx · generado 28/08/2026 07:07</span>
+  <span class="sub">Corte Julio 2026 · BD_RFCST_26_act.xlsx · generado 28/08/2026 11:36</span>
   <nav class="secs">
     <a href="#sec-general">General</a>
     <a href="#sec-ln">Línea de Negocio</a>
@@ -173,41 +177,42 @@
 <section id="sec-general" class="bloque">
   <div class="sec-head"><h2 class="sec-title">General</h2>
     <span class="sub">Totalidad de las líneas de negocio · cifras en dólares ·
-      presupuesto de BD_RFCST26 (solo contratos con prima)</span></div>
+      presupuesto de hoja Ppto2026, solo LN con forecast</span></div>
+<div class="aviso">&#9888; El presupuesto global compara solo las líneas que ya traen forecast. Presupuestado sin forecast en el RFCST: <b>LN4009</b> 216.2 M.</div>
 
   <h3 class="med">Primas · P</h3>
   <div class="grid kpis">
-    <div class="card kpi"><div class="t"><i>&#128181;</i>Primas Forecast 2026</div><div class="v">1,127.6 M</div><div class="d"><b class="up">+31.2%</b> vs Ppto 2026 (859.6 M)</div><div class="d">Real a Jul 26: 662.8 M</div></div>
+    <div class="card kpi"><div class="t"><i>&#128181;</i>Primas Forecast 2026</div><div class="v">1,127.6 M</div><div class="d"><b class="up">+12.8%</b> vs Ppto 2026 (999.5 M)</div><div class="d">Real a Jul 26: 662.8 M</div></div>
     <div class="card kpi"><div class="t"><i>&#128200;</i>Crecimiento vs Real 2025</div><div class="v">+42.5%</div><div class="d">FCST Dic 26 (1,127.6 M) vs cierre Real 2025 (791.2 M)</div></div>
-    <div class="card kpi"><div class="t"><i>&#9202;</i>Incremento Ago-Dic</div><div class="v">464.7 M</div><div class="d"><b class="up">+52.9%</b> vs Ppto Ago-Dic (304.0 M)</div><div class="d">Real Ago-Dic 2025: 350.2 M</div></div>
+    <div class="card kpi"><div class="t"><i>&#9202;</i>Incremento Ago-Dic</div><div class="v">464.7 M</div><div class="d"><b class="up">+24.9%</b> vs Ppto Ago-Dic (372.1 M)</div><div class="d">Real Ago-Dic 2025: 350.2 M</div></div>
   </div>
   <h3 class="med">Siniestros · S</h3>
   <div class="grid kpis">
-    <div class="card kpi"><div class="t"><i>&#9888;</i>Siniestros Forecast 2026</div><div class="v">503.4 M</div><div class="d"><b class="down">+60.1%</b> vs Ppto 2026 (314.4 M)</div><div class="d">Real a Jul 26: 216.1 M</div></div>
+    <div class="card kpi"><div class="t"><i>&#9888;</i>Siniestros Forecast 2026</div><div class="v">503.4 M</div><div class="d"><b class="down">+58.7%</b> vs Ppto 2026 (317.2 M)</div><div class="d">Real a Jul 26: 216.1 M</div></div>
     <div class="card kpi"><div class="t"><i>&#128200;</i>Crecimiento vs Real 2025</div><div class="v">+39.3%</div><div class="d">FCST Dic 26 (503.4 M) vs cierre Real 2025 (361.3 M)</div></div>
-    <div class="card kpi"><div class="t"><i>&#9202;</i>Incremento Ago-Dic</div><div class="v">287.3 M</div><div class="d"><b class="down">+160.4%</b> vs Ppto Ago-Dic (110.3 M)</div><div class="d">Real Ago-Dic 2025: 183.3 M</div></div>
+    <div class="card kpi"><div class="t"><i>&#9202;</i>Incremento Ago-Dic</div><div class="v">287.3 M</div><div class="d"><b class="down">+132.0%</b> vs Ppto Ago-Dic (123.9 M)</div><div class="d">Real Ago-Dic 2025: 183.3 M</div></div>
   </div>
   <h3 class="med">Costos · C</h3>
   <div class="grid kpis">
-    <div class="card kpi"><div class="t"><i>&#129534;</i>Costos Forecast 2026</div><div class="v">227.3 M</div><div class="d"><b class="down">+1.1%</b> vs Ppto 2026 (224.9 M)</div><div class="d">Real a Jul 26: 142.2 M</div></div>
+    <div class="card kpi"><div class="t"><i>&#129534;</i>Costos Forecast 2026</div><div class="v">227.3 M</div><div class="d"><b class="up">-8.0%</b> vs Ppto 2026 (247.1 M)</div><div class="d">Real a Jul 26: 142.2 M</div></div>
     <div class="card kpi"><div class="t"><i>&#128200;</i>Crecimiento vs Real 2025</div><div class="v">+28.1%</div><div class="d">FCST Dic 26 (227.3 M) vs cierre Real 2025 (177.5 M)</div></div>
-    <div class="card kpi"><div class="t"><i>&#9202;</i>Incremento Ago-Dic</div><div class="v">85.1 M</div><div class="d"><b class="down">+5.8%</b> vs Ppto Ago-Dic (80.5 M)</div><div class="d">Real Ago-Dic 2025: 73.4 M</div></div>
+    <div class="card kpi"><div class="t"><i>&#9202;</i>Incremento Ago-Dic</div><div class="v">85.1 M</div><div class="d"><b class="up">-9.2%</b> vs Ppto Ago-Dic (93.7 M)</div><div class="d">Real Ago-Dic 2025: 73.4 M</div></div>
   </div>
 
   <h3 class="med">P-S-C / %P-S-C <span class="ast-mark">*</span></h3>
   <div class="grid kpis">
-    <div class="card kpi"><div class="t"><i>&#128176;</i>P-S-C Forecast 2026</div><div class="v">396.8 M</div><div class="d"><b class="up">+23.9%</b> vs Ppto 2026 (320.3 M)</div><div class="d">Real 2025: 252.4 M</div></div>
+    <div class="card kpi"><div class="t"><i>&#128176;</i>P-S-C Forecast 2026</div><div class="v">396.8 M</div><div class="d"><b class="down">-8.8%</b> vs Ppto 2026 (435.2 M)</div><div class="d">Real 2025: 252.4 M</div></div>
     <div class="card kpi"><div class="t"><i>&#128200;</i>Crecimiento P-S-C vs Real 2025</div><div class="v">+57.2%</div><div class="d">P-S-C FCST (396.8 M) vs Real 2025 (252.4 M)</div></div>
-    <div class="card kpi"><div class="t"><i>&#128202;</i>%P-S-C Forecast 2026</div><div class="v">35.2%</div><div class="d"><b class="down">-2.1%</b> pts vs Ppto</div><div class="d">Ppto 2026: 37.3% · Real 2025: 31.9%</div></div>
+    <div class="card kpi"><div class="t"><i>&#128202;</i>%P-S-C Forecast 2026</div><div class="v">35.2%</div><div class="d"><b class="down">-8.3%</b> pts vs Ppto</div><div class="d">Ppto 2026: 43.5% · Real 2025: 31.9%</div></div>
   </div>
   <div class="ast">* Falta el incremento a la reserva y los costos de cobertura.</div>
-  <div class="insight">&#128161; El RFCST 2026 proyecta <b>1,127.6 M</b> de prima, <b>+31.2%</b> sobre el presupuesto anual y <b>+42.5%</b> contra el cierre real 2025. El incremento Ago-Dic (464.7 M) esta <b>+52.9%</b> contra lo presupuestado para ese periodo (304.0 M), y equivale a 1.3x el real del mismo periodo 2025 (350.2 M). La siniestralidad del forecast es <b>44.6%</b> y el P-S-C queda en <b>396.8 M</b> (35.2% de la prima). <b>166</b> contratos reportan forecast menor al real de julio (V1).</div>
+  <div class="insight">&#128161; El RFCST 2026 proyecta <b>1,127.6 M</b> de prima, <b>+12.8%</b> sobre el presupuesto anual y <b>+42.5%</b> contra el cierre real 2025. El incremento Ago-Dic (464.7 M) esta <b>+24.9%</b> contra lo presupuestado para ese periodo (372.1 M), y equivale a 1.3x el real del mismo periodo 2025 (350.2 M). La siniestralidad del forecast es <b>44.6%</b> y el P-S-C queda en <b>396.8 M</b> (35.2% de la prima). <b>166</b> contratos reportan forecast menor al real de julio (V1).</div>
 </section>
 
 <section id="sec-ln" class="bloque">
   <div class="print-head">
     <h2>Validación RFCST 2026 · 7+5 — Línea de Negocio</h2>
-    <span>Corte Julio 2026 · BD_RFCST_26_act.xlsx · generado 28/08/2026 07:07 · cifras en dólares</span>
+    <span>Corte Julio 2026 · BD_RFCST_26_act.xlsx · generado 28/08/2026 11:36 · cifras en dólares</span>
   </div>
   <div class="sec-head"><h2 class="sec-title">Línea de Negocio</h2>
     <span class="sub">Mismas vistas, por LN · cifras en dólares</span></div>

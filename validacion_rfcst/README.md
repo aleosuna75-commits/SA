@@ -37,9 +37,17 @@ de periodo (para separar Ago-Dic), e imprime en consola lo que encontró. Si la
 hoja no está, avisa y usa el presupuesto de `BD_RFCST26`. La fuente utilizada se
 muestra en el subtítulo de la sección General y en la hoja `Parametros`.
 
+El presupuesto global se acota a las **líneas de negocio que ya traen
+forecast** (columna `LN2` de la hoja, que incluye `LN04008-Agro` y empata con la
+`LN` del forecast). Las LN presupuestadas sin forecast — hoy `LN04009`
+(DUL-Marine, 216.2 M) — se excluyen de la comparación para no hacer ver al RFCST
+artificialmente corto, y se reportan en el aviso de la sección General y en la
+hoja `Ppto_Sin_Forecast` del Excel. Para comparar contra el presupuesto completo,
+poner `PPTO_SOLO_LN_CON_FCST = False` al inicio del script.
+
 Los nombres de columna se configuran al inicio del script (`COL_PPTO`,
-`COLS_ANIO`, `COLS_PERIODO`). Las **gráficas por línea de negocio** siguen
-usando el presupuesto de `BD_RFCST26` sin cambios.
+`COLS_ANIO`, `COLS_PERIODO`, `COLS_LN_PPTO`). Las **gráficas por línea de
+negocio** siguen usando el presupuesto de `BD_RFCST26` sin cambios.
 
 ## Salidas (carpeta `Outputs/`)
 
