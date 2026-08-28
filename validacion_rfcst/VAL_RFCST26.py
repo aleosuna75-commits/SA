@@ -153,10 +153,13 @@ COLS_LN_PPTO = ["LN2", "LíneaNegocio", "LineaNegocio"]
 MESES_AGODIC = [8, 9, 10, 11, 12]
 MESES_ENEJUL = [1, 2, 3, 4, 5, 6, 7]
 
-# El presupuesto global se acota a las LN que si traen forecast:
-# comparar contra LN sin forecast (p.ej. LN04009) haria ver al
-# RFCST artificialmente corto. Las excluidas se reportan aparte.
-PPTO_SOLO_LN_CON_FCST = True
+# El presupuesto global incluye todas las LN presupuestadas,
+# aunque alguna todavia no tenga forecast (hoy LN04009): asi el
+# global cuadra con el presupuesto de la compania y el faltante
+# queda visible como brecha del RFCST. Las LN sin forecast se
+# reportan en el aviso del dashboard y en el Excel.
+# Ponerlo en True para comparar solo contra LN con forecast.
+PPTO_SOLO_LN_CON_FCST = False
 
 # Medidas y sufijos de columnas de la base
 MEDIDAS = ["Primas", "Siniestros", "Costos"]
@@ -706,11 +709,16 @@ def cargar_ppto2026(ruta, lns_forecast):
                     **{m: float(fila[c]) for m, c in COL_PPTO.items()},
                 })
 
-        if PPTO_SOLO_LN_CON_FCST and fuera:
-            p = p[ln_map.isin(lns_forecast)]
+        if fuera:
             resumen_fuera = ", ".join(
                 f"{e['LN']} ({e['Primas'] / 1e6:,.1f} M)" for e in excluidas)
-            print(f"  {HOJA_PPTO}: excluidas por no tener forecast -> {resumen_fuera}")
+            if PPTO_SOLO_LN_CON_FCST:
+                p = p[ln_map.isin(lns_forecast)]
+                print(f"  {HOJA_PPTO}: excluidas por no tener forecast -> "
+                      f"{resumen_fuera}")
+            else:
+                print(f"  {HOJA_PPTO}: incluidas aunque aun no tienen forecast -> "
+                      f"{resumen_fuera}")
     else:
         print(f"  AVISO: en '{HOJA_PPTO}' no se encontro columna de linea de "
               f"negocio {COLS_LN_PPTO}; se usan todas las LN de la hoja.")
@@ -759,21 +767,32 @@ PPTO2026, PPTO_EXCLUIDAS = _res_ppto if _res_ppto else (None, [])
 
 if PPTO2026:
     FUENTE_PPTO = f"hoja {HOJA_PPTO}"
-    if PPTO_EXCLUIDAS and PPTO_SOLO_LN_CON_FCST:
-        FUENTE_PPTO += ", solo LN con forecast"
+    FUENTE_PPTO += (", solo LN con forecast" if PPTO_SOLO_LN_CON_FCST
+                    else ", todas las LN presupuestadas")
 else:
     FUENTE_PPTO = "BD_RFCST26 (solo contratos con prima)"
 
 # Nota visible cuando hay LN presupuestadas sin forecast
 NOTA_PPTO = ""
-if PPTO_EXCLUIDAS and PPTO_SOLO_LN_CON_FCST:
+
+if PPTO_EXCLUIDAS:
     _txt = " · ".join(
         f"<b>LN{e['LN']}</b> {_fmt_m_pre(e['Primas'])}" for e in PPTO_EXCLUIDAS)
-    NOTA_PPTO = (
-        '<div class="aviso">&#9888; El presupuesto global compara solo las líneas '
-        'que ya traen forecast. Presupuestado sin forecast en el RFCST: '
-        f'{_txt}.</div>'
-    )
+    _falta = sum(e["Primas"] for e in PPTO_EXCLUIDAS)
+
+    if PPTO_SOLO_LN_CON_FCST:
+        NOTA_PPTO = (
+            '<div class="aviso">&#9888; El presupuesto global compara solo las '
+            'líneas que ya traen forecast. Presupuestado sin forecast en el '
+            f'RFCST: {_txt}.</div>'
+        )
+    else:
+        NOTA_PPTO = (
+            '<div class="aviso">&#9888; El presupuesto global incluye todas las '
+            f'líneas presupuestadas. {_txt} aún no entrega forecast, así que esos '
+            f'{_fmt_m_pre(_falta)} de prima presupuestada no tienen contraparte '
+            'en el RFCST y ensanchan la brecha contra presupuesto.</div>'
+        )
 
 # =====================================================
 # GLOBALES POR MEDIDA (P / S / C y P-S-C)
@@ -1079,7 +1098,11 @@ with pd.ExcelWriter(salida_xlsx, engine="xlsxwriter") as writer:
         fuera = fuera.rename(columns={
             "Primas": "Ppto Primas", "Siniestros": "Ppto Siniestros",
             "Costos": "Ppto Costos"})
-        fuera["Nota"] = "Presupuestada sin forecast en el RFCST"
+        fuera["Nota"] = (
+            "Sin forecast en el RFCST · "
+            + ("excluida de las cifras globales" if PPTO_SOLO_LN_CON_FCST
+               else "incluida en las cifras globales de presupuesto")
+        )
         exportar(fuera, "Ppto_Sin_Forecast")
 
     exportar(parametros, "Parametros")
