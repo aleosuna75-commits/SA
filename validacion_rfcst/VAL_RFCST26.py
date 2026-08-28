@@ -772,27 +772,13 @@ if PPTO2026:
 else:
     FUENTE_PPTO = "BD_RFCST26 (solo contratos con prima)"
 
-# Nota visible cuando hay LN presupuestadas sin forecast
-NOTA_PPTO = ""
-
+# Las LN presupuestadas sin forecast no se avisan en el
+# dashboard: quedan documentadas en la consola y en la hoja
+# Ppto_Sin_Forecast del Excel
 if PPTO_EXCLUIDAS:
-    _txt = " · ".join(
-        f"<b>LN{e['LN']}</b> {_fmt_m_pre(e['Primas'])}" for e in PPTO_EXCLUIDAS)
-    _falta = sum(e["Primas"] for e in PPTO_EXCLUIDAS)
-
-    if PPTO_SOLO_LN_CON_FCST:
-        NOTA_PPTO = (
-            '<div class="aviso">&#9888; El presupuesto global compara solo las '
-            'líneas que ya traen forecast. Presupuestado sin forecast en el '
-            f'RFCST: {_txt}.</div>'
-        )
-    else:
-        NOTA_PPTO = (
-            '<div class="aviso">&#9888; El presupuesto global incluye todas las '
-            f'líneas presupuestadas. {_txt} aún no entrega forecast, así que esos '
-            f'{_fmt_m_pre(_falta)} de prima presupuestada no tienen contraparte '
-            'en el RFCST y ensanchan la brecha contra presupuesto.</div>'
-        )
+    _txt = ", ".join(
+        f"LN{e['LN']} ({_fmt_m_pre(e['Primas'])})" for e in PPTO_EXCLUIDAS)
+    print(f"  Nota: {_txt} presupuestada(s) sin forecast en el RFCST")
 
 # =====================================================
 # GLOBALES POR MEDIDA (P / S / C y P-S-C)
@@ -1589,13 +1575,7 @@ PLANTILLA = """<!doctype html>
     padding: 5px 12px; border-radius: 999px; cursor: pointer; font-family: inherit; }
   .toggle button.on { background: rgba(57,135,229,.2); color: #9ec5f4; }
   .vacio { color: #898781; font-size: 12.5px; padding: 18px 4px; }
-  footer { margin-top: 22px; color: #898781; font-size: 11px; line-height: 1.6; }
   .cardinal { border-top: 1px solid #2c2c2a; padding-top: 20px; margin-top: 30px; }
-  .aviso { background: rgba(250,178,25,.10); border: 1px solid rgba(250,178,25,.30);
-    border-radius: 10px; padding: 11px 15px; font-size: 12.5px; color: #c3c2b7;
-    margin-bottom: 14px; }
-  .aviso b { color: #fab219; }
-  .print-head { display: none; }
   .acciones { display: flex; justify-content: center; margin-top: 28px; }
   .btn-print { background: rgba(57,135,229,.16); color: #9ec5f4;
     border: 1px solid rgba(57,135,229,.35); border-radius: 10px; padding: 11px 20px;
@@ -1603,30 +1583,22 @@ PLANTILLA = """<!doctype html>
     align-items: center; gap: 9px; }
   .btn-print:hover { background: rgba(57,135,229,.26); color: #ffffff; }
 
-  /* Impresion: solo la seccion Linea de Negocio, en claro */
+  /* Impresion: la seccion Linea de Negocio tal cual se ve en pantalla,
+     conservando el tema oscuro (como una captura) */
   @media print {
-    @page { size: A4 landscape; margin: 10mm; }
-    /* el lienzo hereda color-scheme: dark y pintaria los margenes en negro */
-    :root { color-scheme: light !important; }
-    html { background: #ffffff !important; }
-    body.print-ln { background: #ffffff !important; color: #111111 !important;
-      padding: 0 !important; }
-    body.print-ln > *:not(#sec-ln) { display: none !important; }
+    @page { size: A4 landscape; margin: 0; }
+    * { -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important; }
+    html, body.print-ln { background: #0d0d0d !important; }
+    body.print-ln { padding: 9mm 9mm 6mm !important; }
+    body.print-ln > *:not(#sec-ln):not(header) { display: none !important; }
+    body.print-ln header.top { position: static !important; padding: 0 0 10px !important;
+      margin-bottom: 14px !important; background: none !important; }
+    body.print-ln nav.secs { display: none !important; }
     body.print-ln #sec-ln { display: block !important; margin: 0 !important; }
-    body.print-ln .sec-head { display: none !important; }
-    body.print-ln .print-head { display: block; margin-bottom: 12px; }
-    body.print-ln .print-head h2 { font-size: 15px; font-weight: 650; color: #111111; }
-    body.print-ln .print-head span { font-size: 10.5px; color: #555555; }
-    body.print-ln .card { background: #ffffff !important; border: 1px solid #cccccc !important;
-      break-inside: avoid; page-break-inside: avoid; }
-    body.print-ln h3.med { color: #1a5eb0 !important; break-after: avoid;
-      page-break-after: avoid; margin-top: 12px; }
-    body.print-ln .card h2 { color: #111111 !important; }
-    body.print-ln .card .nota, body.print-ln .lg, body.print-ln .ast { color: #444444 !important; }
-    body.print-ln .tick { fill: #555555 !important; }
-    body.print-ln .cat, body.print-ln .vlabel { fill: #222222 !important; }
+    body.print-ln .card { break-inside: avoid; page-break-inside: avoid; }
+    body.print-ln h3.med { break-after: avoid; page-break-after: avoid; }
     body.print-ln .dos2 { grid-template-columns: 1fr 1fr !important; }
-    * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
   }
 </style>
 </head>
@@ -1648,17 +1620,12 @@ PLANTILLA = """<!doctype html>
   <div class="sec-head"><h2 class="sec-title">General</h2>
     <span class="sub">Totalidad de las líneas de negocio · cifras en dólares ·
       presupuesto de __FUENTE_PPTO__</span></div>
-__NOTA_PPTO__
 __SEC1__
 __SEC1PSC__
   <div class="insight">&#128161; __INSIGHT__</div>
 </section>
 
 <section id="sec-ln" class="bloque">
-  <div class="print-head">
-    <h2>Validación RFCST 2026 · 7+5 — Línea de Negocio</h2>
-    <span>Corte Julio 2026 · __ARCHIVO__ · generado __GENERADO__ · cifras en dólares</span>
-  </div>
   <div class="sec-head"><h2 class="sec-title">Línea de Negocio</h2>
     <span class="sub">Mismas vistas, por LN · cifras en dólares</span></div>
 __SEC2__
@@ -1668,14 +1635,9 @@ __SEC3__
 
 <div class="acciones">
   <button type="button" class="btn-print" id="btn-print-ln">
-    &#128424; Imprimir sección Línea de Negocio en PDF
+    &#128424; Imprimir PDF
   </button>
 </div>
-
-<footer>Validación automática VAL_RFCST26.py · Planeación Financiera · cifras en dólares ·
-V1: consistencia acumulada y cuadre Ago-Dic · V2: incremento vs ppto ajustado ·
-V3: coherencia vs 2025 · V4: índices vs factores · V5: vs ppto anual · V6: calidad de datos ·
-* P-S-C = Primas − Siniestros − Costos: falta el incremento a la reserva y los costos de cobertura.</footer>
 
 <script>
 const DATA = __DATA__;
@@ -2068,7 +2030,6 @@ html = (
     PLANTILLA
     .replace("__ARCHIVO__", os.path.basename(archivo))
     .replace("__FUENTE_PPTO__", FUENTE_PPTO)
-    .replace("__NOTA_PPTO__", NOTA_PPTO)
     .replace("__GENERADO__", datetime.now().strftime("%d/%m/%Y %H:%M"))
     .replace("__SEC1PSC__", sec1_psc)
     .replace("__SEC1__", "".join(sec1_bloques))

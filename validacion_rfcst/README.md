@@ -41,8 +41,8 @@ El presupuesto global incluye **todas las líneas presupuestadas**, aunque
 alguna todavía no tenga forecast, para que el global cuadre con el presupuesto de
 la compañía. Hoy `LN04009` (DUL-Marine, 216.2 M) está presupuestada pero aún no
 entrega forecast: esos millones no tienen contraparte en el RFCST y ensanchan la
-brecha contra presupuesto, así que se señalan en el aviso de la sección General y
-en la hoja `Ppto_Sin_Forecast` del Excel. El script identifica esas LN con la
+brecha contra presupuesto, así que se reportan en la consola al ejecutar y en la
+hoja `Ppto_Sin_Forecast` del Excel. El script identifica esas LN con la
 columna `LN2` de la hoja (que incluye `LN04008-Agro` y empata con la `LN` del
 forecast). Para comparar solo contra las LN que sí traen forecast, poner
 `PPTO_SOLO_LN_CON_FCST = True` al inicio del script.
@@ -57,7 +57,7 @@ negocio** siguen usando el presupuesto de `BD_RFCST26` sin cambios.
 |---|---|
 | `VAL_RFCST26.xlsx` | Dashboard de KPIs, `Resumen_Global` con P/S/C y P-S-C (para el correo del reporte), resumen por LN (con semáforos, score, ranking, variaciones y gaps de las tres medidas, P-S-C/%P-S-C y participaciones, estilo ANA_RFCST), cortes por cardinalidad, LN×Tipo Rea, fuente, país, corredor, compañía, binder y contrato, `Pareto_Gap` por LN×compañía, excepciones, detalle contrato por contrato con todos los flags, y la hoja `Parametros` con los umbrales usados |
 | `Dashboard_RFCST26.html` | Dashboard PRISMA (abrir en el navegador, no requiere internet). **General**: KPIs de Primas / Siniestros / Costos (FCST vs Ppto, crecimiento vs Real 2025, incremento Ago-Dic) y bloque P-S-C / %P-S-C con su nota. **Línea de Negocio**: las mismas vistas por LN en gráficas. **Contrato / Cedente / MGA**: filtros interactivos en cascada (LN, tipo de reaseguro, país, corredor, compañía, contrato o binder según el nivel) que actualizan la gráfica FCST 26 vs Ppto 26 vs Real 25, el semáforo, las entidades con alerta, el resumen por LN y el top de excepciones.
-Incluye un botón al final que imprime en PDF únicamente la sección **Línea de Negocio**, en tema claro y A4 horizontal |
+Incluye un botón **Imprimir PDF** al final que imprime únicamente la sección **Línea de Negocio** conservando el tema oscuro del dashboard, en A4 horizontal y sin márgenes blancos |
 
 ## Validaciones
 
