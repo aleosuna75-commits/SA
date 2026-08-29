@@ -61,9 +61,9 @@ const ALERTAS = [
   {
     nivel: 'medio',
     dia: 'mar-8',
-    titulo: 'El Lightning Lane no funciona durante el Oogie Boogie Bash',
-    detalle: 'Multi Pass, Single Pass y Premier Pass quedan suspendidos durante las horas del evento, de 18:00 a 23:00. Es un evento aparte con su propio boleto.',
-    accion: 'No importa: durante la fiesta las filas ya son cortas. Si tu Lightning Lane del día 8 alcanza a servir de 15:00 a 18:00, úsalo en Radiator Springs Racers y ya. Confírmalo en la app ese mismo día.'
+    titulo: 'El 8 es el único día de Disney sin Lightning Lane',
+    detalle: 'Ese día entran con boleto de Oogie Boogie Bash, que es admisión al evento y no boleto de parque, así que no hay Multi Pass. Encima, durante las horas de la fiesta el servicio queda suspendido para todos. De 15:00 a 18:00 el parque sigue en operación normal y las filas todavía están en niveles de día.',
+    accion: 'Tu sustituto es la fila de Single Rider de Radiator Springs Racers: te separan al subir pero es la misma atracción, y corta la espera a la mitad o menos. Es la única fila larga que te vas a encontrar el día 8.'
   },
   {
     nivel: 'medio',
@@ -123,7 +123,7 @@ const DIAS = [
     { t:'14:00', t2:'14:25', kind:'hotel', titulo:'Hotel: dejar maletas y cambiarse', texto:'Deja el equipaje en bell services aunque el cuarto no esté listo (es gratis). Cámbiate al disfraz aquí, no en el estacionamiento del parque.', why:'Dejar maletas y bolsas de compras a la vista en el carro durante 8 horas en un estacionamiento de Disney es el error más caro que puedes cometer hoy.' },
     { t:'14:25', t2:'14:45', kind:'auto', titulo:'Al estacionamiento de Disney', texto:'Estacionamiento Pixar Pals o Toy Story. Toy Story tiene shuttle; Pixar Pals te deja caminando a Downtown Disney.', why:'A las 14:30 los estacionamientos ya están medio llenos con la gente del día. Pixar Pals suele ser el más rápido de vaciar en la noche.' },
     { t:'14:45', kind:'parque', titulo:'Seguridad y torniquetes de DCA', texto:'Fórmate 15 min antes de las 15:00. Reglas de disfraz: nada de máscaras que cubran toda la cara en adultos, ni armas de utilería realistas.', why:'A las 15:00 en punto abren el acceso para boletos de la fiesta. Estar en los primeros 200 significa llegar a Radiator Springs Racers con el parque todavía en modo día.' },
-    { t:'15:00', t2:'18:00', kind:'atraccion', titulo:'VENTANA DE ORO: atracciones grandes', texto:'El parque se está vaciando porque a las 18:00 sacan a todos los que no traen boleto de fiesta. Ver el plan de ataque completo en la pestaña Parques.', why:'Es la única ventana del viaje donde una atracción de 75 minutos de fila baja a 25 sin pagar Lightning Lane.' },
+    { t:'15:00', t2:'18:00', kind:'atraccion', titulo:'VENTANA DE ORO: atracciones grandes', texto:'El parque se está vaciando porque a las 18:00 sacan a todos los que no traen boleto de fiesta. Hoy no hay Lightning Lane: usa Single Rider en Racers e Incredicoaster. Plan completo en la pestaña Parques.', why:'Es la única ventana del viaje donde una atracción de 75 minutos de fila baja a 25 sin pagar nada. Empieza a las 15:00 en niveles de día y para las 17:30 ya está en caída libre.' },
     { t:'18:00', t2:'23:00', kind:'show', titulo:'OOGIE BOOGIE BASH', texto:'Dulces, villanos, Villains Grove, desfile Frightfully Fun y Mickey\'s Trick and Treat. Plan hora por hora en la pestaña Parques.' },
     { t:'23:00', t2:'23:45', kind:'hotel', titulo:'Salida y check-in real del hotel', texto:'Recoge el equipaje de bell services. A dormir: mañana es rope drop a las 8:00.', why:'Llevas 21 horas despierto. La tentación de "una atracción más" a las 23:00 se paga el miércoles a las 6:45.' }
   ]
@@ -235,19 +235,20 @@ const PARQUES = {
   nombre: 'Oogie Boogie Bash — California Adventure',
   fecha: 'Martes 8 · 15:00 a 23:00',
   horario: 'Entrada con boleto de fiesta desde 15:00 · Fiesta 18:00–23:00 · El parque cierra al público general a las 18:00',
-  ll: 'Durante la fiesta (18:00–23:00) el Lightning Lane queda suspendido: es un evento aparte. Si el tuyo sirve de 15:00 a 18:00, gástalo en Radiator Springs Racers, que es la única fila larga que te vas a encontrar hoy. De 18:00 en adelante no lo vas a necesitar.',
+  ll: 'Hoy NO tienes Lightning Lane: tu boleto es de evento, no de parque. Y aunque lo tuvieras, durante la fiesta queda suspendido. No hace falta: de 18:00 en adelante las filas son cortas solas. Lo único que sí duele es Racers entre 15:00 y 17:00, y eso se resuelve con Single Rider.',
   principios: [
     'De 15:00 a 18:00 el parque se está VACIANDO. Es tu mejor ventana de atracciones grandes de todo el viaje, y es gratis.',
     'De 18:00 a 20:00 todos corren a lo mismo: dulces y villanos. Las filas de caramelos llegan a 40 minutos.',
     'De 21:30 a 23:00 los senderos de dulces se quedan vacíos, siguen surtidos, y las atracciones quedan casi sin fila.',
-    'Lo único verdaderamente escaso son los encuentros con villanos. Elige TRES y olvídate del resto.'
+    'Lo único verdaderamente escaso son los encuentros con villanos. Elige TRES y olvídate del resto.',
+    'Sin Lightning Lane hoy, tu herramienta es la fila de Single Rider: Radiator Springs Racers e Incredicoaster la tienen. Te separan al subir, nada más.'
   ],
   ruta: [
-    { t:'15:00', a:'Radiator Springs Racers', n:'Directo a Cars Land al entrar. Es la fila más larga del parque y a esta hora todavía está en modo día, pero bajando.', tag:'clave' },
+    { t:'15:00', a:'Radiator Springs Racers — por Single Rider', n:'Directo a Cars Land al entrar, sin escalas. Mira el tiempo publicado y decide: si Single Rider está abierta, ésa; si la espera normal marca 40 min o menos, standby; si marca 60+ y no hay Single Rider, déjala y regresa a las 17:30, cuando el parque ya se está vaciando.', tag:'clave' },
     { t:'15:50', a:'Web Slingers: A Spider-Man Adventure', n:'Avengers Campus, a un lado de Cars Land. Ruta natural.' },
     { t:'16:25', a:'Guardians of the Galaxy – Mission: BREAKOUT!', n:'Sigue en Avengers Campus.' },
     { t:'17:00', a:'Incredicoaster', n:'Cruzas a Pixar Pier. Aquí ya se nota el parque vaciándose.' },
-    { t:'17:30', a:'Toy Story Midway Mania o Soarin\'', n:'El que tenga menos fila. Ambos están de camino.' },
+    { t:'17:30', a:'Racers (si la dejaste) o Toy Story / Soarin\'', n:'Si a las 15:00 Racers marcaba 60+, ésta es tu segunda oportunidad: el parque ya se está vaciando. Si ya la hiciste, Toy Story Midway Mania o Soarin\', el que tenga menos fila.' },
     { t:'17:50', a:'📍 Posicionarte para las 18:00', n:'Camina hacia donde estará tu villano prioritario #1. Revisa ubicaciones en el mapa de la app de Disneyland ese mismo día.', tag:'clave' },
     { t:'18:00', a:'Villano prioritario #1', n:'Los que revientan más rápido: Oogie Boogie, Dr. Facilier, Hades y Cruella. A las 18:05 su fila es de 20 min; a las 19:00 es de 70.', tag:'clave' },
     { t:'18:40', a:'2 senderos de dulces de camino', n:'No te desvíes: sólo los que queden sobre tu ruta al siguiente villano.' },
@@ -268,7 +269,8 @@ const PARQUES = {
     'Lleva una bolsa de tela plegable extra en la mochila. Las bolsitas que dan se llenan rápido.',
     'Si alguien tiene alergias, en la entrada dan una bolsa color teal: la cambias al final por dulces sin alérgenos.',
     'Disfrázate en el hotel. Adultos: sin máscaras que cubran toda la cara, sin armas de utilería realistas, sin capas que arrastren.',
-    'Las fotos con villanos son la mejor compra de PhotoPass del viaje: los fotógrafos les meten efectos temáticos.'
+    'Las fotos con villanos son la mejor compra de PhotoPass del viaje: los fotógrafos les meten efectos temáticos. Ojo: hoy el PhotoPass NO viene incluido, porque va con el Multi Pass y hoy no lo tienes.',
+    'Confirma en la app si la fila de Single Rider sigue abierta al llegar: a veces la cierran por la tarde.'
   ]
 },
 
@@ -512,8 +514,8 @@ const LIGHTNING_LANE = {
       d:'El Multi Pass cubre Disneyland y California Adventure. Para caminar de un parque al otro el mismo día sí necesitas boleto Park Hopper, que es otra cosa.' },
     { t:'PhotoPass incluido',
       d:'Todas las fotos con fotógrafo de Disney vienen incluidas. No compren PhotoPass aparte y abusen de los fotógrafos, sobre todo en los encuentros de villanos del Oogie Boogie.' },
-    { t:'No sirve durante el Oogie Boogie Bash',
-      d:'De 18:00 a 23:00 del día 8 queda suspendido: es un evento con boleto aparte. Da igual, las filas de la fiesta son cortas.' }
+    { t:'El día 8 no aplica',
+      d:'Ese día entran con boleto de Oogie Boogie Bash, que es admisión al evento y no al parque, así que no hay Multi Pass. Además el servicio queda suspendido durante las horas de la fiesta. Da igual: las filas del evento son cortas y Racers se resuelve con Single Rider.' }
   ],
   orden: [
     'Mié 9 · Disneyland medio día: Indiana Jones → Haunted Mansion Holiday → Space Mountain → Millennium Falcon',
