@@ -64,3 +64,13 @@ No hay servidor ni cuenta. En Info hay botones para exportar respaldo y para bor
 Los horarios de parques, precios, calendarios de shows y fechas de eventos **cambian**.
 Los datos de la app se verificaron contra fuentes públicas (listadas en la sección Info),
 pero hay que confirmar en las apps oficiales de Disneyland y Universal antes de cada día.
+
+## Version de un solo archivo
+
+`build-artifact.py` une index.html, el CSS y los dos JS en un solo HTML, listo
+para pegar en cualquier lado o publicar como pagina suelta. Quita el service
+worker y el boton de respaldo, que solo funcionan en hosting propio.
+
+```bash
+python3 viaje/build-artifact.py salida.html
+```
