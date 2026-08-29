@@ -272,6 +272,15 @@ const REGLAS = [
   'California va una hora atrás que CDMX durante todo el viaje.'
 ];
 function pintaInfo() {
+  $('#tTransporte').innerHTML = TRANSPORTE.dias.map(x => `
+    <tr><td>
+      <div class="ruta">${esc(x.d)} · <span class="pill ${x.m === 'Shuttle' ? 'p-gr' : 'p-or'}">${esc(x.m)}</span></div>
+      <div class="meta">${esc(x.p)}</div>
+    </td><td class="tt">${esc(x.c)}</td></tr>`).join('');
+  $('#tTransporteNota').innerHTML =
+    `<p><b style="color:var(--gr)">${esc(TRANSPORTE.ahorro)}</b></p>` +
+    `<p style="margin-top:10px">${esc(TRANSPORTE.nota)}</p>`;
+
   $('#tLLfuera').innerHTML =
     '<h3>Lo que tu Lightning Lane NO cubre</h3>' +
     '<p style="margin-top:6px">Son Single Pass: se compran aparte y por atracción. Salvo que lo suyo sea Premier Pass, que sí las incluye.</p>' +

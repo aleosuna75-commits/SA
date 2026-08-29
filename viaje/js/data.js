@@ -17,6 +17,20 @@ const TRIP = {
 /* ---------- ALERTAS: conflictos reales detectados ---------- */
 const ALERTAS = [
   {
+    nivel: 'alto',
+    dia: 'general',
+    titulo: 'El shuttle no sirve para los dos días con hora fija',
+    detalle: 'El transporte del hotel es un ahorro real de $40 USD de estacionamiento por día, pero corre con horario. El servicio que reemplazó al ART va cada 30 minutos de 7:00 a 10:00, cada HORA de 10:00 a 20:00, y otra vez cada 30 minutos de 20:00 hasta media hora después del cierre. Esa franja de una vez por hora cae justo encima de tus dos momentos críticos: la salida al parque a las 14:25 del día 8 y la salida al Dodger Stadium a las 16:15 del día 9.',
+    accion: 'Maneja los días 8 y 9, y usa el shuttle los días 11 y 12. Ahorras $80 sin arriesgar las dos horas que no se pueden mover. Y confirma con tu hotel el primer y el último corrido: muchos Good Neighbor usan camioneta propia, que se llena y deja gente.'
+  },
+  {
+    nivel: 'medio',
+    dia: 'general',
+    titulo: 'Ya nadie tiene entrada anticipada, y eso te conviene',
+    detalle: 'Disneyland eliminó el Early Theme Park Entry el 5 de enero de 2026. Antes, los huéspedes de los hoteles Disney entraban 30 minutos antes y te ganaban las primeras atracciones. Eso se acabó para todos. A cambio les dan una Lightning Lane gratis por estancia, que los Good Neighbor no reciben.',
+    accion: 'Tu rope drop ahora vale tanto como el de cualquiera. A las 8:00 entran todos al mismo tiempo: el que llegó a las 7:30 a la explanada gana, sin importar dónde durmió.'
+  },
+  {
     nivel: 'critico',
     dia: 'mie-9',
     titulo: 'Dodgers y Disneyland el mismo día no caben completos',
@@ -93,6 +107,8 @@ const TRASLADOS = [
   { de: 'Aeropuerto de Tijuana (TIJ)', a: 'Lado americano del CBX (Otay Mesa)', km: '0.4 km a pie', tiempo: '30–45 min', nota: 'Incluye caminar el puente y migración de EE.UU. En hora pico puede pasar de 1 hora.' },
   { de: 'CBX / Otay Mesa', a: 'Aeropuerto de San Diego (SAN)', km: '32 km', tiempo: '25–35 min', nota: 'Por la CA-905 y la I-5 norte. Aquí recoges el Turo.' },
   { de: 'San Diego (SAN)', a: 'Anaheim', km: '153 km', tiempo: '1h40–2h10', nota: 'I-5 norte. Ojo con el cuello de botella de Camp Pendleton y con la zona de Irvine.' },
+  { de: 'Hotel Good Neighbor', a: 'Puertas de Disneyland (en carro)', km: '~5 km', tiempo: '10 min + 20 min de estacionar y caminar', nota: 'Estacionamiento $40 USD por día. Ojo: los 10 minutos son de manejo, no de puerta a torniquete.' },
+  { de: 'Hotel Good Neighbor', a: 'Puertas de Disneyland (en shuttle)', km: '~5 km', tiempo: '25–40 min puerta a torniquete', nota: 'Cada 30 min de 7:00 a 10:00 y de 20:00 al cierre; cada HORA de 10:00 a 20:00. Confirma horarios con tu hotel.' },
   { de: 'Anaheim', a: 'Buena Park (compras)', km: '13 km', tiempo: '15–20 min', nota: 'Clúster de Target, Ross y Marshalls sobre la I-5.' },
   { de: 'Anaheim', a: 'Dodger Stadium', km: '74 km', tiempo: '1h15–2h', nota: 'Salir antes de las 16:30 o el tráfico de la I-5 / SR-110 te come el primer inning.' },
   { de: 'Anaheim', a: 'Universal Studios Hollywood', km: '64 km', tiempo: '1h–1h45', nota: 'Peor entre 7:00 y 9:30. Salir 6:30 para llegar a la apertura.' },
@@ -120,12 +136,12 @@ const DIAS = [
     { t:'10:15', t2:'12:15', kind:'auto', titulo:'San Diego → Buena Park por la I-5', texto:'153 km, entre 1h40 y 2h10. Es un buen momento para desayunar algo rápido en el camino.', why:'Salir a las 10:15 te deja fuera del pico matutino y antes del pico de mediodía. Cada 15 min de retraso aquí son 15 min menos de compras.' },
     { t:'12:15', t2:'13:40', kind:'compras', titulo:'COMPRAS — Target, Ross y Marshalls', texto:'Clúster de Buena Park, sobre la I-5 y a 15 min de Disneyland. Orden sugerido: Ross primero (lo más tardado de revisar), luego Marshalls, y Target al final porque ahí encuentras todo rápido.', why:'Ross y Marshalls requieren escarbar; Target es de pasillo directo. Si el reloj se aprieta, Target es el que puedes hacer en 20 minutos.', alerta:true },
     { t:'13:40', kind:'nota', titulo:'⏰ HORA LÍMITE — salir de compras', texto:'Aunque quede fila en la caja. Este es el único candado del día.', why:'A partir de aquí todo es tiempo mínimo: 20 min al hotel, 25 min de cambio y traslado, 15 min de seguridad. No hay colchón.', alerta:true },
-    { t:'14:00', t2:'14:25', kind:'hotel', titulo:'Hotel: dejar maletas y cambiarse', texto:'Deja el equipaje en bell services aunque el cuarto no esté listo (es gratis). Cámbiate al disfraz aquí, no en el estacionamiento del parque.', why:'Dejar maletas y bolsas de compras a la vista en el carro durante 8 horas en un estacionamiento de Disney es el error más caro que puedes cometer hoy.' },
-    { t:'14:25', t2:'14:45', kind:'auto', titulo:'Al estacionamiento de Disney', texto:'Estacionamiento Pixar Pals o Toy Story. Toy Story tiene shuttle; Pixar Pals te deja caminando a Downtown Disney.', why:'A las 14:30 los estacionamientos ya están medio llenos con la gente del día. Pixar Pals suele ser el más rápido de vaciar en la noche.' },
+    { t:'14:00', t2:'14:25', kind:'hotel', titulo:'Hotel: dejar maletas y cambiarse', texto:'Deja el equipaje en bell services aunque el cuarto no esté listo (es gratis). Cámbiate al disfraz aquí, no en el estacionamiento del parque.', why:'Dejar maletas y bolsas de compras a la vista en el carro durante 8 horas en un estacionamiento de Disney es el error más caro que puedes cometer hoy. Y a 10 minutos del parque, pasar al hotel casi no te cuesta tiempo.' },
+    { t:'14:25', t2:'14:45', kind:'auto', titulo:'Al parque EN CARRO, no en shuttle', texto:'Estacionamiento Pixar Pals o Toy Story, $40 USD.', why:'A esta hora el shuttle corre una vez por hora. Perder un corrido son 60 minutos y tu entrada de las 15:00 es fija. Los $40 compran certeza el único día del viaje que no admite improvisación.', alerta:true },
     { t:'14:45', kind:'parque', titulo:'Seguridad y torniquetes de DCA', texto:'Fórmate 15 min antes de las 15:00. Reglas de disfraz: nada de máscaras que cubran toda la cara en adultos, ni armas de utilería realistas.', why:'A las 15:00 en punto abren el acceso para boletos de la fiesta. Estar en los primeros 200 significa llegar a Radiator Springs Racers con el parque todavía en modo día.' },
     { t:'15:00', t2:'18:00', kind:'atraccion', titulo:'VENTANA DE ORO: atracciones grandes', texto:'El parque se está vaciando porque a las 18:00 sacan a todos los que no traen boleto de fiesta. Hoy no hay Lightning Lane: usa Single Rider en Racers e Incredicoaster. Plan completo en la pestaña Parques.', why:'Es la única ventana del viaje donde una atracción de 75 minutos de fila baja a 25 sin pagar nada. Empieza a las 15:00 en niveles de día y para las 17:30 ya está en caída libre.' },
     { t:'18:00', t2:'23:00', kind:'show', titulo:'OOGIE BOOGIE BASH', texto:'Dulces, villanos, Villains Grove, desfile Frightfully Fun y Mickey\'s Trick and Treat. Plan hora por hora en la pestaña Parques.' },
-    { t:'23:00', t2:'23:45', kind:'hotel', titulo:'Salida y check-in real del hotel', texto:'Recoge el equipaje de bell services. A dormir: mañana es rope drop a las 8:00.', why:'Llevas 21 horas despierto. La tentación de "una atracción más" a las 23:00 se paga el miércoles a las 6:45.' }
+    { t:'23:00', t2:'23:30', kind:'hotel', titulo:'Salida y check-in real del hotel', texto:'Con carro propio te ahorras la fila del último shuttle, que a esta hora va llena. Recoge el equipaje de bell services.', why:'Llevas 21 horas despierto. La tentación de "una atracción más" a las 23:00 se paga el miércoles a las 6:45.' }
   ]
 },
 {
@@ -137,14 +153,14 @@ const DIAS = [
   bloques: [
     { t:'06:45', kind:'hotel', titulo:'Salida del hotel', texto:'Desayuna algo en el cuarto. No pierdas 30 min en un restaurante.' },
     { t:'07:00', kind:'nota', titulo:'📱 Reservar la 1ª Lightning Lane del día', texto:'Las reservas abren a las 7:00 en punto en la app. No necesitas estar en el parque: hazlo desde el cuarto, mientras desayunan. Sugerencia de hoy: Indiana Jones con regreso lo más temprano posible.', why:'La primera reserva es la única con horarios buenos disponibles, y arranca el reloj de 2 horas para la siguiente. Reservarla a las 7:00 en vez de a las 8:30 te regala una atracción extra en el día.', alerta:true },
-    { t:'07:05', t2:'07:30', kind:'auto', titulo:'Estacionamiento y tram', texto:'Mickey & Friends o Pixar Pals. Objetivo: estar en los torniquetes a las 7:30.', why:'Llegar 30 min antes de la apertura es la diferencia entre hacer 5 atracciones antes de las 10:00 o hacer 2.' },
+    { t:'07:05', t2:'07:30', kind:'auto', titulo:'En carro otra vez: hoy tampoco uses el shuttle', texto:'Mickey & Friends o Pixar Pals, $40 USD. Objetivo: estar en los torniquetes a las 7:30.', why:'A las 15:45 sales directo del estacionamiento rumbo al Dodger Stadium. Con shuttle tendrías que volver al hotel por el carro: son 40 minutos que hoy no existen.', alerta:true },
     { t:'07:35', kind:'nota', titulo:'Escanear boleto y reservar la 1ª Lightning Lane', texto:'En cuanto pasas el torniquete ya puedes reservar. Aprovecha los 25 min de espera de la cuerda.', why:'La primera reserva del día es la más valiosa: es la única con inventario de horarios buenos.' },
     { t:'08:00', t2:'15:45', kind:'parque', titulo:'DISNEYLAND — plan de medio día', texto:'Ruta completa en la pestaña Parques. Prioridad: Fantasyland al rope drop, Haunted Mansion Holiday e Indiana Jones antes de mediodía.' },
     { t:'15:45', kind:'nota', titulo:'⏰ HORA LÍMITE — salir del parque', texto:'Sin "una última atracción". Camina a la salida.', why:'De la salida al carro son 20–25 min entre caminata y tram. Ese tiempo ya está contado en la salida de las 16:15.', alerta:true },
     { t:'16:15', t2:'18:00', kind:'auto', titulo:'Anaheim → Dodger Stadium', texto:'74 km. Con tráfico de las 16:30 son 1h15 en un buen día y 2h en uno malo. El estacionamiento del estadio abre 2.5 h antes del juego.', why:'Salir 30 minutos más tarde no te cuesta 30 minutos: te cuesta 50, porque entras de lleno al pico de la I-5 y la SR-110.', alerta:true },
     { t:'18:00', t2:'19:10', kind:'deporte', titulo:'Llegada, estacionamiento y entrada', texto:'Compra el pase de estacionamiento EN LÍNEA por adelantado, sale más barato que en la puerta. Las puertas abren ~1.5 h antes.', why:'Llegar 1 hora antes te deja ver práctica de bateo y comprar el Dodger Dog sin fila de 40 minutos en el 3er inning.' },
     { t:'19:10', kind:'deporte', titulo:'⚾ Dodgers vs Cincinnati Reds', texto:'Primer lanzamiento. Juego de ~3 horas.' },
-    { t:'22:15', t2:'23:30', kind:'auto', titulo:'Regreso a Anaheim', texto:'Salir del estacionamiento del Dodger Stadium toma 30–45 min si te esperas al último out.', why:'Truco de local: sal en la parte baja del 8º inning o quédate 20 minutos después del final. Salir justo al terminar es lo peor de los dos mundos.' }
+    { t:'22:15', t2:'23:30', kind:'auto', titulo:'Regreso al hotel', texto:'Salir del estacionamiento del Dodger Stadium toma 30–45 min si te esperas al último out.', why:'Truco de local: sal en la parte baja del 8º inning o quédate 20 minutos después del final. Salir justo al terminar es lo peor de los dos mundos.' }
   ]
 },
 {
@@ -170,11 +186,11 @@ const DIAS = [
   badge: 'Día completo', parque: 'dca',
   resumen: 'El día más relajado de los cuatro de Disney. DCA se hace completo en un día si empiezas por Cars Land.',
   bloques: [
-    { t:'06:50', kind:'hotel', titulo:'Salida del hotel', texto:'Mismo ritual del miércoles. Reserva tu primera Lightning Lane a las 7:00 desde el carro: hoy va en Web Slingers o Guardians, NO en Racers.', why:'Radiator Springs Racers no está en el Multi Pass. Esa se gana con rope drop.' },
+    { t:'06:50', kind:'hotel', titulo:'Hoy sí: primer shuttle del día', texto:'Toma el corrido de las 7:00. Sin compromisos externos hoy, el transporte incluido te ahorra los $40 del estacionamiento. Reserva tu primera Lightning Lane a las 7:00 desde la parada: va en Web Slingers o Guardians, NO en Racers.', why:'Racers no está en el Multi Pass, ésa se gana con rope drop. Y de 7:00 a 10:00 el shuttle pasa cada 30 minutos: si se te va uno, no pierdes el día.' },
     { t:'07:30', kind:'parque', titulo:'En los torniquetes de DCA', texto:'Objetivo: estar entre los primeros para Radiator Springs Racers.' },
     { t:'08:00', t2:'21:00', kind:'parque', titulo:'DCA — plan de ataque', texto:'Ruta completa en la pestaña Parques. Racers al rope drop, Avengers Campus a media mañana, Pixar Pier en la tarde.' },
     { t:'21:00', kind:'show', titulo:'🌊 World of Color', texto:'Agarra lugar 45 min antes en Paradise Gardens Park, del lado izquierdo viendo la laguna. Confirma horario exacto en la app.', why:'Es el show que NO pudiste ver el día 8 porque el parque cerró a las 18:00 por la fiesta. Hoy es tu única oportunidad.' },
-    { t:'21:30', kind:'nota', titulo:'Salida escalonada', texto:'No salgas con la ola. Pasa a Buena Vista Street 20 minutos, compra algo y sal cuando la fila del tram baje.' }
+    { t:'21:30', kind:'nota', titulo:'Al shuttle sin tardarte', texto:'El último corrido sale media hora después del cierre. Hoy sí conviene salir con la ola: la parada del shuttle no es el tram, no se hace la fila de 45 minutos.', why:'Y si lo pierdes, un Uber al hotel son 10 minutos y $15–25. Sigue saliendo más barato que los $40 del estacionamiento.' }
   ]
 },
 {
@@ -184,17 +200,18 @@ const DIAS = [
   badge: 'Día pico', parque: 'dl-completo',
   resumen: 'Sábado con Halloween Time es el día más lleno de tu semana. También es el mejor: fuegos artificiales y Fantasmic la misma noche, en el orden correcto.',
   bloques: [
-    { t:'06:45', kind:'hotel', titulo:'Salida del hotel', texto:'Hoy el rope drop importa más que ningún otro día.' },
+    { t:'06:45', kind:'hotel', titulo:'Primer shuttle del día', texto:'Corrido de las 7:00. Hoy el rope drop importa más que ningún otro día, y de 7:00 a 10:00 el shuttle pasa cada 30 minutos.', why:'Desde enero de 2026 nadie entra antes que nadie: se acabó la entrada anticipada de los hoteles Disney. El que llegue primero a la explanada gana, y hoy ése puedes ser tú.' },
     { t:'07:00', kind:'nota', titulo:'📱 Reservar la 1ª Lightning Lane del día', texto:'Desde el cuarto, a las 7:00 en punto. Hoy la mejor primera reserva es Haunted Mansion Holiday: es la que más se dispara en sábado.', why:'En sábado los horarios de regreso se agotan de verdad. Media hora de retraso hoy te cuesta las ventanas de la mañana.', alerta:true },
     { t:'07:30', kind:'parque', titulo:'En los torniquetes de Disneyland', texto:'Objetivo real: cruzar antes de las 7:45.' },
     { t:'08:00', t2:'18:00', kind:'parque', titulo:'DISNEYLAND — plan de día completo', texto:'Ruta en la pestaña Parques. Haunted Mansion Holiday y Space Mountain con overlay de Halloween son las prioridades del día.' },
-    { t:'18:00', kind:'nota', titulo:'Regreso al hotel (opcional pero recomendado)', texto:'Si aguantas el traslado, una siesta de 45 min aquí cambia tu noche. Si no, siéntate a cenar temprano en el parque.', why:'Vas a estar de pie hasta las 23:30. La noche del sábado es la más larga del viaje.' },
+    { t:'18:00', kind:'nota', titulo:'Siesta en el hotel — ahora sí hazla', texto:'A 10 minutos y con shuttle, ir y volver te cuesta una hora y te devuelve la noche completa. Regresa al parque a las 19:00 para tu reservación.', why:'Vas a estar de pie hasta las 23:30 y llevas cinco días de parque encima. Estando tan cerca, saltarte la siesta es desperdiciar la ventaja principal de tu hotel.' },
     { t:'19:15', kind:'comida', titulo:'🍽️ River Belle Terrace — paquete Fantasmic', texto:'Confirma tu hora exacta de comida al reservar: el paquete estándar sienta desde las 16:00 y el premium a las 19:15. Estándar ~$64 adulto / $36 niño; premium ~$94 / $49, sin impuestos ni propina.', why:'El paquete incluye pase a un área reservada en Rivers of America. No necesitas apartar lugar 2 horas antes como todos los demás: ese es todo el valor de lo que pagaste.', alerta:true },
     { t:'21:10', kind:'nota', titulo:'Posicionarse en el hub para los fuegos', texto:'Ve al Central Plaza (la rotonda frente al castillo) y párate del LADO OESTE, es decir el que ve hacia Frontierland.', why:'Es la respuesta a tu pregunta: desde el hub ves las proyecciones completas del castillo Y quedas a 6 minutos caminando del área reservada de Fantasmic. Desde Main Street ves igual de bien pero después tienes que caminar contra toda la multitud.', alerta:true },
     { t:'21:30', kind:'show', titulo:'🎆 Halloween Screams (fuegos artificiales)', texto:'~13 minutos. Confirma horario del día en la app; en septiembre suele ser a las 21:30.' },
     { t:'21:50', t2:'22:05', kind:'nota', titulo:'Caminar a Rivers of America', texto:'Sal en cuanto termine el último trueno, sin esperar a que apaguen las luces. Entra al área reservada del paquete.', why:'25 minutos de colchón antes del show. Suficiente sin ser una eternidad de pie.' },
     { t:'22:30', kind:'show', titulo:'🐉 Fantasmic — 2º show', texto:'~25 minutos, desde tu área reservada. Confirma horario en la app.', why:'El 2º show es el correcto para ti: te deja ver los fuegos de las 21:30 completos antes. Con el 1er show habrías tenido que elegir.' },
-    { t:'23:00', kind:'nota', titulo:'NO salgas con la multitud', texto:'El parque cierra a las 23:00 y 40 mil personas caminan a la misma puerta. Métete a una atracción de Frontierland o New Orleans Square, o compra algo en Main Street, y sal a las 23:30.', why:'La fila del tram del estacionamiento a las 23:05 son 45 minutos. A las 23:35 son 10.' }
+    { t:'23:00', kind:'nota', titulo:'Hoy SÍ sal de inmediato: el último shuttle', texto:'Esto cambia respecto al consejo clásico. El último corrido sale media hora después del cierre, así que en cuanto termine Fantasmic camina directo a la parada, sin pasar a comprar nada.', why:'El truco de esperar 30 minutos existe para esquivar la fila del tram del estacionamiento, y hoy tú no usas el tram. Esperar ya no te ahorra nada y sí te puede dejar fuera del último shuttle.', alerta:true },
+    { t:'23:30', kind:'nota', titulo:'Plan B si se fue el shuttle', texto:'Uber o Lyft al hotel: 10 minutos y $15–25 para todos. No te quedes esperando un corrido que ya no viene.', why:'Sale más barato que el estacionamiento del día y evita el único escenario feo de la noche: la familia varada a las 23:40 después de dieciséis horas de pie.' }
   ]
 },
 {
@@ -456,6 +473,7 @@ const CHECKLISTS = [
     'Boletos de Dodgers y pase de estacionamiento comprados',
     'Boletos de Universal comprados y verificado si el 10 es noche de HHN',
     'Hotel confirmado con política de guardar equipaje antes del check-in',
+    'Horarios del shuttle del hotel confirmados: primer corrido, último corrido y cuánta gente cabe',
     'Tarjeta de crédito avisada al banco de viaje a EE.UU.',
     'Seguro médico de viaje',
     'App de Disneyland descargada y con sesión iniciada ANTES de volar',
@@ -494,6 +512,21 @@ const CHECKLISTS = [
     'Curitas o bandas para ampollas'
   ]}
 ];
+
+/* ---------- CARRO O SHUTTLE, DÍA POR DÍA ---------- */
+const TRANSPORTE = {
+  nota: 'El ART, el transporte público que usaban casi todos los Good Neighbor, cerró el 31 de marzo de 2026. Lo que hay ahora son shuttles de hotel y servicios nuevos. Confirma con tu hotel el primer y el último corrido, y si es camioneta propia pregunta cuánta gente cabe: se llenan y dejan pasajeros.',
+  dias: [
+    { d:'Mar 8', m:'Carro', c:'$40', p:'Entrada fija a las 15:00 y el shuttle a esa hora corre una vez por hora.' },
+    { d:'Mié 9', m:'Carro', c:'$40', p:'Sales del estacionamiento directo al Dodger Stadium a las 16:15.' },
+    { d:'Jue 10', m:'Carro', c:'—', p:'Universal Studios Hollywood, a 64 km. No hay alternativa.' },
+    { d:'Vie 11', m:'Shuttle', c:'Gratis', p:'Día completo en DCA sin compromisos externos. Aquí ahorras de verdad.' },
+    { d:'Sáb 12', m:'Shuttle', c:'Gratis', p:'Igual, pero sal en cuanto acabe Fantasmic. Uber como plan B.' },
+    { d:'Dom 13', m:'Carro', c:'—', p:'Los Ángeles y Santa Monica.' },
+    { d:'Lun 14', m:'Carro', c:'—', p:'San Diego y regreso por el CBX.' }
+  ],
+  ahorro: 'Manejando los dos días con hora fija y usando el shuttle los otros dos, ahorras $80 USD de estacionamiento sin arriesgar nada.'
+};
 
 /* ---------- LIGHTNING LANE: mecánica ---------- */
 const LIGHTNING_LANE = {
@@ -544,5 +577,8 @@ const FUENTES = [
   { t:'Multi Pass y Single Pass: qué cubre cada uno (WDW Prep School)', u:'https://wdwprepschool.com/lightning-lane-passes/' },
   { t:'Halloween Horror Nights 2026 Hollywood — fechas', u:'https://blog.discoveruniversal.com/events/halloween-horror-nights-2026-universal-studios-hollywood-lineup/' },
   { t:'Cross Border Xpress — sitio oficial', u:'https://www.crossborderxpress.com/' },
-  { t:'Calendario de los Dodgers 2026 (MLB)', u:'https://www.mlb.com/dodgers/schedule/2026/fullseason' }
+  { t:'Calendario de los Dodgers 2026 (MLB)', u:'https://www.mlb.com/dodgers/schedule/2026/fullseason' },
+  { t:'Cierre del ART y los shuttles que lo reemplazan (WDWNT)', u:'https://wdwnt.com/2026/04/new-hotel-toy-story-lot-shuttle-services-launch-for-disneyland-resort-after-art-shutdown/' },
+  { t:'Fin de la entrada anticipada en los hoteles Disneyland (Disney Tourist Blog)', u:'https://www.disneytouristblog.com/free-lightning-lane-for-on-site-hotel-guests-at-disneyland-resort-early-entry-ending-in-2026/' },
+  { t:'Precios de estacionamiento en Disneyland 2026', u:'https://www.enchantedinsider.com/disneyland-parking/' }
 ];
