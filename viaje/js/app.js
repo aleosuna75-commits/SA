@@ -264,6 +264,7 @@ function pintaGastos() {
 const REGLAS = [
   'Cualquier hora marcada con ⏰ en la app es un candado: si se pasa, algo más se cae.',
   'Come en los parques antes de las 12:00 o después de las 14:00. Nunca en medio.',
+  'La 1ª Lightning Lane del día se reserva al cruzar el torniquete, nunca desde el hotel. Llega temprano y escanea apenas abran.',
   'Escanea tu Lightning Lane en cuanto abra la ventana: eso desbloquea la siguiente de inmediato.',
   'Llegar al estacionamiento a la hora de apertura es llegar al parque 40 minutos tarde.',
   'Nunca dejes maletas ni bolsas de compras a la vista dentro del carro.',

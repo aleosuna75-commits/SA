@@ -18,6 +18,20 @@ const TRIP = {
 const ALERTAS = [
   {
     nivel: 'alto',
+    dia: 'jue-10',
+    titulo: 'Con Early Access hay que salir de Anaheim a las 5:45',
+    detalle: 'El Early Access empieza UNA HORA antes de que abra el parque, y hay que estar en la puerta 30 a 45 minutos antes de que empiece, porque del estacionamiento a los torniquetes hay 10–15 minutos caminando por CityWalk. Si el parque abre a las 9:00, tu ventana es 8:00–9:00 y tienes que llegar a las 7:15. Con 1h a 1h45 de manejo desde Anaheim, eso significa salir a las 5:45.',
+    accion: 'Confirma la hora de apertura del 10 de septiembre en la app de Universal y recorre todo el día si es distinta. Y esa noche, a dormir temprano: vienen de los Dodgers.'
+  },
+  {
+    nivel: 'medio',
+    dia: 'mie-9',
+    titulo: 'La chamarra se canjea adentro, no te la dan en la puerta',
+    detalle: 'Los artículos de paquete temático no se reparten en los accesos como los giveaways normales: se canjean en un módulo designado dentro del estadio, y la ubicación viene en tu boleto digital. Los módulos tienen hora de cierre, normalmente durante los primeros innings.',
+    accion: 'Busca la ubicación del módulo en tu boleto ANTES del día del juego. Al entrar, ve directo a canjear: primero la chamarra, después la comida y los asientos.'
+  },
+  {
+    nivel: 'alto',
     dia: 'general',
     titulo: 'Al salir del parque, NO pidas el Uber en la zona oficial',
     detalle: 'El punto oficial de Uber y Lyft sobre Harbor Blvd es chico para el tamaño del parque. Al cierre, la fila de choferes esperando entrar se desborda sobre la avenida: tú esperas y tu carro no puede llegar. Es el peor momento del día y coincide con el pico de tarifa.',
@@ -145,33 +159,37 @@ const DIAS = [
 {
   id: 'mie-9', fecha: '2026-09-09', dow: 'Miércoles', num: 2,
   titulo: 'Disneyland (medio día) + Dodgers',
-  subtitulo: 'Rope drop 8:00 · Dodgers vs Rojos de Cincinnati 19:10',
+  subtitulo: 'Rope drop 8:00 · Dodgers 19:10 · Canje de chamarra',
   badge: 'Día partido', parque: 'dl-medio',
-  resumen: 'Dos actividades grandes con un traslado de LA en medio. Funciona sólo si el rope drop es real y la salida a las 15:45 es innegociable.',
+  resumen: 'Dos actividades grandes con un traslado de LA en medio. Funciona sólo si el rope drop es real y la salida a las 15:30 es innegociable. Y esta noche hay un pendiente extra: canjear la chamarra del paquete temático antes de que cierre el módulo.',
   bloques: [
     { t:'06:45', kind:'hotel', titulo:'Salida del hotel', texto:'Desayuna algo en el cuarto. No pierdas 30 min en un restaurante.' },
-    { t:'07:00', kind:'nota', titulo:'📱 Reservar la 1ª Lightning Lane del día', texto:'Las reservas abren a las 7:00 en punto en la app. No necesitas estar en el parque: hazlo desde el cuarto, mientras desayunan. Sugerencia de hoy: Indiana Jones con regreso lo más temprano posible.', why:'La primera reserva es la única con horarios buenos disponibles, y arranca el reloj de 2 horas para la siguiente. Reservarla a las 7:00 en vez de a las 8:30 te regala una atracción extra en el día.', alerta:true },
+    { t:'07:25', kind:'nota', titulo:'📱 Escanear el boleto y reservar de inmediato', texto:'La primera Lightning Lane sólo se puede reservar DESPUÉS de escanear tu boleto en el torniquete. No se puede desde el cuarto. Pero los torniquetes abren antes que el parque: cruza en cuanto abran y reserva ahí mismo, parado esperando la cuerda. Hoy: Indiana Jones con el regreso más temprano que te dé.', why:'Por eso llegar temprano vale doble hoy: te da lugar en el rope drop Y adelanta tu primera reserva. Cada media hora que tardes en escanear es media hora que se recorre todo tu día de Lightning Lanes.', alerta:true },
     { t:'07:05', t2:'07:30', kind:'auto', titulo:'Uber al parque, punto de Harbor Blvd', texto:'Deja el carro en el hotel: lo vas a necesitar en la tarde para el Dodger Stadium. Objetivo: estar en los torniquetes a las 7:30.', why:'Hoy es el único día donde manejar saldría unos 20 minutos más rápido, porque a las 15:30 saldrías directo del estacionamiento al estadio. Con Uber tienes que pasar al hotel por el carro. Si un día quieres hacer la excepción, es éste.' },
-    { t:'07:35', kind:'nota', titulo:'Escanear boleto y reservar la 1ª Lightning Lane', texto:'En cuanto pasas el torniquete ya puedes reservar. Aprovecha los 25 min de espera de la cuerda.', why:'La primera reserva del día es la más valiosa: es la única con inventario de horarios buenos.' },
+    { t:'07:30', kind:'nota', titulo:'Ya escaneado: encadenar el resto del día', texto:'Revisa que tu primera reserva quedó guardada y ubica en el mapa dónde caes al abrir la cuerda.', why:'Los 25 minutos de espera de la cuerda son gratis: úsalos para tener decidido el orden de la mañana y no improvisar a las 8:01.' },
     { t:'08:00', t2:'15:45', kind:'parque', titulo:'DISNEYLAND — plan de medio día', texto:'Ruta completa en la pestaña Parques. Prioridad: Fantasyland al rope drop, Haunted Mansion Holiday e Indiana Jones antes de mediodía.' },
     { t:'15:30', kind:'nota', titulo:'⏰ HORA LÍMITE — salir del parque', texto:'Sin "una última atracción". Camina a Harbor Blvd y pide el Uber desde el McDonald\'s.', why:'Se adelantó 15 minutos respecto al plan con carro: caminar al McDonald\'s, esperar el Uber y pasar al hotel por el carro son unos 40 minutos. Salir a las 15:30 protege tu llegada al estadio.', alerta:true },
     { t:'16:10', t2:'18:00', kind:'auto', titulo:'Hotel → Dodger Stadium, ya en tu carro', texto:'74 km. Con tráfico de las 16:30 son 1h15 en un buen día y 2h en uno malo. El estacionamiento del estadio abre 2.5 h antes del juego.', why:'Salir 30 minutos más tarde no te cuesta 30 minutos: te cuesta 50, porque entras de lleno al pico de la I-5 y la SR-110.', alerta:true },
-    { t:'18:00', t2:'19:10', kind:'deporte', titulo:'Llegada, estacionamiento y entrada', texto:'Compra el pase de estacionamiento EN LÍNEA por adelantado, sale más barato que en la puerta. Las puertas abren ~1.5 h antes.', why:'Llegar 1 hora antes te deja ver práctica de bateo y comprar el Dodger Dog sin fila de 40 minutos en el 3er inning.' },
+    { t:'17:40', kind:'deporte', titulo:'🎫 Apertura de puertas', texto:'Las puertas abren 90 minutos antes del juego. Tu estacionamiento ya está pagado y los lotes abren todavía antes.', why:'Hoy no llegas al primer lanzamiento: llegas a la apertura. Tienes una chamarra que canjear y ésa es la única parte del día con fecha de caducidad.', alerta:true },
+    { t:'17:50', t2:'18:20', kind:'deporte', titulo:'🧥 CANJEAR LA CHAMARRA — primero que nada', texto:'Los artículos de paquete temático NO se entregan en la puerta: se canjean en un módulo designado adentro del estadio. La ubicación viene en tu boleto digital. Búscala HOY, no cuando llegues.', why:'Los módulos de canje tienen hora de cierre, normalmente durante los primeros innings, y hacen fila. Comer primero y canjear después es como la gente se queda sin su artículo.', alerta:true },
+    { t:'18:20', t2:'19:10', kind:'deporte', titulo:'Ahora sí: comida y asientos', texto:'Dodger Dog, práctica de bateo y encontrar sus lugares con calma.', why:'Con la chamarra ya en la mano, el resto de la noche es disfrutar. Las filas de comida antes del primer lanzamiento son la mitad que en el 3er inning.' },
     { t:'19:10', kind:'deporte', titulo:'⚾ Dodgers vs Cincinnati Reds', texto:'Primer lanzamiento. Juego de ~3 horas.' },
+    { t:'21:40', kind:'nota', titulo:'Decidir la salida', texto:'Sal en la parte baja del 8º inning, o quédate 20 minutos después del último out. Salir justo al terminar es lo peor de los dos mundos.', why:'Vaciar el estacionamiento del Dodger Stadium toma 30–45 minutos, y mañana hay que salir a las 5:45 rumbo a Universal.' },
     { t:'22:15', t2:'23:30', kind:'auto', titulo:'Regreso al hotel', texto:'Salir del estacionamiento del Dodger Stadium toma 30–45 min si te esperas al último out.', why:'Truco de local: sal en la parte baja del 8º inning o quédate 20 minutos después del final. Salir justo al terminar es lo peor de los dos mundos.' }
   ]
 },
 {
   id: 'jue-10', fecha: '2026-09-10', dow: 'Jueves', num: 3,
   titulo: 'Universal Studios Hollywood',
-  subtitulo: 'Posible noche de Halloween Horror Nights',
-  badge: 'Verificar horario', parque: 'universal',
-  resumen: 'Universal es un parque de un solo día bien hecho. Si el 10 es noche de HHN, el parque diurno cierra temprano y hay que exprimir la mañana.',
+  subtitulo: 'Early Access a Super Nintendo World · Posible noche de HHN',
+  badge: 'Madrugar de verdad', parque: 'universal',
+  resumen: 'Con Early Access este día cambia por completo. Entras a Super Nintendo World una hora antes que todos, la haces vacía, y cuando el parque abre te vas al Lower Lot mientras el resto corre hacia Nintendo. Es la mejor secuencia posible en este parque, pero exige salir de Anaheim a las 5:45.',
   bloques: [
-    { t:'06:30', kind:'auto', titulo:'Salida de Anaheim', texto:'64 km a Universal City. Entre 1h y 1h45 según el tráfico de la mañana.', why:'Salir a las 7:00 en lugar de 6:30 puede costarte 40 minutos reales: es plena hora pico hacia LA.' },
-    { t:'08:00', kind:'parque', titulo:'Llegada y estacionamiento', texto:'Estacionamiento General o Preferred. De ahí caminas por CityWalk a la entrada.', why:'Del carro a los torniquetes hay 10–15 min de caminata que casi nadie contabiliza.' },
-    { t:'08:30', kind:'nota', titulo:'Fila en torniquetes + revisar cola virtual', texto:'Al entrar, revisa de inmediato si Super Nintendo World está con cola virtual en la app. Si lo está, tómala en ese segundo.', why:'La cola virtual de Super Nintendo World se agota en la primera hora en días llenos. Es lo único del parque que se puede acabar.', alerta:true },
-    { t:'09:00', t2:'17:00', kind:'parque', titulo:'UNIVERSAL — plan de ataque', texto:'Ruta completa en la pestaña Parques. Regla de oro: baja al Lower Lot primero, todos se quedan arriba.' },
+    { t:'—', kind:'nota', titulo:'⏰ PRIMERO: confirma la hora de apertura', texto:'Tu Early Access empieza UNA HORA antes de que abra el parque. Si abre a las 9:00, tu ventana es 8:00–9:00. Confirma la hora del 10 de septiembre en la app de Universal y recorre todo este día si es distinta.', why:'Todo el plan de hoy cuelga de ese dato, y es el único del viaje que todavía no está confirmado.', alerta:true },
+    { t:'05:45', kind:'auto', titulo:'Salida de Anaheim', texto:'64 km a Universal City. Entre 1h y 1h45 según el tráfico. Desayunen en el camino.', why:'Hay que estar en la puerta 30–45 min antes de que empiece el Early Access, y eso significa 7:15. Salir a las 6:30 como en el plan anterior ya no alcanza.', alerta:true },
+    { t:'07:15', kind:'parque', titulo:'Llegada, estacionamiento y caminata', texto:'Estacionamiento General. De ahí son 10–15 min caminando por CityWalk hasta los torniquetes.', why:'Esa caminata es la que casi nadie contabiliza y la que hace que la gente llegue tarde a su propio Early Access.' },
+    { t:'08:00', t2:'09:00', kind:'atraccion', titulo:'🍄 EARLY ACCESS — Super Nintendo World', texto:'La tierra entera para ustedes. Mario Kart primero, luego Bowser Jr. y los retos interactivos. Es tu hora dorada del viaje en Universal.', why:'Con Early Access ya no necesitas la cola virtual de Nintendo, que era el único cuello de botella real del parque. Ese problema desaparece.', alerta:true },
+    { t:'09:00', t2:'17:00', kind:'parque', titulo:'UNIVERSAL — resto del día', texto:'Al abrir el parque, todos corren hacia Nintendo y tú te vas al Lower Lot vacío. Ruta completa en la pestaña Parques.' },
     { t:'17:00', kind:'nota', titulo:'⚠️ Posible cierre por HHN', texto:'Si es noche de Halloween Horror Nights, desalojan a quien no traiga boleto del evento. Confirma en la app de Universal.', why:'HHN 2026 corre del 3 de septiembre al 1 de noviembre en noches selectas y arranca a las 19:00.', alerta:true },
     { t:'17:30', t2:'19:00', kind:'ocio', titulo:'CityWalk: cena y compras', texto:'Está fuera del parque, no necesita boleto y es la mejor opción de cena cerca.', why:'Si el parque cierra temprano, CityWalk salva la noche sin manejar hasta LA con hambre.' },
     { t:'19:00', t2:'20:30', kind:'auto', titulo:'Regreso a Anaheim', texto:'El tráfico de salida de LA ya bajó a esta hora.' }
@@ -184,7 +202,7 @@ const DIAS = [
   badge: 'Día completo', parque: 'dca',
   resumen: 'El día más relajado de los cuatro de Disney. DCA se hace completo en un día si empiezas por Cars Land.',
   bloques: [
-    { t:'06:50', kind:'hotel', titulo:'Uber al parque', texto:'A esta hora no hay surge y el viaje son 10 minutos. Reserva tu primera Lightning Lane a las 7:00 desde el camino: va en Web Slingers o Guardians, NO en Racers.', why:'Racers no está en el Multi Pass, ésa se gana con rope drop, y para eso hay que estar en la puerta a las 7:30.' },
+    { t:'06:50', kind:'hotel', titulo:'Uber al parque', texto:'A esta hora no hay surge y el viaje son 10 minutos. Tu primera Lightning Lane se reserva al escanear el boleto, ya en el torniquete: va en Web Slingers o Guardians, NO en Racers.', why:'Racers no está en el Multi Pass, ésa se gana con rope drop, y para eso hay que estar en la puerta a las 7:30.' },
     { t:'07:30', kind:'parque', titulo:'En los torniquetes de DCA', texto:'Objetivo: estar entre los primeros para Radiator Springs Racers.' },
     { t:'08:00', t2:'21:00', kind:'parque', titulo:'DCA — plan de ataque', texto:'Ruta completa en la pestaña Parques. Racers al rope drop, Avengers Campus a media mañana, Pixar Pier en la tarde.' },
     { t:'21:00', kind:'show', titulo:'🌊 World of Color', texto:'Agarra lugar 45 min antes en Paradise Gardens Park, del lado izquierdo viendo la laguna. Confirma horario exacto en la app.', why:'Es el show que NO pudiste ver el día 8 porque el parque cerró a las 18:00 por la fiesta. Hoy es tu única oportunidad.' },
@@ -199,7 +217,7 @@ const DIAS = [
   resumen: 'Sábado con Halloween Time es el día más lleno de tu semana. También es el mejor: fuegos artificiales y Fantasmic la misma noche, en el orden correcto.',
   bloques: [
     { t:'06:45', kind:'hotel', titulo:'Uber al parque', texto:'Diez minutos y sin surge a esta hora. Hoy el rope drop importa más que ningún otro día.', why:'Desde enero de 2026 nadie entra antes que nadie: se acabó la entrada anticipada de los hoteles Disney. El que llegue primero a la explanada gana, y en sábado ése puedes ser tú.' },
-    { t:'07:00', kind:'nota', titulo:'📱 Reservar la 1ª Lightning Lane del día', texto:'Desde el cuarto, a las 7:00 en punto. Hoy la mejor primera reserva es Haunted Mansion Holiday: es la que más se dispara en sábado.', why:'En sábado los horarios de regreso se agotan de verdad. Media hora de retraso hoy te cuesta las ventanas de la mañana.', alerta:true },
+    { t:'07:25', kind:'nota', titulo:'📱 Escanear el boleto y reservar de inmediato', texto:'Sólo se puede reservar después de escanear en el torniquete, nunca desde el cuarto. Cruza en cuanto abran las puertas y reserva ahí parado. Hoy: Haunted Mansion Holiday, la que más se dispara en sábado.', why:'En sábado los horarios de regreso se agotan de verdad. Ser de los primeros en escanear es literalmente ser de los primeros en la fila de reservas.', alerta:true },
     { t:'07:30', kind:'parque', titulo:'En los torniquetes de Disneyland', texto:'Objetivo real: cruzar antes de las 7:45.' },
     { t:'08:00', t2:'18:00', kind:'parque', titulo:'DISNEYLAND — plan de día completo', texto:'Ruta en la pestaña Parques. Haunted Mansion Holiday y Space Mountain con overlay de Halloween son las prioridades del día.' },
     { t:'18:00', kind:'nota', titulo:'Siesta en el hotel — ahora sí hazla', texto:'A 10 minutos y en Uber, ir y volver te cuesta una hora y te devuelve la noche completa. Regresa al parque a las 19:00 para tu reservación.', why:'Vas a estar de pie hasta las 23:30 y llevas cinco días de parque encima. Estando tan cerca, saltarte la siesta es desperdiciar la ventaja principal de tu hotel.' },
@@ -293,7 +311,7 @@ const PARQUES = {
   nombre: 'Disneyland — plan de medio día',
   fecha: 'Miércoles 9 · 8:00 a 15:45',
   horario: 'Parque 8:00–22:00 · Tú sales a las 15:45 por el juego de los Dodgers',
-  ll: 'Ya lo tienes: primera reserva a las 7:00 desde el cuarto. Con medio día la regla es redimir rápido, no acumular: cada vez que escaneas, se desbloquea la siguiente de inmediato. Rise of the Resistance NO está incluida (es Single Pass aparte).',
+  ll: 'La primera reserva sólo se habilita DESPUÉS de escanear tu boleto en el torniquete: no se puede desde el hotel. Los torniquetes abren antes que el parque, así que cruza temprano y reserva parado esperando la cuerda. Con medio día la regla es redimir rápido, no acumular. Rise of the Resistance NO está incluida (es Single Pass aparte).',
   principios: [
     'Haz rope drop en Fantasyland, no en Galaxy\'s Edge. Las atracciones de Fantasyland son cortas, están juntas y tienen las peores filas del día si las dejas para después.',
     'NO hagas rope drop de Rise of the Resistance: la caminata es larga, la atracción se descompone seguido, dura mucho y medio parque va corriendo para allá. Va con Single Pass o no va.',
@@ -302,7 +320,7 @@ const PARQUES = {
     'Come antes de las 12:00 o después de las 14:00. Nunca en medio.'
   ],
   ruta: [
-    { t:'07:00', a:'📱 1ª Lightning Lane, desde el hotel', n:'Indiana Jones con el regreso más temprano que te dé. A las 9:00 la escaneas y desbloqueas la siguiente al instante.', tag:'clave' },
+    { t:'07:25', a:'📱 Escanear boleto → 1ª Lightning Lane', n:'La reserva se habilita al cruzar el torniquete, no antes. Indiana Jones con el regreso más temprano que te dé. A las 9:00 la escaneas y desbloqueas la siguiente al instante.', tag:'clave' },
     { t:'08:00', a:'Peter Pan\'s Flight', n:'La primera del día, siempre. Es la peor relación fila/capacidad del parque: a las 10:00 son 60 minutos por una atracción de 3.', tag:'clave' },
     { t:'08:20', a:'Alice in Wonderland' },
     { t:'08:35', a:'Mr. Toad\'s Wild Ride o Casey Jr.', n:'Lo que esté más vacío. Fantasyland en la primera hora se hace casi corriendo.' },
@@ -333,34 +351,41 @@ const PARQUES = {
 'universal': {
   nombre: 'Universal Studios Hollywood',
   fecha: 'Jueves 10 · desde la apertura',
-  horario: 'Confirma apertura en la app (9:00 típico en septiembre) · En noches de Halloween Horror Nights el parque diurno cierra temprano',
+  horario: 'Early Access a Super Nintendo World, una hora antes de la apertura · Confirma la hora de apertura en la app (9:00 es lo típico en septiembre) · En noches de Halloween Horror Nights el parque diurno cierra temprano',
   ll: 'Ojo: tu Lightning Lane es de Disney y aquí no sirve de nada. El equivalente de Universal es Express Pass, se compra aparte y puede duplicar el costo del boleto. Con rope drop bien hecho un jueves de septiembre no lo necesitas.',
   principios: [
-    'El parque está en dos niveles unidos por escaleras eléctricas larguísimas. Al abrir, TODOS se quedan en el Upper Lot. Bájate al Lower Lot de inmediato: es la ventaja gratis más grande de este parque.',
+    'Tu Early Access resuelve el único cuello de botella real del parque. Haces Super Nintendo World vacía y te olvidas de la cola virtual, que es lo que arruina el día de todos los demás.',
+    'Cuando abra el parque, la masa entera va a correr hacia Nintendo. Tú haz lo contrario: bájate al Lower Lot, que se queda vacío justo en ese momento.',
+    'El parque está en dos niveles unidos por escaleras eléctricas larguísimas. Bajas rápido pero subes lento: planea subir UNA sola vez.',
     'El Studio Tour hay que hacerlo antes de las 11:00. Después se va a 60–90 minutos y no baja en todo el día.',
-    'Super Nintendo World puede operar con cola virtual. Si la tiene, tómala en el segundo en que cruzas los torniquetes.',
     'Universal se termina en un día bien hecho. No lo estires.'
   ],
   ruta: [
-    { t:'Apertura', a:'📱 Cola virtual de Super Nintendo World', n:'Revisa la app apenas entres. Si hay cola virtual, tómala antes de caminar a ningún lado.', tag:'clave' },
-    { t:'+3 min', a:'Bajar al Lower Lot por las escaleras', n:'Sin detenerte arriba. Esta decisión te ahorra 2 horas de fila acumuladas.', tag:'clave' },
-    { t:'Apertura +10', a:'Jurassic World – The Ride', n:'Te vas a mojar. Impermeable barato o guarda el celular.' },
-    { t:'+45 min', a:'Revenge of the Mummy', n:'Está al lado.' },
-    { t:'+75 min', a:'Transformers: The Ride 3D', n:'Cierra el Lower Lot completo.' },
-    { t:'~10:15', a:'Subir y hacer el Studio Tour', n:'Tiene que ser antes de las 11:00. Es la atracción insignia y la única que no se repone.', tag:'clave' },
-    { t:'~11:30', a:'Super Nintendo World: Mario Kart', n:'Si tienes cola virtual, respeta tu ventana. La tierra entera es muy fotogénica: reserva tiempo para verla, no sólo para la atracción.' },
-    { t:'13:00', a:'🍽️ Comida', n:'Antes de las 13:00 o después de las 14:00. Toadstool Cafe en Nintendo World es el más temático.' },
-    { t:'14:00', a:'Wizarding World of Harry Potter', n:'Forbidden Journey y Flight of the Hippogriff. Hogsmeade de tarde tiene mejor luz para fotos.' },
-    { t:'15:00', a:'The Secret Life of Pets y The Simpsons Ride', n:'Rellenos del Upper Lot, filas moderadas.' },
-    { t:'16:00', a:'Un show', n:'WaterWorld o el Special Effects Show. Sentarte 25 minutos a media tarde salva las piernas.' },
+    { t:'07:15', a:'Llegar y cruzar seguridad', n:'Con 45 minutos de margen antes del Early Access. Del estacionamiento a los torniquetes hay 10–15 min de caminata.', tag:'clave' },
+    { t:'08:00', a:'🍄 Mario Kart: Bowser\'s Challenge', n:'Lo primero del Early Access, sin dudarlo. Es la atracción más demandada del parque y ahorita la tienes vacía.', tag:'clave' },
+    { t:'08:25', a:'Mine-Cart Madness o Yoshi\'s Adventure', n:'Lo que esté operando. Aprovecha que sigues casi solo.' },
+    { t:'08:45', a:'Retos interactivos y fotos de la tierra', n:'Bowser Jr.\'s Shadow Showdown y las llaves. Super Nintendo World vacía es LA foto del día.', tag:'joya' },
+    { t:'09:00', a:'⬇️ Al abrir: BAJAR al Lower Lot', n:'Todos van a entrar corriendo a Nintendo justo cuando tú sales. Ve contra la corriente por las escaleras eléctricas.', tag:'clave' },
+    { t:'09:15', a:'Jurassic World – The Ride', n:'Te vas a mojar. Impermeable barato o guarda el celular en bolsa.' },
+    { t:'09:50', a:'Revenge of the Mummy', n:'Está al lado.' },
+    { t:'10:20', a:'Transformers: The Ride 3D', n:'Cierra el Lower Lot completo y sube una sola vez.' },
+    { t:'11:00', a:'Studio Tour', n:'Antes de las 11:00 si puedes. Es la atracción insignia y la única que no se repone.', tag:'clave' },
+    { t:'12:15', a:'🍽️ Comida temprana', n:'Antes de las 13:00. Toadstool Cafe en Nintendo World es el más temático, pero a esta hora ya tiene fila: Springfield es más rápido.' },
+    { t:'13:15', a:'Wizarding World of Harry Potter', n:'Forbidden Journey y Flight of the Hippogriff. Hogsmeade de tarde tiene mejor luz para fotos.' },
+    { t:'14:30', a:'The Secret Life of Pets y The Simpsons Ride', n:'Rellenos del Upper Lot, filas moderadas.' },
+    { t:'15:30', a:'Un show', n:'WaterWorld o el Special Effects Show. Sentarte 25 minutos a media tarde salva las piernas.' },
+    { t:'16:15', a:'Segunda vuelta a Nintendo, si quedaron ganas', n:'Ahora sí con fila, pero ya conocen la tierra y saben qué les faltó.' },
     { t:'17:00', a:'⚠️ Posible cierre por HHN', n:'Si es noche del evento, desalojan. Sal a CityWalk a cenar.', tag:'clave' }
   ],
   evitar: [
-    'Empezar por el Upper Lot. Es el error que comete el 90% de la gente y el que te regala el Lower Lot vacío.',
+    'Llegar justo a la hora en que empieza tu Early Access. Entre estacionarse, caminar CityWalk y pasar seguridad se te van 30 o 40 minutos de tu hora dorada.',
+    'Quedarte en Nintendo después de que abra el parque. En ese minuto exacto se llena y el Lower Lot se vacía: hay que cambiar de lado.',
     'Dejar el Studio Tour para después de comer.',
     'Pagar estacionamiento Preferred: la diferencia real son 5 minutos de caminata.'
   ],
   oro: [
+    'El Early Access es sólo del día 10. El 13 no lo tienes: si quieren repetir Nintendo ese día, va con fila normal o cola virtual.',
+    'La pulsera Power-Up Band se compra aparte y sirve para los retos interactivos de la tierra. Si la van a comprar, háganlo en el Early Access, cuando la tienda está vacía.',
     'Las escaleras eléctricas del Lower Lot son larguísimas: bajas rápido pero subes lento. Planea subir UNA sola vez.',
     'CityWalk está fuera del parque y no cobra entrada: es la mejor cena de la zona y no gastas horario de parque.',
     'Si el 10 resulta ser noche de HHN, el 13 es tu comodín para lo que te falte.'
@@ -371,10 +396,10 @@ const PARQUES = {
   nombre: 'Disney California Adventure — día completo',
   fecha: 'Viernes 11 · 8:00 a cierre',
   horario: 'Confirma horario en la app. Viernes suele cerrar 21:00–22:00 con World of Color.',
-  ll: 'Cuidado con la trampa del día: Radiator Springs Racers NO está en el Multi Pass, es Single Pass aparte. Tus reservas de hoy van en Web Slingers, Guardians, Incredicoaster, Toy Story y Soarin\'. Racers se gana con rope drop.',
+  ll: 'Dos trampas hoy. Una: Radiator Springs Racers NO está en el Multi Pass, es Single Pass aparte, y se gana con rope drop. Dos: la primera reserva sólo se habilita al escanear el boleto en el torniquete. Tus reservas van en Web Slingers, Guardians, Incredicoaster, Toy Story y Soarin\'.',
   principios: [
     'Radiator Springs Racers es LA atracción de este parque y NO la cubre tu Multi Pass. O la haces en los primeros 20 minutos del día, o pagas el Single Pass aparte, o esperas 80 minutos. No hay cuarta opción.',
-    'Tu primera Lightning Lane a las 7:00 va en Web Slingers, para tenerla lista cuando salgas de Cars Land.',
+    'Tu primera Lightning Lane se reserva al escanear el boleto, y va en Web Slingers, para tenerla lista cuando salgas de Cars Land.',
     'DCA es mucho más caminable que Disneyland y se hace completo en un día sin correr.',
     'Guarda Grizzly River Run para la hora de más calor y Pixar Pier para el atardecer.',
     'World of Color es lo que NO pudiste ver el día 8 porque el parque cerró a las 18:00 por la fiesta.'
@@ -413,7 +438,7 @@ const PARQUES = {
   nombre: 'Disneyland — día completo + noche de shows',
   fecha: 'Sábado 12 · 8:00 a 23:00',
   horario: 'Parque 8:00–23:00 · Halloween Screams ~21:30 · Fantasmic 2º show ~22:30 (confirmar en la app)',
-  ll: 'Hoy es el día que más rinde tu Multi Pass: sábado en Halloween Time. Primera reserva a las 7:00 en Haunted Mansion Holiday. Y es el único día donde vale la pena pagar el Single Pass de Rise of the Resistance aparte, porque tienes el día completo para amortizarlo.',
+  ll: 'Hoy es el día que más rinde tu Multi Pass: sábado en Halloween Time. Recuerda que la primera reserva sólo se habilita al escanear el boleto en el torniquete, así que cruza temprano: Haunted Mansion Holiday. Y es el único día donde vale la pena pagar el Single Pass de Rise of the Resistance aparte, porque tienes el día completo para amortizarlo.',
   principios: [
     'Sábado es el día más lleno. Tener Multi Pass no sustituye el rope drop: las dos primeras horas del día valen más que cuatro Lightning Lanes.',
     'Todas tus Lightning Lanes se usan entre 8:00 y 18:00. De 19:15 en adelante es cena y shows, ahí ya no vas a subirte a nada.',
@@ -422,7 +447,7 @@ const PARQUES = {
     'Después de Fantasmic hay una salida masiva. No te formes en ella.'
   ],
   ruta: [
-    { t:'07:00', a:'📱 1ª Lightning Lane: Haunted Mansion Holiday', n:'Desde el cuarto. En sábado es la que más rápido se queda sin ventanas de regreso.', tag:'clave' },
+    { t:'07:25', a:'📱 Escanear boleto → Haunted Mansion Holiday', n:'Se habilita al cruzar el torniquete. En sábado es la que más rápido se queda sin ventanas de regreso: quien escanea a las 7:25 la consigue, quien escanea a las 8:30 ya no.', tag:'clave' },
     { t:'08:00', a:'Peter Pan\'s Flight', n:'Otra vez la primera. Un sábado a las 11:00 son 80 minutos.', tag:'clave' },
     { t:'08:20', a:'Alice in Wonderland' },
     { t:'08:35', a:'Matterhorn Bobsleds' },
@@ -471,6 +496,9 @@ const CHECKLISTS = [
     'Reservación de River Belle Terrace confirmada (hora exacta de comida)',
     'Boletos de Dodgers y pase de estacionamiento comprados',
     'Boletos de Universal comprados y verificado si el 10 es noche de HHN',
+    'Hora de apertura de Universal el 10 confirmada, para calcular la ventana del Early Access',
+    'Boleto de Early Access de Super Nintendo World descargado (es de fecha fija, no se cambia)',
+    'Ubicación del módulo de canje de la chamarra localizada en el boleto digital de los Dodgers',
     'Hotel confirmado con política de guardar equipaje antes del check-in',
     'Dirección del hotel guardada en Uber y Lyft como destino favorito',
     'Tarjeta de crédito avisada al banco de viaje a EE.UU.',
@@ -554,8 +582,8 @@ const LIGHTNING_LANE = {
       d:'En Disneyland el Multi Pass no es como el de Florida. Tienes una selección a la vez y la siguiente se desbloquea cuando escaneas la actual O cuando pasan 2 horas desde que la reservaste, lo que ocurra primero.' },
     { t:'Escanear temprano rinde más que esperar',
       d:'Si redimes a la hora, la siguiente se desbloquea de inmediato. Redimiendo cada hora sacas bastante más reservas al día que dejando correr el reloj de 2 horas. En un día completo la diferencia son 3 o 4 atracciones.' },
-    { t:'La primera se reserva a las 7:00, desde donde estés',
-      d:'No necesitas estar dentro del parque ni haber pasado el torniquete. Hazla desde la cama. Es la única reserva del día con horarios de regreso realmente buenos.' },
+    { t:'Hay que escanear el boleto ANTES de la primera reserva',
+      d:'No se puede desde el hotel ni desde el camino: la app no te deja hasta que cruzas el torniquete. Pero los torniquetes abren antes que el parque, así que puedes escanear 30 o 40 minutos antes de la apertura y reservar ahí mismo, parado esperando la cuerda. Por eso llegar temprano vale doble: lugar en el rope drop y reserva más temprana.' },
     { t:'Cambiar de atracción no reinicia el reloj',
       d:'Si reservas una y luego la modificas por otra del mismo parque, el contador de 2 horas sigue corriendo desde la reserva original. Sirve para corregir sin castigo.' },
     { t:'Funciona en los dos parques',
@@ -594,6 +622,10 @@ const FUENTES = [
   { t:'Cross Border Xpress — sitio oficial', u:'https://www.crossborderxpress.com/' },
   { t:'Calendario de los Dodgers 2026 (MLB)', u:'https://www.mlb.com/dodgers/schedule/2026/fullseason' },
   { t:'Uber y Lyft en Disneyland: puntos de ascenso y descenso (Mickey Visit)', u:'https://mickeyvisit.com/disneyland-uber-lyft-dropoff-pickup-tips/' },
+  { t:'Early Access a Super Nintendo World: cómo funciona (Undercover Tourist)', u:'https://www.undercovertourist.com/blog/early-access-tips-super-nintendo-world/' },
+  { t:'Boleto de Early Access — información oficial de Universal', u:'https://www.universalstudioshollywood.com/web/en/us/tickets-and-passes' },
+  { t:'Política de giveaways y canjes del Dodger Stadium', u:'https://mlb.com/dodgers/ballpark/giveaway-policy' },
+  { t:'Guía del Dodger Stadium: puertas, políticas y procedimientos', u:'https://www.mlb.com/dodgers/ballpark/information/guide' },
   { t:'Guía del punto de Harbor Boulevard 2026 (Enchanted Insider)', u:'https://www.enchantedinsider.com/how-to-harbor-boulevard-guest-drop-off-pick-up-for-disneyland/' },
   { t:'Turo en Cross Border Xpress — ayuda oficial', u:'https://help.turo.com/en_us/cross-border-xpress-(cbx)-or-hosts-S1dzwQZfyl' },
   { t:'Fin de la entrada anticipada en los hoteles Disneyland (Disney Tourist Blog)', u:'https://www.disneytouristblog.com/free-lightning-lane-for-on-site-hotel-guests-at-disneyland-resort-early-entry-ending-in-2026/' },
