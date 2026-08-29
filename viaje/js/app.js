@@ -278,8 +278,15 @@ function pintaInfo() {
       <div class="meta">${esc(x.p)}</div>
     </td><td class="tt">${esc(x.c)}</td></tr>`).join('');
   $('#tTransporteNota').innerHTML =
-    `<p><b style="color:var(--gr)">${esc(TRANSPORTE.ahorro)}</b></p>` +
-    `<p style="margin-top:10px">${esc(TRANSPORTE.nota)}</p>`;
+    `<p><b style="color:var(--gr)">${esc(TRANSPORTE.ahorro)}</b></p>`;
+
+  const m = TRANSPORTE.mcdonalds;
+  $('#tMcd').innerHTML =
+    `<p>${esc(m.porque)}</p>` +
+    '<h3 style="font-size:14px;margin-top:14px">Cómo se hace</h3>' +
+    `<ul class="bullets" style="margin-top:8px">${m.como.map(x => `<li>${esc(x)}</li>`).join('')}</ul>` +
+    '<h3 style="font-size:14px;margin-top:14px">Ojo con esto</h3>' +
+    `<ul class="bullets no" style="margin-top:8px">${m.ojo.map(x => `<li>${esc(x)}</li>`).join('')}</ul>`;
 
   $('#tLLfuera').innerHTML =
     '<h3>Lo que tu Lightning Lane NO cubre</h3>' +
