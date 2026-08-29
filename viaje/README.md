@@ -29,19 +29,38 @@ Se necesita servirla por HTTP (no `file://`) porque el service worker lo requier
 
 ## Publicar gratis
 
-**GitHub Pages** — en Settings → Pages, elige la rama y la carpeta `/viaje`.
-Queda en `https://<usuario>.github.io/<repo>/`.
+**GitHub Pages no sirve para esta app.** Pages sólo publica desde la raíz del
+repositorio o desde `/docs`, y las dos ya están ocupadas por el proyecto de Liga MX.
+No hay opción de publicar desde `/viaje`.
 
-**Netlify o Cloudflare Pages** — arrastra la carpeta `viaje/` a la interfaz web.
-Sin build, sin configuración: es un sitio estático.
+**Netlify** es el camino, y es el mismo que ya usa este repositorio:
+
+1. Entra a https://app.netlify.com y crea cuenta con *Sign up with GitHub*.
+2. *Add new site* → *Import an existing project* → **GitHub** → elige el repositorio **SA**.
+3. Configura:
+
+   | Campo | Valor |
+   |---|---|
+   | Branch to deploy | `claude/app-viaje-cdmx-disneyland-fqh5eg` |
+   | Build command | *(vacío)* |
+   | Publish directory | `viaje` |
+
+4. *Deploy site*, y luego *Site configuration* → *Change site name* para dejarlo
+   en algo como `viaje-socal.netlify.app`.
+
+Cada `git push` que toque `viaje/` republica solo. Es un sitio estático: no hay build.
 
 ## Instalar en el celular
 
-- **iPhone**: abre la liga en Safari → Compartir → *Agregar a pantalla de inicio*.
-- **Android**: abre en Chrome → menú → *Instalar aplicación*.
+- **iPhone**: abre la liga en **Safari** (no en Chrome) → botón Compartir → *Agregar a inicio*.
+- **Android**: abre en Chrome → menú de tres puntos → *Instalar aplicación*.
 
-Después de abrirla una vez, funciona sin señal. Útil en los parques, donde el wifi
-de Disney es lento, y cruzando la frontera.
+Instalada desde su propia dirección, funciona **sin señal** después de abrirla una vez:
+el service worker guarda todo en el teléfono. Eso es lo que la hace útil dentro de los
+parques y cruzando la frontera.
+
+Si en vez de eso guardas el enlace del artifact de Claude, funciona igual de bien pero
+**necesita internet y sesión iniciada**: es una página, no una app instalada.
 
 ## Editar el contenido
 
