@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Viaje SoCal 2026</title>
+<meta name="description" content="Itinerario, estrategia de parques y logística del viaje CDMX → San Diego → Anaheim, del 8 al 14 de septiembre de 2026.">
+<meta name="theme-color" content="#12091f">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Viaje SoCal">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+
+<header class="hdr">
+  <div class="kick">8 – 14 septiembre 2026</div>
+  <h1 id="hdrTitle">Viaje SoCal</h1>
+  <div class="sub" id="hdrSub">CDMX → Tijuana → San Diego → Anaheim → LA</div>
+</header>
+
+<!-- ============ HOY ============ -->
+<section class="view on" id="v-hoy">
+  <div class="wrap">
+    <div class="card cd" id="cdCard">
+      <div class="lbl" id="cdLbl">Faltan para el despegue</div>
+      <div class="big" id="cdBig">—</div>
+      <div class="units" id="cdUnits"></div>
+    </div>
+    <div id="hoyAhora"></div>
+    <div class="sec-t">Los candados del viaje</div>
+    <div id="hoyCandados"></div>
+    <div class="sec-t">Conflictos que hay que resolver</div>
+    <div id="hoyAlertas"></div>
+  </div>
+</section>
+
+<!-- ============ RUTA ============ -->
+<section class="view" id="v-ruta">
+  <div class="days" id="daySel"></div>
+  <div class="wrap">
+    <div class="card" id="dayHead"></div>
+    <div class="tl" id="dayTL"></div>
+  </div>
+</section>
+
+<!-- ============ PARQUES ============ -->
+<section class="view" id="v-parques">
+  <div class="psel" id="parkSel"></div>
+  <div class="wrap" id="parkBody"></div>
+</section>
+
+<!-- ============ LISTAS ============ -->
+<section class="view" id="v-listas">
+  <div class="wrap" id="listasBody"></div>
+</section>
+
+<!-- ============ GASTOS ============ -->
+<section class="view" id="v-gastos">
+  <div class="wrap">
+    <div class="money">
+      <div class="mbox"><b id="totUsd">$0</b><span>Total USD</span></div>
+      <div class="mbox"><b id="totMxn">$0</b><span>Total MXN</span></div>
+    </div>
+    <div class="card">
+      <h3>Agregar gasto</h3>
+      <div class="frm" style="margin-top:10px">
+        <input id="gDesc" placeholder="Concepto" style="flex:1 1 100%">
+        <input id="gMonto" type="number" inputmode="decimal" step="0.01" placeholder="Monto USD" style="flex:1 1 120px">
+        <select id="gCat" style="flex:1 1 130px"></select>
+        <button class="btn" id="gAdd" style="flex:1 1 100%">Agregar</button>
+      </div>
+      <div class="frm" style="margin-top:10px;align-items:center">
+        <span style="font-size:13px;color:var(--tx2)">Tipo de cambio</span>
+        <input id="gTc" type="number" step="0.01" style="width:96px">
+        <span style="font-size:13px;color:var(--tx3)">MXN por USD</span>
+      </div>
+    </div>
+    <div class="sec-t">Por categoría</div>
+    <div class="card" id="gPorCat"></div>
+    <div class="sec-t">Movimientos</div>
+    <div class="card" id="gLista"></div>
+  </div>
+</section>
+
+<!-- ============ INFO ============ -->
+<section class="view" id="v-info">
+  <div class="wrap">
+    <div class="sec-t">Tiempos de traslado</div>
+    <div class="card"><table class="tbl" id="tTraslados"></table></div>
+    <div class="sec-t">Reglas que salvan el viaje</div>
+    <div class="card"><ul class="bullets" id="tReglas"></ul></div>
+    <div class="sec-t">Fuentes consultadas</div>
+    <div class="card" id="tFuentes"></div>
+    <div class="sec-t">Datos y respaldo</div>
+    <div class="card">
+      <p style="margin-bottom:12px">Tus listas y gastos se guardan sólo en este dispositivo. Si borras los datos del navegador se pierden.</p>
+      <div class="frm">
+        <button class="btn ghost" id="btnExport">Exportar respaldo</button>
+        <button class="btn ghost" id="btnReset">Borrar mis datos</button>
+      </div>
+    </div>
+    <div class="note" id="tNota"></div>
+  </div>
+</section>
+
+<nav class="nav" id="nav">
+  <button data-v="hoy" class="on"><span class="ic">🏰</span>Hoy</button>
+  <button data-v="ruta"><span class="ic">🗓️</span>Ruta</button>
+  <button data-v="parques"><span class="ic">🎢</span>Parques</button>
+  <button data-v="listas"><span class="ic">✅</span>Listas</button>
+  <button data-v="gastos"><span class="ic">💵</span>Gastos</button>
+  <button data-v="info"><span class="ic">ℹ️</span>Info</button>
+</nav>
+
+<script src="js/data.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
