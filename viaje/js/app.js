@@ -264,6 +264,7 @@ function pintaGastos() {
 const REGLAS = [
   'Cualquier hora marcada con ⏰ en la app es un candado: si se pasa, algo más se cae.',
   'Come en los parques antes de las 12:00 o después de las 14:00. Nunca en medio.',
+  'Escanea tu Lightning Lane en cuanto abra la ventana: eso desbloquea la siguiente de inmediato.',
   'Llegar al estacionamiento a la hora de apertura es llegar al parque 40 minutos tarde.',
   'Nunca dejes maletas ni bolsas de compras a la vista dentro del carro.',
   'Confirma horarios de shows en la app oficial el mismo día: cambian y se cancelan por viento.',
@@ -271,6 +272,20 @@ const REGLAS = [
   'California va una hora atrás que CDMX durante todo el viaje.'
 ];
 function pintaInfo() {
+  $('#tLLfuera').innerHTML =
+    '<h3>Lo que tu Lightning Lane NO cubre</h3>' +
+    '<p style="margin-top:6px">Son Single Pass: se compran aparte y por atracción. Salvo que lo suyo sea Premier Pass, que sí las incluye.</p>' +
+    '<ul class="bullets no" style="margin-top:10px">' +
+    LIGHTNING_LANE.fuera.map(x => `<li>${esc(x)}</li>`).join('') + '</ul>';
+
+  $('#tLLreglas').innerHTML = LIGHTNING_LANE.reglas.map(r => `
+    <div class="card">
+      <h3 style="font-size:15px">${esc(r.t)}</h3>
+      <p style="margin-top:5px">${esc(r.d)}</p>
+    </div>`).join('');
+
+  $('#tLLorden').innerHTML = LIGHTNING_LANE.orden.map(x => `<li>${esc(x)}</li>`).join('');
+
   $('#tTraslados').innerHTML = TRASLADOS.map(t => `
     <tr><td>
       <div class="ruta">${esc(t.de)} → ${esc(t.a)}</div>

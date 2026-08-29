@@ -45,11 +45,25 @@ const ALERTAS = [
     accion: 'Usa 15:00–18:00 para Radiator Springs Racers, Web Slingers e Incredicoaster. Los dulces y los villanos son para la noche.'
   },
   {
+    nivel: 'alto',
+    dia: 'general',
+    titulo: 'Radiator Springs Racers y Rise of the Resistance NO entran en tu Lightning Lane',
+    detalle: 'Las dos atracciones más demandadas del resort están fuera del Multi Pass: son Lightning Lane Single Pass, que se compra aparte y por atracción. Radiator Springs Racers en California Adventure y Star Wars: Rise of the Resistance en Disneyland. Justo las dos que uno supondría cubiertas.',
+    accion: 'Racers se resuelve con rope drop: entra a Cars Land sin detenerte y la haces en los primeros 20 minutos. Rise no se puede rope-dropear bien, así que ahí sí conviene pagar el Single Pass un solo día, el sábado. La excepción es si lo que tienen es Premier Pass, que sí las incluye.'
+  },
+  {
     nivel: 'medio',
     dia: 'sab-12',
     titulo: 'Sábado es el día más lleno de la semana en Disneyland',
     detalle: 'Tu reservación de Fantasmic ancla el sábado en Disneyland y no se puede mover. Sábado con Halloween Time es el pico de la semana.',
-    accion: 'Lightning Lane Multi Pass ese día no es opcional. Cómpralo desde las 7:00 en la app y haz rope drop.'
+    accion: 'Con Multi Pass el sábado deja de dar miedo, pero el rope drop sigue siendo obligatorio: las primeras dos horas valen más que cuatro Lightning Lanes.'
+  },
+  {
+    nivel: 'medio',
+    dia: 'mar-8',
+    titulo: 'El Lightning Lane no funciona durante el Oogie Boogie Bash',
+    detalle: 'Multi Pass, Single Pass y Premier Pass quedan suspendidos durante las horas del evento, de 18:00 a 23:00. Es un evento aparte con su propio boleto.',
+    accion: 'No importa: durante la fiesta las filas ya son cortas. Si tu Lightning Lane del día 8 alcanza a servir de 15:00 a 18:00, úsalo en Radiator Springs Racers y ya. Confírmalo en la app ese mismo día.'
   },
   {
     nivel: 'medio',
@@ -122,7 +136,7 @@ const DIAS = [
   resumen: 'Dos actividades grandes con un traslado de LA en medio. Funciona sólo si el rope drop es real y la salida a las 15:45 es innegociable.',
   bloques: [
     { t:'06:45', kind:'hotel', titulo:'Salida del hotel', texto:'Desayuna algo en el cuarto. No pierdas 30 min en un restaurante.' },
-    { t:'07:00', kind:'nota', titulo:'📱 Comprar Lightning Lane Multi Pass', texto:'Se habilita a las 7:00 en punto en la app de Disneyland. Desde $34 USD por persona y sube conforme se acerca el día. Incluye todas tus fotos de PhotoPass.', why:'Con medio día disponible, el Multi Pass es lo que convierte 4 atracciones en 8. Cómpralo antes de llegar al estacionamiento.', alerta:true },
+    { t:'07:00', kind:'nota', titulo:'📱 Reservar la 1ª Lightning Lane del día', texto:'Las reservas abren a las 7:00 en punto en la app. No necesitas estar en el parque: hazlo desde el cuarto, mientras desayunan. Sugerencia de hoy: Indiana Jones con regreso lo más temprano posible.', why:'La primera reserva es la única con horarios buenos disponibles, y arranca el reloj de 2 horas para la siguiente. Reservarla a las 7:00 en vez de a las 8:30 te regala una atracción extra en el día.', alerta:true },
     { t:'07:05', t2:'07:30', kind:'auto', titulo:'Estacionamiento y tram', texto:'Mickey & Friends o Pixar Pals. Objetivo: estar en los torniquetes a las 7:30.', why:'Llegar 30 min antes de la apertura es la diferencia entre hacer 5 atracciones antes de las 10:00 o hacer 2.' },
     { t:'07:35', kind:'nota', titulo:'Escanear boleto y reservar la 1ª Lightning Lane', texto:'En cuanto pasas el torniquete ya puedes reservar. Aprovecha los 25 min de espera de la cuerda.', why:'La primera reserva del día es la más valiosa: es la única con inventario de horarios buenos.' },
     { t:'08:00', t2:'15:45', kind:'parque', titulo:'DISNEYLAND — plan de medio día', texto:'Ruta completa en la pestaña Parques. Prioridad: Fantasyland al rope drop, Haunted Mansion Holiday e Indiana Jones antes de mediodía.' },
@@ -156,7 +170,7 @@ const DIAS = [
   badge: 'Día completo', parque: 'dca',
   resumen: 'El día más relajado de los cuatro de Disney. DCA se hace completo en un día si empiezas por Cars Land.',
   bloques: [
-    { t:'06:50', kind:'hotel', titulo:'Salida del hotel', texto:'Mismo ritual del miércoles. Multi Pass a las 7:00 si decides comprarlo.' },
+    { t:'06:50', kind:'hotel', titulo:'Salida del hotel', texto:'Mismo ritual del miércoles. Reserva tu primera Lightning Lane a las 7:00 desde el carro: hoy va en Web Slingers o Guardians, NO en Racers.', why:'Radiator Springs Racers no está en el Multi Pass. Esa se gana con rope drop.' },
     { t:'07:30', kind:'parque', titulo:'En los torniquetes de DCA', texto:'Objetivo: estar entre los primeros para Radiator Springs Racers.' },
     { t:'08:00', t2:'21:00', kind:'parque', titulo:'DCA — plan de ataque', texto:'Ruta completa en la pestaña Parques. Racers al rope drop, Avengers Campus a media mañana, Pixar Pier en la tarde.' },
     { t:'21:00', kind:'show', titulo:'🌊 World of Color', texto:'Agarra lugar 45 min antes en Paradise Gardens Park, del lado izquierdo viendo la laguna. Confirma horario exacto en la app.', why:'Es el show que NO pudiste ver el día 8 porque el parque cerró a las 18:00 por la fiesta. Hoy es tu única oportunidad.' },
@@ -171,7 +185,7 @@ const DIAS = [
   resumen: 'Sábado con Halloween Time es el día más lleno de tu semana. También es el mejor: fuegos artificiales y Fantasmic la misma noche, en el orden correcto.',
   bloques: [
     { t:'06:45', kind:'hotel', titulo:'Salida del hotel', texto:'Hoy el rope drop importa más que ningún otro día.' },
-    { t:'07:00', kind:'nota', titulo:'📱 Lightning Lane Multi Pass — obligatorio hoy', texto:'Sábado sin Multi Pass en Halloween Time son 3 atracciones grandes en todo el día.', alerta:true },
+    { t:'07:00', kind:'nota', titulo:'📱 Reservar la 1ª Lightning Lane del día', texto:'Desde el cuarto, a las 7:00 en punto. Hoy la mejor primera reserva es Haunted Mansion Holiday: es la que más se dispara en sábado.', why:'En sábado los horarios de regreso se agotan de verdad. Media hora de retraso hoy te cuesta las ventanas de la mañana.', alerta:true },
     { t:'07:30', kind:'parque', titulo:'En los torniquetes de Disneyland', texto:'Objetivo real: cruzar antes de las 7:45.' },
     { t:'08:00', t2:'18:00', kind:'parque', titulo:'DISNEYLAND — plan de día completo', texto:'Ruta en la pestaña Parques. Haunted Mansion Holiday y Space Mountain con overlay de Halloween son las prioridades del día.' },
     { t:'18:00', kind:'nota', titulo:'Regreso al hotel (opcional pero recomendado)', texto:'Si aguantas el traslado, una siesta de 45 min aquí cambia tu noche. Si no, siéntate a cenar temprano en el parque.', why:'Vas a estar de pie hasta las 23:30. La noche del sábado es la más larga del viaje.' },
@@ -221,7 +235,7 @@ const PARQUES = {
   nombre: 'Oogie Boogie Bash — California Adventure',
   fecha: 'Martes 8 · 15:00 a 23:00',
   horario: 'Entrada con boleto de fiesta desde 15:00 · Fiesta 18:00–23:00 · El parque cierra al público general a las 18:00',
-  ll: 'NO compres Lightning Lane hoy. Las filas de la fiesta ya son cortas y el parque se vacía solo.',
+  ll: 'Durante la fiesta (18:00–23:00) el Lightning Lane queda suspendido: es un evento aparte. Si el tuyo sirve de 15:00 a 18:00, gástalo en Radiator Springs Racers, que es la única fila larga que te vas a encontrar hoy. De 18:00 en adelante no lo vas a necesitar.',
   principios: [
     'De 15:00 a 18:00 el parque se está VACIANDO. Es tu mejor ventana de atracciones grandes de todo el viaje, y es gratis.',
     'De 18:00 a 20:00 todos corren a lo mismo: dulces y villanos. Las filas de caramelos llegan a 40 minutos.',
@@ -262,25 +276,26 @@ const PARQUES = {
   nombre: 'Disneyland — plan de medio día',
   fecha: 'Miércoles 9 · 8:00 a 15:45',
   horario: 'Parque 8:00–22:00 · Tú sales a las 15:45 por el juego de los Dodgers',
-  ll: 'Lightning Lane Multi Pass desde $34 USD. Con medio día es lo que convierte 5 atracciones en 9. Cómpralo a las 7:00.',
+  ll: 'Ya lo tienes: primera reserva a las 7:00 desde el cuarto. Con medio día la regla es redimir rápido, no acumular: cada vez que escaneas, se desbloquea la siguiente de inmediato. Rise of the Resistance NO está incluida (es Single Pass aparte).',
   principios: [
     'Haz rope drop en Fantasyland, no en Galaxy\'s Edge. Las atracciones de Fantasyland son cortas, están juntas y tienen las peores filas del día si las dejas para después.',
     'NO hagas rope drop de Rise of the Resistance: la caminata es larga, la atracción se descompone seguido, dura mucho y medio parque va corriendo para allá. Va con Single Pass o no va.',
-    'Encadena Lightning Lanes: en cuanto uses una, o pasadas 2 horas, reserva la siguiente. Es una a la vez.',
+    'La siguiente Lightning Lane se desbloquea cuando escaneas la actual O a las 2 horas de haberla reservado, lo que pase primero. Con medio día, escanear temprano es lo que multiplica tus reservas: no dejes correr el reloj de 2 horas.',
+    'Reserva siempre el horario de regreso MÁS TEMPRANO disponible. Hoy no hay noche que aprovechar: sales a las 15:45.',
     'Come antes de las 12:00 o después de las 14:00. Nunca en medio.'
   ],
   ruta: [
-    { t:'07:35', a:'📱 Reservar tu 1ª Lightning Lane', n:'En cuanto escaneas el boleto ya puedes reservar, aunque falten 25 min para abrir. Sugerencia: Space Mountain o Indiana Jones.', tag:'clave' },
+    { t:'07:00', a:'📱 1ª Lightning Lane, desde el hotel', n:'Indiana Jones con el regreso más temprano que te dé. A las 9:00 la escaneas y desbloqueas la siguiente al instante.', tag:'clave' },
     { t:'08:00', a:'Peter Pan\'s Flight', n:'La primera del día, siempre. Es la peor relación fila/capacidad del parque: a las 10:00 son 60 minutos por una atracción de 3.', tag:'clave' },
     { t:'08:20', a:'Alice in Wonderland' },
     { t:'08:35', a:'Mr. Toad\'s Wild Ride o Casey Jr.', n:'Lo que esté más vacío. Fantasyland en la primera hora se hace casi corriendo.' },
     { t:'08:50', a:'Matterhorn Bobsleds', n:'Justo al salir de Fantasyland.' },
-    { t:'09:15', a:'Indiana Jones Adventure', n:'Camina por Adventureland. Si tienes LL aquí, mejor.' },
+    { t:'09:15', a:'Indiana Jones Adventure', n:'Con tu Lightning Lane. Al escanear, reserva de inmediato la siguiente: Haunted Mansion Holiday.', tag:'clave' },
     { t:'09:50', a:'Pirates of the Caribbean', n:'Alta capacidad, casi nunca pasa de 30 min en la mañana.' },
-    { t:'10:20', a:'Haunted Mansion Holiday', n:'Overlay completo de El Extraño Mundo de Jack. Es de las cosas más buscadas de Halloween Time: en la tarde son 75+ minutos.', tag:'clave' },
+    { t:'10:20', a:'Haunted Mansion Holiday', n:'Con Lightning Lane. Overlay completo de El Extraño Mundo de Jack, de lo más buscado de Halloween Time: en la tarde son 75+ minutos. Al escanear, reserva Space Mountain.', tag:'clave' },
     { t:'11:00', a:'Big Thunder Mountain Railroad' },
     { t:'11:40', a:'🍽️ Comida temprana', n:'Bengal Barbecue, Harbour Galley o Rancho del Zocalo. Comer a las 11:40 te ahorra 25 min de fila.' },
-    { t:'12:30', a:'Star Wars: Galaxy\'s Edge', n:'Millennium Falcon: Smugglers Run. Rise of the Resistance sólo si compraste Single Pass ($15–35 aprox).' },
+    { t:'12:30', a:'Star Wars: Galaxy\'s Edge', n:'Millennium Falcon sí entra en tu Multi Pass. Rise of the Resistance no: ésa es Single Pass aparte, $15–35 por persona. En medio día yo me la saltaría y la dejaría para el sábado.' },
     { t:'13:30', a:'Space Mountain', n:'Con tu Lightning Lane. En Halloween Time suele traer overlay temático: confirma en la app.' },
     { t:'14:15', a:'Relleno rápido', n:'Jungle Cruise, Buzz Lightyear, Star Tours o Roger Rabbit, según filas.' },
     { t:'15:15', a:'Main Street: compras y foto del castillo', n:'Main Street está abierta y no hay que caminar de más.' },
@@ -302,7 +317,7 @@ const PARQUES = {
   nombre: 'Universal Studios Hollywood',
   fecha: 'Jueves 10 · desde la apertura',
   horario: 'Confirma apertura en la app (9:00 típico en septiembre) · En noches de Halloween Horror Nights el parque diurno cierra temprano',
-  ll: 'Universal Express es caro (puede duplicar el costo del boleto). Con rope drop bien hecho un jueves de septiembre no lo necesitas.',
+  ll: 'Ojo: tu Lightning Lane es de Disney y aquí no sirve de nada. El equivalente de Universal es Express Pass, se compra aparte y puede duplicar el costo del boleto. Con rope drop bien hecho un jueves de septiembre no lo necesitas.',
   principios: [
     'El parque está en dos niveles unidos por escaleras eléctricas larguísimas. Al abrir, TODOS se quedan en el Upper Lot. Bájate al Lower Lot de inmediato: es la ventaja gratis más grande de este parque.',
     'El Studio Tour hay que hacerlo antes de las 11:00. Después se va a 60–90 minutos y no baja en todo el día.',
@@ -339,9 +354,10 @@ const PARQUES = {
   nombre: 'Disney California Adventure — día completo',
   fecha: 'Viernes 11 · 8:00 a cierre',
   horario: 'Confirma horario en la app. Viernes suele cerrar 21:00–22:00 con World of Color.',
-  ll: 'Opcional hoy. Si lo compras, úsalo en Radiator Springs Racers y Web Slingers.',
+  ll: 'Cuidado con la trampa del día: Radiator Springs Racers NO está en el Multi Pass, es Single Pass aparte. Tus reservas de hoy van en Web Slingers, Guardians, Incredicoaster, Toy Story y Soarin\'. Racers se gana con rope drop.',
   principios: [
-    'Radiator Springs Racers es LA atracción de este parque. O la haces en los primeros 20 minutos, o pagas Lightning Lane, o esperas 80 minutos. No hay cuarta opción.',
+    'Radiator Springs Racers es LA atracción de este parque y NO la cubre tu Multi Pass. O la haces en los primeros 20 minutos del día, o pagas el Single Pass aparte, o esperas 80 minutos. No hay cuarta opción.',
+    'Tu primera Lightning Lane a las 7:00 va en Web Slingers, para tenerla lista cuando salgas de Cars Land.',
     'DCA es mucho más caminable que Disneyland y se hace completo en un día sin correr.',
     'Guarda Grizzly River Run para la hora de más calor y Pixar Pier para el atardecer.',
     'World of Color es lo que NO pudiste ver el día 8 porque el parque cerró a las 18:00 por la fiesta.'
@@ -349,7 +365,7 @@ const PARQUES = {
   ruta: [
     { t:'08:00', a:'Radiator Springs Racers', n:'Rope drop directo a Cars Land, sin detenerte en Buena Vista Street. Es toda la partida de hoy.', tag:'clave' },
     { t:'08:45', a:'Luigi\'s Rollickin\' Roadsters y Mater\'s Junkyard Jamboree', n:'Ya estás en Cars Land y están vacías.' },
-    { t:'09:15', a:'Web Slingers: A Spider-Man Adventure', n:'Avengers Campus, justo al lado.' },
+    { t:'09:15', a:'Web Slingers: A Spider-Man Adventure', n:'Con tu Lightning Lane de las 7:00. Al escanear, reserva Incredicoaster.', tag:'clave' },
     { t:'09:50', a:'Guardians of the Galaxy – Mission: BREAKOUT!' },
     { t:'10:30', a:'Incredicoaster', n:'Ya en Pixar Pier.' },
     { t:'11:00', a:'Toy Story Midway Mania' },
@@ -380,26 +396,27 @@ const PARQUES = {
   nombre: 'Disneyland — día completo + noche de shows',
   fecha: 'Sábado 12 · 8:00 a 23:00',
   horario: 'Parque 8:00–23:00 · Halloween Screams ~21:30 · Fantasmic 2º show ~22:30 (confirmar en la app)',
-  ll: 'Lightning Lane Multi Pass HOY NO ES OPCIONAL. Sábado en Halloween Time es el pico de tu semana.',
+  ll: 'Hoy es el día que más rinde tu Multi Pass: sábado en Halloween Time. Primera reserva a las 7:00 en Haunted Mansion Holiday. Y es el único día donde vale la pena pagar el Single Pass de Rise of the Resistance aparte, porque tienes el día completo para amortizarlo.',
   principios: [
-    'Sábado es el día más lleno. El rope drop de hoy vale el doble que el de cualquier otro día.',
+    'Sábado es el día más lleno. Tener Multi Pass no sustituye el rope drop: las dos primeras horas del día valen más que cuatro Lightning Lanes.',
+    'Todas tus Lightning Lanes se usan entre 8:00 y 18:00. De 19:15 en adelante es cena y shows, ahí ya no vas a subirte a nada.',
     'Tu noche ya está resuelta y en el orden correcto: fuegos a las 21:30, Fantasmic a las 22:30. Ese es exactamente el motivo por el que el 2º show es el que había que reservar.',
     'El paquete de comida te da área reservada. No tienes que apartar lugar 2 horas antes: ese es todo el valor de lo que pagaste.',
     'Después de Fantasmic hay una salida masiva. No te formes en ella.'
   ],
   ruta: [
-    { t:'07:35', a:'📱 Reservar 1ª Lightning Lane', n:'Desde el torniquete, antes de que caiga la cuerda.', tag:'clave' },
+    { t:'07:00', a:'📱 1ª Lightning Lane: Haunted Mansion Holiday', n:'Desde el cuarto. En sábado es la que más rápido se queda sin ventanas de regreso.', tag:'clave' },
     { t:'08:00', a:'Peter Pan\'s Flight', n:'Otra vez la primera. Un sábado a las 11:00 son 80 minutos.', tag:'clave' },
     { t:'08:20', a:'Alice in Wonderland' },
     { t:'08:35', a:'Matterhorn Bobsleds' },
-    { t:'09:00', a:'Indiana Jones Adventure' },
-    { t:'09:40', a:'Haunted Mansion Holiday', n:'Prioridad absoluta de Halloween Time. En sábado por la tarde pasa de 90 minutos.', tag:'clave' },
+    { t:'09:00', a:'Indiana Jones Adventure', n:'Fila normal a esta hora todavía es razonable.' },
+    { t:'09:40', a:'Haunted Mansion Holiday', n:'Con tu Lightning Lane de las 7:00. Prioridad absoluta de Halloween Time: en sábado por la tarde pasa de 90 minutos. Al escanear, reserva Space Mountain.', tag:'clave' },
     { t:'10:20', a:'Pirates of the Caribbean' },
     { t:'10:50', a:'Big Thunder Mountain Railroad' },
     { t:'11:30', a:'Jungle Cruise' },
     { t:'12:00', a:'🍽️ Comida temprana', n:'Antes de las 12:15 o vas a perder 40 minutos formado.' },
-    { t:'13:00', a:'Star Wars: Galaxy\'s Edge', n:'Millennium Falcon y, con Single Pass, Rise of the Resistance. Sábado es el día que más justifica el Single Pass.' },
-    { t:'14:30', a:'Space Mountain', n:'Con Lightning Lane. Confirma si trae overlay de temporada.' },
+    { t:'13:00', a:'Star Wars: Galaxy\'s Edge', n:'Millennium Falcon entra en tu Multi Pass. Rise of the Resistance es Single Pass aparte: si la van a pagar un día, que sea hoy. Cómprala en la mañana, los horarios de regreso se agotan.', tag:'clave' },
+    { t:'14:30', a:'Space Mountain', n:'Con Lightning Lane. Confirma en la app si trae overlay de temporada.' },
     { t:'15:15', a:'Tomorrowland', n:'Star Tours, Buzz Lightyear, Astro Orbitor.' },
     { t:'16:00', a:'Fantasyland pendiente', n:'it\'s a small world, Storybook Land, Snow White, Pinocchio. Baja intensidad a propósito: vas a necesitar piernas en la noche.' },
     { t:'17:00', a:'New Orleans Square y compras', n:'También revisa si está Madame Leota\'s Street Party u otro entretenimiento de temporada en la app.' },
@@ -476,6 +493,35 @@ const CHECKLISTS = [
   ]}
 ];
 
+/* ---------- LIGHTNING LANE: mecánica ---------- */
+const LIGHTNING_LANE = {
+  fuera: [
+    'Star Wars: Rise of the Resistance — Disneyland',
+    'Radiator Springs Racers — California Adventure'
+  ],
+  reglas: [
+    { t:'Una reserva activa a la vez',
+      d:'En Disneyland el Multi Pass no es como el de Florida. Tienes una selección a la vez y la siguiente se desbloquea cuando escaneas la actual O cuando pasan 2 horas desde que la reservaste, lo que ocurra primero.' },
+    { t:'Escanear temprano rinde más que esperar',
+      d:'Si redimes a la hora, la siguiente se desbloquea de inmediato. Redimiendo cada hora sacas bastante más reservas al día que dejando correr el reloj de 2 horas. En un día completo la diferencia son 3 o 4 atracciones.' },
+    { t:'La primera se reserva a las 7:00, desde donde estés',
+      d:'No necesitas estar dentro del parque ni haber pasado el torniquete. Hazla desde la cama. Es la única reserva del día con horarios de regreso realmente buenos.' },
+    { t:'Cambiar de atracción no reinicia el reloj',
+      d:'Si reservas una y luego la modificas por otra del mismo parque, el contador de 2 horas sigue corriendo desde la reserva original. Sirve para corregir sin castigo.' },
+    { t:'Funciona en los dos parques',
+      d:'El Multi Pass cubre Disneyland y California Adventure. Para caminar de un parque al otro el mismo día sí necesitas boleto Park Hopper, que es otra cosa.' },
+    { t:'PhotoPass incluido',
+      d:'Todas las fotos con fotógrafo de Disney vienen incluidas. No compren PhotoPass aparte y abusen de los fotógrafos, sobre todo en los encuentros de villanos del Oogie Boogie.' },
+    { t:'No sirve durante el Oogie Boogie Bash',
+      d:'De 18:00 a 23:00 del día 8 queda suspendido: es un evento con boleto aparte. Da igual, las filas de la fiesta son cortas.' }
+  ],
+  orden: [
+    'Mié 9 · Disneyland medio día: Indiana Jones → Haunted Mansion Holiday → Space Mountain → Millennium Falcon',
+    'Vie 11 · California Adventure: Web Slingers → Incredicoaster → Toy Story Midway Mania → Soarin\' → Guardians',
+    'Sáb 12 · Disneyland completo: Haunted Mansion Holiday → Space Mountain → Indiana Jones → Millennium Falcon → Matterhorn → Big Thunder'
+  ]
+};
+
 /* ---------- PRESUPUESTO: categorías sugeridas ---------- */
 const CATEGORIAS_GASTO = ['Comida','Parques','Transporte','Compras','Hotel','Souvenirs','Otro'];
 
@@ -491,6 +537,9 @@ const FUENTES = [
   { t:'River Belle Terrace — menú y precios del paquete (AllEars)', u:'https://allears.net/dlr/dining/menu/river-belle-terrace/special-dinner/' },
   { t:'Halloween Screams — información oficial', u:'https://disneyland.disney.go.com/entertainment/disneyland/halloween-screams/' },
   { t:'Guía de Lightning Lane en Disneyland 2026', u:'https://www.enchantedinsider.com/disneyland-lightning-lane-complete-guide-2026/' },
+  { t:'Lightning Lane Passes — Disneyland oficial', u:'https://disneyland.disney.go.com/lightning-lane-passes/' },
+  { t:'Cambios a las reglas de Lightning Lane en Disneyland 2026 (AllEars)', u:'https://allears.net/2025/12/16/disneyland-lightning-lane-rules-are-changing-in-2026/' },
+  { t:'Multi Pass y Single Pass: qué cubre cada uno (WDW Prep School)', u:'https://wdwprepschool.com/lightning-lane-passes/' },
   { t:'Halloween Horror Nights 2026 Hollywood — fechas', u:'https://blog.discoveruniversal.com/events/halloween-horror-nights-2026-universal-studios-hollywood-lineup/' },
   { t:'Cross Border Xpress — sitio oficial', u:'https://www.crossborderxpress.com/' },
   { t:'Calendario de los Dodgers 2026 (MLB)', u:'https://www.mlb.com/dodgers/schedule/2026/fullseason' }
