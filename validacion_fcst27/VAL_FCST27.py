@@ -99,8 +99,18 @@ ARCHIVO_FCST = "PptoTecnico2026_Completo.csv"
 PREFIJO_FCST = "PptoTecnico"          # fallback: el .csv mas reciente
 
 ANIO_FCST = 2027                      # ejercicio que se valida
+
+# Planeacion reporta el presupuesto 2026 como "FCST 2026"
+# (fue el forecast con el que se cerro ese ejercicio): esta
+# etiqueta se usa en el dashboard y en el Excel
+ETIQ_PPTO26 = "FCST 2026"
 MESES_TXT = ["ene", "feb", "mar", "abr", "may", "jun",
              "jul", "ago", "sep", "oct", "nov", "dic"]
+
+# Cortes del RFCST 2026: la base no esta mensualizada, solo
+# separa el real acumulado a julio del incremento Ago-Dic
+MESES_ENEJUL = [1, 2, 3, 4, 5, 6, 7]
+MESES_AGODIC = [8, 9, 10, 11, 12]
 
 # ---- Base del RFCST 2026 (comparativo, opcional) ----
 # Es la misma base que alimenta VAL_RFCST26 / el dashboard
@@ -503,7 +513,22 @@ def cargar_rfcst26():
     # RFCST usa "Costos"; aqui el concepto equivalente son
     # las comisiones (costos de adquisicion)
     cols_map = {"Primas": "P", "Siniestros": "S", "Costos": "C"}
-    sufijos = ["1226", "PPTO1226", "1225"]
+
+    # 1226 / PPTO1226 / 1225 alimentan los niveles; los cortes
+    # 0726 y 08-1226 (y sus equivalentes de presupuesto) dan el
+    # unico perfil de estacionalidad que trae la base: la base del
+    # RFCST no esta mensualizada, solo separa Ene-Jul y Ago-Dic
+    sufijos = ["1226", "PPTO1226", "1225",
+               "0726", "08-1226", "PPTO01-0726", "PPTO08-1226"]
+
+    # La base original no siempre trae el incremento Ago-Dic en
+    # columnas propias: se deriva como acumulado Dic menos Jul
+    for medida in cols_map:
+        if f"{medida} 08-1226" not in b.columns and f"{medida} 0726" in b.columns:
+            b[f"{medida} 08-1226"] = (
+                pd.to_numeric(b[f"{medida} 1226"], errors="coerce").fillna(0)
+                - pd.to_numeric(b[f"{medida} 0726"], errors="coerce").fillna(0)
+            )
 
     datos = {}
     for medida, corto in cols_map.items():
@@ -519,6 +544,30 @@ def cargar_rfcst26():
 
     por_ln = t.groupby("_LN").sum()
 
+    # Perfil de estacionalidad 2026 por LN y concepto, para
+    # compararlo contra la mensualizacion del FCST 2027. La base
+    # solo distingue Ene-Jul y Ago-Dic, asi que el perfil queda
+    # plano dentro de cada bloque (el share del bloque repartido
+    # entre sus meses); el dashboard lo dibuja punteado para que
+    # no se lea como una mensualizacion real.
+    def _perfil(fila, col_ini, col_fin):
+        ini = float(fila.get(col_ini, 0.0))
+        fin = float(fila.get(col_fin, 0.0))
+        tot = ini + fin
+        if abs(tot) <= TOL:
+            return None
+        return ([round(ini / tot / len(MESES_ENEJUL), 4)] * len(MESES_ENEJUL)
+                + [round(fin / tot / len(MESES_AGODIC), 4)] * len(MESES_AGODIC))
+
+    def _perfiles(fila):
+        return {cpt: {
+            "rfcst": _perfil(fila, f"{cpt}_0726", f"{cpt}_08-1226"),
+            "ppto": _perfil(fila, f"{cpt}_PPTO01-0726", f"{cpt}_PPTO08-1226"),
+        } for cpt in ("P", "S", "C")}
+
+    season26 = {ln: _perfiles(fila) for ln, fila in por_ln.iterrows()}
+    season26["_tot"] = _perfiles(por_ln.sum())
+
     por_ced = {}
     if "Compañía" in b.columns:
         nums = pd.to_numeric(b["Compañía"], errors="coerce")
@@ -531,10 +580,10 @@ def cargar_rfcst26():
           f"{len(b):,} registros · {por_ln.index.nunique()} LN · "
           f"{len(por_ced):,} cedentes")
     print(f"  Prima RFCST Dic26 {por_ln['P_1226'].sum() / 1e6:,.1f} M · "
-          f"Ppto26 {por_ln['P_PPTO1226'].sum() / 1e6:,.1f} M · "
+          f"{ETIQ_PPTO26} {por_ln['P_PPTO1226'].sum() / 1e6:,.1f} M · "
           f"Real25 {por_ln['P_1225'].sum() / 1e6:,.1f} M")
 
-    return {"por_ln": por_ln, "por_ced": por_ced,
+    return {"por_ln": por_ln, "por_ced": por_ced, "season26": season26,
             "archivo": os.path.basename(ruta)}
 
 
@@ -707,13 +756,13 @@ def resumen_ln():
             fila["Primas_RFCST26"] = r["P_1226"]
             fila["Siniestros_RFCST26"] = r["S_1226"]
             fila["Comisiones_RFCST26"] = r["C_1226"]
-            fila["Primas_PPTO26"] = r["P_PPTO1226"]
-            fila["Siniestros_PPTO26"] = r["S_PPTO1226"]
-            fila["Comisiones_PPTO26"] = r["C_PPTO1226"]
+            fila["Primas_FCST26"] = r["P_PPTO1226"]
+            fila["Siniestros_FCST26"] = r["S_PPTO1226"]
+            fila["Comisiones_FCST26"] = r["C_PPTO1226"]
             fila["Primas_Real25"] = r["P_1225"]
         else:
             for c in ("Primas_RFCST26", "Siniestros_RFCST26", "Comisiones_RFCST26",
-                      "Primas_PPTO26", "Siniestros_PPTO26", "Comisiones_PPTO26",
+                      "Primas_FCST26", "Siniestros_FCST26", "Comisiones_FCST26",
                       "Primas_Real25"):
                 fila[c] = np.nan
 
@@ -976,8 +1025,8 @@ def _fila_global(nombre, gt, gr, rf):
         "RFCST Dic26": rfc,
         "Var $ vs RFCST": fcst - rfc,
         "Var % vs RFCST": _rat(fcst, rfc) - 1 if not math.isnan(rfc) else float("nan"),
-        "Ppto 2026": ppt,
-        "Var % vs Ppto26": _rat(fcst, ppt) - 1 if not math.isnan(ppt) else float("nan"),
+        ETIQ_PPTO26: ppt,
+        f"Var % vs {ETIQ_PPTO26}": _rat(fcst, ppt) - 1 if not math.isnan(ppt) else float("nan"),
         "Real 2025": r25,
     }
 
@@ -1003,8 +1052,8 @@ filas_global.append({
     "RFCST Dic26": pct_psc_rf,
     "Var $ vs RFCST": float("nan"),
     "Var % vs RFCST": pct_psc_fcst - pct_psc_rf,
-    "Ppto 2026": pct_psc_ppto,
-    "Var % vs Ppto26": pct_psc_fcst - pct_psc_ppto,
+    ETIQ_PPTO26: pct_psc_ppto,
+    f"Var % vs {ETIQ_PPTO26}": pct_psc_fcst - pct_psc_ppto,
     "Real 2025": float("nan"),
 })
 
@@ -1139,7 +1188,7 @@ salida_xlsx = os.path.join(xOutputs, "VAL_FCST27.xlsx")
 
 cols_ln = [
     "LN", "Primas", "Primas_RFCST26", "Crec_vs_RFCST", "Semaforo_Crec",
-    "Primas_PPTO26", "Primas_Real25", "Primas_Ret",
+    "Primas_FCST26", "Primas_Real25", "Primas_Ret",
     "Siniestros", "Siniestros_RFCST26", "Ind_Sin", "Ind_Sin_RFCST", "Semaforo_Sin",
     "Comisiones", "Comisiones_RFCST26", "Ind_Cos", "Ind_Cos_RFCST", "Semaforo_Cos",
     "P_S_C", "Pct_P_S_C", "P_S_C_RFCST26", "Pct_P_S_C_RFCST",
@@ -1244,7 +1293,7 @@ print(f"Excel generado: {salida_xlsx}")
 
 S1 = "#3987e5"   # azul    - FCST 2027
 S2 = "#d95926"   # naranja - RFCST 2026
-S3 = "#199e70"   # aqua    - Ppto 2026
+S3 = "#199e70"   # aqua    - presupuesto 2026 (FCST 2026)
 
 
 def _fmt_m(v, dec=1):
@@ -1319,13 +1368,13 @@ def _kpis_concepto(cpt, medida, icono, bueno_arriba, glob):
     k1 = _kpi(icono, f"{medida} {ETIQ_FCST}", _fmt_m(fcst),
               _badge(var_rf, bueno_arriba,
                      f"vs RFCST Dic26 ({_fmt_m(rf['fcst']) if rf else 's/d'})"),
-              f"Ppto 2026: {_fmt_m(rf['ppto']) if rf else 's/d'} · "
+              f"{ETIQ_PPTO26}: {_fmt_m(rf['ppto']) if rf else 's/d'} · "
               f"Real 2025: {_fmt_m(rf['real25']) if rf else 's/d'}")
     k2 = _kpi("&#128200;", "Crecimiento vs RFCST 2026",
               _fmt_pct(var_rf, signo=True),
               f"{ETIQ_FCST} ({_fmt_m(fcst)}) vs RFCST Dic26 "
               f"({_fmt_m(rf['fcst']) if rf else 's/d'})",
-              _badge(var_pp, bueno_arriba, "vs Ppto 2026"))
+              _badge(var_pp, bueno_arriba, f"vs {ETIQ_PPTO26}"))
     k3 = _kpi("&#128197;", "Estacionalidad", txt_pico,
               f"mes pico del anio · promedio mensual {_fmt_m(prom)}",
               f"total {ANIO_FCST}: {_fmt_m(tot)}")
@@ -1353,11 +1402,11 @@ def _kpis_psc(glob, pct):
     k1 = _kpi("&#128176;", f"P-S-C {ETIQ_FCST}", _fmt_m(fcst),
               _badge(var_rf, True,
                      f"vs RFCST Dic26 ({_fmt_m(rf['fcst']) if rf else 's/d'})"),
-              f"Ppto 2026: {_fmt_m(rf['ppto']) if rf else 's/d'}")
+              f"{ETIQ_PPTO26}: {_fmt_m(rf['ppto']) if rf else 's/d'}")
     k2 = _kpi("&#128202;", f"%P-S-C {ETIQ_FCST}", _fmt_pct(pct),
               _badge(pct - pct_psc_rf if not math.isnan(pct_psc_rf) else None,
                      True, "pts vs RFCST Dic26"),
-              f"RFCST Dic26: {_fmt_pct(pct_psc_rf)} · Ppto 2026: {_fmt_pct(pct_psc_ppto)}")
+              f"RFCST Dic26: {_fmt_pct(pct_psc_rf)} · {ETIQ_PPTO26}: {_fmt_pct(pct_psc_ppto)}")
     k3 = _kpi("&#9888;", "Composicion",
               f"{_fmt_pct(_rat(glob['S']['anual'], glob['P']['anual']))} S/P",
               f"Comisiones: {_fmt_pct(_rat(glob['C']['anual'], glob['P']['anual']))} de la prima",
@@ -1444,7 +1493,7 @@ charts_cfg = []
 
 _col_fcst = {"P": "Primas", "S": "Siniestros", "C": "Comisiones"}
 _col_rf = {"P": "Primas_RFCST26", "S": "Siniestros_RFCST26", "C": "Comisiones_RFCST26"}
-_col_pp = {"P": "Primas_PPTO26", "S": "Siniestros_PPTO26", "C": "Comisiones_PPTO26"}
+_col_pp = {"P": "Primas_FCST26", "S": "Siniestros_FCST26", "C": "Comisiones_FCST26"}
 
 for medida, cpt, _, bueno in INFO_MEDIDAS:
     charts_cfg.append({
@@ -1453,7 +1502,7 @@ for medida, cpt, _, bueno in INFO_MEDIDAS:
         "series": [
             {"n": ETIQ_FCST, "c": S1, "v": _vals(r_ln[_col_fcst[cpt]])},
             {"n": "RFCST 2026", "c": S2, "v": _vals(r_ln[_col_rf[cpt]])},
-            {"n": "Ppto 2026", "c": S3, "v": _vals(r_ln[_col_pp[cpt]])},
+            {"n": ETIQ_PPTO26, "c": S3, "v": _vals(r_ln[_col_pp[cpt]])},
         ],
     })
     var = _ratio(r_ln[_col_fcst[cpt]], r_ln[_col_rf[cpt]], MATERIALIDAD) - 1
@@ -1491,7 +1540,7 @@ for medida, cpt, _, _b in INFO_MEDIDAS:
   <div class="grid dos2">
     <div class="card">
       <h2>{medida} por línea de negocio</h2>
-      <div class="nota">{ETIQ_FCST} vs RFCST acumulado a Dic 2026 y Ppto 2026 (USD)</div>
+      <div class="nota">{ETIQ_FCST} vs RFCST acumulado a Dic 2026 y {ETIQ_PPTO26} (USD)</div>
       <div id="ch_{cpt}_niv"></div>
     </div>
     <div class="card">
@@ -1501,24 +1550,18 @@ for medida, cpt, _, _b in INFO_MEDIDAS:
       <div id="ch_{cpt}_var"></div>
     </div>
   </div>
-  <div class="grid dos2">
+  <div class="grid uno">
     <div class="card">
       <div class="chart-head">
         <h2>Estacionalidad mensual · {medida.lower()}</h2>
         <select class="sel-ln" id="sel_line_{cpt}"></select>
       </div>
       <div class="nota">% del año {ANIO_FCST} que aporta cada mes. Con el filtro en
-        (Todas) se dibujan todas las LN; elige una para verla sola.</div>
+        (Todas) se dibujan todas las LN; elige una para comparar su estacionalidad
+        contra la del RFCST 2026 y la del {ETIQ_PPTO26} (líneas punteadas: esas bases
+        no vienen mensualizadas, solo separan Ene-Jul de Ago-Dic, por eso el perfil
+        es plano dentro de cada bloque).</div>
       <div id="ch_line_{cpt}"></div>
-    </div>
-    <div class="card">
-      <div class="chart-head">
-        <h2>Mensualización P · S · C</h2>
-        <select class="sel-ln" id="sel_ring_{cpt}"></select>
-      </div>
-      <div class="nota">Anillo interior = primas · medio = siniestros · exterior =
-        comisiones. Filtra la LN a gusto del área de suscripción.</div>
-      <div id="ch_ring_{cpt}"></div>
     </div>
   </div>""")
 
@@ -1538,6 +1581,21 @@ sec2_bloques.append(f"""
     </div>
   </div>
   <div class="ast">* Falta el incremento a la reserva y los costos de cobertura.</div>""")
+
+sec2_bloques.append(f"""
+  <h3 class="med">Mensualización P · S · C</h3>
+  <div class="grid uno">
+    <div class="card donut-doble">
+      <div class="chart-head">
+        <h2>Mensualización de la estacionalidad {ETIQ_FCST}</h2>
+        <select class="sel-ln" id="sel_ring_LN"></select>
+      </div>
+      <div class="nota">Anillo interior = primas · medio = siniestros · exterior =
+        comisiones. Cada segmento es el % del año que aporta ese mes. Filtra la LN
+        a gusto del área de suscripción.</div>
+      <div id="ch_ring_LN"></div>
+    </div>
+  </div>""")
 
 # =====================================================
 # SECCION 3 - NEGOCIOS (cedente / negocio)
@@ -1624,6 +1682,9 @@ DATA_JS = {
     "charts": charts_cfg,
     "season": {k: {c: (SEASON[k][c] if SEASON[k][c] else None)
                    for c in ("P", "S", "C")} for k in SEASON},
+    # Estacionalidad 2026 (RFCST y presupuesto) para comparar
+    # contra la mensualizacion del FCST: perfil de dos bloques
+    "season26": (RFCST["season26"] if RFCST is not None else {}),
     "part": {
         "lns": LNS,
         "fcst": _vals(r_ln["Primas"]),
@@ -1642,6 +1703,8 @@ DATA_JS = {
         "materialidad": MATERIALIDAD,
         "anio": ANIO_FCST,
         "hayRfcst": RFCST is not None,
+        "etiqFcst": ETIQ_FCST,
+        "etiqPpto26": ETIQ_PPTO26,
     },
 }
 
@@ -1710,6 +1773,7 @@ PLANTILLA = """<!doctype html>
   .card .nota { font-size: 11.5px; color: #898781; margin-bottom: 10px; }
   .dos { grid-template-columns: 2.1fr 1fr; align-items: stretch; }
   .dos2 { grid-template-columns: 1fr 1fr; align-items: stretch; margin-top: 14px; }
+  .uno { grid-template-columns: 1fr; margin-top: 14px; }
   @media (max-width: 950px) { .dos, .dos2 { grid-template-columns: 1fr; } }
   svg { width: 100%; height: auto; display: block; }
   .tick { fill: #898781; font-size: 10.5px; font-family: system-ui, sans-serif;
@@ -2011,7 +2075,8 @@ function lineChart(elId, series) {
     });
     if (!d) return;
     out += '<path d="' + d + '" fill="none" stroke="' + s.c +
-      '" stroke-width="2" class="bar"/>';
+      '" stroke-width="2"' + (s.dash ? ' stroke-dasharray="' + s.dash + '"' : '') +
+      ' class="bar"/>';
     s.v.forEach((v, i) => {
       if (v === null || !isFinite(v)) return;
       out += '<circle cx="' + x(i) + '" cy="' + y(v) + '" r="3" fill="' + s.c +
@@ -2021,7 +2086,9 @@ function lineChart(elId, series) {
   });
   out += '</svg>';
   const leyenda = '<div class="legend">' + series.map(s =>
-    '<span class="lg"><i style="background:' + s.c + '"></i>' + esc(s.n) + '</span>'
+    '<span class="lg">' + (s.dash
+      ? '<i style="height:0;border-radius:0;border-top:2px dashed ' + s.c + '"></i>'
+      : '<i style="background:' + s.c + '"></i>') + esc(s.n) + '</span>'
   ).join('') + '</div>';
   el.innerHTML = leyenda + out;
 }
@@ -2164,15 +2231,27 @@ function selLN(sel, cb) {
 
 ['P', 'S', 'C'].forEach(cpt => {
   const selL = document.getElementById('sel_line_' + cpt);
-  const selR = document.getElementById('sel_ring_' + cpt);
 
   function pintaLinea(lnSel) {
     let series;
     if (lnSel) {
+      // Una sola LN: se compara su mensualizacion contra el
+      // perfil 2026. Las series 2026 van punteadas porque esa
+      // base solo separa Ene-Jul de Ago-Dic (perfil por bloques)
       const v = DATA.season[lnSel] ? DATA.season[lnSel][cpt] : null;
-      series = [{n: 'LN ' + lnSel, c: LNC[DATA.lns.indexOf(lnSel) % LNC.length], v: v || []}];
-      const t = DATA.season._tot[cpt];
-      if (t) series.push({n: 'Total', c: '#898781', v: t});
+      series = [{n: 'LN ' + lnSel + ' · ' + DATA.cfg.etiqFcst, c: S[0], v: v || []}];
+      const s26 = DATA.season26[lnSel];
+      if (s26 && s26[cpt]) {
+        if (s26[cpt].rfcst)
+          series.push({n: 'RFCST 2026', c: S[1], v: s26[cpt].rfcst, dash: '6 4'});
+        if (s26[cpt].ppto)
+          series.push({n: DATA.cfg.etiqPpto26, c: S[2], v: s26[cpt].ppto, dash: '6 4'});
+      }
+      if (series.length === 1) {
+        // Sin base 2026 comparable: al menos el total como referencia
+        const t = DATA.season._tot[cpt];
+        if (t) series.push({n: 'Total ' + DATA.cfg.etiqFcst, c: '#898781', v: t, dash: '3 3'});
+      }
     } else {
       series = DATA.lns.map((ln, i) => ({
         n: 'LN ' + ln, c: LNC[i % LNC.length],
@@ -2182,15 +2261,21 @@ function selLN(sel, cb) {
     lineChart('ch_line_' + cpt, series);
   }
 
+  if (selL) { selLN(selL, pintaLinea); pintaLinea(''); }
+});
+
+// Mensualizacion P·S·C: una sola dona al final de la seccion
+// (antes se repetia identica en los tres conceptos)
+(function () {
+  const sel = document.getElementById('sel_ring_LN');
+  if (!sel) return;
   function pintaDona(lnSel) {
-    const key = lnSel || '_tot';
-    ringDonut('ch_ring_' + cpt, ringsEstacion(key), MESES, MESC,
+    ringDonut('ch_ring_LN', ringsEstacion(lnSel || '_tot'), MESES, MESC,
       lnSel ? 'LN ' + lnSel : DATA.cfg.anio, 'P · S · C');
   }
-
-  if (selL) { selLN(selL, pintaLinea); pintaLinea(''); }
-  if (selR) { selLN(selR, pintaDona); pintaDona(''); }
-});
+  selLN(sel, pintaDona);
+  pintaDona('');
+})();
 
 // ------- Seccion 3: negocios -------
 // Fila: [0 ln, 1 cedente, 2 correlativo, 3 region, 4 paises, 5 corredores,

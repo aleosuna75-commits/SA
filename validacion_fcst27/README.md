@@ -33,10 +33,12 @@ python VAL_FCST27.py
     P-S-C / %P-S-C) con vistas *Tomado / Retenido*, dona de participación
     por LN (PPTO/FCST 27 vs RFCST 26) y dona de estacionalidad global
     (anillos P·S·C por mes).
-  - **Línea de Negocio**: comparativa por LN y variación vs RFCST,
-    estacionalidad mensual en líneas con filtro de LN, y mensualización
-    P·S·C en dona de anillos con filtro de LN — para primas, siniestros y
-    comisiones; P-S-C / %P-S-C por LN al final.
+  - **Línea de Negocio**: por cada concepto, comparativa por LN, variación
+    vs RFCST y estacionalidad mensual en líneas con filtro de LN — al
+    elegir una sola LN se agrega el comparativo contra la estacionalidad
+    del RFCST 2026 y la del FCST 2026 (líneas punteadas, ver nota abajo).
+    Cierran la sección el P-S-C / %P-S-C por LN y una única dona de
+    mensualización P·S·C con filtro de LN.
   - **Negocios**: análisis a nivel cedente / negocio (correlativo) con
     filtros, semáforos, resumen por entidad, estacionalidad del negocio
     seleccionado y top de excepciones.
@@ -70,3 +72,15 @@ candidatas, ver hoja `Retencion_Candidatas`) o capturar `RETENCION_LN`
 
 **Nivel MGA / número de contrato**: el export no trae número de contrato ni
 marca de MGA; el análisis de negocios usa cedente + correlativo del sistema.
+
+**Granularidad de la estacionalidad 2026**: el CSV solo trae mensualizado el
+ejercicio 2027 (los demás años vienen como un renglón único en el periodo 6),
+y la base del RFCST no está mensualizada: solo separa Ene-Jul (real
+devengado) de Ago-Dic (proyección). Por eso el comparativo de estacionalidad
+contra RFCST 2026 y FCST 2026 se dibuja **punteado y plano dentro de cada
+bloque** — es el share real de cada semestre repartido entre sus meses, no
+una mensualización inventada. Si Suscripción comparte la mensualización de
+2026, se puede alimentar directo al perfil.
+
+**Nombre del presupuesto 2026**: se reporta como **FCST 2026** (constante
+`ETIQ_PPTO26` al inicio del script), tanto en el dashboard como en el Excel.
