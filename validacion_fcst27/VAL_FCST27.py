@@ -10,7 +10,7 @@
 #       (siniestralidad S/P y comisiones C/P)
 #   V3. Estacionalidad mensual de primas, siniestros y
 #       comisiones (concentracion y meses sin registro)
-#   V4. Coherencia por negocio (cedente / correlativo):
+#   V4. Coherencia por negocio (cedente / contrato):
 #       siniestros sin prima, primas con signo invertido
 #   V5. Calidad de datos del export (conceptos sin
 #       clasificar, montos atipicos, anios fuera de rango)
@@ -24,27 +24,27 @@
 # -----------------------------------------------------
 # NOTA IMPORTANTE SOBRE EL EXPORT DE SUSCRIPCION
 # -----------------------------------------------------
-# El CSV trae dos defectos de origen que este script
-# resuelve y documenta (hoja Mapeo_Columnas del Excel):
+# El CSV trae un defecto de origen que este script resuelve y
+# documenta (hoja Mapeo_Columnas del Excel): los encabezados NO
+# corresponden a las columnas de datos (el export de BW escribio
+# el catalogo de campos en otro orden), asi que el script lee POR
+# POSICION con el layout de abajo, inferido y verificado contra
+# la estructura de los datos.
 #
-#   1. Los encabezados NO corresponden a las columnas de
-#      datos (el export de BW escribio el catalogo de
-#      campos en otro orden). El script lee POR POSICION
-#      con el mapeo MAPEO_POSICIONAL de abajo, inferido y
-#      verificado contra la estructura de los datos.
+# El concepto (primas / siniestros / comisiones) sale de la
+# cuenta contable que trae el export de 45 columnas, segun el
+# catalogo CUENTAS_CONCEPTO: las cuentas 61xx concentran la
+# prima (en negativo, por ser abono), 5402 los siniestros y 5310
+# las comisiones. El mapeo se verifico contra el RFCST 2026 y el
+# real 2026: los indices implicitos que produce (S/P 44%, C/P
+# 18%) empatan con los de esas bases.
 #
-#   2. La columna del concepto (ZCONCEPTO) viene VACIA,
-#      por lo que primas / siniestros / comisiones solo se
-#      distinguen por la estructura del archivo: para cada
-#      negocio los renglones vienen en corridas ordenadas
-#      Primas (montos negativos: abono), luego Siniestros
-#      y luego Comisiones (montos positivos: cargo). El
-#      script reconstruye el concepto con esa regla y
-#      reporta en Calidad_Datos lo que no pudo clasificar.
-#
-#   Si Suscripcion reexporta el archivo con ZCONCEPTO
-#   lleno, ajustar COL_CONCEPTO_EXPLICITO para usarlo
-#   directamente y desactivar la reconstruccion.
+# El export anterior, de 42 columnas, no traia esa cuenta y el
+# concepto tenia que reconstruirse por la estructura del archivo
+# (corridas Primas -> Siniestros -> Comisiones por negocio). Esa
+# ruta se conserva como respaldo, pero NO separa siniestros de
+# comisiones en los negocios con una sola corrida positiva, asi
+# que las cifras de ese layout llevan esa salvedad.
 # =====================================================
 
 import os
@@ -95,7 +95,7 @@ xOutputs = os.path.join(xFolder, "Outputs")
 os.makedirs(xOutputs, exist_ok=True)
 
 # ---- Base del FCST 2027 (CSV de Suscripcion) ----
-ARCHIVO_FCST = "PptoTecnico2026_Completo.csv"
+ARCHIVO_FCST = "PptoTecnico2026.csv"
 PREFIJO_FCST = "PptoTecnico"          # fallback: el .csv mas reciente
 
 ANIO_FCST = 2027                      # ejercicio que se valida
@@ -192,43 +192,69 @@ COL_VISTA_RETENIDO = None
 VALOR_RETENIDO = 1            # valor de la bandera que marca lo retenido
 RETENCION_LN = {}
 
-# ---- Concepto explicito ----
-# Si un nuevo export trae la columna de concepto llena,
-# indicar aqui su posicion (0-41) y el mapeo de claves, ej.
-#   COL_CONCEPTO_EXPLICITO = (24, {"1": "P", "2": "S", "3": "C"})
-COL_CONCEPTO_EXPLICITO = None
+# ---- Mapeo posicional del CSV ----
+# Posicion -> campo, porque los encabezados del export vienen
+# permutados respecto a las columnas de datos. Hay dos layouts
+# segun el numero de columnas; se elige por el ancho del archivo.
+#
+#   45 columnas (export actual): trae la cuenta contable que
+#      identifica el concepto, el numero de contrato y la columna
+#      de Binder Ppto (hoy vacia).
+#   42 columnas (export anterior): sin cuenta de concepto, el
+#      concepto se reconstruye por la estructura del archivo.
 
-# ---- Mapeo posicional del CSV (42 columnas) ----
-# Posicion -> campo. Inferido de la estructura de los datos
-# porque los encabezados del export vienen permutados. Las
-# posiciones no listadas se conservan pero no se usan.
-MAPEO_POSICIONAL = {
-    4: "LN",              # LN04001 ... LN04008-Agro
-    5: "Pais_Cod",        # codigo numerico de pais / oficina
-    9: "Moneda",          # moneda del contrato (el monto viene en USD)
-    10: "Cuenta_LN",      # cuenta contable de la LN (redundante con LN)
-    11: "Producto",       # cuenta tecnica / producto (A0xx...)
-    12: "Correlativo",    # correlativo del negocio dentro del cedente
-    14: "Periodo",        # AAAA0PP fiscal (2027001..2027012 en el plan)
-    16: "Anio",           # ejercicio fiscal del renglon
-    19: "Mes",            # mes 1-12
-    23: "Flag_A",         # bandera binaria (candidata retencion)
-    25: "Flag_B",         # bandera 1/2/3 (uso por confirmar)
-    26: "TipoRea_Cod",    # 1-4, tipo de reaseguro (por confirmar)
-    30: "Anio_Susc",      # anio de suscripcion de la cohorte
-    31: "Cedente",        # numero de cedente
-    32: "Corredor",       # numero de corredor
-    33: "Flag_C",         # bandera binaria (candidata retencion / MGA)
-    37: "Monto",          # monto USD (primas en negativo, S y C en positivo)
-    39: "Region",         # region R01-R06
+MAPEO_45 = {
+    1: "Cuenta_Concepto",  # cuenta contable: identifica P / S / C
+    6: "LN",               # LN04001 ... LN04008-Agro
+    7: "Pais_Cod",         # codigo numerico de pais / oficina
+    11: "Moneda",          # moneda del contrato (el monto viene en USD)
+    12: "Cuenta_LN",       # cuenta contable de la LN (redundante con LN)
+    13: "Producto",        # cuenta tecnica / producto (A0xx...)
+    14: "Contrato",        # numero de contrato dentro del cedente
+    16: "Periodo",         # AAAA0PP fiscal (2027001..2027012 en el plan)
+    18: "Anio",            # ejercicio fiscal del renglon
+    21: "Mes",             # mes 1-12
+    25: "Flag_A",          # bandera binaria (candidata retencion)
+    27: "Flag_B",          # bandera 1/2/3 (uso por confirmar)
+    28: "TipoRea_Cod",     # 1-4, tipo de reaseguro (por confirmar)
+    32: "Anio_Susc",       # anio de suscripcion de la cohorte
+    33: "Cedente",         # numero de cedente
+    34: "Corredor",        # numero de corredor
+    35: "Flag_C",          # bandera binaria (candidata retencion / MGA)
+    39: "Monto",           # monto USD (primas en negativo, S y C en positivo)
+    41: "Region",          # region R01-R06
+    42: "Binder_Ppto",     # binder de presupuesto (hoy vacio en el export)
+    44: "Archivo_Origen",  # archivo fuente por LN
 }
 
-N_COLUMNAS_CSV = 42
+MAPEO_42 = {
+    4: "LN", 5: "Pais_Cod", 9: "Moneda", 10: "Cuenta_LN", 11: "Producto",
+    12: "Contrato", 14: "Periodo", 16: "Anio", 19: "Mes", 23: "Flag_A",
+    25: "Flag_B", 26: "TipoRea_Cod", 30: "Anio_Susc", 31: "Cedente",
+    32: "Corredor", 33: "Flag_C", 37: "Monto", 39: "Region",
+}
 
-# Columnas que varian dentro de un mismo negocio-concepto y
-# por eso NO forman parte de la llave para reconstruir el
-# concepto (periodo/anio de proyeccion y cohorte)
-_POS_NO_LLAVE = {14, 15, 16, 18, 19, 20, 30, 37}
+LAYOUTS = {45: MAPEO_45, 42: MAPEO_42}
+
+# Columnas que varian dentro de un mismo negocio-concepto y por
+# eso NO forman parte de la llave cuando hay que reconstruir el
+# concepto por estructura (periodo, anio de proyeccion y cohorte)
+POS_NO_LLAVE = {45: {16, 17, 18, 20, 21, 22, 32, 39},
+                42: {14, 15, 16, 18, 19, 20, 30, 37}}
+
+# ---- Concepto por cuenta contable (layout de 45 columnas) ----
+# Verificado contra el RFCST 2026 y el real 2026: las cuentas 61xx
+# concentran la prima (en negativo, por ser abono), 5402 los
+# siniestros y 5310 las comisiones. Los indices implicitos que
+# resultan (S/P 44%, C/P 18%) empatan con los del RFCST.
+CUENTAS_CONCEPTO = {
+    "6104010000": "P", "6108010000": "P", "6111090000": "P",
+    "5402010000": "S", "5402030000": "S",
+    "5310010000": "C",
+}
+
+# Respaldo por prefijo, para cuentas nuevas del mismo grupo
+PREFIJOS_CONCEPTO = [("61", "P"), ("5402", "S"), ("5310", "C")]
 
 MEDIDAS = ["Primas", "Siniestros", "Comisiones"]
 CLAVE_MEDIDA = {"P": "Primas", "S": "Siniestros", "C": "Comisiones"}
@@ -287,13 +313,21 @@ df = pd.read_csv(archivo, encoding="utf-8-sig", low_memory=False)
 
 ENCABEZADOS_ORIGINALES = [str(c).strip() for c in df.columns]
 
-if len(df.columns) != N_COLUMNAS_CSV:
+N_COLUMNAS_CSV = len(df.columns)
+
+if N_COLUMNAS_CSV not in LAYOUTS:
     raise ValueError(
-        f"El CSV trae {len(df.columns)} columnas y se esperaban {N_COLUMNAS_CSV}. "
-        "Cambio el layout del export: revisar MAPEO_POSICIONAL."
+        f"El CSV trae {N_COLUMNAS_CSV} columnas y solo hay layout para "
+        f"{sorted(LAYOUTS)}. Cambio el export: revisar MAPEO_45 / MAPEO_42."
     )
 
-df.columns = [MAPEO_POSICIONAL.get(i, f"pos{i:02d}") for i in range(len(df.columns))]
+MAPEO_POSICIONAL = LAYOUTS[N_COLUMNAS_CSV]
+_POS_NO_LLAVE = POS_NO_LLAVE[N_COLUMNAS_CSV]
+
+df.columns = [MAPEO_POSICIONAL.get(i, f"pos{i:02d}") for i in range(N_COLUMNAS_CSV)]
+
+if "Binder_Ppto" not in df.columns:
+    df["Binder_Ppto"] = np.nan
 
 df["Monto"] = pd.to_numeric(
     df["Monto"].astype(str).str.replace(",", "", regex=False), errors="coerce"
@@ -305,13 +339,26 @@ for col in ("Periodo", "Anio", "Mes", "Anio_Susc"):
 df["LN"] = (df["LN"].astype(str).str.strip()
             .str.replace(r"^LN0*", "", regex=True))
 
-df["Cedente"] = pd.to_numeric(df["Cedente"], errors="coerce").fillna(0).astype(np.int64)
-df["Correlativo"] = pd.to_numeric(df["Correlativo"], errors="coerce").fillna(0).astype(np.int64)
-df["Corredor"] = pd.to_numeric(df["Corredor"], errors="coerce").fillna(0).astype(np.int64)
+for col in ("Cedente", "Contrato", "Corredor"):
+    df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0).astype(np.int64)
 
-print(f"  {len(df):,} renglones · LN: {df['LN'].nunique()} · "
-      f"cedentes: {df['Cedente'].nunique():,} · "
+# Los nulos se pasan a cadena vacia ANTES de astype(str): en
+# pandas reciente astype(str) conserva el nulo y el groupby por
+# binder se quedaria sin grupos
+df["Binder_Ppto"] = (
+    df["Binder_Ppto"].where(df["Binder_Ppto"].notna(), "")
+    .astype(str).str.strip()
+    .replace({"nan": "", "None": "", "0": "", "0.0": ""})
+)
+
+print(f"  {len(df):,} renglones ({N_COLUMNAS_CSV} columnas) · "
+      f"LN: {df['LN'].nunique()} · cedentes: {df['Cedente'].nunique():,} · "
+      f"contratos: {df['Contrato'].nunique():,} · "
       f"anios fiscales: {df['Anio'].min()}-{df['Anio'].max()}")
+
+if df["Binder_Ppto"].eq("").all():
+    print("  Binder Ppto: la columna viene vacia en el export "
+          "(se incluye en el dashboard para cuando se llene).")
 
 # Verificacion cruzada del mapeo: la cuenta contable de la
 # LN (pos. 10) debe corresponder 1 a 1 con la LN (pos. 4);
@@ -333,14 +380,46 @@ if (_cruce > 1).any() or (_cruce2 > 1).any():
 # que el limite entre conceptos es el punto donde el periodo
 # retrocede sin que la cohorte avance.
 
-if COL_CONCEPTO_EXPLICITO is not None:
-    _pos, _claves = COL_CONCEPTO_EXPLICITO
-    _col = MAPEO_POSICIONAL.get(_pos, f"pos{_pos:02d}")
-    df["Concepto"] = (df[_col].astype(str).str.strip()
-                      .map(_claves).fillna("X"))
-    print(f"Concepto tomado de la columna explicita (pos. {_pos}).")
+def concepto_por_cuenta(serie):
+    """P / S / C a partir de la cuenta contable, con respaldo por
+    prefijo para cuentas nuevas del mismo grupo."""
+    cta = serie.astype(str).str.strip()
+    out = cta.map(CUENTAS_CONCEPTO)
+
+    faltan = out.isna()
+    if faltan.any():
+        for pref, etiqueta in PREFIJOS_CONCEPTO:
+            hit = faltan & cta.str.startswith(pref)
+            out = out.mask(hit, etiqueta)
+            faltan = out.isna()
+
+    return out.fillna("X"), cta
+
+
+CUENTAS_NUEVAS = {}
+
+if "Cuenta_Concepto" in df.columns:
+    df["Concepto"], _cta = concepto_por_cuenta(df["Cuenta_Concepto"])
+
+    _no_cat = ~_cta.isin(CUENTAS_CONCEPTO)
+    if _no_cat.any():
+        CUENTAS_NUEVAS = (df.loc[_no_cat]
+                          .groupby(_cta[_no_cat])
+                          .agg(Renglones=("Monto", "size"),
+                               Monto=("Monto", "sum"),
+                               Concepto=("Concepto", "first"))
+                          .to_dict("index"))
+        print(f"AVISO: {len(CUENTAS_NUEVAS)} cuenta(s) fuera del catalogo "
+              "CUENTAS_CONCEPTO; se clasificaron por prefijo (ver Calidad_Datos).")
+
+    print("Concepto tomado de la cuenta contable del export.")
+    METODO_CONCEPTO = "cuenta contable (columna del export)"
 else:
+    METODO_CONCEPTO = ("estructura del archivo (el export no trae la cuenta "
+                       "que identifica el concepto)")
     print("Reconstruyendo el concepto por estructura del archivo ...")
+    print("  AVISO: sin la cuenta contable no se pueden separar siniestros de")
+    print("         comisiones en los negocios con un solo bloque positivo.")
 
     llave_cols = [MAPEO_POSICIONAL.get(i, f"pos{i:02d}")
                   for i in range(N_COLUMNAS_CSV) if i not in _POS_NO_LLAVE]
@@ -432,34 +511,39 @@ _chk("Encabezados permutados",
      "se leyo con el mapeo posicional de la hoja Mapeo_Columnas.",
      0, 0)
 
-_chk("ZCONCEPTO vacia",
-     "El concepto P/S/C se reconstruyo por la estructura del archivo "
-     "(corridas Primas -> Siniestros -> Comisiones por negocio)."
-     if COL_CONCEPTO_EXPLICITO is None else
-     "Se uso la columna de concepto explicita configurada.",
-     0, 0)
+_chk("Origen del concepto P/S/C",
+     f"Concepto tomado de: {METODO_CONCEPTO}."
+     + ("" if "cuenta" in METODO_CONCEPTO else
+        " Sin la cuenta contable, los negocios con un solo bloque positivo "
+        "no permiten separar siniestros de comisiones."), 0, 0)
+
+for _cta_nueva, _info in CUENTAS_NUEVAS.items():
+    _chk("Cuenta fuera del catalogo",
+         f"La cuenta {_cta_nueva} no esta en CUENTAS_CONCEPTO; se clasifico "
+         f"como '{_info['Concepto']}' por prefijo. Confirmar con Suscripcion.",
+         _info["Renglones"], _info["Monto"])
 
 _x = d[d["Concepto"] == "X"]
-_chk("Bloques sin clasificar (X)",
-     f"Corridas positivas de mas alla de la segunda por negocio en {ANIO_FCST}; "
-     "excluidas de P/S/C. Revisar con Suscripcion.",
+_chk("Renglones sin clasificar (X)",
+     f"Renglones de {ANIO_FCST} que no se pudieron asignar a P/S/C; "
+     "excluidos de las cifras. Revisar con Suscripcion.",
      len(_x), _x["Monto"].sum())
 
 _n = d[d["Concepto"] == "N"]
-_chk("Bloques neutros (suma cero)",
-     "Corridas cuya suma es cero: no afectan cifras.",
-     len(_n), 0)
+if len(_n):
+    _chk("Bloques neutros (suma cero)",
+         "Corridas cuya suma es cero: no afectan cifras.", len(_n), 0)
 
 _pp = d[(d["Concepto"] == "P") & (d["Monto"] > TOL)]
 _chk("Primas con signo invertido",
-     f"Renglones positivos dentro de bloques de prima en {ANIO_FCST} "
+     f"Renglones positivos en cuentas de prima en {ANIO_FCST} "
      "(ajustes o devoluciones); restan prima.",
      len(_pp), _pp["Monto"].sum())
 
 _sn = d[(d["Concepto"].isin(["S", "C"])) & (d["Monto"] < -TOL)]
 _chk("Siniestros/comisiones negativos",
-     f"Renglones negativos dentro de bloques S o C en {ANIO_FCST} "
-     "(recuperos o ajustes); restan gasto.",
+     f"Renglones negativos en cuentas de siniestros o comisiones en "
+     f"{ANIO_FCST} (recuperos o ajustes); restan gasto.",
      len(_sn), _sn["Monto"].sum())
 
 _at = df[df["Monto"].abs() > MONTO_ATIPICO]
@@ -475,7 +559,7 @@ _chk("Anios fuera de rango",
      len(_fa), _fa["Monto"].sum())
 
 # Negocios con siniestros o comisiones pero sin prima
-_por_neg = d_ok.pivot_table(index=["LN", "Cedente", "Correlativo"],
+_por_neg = d_ok.pivot_table(index=["LN", "Cedente", "Contrato"],
                             columns="Concepto", values="Valor",
                             aggfunc="sum").fillna(0)
 for c in ("P", "S", "C"):
@@ -1180,10 +1264,11 @@ FUENTE_EST26 = " · ".join(filter(None, [
 # AGREGADOS POR NEGOCIO Y CEDENTE
 # =====================================================
 
-grp_neg = d_ok.groupby(["LN", "Cedente", "Correlativo"], sort=False)
+grp_neg = d_ok.groupby(["LN", "Cedente", "Contrato", "Binder_Ppto"],
+                       sort=False, dropna=False)
 
 neg_rows = []
-for (ln, ced, corr), sub in grp_neg:
+for (ln, ced, cto, binder), sub in grp_neg:
     g = {}
     for cpt in ("P", "S", "C"):
         s = sub[sub["Concepto"] == cpt]
@@ -1228,12 +1313,13 @@ for (ln, ced, corr), sub in grp_neg:
     monedas = sorted(set(sub["Moneda"].dropna().astype(str)))
 
     neg_rows.append([
-        ln, str(int(ced)), str(int(corr)),
+        ln, str(int(ced)), str(int(cto)),
         "/".join(regiones), "/".join(paises[:3]), "/".join(corredores[:3]),
         "/".join(monedas[:4]),
         round(P), round(S), round(C),
         g["P"], g["S"], g["C"],
         sem, " · ".join(motivos),
+        str(binder or "").strip(),
     ])
 
 print(f"Negocios {ANIO_FCST}: {len(neg_rows):,} · "
@@ -1247,7 +1333,7 @@ for ced, sub in d_ok.groupby("Cedente"):
     fila = {"Cedente": int(ced),
             "Nombre": CATALOGO_CED.get(str(int(ced)), ""),
             "LNs": ", ".join(sorted(set(sub["LN"]))),
-            "Negocios": sub.groupby(["LN", "Correlativo"]).ngroups,
+            "Negocios": sub.groupby(["LN", "Contrato"]).ngroups,
             "Primas": P, "Siniestros": S, "Comisiones": C,
             "P_S_C": P - S - C,
             "Ind_Sin": _rat(S, P), "Ind_Cos": _rat(C, P)}
@@ -1402,8 +1488,7 @@ parametros = pd.DataFrame({
         MONTO_ATIPICO,
         PESO_CREC, PESO_SIN, PESO_COS, PESO_EST,
         "* Falta el incremento a la reserva y los costos de cobertura",
-        "P/S/C reconstruidos por estructura del export (ZCONCEPTO vacia)"
-        if COL_CONCEPTO_EXPLICITO is None else "Concepto de columna explicita",
+        METODO_CONCEPTO,
         usuario, datetime.now().strftime("%Y-%m-%d %H:%M"),
     ],
     "Descripcion": [
@@ -1440,6 +1525,21 @@ mapeo_doc = pd.DataFrame({
 
 calidad_df = pd.DataFrame(calidad)
 
+# Catalogo de cuentas usado para clasificar el concepto, con lo
+# que aporta cada una al ejercicio validado
+if "Cuenta_Concepto" in d.columns:
+    _cta_res = (d.groupby([d["Cuenta_Concepto"].astype(str), "Concepto"])["Monto"]
+                .agg(["size", "sum"]).reset_index())
+    _cta_res.columns = ["Cuenta", "Concepto", "Renglones", f"Monto {ANIO_FCST}"]
+    _cta_res["Concepto"] = _cta_res["Concepto"].map(
+        {**CLAVE_MEDIDA, "X": "SIN CLASIFICAR"})
+    _cta_res["En catalogo"] = np.where(
+        _cta_res["Cuenta"].isin(CUENTAS_CONCEPTO), "Si", "No (por prefijo)")
+    cuentas_df = _cta_res.sort_values(f"Monto {ANIO_FCST}", key=abs, ascending=False)
+else:
+    cuentas_df = pd.DataFrame(
+        {"Nota": ["El export de 42 columnas no trae la cuenta del concepto."]})
+
 # =====================================================
 # EXPORT EXCEL
 # =====================================================
@@ -1458,10 +1558,10 @@ cols_ln = [
 ]
 
 neg_export = pd.DataFrame(
-    [r[:10] + [r[13], r[14]] for r in neg_rows],
-    columns=["LN", "Cedente", "Correlativo", "Region", "Paises", "Corredores",
-             "Monedas", "Primas", "Siniestros", "Comisiones", "Semaforo",
-             "Motivos"],
+    [r[:3] + [r[15]] + r[3:10] + [r[13], r[14]] for r in neg_rows],
+    columns=["LN", "Cedente", "Contrato", "Binder Ppto", "Region", "Paises",
+             "Corredores", "Monedas", "Primas", "Siniestros", "Comisiones",
+             "Semaforo", "Motivos"],
 )
 neg_export["Nombre Cedente"] = neg_export["Cedente"].map(
     lambda c: CATALOGO_CED.get(c, ""))
@@ -1541,6 +1641,7 @@ with pd.ExcelWriter(salida_xlsx, engine="xlsxwriter") as writer:
     exportar(neg_export, "Resumen_Negocio")
     exportar(excepciones.head(500), "Excepciones")
     exportar(calidad_df, "Calidad_Datos")
+    exportar(cuentas_df, "Cuentas_Concepto")
     exportar(ret_candidatas, "Retencion_Candidatas")
     exportar(mapeo_doc, "Mapeo_Columnas")
     exportar(parametros, "Parametros")
@@ -1891,9 +1992,9 @@ sec2_bloques.append(f"""
 sec3 = f"""
 <section id="sec-negocios" class="cardinal">
   <div class="sec-head"><h2 class="sec-title">Negocios</h2>
-    <span class="sub">Análisis a nivel cedente / negocio (correlativo del sistema).
-      La base del FCST {ANIO_FCST} no trae número de contrato ni marca de MGA:
-      el correlativo identifica cada negocio dentro del cedente.</span></div>
+    <span class="sub">Análisis a nivel cedente, contrato y binder de presupuesto.
+      Cada negocio es la combinación de cedente y número de contrato dentro de
+      su línea.</span></div>
   <div class="card filtros" id="flt_neg"></div>
   <div class="grid kpis" id="kpi_neg"></div>
   <div class="grid dos">
@@ -2649,12 +2750,13 @@ function selLN(sel, cb) {
 })();
 
 // ------- Seccion 3: negocios -------
-// Fila: [0 ln, 1 cedente, 2 correlativo, 3 region, 4 paises, 5 corredores,
+// Fila: [0 ln, 1 cedente, 2 contrato, 3 region, 4 paises, 5 corredores,
 //        6 monedas, 7 P, 8 S, 9 C, 10 Pm[12], 11 Sm[12], 12 Cm[12],
-//        13 semaforo, 14 motivos]
+//        13 semaforo, 14 motivos, 15 binder ppto]
 const stateNeg = {nivel: 'ced', m: 0, exc: 2, f: {}};
 
-const FDEF_NEG = [[0, 'LN'], [3, 'Región'], [4, 'País (cód.)'], [1, 'Cedente']];
+const FDEF_NEG = [[0, 'LN'], [3, 'Región'], [4, 'País (cód.)'], [1, 'Cedente'],
+                  [2, 'Contrato'], [15, 'Binder Ppto']];
 
 function nombreCed(c) {
   const n = DATA.cat[c];
@@ -2677,15 +2779,17 @@ function buildFiltersNeg() {
   let html = '<div class="flt"><label>Nivel</label>' +
     '<select id="sel_nivel">' +
     '<option value="ced"' + (stateNeg.nivel === 'ced' ? ' selected' : '') + '>Cedente</option>' +
-    '<option value="neg"' + (stateNeg.nivel === 'neg' ? ' selected' : '') + '>Negocio (correlativo)</option>' +
+    '<option value="neg"' + (stateNeg.nivel === 'neg' ? ' selected' : '') + '>Contrato</option>' +
+    '<option value="bin"' + (stateNeg.nivel === 'bin' ? ' selected' : '') + '>Binder Ppto</option>' +
     '</select></div>';
   FDEF_NEG.forEach(([k, label]) => {
     const opts = [...new Set(rowsNeg(k).map(r => String(r[k])).filter(v => v !== ''))]
       .sort((a, b) => a.localeCompare(b, 'es', {numeric: true}));
     const cur = stateNeg.f[k] || '';
     const rot = k === 1 ? nombreCed : (o => o);
+    const vacio = opts.length ? '(Todos)' : '(sin dato en el export)';
     html += '<div class="flt"><label>' + label + '</label>' +
-      '<select data-k="' + k + '"><option value="">(Todos)</option>' +
+      '<select data-k="' + k + '"><option value="">' + vacio + '</option>' +
       opts.map(o => '<option value="' + esc(o) + '"' + (o === cur ? ' selected' : '') + '>' +
         esc(rot(o)) + '</option>').join('') + '</select></div>';
   });
@@ -2711,11 +2815,15 @@ function buildFiltersNeg() {
 
 function entLabel(r) {
   const ced = nombreCed(r[1]);
-  return stateNeg.nivel === 'ced' ? ced : ced + ' · #' + r[2] + ' · LN ' + r[0];
+  if (stateNeg.nivel === 'ced') return ced;
+  if (stateNeg.nivel === 'bin') return r[15] || '(sin binder)';
+  return ced + ' · cto ' + r[2] + ' · LN ' + r[0];
 }
 
 function entKeyNeg(r) {
-  return stateNeg.nivel === 'ced' ? r[1] : r[1] + '|' + r[2] + '|' + r[0];
+  if (stateNeg.nivel === 'ced') return r[1];
+  if (stateNeg.nivel === 'bin') return r[15] || '';
+  return r[1] + '|' + r[2] + '|' + r[0];
 }
 
 function agrupaEntidades(rows) {
@@ -2831,11 +2939,13 @@ function renderNeg() {
   const sev = stateNeg.exc;
   const exc = rows.filter(r => r[13] === sev).sort((a, b) => b[7] - a[7]).slice(0, 10);
   document.getElementById('ex_neg').innerHTML = exc.length ?
-    '<table><thead><tr><th>LN</th><th>Cedente</th><th class="num">Correlativo</th>' +
-    '<th>Región</th><th class="num">Primas</th><th class="num">Siniestros</th>' +
+    '<table><thead><tr><th>LN</th><th>Cedente</th><th class="num">Contrato</th>' +
+    '<th>Binder Ppto</th><th>Región</th><th class="num">Primas</th>' +
+    '<th class="num">Siniestros</th>' +
     '<th class="num">Comisiones</th><th>Motivo</th></tr></thead><tbody>' +
     exc.map(r => '<tr><td>LN ' + esc(r[0]) + '</td><td>' + esc(nombreCed(r[1])) + '</td>' +
-      '<td class="num">' + esc(r[2]) + '</td><td>' + esc(r[3]) + '</td>' +
+      '<td class="num">' + esc(r[2]) + '</td><td>' + esc(r[15] || '–') + '</td>' +
+      '<td>' + esc(r[3]) + '</td>' +
       '<td class="num">' + fmtM(r[7]) + '</td><td class="num">' + fmtM(r[8]) + '</td>' +
       '<td class="num">' + fmtM(r[9]) + '</td>' +
       '<td class="motivo">' + esc(r[14] || 'Revisión') + '</td></tr>').join('') +
