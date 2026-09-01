@@ -120,6 +120,33 @@ ARCHIVO_RFCST = "BD_RFCST_26_act.xlsx"
 PREFIJO_RFCST = "BD_RFCST"
 HOJA_RFCST = "BD_RFCST26"
 
+# ---- Real 2026 mensual (opcional) ----
+# Da la forma mensual observada Ene-Jul 2026, que es la que se
+# usa para abrir el acumulado a julio del RFCST 2026
+ARCHIVO_REAL26 = "BDReal26.xlsx"
+PREFIJO_REAL26 = "BDReal26"
+HOJA_REAL26 = "BD"
+COL_REAL26 = {"P": "Primas USD", "S": "Siniestros USD", "C": "Comisiones USD"}
+COL_REAL26_LN = ["LN2", "LN"]
+ANIO_REAL26 = 2026
+
+# ---- Presupuesto 2026 mensual (hoja del libro del RFCST) ----
+# Trae los 12 meses del ejercicio, asi que la estacionalidad del
+# FCST 2026 sale directa (no necesita ajuste)
+HOJA_PPTO26 = "Ppto2026"
+COL_PPTO26 = {"P": "PmasEmi", "S": "SinOcurr", "C": "CostosAdq"}
+COL_PPTO26_LN = ["LN2", "LíneaNegocio", "LineaNegocio", "ClasificaciónLN"]
+COL_PPTO26_ANIO = ["AñoPpto", "AnioPpto", "Año", "Anio"]
+COL_PPTO26_MES = ["MesPpto", "Mes", "Periodo"]
+
+# Los niveles del FCST 2026 salen de BD_RFCST26 (mismo universo de
+# contratos que el comparativo). La hoja Ppto2026 trae el
+# presupuesto completo de la compania, que es mayor porque incluye
+# contratos sin prima registrada: ponerlo en True para reportar
+# ese presupuesto completo en los niveles (la estacionalidad usa
+# la hoja en ambos casos, porque es un perfil porcentual).
+PPTO26_NIVEL_DESDE_HOJA = False
+
 # ---- Catalogo de cedentes (numero -> nombre, opcional) ----
 ARCHIVO_CATALOGO = "Catalogo"
 HOJA_CATALOGO = "Valores"
@@ -544,30 +571,6 @@ def cargar_rfcst26():
 
     por_ln = t.groupby("_LN").sum()
 
-    # Perfil de estacionalidad 2026 por LN y concepto, para
-    # compararlo contra la mensualizacion del FCST 2027. La base
-    # solo distingue Ene-Jul y Ago-Dic, asi que el perfil queda
-    # plano dentro de cada bloque (el share del bloque repartido
-    # entre sus meses); el dashboard lo dibuja punteado para que
-    # no se lea como una mensualizacion real.
-    def _perfil(fila, col_ini, col_fin):
-        ini = float(fila.get(col_ini, 0.0))
-        fin = float(fila.get(col_fin, 0.0))
-        tot = ini + fin
-        if abs(tot) <= TOL:
-            return None
-        return ([round(ini / tot / len(MESES_ENEJUL), 4)] * len(MESES_ENEJUL)
-                + [round(fin / tot / len(MESES_AGODIC), 4)] * len(MESES_AGODIC))
-
-    def _perfiles(fila):
-        return {cpt: {
-            "rfcst": _perfil(fila, f"{cpt}_0726", f"{cpt}_08-1226"),
-            "ppto": _perfil(fila, f"{cpt}_PPTO01-0726", f"{cpt}_PPTO08-1226"),
-        } for cpt in ("P", "S", "C")}
-
-    season26 = {ln: _perfiles(fila) for ln, fila in por_ln.iterrows()}
-    season26["_tot"] = _perfiles(por_ln.sum())
-
     por_ced = {}
     if "Compañía" in b.columns:
         nums = pd.to_numeric(b["Compañía"], errors="coerce")
@@ -583,11 +586,154 @@ def cargar_rfcst26():
           f"{ETIQ_PPTO26} {por_ln['P_PPTO1226'].sum() / 1e6:,.1f} M · "
           f"Real25 {por_ln['P_1225'].sum() / 1e6:,.1f} M")
 
-    return {"por_ln": por_ln, "por_ced": por_ced, "season26": season26,
+    return {"por_ln": por_ln, "por_ced": por_ced,
             "archivo": os.path.basename(ruta)}
 
 
+def _buscar_columna(cols, candidatas):
+    """Primera columna cuyo nombre coincida con las candidatas."""
+    norm = {str(c).strip().upper(): c for c in cols}
+    for cand in candidatas:
+        if cand.strip().upper() in norm:
+            return norm[cand.strip().upper()]
+    return None
+
+
+def _mensual_por_ln(b, col_ln, meses, cols_medida, etiqueta):
+    """{LN: {concepto: [12 montos]}} mas el total, a partir de una
+    base con una fila por movimiento y su mes."""
+    ln = b[col_ln].map(_norm_ln)
+
+    out = {}
+    for cpt, col in cols_medida.items():
+        if col not in b.columns:
+            print(f"AVISO: a {etiqueta} le falta la columna '{col}'.")
+            continue
+        vals = pd.to_numeric(b[col], errors="coerce").fillna(0)
+        tabla = (pd.DataFrame({"_ln": ln, "_mes": meses, "_v": vals})
+                 .pivot_table(index="_ln", columns="_mes", values="_v",
+                              aggfunc="sum", fill_value=0.0))
+        for m in range(1, 13):
+            if m not in tabla.columns:
+                tabla[m] = 0.0
+        tabla = tabla[[m for m in range(1, 13)]]
+
+        for clave, fila in tabla.iterrows():
+            out.setdefault(clave, {})[cpt] = [float(v) for v in fila]
+        out.setdefault("_tot", {})[cpt] = [float(v) for v in tabla.sum()]
+
+    return out
+
+
+def cargar_real26():
+    """Real 2026 mensual (Ene-Jul) por LN y concepto. Da la forma
+    con la que se abre el acumulado a julio del RFCST 2026."""
+
+    ruta = _buscar_archivo(ARCHIVO_REAL26, PREFIJO_REAL26, ".xlsx")
+
+    if ruta is None:
+        print(f"AVISO: no se encontro {ARCHIVO_REAL26}; la estacionalidad del")
+        print("       RFCST 2026 usara un perfil plano Ene-Jul / Ago-Dic.")
+        return None
+
+    try:
+        crudo = pd.read_excel(ruta, sheet_name=HOJA_REAL26, header=None, nrows=8)
+    except ValueError:
+        print(f"AVISO: {os.path.basename(ruta)} no tiene la hoja '{HOJA_REAL26}'.")
+        return None
+
+    fila = None
+    for i in range(len(crudo)):
+        if any(str(v).strip() == "Periodo" for v in crudo.iloc[i]):
+            fila = i
+            break
+    if fila is None:
+        print(f"AVISO: no se encontro la columna 'Periodo' en {HOJA_REAL26}.")
+        return None
+
+    b = pd.read_excel(ruta, sheet_name=HOJA_REAL26, header=fila)
+    b.columns = [str(c).strip() for c in b.columns]
+
+    col_ln = _buscar_columna(b.columns, COL_REAL26_LN)
+    if col_ln is None:
+        print(f"AVISO: no se encontro la columna de LN {COL_REAL26_LN} en {HOJA_REAL26}.")
+        return None
+
+    per = pd.to_numeric(b["Periodo"], errors="coerce")
+    b = b[(per // 100) == ANIO_REAL26].copy()
+    meses = (per % 100).loc[b.index]
+
+    datos = _mensual_por_ln(b, col_ln, meses, COL_REAL26,
+                            f"{os.path.basename(ruta)} · {HOJA_REAL26}")
+
+    obs = sorted({int(m) for m in meses.dropna().unique()})
+    tot = datos.get("_tot", {}).get("P", [0] * 12)
+    print(f"Real {ANIO_REAL26} mensual ({os.path.basename(ruta)}): "
+          f"meses {obs[0]}-{obs[-1]} · primas {sum(tot) / 1e6:,.1f} M")
+
+    return {"por_ln": datos, "meses": obs, "archivo": os.path.basename(ruta)}
+
+
+def cargar_ppto26():
+    """Presupuesto 2026 mensual (hoja Ppto2026 del libro del RFCST):
+    12 meses abiertos, asi que la estacionalidad del FCST 2026 sale
+    directa, sin ajustes."""
+
+    ruta = _buscar_archivo(ARCHIVO_RFCST, PREFIJO_RFCST, ".xlsx")
+
+    if ruta is None:
+        return None
+
+    try:
+        crudo = pd.read_excel(ruta, sheet_name=HOJA_PPTO26, header=None, nrows=12)
+    except ValueError:
+        print(f"AVISO: el libro del RFCST no tiene la hoja '{HOJA_PPTO26}'; la")
+        print("       estacionalidad del FCST 2026 usara un perfil plano.")
+        return None
+
+    fila = None
+    for i in range(len(crudo)):
+        if any(str(v).strip() == COL_PPTO26["P"] for v in crudo.iloc[i]):
+            fila = i
+            break
+    if fila is None:
+        print(f"AVISO: no se encontro '{COL_PPTO26['P']}' en la hoja {HOJA_PPTO26}.")
+        return None
+
+    b = pd.read_excel(ruta, sheet_name=HOJA_PPTO26, header=fila)
+    b.columns = [str(c).strip() for c in b.columns]
+
+    col_ln = _buscar_columna(b.columns, COL_PPTO26_LN)
+    col_anio = _buscar_columna(b.columns, COL_PPTO26_ANIO)
+    col_mes = _buscar_columna(b.columns, COL_PPTO26_MES)
+
+    if col_ln is None or col_mes is None:
+        print(f"AVISO: a la hoja {HOJA_PPTO26} le falta la columna de LN o de mes.")
+        return None
+
+    if col_anio is not None:
+        anios = pd.to_numeric(b[col_anio], errors="coerce")
+        b = b[anios == ANIO_REAL26].copy()
+
+    mes = pd.to_numeric(b[col_mes], errors="coerce")
+    if mes.max() and mes.max() > 12:          # viene como AAAAMM
+        mes = mes % 100
+
+    datos = _mensual_por_ln(b, col_ln, mes, COL_PPTO26,
+                            f"{os.path.basename(ruta)} · {HOJA_PPTO26}")
+
+    tot = datos.get("_tot", {}).get("P", [0] * 12)
+    print(f"Ppto {ANIO_REAL26} mensual (hoja {HOJA_PPTO26}): "
+          f"12 meses · primas {sum(tot) / 1e6:,.1f} M")
+
+    return {"por_ln": datos, "archivo": f"{os.path.basename(ruta)} · {HOJA_PPTO26}"}
+
+
 RFCST = cargar_rfcst26()
+
+REAL26 = cargar_real26()
+
+PPTO26 = cargar_ppto26() if RFCST is not None else None
 
 FUENTE_RFCST = RFCST["archivo"] if RFCST else "no disponible (s/d)"
 
@@ -760,10 +906,12 @@ def resumen_ln():
             fila["Siniestros_FCST26"] = r["S_PPTO1226"]
             fila["Comisiones_FCST26"] = r["C_PPTO1226"]
             fila["Primas_Real25"] = r["P_1225"]
+            fila["Siniestros_Real25"] = r["S_1225"]
+            fila["Comisiones_Real25"] = r["C_1225"]
         else:
             for c in ("Primas_RFCST26", "Siniestros_RFCST26", "Comisiones_RFCST26",
                       "Primas_FCST26", "Siniestros_FCST26", "Comisiones_FCST26",
-                      "Primas_Real25"):
+                      "Primas_Real25", "Siniestros_Real25", "Comisiones_Real25"):
                 fila[c] = np.nan
 
         fila["P_S_C_RFCST26"] = (fila["Primas_RFCST26"] - fila["Siniestros_RFCST26"]
@@ -915,6 +1063,118 @@ for ln in ["_tot"] + LNS:
             fila[mes] = v[i] if v else np.nan
         est_filas.append(fila)
 est_ln = pd.DataFrame(est_filas)
+
+# =====================================================
+# ESTACIONALIDAD 2026 (RFCST 2026 y FCST 2026)
+# =====================================================
+# FCST 2026: la hoja Ppto2026 trae los 12 meses abiertos, asi que
+#   su estacionalidad es directa.
+# RFCST 2026: la base no esta mensualizada. Ene-Jul se abre con la
+#   forma del real 2026 (escalada al acumulado a julio del propio
+#   RFCST, para que el perfil sume su total) y Ago-Dic se reparte
+#   con la mensualizacion que Suscripcion le dio al FCST 2027.
+#   Ese ajuste se declara al pie de la grafica.
+
+
+def _forma(vals):
+    """Reparte una lista de valores como shares que suman 1.
+    Sirve tanto para montos como para perfiles ya porcentuales, asi
+    que la tolerancia es relativa (TOL esta en dolares y aqui la
+    suma puede ser una fraccion). Devuelve None cuando el total se
+    cancela y el reparto seria ruido."""
+    if not vals:
+        return None
+    tot = sum(vals)
+    escala = max(abs(v) for v in vals)
+    if not math.isfinite(tot) or abs(tot) <= 1e-12 or abs(tot) < 1e-6 * escala:
+        return None
+    return [v / tot for v in vals]
+
+
+def _meses_de(fuente, ln, cpt):
+    """Montos mensuales de una base cargada, con caida al total."""
+    if fuente is None:
+        return None
+    por_ln = fuente["por_ln"]
+    fila = por_ln.get(ln)
+    if not fila or cpt not in fila:
+        return None
+    return fila[cpt]
+
+
+IDX_ENEJUL = [m - 1 for m in MESES_ENEJUL]
+IDX_AGODIC = [m - 1 for m in MESES_AGODIC]
+
+
+def perfil_rfcst26(ln, cpt, fila_rf):
+    """Perfil mensual del RFCST 2026 para una LN y concepto."""
+
+    ini = float(fila_rf.get(f"{cpt}_0726", 0.0))          # acumulado a julio
+    fin = float(fila_rf.get(f"{cpt}_08-1226", 0.0))       # incremento Ago-Dic
+    if abs(ini + fin) <= TOL:
+        return None
+
+    # Ene-Jul: forma del real 2026 observado; si no hay, plana
+    real = _meses_de(REAL26, ln, cpt) or _meses_de(REAL26, "_tot", cpt)
+    forma_ini = _forma([real[i] for i in IDX_ENEJUL]) if real else None
+    if forma_ini is None:
+        forma_ini = [1 / len(IDX_ENEJUL)] * len(IDX_ENEJUL)
+
+    # Ago-Dic: mensualizacion que trae el propio FCST 2027
+    f27 = SEASON.get(ln, {}).get(cpt) or SEASON["_tot"].get(cpt)
+    forma_fin = _forma([f27[i] for i in IDX_AGODIC]) if f27 else None
+    if forma_fin is None:
+        forma_fin = [1 / len(IDX_AGODIC)] * len(IDX_AGODIC)
+
+    meses = [0.0] * 12
+    for k, i in enumerate(IDX_ENEJUL):
+        meses[i] = ini * forma_ini[k]
+    for k, i in enumerate(IDX_AGODIC):
+        meses[i] = fin * forma_fin[k]
+
+    forma = _forma(meses)
+    return [round(v, 4) for v in forma] if forma else None
+
+
+def perfil_ppto26(ln, cpt, fila_rf):
+    """Perfil mensual del FCST 2026 (hoja Ppto2026, 12 meses)."""
+
+    meses = _meses_de(PPTO26, ln, cpt)
+    forma = _forma(meses) if meses else None
+
+    if forma is None:
+        # Sin la hoja mensual: perfil plano por bloques del ppto
+        ini = float(fila_rf.get(f"{cpt}_PPTO01-0726", 0.0))
+        fin = float(fila_rf.get(f"{cpt}_PPTO08-1226", 0.0))
+        if abs(ini + fin) <= TOL:
+            return None
+        meses = ([ini / len(IDX_ENEJUL)] * len(IDX_ENEJUL)
+                 + [fin / len(IDX_AGODIC)] * len(IDX_AGODIC))
+        forma = _forma(meses)
+
+    return [round(v, 4) for v in forma] if forma else None
+
+
+SEASON26 = {}
+
+if RFCST is not None:
+    _rf_ln = RFCST["por_ln"]
+    for _ln in list(_rf_ln.index) + ["_tot"]:
+        _fila = _rf_ln.sum() if _ln == "_tot" else _rf_ln.loc[_ln]
+        SEASON26[_ln] = {
+            cpt: {"rfcst": perfil_rfcst26(_ln, cpt, _fila),
+                  "ppto": perfil_ppto26(_ln, cpt, _fila)}
+            for cpt in ("P", "S", "C")
+        }
+
+# El ajuste Ago-Dic solo aplica al RFCST: el FCST 2026 sale
+# mensualizado de la hoja Ppto2026
+AJUSTE_AGODIC = REAL26 is not None or PPTO26 is not None
+
+FUENTE_EST26 = " · ".join(filter(None, [
+    f"Ene-Jul con la forma del real 2026 ({REAL26['archivo']})" if REAL26 else None,
+    f"FCST 2026 mensual de {PPTO26['archivo']}" if PPTO26 else None,
+])) or "perfil plano Ene-Jul / Ago-Dic (sin bases mensuales)"
 
 # =====================================================
 # AGREGADOS POR NEGOCIO Y CEDENTE
@@ -1533,6 +1793,34 @@ charts_cfg.append({
     ],
 })
 
+# Pie de pagina de las graficas de estacionalidad: declara el
+# ajuste Ago-Dic, que aplica unicamente al RFCST 2026
+if REAL26 is not None or PPTO26 is not None:
+    PIE_EST = (
+        "* RFCST 2026: Ene-Jul se abre con la forma del real 2026 y Ago-Dic no viene "
+        "mensualizado en esa base, por lo que su incremento se reparte con la "
+        f"mensualización que Suscripción dio al {ETIQ_FCST} (tramo punteado). El ajuste "
+        f"aplica solo al RFCST 2026: el {ETIQ_PPTO26} viene mensualizado en la hoja "
+        f"{HOJA_PPTO26} y se grafica sin ajuste."
+    )
+else:
+    PIE_EST = (
+        "* Sin las bases mensuales de 2026, el perfil del RFCST 2026 y del "
+        f"{ETIQ_PPTO26} es plano dentro de cada bloque (Ene-Jul / Ago-Dic)."
+    )
+
+# KPIs de la seccion por LN: mismos cuadros que en General pero
+# recalculados a la linea que elija el area de suscripcion
+sec2_kpis = f"""
+  <div class="card filtros" id="flt_ln">
+    <div class="flt"><label>Línea de negocio</label>
+      <select id="sel_kpi_ln"></select></div>
+    <div class="flt nota-kpi">Los cuadros de primas, siniestros y comisiones se
+      recalculan a la LN seleccionada; las gráficas de abajo siguen mostrando
+      todas las líneas.</div>
+  </div>
+  <div class="grid kpis" id="kpi_ln"></div>"""
+
 sec2_bloques = []
 for medida, cpt, _, _b in INFO_MEDIDAS:
     sec2_bloques.append(f"""
@@ -1558,10 +1846,9 @@ for medida, cpt, _, _b in INFO_MEDIDAS:
       </div>
       <div class="nota">% del año {ANIO_FCST} que aporta cada mes. Con el filtro en
         (Todas) se dibujan todas las LN; elige una para comparar su estacionalidad
-        contra la del RFCST 2026 y la del {ETIQ_PPTO26} (líneas punteadas: esas bases
-        no vienen mensualizadas, solo separan Ene-Jul de Ago-Dic, por eso el perfil
-        es plano dentro de cada bloque).</div>
+        contra la del RFCST 2026 y la del {ETIQ_PPTO26}.</div>
       <div id="ch_line_{cpt}"></div>
+      <div class="ast">{PIE_EST}</div>
     </div>
   </div>""")
 
@@ -1676,15 +1963,50 @@ def _sea_js(dic):
             for k, v in dic.items()}
 
 
+# Cuadros de primas / siniestros / comisiones por LN: los mismos
+# de la seccion General, recalculados a la linea seleccionada
+_COLS_KPI = {
+    "P": ("Primas", "Primas_RFCST26", "Primas_FCST26", "Primas_Real25"),
+    "S": ("Siniestros", "Siniestros_RFCST26", "Siniestros_FCST26", "Siniestros_Real25"),
+    "C": ("Comisiones", "Comisiones_RFCST26", "Comisiones_FCST26", "Comisiones_Real25"),
+}
+
+
+def _num(v):
+    if v is None or (isinstance(v, float) and (math.isnan(v) or math.isinf(v))):
+        return None
+    return round(float(v))
+
+
+kpi_ln = {}
+
+for _, _fila in r_ln.iterrows():
+    kpi_ln[_fila["LN"]] = {
+        cpt: {"f": _num(_fila[c0]), "r": _num(_fila[c1]),
+              "p": _num(_fila[c2]), "r25": _num(_fila[c3])}
+        for cpt, (c0, c1, c2, c3) in _COLS_KPI.items()
+    }
+
+# El total replica los globales de la seccion General (incluye las
+# LN presupuestadas que aun no traen forecast 2027)
+kpi_ln["_tot"] = {
+    cpt: {"f": _num(GLOB_T[cpt]["anual"]),
+          "r": _num(RF_GLOB[cpt]["fcst"]) if RF_GLOB else None,
+          "p": _num(RF_GLOB[cpt]["ppto"]) if RF_GLOB else None,
+          "r25": _num(RF_GLOB[cpt]["real25"]) if RF_GLOB else None}
+    for cpt in ("P", "S", "C")
+}
+
 DATA_JS = {
     "lns": LNS,
+    "lnKpi": kpi_ln,
     "meses": MESES_TXT,
     "charts": charts_cfg,
     "season": {k: {c: (SEASON[k][c] if SEASON[k][c] else None)
                    for c in ("P", "S", "C")} for k in SEASON},
-    # Estacionalidad 2026 (RFCST y presupuesto) para comparar
-    # contra la mensualizacion del FCST: perfil de dos bloques
-    "season26": (RFCST["season26"] if RFCST is not None else {}),
+    # Estacionalidad 2026 (RFCST y FCST 2026) para comparar
+    # contra la mensualizacion del FCST 2027
+    "season26": SEASON26,
     "part": {
         "lns": LNS,
         "fcst": _vals(r_ln["Primas"]),
@@ -1705,6 +2027,9 @@ DATA_JS = {
         "hayRfcst": RFCST is not None,
         "etiqFcst": ETIQ_FCST,
         "etiqPpto26": ETIQ_PPTO26,
+        # A partir de agosto el RFCST 2026 va ajustado: se dibuja
+        # punteado de ese mes en adelante
+        "ajusteDesde": len(MESES_ENEJUL),
     },
 }
 
@@ -1834,6 +2159,8 @@ PLANTILLA = """<!doctype html>
     color: #c3c2b7; border-radius: 8px; padding: 7px 12px; font-size: 12px;
     cursor: pointer; font-family: inherit; }
   .flt-reset:hover { border-color: rgba(57,135,229,.6); color: #ffffff; }
+  .flt.nota-kpi { font-size: 11.5px; color: #898781; flex: 2; min-width: 240px;
+    justify-content: center; line-height: 1.45; }
   .chart-head { display: flex; justify-content: space-between; align-items: center;
     gap: 10px; flex-wrap: wrap; }
   .toggle { display: inline-flex; background: #0d0d0d; border: 1px solid #383835;
@@ -1899,6 +2226,7 @@ __SEC1GRAF__
   <div class="sec-head"><h2 class="sec-title">Línea de Negocio</h2>
     <span class="sub">Mismas vistas, por LN · cifras en dólares · estacionalidad
       mensual del FCST __ANIO__</span></div>
+__SEC2KPI__
 __SEC2__
 </section>
 
@@ -2068,25 +2396,35 @@ function lineChart(elId, series) {
       '" text-anchor="middle" class="cat">' + m + '</text>';
   });
   series.forEach(s => {
-    let d = '';
-    s.v.forEach((v, i) => {
-      if (v === null || !isFinite(v)) return;
-      d += (d ? ' L ' : 'M ') + x(i) + ' ' + y(v);
+    // dashFrom permite dibujar una serie solida hasta cierto mes y
+    // punteada de ahi en adelante (el tramo ajustado del RFCST)
+    const cortes = (s.dashFrom === undefined)
+      ? [[0, s.v.length - 1, !!s.dash]]
+      : [[0, s.dashFrom, false], [s.dashFrom, s.v.length - 1, true]];
+    cortes.forEach(([ini, fin, punteado]) => {
+      let d = '';
+      for (let i = ini; i <= fin; i++) {
+        const v = s.v[i];
+        if (v === null || v === undefined || !isFinite(v)) continue;
+        d += (d ? ' L ' : 'M ') + x(i) + ' ' + y(v);
+      }
+      if (!d) return;
+      out += '<path d="' + d + '" fill="none" stroke="' + s.c +
+        '" stroke-width="2"' + (punteado ? ' stroke-dasharray="6 4"' : '') +
+        ' class="bar"/>';
     });
-    if (!d) return;
-    out += '<path d="' + d + '" fill="none" stroke="' + s.c +
-      '" stroke-width="2"' + (s.dash ? ' stroke-dasharray="' + s.dash + '"' : '') +
-      ' class="bar"/>';
+    {
     s.v.forEach((v, i) => {
       if (v === null || !isFinite(v)) return;
       out += '<circle cx="' + x(i) + '" cy="' + y(v) + '" r="3" fill="' + s.c +
         '" class="bar"><title>' + esc(s.n) + ' · ' + MESES[i] + ': ' +
         fmtPct(v) + '</title></circle>';
     });
+    }
   });
   out += '</svg>';
   const leyenda = '<div class="legend">' + series.map(s =>
-    '<span class="lg">' + (s.dash
+    '<span class="lg">' + ((s.dash && s.dashFrom === undefined)
       ? '<i style="height:0;border-radius:0;border-top:2px dashed ' + s.c + '"></i>'
       : '<i style="background:' + s.c + '"></i>') + esc(s.n) + '</span>'
   ).join('') + '</div>';
@@ -2229,6 +2567,36 @@ function selLN(sel, cb) {
   sel.addEventListener('change', () => cb(sel.value));
 }
 
+// Cuadros de primas / siniestros / comisiones por LN: mismos
+// datos que la seccion General, recalculados al filtro
+(function () {
+  const sel = document.getElementById('sel_kpi_ln');
+  const cont = document.getElementById('kpi_ln');
+  if (!sel || !cont) return;
+  const ICO = {P: '&#128181;', S: '&#9888;', C: '&#129534;'};
+  const BUENO = {P: true, S: false, C: false};
+
+  function pinta(lnSel) {
+    const d = DATA.lnKpi[lnSel || '_tot'] || {};
+    const suf = lnSel ? ' · LN ' + lnSel : '';
+    cont.innerHTML = ['P', 'S', 'C'].map((cpt, i) => {
+      const o = d[cpt] || {};
+      const varRf = (o.r !== null && o.r !== undefined &&
+                     Math.abs(o.r) > DATA.cfg.minDen) ? o.f / o.r - 1 : null;
+      return '<div class="card kpi"><div class="t"><i>' + ICO[cpt] + '</i>' +
+        MEDN[i] + ' ' + DATA.cfg.etiqFcst + suf + '</div>' +
+        '<div class="v">' + fmtM(o.f) + '</div>' +
+        '<div class="d">' + badge(varRf, BUENO[cpt],
+          'vs RFCST Dic26 (' + fmtM(o.r) + ')') + '</div>' +
+        '<div class="d">' + DATA.cfg.etiqPpto26 + ': ' + fmtM(o.p) +
+        ' · Real 2025: ' + fmtM(o.r25) + '</div></div>';
+    }).join('');
+  }
+
+  selLN(sel, pinta);
+  pinta('');
+})();
+
 ['P', 'S', 'C'].forEach(cpt => {
   const selL = document.getElementById('sel_line_' + cpt);
 
@@ -2242,10 +2610,13 @@ function selLN(sel, cb) {
       series = [{n: 'LN ' + lnSel + ' · ' + DATA.cfg.etiqFcst, c: S[0], v: v || []}];
       const s26 = DATA.season26[lnSel];
       if (s26 && s26[cpt]) {
+        // El RFCST va solido hasta julio (forma del real 2026) y
+        // punteado de agosto en adelante (tramo ajustado)
         if (s26[cpt].rfcst)
-          series.push({n: 'RFCST 2026', c: S[1], v: s26[cpt].rfcst, dash: '6 4'});
+          series.push({n: 'RFCST 2026', c: S[1], v: s26[cpt].rfcst,
+                       dashFrom: DATA.cfg.ajusteDesde - 1});
         if (s26[cpt].ppto)
-          series.push({n: DATA.cfg.etiqPpto26, c: S[2], v: s26[cpt].ppto, dash: '6 4'});
+          series.push({n: DATA.cfg.etiqPpto26, c: S[2], v: s26[cpt].ppto});
       }
       if (series.length === 1) {
         // Sin base 2026 comparable: al menos el total como referencia
@@ -2570,6 +2941,7 @@ html = (
     .replace("__SEC1PSC__", sec1_psc)
     .replace("__SEC1GRAF__", sec1_graficas)
     .replace("__SEC1__", "".join(sec1_bloques))
+    .replace("__SEC2KPI__", sec2_kpis)
     .replace("__SEC2__", "".join(sec2_bloques))
     .replace("__SEC3__", sec3)
     .replace("__INSIGHT__", insight)

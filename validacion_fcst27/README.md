@@ -73,14 +73,24 @@ candidatas, ver hoja `Retencion_Candidatas`) o capturar `RETENCION_LN`
 **Nivel MGA / número de contrato**: el export no trae número de contrato ni
 marca de MGA; el análisis de negocios usa cedente + correlativo del sistema.
 
-**Granularidad de la estacionalidad 2026**: el CSV solo trae mensualizado el
-ejercicio 2027 (los demás años vienen como un renglón único en el periodo 6),
-y la base del RFCST no está mensualizada: solo separa Ene-Jul (real
-devengado) de Ago-Dic (proyección). Por eso el comparativo de estacionalidad
-contra RFCST 2026 y FCST 2026 se dibuja **punteado y plano dentro de cada
-bloque** — es el share real de cada semestre repartido entre sus meses, no
-una mensualización inventada. Si Suscripción comparte la mensualización de
-2026, se puede alimentar directo al perfil.
+**Granularidad de la estacionalidad 2026**: el CSV del FCST solo trae
+mensualizado el ejercicio 2027 (los demás años vienen como un renglón único en
+el periodo 6). Para el comparativo 2026 se usan dos bases adicionales:
+
+| Serie | Fuente | Ajuste |
+|---|---|---|
+| FCST 2026 | hoja `Ppto2026` del libro del RFCST (12 meses abiertos) | ninguno, se grafica sólida |
+| RFCST 2026 · Ene-Jul | forma mensual del real 2026 (`BDReal26.xlsx`), escalada al acumulado a julio del RFCST | ninguno, se grafica sólida |
+| RFCST 2026 · Ago-Dic | incremento Ago-Dic del RFCST repartido con la mensualización del FCST 2027 | **sí**, se grafica punteada y se declara al pie de la gráfica |
+
+El ajuste aplica **solo al RFCST 2026**, porque su base no trae esos meses
+abiertos. Si falta alguna de las dos bases el perfil cae a plano por bloque.
+
+**Nivel del FCST 2026**: los niveles salen de `BD_RFCST26` (mismo universo de
+contratos que el comparativo). La hoja `Ppto2026` trae el presupuesto completo
+de la compañía, que es mayor porque incluye contratos sin prima registrada;
+para reportar ese presupuesto completo en los niveles, poner
+`PPTO26_NIVEL_DESDE_HOJA = True`.
 
 **Nombre del presupuesto 2026**: se reporta como **FCST 2026** (constante
 `ETIQ_PPTO26` al inicio del script), tanto en el dashboard como en el Excel.
