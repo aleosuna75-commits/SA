@@ -29,6 +29,16 @@ python VAL_FCST27.py
   vs RFCST/Ppto), Resumen_LN con semáforos y score de riesgo,
   Estacionalidad_LN, Resumen_Cedente, Resumen_Negocio, Excepciones,
   Calidad_Datos, Retencion_Candidatas, Mapeo_Columnas y Parametros.
+- **`Reporte_Alertas_FCST27.xlsx`** — un renglón por negocio en ROJO o
+  AMARILLO, con el mismo formato del reporte de alertas del RFCST 2026:
+  identificación (LN, cedente, contrato, binder, país, región, corredor),
+  las cifras del FCST 2027 **junto a aquello contra lo que se comparan**
+  (RFCST 2026, FCST 2026, real 2026 a julio y real 2025), los índices y
+  desviaciones **como fórmulas de Excel**, los cuatro semáforos y el motivo
+  con los montos. Las celdas que dispararon cada alerta van **marcadas en
+  amarillo** (p. ej. siniestralidad alta marca Primas FCST, Siniestros FCST
+  y % Sin; un salto contra el RFCST marca además las dos cifras comparadas).
+  Incluye hoja `Leyenda` con las reglas, umbrales y celdas que marca cada una.
 - **`Dashboard_FCST27.html`** — dashboard interactivo:
   - **General**: KPIs por concepto (Primas, Siniestros, Comisiones y
     P-S-C / %P-S-C) con vistas *Tomado / Retenido*, dona de participación
@@ -37,14 +47,15 @@ python VAL_FCST27.py
   - **Línea de Negocio**: por cada concepto, comparativa por LN, variación
     vs RFCST y estacionalidad mensual en líneas con filtro de LN — al
     elegir una sola LN se agrega el comparativo contra la estacionalidad
-    del RFCST 2026 y la del FCST 2026 (líneas punteadas, ver nota abajo).
+    del RFCST 2026 y la del FCST 2026 (ver nota abajo).
     Cierran la sección el P-S-C / %P-S-C por LN y una única dona de
     mensualización P·S·C con filtro de LN.
-  - **Negocios**: análisis a nivel cedente / negocio (correlativo) con
+  - **Negocios**: análisis a nivel cedente, contrato y Binder Ppto, con
     filtros, semáforos, resumen por entidad, estacionalidad del negocio
     seleccionado y top de excepciones.
-  - Botón **Imprimir PDF** al final: imprime únicamente la sección Línea
-    de Negocio.
+  - Al final, botón para **descargar el reporte de alertas** (debe estar en
+    la misma carpeta que el HTML) y botón **Imprimir PDF**, que imprime
+    únicamente la sección Línea de Negocio.
 
 > \* Falta el incremento a la reserva y los costos de cobertura — señalado
 > en el dashboard y en el Excel.
@@ -78,6 +89,34 @@ clasifica por prefijo y se reporta en `Calidad_Datos`.
 **Nivel de análisis de negocios**: cedente, contrato y Binder Ppto. La columna
 de Binder Ppto viene vacía en el export actual; el filtro y el nivel de
 agrupación ya están en el dashboard para cuando se llene.
+
+## Cómo se levantan las alertas
+
+El semáforo se evalúa **por negocio** (línea + cedente + contrato):
+
+- **ROJO** — inconsistencias duras en negocios materiales: prima negativa,
+  siniestros o comisiones sin prima, siniestralidad > 100%, comisiones > 65%.
+- **AMARILLO** — índices altos (siniestralidad > 80%, comisiones > 45%,
+  siniestralidad negativa) y desviaciones fuertes contra el mismo negocio en
+  el RFCST 2026: prima desviada más de 40% o un salto de más de 30 pp en
+  siniestralidad o comisiones.
+- **VERDE** — sin alertas, o negocio por debajo de la materialidad.
+
+Dos filtros evitan que el reporte se llene de ruido no accionable:
+`MATERIALIDAD` (10,000 USD: por debajo no se escala a ROJO) y `RELEVANCIA`
+(100,000 USD: una desviación contra 2026 solo alerta si mueve al menos ese
+monto, para que un negocio de 30 k con el índice movido 30 pp no pese lo mismo
+que uno de 20 M). Con esta calibración quedan 325 negocios con alerta de 1,707.
+
+La **concentración mensual** de la prima se reporta como dato (% en el mes
+pico) pero **no levanta semáforo a nivel negocio**: la prima única anual es lo
+normal en reaseguro. Sigue siendo señal a nivel línea de negocio.
+
+Los negocios **sin contraparte en el RFCST 2026** (nuevos, o con otra llave)
+se señalan en el motivo, pero eso por sí solo no levanta semáforo.
+
+En el dashboard, el semáforo de una entidad agregada es **el peor de sus
+negocios**; las columnas Rojos y Amarillos dicen cuántos lo provocaron.
 
 **Vista Retenido**: la base no trae una marca confiable de retención. Por
 default retenido = tomado (con aviso en el dashboard). Cuando Suscripción

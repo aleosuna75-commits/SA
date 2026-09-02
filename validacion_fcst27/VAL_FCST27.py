@@ -57,6 +57,7 @@ from datetime import datetime
 
 import numpy as np
 import pandas as pd
+import xlsxwriter
 
 # Verificacion temprana de dependencias: mejor avisar aqui
 # que tronar despues de procesar toda la base
@@ -99,6 +100,8 @@ ARCHIVO_FCST = "PptoTecnico2026.csv"
 PREFIJO_FCST = "PptoTecnico"          # fallback: el .csv mas reciente
 
 ANIO_FCST = 2027                      # ejercicio que se valida
+
+ETIQ_FCST = f"FCST {ANIO_FCST}"
 
 # Planeacion reporta el presupuesto 2026 como "FCST 2026"
 # (fue el forecast con el que se cerro ese ejercicio): esta
@@ -157,16 +160,34 @@ COL_CAT_NOMBRE = "CedenteRP"
 TOL = 1.0                     # tolerancia en USD
 MATERIALIDAD = 10_000         # USD: negocios por debajo no escalan a ROJO
 
+# Impacto minimo en dolares para levantar una alerta de
+# comparacion contra 2026: sin esto, un negocio de 30 k con la
+# siniestralidad movida 30 pp pesa lo mismo que uno de 20 M y el
+# reporte se llena de ruido que no es accionable
+RELEVANCIA = 100_000
+
 UMBRAL_AMARILLO = 0.20        # desviacion vs RFCST que marca AMARILLO
 UMBRAL_ROJO = 0.40            # desviacion vs RFCST que marca ROJO
 
 IND_SIN_AMARILLO = 0.80       # siniestralidad implicita S/P
 IND_SIN_ROJO = 1.00
-IND_COS_AMARILLO = 0.35       # comisiones implicitas C/P
-IND_COS_ROJO = 0.50
+# Comisiones implicitas C/P. El portafolio corre en 18.5% (RFCST
+# 20.2%) pero hay lineas que operan estructuralmente alto (LN 4003
+# ronda 41%), asi que los umbrales van por encima de esa banda
+IND_COS_AMARILLO = 0.45
+IND_COS_ROJO = 0.65
 
-CONC_AMARILLO = 0.40          # un solo mes concentra > 40% del anio
-CONC_ROJO = 0.60              # un solo mes concentra > 60% del anio
+# Concentracion mensual de la prima. A nivel LN es una senal util
+# (una linea no deberia cargar el ano en un mes); a nivel contrato
+# NO se alerta, porque la prima unica anual es la norma en
+# reaseguro: el dato se reporta pero no levanta semaforo.
+CONC_AMARILLO = 0.40
+CONC_ROJO = 0.60
+
+# Salto de un indice tecnico (siniestralidad o comisiones) del
+# negocio contra su propio RFCST 2026, en puntos porcentuales.
+# Solo alerta si ademas mueve mas de RELEVANCIA en dolares.
+SALTO_IND = 0.30
 
 MONTO_ATIPICO = 100e6         # renglones individuales mayores se reportan
 
@@ -655,6 +676,40 @@ def cargar_rfcst26():
 
     por_ln = t.groupby("_LN").sum()
 
+    # Agregados por negocio (LN, cedente, contrato) para comparar
+    # cada negocio del FCST 2027 contra su equivalente 2026
+    por_negocio = {}
+    if "Num Contrato" in b.columns and "Compañía" in b.columns:
+        _ced = pd.to_numeric(b["Compañía"], errors="coerce")
+        _cto = pd.to_numeric(b["Num Contrato"], errors="coerce")
+        _ok = _ced.notna() & _cto.notna()
+
+        _bloques = {"rfcst": "1226", "ppto": "PPTO1226", "real25": "1225"}
+        _tmp = pd.DataFrame({
+            "_ln": b.loc[_ok, "_LN"],
+            "_ced": _ced[_ok].astype(np.int64),
+            "_cto": _cto[_ok].astype(np.int64),
+        })
+        for _blq, _suf in _bloques.items():
+            for _cpt in ("P", "S", "C"):
+                _tmp[f"{_blq}_{_cpt}"] = datos[f"{_cpt}_{_suf}"].loc[_ok].to_numpy()
+
+        _agg = _tmp.groupby(["_ln", "_ced", "_cto"]).sum()
+        for _llave, _fila in _agg.iterrows():
+            por_negocio[_llave] = {
+                blq: {cpt: float(_fila[f"{blq}_{cpt}"]) for cpt in ("P", "S", "C")}
+                for blq in _bloques
+            }
+        print(f"  negocios con llave LN/cedente/contrato: {len(por_negocio):,}")
+
+    # Nombre de cedente que trae la propia base del RFCST
+    nombres_ced = {}
+    if "Compañía_Nombre" in b.columns and "Compañía" in b.columns:
+        _n = pd.to_numeric(b["Compañía"], errors="coerce")
+        for _num, _nom in zip(_n, b["Compañía_Nombre"]):
+            if pd.notna(_num) and pd.notna(_nom):
+                nombres_ced.setdefault(str(int(_num)), str(_nom).strip())
+
     por_ced = {}
     if "Compañía" in b.columns:
         nums = pd.to_numeric(b["Compañía"], errors="coerce")
@@ -671,6 +726,7 @@ def cargar_rfcst26():
           f"Real25 {por_ln['P_1225'].sum() / 1e6:,.1f} M")
 
     return {"por_ln": por_ln, "por_ced": por_ced,
+            "por_negocio": por_negocio, "nombres_ced": nombres_ced,
             "archivo": os.path.basename(ruta)}
 
 
@@ -750,12 +806,30 @@ def cargar_real26():
     datos = _mensual_por_ln(b, col_ln, meses, COL_REAL26,
                             f"{os.path.basename(ruta)} · {HOJA_REAL26}")
 
+    # Acumulado por negocio, para el reporte de alertas
+    por_negocio = {}
+    if "Num Contrato" in b.columns and "Compañía" in b.columns:
+        _ced = pd.to_numeric(b["Compañía"], errors="coerce")
+        _cto = pd.to_numeric(b["Num Contrato"], errors="coerce")
+        _ok = _ced.notna() & _cto.notna()
+        _tmp = pd.DataFrame({
+            "_ln": b.loc[_ok, col_ln].map(_norm_ln),
+            "_ced": _ced[_ok].astype(np.int64),
+            "_cto": _cto[_ok].astype(np.int64),
+        })
+        for _cpt, _col in COL_REAL26.items():
+            _tmp[_cpt] = pd.to_numeric(b.loc[_ok, _col], errors="coerce").fillna(0).to_numpy()
+        _agg = _tmp.groupby(["_ln", "_ced", "_cto"]).sum()
+        por_negocio = {k: {c: float(v[c]) for c in ("P", "S", "C")}
+                       for k, v in _agg.iterrows()}
+
     obs = sorted({int(m) for m in meses.dropna().unique()})
     tot = datos.get("_tot", {}).get("P", [0] * 12)
     print(f"Real {ANIO_REAL26} mensual ({os.path.basename(ruta)}): "
           f"meses {obs[0]}-{obs[-1]} · primas {sum(tot) / 1e6:,.1f} M")
 
-    return {"por_ln": datos, "meses": obs, "archivo": os.path.basename(ruta)}
+    return {"por_ln": datos, "meses": obs, "por_negocio": por_negocio,
+            "archivo": os.path.basename(ruta)}
 
 
 def cargar_ppto26():
@@ -1267,44 +1341,173 @@ FUENTE_EST26 = " · ".join(filter(None, [
 grp_neg = d_ok.groupby(["LN", "Cedente", "Contrato", "Binder_Ppto"],
                        sort=False, dropna=False)
 
-neg_rows = []
-for (ln, ced, cto, binder), sub in grp_neg:
-    g = {}
-    for cpt in ("P", "S", "C"):
-        s = sub[sub["Concepto"] == cpt]
-        por_mes = s.groupby("Mes")["Valor"].sum()
-        g[cpt] = [round(float(por_mes.get(m, 0.0))) for m in range(1, 13)]
-    P = sum(g["P"]); S = sum(g["S"]); C = sum(g["C"])
+# ---- Contrapartes 2026 / 2025 por negocio ----
+RF_NEG = RFCST["por_negocio"] if RFCST else {}
+RL_NEG = REAL26["por_negocio"] if REAL26 else {}
+NOMBRE_CED = dict(RFCST["nombres_ced"]) if RFCST else {}
+NOMBRE_CED.update(CATALOGO_CED)          # el catalogo manda si existe
+
+VACIO = {"P": 0.0, "S": 0.0, "C": 0.0}
+
+
+def _fmt_corto(v):
+    """Monto compacto para los textos de motivo: 4.43 M / 544.4 k."""
+    if v is None or (isinstance(v, float) and (math.isnan(v) or math.isinf(v))):
+        return "s/d"
+    a = abs(v)
+    if a >= 1e6:
+        return f"{v / 1e6:,.2f} M"
+    if a >= 1e3:
+        return f"{v / 1e3:,.1f} k"
+    return f"{v:,.0f}"
+
+
+def _fmt_pc(v, dec=0):
+    if v is None or (isinstance(v, float) and (math.isnan(v) or math.isinf(v))):
+        return "s/d"
+    return f"{v * 100:,.{dec}f}%"
+
+
+def evaluar_alertas(f, rf, ppto, r25, r26, conc, mes_pico):
+    """Reglas de alerta de un negocio.
+
+    Devuelve (semaforo, motivos, celdas) donde:
+      semaforo  0 verde · 1 amarillo · 2 rojo
+      motivos   textos que citan los montos comparados
+      celdas    columnas del reporte que se marcan en amarillo
+
+    ROJO se reserva a inconsistencias duras en negocios materiales;
+    AMARILLO a indices altos y desviaciones fuertes contra 2026.
+    """
+
+    P, S, C = f["P"], f["S"], f["C"]
+    material = abs(P) > MATERIALIDAD
+
+    motivos, celdas = [], []
+    sem = 0
+
+    def marca(nivel, texto, cols):
+        nonlocal sem
+        motivos.append(texto)
+        celdas.extend(cols)
+        sem = max(sem, nivel)
 
     ind_sin = _rat(S, P)
     ind_cos = _rat(C, P)
-    tot_p = sum(abs(v) for v in g["P"])
-    conc = max(abs(v) for v in g["P"]) / tot_p if tot_p > TOL else float("nan")
 
-    motivos = []
-    sem = 0
-    material = abs(P) > MATERIALIDAD
+    # --- Inconsistencias duras ---
     if P < -TOL:
-        motivos.append("Prima negativa")
-        sem = 2 if material else 1
+        marca(2 if material else 1,
+              f"Prima FCST negativa ({_fmt_corto(P)})", ["P_F"])
+
     if abs(P) <= TOL and (abs(S) > TOL or abs(C) > TOL):
-        motivos.append("S/C sin prima")
-        sem = max(sem, 2 if (abs(S) + abs(C)) > MATERIALIDAD else 1)
-    if not math.isnan(ind_sin) and ind_sin > IND_SIN_ROJO:
-        motivos.append("Siniestralidad > 100%")
-        sem = max(sem, 2 if material else 1)
-    elif not math.isnan(ind_sin) and ind_sin > IND_SIN_AMARILLO:
-        motivos.append(f"Siniestralidad > {IND_SIN_AMARILLO:.0%}")
-        sem = max(sem, 1)
-    if not math.isnan(ind_cos) and ind_cos > IND_COS_ROJO:
-        motivos.append(f"Comisiones > {IND_COS_ROJO:.0%}")
-        sem = max(sem, 2 if material else 1)
-    elif not math.isnan(ind_cos) and ind_cos > IND_COS_AMARILLO:
-        motivos.append(f"Comisiones > {IND_COS_AMARILLO:.0%}")
-        sem = max(sem, 1)
-    if not math.isnan(conc) and conc > CONC_ROJO and material:
-        motivos.append(f"{conc:.0%} de la prima en un mes")
-        sem = max(sem, 1)
+        marca(2 if (abs(S) + abs(C)) > MATERIALIDAD else 1,
+              f"Siniestros/comisiones sin prima (S {_fmt_corto(S)} · "
+              f"C {_fmt_corto(C)} · P {_fmt_corto(P)})",
+              ["P_F", "S_F", "C_F"])
+
+    # --- Indices tecnicos del propio forecast ---
+    if not math.isnan(ind_sin):
+        if ind_sin > IND_SIN_ROJO:
+            marca(2 if material else 1,
+                  f"Siniestralidad {_fmt_pc(ind_sin)} > {IND_SIN_ROJO:.0%} "
+                  f"(S {_fmt_corto(S)} / P {_fmt_corto(P)})",
+                  ["P_F", "S_F", "IND_SIN"])
+        elif ind_sin > IND_SIN_AMARILLO:
+            marca(1, f"Siniestralidad {_fmt_pc(ind_sin)} > {IND_SIN_AMARILLO:.0%} "
+                     f"(S {_fmt_corto(S)} / P {_fmt_corto(P)})",
+                  ["P_F", "S_F", "IND_SIN"])
+        elif ind_sin < -0.05:
+            marca(1, f"Siniestralidad negativa {_fmt_pc(ind_sin)} "
+                     f"(S {_fmt_corto(S)} / P {_fmt_corto(P)})",
+                  ["S_F", "IND_SIN"])
+
+    if not math.isnan(ind_cos):
+        if ind_cos > IND_COS_ROJO:
+            marca(2 if material else 1,
+                  f"Comisiones {_fmt_pc(ind_cos)} > {IND_COS_ROJO:.0%} "
+                  f"(C {_fmt_corto(C)} / P {_fmt_corto(P)})",
+                  ["P_F", "C_F", "IND_COS"])
+        elif ind_cos > IND_COS_AMARILLO:
+            marca(1, f"Comisiones {_fmt_pc(ind_cos)} > {IND_COS_AMARILLO:.0%} "
+                     f"(C {_fmt_corto(C)} / P {_fmt_corto(P)})",
+                  ["P_F", "C_F", "IND_COS"])
+
+    if S < -RELEVANCIA:
+        marca(1, f"Siniestros FCST negativos ({_fmt_corto(S)}): revisar recuperaciones",
+              ["S_F"])
+
+    # --- Contra el RFCST 2026 del mismo negocio ---
+    tiene_rf = rf is not None and abs(rf["P"]) > TOL
+
+    if tiene_rf and material:
+        var_p = _rat(P, rf["P"], MATERIALIDAD) - 1
+        if (not math.isnan(var_p) and abs(var_p) > UMBRAL_ROJO
+                and abs(P - rf["P"]) > RELEVANCIA):
+            marca(1, f"Prima {_fmt_pc(var_p)} vs RFCST 2026 "
+                     f"(FCST {_fmt_corto(P)} vs RFCST {_fmt_corto(rf['P'])})",
+                  ["P_F", "P_R", "VAR_P"])
+
+        ind_sin_rf = _rat(rf["S"], rf["P"])
+        if not math.isnan(ind_sin) and not math.isnan(ind_sin_rf):
+            salto = ind_sin - ind_sin_rf
+            # el salto tiene que mover dinero, no solo el indice
+            if abs(salto) > SALTO_IND and abs(salto * P) > RELEVANCIA:
+                marca(1, f"Siniestralidad {_fmt_pc(ind_sin)} vs {_fmt_pc(ind_sin_rf)} "
+                         f"del RFCST 2026 ({salto * 100:+,.0f} pp · "
+                         f"S {_fmt_corto(S)} vs {_fmt_corto(rf['S'])})",
+                      ["S_F", "S_R", "IND_SIN", "IND_SIN_R"])
+
+        ind_cos_rf = _rat(rf["C"], rf["P"])
+        if not math.isnan(ind_cos) and not math.isnan(ind_cos_rf):
+            salto = ind_cos - ind_cos_rf
+            if abs(salto) > SALTO_IND and abs(salto * P) > RELEVANCIA:
+                marca(1, f"Comisiones {_fmt_pc(ind_cos)} vs {_fmt_pc(ind_cos_rf)} "
+                         f"del RFCST 2026 ({salto * 100:+,.0f} pp · "
+                         f"C {_fmt_corto(C)} vs {_fmt_corto(rf['C'])})",
+                      ["C_F", "C_R", "IND_COS", "IND_COS_R"])
+
+    # La concentracion mensual NO levanta semaforo a nivel negocio
+    # (la prima unica anual es lo normal en reaseguro); queda como
+    # dato en el reporte y como senal a nivel linea de negocio
+
+    # Nota informativa: no escala el semaforo, solo explica que el
+    # negocio no tiene contra que compararse
+    nota = ""
+    if not tiene_rf and material:
+        nota = ("Sin contraparte en el RFCST 2026 (negocio nuevo o con otra "
+                "llave LN/cedente/contrato): no hay comparativo 2026")
+
+    return sem, motivos, celdas, nota
+
+
+negocios = []
+
+for (ln, ced, cto, binder), sub in grp_neg:
+
+    g = {}
+    for cpt in ("P", "S", "C"):
+        s_cpt = sub[sub["Concepto"] == cpt]
+        por_mes = s_cpt.groupby("Mes")["Valor"].sum()
+        g[cpt] = [round(float(por_mes.get(m, 0.0))) for m in range(1, 13)]
+
+    f = {cpt: float(sum(g[cpt])) for cpt in ("P", "S", "C")}
+
+    llave = (ln, int(ced), int(cto))
+    rf = RF_NEG.get(llave, {}).get("rfcst") if llave in RF_NEG else None
+    ppto = RF_NEG.get(llave, {}).get("ppto") if llave in RF_NEG else None
+    r25 = RF_NEG.get(llave, {}).get("real25") if llave in RF_NEG else None
+    r26 = RL_NEG.get(llave)
+
+    tot_p = sum(abs(v) for v in g["P"])
+    if tot_p > TOL:
+        _idx = int(np.argmax([abs(v) for v in g["P"]]))
+        conc = abs(g["P"][_idx]) / tot_p
+        mes_pico = MESES_TXT[_idx]
+    else:
+        conc, mes_pico = float("nan"), ""
+
+    sem, motivos, celdas, nota = evaluar_alertas(f, rf, ppto, r25, r26, conc, mes_pico)
 
     regiones = sorted(set(sub["Region"].dropna().astype(str)))
     paises = sorted(set(pd.to_numeric(sub["Pais_Cod"], errors="coerce")
@@ -1312,15 +1515,26 @@ for (ln, ced, cto, binder), sub in grp_neg:
     corredores = sorted(set(sub["Corredor"].astype(int).astype(str)))
     monedas = sorted(set(sub["Moneda"].dropna().astype(str)))
 
-    neg_rows.append([
-        ln, str(int(ced)), str(int(cto)),
-        "/".join(regiones), "/".join(paises[:3]), "/".join(corredores[:3]),
-        "/".join(monedas[:4]),
-        round(P), round(S), round(C),
-        g["P"], g["S"], g["C"],
-        sem, " · ".join(motivos),
-        str(binder or "").strip(),
-    ])
+    negocios.append({
+        "LN": ln, "Cedente": int(ced), "Contrato": int(cto),
+        "Binder": str(binder or "").strip(),
+        "Region": "/".join(regiones), "Paises": "/".join(paises[:3]),
+        "Corredores": "/".join(corredores[:3]), "Monedas": "/".join(monedas[:4]),
+        "f": f, "rf": rf, "ppto": ppto, "r25": r25, "r26": r26,
+        "meses": g, "conc": conc, "mes_pico": mes_pico,
+        "sem": sem, "motivos": motivos, "celdas": sorted(set(celdas)),
+        "nota": nota,
+    })
+
+neg_rows = [[
+    n["LN"], str(n["Cedente"]), str(n["Contrato"]),
+    n["Region"], n["Paises"], n["Corredores"], n["Monedas"],
+    round(n["f"]["P"]), round(n["f"]["S"]), round(n["f"]["C"]),
+    n["meses"]["P"], n["meses"]["S"], n["meses"]["C"],
+    n["sem"], " · ".join(n["motivos"]) + ((" · " if n["motivos"] else "") + n["nota"]
+                                          if n["nota"] else ""),
+    n["Binder"],
+] for n in negocios]
 
 print(f"Negocios {ANIO_FCST}: {len(neg_rows):,} · "
       f"con alerta: {sum(1 for r in neg_rows if r[13] > 0):,}")
@@ -1649,6 +1863,291 @@ with pd.ExcelWriter(salida_xlsx, engine="xlsxwriter") as writer:
 print(f"Excel generado: {salida_xlsx}")
 
 # =====================================================
+# REPORTE DE ALERTAS (formato del reporte del RFCST 26)
+# =====================================================
+# Una hoja por negocio en ROJO o AMARILLO con: identificacion,
+# las cifras del FCST 2027, aquello contra lo que se compara
+# (RFCST 2026, FCST 2026, real 2026 a julio y real 2025), los
+# indices y desviaciones como formulas de Excel, los semaforos
+# y el motivo con los montos. Las celdas que dispararon cada
+# alerta van marcadas en amarillo.
+
+salida_alertas = os.path.join(xOutputs, "Reporte_Alertas_FCST27.xlsx")
+
+# columna logica -> (letra, indice 0-based)
+COLS_REP = [
+    # Identificacion
+    ("LN", "Identificación"), ("N° Cedente", None), ("Cedente", None),
+    ("País (cód.)", None), ("Región", None), ("Corredor", None),
+    ("Num Contrato", None), ("Binder Ppto", None),
+    # Cifras
+    ("Primas", f"{ETIQ_FCST} · Dic {ANIO_FCST}"), ("Siniestros", None), ("Comisiones", None),
+    ("Primas", "RFCST 2026 · Dic 2026"), ("Siniestros", None), ("Comisiones", None),
+    ("Primas", f"{ETIQ_PPTO26} · Dic 2026"), ("Siniestros", None), ("Comisiones", None),
+    ("Primas", "Real 2026 · Corte a Julio"), ("Siniestros", None), ("Comisiones", None),
+    ("Primas", "Real 2025 · Dic 2025"), ("Siniestros", None), ("Comisiones", None),
+    # Indices
+    (f"% Sin {ETIQ_FCST}", "Índices"), (f"% Com {ETIQ_FCST}", None),
+    ("% Sin RFCST 26", None), ("% Com RFCST 26", None),
+    (f"%P-S-C {ETIQ_FCST}", None), ("%P-S-C RFCST 26", None),
+    # Desviaciones
+    ("Var Primas vs RFCST 26", "Desviaciones"), ("Var Siniestros vs RFCST 26", None),
+    ("Var Comisiones vs RFCST 26", None), (f"Var Primas vs {ETIQ_PPTO26}", None),
+    ("Crec. vs Real 2025", None), ("% prima en el mes pico", None),
+    # Semaforos
+    ("Semáforo Sin.", "Semáforos"), ("Semáforo Com.", None),
+    ("Semáforo vs RFCST", None), ("Semáforo Global", None),
+    # Motivo
+    ("Motivo de la alerta", "Motivo"),
+]
+
+# Posiciones (0-based) de las columnas que se marcan en amarillo
+MARCA_COL = {
+    "P_F": 8, "S_F": 9, "C_F": 10,
+    "P_R": 11, "S_R": 12, "C_R": 13,
+    "IND_SIN": 23, "IND_COS": 24, "IND_SIN_R": 25, "IND_COS_R": 26,
+    "VAR_P": 29, "CONC": 35,
+}
+
+REGLAS_LEYENDA = [
+    ("ROJO", "Prima del FCST negativa", "< 0",
+     f"{ETIQ_FCST} Primas"),
+    ("ROJO", "Siniestros o comisiones sin prima", "prima = 0 y S o C ≠ 0",
+     f"{ETIQ_FCST} Primas · Siniestros · Comisiones"),
+    ("ROJO", "Siniestralidad implícita del forecast por encima del 100%",
+     f"> {IND_SIN_ROJO:.0%}", f"{ETIQ_FCST} Primas · Siniestros · % Sin"),
+    ("ROJO", "Comisiones implícitas muy por encima de la banda del portafolio",
+     f"> {IND_COS_ROJO:.0%}", f"{ETIQ_FCST} Primas · Comisiones · % Com"),
+    ("AMARILLO", "Siniestralidad implícita alta", f"> {IND_SIN_AMARILLO:.0%}",
+     f"{ETIQ_FCST} Primas · Siniestros · % Sin"),
+    ("AMARILLO", "Siniestralidad implícita negativa (revisar recuperaciones)",
+     "< -5%", f"{ETIQ_FCST} Siniestros · % Sin"),
+    ("AMARILLO", "Comisiones implícitas altas", f"> {IND_COS_AMARILLO:.0%}",
+     f"{ETIQ_FCST} Primas · Comisiones · % Com"),
+    ("AMARILLO", "Siniestros del forecast negativos",
+     f"< -{RELEVANCIA:,.0f} USD", f"{ETIQ_FCST} Siniestros"),
+    ("AMARILLO", "Prima muy desviada contra el mismo negocio en el RFCST 2026",
+     f"|var| > {UMBRAL_ROJO:.0%} y diferencia > {RELEVANCIA:,.0f} USD",
+     f"{ETIQ_FCST} Primas · RFCST Primas · Var Primas vs RFCST"),
+    ("AMARILLO", "Salto de la siniestralidad contra la del mismo negocio en el RFCST 2026",
+     f"> {SALTO_IND:.0%} pp y con impacto > {RELEVANCIA:,.0f} USD",
+     f"{ETIQ_FCST} Siniestros · RFCST Siniestros · % Sin (ambos)"),
+    ("AMARILLO", "Salto de las comisiones contra las del mismo negocio en el RFCST 2026",
+     f"> {SALTO_IND:.0%} pp y con impacto > {RELEVANCIA:,.0f} USD",
+     f"{ETIQ_FCST} Comisiones · RFCST Comisiones · % Com (ambos)"),
+]
+
+
+def _v(bloque, cpt):
+    """Monto del bloque comparativo, o None si no hay contraparte."""
+    if not bloque:
+        return None
+    v = bloque.get(cpt)
+    if v is None or (isinstance(v, float) and (math.isnan(v) or math.isinf(v))):
+        return None
+    return float(v)
+
+
+def generar_reporte_alertas(ruta, filas):
+
+    wb = xlsxwriter.Workbook(ruta, {"nan_inf_to_errors": True})
+    ws = wb.add_worksheet("Alertas")
+
+    base = {"font_name": "Arial", "font_size": 9}
+    f_grupo = {c: wb.add_format({**base, "bold": True, "font_color": "#FFFFFF",
+                                 "bg_color": c, "align": "center", "border": 1})
+               for c in ("#5B3C8A", "#1F3864", "#2E5E4E", "#3C3C3C")}
+    f_head = wb.add_format({**base, "bold": True, "bg_color": "#D9E1F2",
+                            "border": 1, "text_wrap": True, "valign": "vcenter",
+                            "align": "center"})
+    f_txt = wb.add_format(base)
+    f_num = wb.add_format({**base, "num_format": "#,##0;(#,##0);-"})
+    f_pct = wb.add_format({**base, "num_format": "0.0%;(0.0%);-"})
+    f_num_m = wb.add_format({**base, "num_format": "#,##0;(#,##0);-",
+                             "bg_color": "#FFEB9C", "bold": True})
+    f_pct_m = wb.add_format({**base, "num_format": "0.0%;(0.0%);-",
+                             "bg_color": "#FFEB9C", "bold": True})
+    f_motivo = wb.add_format({**base, "text_wrap": True, "valign": "top"})
+
+    # Color del grupo por tramo de columnas
+    color_grupo = ["#5B3C8A"] * 8 + ["#1F3864"] * 15 + ["#2E5E4E"] * 12 \
+        + ["#3C3C3C"] * 4 + ["#1F3864"]
+
+    # Fila 1: encabezados de grupo (combinados)
+    ini = 0
+    for i, (_, grupo) in enumerate(COLS_REP):
+        if grupo is None and i > 0:
+            continue
+        fin = i
+        while fin + 1 < len(COLS_REP) and COLS_REP[fin + 1][1] is None:
+            fin += 1
+        if fin > ini or True:
+            texto = grupo or ""
+            if fin > i:
+                ws.merge_range(0, i, 0, fin, texto, f_grupo[color_grupo[i]])
+            else:
+                ws.write(0, i, texto, f_grupo[color_grupo[i]])
+        ini = fin + 1
+
+    # Fila 2: encabezados de columna
+    for i, (nombre, _) in enumerate(COLS_REP):
+        ws.write(1, i, nombre, f_head)
+
+    es_pct = set(range(23, 36))          # indices y desviaciones
+
+    for j, n in enumerate(filas):
+        r = j + 2                        # fila 0-based en la hoja
+        e = r + 1                        # fila 1-based para las formulas
+        marcadas = {MARCA_COL[c] for c in n["celdas"] if c in MARCA_COL}
+
+        def fmt(col):
+            if col in marcadas:
+                return f_pct_m if col in es_pct else f_num_m
+            return f_pct if col in es_pct else f_num
+
+        ident = [n["LN"], n["Cedente"], NOMBRE_CED.get(str(n["Cedente"]), ""),
+                 n["Paises"], n["Region"], n["Corredores"], n["Contrato"],
+                 n["Binder"]]
+        for i, v in enumerate(ident):
+            ws.write(r, i, v, f_txt)
+
+        bloques = [n["f"], n["rf"], n["ppto"], n["r26"], n["r25"]]
+        col = 8
+        for bl in bloques:
+            for cpt in ("P", "S", "C"):
+                v = _v(bl, cpt)
+                if v is None:
+                    ws.write_blank(r, col, None, fmt(col))
+                else:
+                    ws.write_number(r, col, v, fmt(col))
+                col += 1
+
+        # Indices y desviaciones como formulas
+        formulas = [
+            f'=IF(ABS(I{e})>1,J{e}/I{e},"")',
+            f'=IF(ABS(I{e})>1,K{e}/I{e},"")',
+            f'=IF(ABS(L{e})>1,M{e}/L{e},"")',
+            f'=IF(ABS(L{e})>1,N{e}/L{e},"")',
+            f'=IF(ABS(I{e})>1,(I{e}-J{e}-K{e})/I{e},"")',
+            f'=IF(ABS(L{e})>1,(L{e}-M{e}-N{e})/L{e},"")',
+            f'=IF(ABS(L{e})>1,I{e}/L{e}-1,"")',
+            f'=IF(ABS(M{e})>1,J{e}/M{e}-1,"")',
+            f'=IF(ABS(N{e})>1,K{e}/N{e}-1,"")',
+            f'=IF(ABS(O{e})>1,I{e}/O{e}-1,"")',
+            f'=IF(ABS(U{e})>1,I{e}/U{e}-1,"")',
+        ]
+        for k, f_ in enumerate(formulas):
+            ws.write_formula(r, 23 + k, f_, fmt(23 + k))
+
+        conc = n["conc"]
+        if conc is None or math.isnan(conc):
+            ws.write_blank(r, 35, None, fmt(35))
+        else:
+            ws.write_number(r, 35, conc, fmt(35))
+
+        for k, v in enumerate(n["semaforos"]):
+            ws.write(r, 36 + k, v, f_txt)
+
+        ws.write(r, 40 - 0, " · ".join(n["motivos"]) +
+                 ((" · " if n["motivos"] else "") + n["nota"] if n["nota"] else ""),
+                 f_motivo)
+
+    nfilas = len(filas) + 2
+
+    # Semaforos con formato condicional, igual que el reporte del RFCST
+    for col in range(36, 40):
+        for valor, bg, fg in (("ROJO", "#FFC7CE", "#9C0006"),
+                              ("AMARILLO", "#FFEB9C", "#9C6500"),
+                              ("VERDE", "#C6EFCE", "#006100"),
+                              ("SIN DATO", "#EDEDED", "#7F7F7F")):
+            ws.conditional_format(2, col, max(nfilas - 1, 2), col, {
+                "type": "cell", "criteria": "==", "value": f'"{valor}"',
+                "format": wb.add_format({"bg_color": bg, "font_color": fg,
+                                         **base}),
+            })
+
+    ws.freeze_panes(2, 3)
+    ws.autofilter(1, 0, max(nfilas - 1, 2), len(COLS_REP) - 1)
+
+    ws.set_column(0, 0, 8)          # LN
+    ws.set_column(1, 1, 10)         # N° cedente
+    ws.set_column(2, 2, 34)         # nombre
+    ws.set_column(3, 7, 12)
+    ws.set_column(8, 22, 14)
+    ws.set_column(23, 35, 13)
+    ws.set_column(36, 39, 14)
+    ws.set_column(40, 40, 90)       # motivo
+
+    # ---- Leyenda ----
+    lg = wb.add_worksheet("Leyenda")
+    f_t = wb.add_format({**base, "bold": True, "font_size": 12})
+    f_b = wb.add_format({**base, "bold": True, "bg_color": "#D9E1F2", "border": 1})
+    f_w = wb.add_format({**base, "text_wrap": True, "valign": "top"})
+
+    n_rojo_r = sum(1 for n in filas if n["sem"] == 2)
+    n_ama_r = len(filas) - n_rojo_r
+
+    lg.write(0, 0, f"Reporte de alertas del {ETIQ_FCST} · PPTO Técnico", f_t)
+    lg.write(1, 0, f"Generado {datetime.now().strftime('%d/%m/%Y %H:%M')} · "
+                   f"{len(filas):,} negocios en ROJO o AMARILLO "
+                   f"({n_rojo_r:,} rojos · {n_ama_r:,} amarillos) de "
+                   f"{len(negocios):,} · cifras en dólares · materialidad "
+                   f"{MATERIALIDAD:,.0f} USD (negocios por debajo no escalan a ROJO) · "
+                   f"relevancia {RELEVANCIA:,.0f} USD (impacto mínimo para alertar "
+                   f"una desviación contra 2026)", f_w)
+    lg.write(2, 0, "Las celdas en amarillo dentro de la hoja Alertas son las cifras "
+                   "que se compararon para levantar cada alerta; el Motivo repite "
+                   "esos montos.", f_w)
+    lg.write(3, 0, "El negocio es la combinación de línea, cedente y número de "
+                   "contrato; contra esa misma llave se busca su equivalente en el "
+                   "RFCST 2026, en el presupuesto 2026 y en los reales.", f_w)
+
+    for i, t in enumerate(("Semáforo", "Regla", "Umbral",
+                           "Celdas marcadas en amarillo")):
+        lg.write(5, i, t, f_b)
+    for i, fila in enumerate(REGLAS_LEYENDA):
+        for k, v in enumerate(fila):
+            lg.write(6 + i, k, v, f_w)
+
+    r0 = 6 + len(REGLAS_LEYENDA) + 1
+    lg.write(r0, 0, "Semáforo Global: ROJO si hay al menos una regla roja en un "
+                    "negocio material; AMARILLO si solo hay reglas amarillas; VERDE "
+                    "si no hay alertas o el negocio está por debajo de la "
+                    "materialidad.", f_w)
+    lg.write(r0 + 1, 0, "La concentración mensual de la prima se reporta como dato "
+                        "(% en el mes pico) pero no levanta semáforo a nivel "
+                        "negocio: la prima única anual es lo normal en reaseguro.", f_w)
+    lg.write(r0 + 2, 0, "Los negocios sin contraparte en el RFCST 2026 se señalan en "
+                        "el motivo, pero eso por sí solo no levanta semáforo.", f_w)
+
+    lg.set_column(0, 0, 22)
+    lg.set_column(1, 1, 62)
+    lg.set_column(2, 2, 34)
+    lg.set_column(3, 3, 52)
+
+    wb.close()
+
+
+# Semaforos por dimension para el reporte
+for _n in negocios:
+    _f = _n["f"]
+    _is = _rat(_f["S"], _f["P"])
+    _ic = _rat(_f["C"], _f["P"])
+    _vp = (_rat(_f["P"], _n["rf"]["P"], MATERIALIDAD) - 1
+           if _n["rf"] and abs(_n["rf"]["P"]) > TOL else float("nan"))
+    _n["semaforos"] = [semaforo_sin(_is), semaforo_costos(_ic),
+                       semaforo_desviacion(_vp),
+                       ["VERDE", "AMARILLO", "ROJO"][_n["sem"]]]
+
+alertas_rep = sorted([n for n in negocios if n["sem"] > 0],
+                     key=lambda n: (-n["sem"], -abs(n["f"]["P"])))
+
+generar_reporte_alertas(salida_alertas, alertas_rep)
+
+print(f"Reporte de alertas generado: {salida_alertas} "
+      f"({len(alertas_rep):,} negocios)")
+
+# =====================================================
 # DASHBOARD HTML - PALETA Y FORMATOS
 # =====================================================
 
@@ -1667,7 +2166,7 @@ def _fmt_pct(v, dec=1, signo=False):
     if v is None or (isinstance(v, float) and (math.isnan(v) or math.isinf(v))):
         return "s/d"
     if v > 9.99:
-        return "&gt;999%"
+        return f"&times;{v + 1:,.0f}" if v + 1 >= 100 else f"&times;{v + 1:,.1f}"
     if v < -9.99:
         return "&lt;-999%"
     s = "+" if (signo and v > 0) else ""
@@ -1690,8 +2189,6 @@ def _kpi(icono, titulo, valor, linea2, linea3=""):
     )
 
 
-A2 = str(ANIO_FCST)[2:]          # "27"
-ETIQ_FCST = f"FCST {ANIO_FCST}"
 
 # =====================================================
 # SECCION 1 - GENERAL (tomado / retenido por concepto)
@@ -2019,8 +2516,9 @@ sec3 = f"""
   <div class="card scroll">
     <h2>Resumen por entidad</h2>
     <div class="nota">Top por prima {ETIQ_FCST} con los filtros aplicados. Índices
-      sobre agregados; el crecimiento vs RFCST 2026 se calcula por cedente cuando
-      la base del RFCST está disponible.</div>
+      sobre agregados. El semáforo de la entidad es el peor de sus negocios: las
+      columnas Rojos y Amarillos dicen cuántos lo provocaron, y el detalle con el
+      motivo y los montos está en el reporte de alertas del final.</div>
     <div id="rs_neg"></div>
   </div>
   <div class="grid dos2">
@@ -2275,7 +2773,10 @@ PLANTILLA = """<!doctype html>
   .sel-ln:focus { outline: none; border-color: rgba(57,135,229,.6); }
   .vacio { color: #898781; font-size: 12.5px; padding: 18px 4px; }
   .cardinal { border-top: 1px solid #2c2c2a; padding-top: 20px; margin-top: 30px; }
-  .acciones { display: flex; justify-content: center; margin-top: 28px; }
+  .acciones { display: flex; justify-content: center; margin-top: 28px; gap: 12px;
+    flex-wrap: wrap; }
+  a.btn-print { text-decoration: none; }
+  .pie-acciones { max-width: 780px; margin: 10px auto 0; text-align: center; }
   .btn-print { background: rgba(57,135,229,.16); color: #9ec5f4;
     border: 1px solid rgba(57,135,229,.35); border-radius: 10px; padding: 11px 20px;
     font-size: 13px; font-family: inherit; cursor: pointer; display: inline-flex;
@@ -2334,10 +2835,19 @@ __SEC2__
 __SEC3__
 
 <div class="acciones">
+  <a class="btn-print" href="Reporte_Alertas_FCST27.xlsx" download>
+    &#128229; Descargar reporte de alertas (__N_ALERTAS__ negocios)
+  </a>
   <button type="button" class="btn-print" id="btn-print-ln">
     &#128424; Imprimir PDF (Línea de Negocio)
   </button>
 </div>
+<div class="ast pie-acciones">El reporte trae, por cada negocio en rojo o
+  amarillo, sus cifras del __ETIQ_FCST__ junto a aquello contra lo que se comparó
+  (RFCST 2026, __ETIQ_PPTO26__, real 2026 a julio y real 2025), los índices y
+  desviaciones como fórmulas, los semáforos y el motivo con los montos. Las
+  celdas que dispararon cada alerta van marcadas en amarillo. Debe estar en la
+  misma carpeta que este dashboard.</div>
 
 <script>
 const DATA = __DATA__;
@@ -2368,7 +2878,10 @@ function fmtM(v, dec) {
 
 function fmtPct(v, signo) {
   if (v === null || v === undefined || !isFinite(v)) return 's/d';
-  if (v > 9.99) return '>999%';
+  // Una variacion de varios miles por ciento no dice nada: se lee
+  // mejor como el multiplo que representa
+  if (v > 9.99) return '\u00d7' + (v + 1).toLocaleString('en-US',
+    {maximumFractionDigits: (v + 1) >= 100 ? 0 : 1});
   if (v < -9.99) return '<-999%';
   return (signo && v > 0 ? '+' : '') + (v * 100).toLocaleString('en-US',
     {minimumFractionDigits: 1, maximumFractionDigits: 1}) + '%';
@@ -2832,11 +3345,14 @@ function agrupaEntidades(rows) {
     const k = entKeyNeg(r);
     if (!ents[k]) ents[k] = {label: entLabel(r), ced: r[1], n: 0, P: 0, S: 0, C: 0,
       Pm: Array(12).fill(0), Sm: Array(12).fill(0), Cm: Array(12).fill(0),
-      sem: 0, motivos: new Set(), lns: new Set(), reg: new Set()};
+      sem: 0, rojos: 0, amas: 0, motivos: new Set(), lns: new Set(), reg: new Set()};
     const e = ents[k];
     e.n++; e.P += r[7]; e.S += r[8]; e.C += r[9];
     for (let i = 0; i < 12; i++) { e.Pm[i] += r[10][i]; e.Sm[i] += r[11][i]; e.Cm[i] += r[12][i]; }
+    // el semaforo de la entidad es el peor de sus negocios: las
+    // columnas de conteo dicen cuantos lo provocaron
     e.sem = Math.max(e.sem, r[13]);
+    if (r[13] === 2) e.rojos++; else if (r[13] === 1) e.amas++;
     if (r[14]) e.motivos.add(r[14]);
     e.lns.add(r[0]); if (r[3]) e.reg.add(r[3]);
   });
@@ -2909,6 +3425,7 @@ function renderNeg() {
     '<th class="num">vs RFCST 26</th>' +
     '<th class="num">Siniestros</th><th class="num">Comisiones</th>' +
     '<th class="num">S/P</th><th class="num">C/P</th><th class="num">%P-S-C</th>' +
+    '<th class="num">Rojos</th><th class="num">Amarillos</th>' +
     '<th>Semáforo</th></tr></thead><tbody>' +
     top.map(e => {
       const rf = DATA.cfg.hayRfcst && stateNeg.nivel === 'ced'
@@ -2923,6 +3440,8 @@ function renderNeg() {
         '<td class="num">' + fmtPct(ratio(e.S, e.P)) + '</td>' +
         '<td class="num">' + fmtPct(ratio(e.C, e.P)) + '</td>' +
         '<td class="num">' + fmtPct(ratio(e.P - e.S - e.C, e.P)) + '</td>' +
+        '<td class="num">' + (e.rojos ? chip(e.rojos, 'rojo') : '–') + '</td>' +
+        '<td class="num">' + (e.amas ? chip(e.amas, 'amarillo') : '–') + '</td>' +
         '<td>' + chipSem(e.sem) + '</td></tr>';
     }).join('') + '</tbody></table>' :
     '<div class="vacio">Sin datos con los filtros aplicados.</div>';
@@ -3051,6 +3570,9 @@ html = (
     .replace("__SEC1PSC__", sec1_psc)
     .replace("__SEC1GRAF__", sec1_graficas)
     .replace("__SEC1__", "".join(sec1_bloques))
+    .replace("__N_ALERTAS__", f"{len(alertas_rep):,}")
+    .replace("__ETIQ_PPTO26__", ETIQ_PPTO26)
+    .replace("__ETIQ_FCST__", ETIQ_FCST)
     .replace("__SEC2KPI__", sec2_kpis)
     .replace("__SEC2__", "".join(sec2_bloques))
     .replace("__SEC3__", sec3)
