@@ -2413,9 +2413,10 @@ sec2_kpis = f"""
   <div class="card filtros" id="flt_ln">
     <div class="flt"><label>Línea de negocio</label>
       <select id="sel_kpi_ln"></select></div>
-    <div class="flt nota-kpi">Los cuadros de primas, siniestros y comisiones se
-      recalculan a la LN seleccionada; las gráficas de abajo siguen mostrando
-      todas las líneas.</div>
+    <div class="flt nota-kpi">Filtra toda la sección: los cuadros y todas las
+      gráficas de abajo se recalculan a la línea seleccionada, incluidas las
+      estacionalidades y la mensualización P·S·C. Con (Todas las LN) se mantiene
+      la vista comparativa entre líneas.</div>
   </div>
   <div class="grid kpis" id="kpi_ln"></div>"""
 
@@ -2947,7 +2948,10 @@ function groupedBars(elId, cats, series, fmt) {
   const fmtVal = fmt === 'pct' ? v => fmtPct(v, true) : v => fmtM(v);
   const nc = cats.length, ns = series.length;
   const gw = pw / nc, gap = 2;
-  const bw = Math.min(34, (gw * 0.72 - gap * (ns - 1)) / ns);
+  // Con pocas categorias (una LN filtrada) las barras se ensanchan
+  // para que no queden como hilos en medio del panel
+  const bwMax = nc <= 2 ? 90 : (nc <= 4 ? 60 : 34);
+  const bw = Math.min(bwMax, (gw * 0.72 - gap * (ns - 1)) / ns);
   const tw = bw * ns + gap * (ns - 1);
   let out = '<svg viewBox="0 0 ' + W + ' ' + H + '" role="img">';
   ticks.forEach(t => {
@@ -3172,47 +3176,59 @@ function ringsEstacion(lnKey) {
 ringDonut('ch_est_glob', ringsEstacion('_tot'), MESES, MESC,
   DATA.cfg.anio, 'estacionalidad');
 
-// ------- Seccion 2: graficas por LN -------
-DATA.charts.forEach(c => groupedBars(c.el, c.cats, c.series, c.fmt));
-
 function selLN(sel, cb) {
   sel.innerHTML = '<option value="">(Todas las LN)</option>' + DATA.lns.map(l =>
     '<option value="' + esc(l) + '">LN ' + esc(l) + '</option>').join('');
   sel.addEventListener('change', () => cb(sel.value));
 }
 
-// Cuadros de primas / siniestros / comisiones por LN: mismos
-// datos que la seccion General, recalculados al filtro
-(function () {
-  const sel = document.getElementById('sel_kpi_ln');
+// ------- Seccion 2: filtro de linea de negocio -------
+// El selector de arriba manda sobre TODA la seccion: cuadros,
+// comparativas por LN, estacionalidad y mensualizacion P·S·C.
+// Los selectores de cada grafica quedan para refinar una vista
+// concreta y se sincronizan con el filtro de la seccion.
+
+const ICO_MED = {P: '&#128181;', S: '&#9888;', C: '&#129534;'};
+const BUENO_MED = {P: true, S: false, C: false};
+
+function pintaKpisLN(lnSel) {
   const cont = document.getElementById('kpi_ln');
-  if (!sel || !cont) return;
-  const ICO = {P: '&#128181;', S: '&#9888;', C: '&#129534;'};
-  const BUENO = {P: true, S: false, C: false};
+  if (!cont) return;
+  const d = DATA.lnKpi[lnSel || '_tot'] || {};
+  const suf = lnSel ? ' · LN ' + lnSel : '';
+  cont.innerHTML = ['P', 'S', 'C'].map((cpt, i) => {
+    const o = d[cpt] || {};
+    const varRf = (o.r !== null && o.r !== undefined &&
+                   Math.abs(o.r) > DATA.cfg.minDen) ? o.f / o.r - 1 : null;
+    return '<div class="card kpi"><div class="t"><i>' + ICO_MED[cpt] + '</i>' +
+      MEDN[i] + ' ' + DATA.cfg.etiqFcst + suf + '</div>' +
+      '<div class="v">' + fmtM(o.f) + '</div>' +
+      '<div class="d">' + badge(varRf, BUENO_MED[cpt],
+        'vs RFCST Dic26 (' + fmtM(o.r) + ')') + '</div>' +
+      '<div class="d">' + DATA.cfg.etiqPpto26 + ': ' + fmtM(o.p) +
+      ' · Real 2025: ' + fmtM(o.r25) + '</div></div>';
+  }).join('');
+}
 
-  function pinta(lnSel) {
-    const d = DATA.lnKpi[lnSel || '_tot'] || {};
-    const suf = lnSel ? ' · LN ' + lnSel : '';
-    cont.innerHTML = ['P', 'S', 'C'].map((cpt, i) => {
-      const o = d[cpt] || {};
-      const varRf = (o.r !== null && o.r !== undefined &&
-                     Math.abs(o.r) > DATA.cfg.minDen) ? o.f / o.r - 1 : null;
-      return '<div class="card kpi"><div class="t"><i>' + ICO[cpt] + '</i>' +
-        MEDN[i] + ' ' + DATA.cfg.etiqFcst + suf + '</div>' +
-        '<div class="v">' + fmtM(o.f) + '</div>' +
-        '<div class="d">' + badge(varRf, BUENO[cpt],
-          'vs RFCST Dic26 (' + fmtM(o.r) + ')') + '</div>' +
-        '<div class="d">' + DATA.cfg.etiqPpto26 + ': ' + fmtM(o.p) +
-        ' · Real 2025: ' + fmtM(o.r25) + '</div></div>';
-    }).join('');
-  }
+// Comparativas por LN (niveles, variacion y P-S-C): con una LN
+// elegida se deja solo su columna, con (Todas) se dibujan todas
+function pintaChartsLN(lnSel) {
+  DATA.charts.forEach(c => {
+    let cats = c.cats, series = c.series;
+    if (lnSel) {
+      const i = c.cats.indexOf('LN ' + lnSel);
+      if (i >= 0) {
+        cats = [c.cats[i]];
+        series = c.series.map(s => ({n: s.n, c: s.c, v: [s.v[i]]}));
+      }
+    }
+    groupedBars(c.el, cats, series, c.fmt);
+  });
+}
 
-  selLN(sel, pinta);
-  pinta('');
-})();
+const pintaLineaLN = {};
 
 ['P', 'S', 'C'].forEach(cpt => {
-  const selL = document.getElementById('sel_line_' + cpt);
 
   function pintaLinea(lnSel) {
     let series;
@@ -3246,21 +3262,38 @@ function selLN(sel, cb) {
     lineChart('ch_line_' + cpt, series);
   }
 
-  if (selL) { selLN(selL, pintaLinea); pintaLinea(''); }
+  pintaLineaLN[cpt] = pintaLinea;
+
+  const selL = document.getElementById('sel_line_' + cpt);
+  if (selL) selLN(selL, pintaLinea);
 });
 
 // Mensualizacion P·S·C: una sola dona al final de la seccion
-// (antes se repetia identica en los tres conceptos)
-(function () {
-  const sel = document.getElementById('sel_ring_LN');
-  if (!sel) return;
-  function pintaDona(lnSel) {
-    ringDonut('ch_ring_LN', ringsEstacion(lnSel || '_tot'), MESES, MESC,
-      lnSel ? 'LN ' + lnSel : DATA.cfg.anio, 'P · S · C');
-  }
-  selLN(sel, pintaDona);
-  pintaDona('');
-})();
+function pintaDonaLN(lnSel) {
+  ringDonut('ch_ring_LN', ringsEstacion(lnSel || '_tot'), MESES, MESC,
+    lnSel ? 'LN ' + lnSel : DATA.cfg.anio, 'P · S · C');
+}
+
+const selRingLN = document.getElementById('sel_ring_LN');
+if (selRingLN) selLN(selRingLN, pintaDonaLN);
+
+// Filtro maestro de la seccion: arrastra todo lo de arriba y deja
+// los selectores de cada grafica en la misma linea
+function filtraSeccionLN(lnSel) {
+  pintaKpisLN(lnSel);
+  pintaChartsLN(lnSel);
+  ['P', 'S', 'C'].forEach(cpt => {
+    const selL = document.getElementById('sel_line_' + cpt);
+    if (selL) selL.value = lnSel;
+    pintaLineaLN[cpt](lnSel);
+  });
+  if (selRingLN) selRingLN.value = lnSel;
+  pintaDonaLN(lnSel);
+}
+
+const selSeccionLN = document.getElementById('sel_kpi_ln');
+if (selSeccionLN) selLN(selSeccionLN, filtraSeccionLN);
+filtraSeccionLN('');
 
 // ------- Seccion 3: negocios -------
 // Fila: [0 ln, 1 cedente, 2 contrato, 3 region, 4 paises, 5 corredores,

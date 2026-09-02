@@ -44,12 +44,18 @@ python VAL_FCST27.py
     P-S-C / %P-S-C) con vistas *Tomado / Retenido*, dona de participación
     por LN (PPTO/FCST 27 vs RFCST 26) y dona de estacionalidad global
     (anillos P·S·C por mes).
-  - **Línea de Negocio**: por cada concepto, comparativa por LN, variación
-    vs RFCST y estacionalidad mensual en líneas con filtro de LN — al
-    elegir una sola LN se agrega el comparativo contra la estacionalidad
-    del RFCST 2026 y la del FCST 2026 (ver nota abajo).
-    Cierran la sección el P-S-C / %P-S-C por LN y una única dona de
-    mensualización P·S·C con filtro de LN.
+  - **Línea de Negocio**: encabezada por un **filtro de LN que manda sobre
+    toda la sección** — al elegir una línea, los cuadros de primas,
+    siniestros y comisiones y **todas** las gráficas de abajo se recalculan
+    a esa línea (comparativas por LN, variación vs RFCST, P-S-C / %P-S-C,
+    estacionalidades y mensualización P·S·C); con *(Todas las LN)* se
+    mantiene la vista comparativa entre líneas. Por cada concepto:
+    comparativa por LN, variación vs RFCST y estacionalidad mensual, que al
+    filtrar una sola LN agrega el comparativo contra la estacionalidad del
+    RFCST 2026 y la del FCST 2026 (ver nota abajo). Cierran la sección el
+    P-S-C / %P-S-C por LN y una única dona de mensualización P·S·C. Los
+    selectores de cada gráfica siguen ahí para refinar una vista concreta y
+    se sincronizan con el filtro de la sección.
   - **Negocios**: análisis a nivel cedente, contrato y Binder Ppto, con
     filtros, semáforos, resumen por entidad, estacionalidad del negocio
     seleccionado y top de excepciones.
