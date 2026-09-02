@@ -11,3 +11,6 @@ venv/
 # Datos descargados por el extractor (se regeneran)
 world-master/
 world.tar.gz
+
+# Paquete de entrega (se regenera desde reaseguro_ppto/)
+CORRECCION_PRIMAS.zip
