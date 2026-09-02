@@ -216,6 +216,34 @@ if "Compañía_Nombre" not in df.columns:
 df = df[df["LN"].notna()].copy()
 df["LN"] = df["LN"].astype(str).str.strip()
 
+# Correccion de captura: Suscripcion capturo los siniestros y los
+# costos del forecast de 4008-Agro con el signo invertido. Se
+# voltea el signo solo en esa LN y solo en esas columnas, antes
+# de derivar el incremento Ago-Dic y de correr las validaciones.
+CORRECCIONES_SIGNO = [
+    ("4008-Agro", ["Siniestros 1226", "Costos 1226"]),
+]
+
+for _ln, _cols in CORRECCIONES_SIGNO:
+    _mask = df["LN"] == _ln
+    if not _mask.any():
+        continue
+    for _c in _cols:
+        df[_c] = pd.to_numeric(df[_c], errors="coerce")
+        _antes = df.loc[_mask, _c].sum()
+        df.loc[_mask, _c] = -df.loc[_mask, _c]
+        print(f"Correccion de signo · {_ln} · {_c}: "
+              f"{_antes / 1e6:,.2f} M -> {-_antes / 1e6:,.2f} M "
+              f"({int(_mask.sum())} filas)")
+        # si la base ya trae el incremento Ago-Dic, se recalcula
+        _m08 = _c.replace(" 1226", " 08-1226")
+        _m07 = _c.replace(" 1226", " 0726")
+        if _m08 in df.columns:
+            df.loc[_mask, _m08] = (
+                df.loc[_mask, _c]
+                - pd.to_numeric(df.loc[_mask, _m07], errors="coerce").fillna(0)
+            )
+
 # La base original no trae el incremento Ago-Dic en columnas
 # propias: se deriva como acumulado Dic menos acumulado Jul
 for _m in MEDIDAS:
@@ -613,13 +641,97 @@ ranking = (
 
 ranking["Ranking"] = ranking.index + 1
 
-excepciones = df[df["Semaforo_Global"] == "ROJO"].copy()
+# =====================================================
+# MOTIVO DE CADA ALERTA (con los montos comparados)
+# =====================================================
 
-excepciones["Impacto"] = (
-    excepciones["Inc_Primas_AgoDic"].where(
-        excepciones["F_V1_Primas"], excepciones["Primas 1226"].abs()
-    )
-).abs()
+
+def _fm(v):
+    """Monto compacto para los motivos: 12.3 M / 456.7 k / 89."""
+    if v is None or pd.isna(v):
+        return "s/d"
+    a = abs(v)
+    if a >= 1e6:
+        return f"{v / 1e6:,.2f} M"
+    if a >= 1e3:
+        return f"{v / 1e3:,.1f} k"
+    return f"{v:,.0f}"
+
+
+def _fp(v):
+    if v is None or pd.isna(v) or np.isinf(v):
+        return "s/d"
+    return f"{v:+.0%}" if abs(v) < 10 else (">+999%" if v > 0 else "<-999%")
+
+
+def _motivo(row):
+    """Texto que explica por que el contrato esta en ROJO o en
+    AMARILLO, con las cifras que se compararon."""
+    p07, p12 = row["Primas 0726"], row["Primas 1226"]
+    s07, s12 = row["Siniestros 0726"], row["Siniestros 1226"]
+    c07, c12 = row["Costos 0726"], row["Costos 1226"]
+    inc, pp08 = row["Inc_Primas_AgoDic"], row["Primas PPTO08-1226"]
+    isin, icos = row["Ind_Sin_FCST"], row["Ind_Cos_FCST"]
+
+    if row["Semaforo_Global"] not in ("ROJO", "AMARILLO"):
+        return ""
+
+    m = []
+    rojo = row["Semaforo_Global"] == "ROJO"
+
+    if rojo:
+        if row["F_V1_Primas"]:
+            m.append(f"Prima FCST Dic {_fm(p12)} < Real Jul {_fm(p07)}")
+        if row["F_V1_Cuadre"]:
+            m.append(f"Descuadre Ago-Dic: Dic-Jul {_fm(p12 - p07)} vs "
+                     f"reportado {_fm(inc)}")
+        if row["F_V6_PrimaNegativa"]:
+            m.append(f"Prima FCST negativa ({_fm(p12)})")
+        if row["F_V6_FcstCero"]:
+            m.append(f"FCST en cero con Real Jul {_fm(p07)}")
+        if row["F_V6_SinExcede100"]:
+            m.append(f"Siniestralidad {isin:.0%} > {IND_SIN_ROJO:.0%} "
+                     f"(S {_fm(s12)} / P {_fm(p12)})")
+        if row["Semaforo_Inc"] == "ROJO":
+            m.append(f"Desv. incremento {_fp(row['Desv_Inc_AgoDic'])} "
+                     f"(inc {_fm(inc)} vs Ppto Ago-Dic {_fm(pp08)})")
+
+    # Alertas suaves (en un ROJO se agregan despues de las duras,
+    # sin repetir las que ya se listaron)
+    if row["F_V1_Siniestros"]:
+        m.append(f"Siniestros FCST Dic {_fm(s12)} < Real Jul {_fm(s07)}")
+    if row["F_V1_Costos"]:
+        m.append(f"Costos FCST Dic {_fm(c12)} < Real Jul {_fm(c07)}")
+    if row["F_V6_SinPpto"]:
+        m.append(f"Prima FCST {_fm(p12)} sin presupuesto 2026")
+    elif row["Semaforo_Inc"] == "SIN DATO":
+        m.append(f"Sin Ppto Ago-Dic para comparar el incremento ({_fm(inc)})")
+    elif row["Semaforo_Inc"] == "AMARILLO" or (row["Semaforo_Inc"] == "ROJO" and not rojo):
+        m.append(f"Desv. incremento {_fp(row['Desv_Inc_AgoDic'])} "
+                 f"(inc {_fm(inc)} vs Ppto Ago-Dic {_fm(pp08)})")
+    if row["F_V6_SinNegativo"]:
+        m.append(f"Siniestros FCST negativos ({_fm(s12)})")
+    elif row["Semaforo_Sin"] == "AMARILLO":
+        if isin < 0:
+            m.append(f"Siniestralidad negativa {isin:.0%} (S {_fm(s12)} / P {_fm(p12)})")
+        else:
+            m.append(f"Siniestralidad {isin:.0%} > {IND_SIN_AMARILLO:.0%} "
+                     f"(S {_fm(s12)} / P {_fm(p12)})")
+    if row["Semaforo_Costos"] in ("AMARILLO", "ROJO"):
+        umbral = IND_COS_ROJO if row["Semaforo_Costos"] == "ROJO" else IND_COS_AMARILLO
+        m.append(f"Costos {icos:.0%} > {umbral:.0%} (C {_fm(c12)} / P {_fm(p12)})")
+    if row["F_V6_SinFactores"]:
+        m.append("Sin factores historicos ni de ppto")
+    return " · ".join(m)
+
+
+df["Motivo"] = df.apply(_motivo, axis=1)
+
+df["Impacto"] = np.where(
+    df["F_V1_Primas"], df["Inc_Primas_AgoDic"].abs(), df["Primas 1226"].abs()
+)
+
+excepciones = df[df["Semaforo_Global"] == "ROJO"].copy()
 
 excepciones = excepciones.sort_values("Impacto", ascending=False)
 
@@ -1098,6 +1210,7 @@ parametros = pd.DataFrame({
         "Peso score: incremento Ago-Dic", "Peso score: siniestralidad",
         "Peso score: costos", "Peso score: vs Real 2025",
         "Nota P-S-C",
+        "Correccion de signo",
         "Generado por", "Fecha de ejecucion",
     ],
     "Valor": [
@@ -1109,6 +1222,7 @@ parametros = pd.DataFrame({
         IND_COS_AMARILLO, IND_COS_ROJO,
         PESO_INC, PESO_SIN, PESO_COS, PESO_V25,
         "* Falta el incremento a la reserva y los costos de cobertura",
+        "; ".join(f"{ln}: {', '.join(cols)}" for ln, cols in CORRECCIONES_SIGNO),
         usuario, datetime.now().strftime("%Y-%m-%d %H:%M"),
     ],
     "Descripcion": [
@@ -1129,6 +1243,7 @@ parametros = pd.DataFrame({
         "V4: costos implicitos del forecast",
         "V3: incremento Ago-Dic vs mismo periodo 2025",
         "P-S-C no es resultado tecnico: no incluye reservas ni gastos",
+        "Columnas capturadas con signo invertido; se voltea antes de validar",
         "Usuario que ejecuto el script", "",
     ],
 })
@@ -1158,7 +1273,8 @@ cols_detalle = ["Cardinalidad"] + columnas_dim + [
     "Siniestros 1226", "Costos 1226",
     "Ratio_Ejecucion", "Desv_Inc_AgoDic", "Crec_vs_Real25", "Crec_AgoDic_vs_25",
     "Ind_Sin_FCST", "Ind_Cos_FCST", "Var_Primas_PPTO",
-] + flags + ["Num_Flags", "Semaforo_Inc", "Semaforo_Sin", "Semaforo_Costos", "Semaforo_Global"]
+] + flags + ["Num_Flags", "Semaforo_Inc", "Semaforo_Sin", "Semaforo_Costos",
+             "Semaforo_Global", "Motivo"]
 
 with pd.ExcelWriter(salida_xlsx, engine="xlsxwriter") as writer:
 
@@ -1249,6 +1365,285 @@ with pd.ExcelWriter(salida_xlsx, engine="xlsxwriter") as writer:
     exportar(parametros, "Parametros")
 
 print(f"Excel generado: {salida_xlsx}")
+
+# =====================================================
+# REPORTE DE ALERTAS (Excel descargable desde el dashboard)
+# =====================================================
+# Todos los negocios en ROJO o AMARILLO con: identificacion,
+# las cifras con el mismo formato visual de la base (bandas por
+# periodo), indices y desviaciones con formulas, semaforos y
+# motivo. Las celdas que se compararon para levantar cada alerta
+# quedan marcadas en amarillo.
+
+from xlsxwriter.utility import xl_col_to_name
+
+salida_alertas = os.path.join(xOutputs, "Reporte_Alertas_RFCST26.xlsx")
+
+alertas = df[df["Semaforo_Global"].isin(["ROJO", "AMARILLO"])].copy()
+alertas["_orden"] = np.where(alertas["Semaforo_Global"] == "ROJO", 0, 1)
+alertas = alertas.sort_values(["_orden", "Impacto"], ascending=[True, False])
+
+G_ID = "Identificación"
+G_R07 = "Real 2026 / Corte a Julio 2026"
+G_F12 = "Forecast Acumulado a Dic. 2026"
+G_INC = "Incremento Ago-Dic 2026 (FCST)"
+G_PP = "Ppto. 2026 / Dic 2026"
+G_PP08 = "Ppto. 2026 / Ago-Dic 2026"
+G_R25 = "Real Dic. 2025"
+G_R0812 = "Real Ago-Dic 2025"
+G_IND = "Índices"
+G_DESV = "Desviaciones"
+G_SEM = "Semáforos"
+G_MOT = "Motivo de la alerta"
+
+
+def _c(h, g, t, k, f=None):
+    return {"h": h, "g": g, "t": t, "k": k, "f": f}
+
+
+COLS_REP = [
+    _c("Cardinalidad", G_ID, "txt", "Cardinalidad"),
+    _c("LN", G_ID, "txt", "LN"),
+    _c("Tipo Reaseguro", G_ID, "txt", "Tipo Reaseguro"),
+    _c("N° Cía", G_ID, "txt", "Compañía"),
+    _c("Compañía", G_ID, "txt", "Compañía_Nombre"),
+    _c("País", G_ID, "txt", "País"),
+    _c("Corredor", G_ID, "txt", "Corredor"),
+    _c("Num Contrato", G_ID, "txt", "Num Contrato"),
+    _c("Binder", G_ID, "txt", "Binder Ppto"),
+    _c("Año Susc.", G_ID, "txt", "Año Susc."),
+]
+for grupo, suf in ((G_R07, "0726"), (G_F12, "1226"), (G_INC, "08-1226"),
+                   (G_PP, "PPTO1226"), (G_PP08, "PPTO08-1226"),
+                   (G_R25, "1225"), (G_R0812, "08-1225")):
+    for m in MEDIDAS:
+        COLS_REP.append(_c(m, grupo, "num", f"{m} {suf}"))
+
+COLS_REP += [
+    _c("% Sin FCST", G_IND, "fx", "fx_sin_fcst", ("Siniestros 1226", "Primas 1226", False)),
+    _c("% Cos FCST", G_IND, "fx", "fx_cos_fcst", ("Costos 1226", "Primas 1226", False)),
+    _c("% Sin Ppto", G_IND, "fx", "fx_sin_ppto", ("Siniestros PPTO1226", "Primas PPTO1226", False)),
+    _c("% Cos Ppto", G_IND, "fx", "fx_cos_ppto", ("Costos PPTO1226", "Primas PPTO1226", False)),
+    _c("Ind. Sin. Hist", G_IND, "pct", "Ind. Sin. Hist"),
+    _c("Ind. Cos. Hist", G_IND, "pct", "Ind. Cos. Hist"),
+    _c("Var Primas vs Ppto", G_DESV, "fx", "fx_var_p", ("Primas 1226", "Primas PPTO1226", True)),
+    _c("Desv. Inc. Ago-Dic vs Ppto Ago-Dic", G_DESV, "fx", "fx_desv_inc",
+       ("Primas 08-1226", "Primas PPTO08-1226", True)),
+    _c("Crec. vs Real 2025", G_DESV, "fx", "fx_crec25", ("Primas 1226", "Primas 1225", True)),
+    _c("Inc. vs Real Ago-Dic 2025", G_DESV, "fx", "fx_inc25", ("Primas 08-1226", "Primas 08-1225", True)),
+    _c("Var Siniestros vs Ppto", G_DESV, "fx", "fx_var_s", ("Siniestros 1226", "Siniestros PPTO1226", True)),
+    _c("Var Costos vs Ppto", G_DESV, "fx", "fx_var_c", ("Costos 1226", "Costos PPTO1226", True)),
+    _c("Semáforo Inc.", G_SEM, "txt", "Semaforo_Inc"),
+    _c("Semáforo Sin.", G_SEM, "txt", "Semaforo_Sin"),
+    _c("Semáforo Costos", G_SEM, "txt", "Semaforo_Costos"),
+    _c("Semáforo Global", G_SEM, "txt", "Semaforo_Global"),
+    _c("Motivo", G_MOT, "txt", "Motivo"),
+]
+
+IDX_REP = {c["k"]: i for i, c in enumerate(COLS_REP)}
+
+
+def _celdas_alerta(row):
+    """Claves de las columnas que se compararon para cada alerta,
+    para marcarlas en amarillo en el reporte."""
+    s = set()
+    if row["F_V1_Primas"] or row["F_V6_FcstCero"]:
+        s |= {"Primas 0726", "Primas 1226"}
+    if row["F_V1_Cuadre"]:
+        s |= {"Primas 0726", "Primas 1226", "Primas 08-1226"}
+    if row["F_V6_PrimaNegativa"]:
+        s |= {"Primas 1226"}
+    if row["F_V6_SinExcede100"] or row["Semaforo_Sin"] in ("AMARILLO", "ROJO"):
+        s |= {"Siniestros 1226", "Primas 1226", "fx_sin_fcst"}
+    if row["F_V6_SinNegativo"]:
+        s |= {"Siniestros 1226"}
+    if row["Semaforo_Costos"] in ("AMARILLO", "ROJO"):
+        s |= {"Costos 1226", "Primas 1226", "fx_cos_fcst"}
+    if row["F_V6_SinPpto"]:
+        s |= {"Primas 1226", "Primas PPTO1226", "fx_var_p"}
+    elif row["Semaforo_Inc"] in ("AMARILLO", "ROJO"):
+        s |= {"Primas 08-1226", "Primas PPTO08-1226", "fx_desv_inc"}
+    elif row["Semaforo_Inc"] == "SIN DATO":
+        s |= {"Primas 08-1226", "Primas PPTO08-1226"}
+    if row["F_V1_Siniestros"]:
+        s |= {"Siniestros 0726", "Siniestros 1226"}
+    if row["F_V1_Costos"]:
+        s |= {"Costos 0726", "Costos 1226"}
+    if row["F_V6_SinFactores"]:
+        s |= {"Ind. Sin. Hist", "Ind. Cos. Hist"}
+    return s
+
+
+COLORES_BANDA = {
+    G_ID: "#5B3C8A", G_R07: "#1F3864", G_F12: "#1F3864", G_INC: "#2F5597",
+    G_PP: "#1F3864", G_PP08: "#2F5597", G_R25: "#1F3864", G_R0812: "#2F5597",
+    G_IND: "#2E5E4E", G_DESV: "#2E5E4E", G_SEM: "#3C3C3C", G_MOT: "#1F3864",
+}
+
+with pd.ExcelWriter(salida_alertas, engine="xlsxwriter") as writer:
+
+    wb = writer.book
+    ws = wb.add_worksheet("Alertas")
+    writer.sheets["Alertas"] = ws
+
+    base = {"font_name": "Arial", "font_size": 9, "valign": "vcenter"}
+    f_banda = {g: wb.add_format({**base, "bold": True, "font_color": "#FFFFFF",
+                                 "bg_color": col, "align": "center", "border": 1})
+               for g, col in COLORES_BANDA.items()}
+    f_head = wb.add_format({**base, "bold": True, "bg_color": "#D9E1F2",
+                            "border": 1, "text_wrap": True, "align": "center"})
+    f_txt = wb.add_format({**base, "border": 1})
+    f_txt_hl = wb.add_format({**base, "border": 1, "bg_color": "#FFEB9C", "bold": True})
+    f_num = wb.add_format({**base, "border": 1, "num_format": "#,##0;(#,##0);-"})
+    f_num_hl = wb.add_format({**base, "border": 1, "num_format": "#,##0;(#,##0);-",
+                              "bg_color": "#FFEB9C", "bold": True})
+    f_pct = wb.add_format({**base, "border": 1, "num_format": "0.0%;(0.0%);-"})
+    f_pct_hl = wb.add_format({**base, "border": 1, "num_format": "0.0%;(0.0%);-",
+                              "bg_color": "#FFEB9C", "bold": True})
+    f_motivo = wb.add_format({**base, "border": 1, "text_wrap": True})
+    f_rojo = wb.add_format({"bg_color": "#FFC7CE", "font_color": "#9C0006", "bold": True})
+    f_amar = wb.add_format({"bg_color": "#FFEB9C", "font_color": "#9C6500", "bold": True})
+    f_verde = wb.add_format({"bg_color": "#C6EFCE", "font_color": "#006100"})
+    f_gris = wb.add_format({"bg_color": "#EDEDED", "font_color": "#7F7F7F"})
+
+    # Fila 0: bandas por grupo (celdas contiguas del mismo grupo)
+    i = 0
+    while i < len(COLS_REP):
+        g = COLS_REP[i]["g"]
+        j = i
+        while j + 1 < len(COLS_REP) and COLS_REP[j + 1]["g"] == g:
+            j += 1
+        if j > i:
+            ws.merge_range(0, i, 0, j, g, f_banda[g])
+        else:
+            ws.write(0, i, g, f_banda[g])
+        i = j + 1
+
+    # Fila 1: encabezados
+    for j, c in enumerate(COLS_REP):
+        ws.write(1, j, c["h"], f_head)
+
+    # Datos desde la fila 2
+    FILA0 = 2
+    for r, (_, row) in enumerate(alertas.iterrows()):
+        xr = FILA0 + r
+        marcar = _celdas_alerta(row)
+        for j, c in enumerate(COLS_REP):
+            hl = c["k"] in marcar
+            if c["t"] == "txt":
+                val = row[c["k"]]
+                if pd.isna(val):
+                    val = ""
+                elif isinstance(val, float) and np.isfinite(val) and val == int(val):
+                    val = int(val)
+                ws.write(xr, j, val,
+                         f_motivo if c["k"] == "Motivo" else (f_txt_hl if hl else f_txt))
+            elif c["t"] == "num":
+                val = row[c["k"]]
+                ws.write_number(xr, j, 0.0 if pd.isna(val) else float(val),
+                                f_num_hl if hl else f_num)
+            elif c["t"] == "pct":
+                val = row[c["k"]]
+                if pd.isna(val):
+                    ws.write_blank(xr, j, None, f_pct_hl if hl else f_pct)
+                else:
+                    ws.write_number(xr, j, float(val), f_pct_hl if hl else f_pct)
+            else:  # formula
+                num_k, den_k, crec = c["f"]
+                a = f"{xl_col_to_name(IDX_REP[num_k])}{xr + 1}"
+                b = f"{xl_col_to_name(IDX_REP[den_k])}{xr + 1}"
+                expr = f"{a}/{b}-1" if crec else f"{a}/{b}"
+                ws.write_formula(xr, j, f'=IF(ABS({b})>{TOL:g},{expr},"")',
+                                 f_pct_hl if hl else f_pct)
+
+    n_filas = len(alertas)
+    ult = FILA0 + n_filas - 1
+
+    # Semaforos con color
+    for c in COLS_REP:
+        if c["k"].startswith("Semaforo"):
+            j = IDX_REP[c["k"]]
+            for valor, fmt in (("ROJO", f_rojo), ("AMARILLO", f_amar),
+                               ("VERDE", f_verde), ("SIN DATO", f_gris)):
+                ws.conditional_format(FILA0, j, ult, j, {
+                    "type": "cell", "criteria": "==",
+                    "value": f'"{valor}"', "format": fmt,
+                })
+
+    # Anchos, paneles y filtro
+    for j, c in enumerate(COLS_REP):
+        if c["k"] == "Motivo":
+            ancho = 70
+        elif c["k"] in ("Compañía_Nombre",):
+            ancho = 34
+        elif c["t"] == "txt":
+            ancho = 13
+        elif c["t"] == "num":
+            ancho = 13
+        else:
+            ancho = 12
+        ws.set_column(j, j, ancho)
+    ws.set_row(0, 20)
+    ws.set_row(1, 30)
+    ws.freeze_panes(FILA0, 2)
+    ws.autofilter(1, 0, ult, len(COLS_REP) - 1)
+
+    # Hoja de leyenda: que valida cada semaforo y que celdas se marcan
+    ley = wb.add_worksheet("Leyenda")
+    writer.sheets["Leyenda"] = ley
+    f_lt = wb.add_format({**base, "bold": True, "font_size": 12})
+    f_lh = wb.add_format({**base, "bold": True, "bg_color": "#D9E1F2", "border": 1,
+                          "text_wrap": True})
+    f_lc = wb.add_format({**base, "border": 1, "text_wrap": True, "valign": "top"})
+    ley.write(0, 0, "Reporte de alertas del RFCST 2026 · 7+5", f_lt)
+    ley.write(1, 0, f"Generado {datetime.now():%d/%m/%Y %H:%M} · {n_filas:,} negocios en "
+                    f"ROJO o AMARILLO · cifras en dólares · materialidad {MATERIALIDAD:,} USD "
+                    f"(contratos con prima menor no escalan a ROJO)")
+    ley.write(2, 0, "Las celdas en amarillo dentro de la hoja Alertas son las cifras que se "
+                    "compararon para levantar cada alerta; el Motivo repite esos montos.")
+    filas_ley = [
+        ("Semáforo", "Regla", "Umbral", "Celdas marcadas en amarillo"),
+        ("ROJO", "Prima FCST Dic 2026 menor al real acumulado a julio (el acumulado no puede bajar)",
+         f"diferencia > {TOL:g} USD", "Primas Real Jul · Primas FCST Dic"),
+        ("ROJO", "Prima FCST negativa", "< 0", "Primas FCST Dic"),
+        ("ROJO", "FCST en cero teniendo real a julio", "FCST = 0 y Real Jul > 0",
+         "Primas Real Jul · Primas FCST Dic"),
+        ("ROJO", "Siniestralidad del forecast (Siniestros FCST / Primas FCST) mayor a 100%",
+         f"> {IND_SIN_ROJO:.0%}", "Siniestros FCST · Primas FCST · % Sin FCST"),
+        ("ROJO", "Descuadre entre (Dic − Jul) y el incremento Ago-Dic reportado",
+         f"> {TOL:g} USD", "Primas Real Jul · Primas FCST Dic · Primas Inc. Ago-Dic"),
+        ("AMARILLO", "Desviación del incremento Ago-Dic del forecast contra lo presupuestado para Ago-Dic",
+         f"|desv| > {UMBRAL_AMARILLO:.0%} (amarillo) · > {UMBRAL_ROJO:.0%} (rojo en semáforo Inc.)",
+         "Primas Inc. Ago-Dic · Primas Ppto Ago-Dic · Desv. Inc."),
+        ("AMARILLO", "Sin presupuesto Ago-Dic para comparar el incremento", "Ppto Ago-Dic = 0",
+         "Primas Inc. Ago-Dic · Primas Ppto Ago-Dic"),
+        ("AMARILLO", "Siniestralidad del forecast alta o negativa",
+         f"> {IND_SIN_AMARILLO:.0%} o < -5%", "Siniestros FCST · Primas FCST · % Sin FCST"),
+        ("AMARILLO", "Costos del forecast (Costos FCST / Primas FCST) altos",
+         f"> {IND_COS_AMARILLO:.0%} (amarillo) · > {IND_COS_ROJO:.0%} (rojo en semáforo Costos)",
+         "Costos FCST · Primas FCST · % Cos FCST"),
+        ("AMARILLO", "Siniestros o costos FCST Dic menores al real a julio", f"diferencia > {TOL:g} USD",
+         "Siniestros/Costos Real Jul · Siniestros/Costos FCST Dic"),
+        ("AMARILLO", "Prima FCST sin presupuesto anual 2026", "Ppto 2026 = 0",
+         "Primas FCST Dic · Primas Ppto 2026 · Var Primas vs Ppto"),
+        ("AMARILLO", "Siniestros FCST negativos (revisar recuperaciones)", f"< -{MATERIALIDAD:,} USD",
+         "Siniestros FCST Dic"),
+        ("AMARILLO", "Contrato sin factores históricos ni de presupuesto", "factores vacíos",
+         "Ind. Sin. Hist · Ind. Cos. Hist"),
+        ("", "Semáforo Global: ROJO si hay al menos una regla roja en un contrato material; "
+             "AMARILLO si solo hay reglas amarillas; VERDE si no hay alertas o el contrato "
+             "está por debajo de la materialidad.", "", ""),
+    ]
+    for r, fila in enumerate(filas_ley):
+        for j, val in enumerate(fila):
+            ley.write(4 + r, j, val, f_lh if r == 0 else f_lc)
+    ley.set_column(0, 0, 12)
+    ley.set_column(1, 1, 70)
+    ley.set_column(2, 2, 34)
+    ley.set_column(3, 3, 48)
+
+N_ALERTAS = len(alertas)
+print(f"Reporte de alertas generado: {salida_alertas} ({N_ALERTAS:,} negocios)")
 
 # =====================================================
 # DASHBOARD HTML - PALETA Y FORMATOS
@@ -1494,45 +1889,6 @@ def _txt(v):
     return str(v).strip()
 
 
-def _motivos(row):
-    """Causas de alerta del contrato. Para ROJO las inconsistencias
-    duras; para AMARILLO las alertas suaves que lo pusieron ahi."""
-    if row["Semaforo_Global"] == "ROJO":
-        m = []
-        if row["F_V1_Primas"]:
-            m.append("FCST < Real Jul")
-        if row["F_V1_Cuadre"]:
-            m.append("Descuadre Ago-Dic")
-        if row["F_V6_PrimaNegativa"]:
-            m.append("Prima negativa")
-        if row["F_V6_FcstCero"]:
-            m.append("FCST en cero")
-        if row["F_V6_SinExcede100"]:
-            m.append("Siniestralidad > 100%")
-        if row["Semaforo_Inc"] == "ROJO":
-            m.append("Desv. incremento")
-        return " · ".join(m)
-
-    m = []
-    if row["F_V1_Siniestros"]:
-        m.append("Siniestros FCST < Real Jul")
-    if row["F_V1_Costos"]:
-        m.append("Costos FCST < Real Jul")
-    if row["Semaforo_Inc"] != "VERDE":
-        m.append(f"Desv. incremento > {UMBRAL_AMARILLO:.0%}")
-    if row["F_V6_SinNegativo"]:
-        m.append("Siniestros negativos")
-    elif row["Semaforo_Sin"] == "AMARILLO":
-        m.append(f"Siniestralidad > {IND_SIN_AMARILLO:.0%}")
-    if row["Semaforo_Costos"] != "VERDE":
-        m.append(f"Costos > {IND_COS_AMARILLO:.0%}")
-    if row["F_V6_SinPpto"]:
-        m.append("Prima sin ppto")
-    if row["F_V6_SinFactores"]:
-        m.append("Sin factores")
-    return " · ".join(m)
-
-
 rows_js = []
 
 for _, row in df.iterrows():
@@ -1540,7 +1896,7 @@ for _, row in df.iterrows():
     if card is None:
         continue
     sem = SEM_IDX[row["Semaforo_Global"]]
-    imp = abs(row["Inc_Primas_AgoDic"]) if row["F_V1_Primas"] else abs(row["Primas 1226"])
+    imp = row["Impacto"]
     medidas_arr = []
     for m in MEDIDAS:
         medidas_arr.append([
@@ -1553,7 +1909,7 @@ for _, row in df.iterrows():
         card, _txt(row["LN"]), _txt(row["Tipo Reaseguro"]), _txt(row["País"]),
         _txt(row["Corredor"]), _txt(row["Compañía_Nombre"]),
         _txt(row["Num Contrato"]), _txt(row["Binder Ppto"]),
-        sem, _motivos(row) if sem >= 1 else "", round(imp),
+        sem, row["Motivo"] if sem >= 1 else "", round(imp),
         medidas_arr[0], medidas_arr[1], medidas_arr[2],
         _txt(row["Compañía"]),
     ])
@@ -1760,7 +2116,9 @@ PLANTILLA = """<!doctype html>
   .toggle button.on { background: rgba(57,135,229,.2); color: #9ec5f4; }
   .vacio { color: #898781; font-size: 12.5px; padding: 18px 4px; }
   .cardinal { border-top: 1px solid #2c2c2a; padding-top: 20px; margin-top: 30px; }
-  .acciones { display: flex; justify-content: center; margin-top: 28px; }
+  .acciones { display: flex; justify-content: center; gap: 12px; flex-wrap: wrap;
+    margin-top: 28px; }
+  a.btn-print { text-decoration: none; }
   .btn-print { background: rgba(57,135,229,.16); color: #9ec5f4;
     border: 1px solid rgba(57,135,229,.35); border-radius: 10px; padding: 11px 20px;
     font-size: 13px; font-family: inherit; cursor: pointer; display: inline-flex;
@@ -1821,6 +2179,9 @@ __SEC3__
   <button type="button" class="btn-print" id="btn-print-ln">
     &#128424; Imprimir PDF
   </button>
+  <a class="btn-print" href="Reporte_Alertas_RFCST26.xlsx" download>
+    &#11015; Descargar reporte de alertas (__N_ALERTAS__ negocios)
+  </a>
 </div>
 
 <script>
@@ -2230,6 +2591,7 @@ html = (
     .replace("__ARCHIVO__", os.path.basename(archivo))
     .replace("__FUENTE_PPTO__", FUENTE_PPTO)
     .replace("__FUENTE_REALES__", FUENTE_REALES)
+    .replace("__N_ALERTAS__", f"{N_ALERTAS:,}")
     .replace("__GENERADO__", datetime.now().strftime("%d/%m/%Y %H:%M"))
     .replace("__SEC1PSC__", sec1_psc)
     .replace("__SEC1__", "".join(sec1_bloques))

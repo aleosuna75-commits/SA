@@ -13,7 +13,7 @@ python VAL_RFCST26.py
 ```
 
 `VAL_RFCST26.py` es autocontenido: es el unico archivo que necesitas copiar.
-Busca `Inputs/BD_RFCST.xlsx` (o cualquier `BD_RFCST*.xlsx` en `Inputs/`
+Busca `Inputs/BD_RFCST_26_act.xlsx` (o cualquier `BD_RFCST*.xlsx` en `Inputs/`
 o junto al script) y escribe los resultados en `Outputs/`, siempre relativo a
 la carpeta donde vive el script, sin importar desde donde lo ejecutes. Para correrlo contra la carpeta de OneDrive,
 ajustar la variable `xFolder` al inicio del script.
@@ -64,13 +64,23 @@ Los nombres de columna se configuran al inicio del script (`COL_PPTO`,
 `COLS_ANIO`, `COLS_PERIODO`, `COLS_LN_PPTO`). Las **gráficas por línea de
 negocio** siguen usando el presupuesto de `BD_RFCST26` sin cambios.
 
+## Corrección de captura
+
+Suscripción capturó con el signo invertido los **siniestros y costos del
+forecast de `4008-Agro`** (`Siniestros 1226` y `Costos 1226`). El script voltea
+el signo solo en esa LN y solo en esas columnas antes de derivar el incremento
+Ago-Dic y de validar (constante `CORRECCIONES_SIGNO`), lo imprime en consola y lo
+documenta en la hoja `Parametros`. Si Suscripción corrige la base, basta vaciar
+esa lista.
+
 ## Salidas (carpeta `Outputs/`)
 
 | Archivo | Contenido |
 |---|---|
 | `VAL_RFCST26.xlsx` | Dashboard de KPIs, `Resumen_Global` con P/S/C y P-S-C (para el correo del reporte), resumen por LN (con semáforos, score, ranking, variaciones y gaps de las tres medidas, P-S-C/%P-S-C y participaciones, estilo ANA_RFCST), cortes por cardinalidad, LN×Tipo Rea, fuente, país, corredor, compañía, binder y contrato, `Pareto_Gap` por LN×compañía, excepciones, detalle contrato por contrato con todos los flags, y la hoja `Parametros` con los umbrales usados |
-| `Dashboard_RFCST26.html` | Dashboard PRISMA (abrir en el navegador, no requiere internet). **General**: KPIs de Primas / Siniestros / Costos (FCST vs Ppto, crecimiento vs Real 2025, incremento Ago-Dic) y bloque P-S-C / %P-S-C con su nota. **Línea de Negocio**: las mismas vistas por LN en gráficas. **Contrato / Cedente / MGA**: filtros interactivos en cascada (LN, tipo de reaseguro, país, corredor, compañía, contrato o binder según el nivel) que actualizan la gráfica FCST 26 vs Ppto 26 vs Real 25, el semáforo, las entidades con alerta, el resumen por LN y el top de excepciones (con toggle rojo/amarillo y el motivo de cada registro).
-Incluye un botón **Imprimir PDF** al final que imprime únicamente la sección **Línea de Negocio** conservando el tema oscuro del dashboard, en A4 horizontal y sin márgenes blancos |
+| `Reporte_Alertas_RFCST26.xlsx` | Descargable desde el botón del dashboard. Todos los negocios en ROJO o AMARILLO con identificación (cardinalidad, LN, tipo, N° y nombre de compañía, país, corredor, contrato, binder), las cifras con bandas por periodo como en la base (real jul 26, forecast dic 26, incremento ago-dic, ppto anual y ago-dic, real 2025 y ago-dic 2025), índices y desviaciones **con fórmulas**, semáforos coloreados y el **motivo con montos**. Las celdas que se compararon para levantar cada alerta van marcadas en amarillo; la hoja `Leyenda` explica cada regla y qué celdas marca |
+| `Dashboard_RFCST26.html` | Dashboard PRISMA (abrir en el navegador, no requiere internet). **General**: KPIs de Primas / Siniestros / Costos (FCST vs Ppto, crecimiento vs Real 2025, incremento Ago-Dic) y bloque P-S-C / %P-S-C con su nota. **Línea de Negocio**: las mismas vistas por LN en gráficas. **Contrato / Cedente / MGA**: filtros interactivos en cascada (LN, tipo de reaseguro, país, corredor, compañía, contrato o binder según el nivel) que actualizan la gráfica FCST 26 vs Ppto 26 vs Real 25, el semáforo, las entidades con alerta, el resumen por LN y el top de excepciones (con toggle rojo/amarillo y el motivo de cada registro, con los montos comparados).
+Incluye al final un botón **Descargar reporte de alertas** (el Excel de arriba) y un botón **Imprimir PDF** que imprime únicamente la sección **Línea de Negocio** conservando el tema oscuro del dashboard, en A4 horizontal y sin márgenes blancos |
 
 ## Validaciones
 
