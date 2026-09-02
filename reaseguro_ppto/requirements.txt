@@ -1,0 +1,12 @@
+# Dependencias del framework de validacion del Presupuesto Tecnico.
+# Instalar con el venv activado:
+#     pip install -r requirements.txt
+
+pandas>=2.0
+openpyxl>=3.1
+xlsxwriter>=3.1
+
+# Solo para reports/REPORTE_WORD.py. OJO: el paquete se llama
+# python-docx, no docx. "pip install docx" instala otra libreria
+# distinta y abandonada, y el import sigue fallando.
+python-docx>=1.1

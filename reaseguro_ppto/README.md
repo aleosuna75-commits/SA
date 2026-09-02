@@ -178,3 +178,80 @@ ASIGNACION DE RAMO (CONTABLE)
 
 Si la cobertura sale baja o en 0%, la llave detectada no es la correcta y
 hay que fijarla a mano en `SUBRAMO.py`.
+
+---
+
+# Ajuste: `ModuleNotFoundError: No module named 'docx'`
+
+## Causa
+
+Dos cosas, y la segunda es la que importa.
+
+**1. Falta la libreria.** `reports/REPORTE_WORD.py` usa `python-docx`, que
+no esta instalada en el venv.
+
+**2. El proceso completo se cae por una funcion que no se usa.**
+`MAIN.py` importaba el reporte Word en la linea 14:
+
+```python
+from reports.REPORTE_WORD import generar_reporte_word
+```
+
+pero **todo el bloque que lo llama esta comentado** (lineas 114-125). O
+sea: el import se ejecutaba siempre, tumbaba el proceso antes de leer un
+solo registro, y ni siquiera para generar el Word — solo para importarlo.
+
+## Correccion
+
+### La libreria
+
+Con el venv activado:
+
+```
+pip install python-docx
+```
+
+**OJO:** el paquete se llama `python-docx`, no `docx`. `pip install docx`
+instala otra libreria distinta y abandonada, y el import sigue fallando.
+
+Se agrego `requirements.txt` para no tener que acordarse:
+
+```
+pip install -r requirements.txt
+```
+
+### El import
+
+Ahora el reporte Word se importa protegido. Si falta la libreria, avisa y
+el proceso sigue: el Excel es lo obligatorio, el Word es opcional.
+
+```python
+try:
+    from reports.REPORTE_WORD import generar_reporte_word
+    REPORTE_WORD_DISPONIBLE = True
+
+except ModuleNotFoundError:
+    REPORTE_WORD_DISPONIBLE = False
+    generar_reporte_word = None
+    print("AVISO: python-docx no esta instalado, se omite el reporte Word.")
+```
+
+Probado en los dos escenarios: con la libreria instalada y sin ella.
+
+## Ademas: un error que les iba a salir al descomentar el Word
+
+El bloque comentado define `resumen_ln` pero llama con `tabla_ln`, que no
+existe en ningun lado:
+
+```python
+#resumen_ln = next(...)          # <- define resumen_ln
+#generar_reporte_word(
+#    resumen_ln=tabla_ln,        # <- pero pasa tabla_ln  -> NameError
+```
+
+Ya quedo corregido a `resumen_ln=resumen_ln` dentro del comentario, y se
+le agrego una verificacion de `REPORTE_WORD_DISPONIBLE` antes de llamarlo.
+
+`generar_reporte_word` se probo por separado contra un `CONT_LN` con la
+forma real y genera el .docx correctamente (portada, resumen, tabla de
+KPIs y analisis por LN), incluyendo el caso de una LN con primas en cero.
