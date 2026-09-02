@@ -115,3 +115,66 @@ python DIAGNOSTICO_PRIMAS.py "ruta\PptoTecnico2026.csv"
 
 Imprime cuantas filas se pierden con la conversion actual y compara los
 totales contra la corregida.
+
+---
+
+# Ajuste: `procesar_contable() takes 2 positional arguments but 3 were given`
+
+## Causa
+
+`MAIN.py` agrego la carga del catalogo de Subramo y lo pasa como tercer
+argumento:
+
+```python
+sbr = cargar_sbr(ARCHIVO_SUBRAMO)
+tablas_cont, nombres_cont = procesar_contable(ppto, real, sbr)
+```
+
+pero `procesar_contable` y `procesar_suscripcion` seguian declaradas con
+dos parametros.
+
+## Correccion
+
+Ambas firmas ahora son:
+
+```python
+def procesar_contable(ppto, real, sbr=None):
+def procesar_suscripcion(ppto, real, sbr=None):
+```
+
+`sbr=None` mantiene compatibilidad: si alguien las llama con dos
+argumentos siguen funcionando.
+
+El tercer argumento no se ignora. El PPTO **no trae Ramo propio** (el
+REAL si, en `Ramo2`), y sin el las dos bases no cruzan por ramo. El nuevo
+`transformations/SUBRAMO.py` lo asigna con `asignar_ramo(ppto, sbr)`,
+que se llama antes de armar `LLAVE_`.
+
+## Que hace `asignar_ramo`
+
+- Detecta la columna de ramo del catalogo (`Ramo`, `RAMO`, `Cve_Ramo`...).
+- Cruza por las columnas que el catalogo comparte con el PPTO.
+- Normaliza las llaves a texto (`"34.0"` -> `"34"`), porque el PPTO trae
+  los codigos como texto y el catalogo puede traerlos como numero. Sin
+  esto el merge no cruza nada.
+- Quita llaves duplicadas del catalogo y verifica que el numero de filas
+  del PPTO no cambie, para no inflar importes.
+- Imprime la **cobertura** del cruce (cuantas filas encontraron ramo).
+
+**No adivina.** Si no puede resolver la llave o la columna de ramo, deja
+el PPTO como estaba y lo avisa en consola, en lugar de asignar un Ramo
+equivocado en silencio.
+
+## Revisar la cobertura
+
+Al correr, `MAIN.py` ahora imprime:
+
+```
+ASIGNACION DE RAMO (CONTABLE)
+  Cruzando por: ['Contrato']
+  Columna de ramo del catalogo: 'Ramo'
+  Cobertura: 58,079 de 187,590 filas (31.0%)
+```
+
+Si la cobertura sale baja o en 0%, la llave detectada no es la correcta y
+hay que fijarla a mano en `SUBRAMO.py`.

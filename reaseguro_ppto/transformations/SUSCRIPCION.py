@@ -1,11 +1,13 @@
 import pandas as pd
 from utils.GROUPING import generar_resumen
 from transformations.LLAVES import crear_llave
+from transformations.SUBRAMO import asignar_ramo
 from utils.PARSEO import a_numerico, validar_importes
 
 def procesar_suscripcion(
     ppto,
-    real
+    real,
+    sbr=None
 ):
     tablas = []
     nombres = []
@@ -35,6 +37,14 @@ def procesar_suscripcion(
     ppto["Corredor"] = ppto["ZCORREDOR"]
     ppto["Contrato"] = ppto["ZCONTRATO"]
     ppto["AÑO_SUSC"] = ppto["ZSUSCYEAR"]
+
+    # El PPTO no trae Ramo propio: se toma del catalogo Subramo
+    # que MAIN.py carga con cargar_sbr().
+    ppto = asignar_ramo(
+        ppto,
+        sbr,
+        "(SUSCRIPCION)"
+    )
 
     real["Linea_negocio"] = real["LN"]
     real["Ramo"] = real["Ramo2"]
