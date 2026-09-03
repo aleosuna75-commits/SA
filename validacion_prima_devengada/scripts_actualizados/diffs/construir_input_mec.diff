@@ -268,7 +268,7 @@
      p = bd[bd['Tipo Poliza'].astype(str).str.startswith('P')].copy()
      p['ini'] = _a_fecha_serie(p['Fecha Inicio de Vigencia'])
      p['fin'] = _a_fecha_serie(p['Fecha Fin de Vigencia'])
-@@ -231,16 +357,132 @@
+@@ -231,16 +357,136 @@
          f"{int(ok.sum()):,} de {len(p):,} ({ok.mean():.1%})",
          'OK' if ok.mean() >= 0.95 else 'Advertencia — revisar fechas')
      p = p[ok]
@@ -320,9 +320,16 @@
 +      · viene en DÓLARES  -> se convierte a la moneda del input con el TC de cierre
 +      · abre subramos      -> se homologa al grano de la BD (31/35/39->30, 71/73->70)
 +      · no trae vigencia   -> FinVigAAAAMM y MesesPeriodo quedan vacíos
-+      · sólo trae AÑO de suscripción -> cohorte anclada a ENERO (AAAA01), igual que
-+        la herramienta. Bajo el FND calibrado (que indexa por antigüedad de REGISTRO)
-+        eso no afecta la reserva; sí afecta el triángulo por cohorte.
++
++    COHORTE = MES CONTABLE. El input se organiza por FECHA CONTABLE: cada fila es un
++    movimiento que ENTRA a los libros en un mes. El FCST no trae vigencia, así que su
++    cohorte es su propio mes de registro y su antigüedad es 0. El año de suscripción se
++    conserva como dato descriptivo (AnioSusc), no como ancla.
++
++    Anclar la cohorte a enero del año de suscripción —como hacía la herramienta— es lo
++    que NO hay que hacer: se midió que arroja la prima proyectada a antigüedades de 19
++    a 71 meses e infla el triángulo en esos tramos, cuando el movimiento en realidad
++    acaba de entrar.
 +    """
 +    path = path or localizar_fcst()
 +    if path is None:
@@ -350,8 +357,8 @@
 +    df['Ramo'] = pd.to_numeric(df['Ramo'], errors='coerce')
 +    colapsados = sorted(set(df['Ramo'].dropna().astype(int)) & set(HOMOLOGA_RAMO))
 +    df['Ramo'] = df['Ramo'].map(lambda r: HOMOLOGA_RAMO.get(int(r), int(r)) if pd.notna(r) else r)
-+    df['AnioSusc'] = pd.to_numeric(df['AñoSusc'], errors='coerce')
-+    df['CohorteAAAAMM'] = df['AnioSusc'] * 100 + 1
++    df['AnioSusc'] = pd.to_numeric(df['AñoSusc'], errors='coerce')   # descriptivo
++    df['CohorteAAAAMM'] = df['Periodo']        # fecha contable: cuando entra el movimiento
 +    df['FinVigAAAAMM'] = np.nan
 +    df['MesesPeriodo'] = np.nan
 +    df['TipoRea'] = pd.to_numeric(df['TipoRea'], errors='coerce')
@@ -387,14 +394,11 @@
 +    g['Fuente'] = 'FCST'
 +    rep('V14', f'Subramos del FCST colapsados al grano de la BD {HOMOLOGA_RAMO}',
 +        f"{colapsados}", 'OK (homologación)')
-+    # V19 · si el FCST no llega al año en curso, TODA su prima cuelga de cohortes
-+    # anteriores. No afecta al FND calibrado (que indexa por antigüedad de REGISTRO)
-+    # pero sí deforma el triángulo por cohorte, así que se reporta explícitamente.
-+    anios = sorted(g['AnioSusc'].dropna().astype(int).unique())
-+    anio_curso = fin // 100
-+    rep('V19', 'Años de suscripción que trae el FCST', f"{anios}",
-+        'OK' if anio_curso in anios else
-+        f'Advertencia — sin suscripción {anio_curso}: su prima cuelga de cohortes previas')
++    # V19 · deja constancia del criterio: la cohorte del FCST es su MES CONTABLE, no el
++    # año de suscripción. El año de suscripción queda como dato descriptivo.
++    anios = [int(a) for a in sorted(g['AnioSusc'].dropna().unique())]
++    rep('V19', 'FCST · cohorte = mes contable (fecha de ingreso del movimiento)',
++        f"antigüedad 0 · años de suscripción presentes, sólo descriptivos: {anios}", 'OK')
 +    rep('V16', f'FCST · moneda de origen {MONEDA_FCST} -> input {MONEDA}',
 +        _TRASLAPE['factor'], 'OK')
 +    print(f"[input]   FCST -> {len(g):,} filas en la ventana {ini}–{fin} · "
@@ -406,11 +410,17 @@
  def _detectar_ln(df, path):
      if '/ERP/FUNCAREA' in df.columns and df['/ERP/FUNCAREA'].notna().any():
          return str(df['/ERP/FUNCAREA'].mode().iloc[0])
-@@ -263,10 +505,14 @@
+@@ -261,12 +507,18 @@
+         df['Ramo'] = df['Ramo'].fillna(0).astype(int)
+     else:
          df['Ramo'] = 0    # por asignar vía catálogo Subramo (CeBe) — no bloquea el input por LN2
-     # La herramienta solo trae AÑO de suscripción -> cohorte anclada a ENERO (AAAA01).
-     df['CohorteAAAAMM'] = pd.to_numeric(df['ZSUSCYEAR'], errors='coerce') * 100 + 1
-+    df['AnioSusc'] = pd.to_numeric(df['ZSUSCYEAR'], errors='coerce')
+-    # La herramienta solo trae AÑO de suscripción -> cohorte anclada a ENERO (AAAA01).
+-    df['CohorteAAAAMM'] = pd.to_numeric(df['ZSUSCYEAR'], errors='coerce') * 100 + 1
++    # COHORTE = MES CONTABLE, igual que el FCST: la herramienta tampoco trae vigencia,
++    # así que el movimiento cohorta en el mes en que entra. (Antes se anclaba a enero
++    # del año de suscripción, lo que enviaba la prima a antigüedades de varios años.)
++    df['CohorteAAAAMM'] = pd.to_numeric(df['0CALMONTH'], errors='coerce')
++    df['AnioSusc'] = pd.to_numeric(df['ZSUSCYEAR'], errors='coerce')   # descriptivo
 +    df['FinVigAAAAMM'] = np.nan      # la herramienta no trae vigencia por registro
 +    df['MesesPeriodo'] = np.nan      # ni periodicidad de cuentas
      df['Periodo'] = pd.to_numeric(df['0CALMONTH'], errors='coerce')
@@ -422,7 +432,7 @@
             .rename(columns={'ZTIPOREAS':'TipoRea'}))
      g['Fuente'] = f'{fuente_tag}-{ln}'
      print(f"[input]   {os.path.basename(path)} -> {ln} · {len(g)} filas en ventana Ppto {VENTANA_PPTO[0]}–{VENTANA_PPTO[1]}")
-@@ -312,6 +558,9 @@
+@@ -312,6 +564,9 @@
  # ====================== DERIVADOS Y VALIDACIONES ============================
  def derivar(df):
      df = df.copy()
@@ -432,7 +442,7 @@
      df['CohorteAAAAMM'] = pd.to_numeric(df['CohorteAAAAMM'], errors='coerce').fillna(0).astype(int)
      df['Periodo'] = pd.to_numeric(df['Periodo'], errors='coerce').fillna(0).astype(int)
      df['CohorteAnio'] = df['CohorteAAAAMM'] // 100
-@@ -337,7 +586,8 @@
+@@ -337,7 +592,8 @@
      return df[CANON]
  
  def validar(df):
@@ -442,7 +452,7 @@
      rep('V1','Llaves duplicadas', int(dup), 'OK' if dup==0 else 'BLOQUEANTE — revisar agregación')
      rep('V5','Moneda única de la corrida', df['Moneda'].nunique(), 'OK' if df['Moneda'].nunique()==1 else 'BLOQUEANTE')
      reales = df[df['Origen']=='Real']
-@@ -346,8 +596,29 @@
+@@ -346,8 +602,29 @@
      caidas = (df.sort_values('Periodo').groupby(['Fuente','LN2','TipoRea','CohorteAAAAMM'])['PrimaDevAcum']
                  .apply(lambda s: int((s.diff() < 0).sum())).sum())
      rep('V7','Meses con acumulado a la baja (devoluciones, signo natural)', int(caidas), 'Advertencia (se reporta)')
@@ -474,7 +484,7 @@
      if len(her):
          vent = (FRONTERA_REAL//100)*100
          a = (df[(df['Fuente']=='BD') & (df['Periodo']>vent) & (df['Periodo']<=FRONTERA_REAL)]
-@@ -357,11 +628,21 @@
+@@ -357,11 +634,21 @@
          for ln in b.index:
              if ln in a.index and a[ln]!=0:
                  d = b[ln]/a[ln]-1
@@ -497,7 +507,7 @@
  
  
  # ============================== SALIDAS =====================================
-@@ -417,11 +698,16 @@
+@@ -417,11 +704,16 @@
  
  
  if __name__ == '__main__':

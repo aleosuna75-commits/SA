@@ -400,9 +400,16 @@ def fuente_fcst(path=None):
       · viene en DÓLARES  -> se convierte a la moneda del input con el TC de cierre
       · abre subramos      -> se homologa al grano de la BD (31/35/39->30, 71/73->70)
       · no trae vigencia   -> FinVigAAAAMM y MesesPeriodo quedan vacíos
-      · sólo trae AÑO de suscripción -> cohorte anclada a ENERO (AAAA01), igual que
-        la herramienta. Bajo el FND calibrado (que indexa por antigüedad de REGISTRO)
-        eso no afecta la reserva; sí afecta el triángulo por cohorte.
+
+    COHORTE = MES CONTABLE. El input se organiza por FECHA CONTABLE: cada fila es un
+    movimiento que ENTRA a los libros en un mes. El FCST no trae vigencia, así que su
+    cohorte es su propio mes de registro y su antigüedad es 0. El año de suscripción se
+    conserva como dato descriptivo (AnioSusc), no como ancla.
+
+    Anclar la cohorte a enero del año de suscripción —como hacía la herramienta— es lo
+    que NO hay que hacer: se midió que arroja la prima proyectada a antigüedades de 19
+    a 71 meses e infla el triángulo en esos tramos, cuando el movimiento en realidad
+    acaba de entrar.
     """
     path = path or localizar_fcst()
     if path is None:
@@ -430,8 +437,8 @@ def fuente_fcst(path=None):
     df['Ramo'] = pd.to_numeric(df['Ramo'], errors='coerce')
     colapsados = sorted(set(df['Ramo'].dropna().astype(int)) & set(HOMOLOGA_RAMO))
     df['Ramo'] = df['Ramo'].map(lambda r: HOMOLOGA_RAMO.get(int(r), int(r)) if pd.notna(r) else r)
-    df['AnioSusc'] = pd.to_numeric(df['AñoSusc'], errors='coerce')
-    df['CohorteAAAAMM'] = df['AnioSusc'] * 100 + 1
+    df['AnioSusc'] = pd.to_numeric(df['AñoSusc'], errors='coerce')   # descriptivo
+    df['CohorteAAAAMM'] = df['Periodo']        # fecha contable: cuando entra el movimiento
     df['FinVigAAAAMM'] = np.nan
     df['MesesPeriodo'] = np.nan
     df['TipoRea'] = pd.to_numeric(df['TipoRea'], errors='coerce')
@@ -467,14 +474,11 @@ def fuente_fcst(path=None):
     g['Fuente'] = 'FCST'
     rep('V14', f'Subramos del FCST colapsados al grano de la BD {HOMOLOGA_RAMO}',
         f"{colapsados}", 'OK (homologación)')
-    # V19 · si el FCST no llega al año en curso, TODA su prima cuelga de cohortes
-    # anteriores. No afecta al FND calibrado (que indexa por antigüedad de REGISTRO)
-    # pero sí deforma el triángulo por cohorte, así que se reporta explícitamente.
-    anios = sorted(g['AnioSusc'].dropna().astype(int).unique())
-    anio_curso = fin // 100
-    rep('V19', 'Años de suscripción que trae el FCST', f"{anios}",
-        'OK' if anio_curso in anios else
-        f'Advertencia — sin suscripción {anio_curso}: su prima cuelga de cohortes previas')
+    # V19 · deja constancia del criterio: la cohorte del FCST es su MES CONTABLE, no el
+    # año de suscripción. El año de suscripción queda como dato descriptivo.
+    anios = [int(a) for a in sorted(g['AnioSusc'].dropna().unique())]
+    rep('V19', 'FCST · cohorte = mes contable (fecha de ingreso del movimiento)',
+        f"antigüedad 0 · años de suscripción presentes, sólo descriptivos: {anios}", 'OK')
     rep('V16', f'FCST · moneda de origen {MONEDA_FCST} -> input {MONEDA}',
         _TRASLAPE['factor'], 'OK')
     print(f"[input]   FCST -> {len(g):,} filas en la ventana {ini}–{fin} · "
@@ -503,9 +507,11 @@ def _normaliza_herramienta(df, fuente_tag, path):
         df['Ramo'] = df['Ramo'].fillna(0).astype(int)
     else:
         df['Ramo'] = 0    # por asignar vía catálogo Subramo (CeBe) — no bloquea el input por LN2
-    # La herramienta solo trae AÑO de suscripción -> cohorte anclada a ENERO (AAAA01).
-    df['CohorteAAAAMM'] = pd.to_numeric(df['ZSUSCYEAR'], errors='coerce') * 100 + 1
-    df['AnioSusc'] = pd.to_numeric(df['ZSUSCYEAR'], errors='coerce')
+    # COHORTE = MES CONTABLE, igual que el FCST: la herramienta tampoco trae vigencia,
+    # así que el movimiento cohorta en el mes en que entra. (Antes se anclaba a enero
+    # del año de suscripción, lo que enviaba la prima a antigüedades de varios años.)
+    df['CohorteAAAAMM'] = pd.to_numeric(df['0CALMONTH'], errors='coerce')
+    df['AnioSusc'] = pd.to_numeric(df['ZSUSCYEAR'], errors='coerce')   # descriptivo
     df['FinVigAAAAMM'] = np.nan      # la herramienta no trae vigencia por registro
     df['MesesPeriodo'] = np.nan      # ni periodicidad de cuentas
     df['Periodo'] = pd.to_numeric(df['0CALMONTH'], errors='coerce')
