@@ -149,5 +149,16 @@ de la compañía, que es mayor porque incluye contratos sin prima registrada;
 para reportar ese presupuesto completo en los niveles, poner
 `PPTO26_NIVEL_DESDE_HOJA = True`.
 
+**Corrección de signo en el RFCST 2026**: en la LN 4008-Agro los siniestros y
+los costos del reforecast se capturaron con la convención contable invertida
+(los 57 renglones con siniestros vienen en negativo y 53 de 55 en costos,
+cuando en el resto de las líneas y en las demás columnas de la propia LN van
+en positivo). El script invierte el signo **renglón por renglón** — no solo el
+total — para que el corte Ago-Dic derivado también quede bien, y lo registra
+en `Calidad_Datos`. La corrección se valida sola: con ella los índices de esa
+línea pasan a S/P 64.4% y C/P 22.9% en el RFCST, contra 63.1% y 23.0% del FCST
+2027. Se configura en `SIGNO_INVERTIDO_RFCST`; si Suscripción corrige la base
+de origen, basta vaciar ese diccionario.
+
 **Nombre del presupuesto 2026**: se reporta como **FCST 2026** (constante
 `ETIQ_PPTO26` al inicio del script), tanto en el dashboard como en el Excel.

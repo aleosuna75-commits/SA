@@ -123,6 +123,22 @@ ARCHIVO_RFCST = "BD_RFCST_26_act.xlsx"
 PREFIJO_RFCST = "BD_RFCST"
 HOJA_RFCST = "BD_RFCST26"
 
+# Correcciones de signo en la base del RFCST 2026, confirmadas con
+# el area que la captura. En LN 4008-Agro los siniestros y los
+# costos del reforecast quedaron con la convencion contable
+# invertida: los 57 renglones con siniestros vienen en negativo
+# (ninguno positivo) y 53 de 55 en costos, cuando en el resto de
+# las lineas y en las demas columnas de la propia LN van en
+# positivo. Se invierte el signo del renglon, no solo del total,
+# para que el corte Ago-Dic derivado tambien quede bien.
+#   {LN: {medida: [sufijos de columna]}}
+SIGNO_INVERTIDO_RFCST = {
+    "4008-Agro": {"Siniestros": ["1226"], "Costos": ["1226"]},
+}
+
+# Se llena al cargar la base; alimenta la hoja Calidad_Datos
+CORRECCIONES_SIGNO = []
+
 # ---- Real 2026 mensual (opcional) ----
 # Da la forma mensual observada Ene-Jul 2026, que es la que se
 # usa para abrir el acumulado a julio del RFCST 2026
@@ -642,6 +658,30 @@ def cargar_rfcst26():
     b = b[b["LN"].notna()].copy()
     b["_LN"] = b["LN"].map(_norm_ln)
 
+    # Correcciones de signo antes de derivar nada de estas columnas
+    for _ln_fix, _medidas_fix in SIGNO_INVERTIDO_RFCST.items():
+        _mask = b["_LN"] == _ln_fix
+        if not _mask.any():
+            print(f"AVISO: la correccion de signo apunta a LN {_ln_fix}, que no "
+                  "esta en la base del RFCST; se ignora.")
+            continue
+        for _medida_fix, _sufijos_fix in _medidas_fix.items():
+            for _suf_fix in _sufijos_fix:
+                _col_fix = f"{_medida_fix} {_suf_fix}"
+                if _col_fix not in b.columns:
+                    continue
+                _antes = pd.to_numeric(b.loc[_mask, _col_fix],
+                                       errors="coerce").fillna(0)
+                b.loc[_mask, _col_fix] = -_antes
+                CORRECCIONES_SIGNO.append({
+                    "LN": _ln_fix, "Columna": _col_fix,
+                    "Renglones": int((_antes.abs() > TOL).sum()),
+                    "Antes": float(_antes.sum()),
+                    "Despues": float(-_antes.sum()),
+                })
+                print(f"  correccion de signo · LN {_ln_fix} · {_col_fix}: "
+                      f"{_antes.sum() / 1e6:,.2f} M -> {-_antes.sum() / 1e6:,.2f} M")
+
     # RFCST usa "Costos"; aqui el concepto equivalente son
     # las comisiones (costos de adquisicion)
     cols_map = {"Primas": "P", "Siniestros": "S", "Costos": "C"}
@@ -888,6 +928,14 @@ def cargar_ppto26():
 
 
 RFCST = cargar_rfcst26()
+
+for _corr in CORRECCIONES_SIGNO:
+    _chk("Corrección de signo aplicada",
+         f"LN {_corr['LN']} · {_corr['Columna']}: la base del RFCST traía esta "
+         f"columna con la convención contable invertida y se corrigió "
+         f"({_corr['Antes'] / 1e6:,.2f} M -> {_corr['Despues'] / 1e6:,.2f} M). "
+         "Configurable en SIGNO_INVERTIDO_RFCST.",
+         _corr["Renglones"], _corr["Despues"] - _corr["Antes"])
 
 REAL26 = cargar_real26()
 
@@ -1688,6 +1736,7 @@ parametros = pd.DataFrame({
         "Monto atipico (USD)",
         "Peso score: crecimiento vs RFCST", "Peso score: siniestralidad",
         "Peso score: comisiones", "Peso score: estacionalidad",
+        "Correcciones de signo RFCST",
         "Nota P-S-C",
         "Nota conceptos",
         "Generado por", "Fecha de ejecucion",
@@ -1701,6 +1750,8 @@ parametros = pd.DataFrame({
         CONC_AMARILLO, CONC_ROJO,
         MONTO_ATIPICO,
         PESO_CREC, PESO_SIN, PESO_COS, PESO_EST,
+        (" · ".join(f"LN {c['LN']} {c['Columna']}" for c in CORRECCIONES_SIGNO)
+         if CORRECCIONES_SIGNO else "ninguna"),
         "* Falta el incremento a la reserva y los costos de cobertura",
         METODO_CONCEPTO,
         usuario, datetime.now().strftime("%Y-%m-%d %H:%M"),
@@ -1724,6 +1775,7 @@ parametros = pd.DataFrame({
         "V2: siniestralidad implicita del FCST",
         "V2: comisiones implicitas del FCST",
         "V3: concentracion de la prima en el mes pico",
+        "Columnas del RFCST capturadas con el signo invertido (ver Calidad_Datos)",
         "P-S-C no es resultado tecnico: no incluye reservas ni costos de cobertura",
         "Ver hoja Mapeo_Columnas y Calidad_Datos",
         "Usuario que ejecuto el script", "",
