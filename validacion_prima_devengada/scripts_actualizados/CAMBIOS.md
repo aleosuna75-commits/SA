@@ -1,0 +1,100 @@
+# Cambios a aplicar · scripts del MEC y de reservas
+
+Planeación Financiera (BP&A) · Reaseguradora Patria · septiembre 2026
+
+Los cinco scripts de esta carpeta son los originales con los cambios ya aplicados. En `diffs/` está el diff unificado de cada uno para revisarlo línea por línea antes de sustituir nada. Los dos reforecast conservan sus finales de línea Windows (CRLF), así que el diff sale limpio en cualquier herramienta.
+
+Todos los cambios de comportamiento vienen con interruptor: `USAR_FND_CALIBRADO = False` deja los scripts funcionando exactamente como hoy.
+
+| Archivo | Sustituye a | Diff |
+|---|---|---|
+| `mec_devengamiento.py` | mismo nombre (v2 → v3) | +178 / −30 |
+| `reforecastRRC_v11_Esc1_ocl.py` | `reforecastRRC_v10_Esc1_ocl.py` | +68 / −5 |
+| `ReforecastSONR_v4.py` | `ReforecastSONR_v3.py` | +69 / −8 |
+| `construir_input_mec.py` | `construir input mec.py` | +55 / −9 |
+| `generar_output_mec.py` | `generar output mec.py` | +7 / −3 |
+| `test_integracion_fnd.py` | nuevo (prueba de regresión) | — |
+
+Nota de nombres: `construir input mec.py` y `generar output mec.py` traían espacios; aquí van con guion bajo, que es lo que `generar_output_mec.py` espera al importar el módulo (`mec*devengamiento*.py` con guion bajo).
+
+## 1. `mec_devengamiento.py` (v2 → v3)
+
+Módulo nuevo `M4b · REGISTRO`, que es la base de la v3:
+
+- `NT_MENSUAL` — recta de 24-avos de la Nota Técnica por antigüedad de registro.
+- `fnd_registro(ramo, k_reg, delta)` — FND de una cuenta proporcional o facultativa registrada hace `k_reg` meses; `min(1, max(0, NT(k) − δ_ramo))`, cero desde k = 12.
+- `vector_registro`, `tabla_registro` — el vector y la tabla ramo × antigüedad publicables.
+- `antiguedad_registro(mes_valuacion, mes_registro)` — con la advertencia explícita de que en los reforecast el mes de registro es `CALMONTH` (`aPog_MesProc`) y el de valuación es `Meses`; no son lo mismo.
+- `cargar_delta(ruta)` — lee δ de `delta_calibrado.json`, para que una recalibración trimestral no exija tocar código.
+- `ConfigMEC`: `DELTA_RAMO` (los diez δ calibrados), `SUBRAMO_A_RAMO` (31/34/35/37/39 → 30, 71/73 → 70, 20 → 10), `COL_TIPOREA`, `USAR_CALIBRADO`, `ARCHIVO_DELTA`.
+
+Correcciones sobre la v2:
+
+- `factor_no_devengado` — reescrita con jerarquía explícita: no proporcional con fechas → prorrata exacta al mes de valuación; proporcional y facultativo → tabla calibrada por antigüedad de registro; si falta información → el valor legado que pasa el llamador. Acepta `mes_valuacion` y `delta`.
+- `valor_fnd_directo` — igual, con `tiporea` y `mes_valuacion` (la usan las `zFND*` del SONR).
+- `fnd_exacto` — el tercer parámetro pasa de `calmonth` a `mes_valuacion`. Era el bug de fondo: con `CALMONTH` cada registro se valuaba en su propio mes contable y no en la fecha de valuación.
+- `antiguedad_de_row` — acepta `mes_valuacion`.
+- `TablaFND.factor` — la cola devuelve 0.0 en vez de `vec[-1]`, que dejaba un FND residual permanente (4.3% en Vida con horizonte 24).
+- `m4_escenario_frecuencia` — acotada a [0, 1]: con δ negativo (CAT, Crédito) el desplazamiento podía pasar del 100%.
+- Encabezado — documenta qué se midió, con qué evidencia y qué se conserva de la v2. El candado de alcance (FS, 1−LAG, MR, IRR, índice) no cambia.
+
+## 2. `reforecastRRC_v11_Esc1_ocl.py`
+
+- Importa `mec_devengamiento` de la misma carpeta y añade el bloque de configuración `USAR_FND_CALIBRADO`, `FILTRO_ANIO_SUSC`, `DELTA_FND`, `MES_VALUACION` y el helper `fnd_cal(ramo, calmonth, valorfrec_legado)`.
+- `VALORFREC` en `ConsultaReal` y en `ConsultaReal_USD` — antes `xPND.get(CALMONTH).get(FRECUENCIA)`, ahora `fnd_cal(Ramo, CALMONTH, <valor legado>)`. La lógica de `PORC_ND` que ya existía (71/73 usan VALORFREC, TipoRea 2 con fechas iguales da 0, TipoRea 2 con fechas distintas va por prorrata, resto VALORFREC) se conserva intacta.
+- `PORC_ND` en `ConsultaPPTO2025` — igual, sustituye `xPND2`.
+- `MES_VALUACION` se fija por escenario: `Meses` en los escenarios 2 y 3, `Mesesp` (cierre de diciembre) en el 4. Es la corrección que hace que el corte del FND sea la fecha de valuación y no el mes de registro.
+- `FILTRO_ANIO_SUSC` — el filtro `Val(left(aPog_MesProc,4)) <= Susc` del WHERE queda conmutable, con el comentario de que reproducido en la validación deja la RRC en el 29% de la real. Por defecto queda en `True`, es decir como hoy: el cambio es deliberadamente opt-in porque hay que confirmarlo contra el campo `Susc` de SIREC antes de moverlo.
+- Los diccionarios `xPND` y `xPND2` se conservan como valor legado de respaldo; con el FND calibrado activo ya no gobiernan el resultado.
+
+## 3. `ReforecastSONR_v4.py`
+
+- Mismo bloque de importación y configuración, más `fnd_cal(xRamo, xMesProc, xFecVal)` y `_es_no_proporcional`.
+- `zFND`, `zFND_PPTO` y `zFND2` — reciben `xRamo` como último parámetro (opcional, así la firma sigue siendo compatible) y, cuando el negocio no es TipoRea 2, devuelven el FND calibrado por antigüedad de registro. Toda la lógica del no proporcional queda tal cual, incluido el ajuste de `xFinVig == 45930`.
+- Los cinco puntos de llamada pasan el ramo: `Ramo_filt` en `ConsultaReal` y `ConsultaReal_USD`, `Ramo` en `ConsultaPPTO2025`.
+- Con esto el SONR consume el mismo factor que la RRC, así que `Dev = 1 − FND` queda coherente entre las dos reservas por construcción, que es lo que pide la sección 8 del documento del MEC.
+
+## 4. `construir_input_mec.py`
+
+Arrastra al Input tres campos que antes se leían y se tiraban, y sin los cuales no se puede auditar ni recalibrar el FND:
+
+- `AnioSusc` (de `Año Susc.`) — permite verificar el filtro de año de suscripción del punto 2.
+- `FinVigAAAAMM` (de `Fecha Fin de Vigencia`) — separa la prorrata exacta del no proporcional de la tabla por registro.
+- `MesesPeriodo` (periodicidad de cuentas) — separa la frecuencia del δ calibrado en la próxima recalibración.
+
+Los tres son opcionales: si la BD no trae la columna, el campo queda vacío, se reporta en Validaciones (`V12`, `V13`) y todo lo demás funciona igual. La periodicidad se busca entre varios nombres posibles (`Meses Periodo`, `Periodos`, `Período`…) porque el nombre exacto varía entre bases. Los `groupby` de las tres fuentes llevan `dropna=False` para que una fila con un campo opcional vacío no se pierda, `CANON` incorpora las tres columnas y la validación `V1` de duplicados usa el grano nuevo. `Registros_Vigencia_MEC.csv` arrastra además `TipoRea` cuando existe.
+
+## 5. `generar_output_mec.py`
+
+`NOMBRE_RAMO` tenía cruzados cuatro ramos de dos en dos. Corregido a 40 = Responsabilidad Civil, 50 = Marítimo y Transportes, 90 = Automóviles, 110 = Diversos, que es lo que dicen `xNoRamo` del reforecast RRC y el estado de resultados real. Sólo afectaba etiquetas del output.
+
+## 6. Prueba de regresión
+
+`test_integracion_fnd.py` comprueba que `mec.factor_no_devengado` del módulo parchado reproduce la prima no devengada con la que se calibró el modelo contra la RRC real, en cuatro fechas de valuación, y verifica las propiedades de la tabla (k < 0 y k ≥ 12 dan cero, 31 colapsa a 30, 71 a 70, FND acotado a [0, 1], cola del vector en cero).
+
+Resultado actual, cuadre al centavo:
+
+| Mes de valuación | PND módulo (USD) | PND calibración (USD) | Diferencia |
+|---|---|---|---|
+| 202312 | 341,965,442.52 | 341,965,442.52 | 0.00 |
+| 202412 | 423,720,335.82 | 423,720,335.82 | 0.00 |
+| 202512 | 515,919,344.48 | 515,919,344.48 | 0.00 |
+| 202605 | 544,175,560.71 | 544,175,560.71 | 0.00 |
+
+Correr desde la carpeta del proyecto: `python3 scripts_actualizados/test_integracion_fnd.py` (necesita `insumos/` y `salidas/`).
+
+## Orden sugerido para implantar
+
+1. Copiar `mec_devengamiento.py` y `delta_calibrado.json` (de `salidas/`) a la carpeta donde viven los reforecast.
+2. Correr `test_integracion_fnd.py` — debe dar OK antes de tocar los reforecast.
+3. Sustituir el reforecast RRC por la v11 y correr un cierre en paralelo (shadow run) contra el vigente, con `USAR_FND_CALIBRADO = False` primero para confirmar que reproduce la v10 al centavo, y luego en `True`.
+4. Comparar la prima devengada resultante contra la base BEL-IRR-MR con `validar_prima_devengada.py`.
+5. Repetir 3 y 4 con el SONR.
+6. Sólo entonces medir por separado el efecto de `FILTRO_ANIO_SUSC = False`, con el campo `Susc` de SIREC ya verificado.
+
+## Lo que no está en el código y sigue pendiente
+
+- **Documento MEC v6.0 (PDF).** Hay que reemplazar la frase de que el FND sale de la prorrata de vigencias: para proporcional y facultativo se calibra sobre la antigüedad de registro con δ por ramo; la prorrata aplica al no proporcional. El resto del marco (apertura por ramo, back-testing, M4) sigue vigente.
+- **Base BEL-IRR-MR, hoja `HParametros_2026`.** El `Ind Sin RRC` de TEV e Hidro anterior a 202401 está en otra base (0.5 a 8.6 frente a 0.11 a 0.27 después). Hay que homologarlo o marcarlo.
+- **Campo `Susc` de SIREC** para cerrar el punto del filtro de año de suscripción.
+- **Recalibración trimestral.** Correr `validar_prima_devengada.py` en cada cierre y reajustar δ si el ratio total sale de ±3% o un ramo con peso mayor a 5% sale de ±10%. Vigilar Vida: su BEL pasó de 18 a 68 millones de USD entre diciembre de 2024 y mayo de 2026.

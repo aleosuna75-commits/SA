@@ -1,0 +1,147 @@
+--- ORIGINAL/reforecastRRC_v10_Esc1_ocl.py
++++ ACTUALIZADO/reforecastRRC_v11_Esc1_ocl.py
+@@ -1,4 +1,21 @@
+ #RESREVA RRC
++#
++# v11 — FND CALIBRADO (MEC v3). Qué cambió y por qué:
++#   El FND de la prima PROPORCIONAL y FACULTATIVA deja de leerse de los diccionarios
++#   xPND / xPND2 escritos a mano y sale de la tabla calibrada del MEC, indexada por
++#   ANTIGÜEDAD DE REGISTRO k = mes de valuación − CALMONTH, con un desplazamiento δ
++#   por ramo. Se validó contra la prima devengada real (prima emitida − ΔRRC bruta,
++#   con los saldos de la base BEL-IRR-MR): la RRC real queda reproducida con error
++#   medio mensual de 3.1% y la prima devengada anual con error de −2.3% (2023),
++#   +1.4% (2024), +0.7% (2025) y +1.2% (2026 ene–may).
++#   El NO PROPORCIONAL (TipoRea 2) NO cambia: sigue con prorrata exacta por fechas.
++#   Con USAR_FND_CALIBRADO = False el script se comporta exactamente como la v10.
++#
++# PENDIENTE DE VERIFICAR (ver FILTRO_ANIO_SUSC más abajo): el WHERE de la consulta a
++#   Gonzalo excluye la prima positiva registrada en un año calendario posterior al de
++#   suscripción. Reproducido en la validación, ese filtro deja la RRC en el 29% de la
++#   real. Confírmese contra el campo Susc de SIREC antes de cerrar el próximo cierre.
++#
+ #Escenario 0 -> LISTO -> Año Base (202412 real) 
+ #Escenario 1 -> LISTO -> Presupuesto (dls) usando tc real para los meses que ya se tienen y usar el tc ppto para el resto
+ #Escenario 2 -> Usar función real para los meses reales y hacer proceso mensualizados para los meses que no se tienen, para tc usar el estimado ####AGREGAR LA FUNCIÓN DE LOS MENSUALIZADOS PARA EL RESTO DE MESES
+@@ -14,10 +31,36 @@
+ import numpy as np
+ import getpass
+ import os 
++import sys
+ usuario = getpass.getuser()
+ warnings.filterwarnings('ignore')
+ start_time = time.perf_counter()
+ 
++#%% FND CALIBRADO (MEC v3) — sustituye la búsqueda en xPND / xPND2
++# mec_devengamiento.py debe estar en esta misma carpeta.
++_DIR = os.path.dirname(os.path.abspath(__file__))
++if _DIR not in sys.path:
++    sys.path.insert(0, _DIR)
++import mec_devengamiento as mec
++
++USAR_FND_CALIBRADO = True   # False -> comportamiento idéntico a la v10 (xPND)
++FILTRO_ANIO_SUSC   = True   # True = como la v10. Ponerlo en False para medir el
++                            # efecto del filtro «Val(left(aPog_MesProc,4)) <= Susc»
++DELTA_FND = mec.cargar_delta(_DIR)      # lee delta_calibrado.json si existe
++MES_VALUACION = None                    # AAAAMM de la valuación; se fija por escenario
++
++
++def fnd_cal(ramo, calmonth, valorfrec_legado=0.0):
++    """FND de una cuenta proporcional/facultativa: tabla calibrada por antigüedad de
++    REGISTRO respecto al mes de valuación. `valorfrec_legado` es el valor de xPND que
++    se usaría hoy; se devuelve si el FND calibrado está desactivado o falta el mes."""
++    if not USAR_FND_CALIBRADO or MES_VALUACION is None:
++        return valorfrec_legado
++    k = mec.antiguedad_registro(MES_VALUACION, calmonth)
++    if k is None:
++        return valorfrec_legado
++    return 0.0 if k < 0 else mec.fnd_registro(ramo, k, DELTA_FND)
++
+ #%% TABLAS CSV
+ xFolder = fr"C:\Users\{usuario}\OneDrive - GPV\Documentos"
+ 
+@@ -232,9 +275,14 @@
+     
+     xTabla = "From dbo_aMOG_MovGonzalo "
+ 
++    # Filtro de año de suscripción: deja fuera la prima POSITIVA registrada en un año
++    # calendario posterior al de suscripción. Es el candidato principal a la desviación
++    # contra la nota técnica (ver cabecera); se conmuta con FILTRO_ANIO_SUSC.
++    xSusc = ("  and ((Val(PriTomOri5)+Val(PriTomEnCOri5)+Val(PriTomReCOri5) < 0) "
++             "or (Val(left(aPog_MesProc,4)) <= Susc) ) ") if FILTRO_ANIO_SUSC else " "
+     xWhere = f" Where ((Val(aPog_MesProc) > {AuxMesI} and Val(aPog_MesProc) <= {AuxMesF})  or ( FinVig > {zFechaValuacion} and IniVig < {zFechaValuacion}))" \
+             f" and Tipo=5 and Ramo < 130 and Período <> 9  " \
+-                f"  and ((Val(PriTomOri5)+Val(PriTomEnCOri5)+Val(PriTomReCOri5) < 0) or (Val(left(aPog_MesProc,4)) <= Susc) ) " \
++                + xSusc + \
+                     f"and (aPOG_MesProc & '-' & cNAT_IdTPol & '-' & TipoRea & '-' & aPOG_Num not in ('{zLlavesPol}') ) "
+ 
+ 
+@@ -293,8 +341,11 @@
+     ConsultaR['BELMEDIA'] = ConsultaR.apply(lambda row: row['71'] if row['Ramo'] == 71 else (row['73'] if row['Ramo'] == 73 else row[f'IS Bel Media-12']), axis = 1)
+     ConsultaR = ConsultaR.drop(['71','73', f'IS Bel Media-12', 'IS Bel Media'], axis=1)
+     
++    # v11: FND por antigüedad de REGISTRO con δ del ramo (antes: xPND por CALMONTH y
++    # FRECUENCIA). La periodicidad de cuentas queda absorbida en δ.
+     ConsultaR['VALORFREC'] =  ConsultaR.apply(
+-    lambda row: xPND.get(row['CALMONTH'], 0).get(str(row['FRECUENCIA']), 0),
++    lambda row: fnd_cal(row['Ramo'], row['CALMONTH'],
++                        xPND.get(row['CALMONTH'], 0).get(str(row['FRECUENCIA']), 0)),
+     axis=1)
+ 
+     ConsultaR['PORC_ND'] = ConsultaR.apply(
+@@ -456,8 +507,10 @@
+     ConsultaPPTO['CESION'] = ConsultaPPTO.apply(lambda y:zPorcCesion(y['ZTIPOCES'], y[str(y['ZSUSCYEAR'])], y[str(y['ZSUSCYEAR'] * 100)], y['ZSUSCYEAR'], float(y['PRODUCT']), float(y['Porcentaje Cedido']), y['ZTIPOREAS']), axis=1)
+     ConsultaPPTO = ConsultaPPTO.drop(["71","73","2020","2021","2022","2023","2024", "2025", "2026", "2027", "2028", "2029", "202000","202100","202200","202300","202400","202500","202600","202700", "202800","202900", "Llave"], axis=1)
+    
++    # v11: mismo FND calibrado por antigüedad de registro (CALMONTH del presupuesto)
+     ConsultaPPTO['PORC_ND'] =  ConsultaPPTO.apply(
+-    lambda row: xPND2.get(row['CALMONTH'], 0).get(row['FRECUENCIA'], 2),axis=1)
++    lambda row: fnd_cal(row['Ramo'], row['CALMONTH'],
++                        xPND2.get(row['CALMONTH'], 0).get(row['FRECUENCIA'], 2)),axis=1)
+ 
+ 
+ 
+@@ -508,9 +561,14 @@
+     
+     xTabla = "From dbo_aMOG_MovGonzalo "
+ 
++    # Filtro de año de suscripción: deja fuera la prima POSITIVA registrada en un año
++    # calendario posterior al de suscripción. Es el candidato principal a la desviación
++    # contra la nota técnica (ver cabecera); se conmuta con FILTRO_ANIO_SUSC.
++    xSusc = ("  and ((Val(PriTomOri5)+Val(PriTomEnCOri5)+Val(PriTomReCOri5) < 0) "
++             "or (Val(left(aPog_MesProc,4)) <= Susc) ) ") if FILTRO_ANIO_SUSC else " "
+     xWhere = f" Where ((Val(aPog_MesProc) > {AuxMesI} and Val(aPog_MesProc) <= {AuxMesF})  or ( FinVig > {zFechaValuacion} and IniVig < {zFechaValuacion}))" \
+             f" and Tipo=5 and Ramo < 130 and Período <> 9  " \
+-                f"  and ((Val(PriTomOri5)+Val(PriTomEnCOri5)+Val(PriTomReCOri5) < 0) or (Val(left(aPog_MesProc,4)) <= Susc) ) " \
++                + xSusc + \
+                     f"and (aPOG_MesProc & '-' & cNAT_IdTPol & '-' & TipoRea & '-' & aPOG_Num not in ('{zLlavesPol}') ) "
+ 
+ 
+@@ -569,8 +627,11 @@
+     ConsultaR['BELMEDIA'] = ConsultaR.apply(lambda row: row['71'] if row['Ramo'] == 71 else (row['73'] if row['Ramo'] == 73 else row[f'IS Bel Media-{MES}']), axis = 1)
+     ConsultaR = ConsultaR.drop(['71','73', f'IS Bel Media-{MES}', 'IS Bel Media'], axis=1)
+     
++    # v11: FND por antigüedad de REGISTRO con δ del ramo (antes: xPND por CALMONTH y
++    # FRECUENCIA). La periodicidad de cuentas queda absorbida en δ.
+     ConsultaR['VALORFREC'] =  ConsultaR.apply(
+-    lambda row: xPND.get(row['CALMONTH'], 0).get(str(row['FRECUENCIA']), 0),
++    lambda row: fnd_cal(row['Ramo'], row['CALMONTH'],
++                        xPND.get(row['CALMONTH'], 0).get(str(row['FRECUENCIA']), 0)),
+     axis=1)
+ 
+     ConsultaR['PORC_ND'] = ConsultaR.apply(
+@@ -699,6 +760,7 @@
+         xAños[Meses - 1]: {'NA': 0.876712329, '1': 0.876712329, '2': 0.833333333, '3': 0.794520548, '6': 0.671232877, '0': 0.424657534, 'DEF': 0.794520548},
+         xAños[Meses]: {'NA': 0.95890411, '1': 0.95890411, '2': 0.916666667, '3': 0.876712329, '6': 0.753424658, '0': 0.506849315, 'DEF': 0.876712329}}
+ 
++    MES_VALUACION = Meses          # v11: el FND se corta en el mes de VALUACIÓN
+     df_Real_IS_Real = ConsultaReal(xRRC,xIS_CAT,mes_calculo)
+ 
+     ##Meses ppto escenario 2
+@@ -829,6 +891,7 @@
+     AuxMesI =  zAñoRef * 100
+     AuxMesF = zAñoRef * 100 + mes_calculo
+     print(f'Inicio cálculo escenario 4 para {Meses}')
++    MES_VALUACION = Mesesp         # v11: el escenario 4 valúa al cierre de diciembre
+     xReforecast_Real = ConsultaReal_USD(xRRC,xIS_CAT,mes_calculo)
+    
+     

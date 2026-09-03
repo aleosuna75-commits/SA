@@ -1,0 +1,135 @@
+--- ORIGINAL/construir input mec.py
++++ ACTUALIZADO/construir_input_mec.py
+@@ -14,6 +14,18 @@
+    - Input_MEC_Devengamiento.xlsx   (hojas: Input · Cobertura · Validaciones)
+    - TriangulosPrimaDevengada.csv   (lo que consume mec_devengamiento: unidad=LN2)
+ 
++ QUÉ CAMBIÓ EN ESTA VERSIÓN
++   El Input ahora arrastra tres campos que antes se leían y se tiraban, y sin los
++   cuales no se puede auditar el FND ni recalibrarlo:
++     · AnioSusc      (Año Susc.)              -> permite verificar el filtro
++                      «Val(left(aPog_MesProc,4)) <= Susc» del reforecast RRC, que en
++                      la validación deja la RRC en el 29% de la real.
++     · FinVigAAAAMM  (Fecha Fin de Vigencia)  -> separa la prorrata exacta del no
++                      proporcional de la tabla por antigüedad de registro.
++     · MesesPeriodo  (periodicidad de cuentas)-> separa la frecuencia del δ calibrado.
++   Los tres son OPCIONALES: si la BD no trae la columna, el campo queda vacío y todo
++   lo demás funciona igual.
++
+  Reglas clave:
+    · SOLO primas (candado): BD Tipo Póliza ∈ {PD,PF,PV}; herramienta cuenta 61 ×(−1)
+    · Origen 'Real' SOLO en la fuente BD con Periodo ≤ FRONTERA_REAL;
+@@ -164,8 +176,12 @@
+  'ZTIPVENTA','ZSEGMENTO','ZCICCULTV','/ERP/AMOUNT_T','/ERP/AMOUNT',
+  'MANDT','ZREGIONRP']
+ 
+-CANON = ['Fuente','LN2','Ramo','TipoRea','CohorteAnio','CohorteAAAAMM','Periodo',
+-         'Antiguedad','Origen','Moneda','PrimaDevMes','PrimaDevAcum']
++CANON = ['Fuente','LN2','Ramo','TipoRea','AnioSusc','CohorteAnio','CohorteAAAAMM',
++         'FinVigAAAAMM','MesesPeriodo','Periodo','Antiguedad','Origen','Moneda',
++         'PrimaDevMes','PrimaDevAcum']
++
++# Nombres posibles de la periodicidad de cuentas en la BD (se usa el primero que exista)
++COLS_FREC = ['Meses Periodo', 'Meses Período', 'Periodos', 'Períodos', 'Período', 'Periodo Cuentas']
+ 
+ REPORTE = []   # (regla, detalle, valor, severidad)
+ def rep(regla, detalle, valor, sev): REPORTE.append((regla, detalle, valor, sev))
+@@ -182,7 +198,16 @@
+     if faltan:
+         raise SystemExit(f"[input] A la hoja «BD» le faltan columnas: {faltan}\n"
+                          f"        Columnas que sí tiene: {cols}")
+-    bd = leer_excel(ruta, sheet_name=hoja, usecols=use)
++    # opcionales: fin de vigencia y periodicidad de cuentas (si no están, quedan vacías)
++    col_fin = 'Fecha Fin de Vigencia' if 'Fecha Fin de Vigencia' in cols else None
++    col_frec = next((c for c in COLS_FREC if c in cols), None)
++    if col_fin is None:
++        rep('V12', 'Fecha Fin de Vigencia en la BD', 'ausente',
++            'Advertencia — sin ella no se puede separar la prorrata del no proporcional')
++    if col_frec is None:
++        rep('V13', f'Periodicidad de cuentas en la BD (busqué {COLS_FREC})', 'ausente',
++            'Advertencia — la frecuencia queda absorbida en el δ calibrado')
++    bd = leer_excel(ruta, sheet_name=hoja, usecols=use + [c for c in (col_fin, col_frec) if c])
+     n0 = len(bd)
+     prim = bd[bd['Tipo Poliza'].astype(str).str.startswith('P')].copy()
+     rep('V2','Filas excluidas por no ser primas (S*/R*/OD/«20») — fuente BD', n0-len(prim), 'OK (candado)')
+@@ -195,9 +220,18 @@
+             'Bloqueante aplicada')
+     prim = prim[~sin_iv].copy(); iv = iv[~sin_iv]
+     prim['CohorteAAAAMM'] = (iv.dt.year * 100 + iv.dt.month).astype(int)
++    prim['AnioSusc'] = pd.to_numeric(prim['Año Susc.'], errors='coerce')
++    if col_fin is not None:
++        fv = _a_fecha_serie(prim[col_fin])
++        prim['FinVigAAAAMM'] = (fv.dt.year * 100 + fv.dt.month)
++    else:
++        prim['FinVigAAAAMM'] = np.nan
++    prim['MesesPeriodo'] = pd.to_numeric(prim[col_frec], errors='coerce') if col_frec else np.nan
+     monto = 'PrimasNal' if MONEDA == 'Nal' else 'Primas USD'
+-    g = (prim.groupby(['LN2','Ramo','Tipo Rea','CohorteAAAAMM','Periodo'], as_index=False)[monto]
+-             .sum().rename(columns={'Tipo Rea':'TipoRea','Periodo':'Periodo', monto:'PrimaDevMes'}))
++    # dropna=False: si algún campo opcional viene vacío, la fila NO se pierde
++    llaves = ['LN2','Ramo','Tipo Rea','AnioSusc','CohorteAAAAMM','FinVigAAAAMM','MesesPeriodo','Periodo']
++    g = (prim.groupby(llaves, as_index=False, dropna=False)[monto]
++             .sum().rename(columns={'Tipo Rea':'TipoRea', monto:'PrimaDevMes'}))
+     g['Fuente'] = 'BD'
+     print(f"[input]   {len(bd):,} filas · {len(prim):,} de primas · {len(g):,} filas agregadas · "
+           f"cohortes MENSUALES por inicio de vigencia")
+@@ -216,6 +250,11 @@
+     use = ['Ramo','Tipo Poliza','Fecha Inicio de Vigencia','Fecha Fin de Vigencia',
+            'PrimasNal','Primas USD']
+     cols = list(leer_excel(ruta, sheet_name=hoja, nrows=0).columns)
++    # Tipo Rea se arrastra para poder separar el no proporcional (prorrata exacta) del
++    # proporcional y facultativo (tabla por antigüedad de registro). Es opcional: el
++    # módulo MEC sólo exige Ramo | ini | fin | Prima.
++    if 'Tipo Rea' in cols:
++        use = use + ['Tipo Rea']
+     faltan = [c for c in use if c not in cols]
+     if faltan:
+         print(f"[input] Aviso: sin columnas {faltan}; no se puede generar el archivo de vigencias.")
+@@ -231,8 +270,9 @@
+         f"{int(ok.sum()):,} de {len(p):,} ({ok.mean():.1%})",
+         'OK' if ok.mean() >= 0.95 else 'Advertencia — revisar fechas')
+     p = p[ok]
+-    g = (p.groupby(['Ramo', 'ini', 'fin'], as_index=False)[monto]
+-           .sum().rename(columns={monto: 'Prima'}))
++    llaves = ['Ramo', 'ini', 'fin'] + (['Tipo Rea'] if 'Tipo Rea' in p.columns else [])
++    g = (p.groupby(llaves, as_index=False, dropna=False)[monto]
++           .sum().rename(columns={monto: 'Prima', 'Tipo Rea': 'TipoRea'}))
+     x = _guardar_seguro(lambda ruta_out: g.to_csv(ruta_out, index=False),
+                         os.path.join(RUTA_SALIDA, 'Registros_Vigencia_MEC.csv'), "Vigencias")
+     print(f"[input]   Vigencias: {len(g):,} combinaciones (Ramo × vigencia) · "
+@@ -263,10 +303,14 @@
+         df['Ramo'] = 0    # por asignar vía catálogo Subramo (CeBe) — no bloquea el input por LN2
+     # La herramienta solo trae AÑO de suscripción -> cohorte anclada a ENERO (AAAA01).
+     df['CohorteAAAAMM'] = pd.to_numeric(df['ZSUSCYEAR'], errors='coerce') * 100 + 1
++    df['AnioSusc'] = pd.to_numeric(df['ZSUSCYEAR'], errors='coerce')
++    df['FinVigAAAAMM'] = np.nan      # la herramienta no trae vigencia por registro
++    df['MesesPeriodo'] = np.nan      # ni periodicidad de cuentas
+     df['Periodo'] = pd.to_numeric(df['0CALMONTH'], errors='coerce')
+     # SOLO se usa la proyección de suscripción para la VENTANA Ppto (jul–dic del año frontera).
+     df = df[(df['Periodo'] >= VENTANA_PPTO[0]) & (df['Periodo'] <= VENTANA_PPTO[1])]
+-    g = (df.groupby(['LN2','Ramo','ZTIPOREAS','CohorteAAAAMM','Periodo'], as_index=False)['PrimaDevMes'].sum()
++    g = (df.groupby(['LN2','Ramo','ZTIPOREAS','AnioSusc','CohorteAAAAMM','FinVigAAAAMM',
++                     'MesesPeriodo','Periodo'], as_index=False, dropna=False)['PrimaDevMes'].sum()
+            .rename(columns={'ZTIPOREAS':'TipoRea'}))
+     g['Fuente'] = f'{fuente_tag}-{ln}'
+     print(f"[input]   {os.path.basename(path)} -> {ln} · {len(g)} filas en ventana Ppto {VENTANA_PPTO[0]}–{VENTANA_PPTO[1]}")
+@@ -312,6 +356,9 @@
+ # ====================== DERIVADOS Y VALIDACIONES ============================
+ def derivar(df):
+     df = df.copy()
++    for c in ('AnioSusc', 'FinVigAAAAMM', 'MesesPeriodo'):   # por si una fuente no los trae
++        if c not in df.columns:
++            df[c] = np.nan
+     df['CohorteAAAAMM'] = pd.to_numeric(df['CohorteAAAAMM'], errors='coerce').fillna(0).astype(int)
+     df['Periodo'] = pd.to_numeric(df['Periodo'], errors='coerce').fillna(0).astype(int)
+     df['CohorteAnio'] = df['CohorteAAAAMM'] // 100
+@@ -337,7 +384,8 @@
+     return df[CANON]
+ 
+ def validar(df):
+-    dup = df.duplicated(subset=['Fuente','LN2','Ramo','TipoRea','CohorteAAAAMM','Periodo']).sum()
++    dup = df.duplicated(subset=['Fuente','LN2','Ramo','TipoRea','AnioSusc','CohorteAAAAMM',
++                                'FinVigAAAAMM','MesesPeriodo','Periodo']).sum()
+     rep('V1','Llaves duplicadas', int(dup), 'OK' if dup==0 else 'BLOQUEANTE — revisar agregación')
+     rep('V5','Moneda única de la corrida', df['Moneda'].nunique(), 'OK' if df['Moneda'].nunique()==1 else 'BLOQUEANTE')
+     reales = df[df['Origen']=='Real']
