@@ -11,7 +11,7 @@ Todos los cambios de comportamiento vienen con interruptor: `USAR_FND_CALIBRADO 
 | `mec_devengamiento.py` | mismo nombre (v2 → v3) | +178 / −30 |
 | `reforecastRRC_v11_Esc1_ocl.py` | `reforecastRRC_v10_Esc1_ocl.py` | +68 / −5 |
 | `ReforecastSONR_v4.py` | `ReforecastSONR_v3.py` | +69 / −8 |
-| `construir_input_mec.py` | `construir input mec.py` | +55 / −9 |
+| `construir_input_mec.py` | `construir input mec.py` | +305 / −43 |
 | `generar_output_mec.py` | `generar output mec.py` | +7 / −3 |
 | `test_integracion_fnd.py` | nuevo (prueba de regresión) | — |
 
@@ -63,6 +63,17 @@ Arrastra al Input tres campos que antes se leían y se tiraban, y sin los cuales
 - `MesesPeriodo` (periodicidad de cuentas) — separa la frecuencia del δ calibrado en la próxima recalibración.
 
 Los tres son opcionales: si la BD no trae la columna, el campo queda vacío, se reporta en Validaciones (`V12`, `V13`) y todo lo demás funciona igual. La periodicidad se busca entre varios nombres posibles (`Meses Periodo`, `Periodos`, `Período`…) porque el nombre exacto varía entre bases. Los `groupby` de las tres fuentes llevan `dropna=False` para que una fila con un campo opcional vacío no se pierda, `CANON` incorpora las tres columnas y la validación `V1` de duplicados usa el grano nuevo. `Registros_Vigencia_MEC.csv` arrastra además `TipoRea` cuando existe.
+
+### 4b. Corte del año: real enero–julio 2026 + FCST agosto–diciembre 2026
+
+`construir_input_mec.py` ahora arma el input con dos fuentes y `FRONTERA_REAL = 202607`, `VENTANA_PPTO = (202608, 202612)`:
+
+- **Detección de encabezado.** Ni `BDReal26.xlsx` ni `FCST2026.xlsx` se podían leer: traen filas de títulos y totales antes del encabezado (fila 2 y fila 3), y el script abortaba diciendo que faltaban columnas. `detectar_header` y `hoja_datos` ahora lo buscan en las primeras filas.
+- **Nueva fuente `fuente_fcst()`.** Lee la hoja `Ppto2026`, convierte de USD a la moneda del input con el TC de cierre mensual (`cargar_tc`, que prioriza `tc_mensual_bd.csv`), homologa los subramos del FCST al grano de la BD (31/35/39 → 30, 71/73 → 70) y devuelve sólo los meses de la ventana. `localizar_fcst()` lo encuentra por patrón de nombre.
+- **Candado de vigencias.** `Registros_Vigencia_MEC.csv` ya no se sobrescribe cuando la BD cubre menos de `MESES_MIN_VIGENCIAS` (24) meses de registro: se guarda aparte y se avisa, porque la curva PF+ del no proporcional se estima de ese archivo.
+- **Validaciones nuevas.** `V9` presupuesto contra realidad en el traslape, `V14` subramos colapsados, `V16` conversión de moneda, `V17` qué meses aporta cada fuente y si el año quedó con huecos, `V18` cobertura del histórico de vigencias, `V19` años de suscripción del FCST.
+
+Resultado de la corrida: 13,255 M MXN reales (enero–julio) + 9,072 M proyectados (agosto–diciembre) = 22,327 M en 2026, sin meses faltantes. El detalle y las cuatro advertencias que dejó la corrida están en `input_mec_2026/LEEME.md`.
 
 ## 5. `generar_output_mec.py`
 
