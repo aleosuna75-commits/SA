@@ -4,7 +4,7 @@ Planeación Financiera (BP&A) · Reaseguradora Patria · septiembre 2026
 
 ## Conclusión
 
-**El MEC v2 tal como está publicado (FND por prorrata de vigencias, indexado desde el inicio de vigencia) no cuadra con la prima devengada real: reproduce sólo el 22% de la RRC real y sobreestima la prima devengada tomada entre 2.6% y 8.4% al año.** La RRC real (base BEL-IRR-MR) devenga la prima proporcional y facultativa por **antigüedad de registro** con la recta de la Nota Técnica, y cerca del 69% de la prima de Patria se registra en un año calendario posterior al de su inicio de vigencia, así que "antigüedad desde la vigencia" y "antigüedad desde el registro" son dos mundos distintos.
+**El MEC v2 tal como está publicado (FND por prorrata de vigencias, indexado desde el inicio de vigencia) no cuadra con la prima devengada real: reproduce sólo el 25.5% de la RRC real y sobreestima la prima devengada tomada entre 2.6% y 8.4% al año.** La RRC real (base BEL-IRR-MR) devenga la prima proporcional y facultativa por **antigüedad de registro** con la recta de la Nota Técnica, y cerca del 69% de la prima de Patria se registra en un año calendario posterior al de su inicio de vigencia, así que "antigüedad desde la vigencia" y "antigüedad desde el registro" son dos mundos distintos.
 
 **Recalibrado el FND sobre la antigüedad de registro, con un desplazamiento δ por ramo (regla M4 del propio MEC), el modelo reproduce la RRC real con error medio mensual del 3.1% y la prima devengada anual con error de −2.3% (2023), +1.4% (2024), +0.7% (2025) y +1.2% (2026 ene–may), tanto tomada como retenida.** El no proporcional conserva la prorrata exacta por fechas.
 
@@ -23,12 +23,14 @@ Como todo lo que no es FND se toma del real, la razón RRC modelo / RRC real es 
 
 ## Resultados
 
-Razón Σ prima no devengada modelo / real y error absoluto medio mensual, 202301–202605 (CAT desde 202401):
+Razón Σ prima no devengada modelo / real y error absoluto medio mensual, 202301–202605 (CAT desde 202401).
+El peso es la participación en la PND real sobre la ventana común 202301–202605, así que suma 100%: **el ramo más
+pesado es Incendio (31.9%), no CAT (29.8%)**.
 
 | Ramo | Peso en RRC | NT por registro (mensual) | NT por registro (trimestral) | MEC publicado (cohorte vigencia) | **Calibrado δ** | MAPE calibrado |
 |---|---|---|---|---|---|---|
 | Incendio | 32% | 0.997 | 0.868 | 0.164 | **0.997** | 2.4% |
-| CAT (71+73) | 32% | 0.950 | 0.842 | 0.253 | **1.003** | 5.2% |
+| CAT (71+73) | 30% | 0.950 | 0.842 | 0.253 | **1.003** | 5.2% |
 | MyT | 10% | 0.987 | 0.846 | 0.145 | **1.005** | 5.2% |
 | Diversos | 8% | 1.006 | 0.859 | 0.117 | **1.006** | 5.1% |
 | Vida | 7% | 1.161 | 1.065 | 0.423 | **1.016** | 10.1% |
@@ -38,6 +40,13 @@ Razón Σ prima no devengada modelo / real y error absoluto medio mensual, 20230
 | Agro | 2% | 1.186 | 1.008 | 0.179 | **0.968** | 8.5% |
 | Crédito | 1% | 0.866 | 0.740 | 0.071 | **0.995** | 8.7% |
 | **Total** | | **0.993** | 0.871 | **0.218** | **0.989** | **3.1%** |
+
+**Sobre la columna «MEC publicado».** Esos ratios son los de la reconstrucción del banco, que usa los vectores PF+ a
+72 meses con la cola a cero. El MEC v2 publicado los trunca a 24 (`HORIZONTE = 24`) y **sostiene `vec[23]` de ahí en
+adelante** (`TablaFND.factor`), lo que le da un piso permanente en todos los ramos. Reproducida la regla publicada al
+pie de la letra, el ratio total sube de **0.218 a 0.255** y los de ramo a: Incendio 0.189, CAT 0.275, MyT 0.167,
+Diversos 0.152, Vida 0.625, AyE 0.360, RC 0.169, Autos 0.470, Agro 0.268, Crédito 0.090. La conclusión no cambia
+—el MEC publicado reproduce alrededor de un cuarto de la RRC real— pero la cifra a citar es **25.5%, no 22%**.
 
 Prima devengada del total de la cartera (USD), real vs modelo:
 
@@ -50,13 +59,17 @@ Prima devengada del total de la cartera (USD), real vs modelo:
 
 En MXN, 2025: prima devengada tomada real 18,375 M vs calibrado 18,539 M (+0.9%) vs MEC publicado 19,060 M (+3.7%); retenida real 13,278 M vs calibrado 13,403 M (+0.9%).
 
-Saldo al 202605 (USD): RRC bruta real 370.4 M, calibrado 360.3 M (−2.7%), MEC publicado 88.1 M (−76%). RRC neta real 247.8 M, calibrado 241.6 M, MEC publicado 54.5 M. Adoptar el MEC publicado liberaría del orden de 280 M USD (≈ 4,900 M MXN) de reserva bruta.
+Saldo al 202605 (USD): RRC bruta real 370.4 M, calibrado 360.3 M (−2.7%), MEC publicado **107.8 M (−70.9%)**. Adoptar el MEC publicado liberaría **262.5 M USD (≈ 4,553 M MXN)** de reserva bruta.
 
 ## Por qué el MEC publicado no cuadra
 
 1. En la BD del MEC, la prima se registra con mucho rezago respecto a su vigencia: 8% en el mes de inicio, 14% entre 6 y 8 meses después, 17% entre 9 y 11, 28% entre 12 y 17 y 20% a 18 meses o más. El 69% de la prima (79% del proporcional) se registra en un año calendario posterior al de inicio de vigencia.
 2. El MEC v2 asigna a esa prima el FND de su cohorte de vigencia, que ya es cero o casi cero cuando se registra. La RRC real, en cambio, la devenga como riesgo nuevo desde el mes de registro (recta de 24-avos de la Nota Técnica). Es la misma lógica de `xPND[CALMONTH]` de los reforecast, y los datos lo confirman: para Incendio, MyT, Diversos y RC la NT mensual por registro reproduce la RRC real con δ = 0.
-3. La prorrata exacta por fechas sí es la regla correcta para el no proporcional (TipoRea 2), que es donde el reforecast ya la aplica.
+3. La prorrata exacta por fechas sí es la regla correcta para el no proporcional (TipoRea 2), **excepto CAT**: en el
+   reforecast la rama `Ramo in [71, 73] → VALORFREC` se evalúa **antes** que la de `TipoRea == 2`, así que el CAT no
+   proporcional nunca llega a la prorrata y se devenga por `xPND`. CAT es el 49.3% de la prima TipoRea 2, de modo que
+   la prorrata cubre el **6.8%** de la prima en USD, no el 13.4% que es el TipoRea 2 completo. Es una razón más para
+   mirar CAT aparte.
 
 Nota metodológica: la prorrata por vigencia es la visión económica del riesgo corrido; la RRC real refleja la regla regulatoria de registro. Para que el modelo cuadre con la prima devengada contable hay que reproducir la regla regulatoria, y ese es el objetivo que se pidió aquí.
 
