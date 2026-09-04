@@ -1,0 +1,326 @@
+--- ORIGINAL/mec_devengamiento.py (v2)
++++ ACTUALIZADO/mec_devengamiento.py (v3)
+@@ -1,8 +1,42 @@
+ # -*- coding: utf-8 -*-
+ """
+ ================================================================================
+- mec_devengamiento.py  ·  v2  ·  Método de Emergencia por Cohortes (MEC)
++ mec_devengamiento.py  ·  v3  ·  Método de Emergencia por Cohortes (MEC)
+  FRAMEWORK MODULAR — SOLO PARA EL FACTOR DE NO DEVENGAMIENTO (FND)
++
++ QUÉ CAMBIÓ EN LA v3 (validación contra la prima devengada REAL)
++ ---------------------------------------------------------------
++ Se validó la v2 contra la prima devengada real (prima emitida − ΔRRC bruta;
++ prima retenida − ΔRRC neta, con los saldos de la base BEL-IRR-MR) y NO cuadra:
++ reproducía el 22% de la RRC real y sobreestimaba la prima devengada entre 2.6% y
++ 8.4% al año. La causa está medida:
++
++   · El 69% de la prima de Patria (79% del proporcional) se REGISTRA en un año
++     calendario posterior al de su inicio de vigencia. La v2 le asigna el FND de su
++     cohorte de vigencia, que ya es ~0 cuando la cuenta llega.
++   · La RRC real devenga esa prima como riesgo NUEVO desde el mes de registro, con
++     la recta de 24-avos de la Nota Técnica (misma lógica de xPND[CALMONTH]).
++   · Verificado por ramo: con antigüedad de REGISTRO y δ=0, Incendio, Diversos, RC y
++     MyT reproducen la RRC real (ratio 0.99–1.01, error medio mensual 2.4%–5.2%).
++
++ Por eso el FND de PROPORCIONAL y FACULTATIVO (TipoRea 1 y 3) se indexa por
++ ANTIGÜEDAD DE REGISTRO y su único parámetro por ramo es el desplazamiento δ de la
++ regla M4 (frecuencia de cuentas):
++
++       FND_ramo(k_reg) = min(1, max(0, NT(k_reg) − δ_ramo)),  k_reg = 0..11
++
++ El NO PROPORCIONAL (TipoRea 2) conserva la prorrata exacta por fechas de vigencia
++ (M2), que es donde esa regla sí describe al negocio.
++
++ Ajuste logrado (202301–202605): RRC real reproducida con error medio mensual de
++ 3.1%; prima devengada anual con error de −2.3% (2023), +1.4% (2024), +0.7% (2025)
++ y +1.2% (2026 ene–may), tanto tomada como retenida.
++
++ ALCANCE (candado, sin cambios): esto sustituye SOLO la fuente del FND. FS/BELMEDIA,
++ el desarrollo de siniestros (1−LAG), el margen de riesgo, el IRR y el índice se
++ mantienen con el método vigente.
++
++ --- Documentación de la v2 (la prorrata sigue vigente para el no proporcional) ---
+ --------------------------------------------------------------------------------
+  Planeación Financiera (BP&A) · Reaseguradora Patria (GPV)
+ 
+@@ -77,6 +111,29 @@
+     # AJUSTAR si el catálogo de la casa usa otra codificación.
+     FREC_MESES = {1: 1, 2: 3, 3: 4, 4: 6, 5: 12}
+ 
++    # --- v3: FND calibrado por antigüedad de REGISTRO (proporcional y facultativo) ---
++    COL_TIPOREA = "TipoRea"       # 1 proporcional · 2 no proporcional · 3 facultativo
++    USAR_CALIBRADO = True         # False -> comportamiento v2 (todo por cohorte de vigencia)
++    ARCHIVO_DELTA = "delta_calibrado.json"   # opcional: recalibración sin tocar código
++
++    # δ por ramo, ajustado por mínimos cuadrados contra la prima no devengada real
++    # (base BEL-IRR-MR, 202301–202605; CAT desde 202401 por el índice TEV/Hidro).
++    # δ es el desplazamiento de la regla M4: δ = (t−1)/2 · 30/365, t = meses de cuenta.
++    DELTA_RAMO = {
++        10: 0.070,    # Vida                       ~trimestral
++        30: 0.045,    # Accidentes y Enfermedades  ~bimestral
++        40: 0.000,    # Responsabilidad Civil      NT mensual
++        50: -0.010,   # Marítimo y Transportes     NT mensual
++        60: 0.000,    # Incendio                   NT mensual
++        70: -0.035,   # Terremoto / Cat            ligeramente sobre NT mensual
++        80: 0.095,    # Agrícola                   ~trimestral-cuatrimestral
++        90: 0.130,    # Automóviles                ~cuatrimestral
++        100: -0.085,  # Crédito                    sobre NT mensual (ramo de bajo peso)
++        110: 0.000,   # Diversos                   NT mensual
++    }
++    # subramos del catálogo SIREC que caen en cada ramo de la tabla
++    SUBRAMO_A_RAMO = {20: 10, 31: 30, 34: 30, 35: 30, 37: 30, 39: 30, 71: 70, 73: 70}
++
+ 
+ # =============================================================================
+ # M1 · DATOS — registros de prima con vigencia real
+@@ -269,7 +326,86 @@
+     vectores oficiales NT (diferencia 0.000000) en trimestral (30 días),
+     cuatrimestral (45), semestral (75) y anual (165)."""
+     desp = (meses_cuenta - 1) / 2 * cfg.DIAS_MES / cfg.DIAS_ANIO
+-    return np.maximum(0.0, np.asarray(vec, dtype=float) - desp)
++    # se acota a [0, 1]: un desplazamiento negativo (δ<0) no puede pasar del 100%
++    return np.clip(np.asarray(vec, dtype=float) - desp, 0.0, 1.0)
++
++
++# =============================================================================
++# M4b · REGISTRO — FND calibrado por antigüedad de REGISTRO   <- LA BASE DE LA v3
++# =============================================================================
++# Recta de la Nota Técnica (24-avos) por antigüedad de registro k = 0..11, donde
++# k = 0 es el propio mes en que la cuenta entra. Es la tabla xPND 'NA' de los
++# reforecast, verificada contra los vectores oficiales NT.
++NT_MENSUAL = np.array([0.95890411, 0.876712329, 0.791780822, 0.706849315,
++                       0.624657534, 0.539726027, 0.457534247, 0.37260274,
++                       0.295890411, 0.210958904, 0.126027397, 0.043835616])
++
++
++def cargar_delta(ruta_o_dir, cfg: ConfigMEC = ConfigMEC()) -> dict:
++    """Lee δ por ramo del JSON de la recalibración (validar_prima_devengada.py).
++    Si no existe, devuelve el δ de ConfigMEC. Así una recalibración trimestral no
++    exige tocar código: se sustituye el JSON y se vuelve a correr."""
++    import json
++    ruta = ruta_o_dir
++    if os.path.isdir(str(ruta_o_dir)):
++        ruta = os.path.join(ruta_o_dir, cfg.ARCHIVO_DELTA)
++    if not os.path.exists(str(ruta)):
++        return dict(cfg.DELTA_RAMO)
++    GRUPO = {"Vida": 10, "AyE": 30, "RC": 40, "MyT": 50, "Incendio": 60,
++             "CAT": 70, "Agro": 80, "Autos": 90, "Credito": 100, "Diversos": 110}
++    with open(ruta, encoding="utf-8") as f:
++        d = json.load(f)
++    out = dict(cfg.DELTA_RAMO)
++    for k, v in d.items():
++        r = GRUPO.get(k, _int_o_none(k))
++        if r is not None:
++            out[int(r)] = float(v)
++    return out
++
++
++def ramo_de_tabla(ramo, cfg: ConfigMEC = ConfigMEC()):
++    """Colapsa el subramo del catálogo al ramo de la tabla de δ (31->30, 71->70…)."""
++    r = _int_o_none(ramo)
++    return None if r is None else cfg.SUBRAMO_A_RAMO.get(r, r)
++
++
++def antiguedad_registro(mes_valuacion, mes_registro) -> int | None:
++    """k_reg = meses entre el mes CONTABLE DE REGISTRO de la cuenta y el mes de
++    VALUACIÓN. Ojo: en los reforecast el mes de registro es CALMONTH
++    (aPog_MesProc) y el de valuación es la variable `Meses`; no son lo mismo."""
++    try:
++        a, b = int(mes_valuacion), int(mes_registro)
++    except Exception:
++        return None
++    return (a // 100 - b // 100) * 12 + (a % 100 - b % 100)
++
++
++def vector_registro(ramo, delta: dict | None = None, horizonte: int = 24,
++                    cfg: ConfigMEC = ConfigMEC()) -> np.ndarray:
++    """Vector FND del ramo por antigüedad de registro, con cola en CERO."""
++    d = (delta or cfg.DELTA_RAMO).get(ramo_de_tabla(ramo, cfg), 0.0)
++    v = np.zeros(int(horizonte))
++    v[:12] = np.clip(NT_MENSUAL - d, 0.0, 1.0)
++    return v
++
++
++def fnd_registro(ramo, k_reg, delta: dict | None = None,
++                 cfg: ConfigMEC = ConfigMEC()) -> float:
++    """FND de una cuenta proporcional/facultativa registrada hace k_reg meses."""
++    if k_reg is None or k_reg < 0 or k_reg >= 12:
++        return 0.0
++    d = (delta or cfg.DELTA_RAMO).get(ramo_de_tabla(ramo, cfg), 0.0)
++    return float(np.clip(NT_MENSUAL[int(k_reg)] - d, 0.0, 1.0))
++
++
++def tabla_registro(delta: dict | None = None, horizonte: int = 12,
++                   cfg: ConfigMEC = ConfigMEC()) -> pd.DataFrame:
++    """Tabla publicable ramo × antigüedad de registro (el objeto que consume RRC)."""
++    d = delta or cfg.DELTA_RAMO
++    t = pd.DataFrame({r: vector_registro(r, d, horizonte, cfg) for r in sorted(d)}).T
++    t.columns = [f"k={k}" for k in range(int(horizonte))]
++    t.index.name = "Ramo"
++    return t
+ 
+ 
+ # =============================================================================
+@@ -305,19 +441,23 @@
+         return None
+ 
+ 
+-def fnd_exacto(inivig, finvig, calmonth, cfg: ConfigMEC = ConfigMEC()):
++def fnd_exacto(inivig, finvig, mes_valuacion, cfg: ConfigMEC = ConfigMEC()):
+     """FND EXACTO de un registro: fracción de SU vigencia no expirada al cierre del
+-    mes contable. No usa vectores ni promedios, así que no arrastra error de mezcla.
++    MES DE VALUACIÓN. No usa vectores ni promedios, así que no arrastra error de
++    mezcla. Es la regla del no proporcional (TipoRea 2).
++
++    OJO (corregido en v3): el corte es el mes de VALUACIÓN, no el CALMONTH del
++    registro. En los reforecast CALMONTH es el mes contable en que entró la cuenta
++    (aPog_MesProc); pasarlo como corte hace que cada registro se valúe en su propio
++    mes y no en la fecha de valuación.
+ 
+-    Se midió sobre la cartera real que aproximar con un vector por ramo x antiguedad
+-    deja un sesgo del orden de 5% en la reserva, mientras que esta vía es exacta.
+     Devuelve None si falta alguna fecha (entonces se cae al vector)."""
+     ini = _a_fecha_libre(inivig)
+     fin = _a_fecha_libre(finvig)
+     if ini is None or fin is None:
+         return None
+     try:
+-        cal = int(calmonth)
++        cal = int(mes_valuacion)
+     except Exception:
+         return None
+     corte = pd.Timestamp(year=cal // 100, month=cal % 100, day=1) + pd.offsets.MonthEnd(0)
+@@ -365,11 +505,12 @@
+         except Exception:
+             return None
+ 
+-    def antiguedad_de_row(self, row) -> int | None:
+-        """Antigüedad = meses entre el inicio de vigencia y el mes contable."""
++    def antiguedad_de_row(self, row, mes_valuacion=None) -> int | None:
++        """Antigüedad de COHORTE = meses entre el inicio de vigencia y el mes de
++        valuación (si no se pasa, el mes contable del registro, como en la v2)."""
+         cfg = self.cfg
+         try:
+-            cal = int(row[cfg.COL_CALMONTH])
++            cal = int(mes_valuacion if mes_valuacion is not None else row[cfg.COL_CALMONTH])
+         except Exception:
+             return None
+         iv = self._a_fecha(row[cfg.COL_INIVIG]) if cfg.COL_INIVIG in getattr(row, "index", row) else None
+@@ -396,7 +537,9 @@
+         k = int(antiguedad)
+         if k < 0:
+             return fallback
+-        return float(vec[-1]) if k >= len(vec) else float(vec[k])
++        # cola en CERO (v3): antes devolvía vec[-1], que dejaba un FND residual
++        # permanente (4.3% en Vida con horizonte 24) para antigüedades muy altas.
++        return 0.0 if k >= len(vec) else float(vec[k])
+ 
+ 
+ def m6_publicar(vectores: dict, cartera, decisiones: dict,
+@@ -446,28 +589,51 @@
+ # API DE INTEGRACIÓN — reemplaza la búsqueda en xPND dentro de los reforecast
+ # =============================================================================
+ def factor_no_devengado(tabla: TablaFND, row, fallback_value: float,
+-                        cfg: ConfigMEC = ConfigMEC()) -> float:
+-    """Para el RRC. El llamador pasa el VALOR LEGADO EXACTO en `fallback_value`
+-    (p. ej. xPND.get(...).get(...)), de modo que si la tabla no aplica, el
+-    comportamiento es idéntico al de hoy."""
+-    if not tabla.activa:
+-        return fallback_value
++                        cfg: ConfigMEC = ConfigMEC(), mes_valuacion=None,
++                        fecha_valuacion=None, delta: dict | None = None) -> float:
++    """Para el RRC. Sustituye la búsqueda en xPND dentro de ConsultaReal*.
++
++    Jerarquía (v3):
++      1. NO PROPORCIONAL (TipoRea 2) con sus dos fechas -> prorrata EXACTA al mes de
++         valuación. Es la regla que la RRC real aplica a ese negocio.
++      2. PROPORCIONAL y FACULTATIVO (TipoRea 1 y 3) -> tabla calibrada por
++         ANTIGÜEDAD DE REGISTRO (mes de valuación − CALMONTH) con δ del ramo.
++      3. Si falta información -> `fallback_value`, el valor legado EXACTO que pasa el
++         llamador (p. ej. xPND.get(...).get(...)), así el comportamiento no cambia.
++
++    `mes_valuacion` es AAAAMM de la valuación (variable `Meses` del reforecast). Si no
++    se pasa, se cae al CALMONTH del registro y el resultado es el de la v2.
++    """
+     try:
+         ramo = row[cfg.COL_RAMO]
+     except Exception:
+         return fallback_value
+-    # 1) si el registro trae SUS DOS fechas de vigencia, el FND es exacto (sin vector)
+-    if cfg.USAR_EXACTO_SI_HAY_FECHAS:
++    idx = getattr(row, "index", row)
++    mv = mes_valuacion if mes_valuacion is not None else (
++        row[cfg.COL_CALMONTH] if cfg.COL_CALMONTH in idx else None)
++
++    tipo = _int_o_none(row[cfg.COL_TIPOREA]) if cfg.COL_TIPOREA in idx else None
++
++    # 1) no proporcional: prorrata exacta por fechas de vigencia
++    if cfg.USAR_EXACTO_SI_HAY_FECHAS and tipo == 2:
+         try:
+-            idx = getattr(row, "index", row)
+             if cfg.COL_INIVIG in idx and cfg.COL_FINVIG in idx:
+-                v = fnd_exacto(row[cfg.COL_INIVIG], row[cfg.COL_FINVIG], row[cfg.COL_CALMONTH], cfg)
++                v = fnd_exacto(row[cfg.COL_INIVIG], row[cfg.COL_FINVIG], mv, cfg)
+                 if v is not None:
+                     return v
+         except Exception:
+             pass
+-    # 2) si no, el vector del ramo (o el de cartera) por antigüedad
+-    antig = tabla.antiguedad_de_row(row)
++
++    # 2) proporcional / facultativo: tabla calibrada por antigüedad de REGISTRO
++    if cfg.USAR_CALIBRADO and tipo != 2 and cfg.COL_CALMONTH in idx:
++        k = antiguedad_registro(mv, row[cfg.COL_CALMONTH])
++        if k is not None:
++            return 0.0 if k < 0 else fnd_registro(ramo, k, delta, cfg)
++
++    # 3) legado v2: vector del ramo (o de cartera) por antigüedad de cohorte
++    if not tabla.activa:
++        return fallback_value
++    antig = tabla.antiguedad_de_row(row, mes_valuacion=mv)
+     try:
+         frec = row[cfg.COL_FREC]
+     except Exception:
+@@ -477,17 +643,34 @@
+ 
+ def valor_fnd_directo(tabla: TablaFND, ramo, mesproc, inivig, frecuencia,
+                       fallback_value: float, cfg: ConfigMEC = ConfigMEC(),
+-                      finvig=None) -> float:
++                      finvig=None, tiporea=None, mes_valuacion=None,
++                      delta: dict | None = None) -> float:
+     """Para las funciones zFND* del SONR, que reciben valores sueltos.
+-    Si se pasa `finvig`, el FND se calcula EXACTO con las fechas del registro."""
+-    if not tabla.activa:
+-        return fallback_value
+-    if cfg.USAR_EXACTO_SI_HAY_FECHAS and finvig is not None:
+-        v = fnd_exacto(inivig, finvig, mesproc, cfg)
++
++    `mesproc`        = mes contable de REGISTRO de la cuenta (CALMONTH)
++    `mes_valuacion`  = AAAAMM de la valuación (si falta, se usa `mesproc`, = v2)
++    `tiporea`        = 2 -> prorrata exacta por fechas; 1 y 3 -> tabla calibrada
++    """
++    mv = mes_valuacion if mes_valuacion is not None else mesproc
++
++    # 1) no proporcional con fechas: prorrata exacta al mes de valuación
++    if cfg.USAR_EXACTO_SI_HAY_FECHAS and finvig is not None and (
++            tiporea is None or _int_o_none(tiporea) == 2):
++        v = fnd_exacto(inivig, finvig, mv, cfg)
+         if v is not None:
+             return v
++
++    # 2) proporcional / facultativo: antigüedad de REGISTRO
++    if cfg.USAR_CALIBRADO and _int_o_none(tiporea) != 2:
++        k = antiguedad_registro(mv, mesproc)
++        if k is not None:
++            return 0.0 if k < 0 else fnd_registro(ramo, k, delta, cfg)
++
++    # 3) legado v2
++    if not tabla.activa:
++        return fallback_value
+     try:
+-        cal = int(mesproc)
++        cal = int(mv)
+     except Exception:
+         return fallback_value
+     iv = tabla._a_fecha(inivig)
