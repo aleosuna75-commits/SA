@@ -10,14 +10,14 @@ usuario = "asunad"
 warnings.filterwarnings('ignore')
 
 #%% FND CALIBRADO (MEC v3) — sustituye la búsqueda en xPND
-# mec_devengamiento.py y delta_calibrado.json deben estar en esta misma carpeta.
-_DIR = os.path.dirname(os.path.abspath(__file__))
-if _DIR not in sys.path:
-    sys.path.insert(0, _DIR)
+# mec_devengamiento.py y delta_calibrado.json se leen de la carpeta de Documents.
+CARPETA_FND = fr"C:\Users\{usuario}\OneDrive - GPV\Documents"
+if CARPETA_FND not in sys.path:
+    sys.path.insert(0, CARPETA_FND)
 import mec_devengamiento as mec
 
 USAR_FND_CALIBRADO = True   # False -> comportamiento idéntico al script original (xPND)
-DELTA_FND = mec.cargar_delta(_DIR)      # lee delta_calibrado.json si existe
+DELTA_FND = mec.cargar_delta(CARPETA_FND)   # lee delta_calibrado.json de Documents si existe
 
 
 def fnd_cal(xRamo, xMesProc, xFecVal, legado=0.0):
@@ -41,15 +41,11 @@ def _es_no_proporcional(xTipoRea) -> bool:
     except Exception:
         return False
 
-#%% CARPETA LOCAL — todos los insumos se leen y todas las salidas se escriben aquí
-# Es la carpeta donde está este script (Documents). Si quieres otra, pon la ruta completa.
-CARPETA = _DIR
-
 #%% INPUTS
 zAñoPpto = 2026
 zAño= 2026
 zMes = 12
-xFolder = CARPETA
+xFolder = fr"C:\Users\{usuario}\OneDrive - GPV\Archivos de Maria Osmara Camacho Lopez - Inputs"
 #xAjManuales = pd.read_csv(f"{xFolder}\\AjManuales_SONR.csv")
 
 #### PPTO
@@ -264,7 +260,7 @@ def ConsultaMoneda_usd():
 
 ConsultaTC_usd = ConsultaMoneda_usd()
 TC_USD = ConsultaMoneda_usd()
-xFolder = CARPETA
+xFolder = fr"C:\Users\{usuario}\OneDrive - GPV\Archivos de Maria Osmara Camacho Lopez - Inputs"
 fileName = f"{xFolder}\\TablaTCSONR.xlsx"
 TC_USD.to_excel(fileName, index=False)
 
@@ -667,7 +663,7 @@ for mes in range(zMes):
     df.append(auxSONR_sum_3)
     df.append(auxSONR_sum)
     
-    xFolder = CARPETA
+    xFolder = fr"C:\Users\{usuario}\OneDrive - GPV\Documents\Outputs"
     fileName = f"{xFolder}\\auxSONR_sum.xlsx"
     auxSONR_sum.to_excel(fileName, index=False)
 
@@ -681,8 +677,6 @@ df_concatenado = df_concatenado.drop_duplicates()
 Columnas = ['Reserva', 'Escenario', 'Tipo de Monto', 'Ramo', 'Periodo', 'Monto_MXN', 'Monto_USD']
 df_concatenado = df_concatenado[Columnas]
 
-xFolder = CARPETA
-# el nombre de la salida dice con qué FND se corrió, para compararla contra SONR_esc.xlsx sin pisarlo
-fileName = f"{xFolder}\\{'SONR_esc_FNDcal.xlsx' if USAR_FND_CALIBRADO else 'SONR_esc_legado.xlsx'}"
-print(f"[SONR] Salida escrita en: {fileName}")
+xFolder = fr"C:\Users\{usuario}\OneDrive - GPV\Documents\Outputs"
+fileName = f"{xFolder}\\SONR_esc.xlsx"
 df_concatenado.to_excel(fileName, index=False)

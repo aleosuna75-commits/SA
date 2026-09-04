@@ -13,15 +13,15 @@ warnings.filterwarnings('ignore')
 start_time = time.perf_counter()
 
 #%% FND CALIBRADO (MEC v3) — sustituye la búsqueda en xPND
-# mec_devengamiento.py y delta_calibrado.json deben estar en esta misma carpeta.
-_DIR = os.path.dirname(os.path.abspath(__file__))
-if _DIR not in sys.path:
-    sys.path.insert(0, _DIR)
+# mec_devengamiento.py y delta_calibrado.json se leen de la carpeta de Documents.
+CARPETA_FND = fr"C:\Users\{usuario}\OneDrive - GPV\Documents"
+if CARPETA_FND not in sys.path:
+    sys.path.insert(0, CARPETA_FND)
 import mec_devengamiento as mec
 
 USAR_FND_CALIBRADO = True   # False -> comportamiento idéntico al script original (xPND)
-DELTA_FND = mec.cargar_delta(_DIR)      # lee delta_calibrado.json si existe
-MES_VALUACION = None                    # AAAAMM de la valuación; se fija en el ciclo
+DELTA_FND = mec.cargar_delta(CARPETA_FND)   # lee delta_calibrado.json de Documents si existe
+MES_VALUACION = None                        # AAAAMM de la valuación; se fija en el ciclo
 
 
 def fnd_cal(ramo, calmonth, valorfrec_legado=0.0):
@@ -35,18 +35,14 @@ def fnd_cal(ramo, calmonth, valorfrec_legado=0.0):
         return valorfrec_legado
     return 0.0 if k < 0 else mec.fnd_registro(ramo, k, DELTA_FND)
 
-#%% CARPETA LOCAL — todos los insumos se leen y todas las salidas se escriben aquí
-# Es la carpeta donde está este script (Documents). Si quieres otra, pon la ruta completa.
-CARPETA = _DIR
-
 #%% TABLAS CSV
-xFolder = CARPETA
+xFolder = fr"C:\Users\{usuario}\OneDrive - GPV\Documents"
 
-xFolder = CARPETA
+xFolder = fr"C:\Users\{usuario}\OneDrive - GPV\Documents"
 xRamo = pd.read_excel(f"{xFolder}\\CentralizadoCatálogos_SIRECySAP.xlsx", sheet_name="Valores", usecols="J:M", skiprows=1)
 xPais = pd.read_excel(f"{xFolder}\\CentralizadoCatálogos_SIRECySAP.xlsx", sheet_name="Valores", usecols="O:T", skiprows=1)
 
-xFolder = CARPETA
+xFolder = fr"C:\Users\{usuario}\OneDrive - GPV\Archivos de Maria Osmara Camacho Lopez - Inputs"
 xLlavesPol = pd.read_csv(f"{xFolder}\\LlavesPol.csv")
 xRRC = pd.read_csv(f"{xFolder}\\ParametrosMensPPTO_3+9.csv")
 xIS_CAT = pd.read_csv(f"{xFolder}\\IS_Cat.csv")
@@ -126,7 +122,7 @@ def ConsultaMoneda_usd():
 
 TC_USD = ConsultaMoneda_usd()
 
-xFolder = CARPETA
+xFolder = fr"C:\Users\{usuario}\OneDrive - GPV\Archivos de Maria Osmara Camacho Lopez - Inputs"
 fileName = f"{xFolder}\\TablaTCRRC.xlsx"
 
 TC_USD.to_excel(fileName, index=False)
@@ -381,7 +377,7 @@ def ConsultaReal_USD(IS,IS_CAT, MES):
     ConsultaR = ConsultaR.reindex(columns=xColumnas, fill_value='')
     #ConsultaR = pd.concat([ConsultaR,xAjManuales],axis=0) 
    
-    xFolder = CARPETA
+    xFolder = fr"C:\Users\{usuario}\OneDrive - GPV\Documents\Outputs"
     fileName = f"{xFolder}\\ConsultaR_RRC_{MES}.xlsx"
     ConsultaR.to_excel(fileName, index=False)
 
@@ -535,7 +531,7 @@ def ConsultaReal(IS,IS_CAT, MES):
              'TC_Valuación', 'TC_CierreAnterior', 'PMADEV_2026', 'DESVIACION2026', 'BELRIESGO2026_TCVal', 'BELGASTO2026_TCVal',
              'IRR2026_TCVal', 'MR2026_TCVal', 'BELRIESGO2026_TCAñoAnt', 'BELGASTO2026_TCAñoAnt', 'IRR2026_TCAñoAnt', 'MR2026_TCAñoAnt']
     
-    xFolder = CARPETA
+    xFolder = fr"C:\Users\{usuario}\OneDrive - GPV\Documents\Outputs"
     fileName = f"{xFolder}\\ConsultaPPTO_RRC_{MES}_tradicional.xlsx"
     ConsultaR.to_excel(fileName, index=False)
 
@@ -699,10 +695,8 @@ xRRC_saldos = xRRC_saldos[Columnas]
 print(f'Fin concatenación df')
 print(f'Inicio creación xlsx')
 
-xFolder = CARPETA
-# el nombre de la salida dice con qué FND se corrió, para compararla contra RRC_esc.xlsx sin pisarlo
-fileName = f"{xFolder}\\{'RRC_esc_FNDcal.xlsx' if USAR_FND_CALIBRADO else 'RRC_esc_legado.xlsx'}"
-print(f"[RRC] Salida escrita en: {fileName}")
+xFolder = fr"C:\Users\{usuario}\OneDrive - GPV\Documents\Outputs"
+fileName = f"{xFolder}\\RRC_esc.xlsx"
 
 xRRC_saldos.to_excel(fileName, index=False)
 
