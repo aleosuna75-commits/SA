@@ -48,8 +48,9 @@ Prueba de control que vale la pena hacer primero: corre con `False`, compara con
 - Finales de línea Windows (CRLF) y tabulaciones intactos; `py_compile` limpio.
 - Revisión adversarial independiente por dos lentes (alcance del cambio; corrección del interruptor y la integración) por archivo.
 
-Tres cosas que conviene saber al leer los resultados con el interruptor en `True`:
+Cuatro cosas que conviene saber al leer los resultados con el interruptor en `True`:
 
+- El CAT **proporcional y facultativo** (ramos 71/73 con TipoRea 1 o 3) sí cambia: el original les daba la columna `NA` de `xPND` (la frecuencia se fuerza a `NA` para 71/73) y ahora toman la tabla calibrada del ramo 70, con su δ de −0.035. Es parte del cambio pedido —es proporcional— y es coherente con la calibración, que ajustó el δ de CAT sobre ese mismo tramo. El CAT **no proporcional** (TipoRea 2) queda intacto, como el resto del no proporcional.
 - Las cuentas proporcionales o facultativas **sin fechas de vigencia** (IniVig = FinVig = 0 tras el `fillna`) ya no van por la regla 0/1 del original sino por la tabla calibrada según su mes de registro. Es lo que dice el modelo: el FND del proporcional depende del mes en que se registra la cuenta, no de la vigencia.
 - En el SONR, las filas fijas de `xPND` (`202606`, `202706`, …) dejan de aplicar al proporcional. En el original la llave `202606` estaba repetida y la fila fija pisaba a la del mes, así que en junio usaba 0.4986 en lugar de 0.9589; eso explica una diferencia visible en junio.
 - `mec_devengamiento.py` tiene que estar en Documents aunque el interruptor esté en `False`: el import es incondicional. Si falta, el script muere en el import.
