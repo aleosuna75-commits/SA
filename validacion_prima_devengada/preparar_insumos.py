@@ -44,9 +44,11 @@ HORIZONTE_PF = 72          # meses del vector PF+ (Vida tiene cola multianual)
 
 
 def _buscar(patrones, obligatorio=True, que=""):
+    """Busca el archivo en la carpeta del script y, como respaldo, en insumos/."""
     cand = []
     for p in patrones:
         cand += glob.glob(os.path.join(BASE, p))
+        cand += glob.glob(os.path.join(INS, p))
     cand = sorted({c for c in cand if not os.path.basename(c).startswith("~$")}, key=os.path.getmtime, reverse=True)
     if cand:
         if len(cand) > 1:
@@ -197,7 +199,7 @@ def er_real():
                 out.append([per, lab] + pd.to_numeric(raw.iloc[j, 2:17], errors="coerce").tolist())
     er = pd.DataFrame(out, columns=["Periodo", "Concepto"] + cols)
     er.to_csv(destino, index=False)
-    print(f"[insumos]   er_real_primas.csv · bloques {sorted(er['Periodo'].unique())}")
+    print(f"[insumos]   er_real_primas.csv · bloques {[int(x) for x in sorted(er['Periodo'].unique())]}")
 
 
 if __name__ == "__main__":
