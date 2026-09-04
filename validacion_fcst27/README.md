@@ -96,6 +96,20 @@ clasifica por prefijo y se reporta en `Calidad_Datos`.
 de Binder Ppto viene vacía en el export actual; el filtro y el nivel de
 agrupación ya están en el dashboard para cuando se llene.
 
+**Conteo de negocios**: el negocio es la combinación de línea, cedente y
+contrato (1,707 en el ejercicio 2027). Suscripción integra abriendo además por
+**corredor**, lo que da un conteo mayor porque un mismo contrato colocado por
+dos corredores cuenta doble (1,905 en total; en LN 4001, 571 contra 581). El
+dashboard y el Excel reportan ambos conteos para poder reconciliar sin cambiar
+el nivel de análisis. Ojo además con el alcance: el conteo del script es del
+ejercicio 2027, mientras que una integración sobre todo el archivo incluye
+negocios que solo tienen renglones en 2026.
+
+**Comparativo vs RFCST 2026 a nivel negocio**: se compara cada negocio contra
+su equivalente por línea + cedente + contrato, y solo se suman los que cruzan.
+Comparar contra el total del cedente mezclaba sus otras líneas y desviaba el
+dato al filtrar por LN.
+
 ## Cómo se levantan las alertas
 
 El semáforo se evalúa **por negocio** (línea + cedente + contrato):

@@ -1561,13 +1561,15 @@ for (ln, ced, cto, binder), sub in grp_neg:
     paises = sorted(set(pd.to_numeric(sub["Pais_Cod"], errors="coerce")
                         .dropna().astype(int).astype(str)))
     corredores = sorted(set(sub["Corredor"].astype(int).astype(str)))
+    n_corredores = len(corredores)
     monedas = sorted(set(sub["Moneda"].dropna().astype(str)))
 
     negocios.append({
         "LN": ln, "Cedente": int(ced), "Contrato": int(cto),
         "Binder": str(binder or "").strip(),
         "Region": "/".join(regiones), "Paises": "/".join(paises[:3]),
-        "Corredores": "/".join(corredores[:3]), "Monedas": "/".join(monedas[:4]),
+        "Corredores": "/".join(corredores[:3]), "N_Corredores": n_corredores,
+        "Monedas": "/".join(monedas[:4]),
         "f": f, "rf": rf, "ppto": ppto, "r25": r25, "r26": r26,
         "meses": g, "conc": conc, "mes_pico": mes_pico,
         "sem": sem, "motivos": motivos, "celdas": sorted(set(celdas)),
@@ -1582,10 +1584,22 @@ neg_rows = [[
     n["sem"], " · ".join(n["motivos"]) + ((" · " if n["motivos"] else "") + n["nota"]
                                           if n["nota"] else ""),
     n["Binder"],
+    # Prima del MISMO negocio en el RFCST 2026 (None si no cruza):
+    # comparar contra el total del cedente mezclaba sus otras LN
+    (round(n["rf"]["P"]) if n["rf"] and abs(n["rf"]["P"]) > TOL else None),
+    # Corredores distintos: Suscripcion integra abriendo por
+    # corredor, asi que el conteo alterno permite reconciliar
+    n["N_Corredores"],
 ] for n in negocios]
 
+# Suscripcion integra abriendo tambien por corredor: el conteo
+# alterno se reporta para poder reconciliar sin cambiar el nivel
+# de analisis, que es el contrato
+NEG_CON_CORREDOR = d_ok.groupby(["LN", "Cedente", "Contrato", "Corredor"]).ngroups
+
 print(f"Negocios {ANIO_FCST}: {len(neg_rows):,} · "
-      f"con alerta: {sum(1 for r in neg_rows if r[13] > 0):,}")
+      f"con alerta: {sum(1 for r in neg_rows if r[13] > 0):,} · "
+      f"abriendo por corredor serian {NEG_CON_CORREDOR:,}")
 
 # Resumen por cedente (Excel)
 ced_filas = []
@@ -1681,6 +1695,7 @@ _rf_p = RF_GLOB["P"]["fcst"] if RF_GLOB else float("nan")
 dashboard = pd.DataFrame({
     "Indicador": [
         "Negocios analizados",
+        "Negocios abriendo por corredor",
         "Lineas de negocio",
         "Cedentes",
         f"Prima FCST {ANIO_FCST} (tomado)",
@@ -1701,6 +1716,7 @@ dashboard = pd.DataFrame({
     ],
     "Valor": [
         len(neg_rows),
+        NEG_CON_CORREDOR,
         len(LNS),
         d_ok["Cedente"].nunique(),
         gp,
@@ -2569,9 +2585,11 @@ sec3 = f"""
   <div class="card scroll">
     <h2>Resumen por entidad</h2>
     <div class="nota">Top por prima {ETIQ_FCST} con los filtros aplicados. Índices
-      sobre agregados. El semáforo de la entidad es el peor de sus negocios: las
-      columnas Rojos y Amarillos dicen cuántos lo provocaron, y el detalle con el
-      motivo y los montos está en el reporte de alertas del final.</div>
+      sobre agregados. La variación vs RFCST 2026 compara cada negocio contra su
+      equivalente por línea, cedente y contrato, y solo suma los que cruzan. El
+      semáforo de la entidad es el peor de sus negocios: las columnas Rojos y
+      Amarillos dicen cuántos lo provocaron, y el detalle con el motivo y los
+      montos está en el reporte de alertas del final.</div>
     <div id="rs_neg"></div>
   </div>
   <div class="grid dos2">
@@ -2666,8 +2684,6 @@ DATA_JS = {
     },
     "neg": neg_rows,
     "cat": CATALOGO_CED,
-    "rfcstCed": ({str(k): round(v) for k, v in RFCST["por_ced"].items()}
-                 if RFCST is not None else {}),
     "cfg": {
         "umbralAmarillo": UMBRAL_AMARILLO,
         "umbralRojo": UMBRAL_ROJO,
@@ -3350,7 +3366,8 @@ filtraSeccionLN('');
 // ------- Seccion 3: negocios -------
 // Fila: [0 ln, 1 cedente, 2 contrato, 3 region, 4 paises, 5 corredores,
 //        6 monedas, 7 P, 8 S, 9 C, 10 Pm[12], 11 Sm[12], 12 Cm[12],
-//        13 semaforo, 14 motivos, 15 binder ppto]
+//        13 semaforo, 14 motivos, 15 binder ppto, 16 prima RFCST 2026
+//        del mismo negocio (null si no cruza), 17 num. de corredores]
 const stateNeg = {nivel: 'ced', m: 0, exc: 2, f: {}};
 
 const FDEF_NEG = [[0, 'LN'], [3, 'Región'], [4, 'País (cód.)'], [1, 'Cedente'],
@@ -3430,9 +3447,11 @@ function agrupaEntidades(rows) {
     const k = entKeyNeg(r);
     if (!ents[k]) ents[k] = {label: entLabel(r), ced: r[1], n: 0, P: 0, S: 0, C: 0,
       Pm: Array(12).fill(0), Sm: Array(12).fill(0), Cm: Array(12).fill(0),
-      sem: 0, rojos: 0, amas: 0, motivos: new Set(), lns: new Set(), reg: new Set()};
+      sem: 0, rojos: 0, amas: 0, R: 0, nR: 0,
+      motivos: new Set(), lns: new Set(), reg: new Set()};
     const e = ents[k];
     e.n++; e.P += r[7]; e.S += r[8]; e.C += r[9];
+    if (r[16] !== null && r[16] !== undefined) { e.R += r[16]; e.nR++; }
     for (let i = 0; i < 12; i++) { e.Pm[i] += r[10][i]; e.Sm[i] += r[11][i]; e.Cm[i] += r[12][i]; }
     // el semaforo de la entidad es el peor de sus negocios: las
     // columnas de conteo dicen cuantos lo provocaron
@@ -3457,29 +3476,27 @@ function renderNeg() {
   const nR = rows.filter(r => r[13] === 2).length;
   const nA = rows.filter(r => r[13] === 1).length;
 
-  // crecimiento vs RFCST por cedentes con base comparable
-  let pF = 0, pR = 0;
-  if (DATA.cfg.hayRfcst) {
-    const porCed = {};
-    rows.forEach(r => { porCed[r[1]] = (porCed[r[1]] || 0) + r[7]; });
-    for (const c in porCed) {
-      const rf = DATA.rfcstCed[c];
-      if (rf !== undefined && Math.abs(rf) > DATA.cfg.materialidad) {
-        pF += porCed[c]; pR += rf;
-      }
-    }
-  }
+  // Crecimiento contra la contraparte del MISMO negocio en el
+  // RFCST 2026: sumar el cedente completo mezclaba sus otras
+  // lineas y desviaba el dato al filtrar por LN
+  let pF = 0, pR = 0, nCruz = 0;
+  rows.forEach(r => {
+    if (r[16] !== null && r[16] !== undefined) { pF += r[7]; pR += r[16]; nCruz++; }
+  });
   const crec = (pR !== 0) ? pF / pR - 1 : null;
 
   document.getElementById('kpi_neg').innerHTML =
     '<div class="card kpi"><div class="t"><i>&#128181;</i>Prima FCST ' + DATA.cfg.anio +
     '</div><div class="v">' + fmtM(P) + '</div><div class="d">' +
     lista.length.toLocaleString('en-US') + ' entidades · ' +
-    rows.length.toLocaleString('en-US') + ' negocios</div></div>' +
+    rows.length.toLocaleString('en-US') + ' negocios (' +
+    rows.reduce((a, r) => a + (r[17] || 1), 0).toLocaleString('en-US') +
+    ' abriendo por corredor)</div></div>' +
     '<div class="card kpi"><div class="t"><i>&#128200;</i>Crecimiento vs RFCST 2026</div>' +
     '<div class="v">' + fmtPct(crec, true) + '</div>' +
     '<div class="d">' + (DATA.cfg.hayRfcst
-      ? 'solo cedentes presentes en ambas bases: FCST ' + fmtM(pF) + ' vs RFCST ' + fmtM(pR)
+      ? nCruz.toLocaleString('en-US') + ' de ' + rows.length.toLocaleString('en-US') +
+        ' negocios con contraparte: FCST ' + fmtM(pF) + ' vs RFCST ' + fmtM(pR)
       : 'sin base RFCST 2026 disponible') + '</div></div>' +
     '<div class="card kpi"><div class="t"><i>&#9888;</i>Índices implícitos</div>' +
     '<div class="v">' + fmtPct(ratio(Sv, P)) + '</div>' +
@@ -3513,10 +3530,8 @@ function renderNeg() {
     '<th class="num">Rojos</th><th class="num">Amarillos</th>' +
     '<th>Semáforo</th></tr></thead><tbody>' +
     top.map(e => {
-      const rf = DATA.cfg.hayRfcst && stateNeg.nivel === 'ced'
-        ? DATA.rfcstCed[e.ced] : undefined;
-      const cr = rf !== undefined && Math.abs(rf) > DATA.cfg.materialidad
-        ? e.P / rf - 1 : null;
+      // Solo la parte del negocio que tiene contraparte en 2026
+      const cr = (e.nR && Math.abs(e.R) > DATA.cfg.minDen) ? e.P / e.R - 1 : null;
       return '<tr><td>' + esc(e.label) + '</td><td>' + esc([...e.lns].join(', ')) +
         '</td><td>' + esc([...e.reg].join(', ')) + '</td>' +
         '<td class="num">' + e.n + '</td><td class="num">' + fmtM(e.P) + '</td>' +
