@@ -22,12 +22,17 @@
    · insumos\\tc_mensual_bd.csv  — TC de cierre por mes
    · mec_devengamiento.py        — para NT y la tabla de ramos
 
- QUÉ HACE. Para cada ramo ajusta δ minimizando el error contra el BEL real, en dos
- variantes, y se queda con la mejor:
-   ESCALONADA   FND = clip(NT(k) − δ_M4(frecuencia) − δ_ramo, 0, 1)   ← recomendada
+ QUÉ HACE. Para cada ramo ajusta δ minimizando el error contra el BEL real, en tres
+ variantes, y las reporta las tres:
+   DESPLAZADA   FND = clip(PORC_ND_legado − δ_ramo, 0, 1)             ← RECOMENDADA
+   ESCALONADA   FND = clip(NT(k) − δ_M4(frecuencia) − δ_ramo, 0, 1)
    PLANA        FND = clip(NT(k) − δ_ramo, 0, 1)                      ← la de hoy
- donde δ_M4(t) = (t−1)/2·30/365 es la regla M4 del MEC, que es exactamente el
- escalonamiento por frecuencia que ya trae la tabla xPND del reforecast.
+ δ_M4(t) = (t−1)/2·30/365 es la regla M4 del MEC. Reproduce EXACTO las columnas
+ 'NA', '1' y '3' de xPND (el 83% de la prima), pero las columnas '2', '6' y '0'
+ difieren hasta 0.0055 en la cola, donde la tabla trunca antes. Por eso la variante
+ recomendada no reconstruye la tabla: parte del PORC_ND legado que ya trae el
+ archivo y sólo le aplica el desplazamiento por ramo. Es exacta por construcción y
+ se implementa en el reforecast con una línea, sin tocar xPND.
 
  Respeta la jerarquía de PORC_ND del script: los ramos 71/73 y el no proporcional
  (TipoRea 2) se dejan como están y no entran al ajuste.
@@ -80,6 +85,8 @@ FREC2MESES = {"1": 1, "2": 2, "3": 3, "6": 6, "0": 12, "NA": 1, "DEF": 3}
 
 
 def meses_cuenta(f):
+    if f is None or (isinstance(f, float) and np.isnan(f)):
+        return 1                      # 'NA' -> columna mensual, δ_M4 = 0
     s = str(f).strip()
     if s.endswith(".0"):
         s = s[:-2]
@@ -165,7 +172,10 @@ def main():
     # ---- diagnóstico: ¿cuánta prima anula el legado por FRECUENCIA fuera de catálogo?
     CAT_XPND = {"1", "2", "3", "6", "0", "NA", "DEF"}
     aj = d[d.ajustable].copy()
-    aj["frec_txt"] = aj.FRECUENCIA.astype(str).str.strip().str.replace(r"\.0$", "", regex=True)
+    # OJO: en el archivo, las filas cuya FRECUENCIA era la cadena 'NA' llegan como vacío
+    # (el viaje a Excel las convierte en NaN). En memoria SÍ son 'NA', que está en el catálogo.
+    aj["frec_txt"] = np.where(aj.FRECUENCIA.isna(), "NA",
+                              aj.FRECUENCIA.astype(str).str.strip().str.replace(r"\.0$", "", regex=True))
     aj["fuera_catalogo"] = ~aj.frec_txt.isin(CAT_XPND)
     aj["legado_cero"] = aj.PORC_ND.abs() < 1e-12
     pw = aj.peso_USD.abs()
@@ -202,21 +212,25 @@ def main():
     if os.path.exists(jp):
         delta_prod = json.load(open(jp, encoding="utf-8"))
 
-    def bel(sub, dl, escalonada):
-        """BEL en USD que produce δ = dl sobre este subconjunto."""
+    def bel(sub, dl, modo):
+        """BEL en USD que produce δ = dl sobre este subconjunto.
+        modo: 'desplazada' (parte del PORC_ND legado), 'escalonada' (NT − δ_M4) o 'plana' (NT)."""
         fijo = sub.loc[~sub.ajustable, "BEL_legado_USD"].sum()
         a = sub[sub.ajustable]
         if a.empty:
             return fijo
-        base = NT[np.clip(a.k.to_numpy(int), 0, len(NT) - 1)]
-        base = np.where((a.k < 0) | (a.k >= len(NT)), 0.0, base)
-        desp = (a.dM4.to_numpy() if escalonada else 0.0) + dl
+        if modo == "desplazada":
+            base, desp = a.PORC_ND.to_numpy(float), dl
+        else:
+            base = NT[np.clip(a.k.to_numpy(int), 0, len(NT) - 1)]
+            base = np.where((a.k < 0) | (a.k >= len(NT)), 0.0, base)
+            desp = (a.dM4.to_numpy() if modo == "escalonada" else 0.0) + dl
         return fijo + float((a.peso_USD.to_numpy() * np.clip(base - desp, 0.0, 1.0)).sum())
 
     filas, mejor = [], {}
     print("\n" + "=" * 108)
     print(f"{'Ramo':10s} {'real':>10s} {'legado':>10s} {'razón':>6s} | {'δ prod':>7s} {'razón':>6s} |"
-          f" {'δ plana':>7s} {'razón':>6s} | {'δ escal':>7s} {'razón':>6s}  <- recomendada")
+          f" {'δ plana':>7s} {'razón':>6s} | {'δ escal':>7s} {'razón':>6s} | {'δ desp':>7s} {'razón':>6s} <- rec.")
     print("=" * 108)
     for g, sub in d.groupby("Grupo"):
         y = sum(rr.get((g, m), np.nan) for m in meses_val)
@@ -225,18 +239,21 @@ def main():
             continue
         leg = sub.BEL_legado_USD.sum()
         dp = float(delta_prod.get(g, 0.0))
-        bprod = bel(sub, dp, False)
+        bprod = bel(sub, dp, "plana")
         best = {}
-        for esc in (False, True):
-            cand = min(GRID, key=lambda x: abs(bel(sub, x, esc) - y))
-            best[esc] = (cand, bel(sub, cand, esc))
-        mejor[g] = {"delta_escalonada": float(best[True][0]), "delta_plana": float(best[False][0])}
+        for modo in ("plana", "escalonada", "desplazada"):
+            cand = min(GRID, key=lambda x: abs(bel(sub, x, modo) - y))
+            best[modo] = (cand, bel(sub, cand, modo))
+        mejor[g] = {m: float(best[m][0]) for m in best}
         print(f"{g:10s} {y/1e6:10.1f} {leg/1e6:10.1f} {leg/y:6.3f} | {dp:+7.3f} {bprod/y:6.3f} |"
-              f" {best[False][0]:+7.3f} {best[False][1]/y:6.3f} | {best[True][0]:+7.3f} {best[True][1]/y:6.3f}")
+              f" {best['plana'][0]:+7.3f} {best['plana'][1]/y:6.3f} |"
+              f" {best['escalonada'][0]:+7.3f} {best['escalonada'][1]/y:6.3f} |"
+              f" {best['desplazada'][0]:+7.3f} {best['desplazada'][1]/y:6.3f}")
         filas.append(dict(Grupo=g, BEL_real=y, BEL_legado=leg, razon_legado=leg / y,
                           delta_produccion=dp, razon_produccion=bprod / y,
-                          delta_plana=best[False][0], razon_plana=best[False][1] / y,
-                          delta_escalonada=best[True][0], razon_escalonada=best[True][1] / y,
+                          delta_plana=best["plana"][0], razon_plana=best["plana"][1] / y,
+                          delta_escalonada=best["escalonada"][0], razon_escalonada=best["escalonada"][1] / y,
+                          delta_desplazada=best["desplazada"][0], razon_desplazada=best["desplazada"][1] / y,
                           dM4_medio=np.average(sub.loc[sub.ajustable, "dM4"],
                                                weights=sub.loc[sub.ajustable, "peso_USD"].abs())
                           if sub.ajustable.any() else 0.0))
@@ -245,17 +262,19 @@ def main():
         raise SystemExit("[recal] No hubo ningún ramo con RRC real en esos meses.")
     print("-" * 108)
     for et, col in [("legado", "razon_legado"), ("δ de producción", "razon_produccion"),
-                    ("δ plana reajustada", "razon_plana"), ("δ escalonada reajustada", "razon_escalonada")]:
+                    ("δ plana reajustada", "razon_plana"), ("δ escalonada reajustada", "razon_escalonada"),
+                    ("δ desplazada reajustada", "razon_desplazada")]:
         tot = (r[col] * r.BEL_real).sum() / r.BEL_real.sum()
         mae = np.mean(np.abs(r[col] - 1))
         print(f"  {et:26s} razón total {tot:.4f}   error absoluto medio por ramo {mae:.2%}")
 
     r.to_csv(os.path.join(BASE, "recalibracion_reforecast.csv"), index=False)
-    json.dump({g: v["delta_escalonada"] for g, v in mejor.items()},
+    json.dump({g: v["desplazada"] for g, v in mejor.items()},
               open(os.path.join(BASE, "delta_recalibrado.json"), "w", encoding="utf-8"), indent=2)
-    print(f"\n[recal] delta_recalibrado.json (variante ESCALONADA) y recalibracion_reforecast.csv escritos en {BASE}")
-    print("[recal] Para usarlo: sustituye delta_calibrado.json por delta_recalibrado.json y activa el")
-    print("        escalonamiento por frecuencia en el FND del reforecast (ver README).")
+    print(f"\n[recal] delta_recalibrado.json (variante DESPLAZADA) y recalibracion_reforecast.csv escritos en {BASE}")
+    print("[recal] Para usarlo en el reforecast, el FND deja de sustituir a VALORFREC y sólo lo desplaza:")
+    print("            PORC_ND = clip(VALORFREC_legado − δ_ramo, 0, 1)")
+    print("        Así se conserva la tabla xPND que el área ya valida y el modelo aporta sólo el ajuste por ramo.")
 
 
 if __name__ == "__main__":
