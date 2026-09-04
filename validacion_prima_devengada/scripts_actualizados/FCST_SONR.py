@@ -20,19 +20,27 @@ USAR_FND_CALIBRADO = True   # False -> comportamiento idéntico al script origin
 DELTA_FND = mec.cargar_delta(CARPETA_FND)   # lee delta_calibrado.json de Documents si existe
 
 
-def fnd_cal(xRamo, xMesProc, xFecVal, legado=0.0):
-    """FND de una cuenta proporcional/facultativa por antigüedad de REGISTRO:
-    k = mes de valuación (de xFecVal) − mes contable de registro (xMesProc)."""
+# XPND_K traduce cada CLAVE de xPND a la antigüedad de registro k que representa.
+# Se rearma junto a xPND en cada mes del ciclo (xPND[xAños[Meses - j]] vale NT(j)).
+XPND_K = {}
+
+
+def fnd_modelo(xRamo, clave, legado):
+    """FND del modelo EN EL LUGAR EXACTO donde el script leía la tabla xPND.
+
+    Sustituye el VALOR de la tabla, no la lógica: la clave (xMesProc o el xVal
+    desplazado que calcula el propio script) ya viene resuelta por el código
+    original, y aquí sólo se traduce a la antigüedad k con el mismo mapa con el
+    que se arma xPND. Así el modelo no se salta ninguna rama —ni la de
+    xIniVig == xFinVig, ni la del no proporcional, ni el corte de 12 meses— y
+    con USAR_FND_CALIBRADO = False el script es idéntico al original.
+    """
     if not USAR_FND_CALIBRADO or xRamo is None:
         return legado
-    try:
-        mv = xFecVal.year * 100 + xFecVal.month
-    except Exception:
-        return legado
-    k = mec.antiguedad_registro(mv, xMesProc)
+    k = XPND_K.get(clave)
     if k is None:
         return legado
-    return 0.0 if k < 0 else mec.fnd_registro(xRamo, k, DELTA_FND)
+    return mec.fnd_registro(xRamo, k, DELTA_FND)
 
 
 def _es_no_proporcional(xTipoRea) -> bool:
@@ -81,11 +89,6 @@ xEscenario = {"BEL_RIESGO":["BEL", 2],
 
 #%% FUNCIÓN FND REAL.
 def zFND(xIniVig, xFinVig, xTipoRea, xAñoMes, xFecVal, xMesProc, xFrecuencia, xRamo=None):
-    # FND del modelo: proporcional y facultativo -> tabla calibrada por antigüedad de registro.
-    # El no proporcional (TipoRea 2) sigue por la lógica de fechas de más abajo, sin cambios.
-    if USAR_FND_CALIBRADO and not _es_no_proporcional(xTipoRea):
-        return fnd_cal(xRamo, xMesProc, xFecVal,
-                       xPND.get(xMesProc, {}).get(str(xFrecuencia), 0))   # {}: un mes fuera de la ventana da 0, no revienta
     mes_proc_str = str(xMesProc)
     right_3 = mes_proc_str[-3:] if len(mes_proc_str) >= 3 else mes_proc_str
 
@@ -128,14 +131,11 @@ def zFND(xIniVig, xFinVig, xTipoRea, xAñoMes, xFecVal, xMesProc, xFrecuencia, x
             if xMesProc <= prev_year_ym:
                 return 0
             else:
-                result = xPND.get(xMesProc,0).get(str(xFrecuencia), 0) 
-                return result
+                result = xPND.get(xMesProc,0).get(str(xFrecuencia), 0)
+                return fnd_modelo(xRamo, xMesProc, result)
 
 #%% FUNCIÓN FND PPTO
 def zFND_PPTO(xIniVig, xFinVig, xTipoRea, xAñoMes, xFecVal, xMesProc, xFrecuencia, xRamo=None):
-    # FND del modelo (idem zFND). En presupuesto xMesProc es el mes de registro de la cuenta.
-    if USAR_FND_CALIBRADO and not _es_no_proporcional(xTipoRea):
-        return fnd_cal(xRamo, xMesProc, xFecVal, 0.0)
     fecha = datetime(zAño, 12, 31)
     #print(xMesProc)
     #print(xFecVal)
@@ -158,8 +158,8 @@ def zFND_PPTO(xIniVig, xFinVig, xTipoRea, xAñoMes, xFecVal, xMesProc, xFrecuenc
                 #result = 1
                 result = xPND.get(xVal,0).get(str(xFrecuencia), 0)
             else:
-                result = xPND.get(xVal,0).get(str(xFrecuencia), 0) 
-            return result
+                result = xPND.get(xVal,0).get(str(xFrecuencia), 0)
+            return fnd_modelo(xRamo, xVal, result)
     else:
         if xTipoRea == 2: 
             if xAñoMes == (xFecVal.year) * 100 + xFecVal.month:
@@ -179,15 +179,11 @@ def zFND_PPTO(xIniVig, xFinVig, xTipoRea, xAñoMes, xFecVal, xMesProc, xFrecuenc
                         xVal = int(xMesProc) - xFecVal.month
                     else:
                         xVal = int(xMesProc) - xFecVal.month + 12
-                result = xPND.get(xVal,0).get(str(xFrecuencia), 0) 
-                return result
+                result = xPND.get(xVal,0).get(str(xFrecuencia), 0)
+                return fnd_modelo(xRamo, xVal, result)
 
 #%% zFND REAL REFORECAST
 def zFND2(xIniVig, xFinVig, xTipoRea, xAñoMes, xFecVal, xMesProc, xFrecuencia, xRamo=None):
-    # FND del modelo (idem zFND, versión del reforecast).
-    if USAR_FND_CALIBRADO and not _es_no_proporcional(xTipoRea):
-        return fnd_cal(xRamo, xMesProc, xFecVal,
-                       xPND.get(xMesProc, {}).get(str(xFrecuencia), 0))   # {}: un mes fuera de la ventana da 0, no revienta
     mes_proc_str = str(int(xMesProc))
     if xIniVig == xFinVig: 
         current_ym = xFecVal.year * 100 + xFecVal.month
@@ -234,8 +230,8 @@ def zFND2(xIniVig, xFinVig, xTipoRea, xAñoMes, xFecVal, xMesProc, xFrecuencia, 
                 #print(xMesProc)
                 #print(xVal)
                 #print(xPND)
-                result = xPND.get(xVal,0).get(str(xFrecuencia), 0) 
-                return result
+                result = xPND.get(xVal,0).get(str(xFrecuencia), 0)
+                return fnd_modelo(xRamo, xVal, result)
 #%% FUNCIÓN CONSULTA TC USD.
 def ConsultaMoneda_usd():
     conn_str = (r'DRIVER={Microsoft Access Driver (*.mdb, *.accdb)};'
@@ -582,6 +578,15 @@ for mes in range(zMes):
     202706: {'NA': 0.498630136986301, '1': 0.498630136986301, '2': 0.458333333333333, '3': 0.499771689497717, '6': 0.293150684931507, '0': 0.0438356164383562, 'DEF': 0.499771689497717},
     202806: {'NA': 0.498630136986301, '1': 0.498630136986301, '2': 0.458333333333333, '3': 0.499771689497717, '6': 0.293150684931507, '0': 0.0438356164383562, 'DEF': 0.499771689497717},
     202906: {'NA': 0.498630136986301, '1': 0.498630136986301, '2': 0.458333333333333, '3': 0.499771689497717, '6': 0.293150684931507, '0': 0.0438356164383562, 'DEF': 0.499771689497717}}
+
+    # Antigüedad k de cada clave de la escalera. Las cuatro entradas fijas de arriba
+    # no entran: el original las sobrescribe con un valor propio, ahí manda el legado.
+    XPND_K.clear()
+    for _j in range(12):
+        XPND_K[xAños[Meses - _j]] = _j
+    for _fijo in (202606, 202706, 202806, 202906):
+        XPND_K.pop(_fijo, None)
+
     
     
 

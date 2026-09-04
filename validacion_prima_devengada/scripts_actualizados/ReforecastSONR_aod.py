@@ -20,19 +20,30 @@ USAR_FND_CALIBRADO = True   # False -> comportamiento idéntico al script origin
 DELTA_FND = mec.cargar_delta(CARPETA_FND)   # lee delta_calibrado.json de Documents si existe
 
 
-def fnd_cal(xRamo, xMesProc, xFecVal, legado=0.0):
-    """FND de una cuenta proporcional/facultativa por antigüedad de REGISTRO:
-    k = mes de valuación (de xFecVal) − mes contable de registro (xMesProc)."""
+# XPND_K traduce cada CLAVE de xPND a la antigüedad de registro k que representa.
+# Se rearma junto a xPND en cada mes del ciclo (xPND[xAños[Meses - j]] vale NT(j)).
+XPND_K = {}
+
+
+def fnd_modelo(xRamo, clave, legado):
+    """FND del modelo EN EL LUGAR EXACTO donde el script leía la tabla xPND.
+
+    Sustituye el VALOR de la tabla, no la lógica: la clave (xMesProc o el xVal
+    desplazado que calcula el propio script) ya viene resuelta por el código
+    original, y aquí sólo se traduce a la antigüedad k con el mismo mapa con el
+    que se arma xPND. Así el modelo no se salta ninguna rama —ni la de
+    xIniVig == xFinVig, ni la del no proporcional, ni el corte de 12 meses— y
+    con USAR_FND_CALIBRADO = False el script es idéntico al original.
+
+    Si la clave no está en la escalera de 12 meses (las entradas fijas 202606,
+    202706, 202806 y 202906 que el original mete aparte), se respeta el legado.
+    """
     if not USAR_FND_CALIBRADO or xRamo is None:
         return legado
-    try:
-        mv = xFecVal.year * 100 + xFecVal.month
-    except Exception:
-        return legado
-    k = mec.antiguedad_registro(mv, xMesProc)
+    k = XPND_K.get(clave)
     if k is None:
         return legado
-    return 0.0 if k < 0 else mec.fnd_registro(xRamo, k, DELTA_FND)
+    return mec.fnd_registro(xRamo, k, DELTA_FND)
 
 
 def _es_no_proporcional(xTipoRea) -> bool:
@@ -54,7 +65,8 @@ xSubramo = pd.read_csv(f"{xFolder}\\Subramo.csv")
 ####Mensual
 Tbase_mp = pd.read_csv(f"{xFolder}\\TablaBase_MetodoPropio.csv")
 Tbase_mp_ext = pd.read_csv(f"{xFolder}\\TablaBase_MetodoPropio_ext.csv")
-ParamSONR = pd.read_csv(f"{xFolder}\\ParamSONR2026_3+9.csv")
+ParamSONR_ARCHIVO = "ParamSONR2026_3+9.csv"
+ParamSONR = pd.read_csv(f"{xFolder}\\{ParamSONR_ARCHIVO}")
 ParamSONR_inc = pd.read_csv(f"{xFolder}\\ParamSONR2026_3+9.csv")
 xPNDmes = pd.read_csv(f"{xFolder}\\PNDmes.csv")
 xFrecCol = pd.read_csv(f"{xFolder}\\FrecCol.csv")
@@ -81,11 +93,6 @@ xEscenario = {"BEL_RIESGO":["BEL", 2],
 
 #%% FUNCIÓN FND REAL.
 def zFND(xIniVig, xFinVig, xTipoRea, xAñoMes, xFecVal, xMesProc, xFrecuencia, xRamo=None):
-    # FND del modelo: proporcional y facultativo -> tabla calibrada por antigüedad de registro.
-    # El no proporcional (TipoRea 2) sigue por la lógica de fechas de más abajo, sin cambios.
-    if USAR_FND_CALIBRADO and not _es_no_proporcional(xTipoRea):
-        return fnd_cal(xRamo, xMesProc, xFecVal,
-                       xPND.get(xMesProc, {}).get(str(xFrecuencia), 0))   # {}: un mes fuera de la ventana da 0, no revienta
     mes_proc_str = str(xMesProc)
     right_3 = mes_proc_str[-3:] if len(mes_proc_str) >= 3 else mes_proc_str
 
@@ -128,14 +135,11 @@ def zFND(xIniVig, xFinVig, xTipoRea, xAñoMes, xFecVal, xMesProc, xFrecuencia, x
             if xMesProc <= prev_year_ym:
                 return 0
             else:
-                result = xPND.get(xMesProc,0).get(str(xFrecuencia), 0) 
-                return result
+                result = xPND.get(xMesProc,0).get(str(xFrecuencia), 0)
+                return fnd_modelo(xRamo, xMesProc, result)
 
 #%% FUNCIÓN FND PPTO
 def zFND_PPTO(xIniVig, xFinVig, xTipoRea, xAñoMes, xFecVal, xMesProc, xFrecuencia, xRamo=None):
-    # FND del modelo (idem zFND). En presupuesto xMesProc es el mes de registro de la cuenta.
-    if USAR_FND_CALIBRADO and not _es_no_proporcional(xTipoRea):
-        return fnd_cal(xRamo, xMesProc, xFecVal, 0.0)
     fecha = datetime(zAño, 12, 31)
     #print(xMesProc)
     #print(xFecVal)
@@ -158,8 +162,8 @@ def zFND_PPTO(xIniVig, xFinVig, xTipoRea, xAñoMes, xFecVal, xMesProc, xFrecuenc
                 #result = 1
                 result = xPND.get(xVal,0).get(str(xFrecuencia), 0)
             else:
-                result = xPND.get(xVal,0).get(str(xFrecuencia), 0) 
-            return result
+                result = xPND.get(xVal,0).get(str(xFrecuencia), 0)
+            return fnd_modelo(xRamo, xVal, result)
     else:
         if xTipoRea == 2: 
             if xAñoMes == (xFecVal.year) * 100 + xFecVal.month:
@@ -179,15 +183,11 @@ def zFND_PPTO(xIniVig, xFinVig, xTipoRea, xAñoMes, xFecVal, xMesProc, xFrecuenc
                         xVal = int(xMesProc) - xFecVal.month
                     else:
                         xVal = int(xMesProc) - xFecVal.month + 12
-                result = xPND.get(xVal,0).get(str(xFrecuencia), 0) 
-                return result
+                result = xPND.get(xVal,0).get(str(xFrecuencia), 0)
+                return fnd_modelo(xRamo, xVal, result)
 
 #%% zFND REAL REFORECAST
 def zFND2(xIniVig, xFinVig, xTipoRea, xAñoMes, xFecVal, xMesProc, xFrecuencia, xRamo=None):
-    # FND del modelo (idem zFND, versión del reforecast).
-    if USAR_FND_CALIBRADO and not _es_no_proporcional(xTipoRea):
-        return fnd_cal(xRamo, xMesProc, xFecVal,
-                       xPND.get(xMesProc, {}).get(str(xFrecuencia), 0))   # {}: un mes fuera de la ventana da 0, no revienta
     mes_proc_str = str(int(xMesProc))
     if xIniVig == xFinVig: 
         current_ym = xFecVal.year * 100 + xFecVal.month
@@ -234,8 +234,8 @@ def zFND2(xIniVig, xFinVig, xTipoRea, xAñoMes, xFecVal, xMesProc, xFrecuencia, 
                 #print(xMesProc)
                 #print(xVal)
                 #print(xPND)
-                result = xPND.get(xVal,0).get(str(xFrecuencia), 0) 
-                return result
+                result = xPND.get(xVal,0).get(str(xFrecuencia), 0)
+                return fnd_modelo(xRamo, xVal, result)
 #%% FUNCIÓN CONSULTA TC USD.
 def ConsultaMoneda_usd():
     conn_str = (r'DRIVER={Microsoft Access Driver (*.mdb, *.accdb)};'
@@ -449,7 +449,7 @@ def Metodo_propio():
     global Tbase_mp, ConsultaR
     BC = -3910064857 #TEMPORAL
     BC2 = 84398596 #TEMPORAL
-    Tbase_mp_ = Tbase_mp
+    Tbase_mp_ = Tbase_mp.copy()   # .copy(): sin esto cada vuelta del ciclo muta el global
     Tbase_mp_['Año'] = zAño
     Tbase_mp_['AñoMes'] = Meses
     Tbase_mp_['AñoSusc'] = Tbase_mp_.apply(lambda row: row['Año'] + 1 - row['NoLAG'], axis=1) 
@@ -582,6 +582,16 @@ for mes in range(zMes):
     202706: {'NA': 0.498630136986301, '1': 0.498630136986301, '2': 0.458333333333333, '3': 0.499771689497717, '6': 0.293150684931507, '0': 0.0438356164383562, 'DEF': 0.499771689497717},
     202806: {'NA': 0.498630136986301, '1': 0.498630136986301, '2': 0.458333333333333, '3': 0.499771689497717, '6': 0.293150684931507, '0': 0.0438356164383562, 'DEF': 0.499771689497717},
     202906: {'NA': 0.498630136986301, '1': 0.498630136986301, '2': 0.458333333333333, '3': 0.499771689497717, '6': 0.293150684931507, '0': 0.0438356164383562, 'DEF': 0.499771689497717}}
+
+    # Antigüedad k que representa cada clave de la escalera de 12 meses. Las cuatro
+    # entradas fijas de arriba (202606, 202706, 202806, 202906) NO entran: el original
+    # las sobrescribe con un valor propio, así que ahí se respeta el legado.
+    XPND_K.clear()
+    for _j in range(12):
+        XPND_K[xAños[Meses - _j]] = _j
+    for _fijo in (202606, 202706, 202806, 202906):
+        XPND_K.pop(_fijo, None)
+
     
     
 
@@ -589,6 +599,35 @@ for mes in range(zMes):
 
     print(ConsultaR)
     df_Real_IS_Real = Metodo_propio()
+
+    # ---- DIAGNÓSTICO: por qué un ramo se queda sin filas -------------------------
+    # df_SONR_dim.set_index([...]).stack() DESCARTA los NaN. Si BEL_RIESGO, IRR y MR
+    # son NaN para un ramo, ese ramo desaparece de la salida SIN AVISO. El NaN viene
+    # casi siempre del merge con ParamSONR: si no hay fila con Llave '<AñoMes>-<Ramo>',
+    # 'Ind Sin SONR Media' y 'Factor_Ret' llegan vacíos y todo lo que cuelga de ellos
+    # también. Esto lo reporta en claro en vez de perderlo.
+    try:
+        _d = df_Real_IS_Real
+        _falta_param = sorted(set(_d.loc[_d['Ind Sin SONR Media'].isna(), 'Ramo'].tolist()))
+        _falta_ret = sorted(set(_d.loc[_d['Factor_Ret'].isna(), 'Ramo'].tolist()))
+        _sin_bel = _d.groupby('Ramo')['BEL_RIESGO'].apply(lambda x: x.isna().all())
+        _mudos = sorted(_sin_bel[_sin_bel].index.tolist())
+    except Exception as _e:
+        # el diagnóstico NUNCA debe tumbar la corrida
+        print(f"[SONR][{Meses}] no pude revisar los ramos: {_e}")
+        _falta_param = _falta_ret = _mudos = []
+    if _falta_param or _falta_ret or _mudos:
+        print(f"[SONR][{Meses}] AVISO — ramos que se van a perder en la salida:")
+        if _falta_param:
+            print(f"    sin 'Ind Sin SONR Media' (falta Llave '{Meses}-<ramo>' en ParamSONR): {_falta_param}")
+        if _falta_ret:
+            print(f"    sin 'Factor_Ret' en ParamSONR: {_falta_ret}")
+        if _mudos:
+            print(f"    BEL_RIESGO todo NaN -> NO saldrán en Base SONR: {_mudos}")
+        print(f"    Revisa que {ParamSONR_ARCHIVO} tenga una fila por cada '{Meses}-<ramo>'.")
+    else:
+        print(f"[SONR][{Meses}] ok — {df_Real_IS_Real['Ramo'].nunique()} ramos con BEL_RIESGO calculado")
+    # -----------------------------------------------------------------------------
     print(df_Real_IS_Real)
     xColumnas = ['Ramo', 'BEL_RIESGO', 'IRR', 'MR']
     df_SONR_dim = df_Real_IS_Real.reindex(columns=xColumnas)
@@ -676,6 +715,37 @@ df_concatenado = df_concatenado.drop_duplicates()
 #Columnas = ['Reserva', 'Escenario', 'Tipo de Monto', 'Ramo', 'Periodo', 'Monto_MXN', 'TC', 'Monto_USD']
 Columnas = ['Reserva', 'Escenario', 'Tipo de Monto', 'Ramo', 'Periodo', 'Monto_MXN', 'Monto_USD']
 df_concatenado = df_concatenado[Columnas]
+
+# ---- RESUMEN DE COBERTURA -------------------------------------------------------
+# La corrida de septiembre con el FND del modelo perdió 8 de 11 ramos desde 202604 y
+# nadie se enteró hasta comparar los Excel: la salida simplemente traía menos filas.
+# Esto lo dice antes de escribir el archivo.
+try:
+    _esc = df_concatenado[df_concatenado["Escenario"] == 2]
+    _ramos = sorted(_esc["Ramo"].dropna().unique())
+    _pers = sorted(_esc["Periodo"].dropna().unique())
+    _hay = set(zip(_esc["Ramo"], _esc["Periodo"]))
+    _faltan = [(r, p) for r in _ramos for p in _pers if (r, p) not in _hay]
+    print(f"[SONR] cobertura escenario 2: {len(_ramos)} ramos x {len(_pers)} periodos"
+          f" = {len(_ramos)*len(_pers)} esperados, {len(_hay)} presentes")
+    if _faltan:
+        print(f"[SONR] !! FALTAN {len(_faltan)} combinaciones ramo x periodo. La salida está INCOMPLETA.")
+        import collections as _c
+        _pr = _c.defaultdict(list)
+        for r, pp in _faltan:
+            _pr[r].append(int(pp))
+        for r in sorted(_pr):
+            print(f"       ramo {r}: {sorted(_pr[r])}")
+        print("[SONR]    Causa habitual: falta la Llave '<AAAAMM>-<ramo>' en " + ParamSONR_ARCHIVO + ",")
+        print("[SONR]    lo que deja 'Ind Sin SONR Media' vacío y .stack() borra la fila en silencio.")
+    else:
+        print("[SONR] cobertura completa: no falta ninguna combinación ramo x periodo.")
+    _dup = df_concatenado.duplicated(subset=["Escenario","Tipo de Monto","Ramo","Periodo"]).sum()
+    if _dup:
+        print(f"[SONR] !! {_dup} filas duplicadas por (Escenario, Tipo, Ramo, Periodo).")
+except Exception as _e:
+    print(f"[SONR] no pude resumir la cobertura: {_e}")
+# ---------------------------------------------------------------------------------
 
 xFolder = fr"C:\Users\{usuario}\OneDrive - GPV\Documents\Outputs"
 fileName = f"{xFolder}\\SONR_esc.xlsx"
