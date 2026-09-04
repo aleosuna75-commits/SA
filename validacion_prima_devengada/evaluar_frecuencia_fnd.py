@@ -73,7 +73,10 @@ b = b[b["Tipo Rea"] != 2]                                   # sólo proporcional
 b["t"] = pd.to_numeric(b["Meses Periodo"], errors="coerce")
 # la frecuencia sólo escalona donde el reforecast la aplica: TipoRea 1 fuera de CAT y Crédito
 aplica = (b["Tipo Rea"] == 1) & (~b["Ramo"].isin([70, 71, 73, 100]))
-b.loc[~aplica | b["t"].isna() | (b["t"] <= 0), "t"] = 1.0
+# «Meses Periodo» = 0 es el código de cuenta ANUAL (columna '0' de xPND, δ_M4 = 0.452),
+# NO mensual. Leerlo como mensual invierte la mezcla de la cartera por completo.
+b.loc[b["t"] == 0, "t"] = 12.0
+b.loc[~aplica | b["t"].isna(), "t"] = 1.0
 BUCKETS = sorted(b["t"].unique())
 print("Buckets de periodicidad (meses):", [int(x) for x in BUCKETS], " → δ_M4:",
       [round(d_m4(x), 4) for x in BUCKETS])

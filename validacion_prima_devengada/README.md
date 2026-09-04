@@ -83,40 +83,70 @@ La tabla completa está en `salidas/tabla_fnd_calibrada.csv` y en la hoja TablaF
 
 Recomendación de recalibración periódica: correr `validar_prima_devengada.py` en cada cierre trimestral con la base BEL-IRR-MR actualizada; si el ratio total sale de ±3% o algún ramo con peso > 5% sale de ±10%, reajustar δ.
 
-## La frecuencia de la cuenta: evaluada y descartada como fuente de error
+## El δ calibrado NO transfiere al reforecast — no adoptar el FND del modelo todavía
 
-La tabla `xPND` anterior daba un FND distinto según la periodicidad de la cuenta (columnas `1`, `2`, `3`, `6`, `0`); el FND del modelo no distingue frecuencia. Eso hace que un ramo cuyo δ salió cero —Incendio— igual se mueva: sus cuentas mensuales dan idéntico, pero las trimestrales, semestrales y anuales suben. La pregunta natural es si ahí hay un sesgo. Se evaluó con datos y **la respuesta es que no: incorporar la frecuencia no mejora el ajuste, y usarla sola lo empeora.**
+**Corrección importante a lo que decía antes esta sección.** Al correr el reforecast RRC con el FND del modelo y
+contrastar contra la RRC real, el modelo queda peor que el FND de siempre. Es un resultado medido, no una sospecha:
 
-Primero, un hecho que conviene tener claro: **las columnas de frecuencia de `xPND` son exactamente la regla M4 del propio MEC**, `δ = (t − 1)/2 · 30/365` con `t` = meses de la cuenta. Se verificó al centavo para t = 3, 6 y 12 (la de t = 2 difiere en 0.0011 por redondeo de la tabla). Es decir, la tabla anterior ya era `NT(k) − δ_M4(t)`; no es un esquema distinto, es el mismo con el desplazamiento puesto por frecuencia en vez de por ramo.
+| Prima no devengada, 202601–202605, USD | Total | Sin CAT | Sólo CAT |
+|---|---|---|---|
+| RRC **real** | 2,750 M | 1,907 M | 843 M |
+| Reforecast con el FND **legado** | 2,454 M (−10.8%) | **1,936 M (+1.5%)** | 518 M (−38.6%) |
+| Reforecast con el FND **del modelo** | 2,644 M (−3.8%) | **2,088 M (+9.5%)** | 557 M (−34.0%) |
 
-Con eso, se ajustaron tres variantes contra la misma RRC real, misma ventana (202301–202605, CAT desde 202401) y mismo insumo:
+Sobre el BEL en escenario 2 el error absoluto medio por ramo × mes pasa de **9.1%** (legado) a **17.5%** (modelo), y el
+legado gana en 11 de 13 ramos.
 
-| Variante | Qué hace | Ratio Σmodelo/Σreal | MAPE mensual del total | PND al 202605 |
-|---|---|---|---|---|
-| **A** | δ por ramo, frecuencia aplastada — **producción** | 0.9996 | 2.42% | 544.2 M USD |
-| **B** | δ = M4(frecuencia), sin δ por ramo — *la tabla anterior* | 0.9688 | 3.76% | 529.8 M USD |
-| **C** | δ = M4(frecuencia) **+** δ residual por ramo | 1.0012 | 2.40% | 544.9 M USD |
+### Por qué
 
-C, que es la propuesta «meter la frecuencia además del ramo», queda indistinguible de A: +0.14% en la reserva y el MAPE se mueve dos centésimas de punto. Y la razón se ve al abrir los parámetros: **el δ residual de C cancela casi exactamente el desplazamiento por frecuencia.**
+δ se calibró para que `Σ prima_BD-MEC × FND ≈ PND_real`. El reforecast aplica ese δ sobre **otra base de prima**: la
+consulta a BD Gonzalo, con sus propios filtros (ventana de `aPog_MesProc`, el candado de año de suscripción, exclusión
+de `LlavesPol`). Con el **mismo** FND del modelo, esa base produce alrededor de **10% más** prima no devengada que la
+base del MEC. El δ absorbe el nivel de una base y se aplica a otra, así que sobreestima.
 
-| Ramo | δ_M4 que implica su mezcla de frecuencias | δ residual de C | suma | δ_A (producción) |
-|---|---|---|---|---|
-| Incendio | +0.0283 | −0.030 | −0.002 | 0.000 |
-| Diversos | +0.0356 | −0.035 | +0.001 | 0.000 |
-| RC | +0.0193 | −0.020 | −0.001 | 0.000 |
-| MyT | +0.0430 | −0.055 | −0.012 | −0.010 |
-| AyE | +0.0193 | +0.030 | +0.049 | +0.045 |
-| Autos | +0.0296 | +0.100 | +0.130 | +0.130 |
-| Agro | +0.0237 | +0.075 | +0.099 | +0.095 |
-| Vida | +0.0095 | +0.060 | +0.070 | +0.070 |
+El FND legado no tiene ese problema porque nunca se calibró fuera: es `NT(k) − δ_M4(frecuencia)`, y su escalonamiento
+por periodicidad de la cuenta actúa justo como la reducción que esa base más grande necesita. Se ve en el δ que haría
+cuadrar cada ramo dentro del reforecast, comparado con el δ_M4 que implica su mezcla de frecuencias:
 
-En todos los casos `δ_M4 + δ_C ≈ δ_A`. La calibración deshace sistemáticamente el escalonamiento por frecuencia, que es la forma que tienen los datos de decir que **la RRC real no lo aplica**: devenga como si todas las cuentas fueran mensuales, y lo que sí varía por ramo es otra cosa (Autos +0.130, Vida +0.070, CAT −0.035), que el δ por ramo ya recoge.
+| Ramo | δ actual | δ_M4 de su mezcla | δ que haría cuadrar |
+|---|---|---|---|
+| Incendio | 0.000 | 0.241 | 0.271 |
+| Diversos | 0.000 | 0.261 | 0.336 |
+| MyT | −0.010 | 0.239 | 0.215 |
+| AyE | +0.045 | 0.334 | 0.227 |
+| Autos | +0.130 | 0.322 | 0.318 |
+| Vida | +0.070 | 0.069 | 0.069 |
 
-La consecuencia práctica es la contraria a la sospecha: la variante B —que es la lógica de la tabla anterior— **subestima la reserva en 2.6%, unos 14.3 M USD al 202605**, y para Incendio en particular deja la razón en 0.947 contra el 0.997 de la calibración actual. Es decir, en Incendio el FND del modelo no se aleja de la RRC real: se acerca cinco puntos. La diferencia que aparece contra el output anterior es el modelo quitando un escalonamiento que la reserva real no tiene.
+El δ necesario cae encima del δ_M4 de la frecuencia. Es decir: **dentro del reforecast, la respuesta correcta es
+básicamente lo que el FND legado ya hace.** Vida lo confirma por el otro lado: es 75% cuentas mensuales, su δ_M4 es
+0.069, su δ calibrado 0.070 y el necesario 0.069 — ahí sí transfiere, porque no hay escalonamiento que perder.
 
-Reproducible con `evaluar_frecuencia_fnd.py`, que necesita `insumos/` y la BD del MEC (única fuente de `Meses Periodo`). Un matiz de la corrida: la mezcla de periodicidad se tomó de los meses que cubre la BD disponible (2024–2026) y se aplicó al histórico; con una BD que cubra toda la ventana el reparto es exacto, aunque la cancelación es tan limpia y tan consistente entre ramos que la conclusión no depende de eso.
+### Sobre la frecuencia
 
-Si en algún momento se quiere abrir el modelo por frecuencia, el camino no es sumar δ_M4: sería calibrar δ por ramo × frecuencia con la periodicidad en el insumo. Los datos de hoy no lo piden.
+La sección anterior concluía que la frecuencia no aportaba. Esa conclusión tenía un error de dato: `Meses Periodo = 0`
+en la BD del MEC es el código de cuenta **anual** (columna `'0'` de xPND, δ_M4 = 0.452), y se estaba leyendo como
+mensual. Con el mapeo correcto la mezcla real de la cartera proporcional es del orden de 48–76% anual, no 59% mensual.
+
+Rehecha con el mapeo bueno, la comparación **sobre la base del MEC** sigue dando lo mismo: la variante «M4 por
+frecuencia + δ residual» empata con «δ por ramo» (razón 1.00 contra 1.00, MAPE 8.99% contra 8.89%) porque el δ residual
+vuelve a cancelar el escalonamiento. Lo que cambia es la lectura: esa cancelación es un artefacto de esa base de prima,
+y no sobrevive al cambio de base. Reproducible con `evaluar_frecuencia_fnd.py`.
+
+### Qué hacer
+
+1. **No adoptar el FND del modelo en producción todavía.** Dejar `USAR_FND_CALIBRADO = False` hasta recalibrar.
+2. **Recalibrar δ sobre la base de prima del propio reforecast**, no sobre la del MEC. Hace falta el intermedio que el
+   script ya escribe, `ConsultaPPTO_RRC_<mes>_tradicional.xlsx`, con `CALMONTH`, `Período`/`FRECUENCIA`, `Ramo`,
+   `TipoRea`, `MONTO_PI` y `BELMEDIA` por registro; con dos o tres meses alcanza para fijar δ por ramo contra la RRC real.
+3. Al recalibrar, **conservar el escalonamiento por frecuencia** (`FND = NT(k) − δ_M4(frecuencia) − δ_ramo`): la
+   evidencia de arriba dice que dentro del reforecast es necesario.
+
+### Lo que sí es un problema grande y no es nuestro
+
+**CAT (ramos 71 y 73) queda 38.6% por debajo de la RRC real en la corrida legada y 34.0% en la del modelo** — unos
+325 M USD. Falla en las dos, así que es previo al cambio de FND y no lo causa el modelo. En el banco de validación, en
+cambio, CAT cuadra (razón 0.946 contra la RRC real), lo que apunta a que la consulta del reforecast deja fuera prima
+CAT que sí está en la base del MEC. Vale la pena atacarlo: es la desviación más grande de todo el reporte.
 
 ## Hallazgos colaterales que conviene revisar
 
