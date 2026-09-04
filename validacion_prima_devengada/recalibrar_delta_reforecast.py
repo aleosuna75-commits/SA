@@ -127,6 +127,12 @@ def main():
     else:
         d["TC_Val"] = 1.0
     d = d.dropna(subset=["Ramo", "CALMONTH", "MONTO_PI", "BELMEDIA"])
+    # PORC_ND nulo = el legado no le asignó factor (frecuencia fuera del catálogo de xPND):
+    # cuenta como 0, que es lo que el legado acaba metiendo en el BEL.
+    n_nulos = int(d.PORC_ND.isna().sum())
+    if n_nulos:
+        print(f"[recal] Aviso: {n_nulos:,} registros traen PORC_ND vacío; se toman como 0 (así entran al BEL).")
+    d["PORC_ND"] = d.PORC_ND.fillna(0.0)
     d["Grupo"] = d.Ramo.map(RAMO2GRUPO)
     d = d[d.Grupo.notna()].copy()
     d["k"] = [antiguedad(v, c) for v, c in zip(d.MES_VAL, d.CALMONTH)]
@@ -155,6 +161,39 @@ def main():
         raise SystemExit(f"[recal] Sin TC para {sorted(d.loc[d.TC_mes.isna(),'MES_VAL'].unique())} en tc_mensual_bd.csv")
     d["peso_USD"] = d.peso / d.TC_mes
     d["BEL_legado_USD"] = d.BEL_legado / d.TC_mes
+
+    # ---- diagnóstico: ¿cuánta prima anula el legado por FRECUENCIA fuera de catálogo?
+    CAT_XPND = {"1", "2", "3", "6", "0", "NA", "DEF"}
+    aj = d[d.ajustable].copy()
+    aj["frec_txt"] = aj.FRECUENCIA.astype(str).str.strip().str.replace(r"\.0$", "", regex=True)
+    aj["fuera_catalogo"] = ~aj.frec_txt.isin(CAT_XPND)
+    aj["legado_cero"] = aj.PORC_ND.abs() < 1e-12
+    pw = aj.peso_USD.abs()
+    print("\n" + "=" * 108)
+    print("DIAGNÓSTICO · ¿por qué el modelo sube? Dos mecanismos posibles, aquí se distinguen")
+    print("=" * 108)
+    print("  Reparto de la prima proporcional ajustable, por código de FRECUENCIA:")
+    rep = aj.groupby("frec_txt").apply(
+        lambda x: pd.Series({"prima_USD": x.peso_USD.abs().sum(),
+                             "en_catalogo_xPND": (~x.fuera_catalogo).all(),
+                             "FND_legado_medio": np.average(x.PORC_ND.fillna(0.0), weights=x.peso_USD.abs())
+                             if x.peso_USD.abs().sum() > 0 else 0.0,
+                             "%_con_FND_legado_0": 100 * x.loc[x.legado_cero, "peso_USD"].abs().sum()
+                             / max(x.peso_USD.abs().sum(), 1e-9)}), include_groups=False)
+    rep["%_prima"] = 100 * rep.prima_USD / rep.prima_USD.sum()
+    print(rep.sort_values("prima_USD", ascending=False).to_string(
+        formatters={"prima_USD": lambda v: f"{v/1e6:10.1f}", "FND_legado_medio": lambda v: f"{v:.4f}",
+                    "%_con_FND_legado_0": lambda v: f"{v:5.1f}", "%_prima": lambda v: f"{v:5.1f}"}))
+    f_fuera = 100 * pw[aj.fuera_catalogo].sum() / max(pw.sum(), 1e-9)
+    f_cero = 100 * pw[aj.legado_cero].sum() / max(pw.sum(), 1e-9)
+    print(f"\n  Prima con FRECUENCIA fuera del catálogo de xPND: {f_fuera:.1f}%"
+          f"   ·   prima cuyo FND legado es exactamente 0: {f_cero:.1f}%")
+    if f_fuera > 1:
+        print("  >> MECANISMO (b): el legado ANULA esa prima (FND = 0) y el modelo le da NT(k)−δ.")
+        print("     Eso infla el modelo y además habría que preguntarle al área si anularla es intencional.")
+    else:
+        print("  >> El catálogo cubre la cartera: la sobreestimación viene del MECANISMO (a),")
+        print("     el escalonamiento por frecuencia que el modelo aplana.")
 
     delta_prod = {}
     jp = os.path.join(BASE, "delta_calibrado.json")
