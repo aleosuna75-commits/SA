@@ -83,6 +83,41 @@ La tabla completa está en `salidas/tabla_fnd_calibrada.csv` y en la hoja TablaF
 
 Recomendación de recalibración periódica: correr `validar_prima_devengada.py` en cada cierre trimestral con la base BEL-IRR-MR actualizada; si el ratio total sale de ±3% o algún ramo con peso > 5% sale de ±10%, reajustar δ.
 
+## La frecuencia de la cuenta: evaluada y descartada como fuente de error
+
+La tabla `xPND` anterior daba un FND distinto según la periodicidad de la cuenta (columnas `1`, `2`, `3`, `6`, `0`); el FND del modelo no distingue frecuencia. Eso hace que un ramo cuyo δ salió cero —Incendio— igual se mueva: sus cuentas mensuales dan idéntico, pero las trimestrales, semestrales y anuales suben. La pregunta natural es si ahí hay un sesgo. Se evaluó con datos y **la respuesta es que no: incorporar la frecuencia no mejora el ajuste, y usarla sola lo empeora.**
+
+Primero, un hecho que conviene tener claro: **las columnas de frecuencia de `xPND` son exactamente la regla M4 del propio MEC**, `δ = (t − 1)/2 · 30/365` con `t` = meses de la cuenta. Se verificó al centavo para t = 3, 6 y 12 (la de t = 2 difiere en 0.0011 por redondeo de la tabla). Es decir, la tabla anterior ya era `NT(k) − δ_M4(t)`; no es un esquema distinto, es el mismo con el desplazamiento puesto por frecuencia en vez de por ramo.
+
+Con eso, se ajustaron tres variantes contra la misma RRC real, misma ventana (202301–202605, CAT desde 202401) y mismo insumo:
+
+| Variante | Qué hace | Ratio Σmodelo/Σreal | MAPE mensual del total | PND al 202605 |
+|---|---|---|---|---|
+| **A** | δ por ramo, frecuencia aplastada — **producción** | 0.9996 | 2.42% | 544.2 M USD |
+| **B** | δ = M4(frecuencia), sin δ por ramo — *la tabla anterior* | 0.9688 | 3.76% | 529.8 M USD |
+| **C** | δ = M4(frecuencia) **+** δ residual por ramo | 1.0012 | 2.40% | 544.9 M USD |
+
+C, que es la propuesta «meter la frecuencia además del ramo», queda indistinguible de A: +0.14% en la reserva y el MAPE se mueve dos centésimas de punto. Y la razón se ve al abrir los parámetros: **el δ residual de C cancela casi exactamente el desplazamiento por frecuencia.**
+
+| Ramo | δ_M4 que implica su mezcla de frecuencias | δ residual de C | suma | δ_A (producción) |
+|---|---|---|---|---|
+| Incendio | +0.0283 | −0.030 | −0.002 | 0.000 |
+| Diversos | +0.0356 | −0.035 | +0.001 | 0.000 |
+| RC | +0.0193 | −0.020 | −0.001 | 0.000 |
+| MyT | +0.0430 | −0.055 | −0.012 | −0.010 |
+| AyE | +0.0193 | +0.030 | +0.049 | +0.045 |
+| Autos | +0.0296 | +0.100 | +0.130 | +0.130 |
+| Agro | +0.0237 | +0.075 | +0.099 | +0.095 |
+| Vida | +0.0095 | +0.060 | +0.070 | +0.070 |
+
+En todos los casos `δ_M4 + δ_C ≈ δ_A`. La calibración deshace sistemáticamente el escalonamiento por frecuencia, que es la forma que tienen los datos de decir que **la RRC real no lo aplica**: devenga como si todas las cuentas fueran mensuales, y lo que sí varía por ramo es otra cosa (Autos +0.130, Vida +0.070, CAT −0.035), que el δ por ramo ya recoge.
+
+La consecuencia práctica es la contraria a la sospecha: la variante B —que es la lógica de la tabla anterior— **subestima la reserva en 2.6%, unos 14.3 M USD al 202605**, y para Incendio en particular deja la razón en 0.947 contra el 0.997 de la calibración actual. Es decir, en Incendio el FND del modelo no se aleja de la RRC real: se acerca cinco puntos. La diferencia que aparece contra el output anterior es el modelo quitando un escalonamiento que la reserva real no tiene.
+
+Reproducible con `evaluar_frecuencia_fnd.py`, que necesita `insumos/` y la BD del MEC (única fuente de `Meses Periodo`). Un matiz de la corrida: la mezcla de periodicidad se tomó de los meses que cubre la BD disponible (2024–2026) y se aplicó al histórico; con una BD que cubra toda la ventana el reparto es exacto, aunque la cancelación es tan limpia y tan consistente entre ramos que la conclusión no depende de eso.
+
+Si en algún momento se quiere abrir el modelo por frecuencia, el camino no es sumar δ_M4: sería calibrar δ por ramo × frecuencia con la periodicidad en el insumo. Los datos de hoy no lo piden.
+
 ## Hallazgos colaterales que conviene revisar
 
 - **Filtro de año de suscripción en `reforecastRRC_v10_Esc1_ocl.py`.** La consulta a Gonzalo excluye la prima positiva registrada en un año calendario posterior al de suscripción (`Val(left(aPog_MesProc,4)) <= Susc`). Reproducido con año de suscripción ≈ año de inicio de vigencia, ese filtro deja el modelo en el 29% de la RRC real (variante `NT_reg_susc` del Excel). Es un candidato fuerte a la desviación considerable contra la Nota Técnica que motivó este trabajo; hay que verificarlo con el campo Susc real de SIREC, que la BD del MEC no trae.
@@ -106,6 +141,7 @@ Recomendación de recalibración periódica: correr `validar_prima_devengada.py`
 | `preparar_insumos.py` | construye `insumos/` a partir de los archivos crudos (`BD_ BEL - IRR - MR.xlsx`, `Input_MEC_Devengamiento.xlsx`, `Registros_Vigencia_MEC.csv`, Integración Dim opcional) que estén en la misma carpeta |
 | `validar_prima_devengada.py` | motor de reconstrucción, comparación y calibración; genera todo lo de `salidas/` |
 | `verificar_excel_formulas.py` | recalcula el Excel con LibreOffice y comprueba que las fórmulas de la hoja Mensual reproducen los valores de Python |
+| `evaluar_frecuencia_fnd.py` | contrasta δ por ramo contra δ por frecuencia (regla M4) contra las dos juntas; sustenta la sección sobre la frecuencia |
 | `fnd_calibrado.py` | tabla FND calibrada y funciones de integración para RRC / SONR |
 | `insumos/` | prima por ramo × cohorte × mes de registro (BD del MEC), saldos RRC reales, IS por ramo × mes, TC, vectores PF+ (horizonte 72), primas del ER real, vigencias del MEC |
 | `salidas/Validacion_Prima_Devengada.xlsx` | Resumen, Formulas, Graficas, PD anual por ramo, ajuste PND, calibración, tabla FND, detalle mensual, parámetros reales, supuestos |
