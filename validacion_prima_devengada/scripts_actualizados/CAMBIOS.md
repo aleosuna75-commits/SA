@@ -14,6 +14,8 @@ Todos los cambios de comportamiento vienen con interruptor: `USAR_FND_CALIBRADO 
 | `construir_input_mec.py` | `construir input mec.py` | +334 / −53 |
 | `generar_output_mec.py` | `generar output mec.py` | +7 / −3 |
 | `comparar_outputs_reservas.py` | nuevo (output anterior vs output con FND calibrado) | — |
+| `ReforecastRRC_aod.py` | el script actual del área, mismo nombre | +43 / −10 |
+| `ReforecastSONR_aod.py` | el script actual del área, mismo nombre | +63 / −11 |
 | `test_integracion_fnd.py` | nuevo (prueba de regresión) | — |
 
 Todos los scripts leen sus insumos y escriben sus salidas en **su propia carpeta**; la guía de qué archivo va en la carpeta local para cada paso está en `LEEME_carpeta_local.md`.
@@ -114,7 +116,26 @@ Pone lado a lado el output anterior de cada reforecast (`RRC_esc.xlsx`, `SONR_es
 - **Marcas en el Excel.** En Mensual (y en las demás hojas donde aparecen) `PND_real` y `PND_CAL` van en azul: son la prima no devengada real y la del modelo calibrado contra la que se compara. Las columnas en ámbar traen **fórmulas vivas de Excel**: `PR = PE × (1 − ces)`, `BRUTO_CAL = PND_CAL × IS × (1 + g + mr)`, `NETO_CAL = BRUTO_CAL − PND_CAL × IS × c`, `ratio_CAL_real = PND_CAL / PND_real`, las variaciones `dBRUTO_*` y `dNETO_*` (mes contra mes dentro del mismo grupo) y `PD_tom_* = PE − dBRUTO_*`, `PD_ret_* = PR − dNETO_*`. Cada encabezado lleva un comentario con su fórmula y la hoja `Formulas` las lista todas. `verificar_excel_formulas.py` recalcula el libro con LibreOffice y comprueba que las 12 columnas de fórmulas reproducen los valores de Python (diferencia máxima 5e-7 USD en 530 filas).
 - **Corribles en la carpeta local.** `preparar_insumos.py` (nuevo) construye `insumos\` a partir de los archivos crudos que estén en la misma carpeta (`BD_ BEL - IRR - MR.xlsx`, `Input_MEC_Devengamiento.xlsx`, `Registros_Vigencia_MEC.csv`, `Integración*.xlsb` opcional); `validar_prima_devengada.py` detecta solo el último mes con saldo de la base real (antes era una constante) y escribe en `salidas\`. Los CSV que genera son idénticos a los de la entrega anterior (diferencia máxima 4e-9).
 
-## 8. Prueba de regresión
+## 8. Scripts `_aod` — los actuales del área, con sólo dos cambios
+
+El usuario entregó sus dos reforecast vigentes (`ReforecastRRC_aod.py`, `ReforecastSONR_aod.py`: ya en 2026, con sus nombres de archivo, y el RRC sin escenario de presupuesto) y pidió ajustarlos «tal cual están» con una única diferencia: FND del modelo y outputs en Documents. Están en esta carpeta con el mismo nombre; los originales en `_orig/` y los diffs en `diffs/`. Guía en `LEEME_aod.md`.
+
+Cambios, y nada más:
+
+- Bloque `#%% FND CALIBRADO`: importa `mec_devengamiento` desde la carpeta del script, lee `delta_calibrado.json`, define `fnd_cal` y el interruptor `USAR_FND_CALIBRADO`. En el RRC `MES_VALUACION = Meses` se fija dentro del ciclo; en el SONR el mes de valuación sale de `xFecVal`.
+- RRC: `VALORFREC` en `ConsultaReal` y `ConsultaReal_USD` pasa por `fnd_cal(row['Ramo'], row['CALMONTH'], <valor xPND de siempre>)`. La lógica de `PORC_ND` (71/73, no proporcional por fechas, resto) no se toca.
+- SONR: `zFND`, `zFND2` y `zFND_PPTO` reciben `xRamo=None` al final (firma compatible) y, si el negocio no es TipoRea 2, devuelven `fnd_cal`; los tres puntos de llamada pasan `y['Ramo_filt']`.
+- Rutas: las de `Documents`, `Archivos de Maria Osmara Camacho Lopez - Inputs` y `Documents\Outputs` pasan a `CARPETA = _DIR`. La salida final se llama `RRC_esc_FNDcal.xlsx` / `SONR_esc_FNDcal.xlsx` o `*_legado.xlsx` según el interruptor.
+
+**No** llevan el resolver de nombres de archivo ni el bloque de año de la sección 3b: el usuario pidió los suyos tal cual, y ya están en 2026 con los nombres correctos.
+
+### Corrección que salió de la prueba: el legado se evaluaba antes de tiempo (SONR)
+
+La rama calibrada de `zFND` pasaba a `fnd_cal` el valor de siempre como respaldo, `xPND.get(xMesProc, 0).get(...)`, y Python lo evalúa antes de entrar a la función. En el original esa expresión sólo se alcanza para registros de los últimos doce meses, porque una guarda (`xMesProc <= prev_year_ym → 0`) devuelve antes; el SONR lee diez años de registros, así que con el interruptor encendido el primer registro fuera de la ventana daba `AttributeError: 'int' object has no attribute 'get'`. El default pasa a `{}`: un mes fuera de la ventana devuelve 0, que es exactamente lo que el original devuelve por su guarda. Corregido en `ReforecastSONR_aod.py` y en `ReforecastSONR_v4.py`, que tenía el mismo patrón. El RRC no lo necesita: su original ya evaluaba esa expresión para todas las filas.
+
+Verificación: extrayendo las funciones por AST y corriéndolas contra las originales con `xPND` construido como en el script (sólo doce meses), con el interruptor en `False` 1,296 casos idénticos; en `True` cero errores, no proporcional idéntico (432) y proporcional igual a `mec.fnd_registro` (864).
+
+## 9. Prueba de regresión
 
 `test_integracion_fnd.py` comprueba que `mec.factor_no_devengado` del módulo parchado reproduce la prima no devengada con la que se calibró el modelo contra la RRC real, en cuatro fechas de valuación, y verifica las propiedades de la tabla (k < 0 y k ≥ 12 dan cero, 31 colapsa a 30, 71 a 70, FND acotado a [0, 1], cola del vector en cero).
 

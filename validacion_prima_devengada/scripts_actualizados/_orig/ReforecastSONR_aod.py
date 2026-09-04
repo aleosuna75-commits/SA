@@ -1,172 +1,52 @@
-#%% RESERVA SONR
-#
-# v4 — FND CALIBRADO (MEC v3). Qué cambió y por qué:
-#   El FND de la prima PROPORCIONAL y FACULTATIVA (TipoRea 1 y 3) deja de leerse de
-#   los diccionarios xPND escritos a mano y sale de la tabla calibrada del MEC,
-#   indexada por ANTIGÜEDAD DE REGISTRO k = mes de valuación − CALMONTH, con un
-#   desplazamiento δ por ramo. Es el MISMO factor que consume el RRC, de modo que la
-#   prima devengada del SONR (Dev = 1 − FND) queda coherente con la RRC por
-#   construcción, como pide la sección 8 del documento del MEC.
-#   Se calibró contra la prima devengada real (base BEL-IRR-MR): error medio mensual
-#   de 3.1% en la reserva y de 0.7%–2.3% en la prima devengada anual.
-#   El NO PROPORCIONAL (TipoRea 2) NO cambia: conserva su ratio por fechas.
-#   Con USAR_FND_CALIBRADO = False el script se comporta exactamente como la v3.
-#
 #%% LIBRERÍAS
 import pyodbc
 import pandas as pd
 import warnings
 import getpass
-import os
-import sys
 from datetime import datetime
-usuario = getpass.getuser()
+usuario = "asunad"
 warnings.filterwarnings('ignore')
 
-#%% FND CALIBRADO (MEC v3) — sustituye la búsqueda en xPND
-# mec_devengamiento.py debe estar en esta misma carpeta.
-_DIR = os.path.dirname(os.path.abspath(__file__))
-if _DIR not in sys.path:
-    sys.path.insert(0, _DIR)
-import mec_devengamiento as mec
-
-USAR_FND_CALIBRADO = True   # False -> comportamiento idéntico a la v3 (xPND)
-DELTA_FND = mec.cargar_delta(_DIR)      # lee delta_calibrado.json si existe
-
-
-def fnd_cal(xRamo, xMesProc, xFecVal, legado=0.0):
-    """FND de una cuenta proporcional/facultativa por antigüedad de REGISTRO:
-    k = mes de valuación (de xFecVal) − mes contable de registro (xMesProc)."""
-    if not USAR_FND_CALIBRADO or xRamo is None:
-        return legado
-    try:
-        mv = xFecVal.year * 100 + xFecVal.month
-    except Exception:
-        return legado
-    k = mec.antiguedad_registro(mv, xMesProc)
-    if k is None:
-        return legado
-    return 0.0 if k < 0 else mec.fnd_registro(xRamo, k, DELTA_FND)
-
-
-def _es_no_proporcional(xTipoRea) -> bool:
-    try:
-        return int(float(xTipoRea)) == 2
-    except Exception:
-        return False
-
-#%% AÑO Y MES DE VALUACIÓN — lo único que se mueve en cada cierre
-# Todo lo que depende del año se deriva de aquí: los nombres de archivo que llevan año,
-# el mapa xAños, el corte del presupuesto, las fechas de valuación y el periodo de salida.
-# No quedan años sueltos más abajo (los «2025» que verás en nombres de columna como
-# IRR2025_TCVal son etiquetas internas del script y no dependen del ejercicio).
+#%% INPUTS
 zAñoPpto = 2026
 zAño= 2026
 zMes = 12
-#%% CARPETA LOCAL — todos los insumos se leen y todas las salidas se escriben aquí
-# Por defecto es la carpeta donde está este script (ponlo en «…\OneDrive - GPV\Documents»).
-# Si quieres otra, escribe la ruta completa, p. ej.  CARPETA = r"C:\Users\tu.usuario\OneDrive - GPV\Documents"
-# La base de valuación (BaseValuacion.accdb) sigue leyéndose del servidor \\adsroma; eso no cambia.
-CARPETA = _DIR
-xFolder = CARPETA
-
-#%% ARCHIVOS DE ENTRADA — los nombres tal como están en la carpeta
-# Cada entrada admite varios nombres y se usa el PRIMERO que exista, así que el script
-# aguanta que un archivo cambie de nombre entre cierres. {A} = zAño, {A-1} = año anterior.
-# Si alguno se llama distinto, ponlo al principio de su lista.
-ARCHIVOS = {
-    "aj_manuales":    ["AjManuales_SONR.csv"],
-    "subramo":        ["Subramo.csv"],
-    "tbase_mp":       ["TablaBase_MetodoPropio.csv"],
-    "tbase_mp_ext":   ["TablaBase_MetodoPropio_ext.csv"],
-    "param_sonr":     ["ParamSONR{A}.csv", "ParamSONR.csv", "ParamSONR{A-1}.csv"],
-    # los lags de incurrido: si no hay archivo aparte, sirve el mismo ParamSONR
-    "param_sonr_inc": ["ParamSONR{A}_lagsinc.csv", "ParamSONR{A}.csv", "ParamSONR{A-1}_lagsinc.csv"],
-    "pnd_mes":        ["PNDmes.csv"],
-    "frec_col":       ["FrecCol.csv"],
-    "llaves_pol":     ["LlavesPol.csv"],
-    "esc_base":       ["Escenario_base_SONR.csv"],
-    "ppto_tecnico":   ["PptoTecnico{A}.csv", "PptoTecnico.csv", "PptoTecnico{A-1}.csv"],
-}
-
-
-def ruta(clave):
-    """Ruta completa del archivo, probando los nombres de ARCHIVOS[clave] en orden.
-    Si ninguno existe, aborta diciendo qué hay en la carpeta que se le parezca."""
-    import difflib
-    nombres = [x.replace("{A-1}", str(zAño - 1)).replace("{A}", str(zAño)) for x in ARCHIVOS[clave]]
-    for x in nombres:
-        p = os.path.join(CARPETA, x)
-        if os.path.exists(p):
-            if x != nombres[0]:
-                print(f"[SONR] {clave}: uso «{x}» ({nombres[0]} no está en la carpeta).")
-            return p
-    hay = os.listdir(CARPETA)
-    cerca = difflib.get_close_matches(nombres[0], hay, n=3, cutoff=0.4)
-    raise SystemExit(f"[SONR] No encontré el archivo «{clave}».\n"
-                     f"       Busqué, en este orden: {nombres}\n"
-                     f"       En la carpeta: {CARPETA}\n"
-                     f"       Lo más parecido que hay ahí: {cerca or 'nada'}\n"
-                     f"       Corrige el nombre en el diccionario ARCHIVOS, arriba en este script.")
-
-
-xAjManuales = pd.read_csv(ruta("aj_manuales"))
+xFolder = fr"C:\Users\{usuario}\OneDrive - GPV\Archivos de Maria Osmara Camacho Lopez - Inputs"
+#xAjManuales = pd.read_csv(f"{xFolder}\\AjManuales_SONR.csv")
 
 #### PPTO
-xSubramo = pd.read_csv(ruta("subramo"))
+xSubramo = pd.read_csv(f"{xFolder}\\Subramo.csv")
 
 ####Mensual
-Tbase_mp = pd.read_csv(ruta("tbase_mp"))
-Tbase_mp_ext = pd.read_csv(ruta("tbase_mp_ext"))
-ParamSONR = pd.read_csv(ruta("param_sonr"))
-ParamSONR_inc = pd.read_csv(ruta("param_sonr_inc"))
-xPNDmes = pd.read_csv(ruta("pnd_mes"))
-xFrecCol = pd.read_csv(ruta("frec_col"))
-xLlavesPol = pd.read_csv(ruta("llaves_pol"))
-xEsc_base = pd.read_csv(ruta("esc_base"))
+Tbase_mp = pd.read_csv(f"{xFolder}\\TablaBase_MetodoPropio.csv")
+Tbase_mp_ext = pd.read_csv(f"{xFolder}\\TablaBase_MetodoPropio_ext.csv")
+ParamSONR = pd.read_csv(f"{xFolder}\\ParamSONR2026_3+9.csv")
+ParamSONR_inc = pd.read_csv(f"{xFolder}\\ParamSONR2026_3+9.csv")
+xPNDmes = pd.read_csv(f"{xFolder}\\PNDmes.csv")
+xFrecCol = pd.read_csv(f"{xFolder}\\FrecCol.csv")
+xLlavesPol = pd.read_csv(f"{xFolder}\\LlavesPol.csv")
+xEsc_base = pd.read_csv(f"{xFolder}\\Escenario_base_SONR.csv")
 
 #%% DICCIONARIOS
-def mapa_años(a):
-    """Reconstruye xAños: traduce la aritmética «Meses - k» a un AAAAMM real cruzando
-    el cambio de año. Cubre de enero del año a-1 a diciembre del año a."""
-    m = {a * 100 + i: a * 100 + i for i in range(1, 13)}
-    m.update({a * 100 - 11 + i: (a - 1) * 100 + 1 + i for i in range(12)})
-    return m
+xAños ={202612:202612, 202611:202611, 202610:202610, 202609:202609, 202608:202608, 202607:202607, 202606:202606, 202605:202605, 202604:202604, 202603:202603, 202602:202602, 202601:202601,
+        202600:202512, 202599:202511, 202598:202510, 202597:202509, 202596:202508, 202595:202507, 202594:202506, 202593:202505, 202592:202504, 202591:202503, 202590:202502, 202589:202501}
 
-
-xAños = mapa_años(zAño)
-
-xTC_PPTO = {202412:19.5,202501:19.5146,202502:19.5438,202503:19.5729,
-         202504:19.6021,202505:19.6313,202506:19.6604,202507:19.6896,
-         202508:19.7188,202509:19.7479,202510:19.7771,202511:19.8063,
-         202512:19.8354}
-
-
-def revisar_tc_ppto(periodos):
-    """El TC de presupuesto es un dato: no se deriva del año. Si el escenario base trae
-    meses que no están en xTC_PPTO hay que agregarlos a mano; esto avisa con nombre y
-    apellido en vez de reventar con un KeyError sin contexto."""
-    faltan = sorted({int(p) for p in periodos} - set(xTC_PPTO))
-    if faltan:
-        raise SystemExit(f"[SONR] Faltan tipos de cambio de presupuesto en xTC_PPTO para {faltan}.\n"
-                         f"       Hoy la tabla cubre {min(xTC_PPTO)}–{max(xTC_PPTO)}.\n"
-                         f"       Agrégalos en el diccionario xTC_PPTO, arriba en este script.")
+xTC_PPTO = {202512:18.008,202601:19.0333,202602:19.0667,
+            202603:19.1,202604:19.1333,202605:19.1667,
+            202606:19.2,202607:19.2333,202608:19.2667,
+            202609:19.3,202610:19.3333,202611:19.3667,
+            202612:19.4}
 
 xEscenario = {"BEL_RIESGO":["BEL", 2],
         "IRR":["IRR",2],
-        "IRR2025_TCVal":["IRR",2],
+        "IRR2026_TCVal":["IRR",2],
         "MR":["MR",2],
         "BRUTO":["BRUTO",2],
         "NETO":["NETO",2]}
 
 
 #%% FUNCIÓN FND REAL.
-def zFND(xIniVig, xFinVig, xTipoRea, xAñoMes, xFecVal, xMesProc, xFrecuencia, xRamo=None):
-    # v4: proporcional y facultativo -> tabla calibrada por antigüedad de registro.
-    # El no proporcional (TipoRea 2) sigue por la lógica de fechas de más abajo.
-    if USAR_FND_CALIBRADO and not _es_no_proporcional(xTipoRea):
-        return fnd_cal(xRamo, xMesProc, xFecVal,
-                       xPND.get(xMesProc, {}).get(str(xFrecuencia), 0))   # {}: un mes fuera de la ventana da 0, no revienta
+def zFND(xIniVig, xFinVig, xTipoRea, xAñoMes, xFecVal, xMesProc, xFrecuencia):
     mes_proc_str = str(xMesProc)
     right_3 = mes_proc_str[-3:] if len(mes_proc_str) >= 3 else mes_proc_str
 
@@ -213,11 +93,7 @@ def zFND(xIniVig, xFinVig, xTipoRea, xAñoMes, xFecVal, xMesProc, xFrecuencia, x
                 return result
 
 #%% FUNCIÓN FND PPTO
-def zFND_PPTO(xIniVig, xFinVig, xTipoRea, xAñoMes, xFecVal, xMesProc, xFrecuencia, xRamo=None):
-    # v4: idem zFND. En el presupuesto CALMONTH es el mes en que se proyecta el
-    # registro de la cuenta, así que la antigüedad de registro se calcula igual.
-    if USAR_FND_CALIBRADO and not _es_no_proporcional(xTipoRea):
-        return fnd_cal(xRamo, xMesProc, xFecVal, 0.0)
+def zFND_PPTO(xIniVig, xFinVig, xTipoRea, xAñoMes, xFecVal, xMesProc, xFrecuencia):
     fecha = datetime(zAño, 12, 31)
     #print(xMesProc)
     #print(xFecVal)
@@ -236,7 +112,7 @@ def zFND_PPTO(xIniVig, xFinVig, xTipoRea, xAñoMes, xFecVal, xMesProc, xFrecuenc
                     xVal = xAños.get(int(xMesProc) - xFecVal.month,0)
                 else:
                     xVal = xAños.get(int(xMesProc) - xFecVal.month + 12 ,0)
-            if xVal < (zAño*100 + 1):
+            if xVal < 202601:
                 #result = 1
                 result = xPND.get(xVal,0).get(str(xFrecuencia), 0)
             else:
@@ -265,11 +141,7 @@ def zFND_PPTO(xIniVig, xFinVig, xTipoRea, xAñoMes, xFecVal, xMesProc, xFrecuenc
                 return result
 
 #%% zFND REAL REFORECAST
-def zFND2(xIniVig, xFinVig, xTipoRea, xAñoMes, xFecVal, xMesProc, xFrecuencia, xRamo=None):
-    # v4: idem zFND (versión del reforecast).
-    if USAR_FND_CALIBRADO and not _es_no_proporcional(xTipoRea):
-        return fnd_cal(xRamo, xMesProc, xFecVal,
-                       xPND.get(xMesProc, {}).get(str(xFrecuencia), 0))   # {}: un mes fuera de la ventana da 0, no revienta
+def zFND2(xIniVig, xFinVig, xTipoRea, xAñoMes, xFecVal, xMesProc, xFrecuencia):
     mes_proc_str = str(int(xMesProc))
     if xIniVig == xFinVig: 
         current_ym = xFecVal.year * 100 + xFecVal.month
@@ -342,15 +214,14 @@ def ConsultaMoneda_usd():
 
 ConsultaTC_usd = ConsultaMoneda_usd()
 TC_USD = ConsultaMoneda_usd()
-xFolder = CARPETA
+xFolder = fr"C:\Users\{usuario}\OneDrive - GPV\Archivos de Maria Osmara Camacho Lopez - Inputs"
 fileName = f"{xFolder}\\TablaTCSONR.xlsx"
 TC_USD.to_excel(fileName, index=False)
 
 
 #%% FUNCIÓN CONSULTA MONEDA.
 def ConsultaMoneda():
-    # zAño se toma del bloque de arriba; antes había aquí un «zAño = 2025» local que
-    # pisaba al global y dejaba Anio_ant en el año equivocado al mover el ejercicio.
+    zAño = 2026
     conn_str = (r'DRIVER={Microsoft Access Driver (*.mdb, *.accdb)};'
             r'DBQ=\\adsroma\Documentos Patria\ReservasRRC\BaseValuacion.accdb;')
 
@@ -397,30 +268,9 @@ def calcular_tbase_mp(row, df_consulta):
     
     return suma
 
-def calcular_tbase_mp_rf_real(row, df_consulta):
-    # Filtramos el dataframe de consulta según las condiciones
-    mask = (
-        (ConsultaR_USD['AñoMes'] > row['Fecha Inicio']) & 
-        (ConsultaR_USD['AñoMes'] <= row['Fecha Fin']) &  
-        (ConsultaR_USD['Ramo_filt'] == row['Ramo'])   
-    )
-    añomes = row['AñoMes']
-    # Sumamos los valores de la columna T que cumplen las condiciones
-    suma = df_consulta.loc[mask, f'PrimaDev_{añomes}_Val'].sum()
 
-    return suma
 
-def calcular_tbase_mp_rf_ppto(row, df_consulta):
-    # Filtramos el dataframe de consulta según las condiciones
-    mask = (
-        (ConsultaPPTO['AñoMes'] > row['Fecha Inicio']) &
-        (ConsultaPPTO['AñoMes'] <= row['Fecha Fin']) & 
-        (ConsultaPPTO['Ramo'] == row['Ramo'])    
-    )
-    añomes = row['AñoMes']
-    # Sumamos los valores de la columna T que cumplen las condiciones
-    suma = df_consulta.loc[mask, f'PrimaDev_{añomes}_Val'].sum()
-    return suma
+
 #%% FUNCIÓN CONSULTA PARA SONR REAL
 def ConsultaReal(MES, FECVAL, AÑOMES):
     zInicio = (zAño - 10) * 100 + MES
@@ -454,14 +304,14 @@ def ConsultaReal(MES, FECVAL, AÑOMES):
     tMovGG = pd.read_sql(xSQL, conn)
     conn.close()
     
-    ConsultaR = pd.concat([tMovGG,xAjManuales]) 
-    #ConsultaR = tMovGG
+    #ConsultaR = pd.concat([tMovGG,xAjManuales]) 
+    ConsultaR = tMovGG
 
     ConsultaR['AñoMes'] = ConsultaR.apply(lambda row: row['Susc'] * 100 + int(str(int(row['CALMONTH']))[-2:]), axis=1) 
     
     ConsultaR['Frecuencia'] = ConsultaR.apply(lambda row: row['Periodo'] if (row['TipoRea'] == 1 and row['Ramo_filt'] != 70 and row['Ramo_filt'] != 100) else ('NA' if pd.notna(row['Periodo']) else 'DEF'), axis=1)
     ConsultaR[['IniVig', 'FinVig']] = ConsultaR[['IniVig', 'FinVig']].fillna(0)
-    ConsultaR[f'FND_{AÑOMES}'] = ConsultaR.apply(lambda y: zFND(y['IniVig'], y['FinVig'], y['TipoRea'], y['AñoMes'], FECVAL, y['CALMONTH'], y['Frecuencia'], y['Ramo_filt']), axis=1)
+    ConsultaR[f'FND_{AÑOMES}'] = ConsultaR.apply(lambda y: zFND(y['IniVig'], y['FinVig'], y['TipoRea'], y['AñoMes'], FECVAL, y['CALMONTH'], y['Frecuencia']), axis=1)
     
     #ConsultaR[f'FND_{Meses}'] = ConsultaR.apply(lambda y: zFNDmes(y['IniVig'], y['FinVig'], y['TipoRea'], y['Susc'], zFechaValuacion, y['CALMONTH'], y['Frecuencia'], xPNDmes, xFrecCol), axis=1)
     ConsultaR[f'Dev_{AÑOMES}'] = ConsultaR.apply(lambda row: 1 - row[f'FND_{AÑOMES}'] , axis=1)
@@ -520,7 +370,7 @@ def ConsultaReal_USD(MES, FECVAL, AÑOMES):
   
         zFechaValuacion = f'31/12/{zAño + mes}'
         zFechaValuacion = pd.Timestamp(zFechaValuacion)
-        ConsultaR[f'FND_{zAño + mes}12'] = ConsultaR.apply(lambda y: zFND2(y['IniVig'], y['FinVig'], y['TipoRea'], y['AñoMes'], zFechaValuacion, y['CALMONTH'], y['Frecuencia'], y['Ramo_filt']), axis=1)
+        ConsultaR[f'FND_{zAño + mes}12'] = ConsultaR.apply(lambda y: zFND2(y['IniVig'], y['FinVig'], y['TipoRea'], y['AñoMes'], zFechaValuacion, y['CALMONTH'], y['Frecuencia']), axis=1)
         ConsultaR[f'Dev_{zAño + mes}12'] = ConsultaR.apply(lambda row: 1 - row[f'FND_{zAño + mes}12'] , axis=1)
         ConsultaR[f'PrimaDev_{zAño + mes}12_Val'] = ConsultaR.apply(lambda row: row['PmaTomUSD'] * row[f'Dev_{zAño + mes}12'], axis=1)
 
@@ -541,7 +391,7 @@ def ConsultaReal_USD(MES, FECVAL, AÑOMES):
         
         zFechaValuacion = f'{dia}/{AuxMes}{mes_calculo}/{zAño}'
         zFechaValuacion = pd.Timestamp(zFechaValuacion)
-        ConsultaR[f'FND_{zAño}{AuxMes}{mes_calculo}'] = ConsultaR.apply(lambda y: zFND2(y['IniVig'], y['FinVig'], y['TipoRea'], y['AñoMes'], zFechaValuacion, y['CALMONTH'], y['Frecuencia'], y['Ramo_filt']), axis=1)
+        ConsultaR[f'FND_{zAño}{AuxMes}{mes_calculo}'] = ConsultaR.apply(lambda y: zFND2(y['IniVig'], y['FinVig'], y['TipoRea'], y['AñoMes'], zFechaValuacion, y['CALMONTH'], y['Frecuencia']), axis=1)
         ConsultaR[f'Dev_{zAño}{AuxMes}{mes_calculo}'] = ConsultaR.apply(lambda row: 1 - row[f'FND_{zAño}{AuxMes}{mes_calculo}'] , axis=1)
         ConsultaR[f'PrimaDev_{zAño}{AuxMes}{mes_calculo}_Val'] = ConsultaR.apply(lambda row: row['PmaTomOri'] * row['TC_USD'] * row[f'Dev_{zAño}{AuxMes}{mes_calculo}'], axis=1)
 
@@ -575,60 +425,6 @@ def Metodo_propio():
     
 
     return Tbase_mp_
-
-#%% FUNCIÓN CONSULTA PARA SONR PPTO
-def ConsultaPPTO2025(MES):
-    
-    xFolder = CARPETA
-    xFile = ruta("ppto_tecnico")
-    ConsultaP = pd.read_csv(xFile, thousands=',')
-    ConsultaPPTO = ConsultaP[(ConsultaP["GL_ACCT"] > 6101000000) & (ConsultaP["GL_ACCT"] < 6108999999) & (ConsultaP["CALMONTH"] >= (zAño*100 + MES + 1))]
-
-    Columnas = ['CALMONTH', 'PROFTCTR', 'ZTIPOREAS', 'ZSUSCYEAR', 'AMOUNT']
-
-    ConsultaPPTO = ConsultaPPTO[Columnas]
-    ConsultaPPTO = ConsultaPPTO.groupby(['CALMONTH', 'PROFTCTR', 'ZTIPOREAS', 'ZSUSCYEAR'])['AMOUNT'].sum().reset_index()
-
-    ConsultaPPTO= ConsultaPPTO.merge(xSubramo[["CeBe","Ramo", "Ramo2"]].drop_duplicates(),
-                             how="left", left_on="PROFTCTR", right_on="CeBe")
-    
-    ConsultaPPTO['Periodo'] = 3
-    ConsultaPPTO['AñoMes'] = ConsultaPPTO.apply(lambda row: row['ZSUSCYEAR'] * 100 + int(str(int(row['CALMONTH']))[-2:]), axis=1)
-    ConsultaPPTO['Frecuencia'] = ConsultaPPTO.apply(lambda row: row['Periodo'] if (row['ZTIPOREAS'] == 1 or row['ZTIPOREAS'] == 3) and row['Ramo'] != 71 and row['Ramo'] != 73 and row['Ramo'] != 100 else 'NA', axis = 1)
-    ConsultaPPTO['Frecuencia'] = ConsultaPPTO['Frecuencia'].fillna('DEF')
-
-    #DICIEMRE AÑO PPTO Y CIERRE DE LOS SIG 4 AÑOS
-    for mes in range(5):
-  
-        zFechaValuacion = f'31/12/{zAño + mes}'
-        zFechaValuacion = pd.Timestamp(zFechaValuacion)
-        ConsultaPPTO[f'FND_{zAño + mes}12'] = ConsultaPPTO.apply(lambda y: zFND_PPTO(0, 0, y['ZTIPOREAS'], y['AñoMes'], zFechaValuacion, y['CALMONTH'], y['Frecuencia'], y['Ramo']), axis=1)
-        ConsultaPPTO[f'Dev_{zAño + mes}12'] = ConsultaPPTO.apply(lambda row: 1 - row[f'FND_{zAño + mes}12'] , axis=1)
-        ConsultaPPTO[f'PrimaDev_{zAño + mes}12_Val'] = ConsultaPPTO.apply(lambda row: -row['AMOUNT'] * row[f'Dev_{zAño + mes}12'], axis=1)
-
-    #ENERO-NOVIEMBRE AÑO PPTO
-    for mes in range(11):
-        mes_calculo = mes + 1 
-        if mes_calculo < 10:
-            AuxMes = 0
-        else:
-            AuxMes= ""
-
-        if mes_calculo == 2:
-            dia = 28
-        elif mes_calculo in [1,3,5,7,8,10,12]:
-            dia = 31
-        else:
-            dia = 30
-        
-        zFechaValuacion = f'{dia}/{AuxMes}{mes_calculo}/{zAño}'
-        zFechaValuacion = pd.Timestamp(zFechaValuacion)
-        ConsultaPPTO[f'FND_{zAño}{AuxMes}{mes_calculo}'] = ConsultaPPTO.apply(lambda y: zFND_PPTO(0, 0, y['ZTIPOREAS'], y['AñoMes'], zFechaValuacion, y['CALMONTH'], y['Frecuencia'], y['Ramo']), axis=1)
-        ConsultaPPTO[f'Dev_{zAño}{AuxMes}{mes_calculo}'] = ConsultaPPTO.apply(lambda row: 1 - row[f'FND_{zAño}{AuxMes}{mes_calculo}'] , axis=1)
-        ConsultaPPTO[f'PrimaDev_{zAño}{AuxMes}{mes_calculo}_Val'] = ConsultaPPTO.apply(lambda row: -row['AMOUNT'] * row[f'Dev_{zAño}{AuxMes}{mes_calculo}'], axis=1)
-    
-    
-    return ConsultaPPTO
 
 #%% FUNCIÓN MÉTODO PROPIO REFORECAST
 def Metodo_propio_reforecast():
@@ -700,7 +496,6 @@ df = []
 columnas_finales = ['Reserva', 'Escenario', 'Tipo de Monto','Ramo', 'Periodo', 'Monto_MXN', 'Monto_USD', 'TC']
 xEsc_base = xEsc_base[columnas_finales]
 
-revisar_tc_ppto(xEsc_base['Periodo'])
 xEsc_base['TC'] =  xEsc_base.apply(lambda row: xTC_PPTO[row['Periodo']],axis=1)
 xEsc_base['Monto_MXN'] = xEsc_base.apply(lambda row: row['Monto_USD'] * row['TC'], axis = 1)
 df.append(xEsc_base)
@@ -745,17 +540,13 @@ for mes in range(zMes):
     
 
     ConsultaR = ConsultaReal(mes_calculo, zFechaValuacion, Meses)
+
+    print(ConsultaR)
     df_Real_IS_Real = Metodo_propio()
-    #xFolder = r"C:\Users\aburtona\OneDrive - GPV\Documentos"
-    #fileName = f"{xFolder}\\SONR_consulta_{mes_calculo}.xlsx"
-    #ConsultaR.to_excel(fileName, index=False)
-    #fileName = f"{xFolder}\\SONR_met_{mes_calculo}.xlsx"
-    #df_Real_IS_Real.to_excel(fileName, index=False)
-    #print(df_Real_IS_Real)
-    #print(ConsultaR)
+    print(df_Real_IS_Real)
     xColumnas = ['Ramo', 'BEL_RIESGO', 'IRR', 'MR']
     df_SONR_dim = df_Real_IS_Real.reindex(columns=xColumnas)
-    #print(df_SONR_dim)
+    print(df_SONR_dim)
     df_SONR_dim['BRUTO'] = df_SONR_dim.apply(lambda row: row['BEL_RIESGO'] + row['MR'], axis = 1)
     df_SONR_dim['NETO'] = df_SONR_dim.apply(lambda row: row['BRUTO'] - row['IRR'], axis = 1)
 
@@ -824,97 +615,9 @@ for mes in range(zMes):
 
     auxSONR_sum_3 = auxSONR_sum_3.reindex(columns=xColumnas)
     df.append(auxSONR_sum_3)
-#%% ESCENARIO 4
-    Mesesr = zAño * 100 + 12
-    xPND = {
-    xAños[Mesesr - 11]: {'NA': 0.043835616, '1': 0.043835616, '2': 0, '3': 0, '6': 0, '0': 0, 'DEF': 0},
-    xAños[Mesesr - 10]: {'NA': 0.126027397, '1': 0.126027397, '2': 0.083333333, '3': 0.043835616, '6': 0, '0': 0, 'DEF': 0.043835616},
-    xAños[Mesesr - 9]: {'NA': 0.210958904, '1': 0.210958904, '2': 0.166666667, '3': 0.128767123, '6': 0.005479452, '0': 0, 'DEF': 0.128767123},
-    xAños[Mesesr - 8]: {'NA': 0.295890411, '1': 0.295890411, '2': 0.25, '3': 0.21369863, '6': 0.08630137, '0': 0, 'DEF': 0.21369863},
-    xAños[Mesesr - 7]: {'NA': 0.37260274, '1': 0.37260274, '2': 0.333333333, '3': 0.290410959, '6': 0.167123288, '0': 0, 'DEF': 0.290410959},
-    xAños[Mesesr - 6]: {'NA': 0.457534247, '1': 0.457534247, '2': 0.416666667, '3': 0.375342466, '6': 0.252054795, '0': 0, 'DEF': 0.375342466},
-    xAños[Mesesr - 5]: {'NA': 0.539726027, '1': 0.539726027, '2': 0.5, '3': 0.457534247, '6': 0.334246575, '0': 0.087671233, 'DEF': 0.457534247},
-    xAños[Mesesr - 4]: {'NA': 0.624657534, '1': 0.624657534, '2': 0.583333333, '3': 0.542465753, '6': 0.419178082, '0': 0.17260274, 'DEF': 0.542465753},
-    xAños[Mesesr - 3]: {'NA': 0.706849315, '1': 0.706849315, '2': 0.666666667, '3': 0.624657534, '6':  0.501369863, '0': 0.254794521, 'DEF': 0.624657534},
-    xAños[Mesesr - 2]: {'NA': 0.791780822, '1': 0.791780822, '2': 0.75, '3': 0.709589041, '6': 0.58630137, '0': 0.339726027, 'DEF': 0.709589041},
-    xAños[Mesesr - 1]: {'NA': 0.876712329, '1': 0.876712329, '2': 0.833333333, '3': 0.794520548, '6': 0.671232877, '0': 0.424657534, 'DEF': 0.794520548},
-    xAños[Mesesr]: {'NA': 0.95890411, '1': 0.95890411, '2': 0.916666667, '3': 0.876712329, '6': 0.753424658, '0': 0.506849315, 'DEF': 0.876712329},
-    202606: {'NA': 0.498630136986301, '1': 0.498630136986301, '2': 0.458333333333333, '3': 0.499771689497717, '6': 0.293150684931507, '0': 0.0438356164383562, 'DEF': 0.499771689497717},
-    202706: {'NA': 0.498630136986301, '1': 0.498630136986301, '2': 0.458333333333333, '3': 0.499771689497717, '6': 0.293150684931507, '0': 0.0438356164383562, 'DEF': 0.499771689497717},
-    202806: {'NA': 0.498630136986301, '1': 0.498630136986301, '2': 0.458333333333333, '3': 0.499771689497717, '6': 0.293150684931507, '0': 0.0438356164383562, 'DEF': 0.499771689497717},
-    202906: {'NA': 0.498630136986301, '1': 0.498630136986301, '2': 0.458333333333333, '3': 0.499771689497717, '6': 0.293150684931507, '0': 0.0438356164383562, 'DEF': 0.499771689497717}}
-    ConsultaR_USD = ConsultaReal_USD(mes_calculo, zFechaValuacion, Meses)
-    xFolder = CARPETA
-    fileName = f"{xFolder}\\ConsultaR_USD{mes_calculo}_E4.xlsx"
-    ConsultaR_USD.to_excel(fileName, index=False)
-    
-    Mesesp = zAño * 100 + 12
-    xPND = {
-        xAños[Mesesp - 11]: {'NA': 0.043835616, '1': 0.043835616, '2': 0, '3': 0, '6': 0, '0': 0, 'DEF': 0},
-        xAños[Mesesp - 10]: {'NA': 0.126027397, '1': 0.126027397, '2': 0.083333333, '3': 0.043835616, '6': 0, '0': 0, 'DEF': 0.043835616},
-        xAños[Mesesp - 9]: {'NA': 0.210958904, '1': 0.210958904, '2': 0.166666667, '3': 0.128767123, '6': 0.005479452, '0': 0, 'DEF': 0.128767123},
-        xAños[Mesesp - 8]: {'NA': 0.295890411, '1': 0.295890411, '2': 0.25, '3': 0.21369863, '6': 0.08630137, '0': 0, 'DEF': 0.21369863},
-        xAños[Mesesp - 7]: {'NA': 0.37260274, '1': 0.37260274, '2': 0.333333333, '3': 0.290410959, '6': 0.167123288, '0': 0, 'DEF': 0.290410959},
-        xAños[Mesesp - 6]: {'NA': 0.457534247, '1': 0.457534247, '2': 0.416666667, '3': 0.375342466, '6': 0.252054795, '0': 0, 'DEF': 0.375342466},
-        xAños[Mesesp - 5]: {'NA': 0.539726027, '1': 0.539726027, '2': 0.5, '3': 0.457534247, '6': 0.334246575, '0': 0.087671233, 'DEF': 0.457534247},
-        xAños[Mesesp - 4]: {'NA': 0.624657534, '1': 0.624657534, '2': 0.583333333, '3': 0.542465753, '6': 0.419178082, '0': 0.17260274, 'DEF': 0.542465753},
-        xAños[Mesesp - 3]: {'NA': 0.706849315, '1': 0.706849315, '2': 0.666666667, '3': 0.624657534, '6':  0.501369863, '0': 0.254794521, 'DEF': 0.624657534},
-        xAños[Mesesp - 2]: {'NA': 0.791780822, '1': 0.791780822, '2': 0.75, '3': 0.709589041, '6': 0.58630137, '0': 0.339726027, 'DEF': 0.709589041},
-        xAños[Mesesp - 1]: {'NA': 0.876712329, '1': 0.876712329, '2': 0.833333333, '3': 0.794520548, '6': 0.671232877, '0': 0.424657534, 'DEF': 0.794520548},
-        xAños[Mesesp]: {'NA': 0.95890411, '1': 0.95890411, '2': 0.916666667, '3': 0.876712329, '6': 0.753424658, '0': 0.506849315, 'DEF': 0.876712329},
-        202606: {'NA': 0.498630136986301, '1': 0.498630136986301, '2': 0.458333333333333, '3': 0.499771689497717, '6': 0.293150684931507, '0': 0.0438356164383562, 'DEF': 0.499771689497717},
-        202706: {'NA': 0.498630136986301, '1': 0.498630136986301, '2': 0.458333333333333, '3': 0.499771689497717, '6': 0.293150684931507, '0': 0.0438356164383562, 'DEF': 0.499771689497717},
-        202806: {'NA': 0.498630136986301, '1': 0.498630136986301, '2': 0.458333333333333, '3': 0.499771689497717, '6': 0.293150684931507, '0': 0.0438356164383562, 'DEF': 0.499771689497717},
-        202906: {'NA': 0.498630136986301, '1': 0.498630136986301, '2': 0.458333333333333, '3': 0.499771689497717, '6': 0.293150684931507, '0': 0.0438356164383562, 'DEF': 0.499771689497717}}
-    
-    if mes_calculo == 12:
-        df_reforecast = Metodo_propio_reforecast_dic()
-    else:
-
-        ConsultaPPTO = ConsultaPPTO2025(mes_calculo)
-        df_reforecast = Metodo_propio_reforecast()
-        fileName = f"{xFolder}\\ConsultaPPTO{mes_calculo}_E4.xlsx"
-        ConsultaPPTO.to_excel(fileName, index=False)
-
-    fileName = f"{xFolder}\\df_reforecast{mes_calculo}_E4.xlsx"
-    df_reforecast.to_excel(fileName, index=False)
-
-    df_reforecast = df_reforecast[(df_reforecast["AñoMes"] == (zAño*100 + 12))]
-
-    xColumnas = ['Ramo', 'BEL_RIESGO', 'IRR', 'MR']
-    df_SONR_dim = df_reforecast.reindex(columns=xColumnas)
-
-    df_SONR_dim['BRUTO'] = df_SONR_dim.apply(lambda row: row['BEL_RIESGO'] + row['MR'], axis = 1)
-    df_SONR_dim['NETO'] = df_SONR_dim.apply(lambda row: row['BRUTO'] - row['IRR'], axis = 1)
-
-    df_SONR_dim['Reserva'] = 'SONR'
-    df_SONR_dim['Periodo'] = f'{zAño}12-{mes_calculo}'
-
-
-    auxSONR = df_SONR_dim.set_index(["Reserva", "Ramo", "Periodo"]).stack()
-    auxSONR = auxSONR.reset_index()
-    auxSONR.columns = ['Reserva', 'Ramo', 'Periodo', 'Origen', 'Monto'] 
-    
-    #######
-    auxSONR_sum = auxSONR.groupby(['Reserva', 'Ramo', 'Periodo', 'Origen']).agg({'Monto': 'sum'}).reset_index()
-    auxSONR_sum['Tipo de Monto'] = auxSONR_sum['Origen'].apply(lambda x: xEscenario[x][0])
-    auxSONR_sum['Escenario'] = 4
-    auxSONR_sum['Periodo2'] = zAño*100 + 12
-
-    auxSONR_sum= auxSONR_sum.merge(TC_USD[["cTCAD_FecAMD","cTCAD_Mnt"]].drop_duplicates(),
-                             how="left", left_on="Periodo2", right_on="cTCAD_FecAMD")
-    
-    auxSONR_sum['TC'] = auxSONR_sum['cTCAD_Mnt']
-    auxSONR_sum['Monto_USD'] = auxSONR_sum['Monto']
-    auxSONR_sum['Monto_MXN'] = auxSONR_sum.apply(lambda row: row['Monto_USD'] * row['cTCAD_Mnt'], axis = 1)
-
-    xColumnas = ['Reserva', 'Ramo', 'Periodo', 'Tipo de Monto', 'Escenario',
-                'Monto_MXN', 'Monto_USD']
-
-    auxSONR_sum = auxSONR_sum.reindex(columns=xColumnas)
-
     df.append(auxSONR_sum)
-    xFolder = CARPETA
+    
+    xFolder = fr"C:\Users\{usuario}\OneDrive - GPV\Documents\Outputs"
     fileName = f"{xFolder}\\auxSONR_sum.xlsx"
     auxSONR_sum.to_excel(fileName, index=False)
 
@@ -928,13 +631,6 @@ df_concatenado = df_concatenado.drop_duplicates()
 Columnas = ['Reserva', 'Escenario', 'Tipo de Monto', 'Ramo', 'Periodo', 'Monto_MXN', 'Monto_USD']
 df_concatenado = df_concatenado[Columnas]
 
-xFolder = CARPETA
-# v4: el nombre de la salida dice con qué FND se corrió, para poder comparar contra el output anterior
-# (SONR_esc.xlsx de la v3) sin pisarlo.
-fileName = f"{xFolder}\\{'SONR_esc_FNDcal.xlsx' if USAR_FND_CALIBRADO else 'SONR_esc_legado.xlsx'}"
-print(f"[SONR] Salida escrita en: {fileName}")
+xFolder = fr"C:\Users\{usuario}\OneDrive - GPV\Documents\Outputs"
+fileName = f"{xFolder}\\SONR_esc.xlsx"
 df_concatenado.to_excel(fileName, index=False)
-
-
-
-

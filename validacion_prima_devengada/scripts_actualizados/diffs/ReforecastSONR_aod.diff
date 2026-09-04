@@ -1,0 +1,152 @@
+--- ORIGINAL/ReforecastSONR_aod.py
++++ ACTUALIZADO/ReforecastSONR_aod.py
+@@ -4,14 +4,52 @@
+ import warnings
+ import getpass
+ from datetime import datetime
++import os
++import sys
+ usuario = "asunad"
+ warnings.filterwarnings('ignore')
+ 
++#%% FND CALIBRADO (MEC v3) — sustituye la búsqueda en xPND
++# mec_devengamiento.py y delta_calibrado.json deben estar en esta misma carpeta.
++_DIR = os.path.dirname(os.path.abspath(__file__))
++if _DIR not in sys.path:
++    sys.path.insert(0, _DIR)
++import mec_devengamiento as mec
++
++USAR_FND_CALIBRADO = True   # False -> comportamiento idéntico al script original (xPND)
++DELTA_FND = mec.cargar_delta(_DIR)      # lee delta_calibrado.json si existe
++
++
++def fnd_cal(xRamo, xMesProc, xFecVal, legado=0.0):
++    """FND de una cuenta proporcional/facultativa por antigüedad de REGISTRO:
++    k = mes de valuación (de xFecVal) − mes contable de registro (xMesProc)."""
++    if not USAR_FND_CALIBRADO or xRamo is None:
++        return legado
++    try:
++        mv = xFecVal.year * 100 + xFecVal.month
++    except Exception:
++        return legado
++    k = mec.antiguedad_registro(mv, xMesProc)
++    if k is None:
++        return legado
++    return 0.0 if k < 0 else mec.fnd_registro(xRamo, k, DELTA_FND)
++
++
++def _es_no_proporcional(xTipoRea) -> bool:
++    try:
++        return int(float(xTipoRea)) == 2
++    except Exception:
++        return False
++
++#%% CARPETA LOCAL — todos los insumos se leen y todas las salidas se escriben aquí
++# Es la carpeta donde está este script (Documents). Si quieres otra, pon la ruta completa.
++CARPETA = _DIR
++
+ #%% INPUTS
+ zAñoPpto = 2026
+ zAño= 2026
+ zMes = 12
+-xFolder = fr"C:\Users\{usuario}\OneDrive - GPV\Archivos de Maria Osmara Camacho Lopez - Inputs"
++xFolder = CARPETA
+ #xAjManuales = pd.read_csv(f"{xFolder}\\AjManuales_SONR.csv")
+ 
+ #### PPTO
+@@ -46,7 +84,12 @@
+ 
+ 
+ #%% FUNCIÓN FND REAL.
+-def zFND(xIniVig, xFinVig, xTipoRea, xAñoMes, xFecVal, xMesProc, xFrecuencia):
++def zFND(xIniVig, xFinVig, xTipoRea, xAñoMes, xFecVal, xMesProc, xFrecuencia, xRamo=None):
++    # FND del modelo: proporcional y facultativo -> tabla calibrada por antigüedad de registro.
++    # El no proporcional (TipoRea 2) sigue por la lógica de fechas de más abajo, sin cambios.
++    if USAR_FND_CALIBRADO and not _es_no_proporcional(xTipoRea):
++        return fnd_cal(xRamo, xMesProc, xFecVal,
++                       xPND.get(xMesProc, {}).get(str(xFrecuencia), 0))   # {}: un mes fuera de la ventana da 0, no revienta
+     mes_proc_str = str(xMesProc)
+     right_3 = mes_proc_str[-3:] if len(mes_proc_str) >= 3 else mes_proc_str
+ 
+@@ -93,7 +136,10 @@
+                 return result
+ 
+ #%% FUNCIÓN FND PPTO
+-def zFND_PPTO(xIniVig, xFinVig, xTipoRea, xAñoMes, xFecVal, xMesProc, xFrecuencia):
++def zFND_PPTO(xIniVig, xFinVig, xTipoRea, xAñoMes, xFecVal, xMesProc, xFrecuencia, xRamo=None):
++    # FND del modelo (idem zFND). En presupuesto xMesProc es el mes de registro de la cuenta.
++    if USAR_FND_CALIBRADO and not _es_no_proporcional(xTipoRea):
++        return fnd_cal(xRamo, xMesProc, xFecVal, 0.0)
+     fecha = datetime(zAño, 12, 31)
+     #print(xMesProc)
+     #print(xFecVal)
+@@ -141,7 +187,11 @@
+                 return result
+ 
+ #%% zFND REAL REFORECAST
+-def zFND2(xIniVig, xFinVig, xTipoRea, xAñoMes, xFecVal, xMesProc, xFrecuencia):
++def zFND2(xIniVig, xFinVig, xTipoRea, xAñoMes, xFecVal, xMesProc, xFrecuencia, xRamo=None):
++    # FND del modelo (idem zFND, versión del reforecast).
++    if USAR_FND_CALIBRADO and not _es_no_proporcional(xTipoRea):
++        return fnd_cal(xRamo, xMesProc, xFecVal,
++                       xPND.get(xMesProc, {}).get(str(xFrecuencia), 0))   # {}: un mes fuera de la ventana da 0, no revienta
+     mes_proc_str = str(int(xMesProc))
+     if xIniVig == xFinVig: 
+         current_ym = xFecVal.year * 100 + xFecVal.month
+@@ -214,7 +264,7 @@
+ 
+ ConsultaTC_usd = ConsultaMoneda_usd()
+ TC_USD = ConsultaMoneda_usd()
+-xFolder = fr"C:\Users\{usuario}\OneDrive - GPV\Archivos de Maria Osmara Camacho Lopez - Inputs"
++xFolder = CARPETA
+ fileName = f"{xFolder}\\TablaTCSONR.xlsx"
+ TC_USD.to_excel(fileName, index=False)
+ 
+@@ -311,7 +361,7 @@
+     
+     ConsultaR['Frecuencia'] = ConsultaR.apply(lambda row: row['Periodo'] if (row['TipoRea'] == 1 and row['Ramo_filt'] != 70 and row['Ramo_filt'] != 100) else ('NA' if pd.notna(row['Periodo']) else 'DEF'), axis=1)
+     ConsultaR[['IniVig', 'FinVig']] = ConsultaR[['IniVig', 'FinVig']].fillna(0)
+-    ConsultaR[f'FND_{AÑOMES}'] = ConsultaR.apply(lambda y: zFND(y['IniVig'], y['FinVig'], y['TipoRea'], y['AñoMes'], FECVAL, y['CALMONTH'], y['Frecuencia']), axis=1)
++    ConsultaR[f'FND_{AÑOMES}'] = ConsultaR.apply(lambda y: zFND(y['IniVig'], y['FinVig'], y['TipoRea'], y['AñoMes'], FECVAL, y['CALMONTH'], y['Frecuencia'], y['Ramo_filt']), axis=1)
+     
+     #ConsultaR[f'FND_{Meses}'] = ConsultaR.apply(lambda y: zFNDmes(y['IniVig'], y['FinVig'], y['TipoRea'], y['Susc'], zFechaValuacion, y['CALMONTH'], y['Frecuencia'], xPNDmes, xFrecCol), axis=1)
+     ConsultaR[f'Dev_{AÑOMES}'] = ConsultaR.apply(lambda row: 1 - row[f'FND_{AÑOMES}'] , axis=1)
+@@ -370,7 +420,7 @@
+   
+         zFechaValuacion = f'31/12/{zAño + mes}'
+         zFechaValuacion = pd.Timestamp(zFechaValuacion)
+-        ConsultaR[f'FND_{zAño + mes}12'] = ConsultaR.apply(lambda y: zFND2(y['IniVig'], y['FinVig'], y['TipoRea'], y['AñoMes'], zFechaValuacion, y['CALMONTH'], y['Frecuencia']), axis=1)
++        ConsultaR[f'FND_{zAño + mes}12'] = ConsultaR.apply(lambda y: zFND2(y['IniVig'], y['FinVig'], y['TipoRea'], y['AñoMes'], zFechaValuacion, y['CALMONTH'], y['Frecuencia'], y['Ramo_filt']), axis=1)
+         ConsultaR[f'Dev_{zAño + mes}12'] = ConsultaR.apply(lambda row: 1 - row[f'FND_{zAño + mes}12'] , axis=1)
+         ConsultaR[f'PrimaDev_{zAño + mes}12_Val'] = ConsultaR.apply(lambda row: row['PmaTomUSD'] * row[f'Dev_{zAño + mes}12'], axis=1)
+ 
+@@ -391,7 +441,7 @@
+         
+         zFechaValuacion = f'{dia}/{AuxMes}{mes_calculo}/{zAño}'
+         zFechaValuacion = pd.Timestamp(zFechaValuacion)
+-        ConsultaR[f'FND_{zAño}{AuxMes}{mes_calculo}'] = ConsultaR.apply(lambda y: zFND2(y['IniVig'], y['FinVig'], y['TipoRea'], y['AñoMes'], zFechaValuacion, y['CALMONTH'], y['Frecuencia']), axis=1)
++        ConsultaR[f'FND_{zAño}{AuxMes}{mes_calculo}'] = ConsultaR.apply(lambda y: zFND2(y['IniVig'], y['FinVig'], y['TipoRea'], y['AñoMes'], zFechaValuacion, y['CALMONTH'], y['Frecuencia'], y['Ramo_filt']), axis=1)
+         ConsultaR[f'Dev_{zAño}{AuxMes}{mes_calculo}'] = ConsultaR.apply(lambda row: 1 - row[f'FND_{zAño}{AuxMes}{mes_calculo}'] , axis=1)
+         ConsultaR[f'PrimaDev_{zAño}{AuxMes}{mes_calculo}_Val'] = ConsultaR.apply(lambda row: row['PmaTomOri'] * row['TC_USD'] * row[f'Dev_{zAño}{AuxMes}{mes_calculo}'], axis=1)
+ 
+@@ -617,7 +667,7 @@
+     df.append(auxSONR_sum_3)
+     df.append(auxSONR_sum)
+     
+-    xFolder = fr"C:\Users\{usuario}\OneDrive - GPV\Documents\Outputs"
++    xFolder = CARPETA
+     fileName = f"{xFolder}\\auxSONR_sum.xlsx"
+     auxSONR_sum.to_excel(fileName, index=False)
+ 
+@@ -631,6 +681,8 @@
+ Columnas = ['Reserva', 'Escenario', 'Tipo de Monto', 'Ramo', 'Periodo', 'Monto_MXN', 'Monto_USD']
+ df_concatenado = df_concatenado[Columnas]
+ 
+-xFolder = fr"C:\Users\{usuario}\OneDrive - GPV\Documents\Outputs"
+-fileName = f"{xFolder}\\SONR_esc.xlsx"
++xFolder = CARPETA
++# el nombre de la salida dice con qué FND se corrió, para compararla contra SONR_esc.xlsx sin pisarlo
++fileName = f"{xFolder}\\{'SONR_esc_FNDcal.xlsx' if USAR_FND_CALIBRADO else 'SONR_esc_legado.xlsx'}"
++print(f"[SONR] Salida escrita en: {fileName}")
+ df_concatenado.to_excel(fileName, index=False)
+\ No newline at end of file

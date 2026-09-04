@@ -184,7 +184,7 @@
 +    # El no proporcional (TipoRea 2) sigue por la lógica de fechas de más abajo.
 +    if USAR_FND_CALIBRADO and not _es_no_proporcional(xTipoRea):
 +        return fnd_cal(xRamo, xMesProc, xFecVal,
-+                       xPND.get(xMesProc, 0).get(str(xFrecuencia), 0))
++                       xPND.get(xMesProc, {}).get(str(xFrecuencia), 0))   # {}: un mes fuera de la ventana da 0, no revienta
      mes_proc_str = str(xMesProc)
      right_3 = mes_proc_str[-3:] if len(mes_proc_str) >= 3 else mes_proc_str
  
@@ -219,7 +219,7 @@
 +    # v4: idem zFND (versión del reforecast).
 +    if USAR_FND_CALIBRADO and not _es_no_proporcional(xTipoRea):
 +        return fnd_cal(xRamo, xMesProc, xFecVal,
-+                       xPND.get(xMesProc, 0).get(str(xFrecuencia), 0))
++                       xPND.get(xMesProc, {}).get(str(xFrecuencia), 0))   # {}: un mes fuera de la ventana da 0, no revienta
      mes_proc_str = str(int(xMesProc))
      if xIniVig == xFinVig: 
          current_ym = xFecVal.year * 100 + xFecVal.month
