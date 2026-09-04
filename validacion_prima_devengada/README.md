@@ -135,9 +135,12 @@ y no sobrevive al cambio de base. Reproducible con `evaluar_frecuencia_fnd.py`.
 ### Qué hacer
 
 1. **No adoptar el FND del modelo en producción todavía.** Dejar `USAR_FND_CALIBRADO = False` hasta recalibrar.
-2. **Recalibrar δ sobre la base de prima del propio reforecast**, no sobre la del MEC. Hace falta el intermedio que el
-   script ya escribe, `ConsultaPPTO_RRC_<mes>_tradicional.xlsx`, con `CALMONTH`, `Período`/`FRECUENCIA`, `Ramo`,
-   `TipoRea`, `MONTO_PI` y `BELMEDIA` por registro; con dos o tres meses alcanza para fijar δ por ramo contra la RRC real.
+2. **Recalibrar δ sobre la base de prima del propio reforecast**, no sobre la del MEC. Para eso está
+   `recalibrar_delta_reforecast.py`: pon en su carpeta dos o tres `ConsultaPPTO_RRC_<mes>_tradicional.xlsx` (los
+   escribe el propio reforecast en `Documents\Outputs`), más `insumos\` y `mec_devengamiento.py`, y córrelo. Ajusta δ
+   por ramo contra el BEL real en dos variantes —escalonada por frecuencia y plana— y escribe `delta_recalibrado.json`.
+   Respeta la jerarquía de `PORC_ND`: deja fuera del ajuste los ramos 71/73 y el no proporcional. Probado contra un caso
+   sintético con δ conocido: lo recupera al milésimo.
 3. Al recalibrar, **conservar el escalonamiento por frecuencia** (`FND = NT(k) − δ_M4(frecuencia) − δ_ramo`): la
    evidencia de arriba dice que dentro del reforecast es necesario.
 
@@ -171,7 +174,8 @@ CAT que sí está en la base del MEC. Vale la pena atacarlo: es la desviación m
 | `preparar_insumos.py` | construye `insumos/` a partir de los archivos crudos (`BD_ BEL - IRR - MR.xlsx`, `Input_MEC_Devengamiento.xlsx`, `Registros_Vigencia_MEC.csv`, Integración Dim opcional) que estén en la misma carpeta |
 | `validar_prima_devengada.py` | motor de reconstrucción, comparación y calibración; genera todo lo de `salidas/` |
 | `verificar_excel_formulas.py` | recalcula el Excel con LibreOffice y comprueba que las fórmulas de la hoja Mensual reproducen los valores de Python |
-| `evaluar_frecuencia_fnd.py` | contrasta δ por ramo contra δ por frecuencia (regla M4) contra las dos juntas; sustenta la sección sobre la frecuencia |
+| `evaluar_frecuencia_fnd.py` | contrasta δ por ramo contra δ por frecuencia (regla M4) contra las dos juntas |
+| `recalibrar_delta_reforecast.py` | reajusta δ sobre la base de prima del reforecast, a partir de sus propios `ConsultaPPTO_RRC_<mes>_tradicional.xlsx` |
 | `fnd_calibrado.py` | tabla FND calibrada y funciones de integración para RRC / SONR |
 | `insumos/` | prima por ramo × cohorte × mes de registro (BD del MEC), saldos RRC reales, IS por ramo × mes, TC, vectores PF+ (horizonte 72), primas del ER real, vigencias del MEC |
 | `salidas/Validacion_Prima_Devengada.xlsx` | Resumen, Formulas, Graficas, PD anual por ramo, ajuste PND, calibración, tabla FND, detalle mensual, parámetros reales, supuestos |
