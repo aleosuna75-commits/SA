@@ -8,13 +8,13 @@ Todos los cambios de comportamiento vienen con interruptor: `USAR_FND_CALIBRADO 
 
 | Archivo | Sustituye a | Diff |
 |---|---|---|
-| `mec_devengamiento.py` | mismo nombre (v2 → v3) | +178 / −30 |
-| `reforecastRRC_v11_Esc1_ocl.py` | `reforecastRRC_v10_Esc1_ocl.py` | +89 / −13 |
-| `ReforecastSONR_v4.py` | `ReforecastSONR_v3.py` | +88 / −15 |
-| `construir_input_mec.py` | `construir input mec.py` | +334 / −53 |
+| `mec_devengamiento.py` | mismo nombre (v2 → v3) | +213 / −30 |
+| `reforecastRRC_v11_Esc1_ocl.py` | `reforecastRRC_v10_Esc1_ocl.py` | +183 / −40 |
+| `ReforecastSONR_v4.py` | `ReforecastSONR_v3.py` | +169 / −35 |
+| `construir_input_mec.py` | `construir input mec.py` | +360 / −53 |
 | `generar_output_mec.py` | `generar output mec.py` | +7 / −3 |
 | `comparar_outputs_reservas.py` | nuevo (output anterior vs output con FND calibrado) | — |
-| `ReforecastRRC_aod.py` | el script actual del área, mismo nombre | +29 / −2 |
+| `ReforecastRRC_aod.py` | el script actual del área, mismo nombre | +34 / −2 |
 | `ReforecastSONR_aod.py` | el script actual del área, mismo nombre | +52 / −6 |
 | `test_integracion_fnd.py` | nuevo (prueba de regresión) | — |
 
@@ -125,6 +125,10 @@ El cambio, y nada más:
 - Bloque `#%% FND CALIBRADO`: importa `mec_devengamiento` desde `C:\Users\{usuario}\OneDrive - GPV\Documents` (`CARPETA_FND`, con la misma convención de rutas del script), lee `delta_calibrado.json` de ahí, define `fnd_cal` y el interruptor `USAR_FND_CALIBRADO`. En el RRC `MES_VALUACION = Meses` se fija dentro del ciclo; en el SONR el mes de valuación sale de `xFecVal`.
 - RRC: `VALORFREC` en `ConsultaReal` y `ConsultaReal_USD` pasa por `fnd_cal(row['Ramo'], row['CALMONTH'], <valor xPND de siempre>)`. La lógica de `PORC_ND` (71/73, no proporcional por fechas, resto) no se toca.
 - SONR: `zFND`, `zFND2` y `zFND_PPTO` reciben `xRamo=None` al final (firma compatible) y, si el negocio no es TipoRea 2, devuelven `fnd_cal`; los tres puntos de llamada pasan `y['Ramo_filt']`.
+
+- `fnd_cal` del RRC recibe además `tiporea` y devuelve el legado cuando es 2. Lo señaló la revisión adversarial: la jerarquía original de `PORC_ND` evalúa `row['Ramo'] in [71, 73]` antes que la rama de TipoRea 2, así que el CAT XL nunca va por prorrata y toma `VALORFREC`; sin la guarda habría tomado la tabla calibrada, que en `validar_prima_devengada.py` se ajusta sólo sobre `tipo != 2`. Corregido también en `reforecastRRC_v11_Esc1_ocl.py`, que tenía el mismo patrón en sus tres puntos de llamada. El SONR ya guardaba por TipoRea con `_es_no_proporcional`.
+
+Consecuencias inherentes al cambio, documentadas en el LEEME: las cuentas proporcionales sin fechas (IniVig = FinVig) pasan de la regla 0/1 a la tabla por mes de registro; en el SONR las filas fijas de `xPND` (202606 repetida pisaba a la del mes: 0.4986 en vez de 0.9589 en junio) dejan de aplicar al proporcional; y el import de `mec_devengamiento` es incondicional, así que el módulo debe estar en Documents aunque el interruptor esté en `False`.
 
 **No** cambian las rutas de insumos ni de salida, ni los nombres de los archivos que escribe (`RRC_esc.xlsx`, `SONR_esc.xlsx` en `Documents\Outputs`), ni `usuario`, ni queries, filtros o constantes. Tampoco llevan el resolver de nombres ni el bloque de año de la sección 3b. Consecuencia práctica, señalada en el LEEME: los dos modos escriben el mismo archivo de salida, así que hay que renombrar el output anterior antes de correr para poder compararlos.
 

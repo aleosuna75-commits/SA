@@ -24,12 +24,17 @@ DELTA_FND = mec.cargar_delta(CARPETA_FND)   # lee delta_calibrado.json de Docume
 MES_VALUACION = None                        # AAAAMM de la valuación; se fija en el ciclo
 
 
-def fnd_cal(ramo, calmonth, valorfrec_legado=0.0):
+def fnd_cal(ramo, calmonth, valorfrec_legado=0.0, tiporea=None):
     """FND de una cuenta proporcional/facultativa: tabla calibrada por antigüedad de
     REGISTRO respecto al mes de valuación. `valorfrec_legado` es el valor de xPND que
     se usaría hoy; se devuelve si el FND calibrado está desactivado o falta el mes."""
     if not USAR_FND_CALIBRADO or MES_VALUACION is None:
         return valorfrec_legado
+    try:                        # el NO proporcional (TipoRea 2) no cambia: conserva el valor de siempre.
+        if int(float(tiporea)) == 2:   # Hace falta aquí porque PORC_ND mira «Ramo in [71,73]» antes que
+            return valorfrec_legado    # TipoRea 2, y el CAT XL iría a la tabla calibrada sin esta guarda.
+    except Exception:
+        pass
     k = mec.antiguedad_registro(MES_VALUACION, calmonth)
     if k is None:
         return valorfrec_legado
@@ -316,7 +321,7 @@ def ConsultaReal_USD(IS,IS_CAT, MES):
     
     ConsultaR['VALORFREC'] =  ConsultaR.apply(
     lambda row: fnd_cal(row['Ramo'], row['CALMONTH'],
-                        xPND.get(row['CALMONTH'], 0).get(str(row['FRECUENCIA']), 0)),
+                        xPND.get(row['CALMONTH'], 0).get(str(row['FRECUENCIA']), 0), row['TipoRea']),
     axis=1)
 
     ConsultaR['PORC_ND'] = ConsultaR.apply(
@@ -470,7 +475,7 @@ def ConsultaReal(IS,IS_CAT, MES):
     
     ConsultaR['VALORFREC'] =  ConsultaR.apply(
     lambda row: fnd_cal(row['Ramo'], row['CALMONTH'],
-                        xPND.get(row['CALMONTH'], 0).get(str(row['FRECUENCIA']), 0)),
+                        xPND.get(row['CALMONTH'], 0).get(str(row['FRECUENCIA']), 0), row['TipoRea']),
     axis=1)
 
     ConsultaR['PORC_ND'] = ConsultaR.apply(

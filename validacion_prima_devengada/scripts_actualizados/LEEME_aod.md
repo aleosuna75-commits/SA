@@ -44,7 +44,14 @@ Prueba de control que vale la pena hacer primero: corre con `False`, compara con
 - Comparación por AST del original contra el nuevo: los únicos nodos que cambian son el bloque del FND y las funciones donde vive la búsqueda en `xPND` (`ConsultaReal`, `ConsultaReal_USD`; en el SONR también `zFND`, `zFND2`, `zFND_PPTO`). Rutas, nombres de salida, queries, filtros y fórmulas, idénticos.
 - Con el interruptor en `False`, las funciones del FND del SONR reproducen las originales en 1,296 casos (tres tipos de reaseguro × cuatro combinaciones de vigencia × registros de 10 años a hoy × seis frecuencias). Cero diferencias.
 - Con `True`: cero errores, el no proporcional idéntico al original en 432 casos, el proporcional igual a la tabla calibrada en 864.
+- En el RRC, el CAT no proporcional (ramos 71/73 con TipoRea 2) conserva el valor de siempre: `fnd_cal` recibe el TipoRea y devuelve el legado cuando es 2. Hacía falta porque la jerarquía original de `PORC_ND` mira «Ramo in [71,73]» antes que TipoRea 2, y sin esa guarda el CAT XL habría tomado la tabla calibrada, que sólo se ajustó sobre el proporcional. Lo encontró la revisión adversarial; está probado contra el original.
 - Finales de línea Windows (CRLF) y tabulaciones intactos; `py_compile` limpio.
 - Revisión adversarial independiente por dos lentes (alcance del cambio; corrección del interruptor y la integración) por archivo.
+
+Tres cosas que conviene saber al leer los resultados con el interruptor en `True`:
+
+- Las cuentas proporcionales o facultativas **sin fechas de vigencia** (IniVig = FinVig = 0 tras el `fillna`) ya no van por la regla 0/1 del original sino por la tabla calibrada según su mes de registro. Es lo que dice el modelo: el FND del proporcional depende del mes en que se registra la cuenta, no de la vigencia.
+- En el SONR, las filas fijas de `xPND` (`202606`, `202706`, …) dejan de aplicar al proporcional. En el original la llave `202606` estaba repetida y la fila fija pisaba a la del mes, así que en junio usaba 0.4986 en lugar de 0.9589; eso explica una diferencia visible en junio.
+- `mec_devengamiento.py` tiene que estar en Documents aunque el interruptor esté en `False`: el import es incondicional. Si falta, el script muere en el import.
 
 Un detalle que salió de esa prueba: el primer parche evaluaba el valor legado de `xPND` antes de tiempo, y como el SONR lee diez años de registros, con el interruptor encendido habría reventado en la primera fila de más de doce meses. Corregido aquí y en la v4 que te había mandado antes.

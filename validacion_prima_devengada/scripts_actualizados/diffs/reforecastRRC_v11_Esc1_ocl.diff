@@ -22,7 +22,7 @@
  #Escenario 0 -> LISTO -> Año Base (202412 real) 
  #Escenario 1 -> LISTO -> Presupuesto (dls) usando tc real para los meses que ya se tienen y usar el tc ppto para el resto
  #Escenario 2 -> Usar función real para los meses reales y hacer proceso mensualizados para los meses que no se tienen, para tc usar el estimado ####AGREGAR LA FUNCIÓN DE LOS MENSUALIZADOS PARA EL RESTO DE MESES
-@@ -14,32 +31,120 @@
+@@ -14,32 +31,125 @@
  import numpy as np
  import getpass
  import os 
@@ -45,12 +45,17 @@
 +MES_VALUACION = None                    # AAAAMM de la valuación; se fija por escenario
 +
 +
-+def fnd_cal(ramo, calmonth, valorfrec_legado=0.0):
++def fnd_cal(ramo, calmonth, valorfrec_legado=0.0, tiporea=None):
 +    """FND de una cuenta proporcional/facultativa: tabla calibrada por antigüedad de
 +    REGISTRO respecto al mes de valuación. `valorfrec_legado` es el valor de xPND que
 +    se usaría hoy; se devuelve si el FND calibrado está desactivado o falta el mes."""
 +    if not USAR_FND_CALIBRADO or MES_VALUACION is None:
 +        return valorfrec_legado
++    try:                        # el NO proporcional (TipoRea 2) no cambia: conserva el valor de siempre.
++        if int(float(tiporea)) == 2:   # Hace falta aquí porque PORC_ND mira «Ramo in [71,73]» antes que
++            return valorfrec_legado    # TipoRea 2, y el CAT XL iría a la tabla calibrada sin esta guarda.
++    except Exception:
++        pass
 +    k = mec.antiguedad_registro(MES_VALUACION, calmonth)
 +    if k is None:
 +        return valorfrec_legado
@@ -163,7 +168,7 @@
  
  #%% DICCIONARIOS
  xNoRamo = { 'Vida' : 10, "Acc Per." : 31, "GMM" : 35, "Salud" : 39, "Resp. Civil" : 40, 
-@@ -68,12 +173,22 @@
+@@ -68,12 +178,22 @@
           202504:19.6021,202505:19.6313,202506:19.6604,202507:19.6896,
           202508:19.7188,202509:19.7479,202510:19.7771,202511:19.8063,
           202512:19.8354}
@@ -188,7 +193,7 @@
  Nomeses = [1,12]
  
  COC = 0.1
-@@ -124,7 +239,7 @@
+@@ -124,7 +244,7 @@
  
  
  def zPorcCesion(xCesion, zTablaCesion, zCesionPI, xSusc, xPorCed, xPorCedEsp, xTipoRea):
@@ -197,7 +202,7 @@
      xPI = 1
  
      if xSusc >= 2023:
-@@ -232,9 +347,14 @@
+@@ -232,9 +352,14 @@
      
      xTabla = "From dbo_aMOG_MovGonzalo "
  
@@ -213,7 +218,7 @@
                      f"and (aPOG_MesProc & '-' & cNAT_IdTPol & '-' & TipoRea & '-' & aPOG_Num not in ('{zLlavesPol}') ) "
  
  
-@@ -293,8 +413,11 @@
+@@ -293,8 +418,11 @@
      ConsultaR['BELMEDIA'] = ConsultaR.apply(lambda row: row['71'] if row['Ramo'] == 71 else (row['73'] if row['Ramo'] == 73 else row[f'IS Bel Media-12']), axis = 1)
      ConsultaR = ConsultaR.drop(['71','73', f'IS Bel Media-12', 'IS Bel Media'], axis=1)
      
@@ -222,11 +227,11 @@
      ConsultaR['VALORFREC'] =  ConsultaR.apply(
 -    lambda row: xPND.get(row['CALMONTH'], 0).get(str(row['FRECUENCIA']), 0),
 +    lambda row: fnd_cal(row['Ramo'], row['CALMONTH'],
-+                        xPND.get(row['CALMONTH'], 0).get(str(row['FRECUENCIA']), 0)),
++                        xPND.get(row['CALMONTH'], 0).get(str(row['FRECUENCIA']), 0), row['TipoRea']),
      axis=1)
  
      ConsultaR['PORC_ND'] = ConsultaR.apply(
-@@ -364,10 +487,10 @@
+@@ -364,10 +492,10 @@
  def ConsultaPPTO2025(MES):
      global xPais, xSubramo, ConsultaTC, xRRC, xIS_BEL_MEDIA, BC, RCS, COC, tc_CIERRE, zMes, zAFUN, xCesionPI, xTablaCesion, zFrecuencias, xPND2, Cesion_Esp
      
@@ -240,7 +245,7 @@
  
      Columnas = [
      'PROFTCTR', 'ZREGIONRP', 'ZTIPOREAS', 'ZOFICN_RP', 'FUNCAREA', 'ZMGA', 
-@@ -456,8 +579,10 @@
+@@ -456,8 +584,10 @@
      ConsultaPPTO['CESION'] = ConsultaPPTO.apply(lambda y:zPorcCesion(y['ZTIPOCES'], y[str(y['ZSUSCYEAR'])], y[str(y['ZSUSCYEAR'] * 100)], y['ZSUSCYEAR'], float(y['PRODUCT']), float(y['Porcentaje Cedido']), y['ZTIPOREAS']), axis=1)
      ConsultaPPTO = ConsultaPPTO.drop(["71","73","2020","2021","2022","2023","2024", "2025", "2026", "2027", "2028", "2029", "202000","202100","202200","202300","202400","202500","202600","202700", "202800","202900", "Llave"], axis=1)
     
@@ -248,11 +253,11 @@
      ConsultaPPTO['PORC_ND'] =  ConsultaPPTO.apply(
 -    lambda row: xPND2.get(row['CALMONTH'], 0).get(row['FRECUENCIA'], 2),axis=1)
 +    lambda row: fnd_cal(row['Ramo'], row['CALMONTH'],
-+                        xPND2.get(row['CALMONTH'], 0).get(row['FRECUENCIA'], 2)),axis=1)
++                        xPND2.get(row['CALMONTH'], 0).get(row['FRECUENCIA'], 2), row['TipoRea']),axis=1)
  
  
  
-@@ -508,9 +633,14 @@
+@@ -508,9 +638,14 @@
      
      xTabla = "From dbo_aMOG_MovGonzalo "
  
@@ -268,7 +273,7 @@
                      f"and (aPOG_MesProc & '-' & cNAT_IdTPol & '-' & TipoRea & '-' & aPOG_Num not in ('{zLlavesPol}') ) "
  
  
-@@ -569,8 +699,11 @@
+@@ -569,8 +704,11 @@
      ConsultaR['BELMEDIA'] = ConsultaR.apply(lambda row: row['71'] if row['Ramo'] == 71 else (row['73'] if row['Ramo'] == 73 else row[f'IS Bel Media-{MES}']), axis = 1)
      ConsultaR = ConsultaR.drop(['71','73', f'IS Bel Media-{MES}', 'IS Bel Media'], axis=1)
      
@@ -277,11 +282,11 @@
      ConsultaR['VALORFREC'] =  ConsultaR.apply(
 -    lambda row: xPND.get(row['CALMONTH'], 0).get(str(row['FRECUENCIA']), 0),
 +    lambda row: fnd_cal(row['Ramo'], row['CALMONTH'],
-+                        xPND.get(row['CALMONTH'], 0).get(str(row['FRECUENCIA']), 0)),
++                        xPND.get(row['CALMONTH'], 0).get(str(row['FRECUENCIA']), 0), row['TipoRea']),
      axis=1)
  
      ConsultaR['PORC_ND'] = ConsultaR.apply(
-@@ -599,7 +732,7 @@
+@@ -599,7 +737,7 @@
      ConsultaR['TC_Valuación'] =  ConsultaR['cTCAD_Mnt_x']
      ConsultaR['TC_CierreAnterior'] = ConsultaR['cTCAD_Mnt_y']
      ConsultaR['BELMEDIA'] = pd.to_numeric(ConsultaR['BELMEDIA'], errors='coerce')
@@ -290,7 +295,7 @@
      fileName = f"{xFolder1}\\ConsultaR.xlsx"
      ConsultaR.to_excel(fileName, index=False)
      ConsultaR['BELRIESGO2025_TCVal'] = ConsultaR.apply(lambda row: row['MONTO_PI']*row['PORC_ND']*row['BELMEDIA']*row['TC_Valuación'], axis = 1)
-@@ -628,7 +761,7 @@
+@@ -628,7 +766,7 @@
               'TC_Valuación', 'TC_CierreAnterior', 'PMADEV_2025', 'DESVIACION2025', 'BELRIESGO2025_TCVal', 'BELGASTO2025_TCVal',
               'IRR2025_TCVal', 'MR2025_TCVal', 'BELRIESGO2025_TCAñoAnt', 'BELGASTO2025_TCAñoAnt', 'IRR2025_TCAñoAnt', 'MR2025_TCAñoAnt']
      
@@ -299,7 +304,7 @@
      fileName = f"{xFolder}\\ConsultaPPTO_RRC_{MES}_tradicional.xlsx"
      ConsultaR.to_excel(fileName, index=False)
  
-@@ -647,6 +780,7 @@
+@@ -647,6 +785,7 @@
  #xEsc_base= xEsc_base.merge(TC_USD[["cTCAD_FecAMD","cTCAD_Mnt"]].drop_duplicates(),
  #                             how="left", left_on="Periodo", right_on="cTCAD_FecAMD")
  #xEsc_base['TC'] = xEsc_base['cTCAD_Mnt']
@@ -307,7 +312,7 @@
  xEsc_base['TC'] =  xEsc_base.apply(lambda row: xTC_PPTO[row['Periodo']],axis=1)
  xEsc_base['Monto_MXN'] = xEsc_base.apply(lambda row: row['Monto_USD'] * row['TC'], axis = 1)
  print('Fin cálculo escenario 0 y 1')
-@@ -674,7 +808,7 @@
+@@ -674,7 +813,7 @@
      else:
          dia = 30
  
@@ -316,7 +321,7 @@
      AuxMesI =  zAñoRef * 100 + mes_calculo
      AuxMesF = AuxMesI + 100
  
-@@ -683,8 +817,7 @@
+@@ -683,8 +822,7 @@
  
      print(f'Inicio cálculo escenario 2 para {Meses}')
  
@@ -326,7 +331,7 @@
      xPND = {
          xAños[Meses - 11]: {'NA': 0.043835616, '1': 0.043835616, '2': 0, '3': 0, '6': 0, '0': 0, 'DEF': 0},
          xAños[Meses - 10]: {'NA': 0.126027397, '1': 0.126027397, '2': 0.083333333, '3': 0.043835616, '6': 0, '0': 0, 'DEF': 0.043835616},
-@@ -699,6 +832,7 @@
+@@ -699,6 +837,7 @@
          xAños[Meses - 1]: {'NA': 0.876712329, '1': 0.876712329, '2': 0.833333333, '3': 0.794520548, '6': 0.671232877, '0': 0.424657534, 'DEF': 0.794520548},
          xAños[Meses]: {'NA': 0.95890411, '1': 0.95890411, '2': 0.916666667, '3': 0.876712329, '6': 0.753424658, '0': 0.506849315, 'DEF': 0.876712329}}
  
@@ -334,7 +339,7 @@
      df_Real_IS_Real = ConsultaReal(xRRC,xIS_CAT,mes_calculo)
  
      ##Meses ppto escenario 2
-@@ -825,10 +959,11 @@
+@@ -825,10 +964,11 @@
      else:
          dia = 30
  
@@ -347,7 +352,7 @@
      xReforecast_Real = ConsultaReal_USD(xRRC,xIS_CAT,mes_calculo)
     
      
-@@ -860,7 +995,7 @@
+@@ -860,7 +1000,7 @@
      auxReforecast_sum['Tipo de Monto'] = auxReforecast_sum['Origen'].apply(lambda x: xEscenario[x][0])
      auxReforecast_sum['Escenario'] = auxReforecast_sum['Origen'].apply(lambda x: xEscenario[x][1])
      auxReforecast_sum['Monto_USD'] = auxReforecast_sum['Monto']
@@ -356,7 +361,7 @@
  
      auxReforecast_sum= auxReforecast_sum.merge(TC_USD[["cTCAD_FecAMD","cTCAD_Mnt"]].drop_duplicates(),
                               how="left", left_on="Periodo2", right_on="cTCAD_FecAMD")
-@@ -883,8 +1018,11 @@
+@@ -883,8 +1023,11 @@
  
  print(f'Fin concatenación df')
  print(f'Inicio creación xlsx')
