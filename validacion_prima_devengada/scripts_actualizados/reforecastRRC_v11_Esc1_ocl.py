@@ -65,34 +65,86 @@ def fnd_cal(ramo, calmonth, valorfrec_legado=0.0):
 #%% CARPETA LOCAL — todos los insumos se leen y todas las salidas se escriben aquí
 # Por defecto es la carpeta donde está este script (ponlo en «…\OneDrive - GPV\Documents»).
 # Si quieres otra, escribe la ruta completa, p. ej.  CARPETA = r"C:\Users\tu.usuario\OneDrive - GPV\Documents"
-# Archivos que deben estar en CARPETA:
-#   CentralizadoCatálogos_SIRECySAP.xlsx · LlavesPol.csv · ParametrosMens2025.csv · IS_Cat.csv · AjManuales.csv
-#   ParametrosMensPPTO2025.csv · IS_Cat_PPTO.csv · Escenario_base_RRC.csv · Subramo.csv · CesionPI.csv · AFUN.csv
-#   zFrecuencias.csv · TablaCesion_Esc1.csv · Cesion ID Esp.csv · PptoTecnico2025.csv
-#   mec_devengamiento.py · delta_calibrado.json
 # La base de valuación (BaseValuacion.accdb) sigue leyéndose del servidor \\adsroma; eso no cambia.
 CARPETA = _DIR
 xFolder = CARPETA
 
-xFolder = CARPETA
-xRamo = pd.read_excel(f"{xFolder}\\CentralizadoCatálogos_SIRECySAP.xlsx", sheet_name="Valores", usecols="J:M", skiprows=1)
-xPais = pd.read_excel(f"{xFolder}\\CentralizadoCatálogos_SIRECySAP.xlsx", sheet_name="Valores", usecols="O:T", skiprows=1)
+#%% AÑO Y MES DE VALUACIÓN — lo único que se mueve en cada cierre
+# Todo lo que depende del año se deriva de aquí: los nombres de archivo que llevan año,
+# el mapa xAños, el corte del presupuesto, las fechas de valuación y el periodo de salida.
+# No quedan años sueltos más abajo (los «2025» que verás en nombres de columna como
+# BELRIESGO2025_TCVal son etiquetas internas del script y no dependen del ejercicio).
+zMes = 9
+zAño = 2026
 
-xFolder = CARPETA
-xLlavesPol = pd.read_csv(f"{xFolder}\\LlavesPol.csv")
-xRRC = pd.read_csv(f"{xFolder}\\ParametrosMens2025.csv")
-xIS_CAT = pd.read_csv(f"{xFolder}\\IS_Cat.csv")
-xAjManuales = pd.read_csv(f"{xFolder}\\AjManuales.csv") 
-xRRC_PPTO = pd.read_csv(f"{xFolder}\\ParametrosMensPPTO2025.csv")
-xIS_CAT_PPTO = pd.read_csv(f"{xFolder}\\IS_Cat_PPTO.csv")
-xEsc_base = pd.read_csv(f"{xFolder}\\Escenario_base_RRC.csv")
-xSubramo = pd.read_csv(f"{xFolder}\\Subramo.csv")
-xIS_BEL_MEDIA = xIS_CAT_PPTO 
-xCesionPI = pd.read_csv(f"{xFolder}\\CesionPI.csv")
-zAFUN = pd.read_csv(f"{xFolder}\\AFUN.csv")
-zFrecuencias = pd.read_csv(f"{xFolder}\\zFrecuencias.csv")
-xTablaCesion = pd.read_csv(f"{xFolder}\\TablaCesion_Esc1.csv")
-Cesion_Esp = pd.read_csv(f"{xFolder}\\Cesion ID Esp.csv")
+#%% ARCHIVOS DE ENTRADA — los nombres tal como están en la carpeta
+# Cada entrada admite varios nombres y se usa el PRIMERO que exista, así que el script
+# aguanta que un archivo cambie de nombre entre cierres. {A} = zAño, {A-1} = año anterior.
+# Si alguno se llama distinto, ponlo al principio de su lista.
+ARCHIVOS = {
+    "catalogos":       ["CentralizadoCatálogos_SIRECySAP.xlsx", "CentralizadoCatalogos_SIRECySAP.xlsx"],
+    "llaves_pol":      ["LlavesPol.csv"],
+    "param_mens":      ["ParametrosMens{A}.csv", "ParametrosMens.csv", "ParametrosMens{A-1}.csv"],
+    "is_cat":          ["IS_Cat.csv"],
+    "aj_manuales":     ["AjManuales.csv"],
+    "param_mens_ppto": ["ParametrosMensPPTO.csv", "ParametrosMensPPTO{A}.csv", "ParametrosMensPPTO{A-1}.csv"],
+    "is_cat_ppto":     ["IS_Cat_PPTO.csv"],
+    "esc_base":        ["Escenario_base_RRC.csv"],
+    "subramo":         ["Subramo.csv"],
+    "cesion_pi":       ["CesionPI.csv"],
+    "afun":            ["AFUN.csv"],
+    "frecuencias":     ["zFrecuencias.csv"],
+    "tabla_cesion":    ["TablaCesion_Esc1.csv"],
+    "cesion_esp":      ["Cesion ID Esp.csv"],
+    "ppto_tecnico":    ["PptoTecnico{A}.csv", "PptoTecnico.csv", "PptoTecnico{A-1}.csv"],
+}
+
+
+def ruta(clave):
+    """Ruta completa del archivo, probando los nombres de ARCHIVOS[clave] en orden.
+    Si ninguno existe, aborta diciendo qué hay en la carpeta que se le parezca."""
+    import difflib
+    nombres = [x.replace("{A-1}", str(zAño - 1)).replace("{A}", str(zAño)) for x in ARCHIVOS[clave]]
+    for x in nombres:
+        p = os.path.join(CARPETA, x)
+        if os.path.exists(p):
+            if x != nombres[0]:
+                print(f"[RRC] {clave}: uso «{x}» ({nombres[0]} no está en la carpeta).")
+            return p
+    hay = os.listdir(CARPETA)
+    cerca = difflib.get_close_matches(nombres[0], hay, n=3, cutoff=0.4)
+    raise SystemExit(f"[RRC] No encontré el archivo «{clave}».\n"
+                     f"      Busqué, en este orden: {nombres}\n"
+                     f"      En la carpeta: {CARPETA}\n"
+                     f"      Lo más parecido que hay ahí: {cerca or 'nada'}\n"
+                     f"      Corrige el nombre en el diccionario ARCHIVOS, arriba en este script.")
+
+
+xRamo = pd.read_excel(ruta("catalogos"), sheet_name="Valores", usecols="J:M", skiprows=1)
+xPais = pd.read_excel(ruta("catalogos"), sheet_name="Valores", usecols="O:T", skiprows=1)
+
+xLlavesPol = pd.read_csv(ruta("llaves_pol"))
+xRRC = pd.read_csv(ruta("param_mens"))
+xIS_CAT = pd.read_csv(ruta("is_cat"))
+xAjManuales = pd.read_csv(ruta("aj_manuales"))
+xRRC_PPTO = pd.read_csv(ruta("param_mens_ppto"))
+xIS_CAT_PPTO = pd.read_csv(ruta("is_cat_ppto"))
+xEsc_base = pd.read_csv(ruta("esc_base"))
+xSubramo = pd.read_csv(ruta("subramo"))
+xIS_BEL_MEDIA = xIS_CAT_PPTO
+xCesionPI = pd.read_csv(ruta("cesion_pi"))
+zAFUN = pd.read_csv(ruta("afun"))
+zFrecuencias = pd.read_csv(ruta("frecuencias"))
+xTablaCesion = pd.read_csv(ruta("tabla_cesion"))
+Cesion_Esp = pd.read_csv(ruta("cesion_esp"))
+
+
+def mapa_años(a):
+    """Reconstruye xAños: traduce la aritmética «Meses - k» a un AAAAMM real cruzando
+    el cambio de año. Cubre de enero del año a-1 a diciembre del año a."""
+    m = {a * 100 + i: a * 100 + i for i in range(1, 13)}
+    m.update({a * 100 - 11 + i: (a - 1) * 100 + 1 + i for i in range(12)})
+    return m
 
 #%% DICCIONARIOS
 xNoRamo = { 'Vida' : 10, "Acc Per." : 31, "GMM" : 35, "Salud" : 39, "Resp. Civil" : 40, 
@@ -121,12 +173,22 @@ xTC_PPTO = {202412:19.5,202501:19.5146,202502:19.5438,202503:19.5729,
          202504:19.6021,202505:19.6313,202506:19.6604,202507:19.6896,
          202508:19.7188,202509:19.7479,202510:19.7771,202511:19.8063,
          202512:19.8354}
+
+
+def revisar_tc_ppto(periodos):
+    """El TC de presupuesto es un dato: no se deriva del año. Si el escenario base trae
+    meses que no están en xTC_PPTO hay que agregarlos a mano; esto avisa con nombre y
+    apellido en vez de reventar con un KeyError sin contexto."""
+    faltan = sorted({int(p) for p in periodos} - set(xTC_PPTO))
+    if faltan:
+        raise SystemExit(f"[RRC] Faltan tipos de cambio de presupuesto en xTC_PPTO para {faltan}.\n"
+                         f"      Hoy la tabla cubre {min(xTC_PPTO)}–{max(xTC_PPTO)}.\n"
+                         f"      Agrégalos en el diccionario xTC_PPTO, arriba en este script.")
 	
 
 
 #%% VARIABLES INPUT
-zMes = 9
-zAño = 2025
+# zMes y zAño se definen arriba, en el bloque «AÑO Y MES DE VALUACIÓN».
 Nomeses = [1,12]
 
 COC = 0.1
@@ -177,7 +239,7 @@ for i in range(num_proyecciones):
 
 
 def zPorcCesion(xCesion, zTablaCesion, zCesionPI, xSusc, xPorCed, xPorCedEsp, xTipoRea):
-    AñoRef = 2025
+    AñoRef = zAño          # se deja por compatibilidad; esta función no lo usa
     xPI = 1
 
     if xSusc >= 2023:
@@ -426,9 +488,9 @@ def ConsultaPPTO2025(MES):
     global xPais, xSubramo, ConsultaTC, xRRC, xIS_BEL_MEDIA, BC, RCS, COC, tc_CIERRE, zMes, zAFUN, xCesionPI, xTablaCesion, zFrecuencias, xPND2, Cesion_Esp
     
     xFolder = CARPETA
-    xFile = fr"{xFolder}\PptoTecnico2025.csv"
+    xFile = ruta("ppto_tecnico")
     ConsultaP = pd.read_csv(xFile, thousands=',')
-    ConsultaPPTO = ConsultaP[(ConsultaP["GL_ACCT"] > 6101000000) & (ConsultaP["GL_ACCT"] < 6108999999) & (ConsultaP["CALMONTH"] <= 202512) & (ConsultaP["CALMONTH"] >= (zAño*100 + MES + 1))]
+    ConsultaPPTO = ConsultaP[(ConsultaP["GL_ACCT"] > 6101000000) & (ConsultaP["GL_ACCT"] < 6108999999) & (ConsultaP["CALMONTH"] <= (zAño*100 + 12)) & (ConsultaP["CALMONTH"] >= (zAño*100 + MES + 1))]
 
     Columnas = [
     'PROFTCTR', 'ZREGIONRP', 'ZTIPOREAS', 'ZOFICN_RP', 'FUNCAREA', 'ZMGA', 
@@ -718,6 +780,7 @@ xEsc_base = xEsc_base[columnas_finales]
 #xEsc_base= xEsc_base.merge(TC_USD[["cTCAD_FecAMD","cTCAD_Mnt"]].drop_duplicates(),
 #                             how="left", left_on="Periodo", right_on="cTCAD_FecAMD")
 #xEsc_base['TC'] = xEsc_base['cTCAD_Mnt']
+revisar_tc_ppto(xEsc_base['Periodo'])
 xEsc_base['TC'] =  xEsc_base.apply(lambda row: xTC_PPTO[row['Periodo']],axis=1)
 xEsc_base['Monto_MXN'] = xEsc_base.apply(lambda row: row['Monto_USD'] * row['TC'], axis = 1)
 print('Fin cálculo escenario 0 y 1')
@@ -745,7 +808,7 @@ for mes in range(zMes):
     else:
         dia = 30
 
-    zFechaValuacion = f'{dia}/{AuxMes}{mes_calculo}/2025'
+    zFechaValuacion = f'{dia}/{AuxMes}{mes_calculo}/{zAño}'
     AuxMesI =  zAñoRef * 100 + mes_calculo
     AuxMesF = AuxMesI + 100
 
@@ -754,8 +817,7 @@ for mes in range(zMes):
 
     print(f'Inicio cálculo escenario 2 para {Meses}')
 
-    xAños ={202512:202512, 202511:202511, 202510:202510, 202509:202509, 202508:202508, 202507:202507, 202506:202506, 202505:202505, 202504:202504, 202503:202503, 202502:202502, 202501:202501,
-            202500:202412, 202499:202411, 202498:202410, 202497:202409, 202496:202408, 202495:202407, 202494:202406, 202493:202405, 202492:202404, 202491:202403, 202490:202402, 202489:202401}
+    xAños = mapa_años(zAño)
     xPND = {
         xAños[Meses - 11]: {'NA': 0.043835616, '1': 0.043835616, '2': 0, '3': 0, '6': 0, '0': 0, 'DEF': 0},
         xAños[Meses - 10]: {'NA': 0.126027397, '1': 0.126027397, '2': 0.083333333, '3': 0.043835616, '6': 0, '0': 0, 'DEF': 0.043835616},
@@ -897,7 +959,7 @@ for mes in range(zMes):
     else:
         dia = 30
 
-    zFechaValuacion = f'{dia}/{AuxMes}{mes_calculo}/2025'
+    zFechaValuacion = f'{dia}/{AuxMes}{mes_calculo}/{zAño}'
     AuxMesI =  zAñoRef * 100
     AuxMesF = zAñoRef * 100 + mes_calculo
     print(f'Inicio cálculo escenario 4 para {Meses}')
@@ -933,7 +995,7 @@ for mes in range(zMes):
     auxReforecast_sum['Tipo de Monto'] = auxReforecast_sum['Origen'].apply(lambda x: xEscenario[x][0])
     auxReforecast_sum['Escenario'] = auxReforecast_sum['Origen'].apply(lambda x: xEscenario[x][1])
     auxReforecast_sum['Monto_USD'] = auxReforecast_sum['Monto']
-    auxReforecast_sum['Periodo2'] = 202512
+    auxReforecast_sum['Periodo2'] = zAño*100 + 12
 
     auxReforecast_sum= auxReforecast_sum.merge(TC_USD[["cTCAD_FecAMD","cTCAD_Mnt"]].drop_duplicates(),
                              how="left", left_on="Periodo2", right_on="cTCAD_FecAMD")

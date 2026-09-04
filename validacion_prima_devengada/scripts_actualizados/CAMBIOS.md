@@ -60,6 +60,22 @@ Correcciones sobre la v2:
 - Con esto el SONR consume el mismo factor que la RRC, así que `Dev = 1 − FND` queda coherente entre las dos reservas por construcción, que es lo que pide la sección 8 del documento del MEC.
 - **Rutas locales y nombre de la salida**, igual que en el RRC: las seis rutas fijas pasan a `CARPETA = _DIR` y la salida se llama `SONR_esc_FNDcal.xlsx` o `SONR_esc_legado.xlsx` según el interruptor, sin pisar el `SONR_esc.xlsx` de la v3.
 
+### 3b. Un solo año y un resolver de nombres de archivo (RRC y SONR)
+
+Al llevar los scripts a la carpeta local salieron dos problemas que no eran de ruta sino de nombre y de año:
+
+- **Los insumos cambiaron de nombre entre cierres.** `ParametrosMens2025.csv` es hoy `ParametrosMens2026.csv`, `ParametrosMensPPTO2025.csv` es `ParametrosMensPPTO.csv` (sin año), `ParamSONR2025.csv` es `ParamSONR2026.csv` y el `ParamSONR2025_lagsinc.csv` ya no existe como archivo aparte. Ahora cada script trae un diccionario `ARCHIVOS` donde cada insumo admite varios nombres, con `{A}` = `zAño` y `{A-1}` = año anterior, y una función `ruta()` que usa el primero que exista, avisa en pantalla cuando no es el primero de la lista, y si no encuentra ninguno aborta diciendo qué buscó y qué hay en la carpeta que se le parezca (`difflib`). Cambiar un nombre es editar una línea del diccionario, no cazar `read_csv` por todo el archivo.
+- **El año estaba repartido por el cuerpo del script.** Ahora `zAño` (y `zAñoPpto`, `zMes`) viven en un bloque `AÑO Y MES DE VALUACIÓN` arriba del todo, y de ahí se derivan: el mapa `xAños` (que era un literal de 24 entradas y ahora lo arma `mapa_años(zAño)`, verificado idéntico al original para 2025), el corte del presupuesto `CALMONTH <= zAño*100+12`, las dos `zFechaValuacion` que traían `/2025` fijo, el `Periodo2` del escenario 4, el `AñoMes == 202512` del SONR y su `xVal < 202501`. Movidos a 2026 por indicación del área.
+
+Dos cosas que salieron de paso:
+
+- **`zAño = 2025` local dentro de `ConsultaMoneda()` del SONR**, que pisaba al global. Al mover el ejercicio habría dejado `Anio_ant` en el año equivocado sin avisar. Eliminado; la función usa el global.
+- **`AñoRef = 2025` en `zPorcCesion()` del RRC** estaba asignado y nunca se usaba. Se deja derivado de `zAño` para que no vuelva a quedar viejo.
+
+Lo que **no** se puede derivar es `xTC_PPTO`, el tipo de cambio de presupuesto: es un dato y hoy cubre 202412–202512. Los dos scripts ahora lo revisan contra los periodos del escenario base antes de empezar (`revisar_tc_ppto`) y abortan diciendo qué meses faltan, en vez de reventar con un `KeyError` sin contexto a la mitad de la corrida.
+
+Las reglas por año de suscripción (`xSusc >= 2023`, `>= 2022`, `== 2021`) no se tocaron: son de negocio y no dependen del ejercicio de valuación. Los nombres de columna con año (`BELRIESGO2025_TCVal`, `IRR2025`, `MR2025`, `DESVIACION2025`…) tampoco: los crea y los consume el mismo script, así que renombrarlos sería riesgo sin beneficio.
+
 ## 4. `construir_input_mec.py`
 
 Arrastra al Input tres campos que antes se leían y se tiraban, y sin los cuales no se puede auditar ni recalibrar el FND:

@@ -91,10 +91,22 @@ En el Excel, la columna `Año` es siempre el **año contable** (el mes de valuac
 | `ReforecastSONR_v4.py` | reemplaza a la v3 |
 | `mec_devengamiento.py` | módulo del MEC v3 (el mismo de arriba) |
 | `delta_calibrado.json` | los δ por ramo; toma el de `salidas\` del paso 2 (o el de esta carpeta) |
-| Insumos del RRC | `CentralizadoCatálogos_SIRECySAP.xlsx` · `LlavesPol.csv` · `ParametrosMens2025.csv` · `IS_Cat.csv` · `AjManuales.csv` · `ParametrosMensPPTO2025.csv` · `IS_Cat_PPTO.csv` · `Escenario_base_RRC.csv` · `Subramo.csv` · `CesionPI.csv` · `AFUN.csv` · `zFrecuencias.csv` · `TablaCesion_Esc1.csv` · `Cesion ID Esp.csv` · `PptoTecnico2025.csv` |
-| Insumos del SONR | `AjManuales_SONR.csv` · `Subramo.csv` · `TablaBase_MetodoPropio.csv` · `TablaBase_MetodoPropio_ext.csv` · `ParamSONR2025.csv` · `ParamSONR2025_lagsinc.csv` · `PNDmes.csv` · `FrecCol.csv` · `LlavesPol.csv` · `Escenario_base_SONR.csv` · `PptoTecnico2025.csv` |
+| Insumos del RRC | `CentralizadoCatálogos_SIRECySAP.xlsx` · `LlavesPol.csv` · `ParametrosMens2026.csv` · `IS_Cat.csv` · `AjManuales.csv` · `ParametrosMensPPTO.csv` · `IS_Cat_PPTO.csv` · `Escenario_base_RRC.csv` · `Subramo.csv` · `CesionPI.csv` · `AFUN.csv` · `zFrecuencias.csv` · `TablaCesion_Esc1.csv` · `Cesion ID Esp.csv` · `PptoTecnico2026.csv` |
+| Insumos del SONR | `AjManuales_SONR.csv` · `Subramo.csv` · `TablaBase_MetodoPropio.csv` · `TablaBase_MetodoPropio_ext.csv` · `ParamSONR2026.csv` · `PNDmes.csv` · `FrecCol.csv` · `LlavesPol.csv` · `Escenario_base_SONR.csv` · `PptoTecnico2026.csv` |
 
 Son exactamente los archivos que los scripts ya leían de las distintas carpetas de OneDrive; sólo cambia que ahora viven todos juntos. El único cambio de resultado es el FND: con `USAR_FND_CALIBRADO = True` (valor por defecto) el proporcional y el facultativo usan la tabla calibrada por antigüedad de registro y el no proporcional sigue con la prorrata exacta; con `False` los scripts se comportan igual que la v10 y la v3.
+
+### El año y los nombres de archivo
+
+Los dos scripts tienen arriba un bloque **`AÑO Y MES DE VALUACIÓN`** con `zAño` (y `zAñoPpto`/`zMes`). De ahí se deriva todo lo que dependía del año: los nombres de archivo que lo llevan, el mapa `xAños`, el corte del presupuesto (`CALMONTH <= zAño*100+12`), las fechas de valuación y el periodo del escenario 4. En cada cierre se mueve ese número y ya; no quedan años sueltos en el cuerpo del script. Los `2025` que verás en nombres de columna (`BELRIESGO2025_TCVal`, `IRR2025`, `MR2025`…) son etiquetas internas que el propio script crea y consume, no dependen del ejercicio.
+
+Debajo hay un bloque **`ARCHIVOS DE ENTRADA`**: un diccionario con el nombre de cada insumo. Cada entrada admite **varios nombres** y se usa el primero que exista, así que los scripts aguantan que un archivo cambie de nombre entre cierres (`{A}` se sustituye por `zAño`, `{A-1}` por el año anterior). Si el nombre que se usa no es el primero de la lista, lo dice en pantalla:
+
+    [RRC] ppto_tecnico: uso «PptoTecnico2025.csv» (PptoTecnico2026.csv no está en la carpeta).
+
+Y si no encuentra ninguno, aborta diciendo qué buscó y qué hay en la carpeta que se le parezca, en vez de reventar con un `FileNotFoundError` pelón. Para agregar o cambiar un nombre basta editar ese diccionario.
+
+**El tipo de cambio de presupuesto sí hay que actualizarlo a mano.** `xTC_PPTO` es un dato, no se deriva del año, y hoy cubre de 202412 a 202512. Si tu `Escenario_base_RRC.csv` / `Escenario_base_SONR.csv` ya trae periodos de 2026, hay que agregar esos meses al diccionario. Los scripts lo revisan antes de empezar y te dicen exactamente qué meses faltan.
 
 El nombre de la salida dice con qué factor se corrió, para que no pise el output anterior:
 

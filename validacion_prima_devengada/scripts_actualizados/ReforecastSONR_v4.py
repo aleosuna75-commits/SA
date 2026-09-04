@@ -55,43 +55,102 @@ def _es_no_proporcional(xTipoRea) -> bool:
     except Exception:
         return False
 
-#%% INPUTS
-zAñoPpto = 2025
-zAño= 2025
+#%% AÑO Y MES DE VALUACIÓN — lo único que se mueve en cada cierre
+# Todo lo que depende del año se deriva de aquí: los nombres de archivo que llevan año,
+# el mapa xAños, el corte del presupuesto, las fechas de valuación y el periodo de salida.
+# No quedan años sueltos más abajo (los «2025» que verás en nombres de columna como
+# IRR2025_TCVal son etiquetas internas del script y no dependen del ejercicio).
+zAñoPpto = 2026
+zAño= 2026
 zMes = 12
 #%% CARPETA LOCAL — todos los insumos se leen y todas las salidas se escriben aquí
 # Por defecto es la carpeta donde está este script (ponlo en «…\OneDrive - GPV\Documents»).
 # Si quieres otra, escribe la ruta completa, p. ej.  CARPETA = r"C:\Users\tu.usuario\OneDrive - GPV\Documents"
-# Archivos que deben estar en CARPETA:
-#   AjManuales_SONR.csv · Subramo.csv · TablaBase_MetodoPropio.csv · TablaBase_MetodoPropio_ext.csv
-#   ParamSONR2025.csv · ParamSONR2025_lagsinc.csv · PNDmes.csv · FrecCol.csv · LlavesPol.csv
-#   Escenario_base_SONR.csv · PptoTecnico2025.csv · mec_devengamiento.py · delta_calibrado.json
 # La base de valuación (BaseValuacion.accdb) sigue leyéndose del servidor \\adsroma; eso no cambia.
 CARPETA = _DIR
 xFolder = CARPETA
-xAjManuales = pd.read_csv(f"{xFolder}\\AjManuales_SONR.csv")
+
+#%% ARCHIVOS DE ENTRADA — los nombres tal como están en la carpeta
+# Cada entrada admite varios nombres y se usa el PRIMERO que exista, así que el script
+# aguanta que un archivo cambie de nombre entre cierres. {A} = zAño, {A-1} = año anterior.
+# Si alguno se llama distinto, ponlo al principio de su lista.
+ARCHIVOS = {
+    "aj_manuales":    ["AjManuales_SONR.csv"],
+    "subramo":        ["Subramo.csv"],
+    "tbase_mp":       ["TablaBase_MetodoPropio.csv"],
+    "tbase_mp_ext":   ["TablaBase_MetodoPropio_ext.csv"],
+    "param_sonr":     ["ParamSONR{A}.csv", "ParamSONR.csv", "ParamSONR{A-1}.csv"],
+    # los lags de incurrido: si no hay archivo aparte, sirve el mismo ParamSONR
+    "param_sonr_inc": ["ParamSONR{A}_lagsinc.csv", "ParamSONR{A}.csv", "ParamSONR{A-1}_lagsinc.csv"],
+    "pnd_mes":        ["PNDmes.csv"],
+    "frec_col":       ["FrecCol.csv"],
+    "llaves_pol":     ["LlavesPol.csv"],
+    "esc_base":       ["Escenario_base_SONR.csv"],
+    "ppto_tecnico":   ["PptoTecnico{A}.csv", "PptoTecnico.csv", "PptoTecnico{A-1}.csv"],
+}
+
+
+def ruta(clave):
+    """Ruta completa del archivo, probando los nombres de ARCHIVOS[clave] en orden.
+    Si ninguno existe, aborta diciendo qué hay en la carpeta que se le parezca."""
+    import difflib
+    nombres = [x.replace("{A-1}", str(zAño - 1)).replace("{A}", str(zAño)) for x in ARCHIVOS[clave]]
+    for x in nombres:
+        p = os.path.join(CARPETA, x)
+        if os.path.exists(p):
+            if x != nombres[0]:
+                print(f"[SONR] {clave}: uso «{x}» ({nombres[0]} no está en la carpeta).")
+            return p
+    hay = os.listdir(CARPETA)
+    cerca = difflib.get_close_matches(nombres[0], hay, n=3, cutoff=0.4)
+    raise SystemExit(f"[SONR] No encontré el archivo «{clave}».\n"
+                     f"       Busqué, en este orden: {nombres}\n"
+                     f"       En la carpeta: {CARPETA}\n"
+                     f"       Lo más parecido que hay ahí: {cerca or 'nada'}\n"
+                     f"       Corrige el nombre en el diccionario ARCHIVOS, arriba en este script.")
+
+
+xAjManuales = pd.read_csv(ruta("aj_manuales"))
 
 #### PPTO
-xSubramo = pd.read_csv(f"{xFolder}\\Subramo.csv")
+xSubramo = pd.read_csv(ruta("subramo"))
 
 ####Mensual
-Tbase_mp = pd.read_csv(f"{xFolder}\\TablaBase_MetodoPropio.csv")
-Tbase_mp_ext = pd.read_csv(f"{xFolder}\\TablaBase_MetodoPropio_ext.csv")
-ParamSONR = pd.read_csv(f"{xFolder}\\ParamSONR2025.csv")
-ParamSONR_inc = pd.read_csv(f"{xFolder}\\ParamSONR2025_lagsinc.csv")
-xPNDmes = pd.read_csv(f"{xFolder}\\PNDmes.csv")
-xFrecCol = pd.read_csv(f"{xFolder}\\FrecCol.csv")
-xLlavesPol = pd.read_csv(f"{xFolder}\\LlavesPol.csv")
-xEsc_base = pd.read_csv(f"{xFolder}\\Escenario_base_SONR.csv")
+Tbase_mp = pd.read_csv(ruta("tbase_mp"))
+Tbase_mp_ext = pd.read_csv(ruta("tbase_mp_ext"))
+ParamSONR = pd.read_csv(ruta("param_sonr"))
+ParamSONR_inc = pd.read_csv(ruta("param_sonr_inc"))
+xPNDmes = pd.read_csv(ruta("pnd_mes"))
+xFrecCol = pd.read_csv(ruta("frec_col"))
+xLlavesPol = pd.read_csv(ruta("llaves_pol"))
+xEsc_base = pd.read_csv(ruta("esc_base"))
 
 #%% DICCIONARIOS
-xAños ={202512:202512, 202511:202511, 202510:202510, 202509:202509, 202508:202508, 202507:202507, 202506:202506, 202505:202505, 202504:202504, 202503:202503, 202502:202502, 202501:202501,
-        202500:202412, 202499:202411, 202498:202410, 202497:202409, 202496:202408, 202495:202407, 202494:202406, 202493:202405, 202492:202404, 202491:202403, 202490:202402, 202489:202401}
+def mapa_años(a):
+    """Reconstruye xAños: traduce la aritmética «Meses - k» a un AAAAMM real cruzando
+    el cambio de año. Cubre de enero del año a-1 a diciembre del año a."""
+    m = {a * 100 + i: a * 100 + i for i in range(1, 13)}
+    m.update({a * 100 - 11 + i: (a - 1) * 100 + 1 + i for i in range(12)})
+    return m
+
+
+xAños = mapa_años(zAño)
 
 xTC_PPTO = {202412:19.5,202501:19.5146,202502:19.5438,202503:19.5729,
          202504:19.6021,202505:19.6313,202506:19.6604,202507:19.6896,
          202508:19.7188,202509:19.7479,202510:19.7771,202511:19.8063,
          202512:19.8354}
+
+
+def revisar_tc_ppto(periodos):
+    """El TC de presupuesto es un dato: no se deriva del año. Si el escenario base trae
+    meses que no están en xTC_PPTO hay que agregarlos a mano; esto avisa con nombre y
+    apellido en vez de reventar con un KeyError sin contexto."""
+    faltan = sorted({int(p) for p in periodos} - set(xTC_PPTO))
+    if faltan:
+        raise SystemExit(f"[SONR] Faltan tipos de cambio de presupuesto en xTC_PPTO para {faltan}.\n"
+                         f"       Hoy la tabla cubre {min(xTC_PPTO)}–{max(xTC_PPTO)}.\n"
+                         f"       Agrégalos en el diccionario xTC_PPTO, arriba en este script.")
 
 xEscenario = {"BEL_RIESGO":["BEL", 2],
         "IRR":["IRR",2],
@@ -177,7 +236,7 @@ def zFND_PPTO(xIniVig, xFinVig, xTipoRea, xAñoMes, xFecVal, xMesProc, xFrecuenc
                     xVal = xAños.get(int(xMesProc) - xFecVal.month,0)
                 else:
                     xVal = xAños.get(int(xMesProc) - xFecVal.month + 12 ,0)
-            if xVal < 202501:
+            if xVal < (zAño*100 + 1):
                 #result = 1
                 result = xPND.get(xVal,0).get(str(xFrecuencia), 0)
             else:
@@ -290,7 +349,8 @@ TC_USD.to_excel(fileName, index=False)
 
 #%% FUNCIÓN CONSULTA MONEDA.
 def ConsultaMoneda():
-    zAño = 2025
+    # zAño se toma del bloque de arriba; antes había aquí un «zAño = 2025» local que
+    # pisaba al global y dejaba Anio_ant en el año equivocado al mover el ejercicio.
     conn_str = (r'DRIVER={Microsoft Access Driver (*.mdb, *.accdb)};'
             r'DBQ=\\adsroma\Documentos Patria\ReservasRRC\BaseValuacion.accdb;')
 
@@ -520,7 +580,7 @@ def Metodo_propio():
 def ConsultaPPTO2025(MES):
     
     xFolder = CARPETA
-    xFile = fr"{xFolder}\PptoTecnico2025.csv"
+    xFile = ruta("ppto_tecnico")
     ConsultaP = pd.read_csv(xFile, thousands=',')
     ConsultaPPTO = ConsultaP[(ConsultaP["GL_ACCT"] > 6101000000) & (ConsultaP["GL_ACCT"] < 6108999999) & (ConsultaP["CALMONTH"] >= (zAño*100 + MES + 1))]
 
@@ -640,6 +700,7 @@ df = []
 columnas_finales = ['Reserva', 'Escenario', 'Tipo de Monto','Ramo', 'Periodo', 'Monto_MXN', 'Monto_USD', 'TC']
 xEsc_base = xEsc_base[columnas_finales]
 
+revisar_tc_ppto(xEsc_base['Periodo'])
 xEsc_base['TC'] =  xEsc_base.apply(lambda row: xTC_PPTO[row['Periodo']],axis=1)
 xEsc_base['Monto_MXN'] = xEsc_base.apply(lambda row: row['Monto_USD'] * row['TC'], axis = 1)
 df.append(xEsc_base)
@@ -818,7 +879,7 @@ for mes in range(zMes):
     fileName = f"{xFolder}\\df_reforecast{mes_calculo}_E4.xlsx"
     df_reforecast.to_excel(fileName, index=False)
 
-    df_reforecast = df_reforecast[(df_reforecast["AñoMes"] == 202512)]
+    df_reforecast = df_reforecast[(df_reforecast["AñoMes"] == (zAño*100 + 12))]
 
     xColumnas = ['Ramo', 'BEL_RIESGO', 'IRR', 'MR']
     df_SONR_dim = df_reforecast.reindex(columns=xColumnas)
@@ -838,7 +899,7 @@ for mes in range(zMes):
     auxSONR_sum = auxSONR.groupby(['Reserva', 'Ramo', 'Periodo', 'Origen']).agg({'Monto': 'sum'}).reset_index()
     auxSONR_sum['Tipo de Monto'] = auxSONR_sum['Origen'].apply(lambda x: xEscenario[x][0])
     auxSONR_sum['Escenario'] = 4
-    auxSONR_sum['Periodo2'] = 202512
+    auxSONR_sum['Periodo2'] = zAño*100 + 12
 
     auxSONR_sum= auxSONR_sum.merge(TC_USD[["cTCAD_FecAMD","cTCAD_Mnt"]].drop_duplicates(),
                              how="left", left_on="Periodo2", right_on="cTCAD_FecAMD")
