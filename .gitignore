@@ -14,3 +14,6 @@ world.tar.gz
 
 # Paquete de entrega (se regenera con el script de empaquetado)
 validacion_prima_devengada/MEC_FND_calibrado_v3.zip
+
+# Salida del modo --demo del comparador (se regenera)
+validacion_prima_devengada/scripts_actualizados/_demo_comparador/

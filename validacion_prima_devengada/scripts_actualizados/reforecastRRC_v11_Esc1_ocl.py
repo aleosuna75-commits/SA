@@ -62,13 +62,23 @@ def fnd_cal(ramo, calmonth, valorfrec_legado=0.0):
     return 0.0 if k < 0 else mec.fnd_registro(ramo, k, DELTA_FND)
 
 #%% TABLAS CSV
-xFolder = fr"C:\Users\{usuario}\OneDrive - GPV\Documentos"
+#%% CARPETA LOCAL — todos los insumos se leen y todas las salidas se escriben aquí
+# Por defecto es la carpeta donde está este script (ponlo en «…\OneDrive - GPV\Documents»).
+# Si quieres otra, escribe la ruta completa, p. ej.  CARPETA = r"C:\Users\tu.usuario\OneDrive - GPV\Documents"
+# Archivos que deben estar en CARPETA:
+#   CentralizadoCatálogos_SIRECySAP.xlsx · LlavesPol.csv · ParametrosMens2025.csv · IS_Cat.csv · AjManuales.csv
+#   ParametrosMensPPTO2025.csv · IS_Cat_PPTO.csv · Escenario_base_RRC.csv · Subramo.csv · CesionPI.csv · AFUN.csv
+#   zFrecuencias.csv · TablaCesion_Esc1.csv · Cesion ID Esp.csv · PptoTecnico2025.csv
+#   mec_devengamiento.py · delta_calibrado.json
+# La base de valuación (BaseValuacion.accdb) sigue leyéndose del servidor \\adsroma; eso no cambia.
+CARPETA = _DIR
+xFolder = CARPETA
 
-xFolder = fr"C:\Users\{usuario}\OneDrive - GPV\Planeación Financiera RPAT - Documents\Financieros"
+xFolder = CARPETA
 xRamo = pd.read_excel(f"{xFolder}\\CentralizadoCatálogos_SIRECySAP.xlsx", sheet_name="Valores", usecols="J:M", skiprows=1)
 xPais = pd.read_excel(f"{xFolder}\\CentralizadoCatálogos_SIRECySAP.xlsx", sheet_name="Valores", usecols="O:T", skiprows=1)
 
-xFolder = fr"C:\Users\{usuario}\OneDrive - GPV\Planeación Financiera RPAT - Documents\Forecasts\2025\CSV Auxiliares"
+xFolder = CARPETA
 xLlavesPol = pd.read_csv(f"{xFolder}\\LlavesPol.csv")
 xRRC = pd.read_csv(f"{xFolder}\\ParametrosMens2025.csv")
 xIS_CAT = pd.read_csv(f"{xFolder}\\IS_Cat.csv")
@@ -415,7 +425,7 @@ def ConsultaReal_USD(IS,IS_CAT, MES):
 def ConsultaPPTO2025(MES):
     global xPais, xSubramo, ConsultaTC, xRRC, xIS_BEL_MEDIA, BC, RCS, COC, tc_CIERRE, zMes, zAFUN, xCesionPI, xTablaCesion, zFrecuencias, xPND2, Cesion_Esp
     
-    xFolder = fr"C:\Users\mocamachol\OneDrive - GPV\Planeación Financiera RPAT - Documents\Presupuestos\2025\02 Técnico\BD_PptoTécnico_2025"
+    xFolder = CARPETA
     xFile = fr"{xFolder}\PptoTecnico2025.csv"
     ConsultaP = pd.read_csv(xFile, thousands=',')
     ConsultaPPTO = ConsultaP[(ConsultaP["GL_ACCT"] > 6101000000) & (ConsultaP["GL_ACCT"] < 6108999999) & (ConsultaP["CALMONTH"] <= 202512) & (ConsultaP["CALMONTH"] >= (zAño*100 + MES + 1))]
@@ -660,7 +670,7 @@ def ConsultaReal(IS,IS_CAT, MES):
     ConsultaR['TC_Valuación'] =  ConsultaR['cTCAD_Mnt_x']
     ConsultaR['TC_CierreAnterior'] = ConsultaR['cTCAD_Mnt_y']
     ConsultaR['BELMEDIA'] = pd.to_numeric(ConsultaR['BELMEDIA'], errors='coerce')
-    xFolder1 = r"C:\Users\mocamachol\OneDrive - GPV\Documentos"
+    xFolder1 = CARPETA
     fileName = f"{xFolder1}\\ConsultaR.xlsx"
     ConsultaR.to_excel(fileName, index=False)
     ConsultaR['BELRIESGO2025_TCVal'] = ConsultaR.apply(lambda row: row['MONTO_PI']*row['PORC_ND']*row['BELMEDIA']*row['TC_Valuación'], axis = 1)
@@ -689,7 +699,7 @@ def ConsultaReal(IS,IS_CAT, MES):
              'TC_Valuación', 'TC_CierreAnterior', 'PMADEV_2025', 'DESVIACION2025', 'BELRIESGO2025_TCVal', 'BELGASTO2025_TCVal',
              'IRR2025_TCVal', 'MR2025_TCVal', 'BELRIESGO2025_TCAñoAnt', 'BELGASTO2025_TCAñoAnt', 'IRR2025_TCAñoAnt', 'MR2025_TCAñoAnt']
     
-    xFolder = r"C:\Users\mocamachol\OneDrive - GPV\Documentos"
+    xFolder = CARPETA
     fileName = f"{xFolder}\\ConsultaPPTO_RRC_{MES}_tradicional.xlsx"
     ConsultaR.to_excel(fileName, index=False)
 
@@ -946,8 +956,11 @@ xRRC_saldos = xRRC_saldos[Columnas]
 
 print(f'Fin concatenación df')
 print(f'Inicio creación xlsx')
-xFolder = r"C:\Users\mocamachol\OneDrive - GPV\Documentos"
-fileName = f"{xFolder}\\RRC_esc.xlsx"
+xFolder = CARPETA
+# v11: el nombre de la salida dice con qué FND se corrió, para poder comparar contra el output anterior
+# (RRC_esc.xlsx de la v10) sin pisarlo.
+fileName = f"{xFolder}\\{'RRC_esc_FNDcal.xlsx' if USAR_FND_CALIBRADO else 'RRC_esc_legado.xlsx'}"
+print(f"[RRC] Salida escrita en: {fileName}")
 xRRC_saldos.to_excel(fileName, index=False)
 
 end_time = time.perf_counter()

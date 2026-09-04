@@ -41,12 +41,17 @@ import os, sys, json
 import numpy as np
 import pandas as pd
 
+# El script se ancla a SU PROPIA CARPETA (ponlo en «…\OneDrive - GPV\Documents»).
+# Lee los insumos de la subcarpeta insumos/ (la genera preparar_insumos.py) o, si no
+# existe, de la misma carpeta; escribe todo en salidas/.
 BASE = os.path.dirname(os.path.abspath(__file__))
-INS = os.path.join(BASE, "insumos")
+INS = os.path.join(BASE, "insumos") if os.path.isdir(os.path.join(BASE, "insumos")) else BASE
 OUT = os.path.join(BASE, "salidas")
 os.makedirs(OUT, exist_ok=True)
 
-T0, T1 = 202201, 202605          # ventana con RRC real disponible
+T0 = 202201                      # primer mes con RRC real en la base
+T1 = 202605                      # último mes con RRC real; se SOBREESCRIBE con el último
+                                 # mes con saldo de real_rrc_long.csv al cargarlo
 CAL0 = 202301                    # ventana de calibración / reporte (evita la rampa 2022)
 CAL0_GRUPO = {"CAT": 202401}     # CAT: el índice TEV/Hidro sólo es consistente desde 2024
 H = 72                           # horizonte de los vectores MEC
@@ -133,7 +138,11 @@ def cargar_real() -> tuple[pd.DataFrame, pd.DataFrame]:
     BEL, GTO, MR, IRR, BRUTO, NETO (USD), PND_real = Σ_sub BEL/IS, IS_eff = BEL/PND_real,
     g=GTO/BEL, mr=MR/BEL, c=IRR/BEL."""
     r = pd.read_csv(os.path.join(INS, "real_rrc_long.csv"))
-    r = r[(r["PERIODO"] >= T0) & (r["PERIODO"] <= T1)]
+    r = r[r["PERIODO"] >= T0]
+    # último mes con saldo real: la base trae los meses futuros en cero
+    tot = r.groupby("PERIODO")["RRC BRUTO"].sum()
+    t1 = int(tot[tot.abs() > 0].index.max())
+    r = r[r["PERIODO"] <= t1]
     is_ = pd.read_csv(os.path.join(INS, "is_rrc_real.csv")).set_index("Fecha")
     is_.columns = [str(c).strip() for c in is_.columns]
     per = sorted(r["PERIODO"].unique())
@@ -168,7 +177,7 @@ def cargar_real() -> tuple[pd.DataFrame, pd.DataFrame]:
     g["g"] = g["GTO"] / g["BEL"]
     g["mr"] = g["MR"] / g["BEL"]
     g["c"] = g["IRR"] / g["BEL"]
-    return g, is_ram
+    return g, is_ram, t1
 
 
 def cargar_vectores() -> tuple[dict, np.ndarray, list]:
@@ -190,7 +199,7 @@ def cargar_cesion_er() -> pd.DataFrame:
             ced = e.loc["(-) PRIMA CEDIDA / RETROCEDIDA", spec["er"]].sum()
             out[(g, anio)] = ced / pe if pe else 0.0
     ces = pd.Series(out).rename("ces").reset_index()
-    ces.columns = ["Grupo", "Anio", "ces"]
+    ces.columns = ["Grupo", "Año", "ces"]
     return ces
 
 
@@ -295,8 +304,10 @@ def comparar(real: pd.DataFrame, pe: pd.DataFrame, pnds: dict, ces: pd.DataFrame
     base = real[["Grupo", "PERIODO", "BEL", "BRUTO", "NETO", "IRR", "PND_real", "IS_eff", "g", "mr", "c"]].copy()
     base = base.merge(largo(pe, "PE"), on=["PERIODO", "Grupo"], how="left")
     base["TC"] = base["PERIODO"].map(tc)
-    base["Anio"] = base["PERIODO"] // 100
-    base = base.merge(ces, on=["Grupo", "Anio"], how="left")
+    # Año CONTABLE: el de PERIODO, que es el mes de valuación de la RRC real y el mes
+    # contable en que se registra la prima. No es el año de suscripción.
+    base["Año"] = base["PERIODO"] // 100
+    base = base.merge(ces, on=["Grupo", "Año"], how="left")
     base["ces"] = base.groupby("Grupo")["ces"].transform(lambda s: s.ffill().bfill())
     base["PR"] = base["PE"] * (1 - base["ces"])
     base = base.sort_values(["Grupo", "PERIODO"])
@@ -319,7 +330,7 @@ def comparar(real: pd.DataFrame, pe: pd.DataFrame, pnds: dict, ces: pd.DataFrame
 def resumen_anual(cmp: pd.DataFrame, variantes: list) -> pd.DataFrame:
     """Prima devengada tomada y retenida por grupo y año: real vs variantes, con error."""
     c = cmp[cmp["PERIODO"] >= CAL0].copy()
-    c["Anio"] = c["PERIODO"] // 100
+    c["Año"] = c["PERIODO"] // 100          # año contable
     # equivalentes en MXN: Δreserva del mes × TC de cierre del mes (así lo lleva el ER:
     # el efecto cambiario del saldo no pasa por la variación de reserva)
     c["PE_MXN"] = c["PE"] * c["TC"]
@@ -334,8 +345,8 @@ def resumen_anual(cmp: pd.DataFrame, variantes: list) -> pd.DataFrame:
         agg[f"PD_tom_{v}"] = "sum"; agg[f"PD_ret_{v}"] = "sum"
         agg[f"dBRUTO_{v}"] = "sum"; agg[f"dNETO_{v}"] = "sum"
         agg[f"PD_tom_{v}_MXN"] = "sum"; agg[f"PD_ret_{v}_MXN"] = "sum"
-    a = c.groupby(["Grupo", "Anio"]).agg(agg).reset_index()
-    tot = c.groupby("Anio").agg(agg).reset_index(); tot["Grupo"] = "TOTAL"
+    a = c.groupby(["Grupo", "Año"]).agg(agg).reset_index()
+    tot = c.groupby("Año").agg(agg).reset_index(); tot["Grupo"] = "TOTAL"
     a = pd.concat([a, tot], ignore_index=True)
     for v in variantes:
         a[f"err_tom_{v}"] = a[f"PD_tom_{v}"] - a["PD_tom_real"]
@@ -425,9 +436,10 @@ def tabla_fnd_calibrada(delta: dict) -> pd.DataFrame:
 # 5 · SALIDAS
 # ============================================================================
 def main():
+    global T1
     tc = cargar_tc()
+    real, is_ram, T1 = cargar_real()        # fija T1 al último mes con saldo real
     inp = cargar_input(tc)
-    real, is_ram = cargar_real()
     vec, cart, abiertos = cargar_vectores()
     ces = cargar_cesion_er()
     motor = Motor(inp, vec, cart, abiertos)
@@ -449,16 +461,16 @@ def main():
     pd.set_option("display.float_format", lambda x: f"{x:,.4f}")
     print("\n=== δ calibrado por grupo (FND = max(0, NT(k_reg) − δ)) ===")
     print(cal.to_string(index=False))
-    print("\n=== Ajuste de la prima no devengada (== RRC) por variante · ventana 202301–202605 ===")
+    print(f"\n=== Ajuste de la prima no devengada (== RRC) por variante · ventana {CAL0}–{T1} ===")
     piv = met.pivot(index="Grupo", columns="Variante", values="ratio")[variantes]
     print("ratio Σmodelo/Σreal:\n" + piv.to_string())
     piv2 = met.pivot(index="Grupo", columns="Variante", values="MAPE")[variantes]
     print("MAPE mensual:\n" + piv2.to_string())
     print("\n=== Prima devengada TOMADA por año (USD) · real vs variantes · TOTAL ===")
-    cols = ["Anio", "PE", "PD_tom_real"] + [f"PD_tom_{v}" for v in variantes] + [f"err%_tom_{v}" for v in variantes]
+    cols = ["Año", "PE", "PD_tom_real"] + [f"PD_tom_{v}" for v in variantes] + [f"err%_tom_{v}" for v in variantes]
     print(anual[anual["Grupo"] == "TOTAL"][cols].to_string(index=False))
     print("\n=== Prima devengada RETENIDA por año (USD) · TOTAL ===")
-    cols = ["Anio", "PR", "PD_ret_real"] + [f"PD_ret_{v}" for v in variantes] + [f"err%_ret_{v}" for v in variantes]
+    cols = ["Año", "PR", "PD_ret_real"] + [f"PD_ret_{v}" for v in variantes] + [f"err%_ret_{v}" for v in variantes]
     print(anual[anual["Grupo"] == "TOTAL"][cols].to_string(index=False))
 
     # ---- archivos ----
@@ -477,69 +489,150 @@ def main():
 def escribir_excel(cmp, anual, met, cal, tabla, variantes, real, is_ram, delta):
     from openpyxl import Workbook
     from openpyxl.styles import Font, PatternFill, Alignment
+    from openpyxl.comments import Comment
     from openpyxl.utils import get_column_letter as GCL
     VERDE, VERDE2, BLANCO, GRIS, CLARO, ROJO = 'FF00573F', 'FF2E7D53', 'FFFFFFFF', 'FFF2F2EE', 'FFE8F1EA', 'FFA6192E'
+    AZUL, AZUL_CLARO = 'FF1F4E79', 'FFDDEBF7'        # PND real y PND calibrado: lo que se compara
+    AMBAR, AMBAR_CLARO = 'FF7F6000', 'FFFFF2CC'       # celdas con fórmula Excel viva
+    ETIQ = {"Año": "Año contable", "PERIODO": "Mes contable\n(AAAAMM)"}
+    PCT = {"ratio", "MAPE", "R2", "IS_eff", "g", "mr", "c", "ces", "ratio_CAL_real"}
     wb = Workbook(); wb.remove(wb.active)
 
-    def hoja(nombre, titulo, sub, df, nf=None, ancho=14):
-        ws = wb.create_sheet(nombre)
-        n = max(len(df.columns), 4)
+    def fmt(col):
+        if col.startswith("err%") or col in PCT or col.startswith("k="):
+            return '0.00%'
+        if col == "delta":
+            return '0.000'
+        if col in ("PERIODO", "Año"):
+            return '0'
+        return '#,##0'
+
+    def banda(ws, titulo, sub, n):
         ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=n)
         c = ws.cell(1, 1, titulo); c.font = Font(bold=True, color=BLANCO, size=12); c.fill = PatternFill('solid', fgColor=VERDE)
         ws.merge_cells(start_row=2, start_column=1, end_row=2, end_column=n)
         c = ws.cell(2, 1, sub); c.font = Font(italic=True, color=BLANCO, size=9); c.fill = PatternFill('solid', fgColor=VERDE2)
+        c.alignment = Alignment('left', 'center', wrap_text=True)
+        ws.row_dimensions[2].height = 30
+
+    def celda(ws, i, j, v, col, azul=False, formula=False):
+        if isinstance(v, (float, np.floating)) and (np.isnan(v) or np.isinf(v)):
+            v = None
+        c = ws.cell(i, j, v)
+        if formula or (isinstance(v, (int, float, np.integer, np.floating)) and not isinstance(v, bool)):
+            c.number_format = fmt(col)
+            if not formula and col.startswith("err%") and abs(v) > 0.02:
+                c.font = Font(color=ROJO, bold=True)
+        if azul:
+            c.fill = PatternFill('solid', fgColor=AZUL_CLARO)
+        elif formula:
+            c.fill = PatternFill('solid', fgColor=AMBAR_CLARO)
+        elif i % 2 == 0:
+            c.fill = PatternFill('solid', fgColor=GRIS)
+        return c
+
+    def cabecera(ws, j, col, azul=False, formula=False, comentario=None):
+        c = ws.cell(3, j, ETIQ.get(col, col) + ("\n(fórmula)" if formula else ""))
+        c.font = Font(bold=True, color=BLANCO)
+        c.fill = PatternFill('solid', fgColor=(AZUL if azul else AMBAR if formula else VERDE))
+        c.alignment = Alignment('center', 'center', wrap_text=True)
+        if comentario:
+            c.comment = Comment(comentario, "validar_prima_devengada")
+        return c
+
+    def hoja(nombre, titulo, sub, df, ancho=14, azules=(), comentarios=None):
+        ws = wb.create_sheet(nombre)
+        n = max(len(df.columns), 4)
+        banda(ws, titulo, sub, n)
         for j, col in enumerate(df.columns, 1):
-            c = ws.cell(3, j, str(col)); c.font = Font(bold=True, color=BLANCO); c.fill = PatternFill('solid', fgColor=VERDE)
-            c.alignment = Alignment('center', 'center', wrap_text=True)
+            col = str(col)
+            cabecera(ws, j, col, azul=(col in azules), comentario=(comentarios or {}).get(col))
             ws.column_dimensions[GCL(j)].width = ancho
         ws.row_dimensions[3].height = 32
         for i, row in enumerate(df.itertuples(index=False), 4):
             for j, v in enumerate(row, 1):
-                if isinstance(v, (float, np.floating)) and (np.isnan(v) or np.isinf(v)):
-                    v = None
-                c = ws.cell(i, j, v)
                 col = str(df.columns[j - 1])
-                if isinstance(v, (int, float, np.integer, np.floating)) and not isinstance(v, bool):
-                    if col.startswith("err%") or col in ("ratio", "MAPE", "R2", "IS_eff", "g", "mr", "c", "ces") or col.startswith("k="):
-                        c.number_format = '0.00%'
-                    elif col == "delta":
-                        c.number_format = '0.000'
-                    elif col in ("PERIODO", "Anio"):
-                        c.number_format = '0'
-                    else:
-                        c.number_format = '#,##0'
-                    if col.startswith("err%") and abs(v) > 0.02:
-                        c.font = Font(color=ROJO, bold=True)
-                if i % 2 == 0:
-                    c.fill = PatternFill('solid', fgColor=GRIS)
+                celda(ws, i, j, v, col, azul=(col in azules))
         ws.freeze_panes = 'A4'
         return ws
 
-    # Resumen ejecutivo
+    # ---------------------------- Fórmulas (texto) ----------------------------
+    NT_TXT = ", ".join(f"{x:.4f}" for x in NT_M)
+    FORMULAS = [
+        ("Año contable", "Año = ENTERO(PERIODO / 100)",
+         "PERIODO es el mes CONTABLE: el mes de valuación del saldo de RRC en la base BEL-IRR-MR y el mes en que se "
+         "registra la prima (aPog_MesProc / CALMONTH). No es el año de suscripción; ése queda como dato descriptivo (AñoSusc) en el input del MEC."),
+        ("Antigüedad de registro k", "k = mes de valuación − mes de registro (CALMONTH), en meses",
+         "Es el eje del FND para proporcional y facultativo. k = 0 es el propio mes en que entra la cuenta."),
+        ("FND calibrado (TipoRea 1 y 3)", "FND = MIN(1, MAX(0, NT[k] − δ_ramo))  para k = 0…11;  FND = 0 si k < 0 o k ≥ 12",
+         f"NT = recta de 24-avos de la Nota Técnica (tabla xPND 'NA'): [{NT_TXT}]. δ_ramo en delta_calibrado.json / hoja Calibracion."),
+        ("FND no proporcional (TipoRea 2)", "FND = MIN(1, MAX(0, (FinVig − cierre del mes de valuación) / (FinVig − IniVig)))",
+         "Prorrata exacta por fechas. Si el registro no trae fechas (como en la BD del MEC), se usa la curva PF+ de cartera por antigüedad de cohorte."),
+        ("Prima en USD", "Prima_USD = PrimasNal / TC(mes de registro)",
+         "TC de cierre mensual de la base BEL-IRR-MR (2022 en adelante); 2019–2021 promedios Banxico aproximados."),
+        ("PND modelo (por ramo y mes)", "PND_modelo(ramo, t) = Σ_registros Prima_USD × FND(k, ramo)",
+         "Suma sobre todos los registros de prima con mes de registro ≤ t. Columna PND_CAL (azul) en la hoja Mensual."),
+        ("PND real implícita", "PND_real(ramo, t) = Σ_subramos BEL_subramo(t) / IS_subramo(t)",
+         "BEL = 'RRC BEL' de BD_Montos_RRC_SONR; IS = 'Ind Sin RRC' de HParametros (Real). AyE suma 30+34+37; CAT suma 71+73. "
+         "Columna PND_real (azul) en Mensual. En esa hoja, BEL_real / IS_eff reproduce PND_real."),
+        ("Índice efectivo", "IS_eff = BEL_real / PND_real", "Índice de siniestralidad efectivo del grupo; en grupos de un solo subramo es el 'Ind Sin RRC' tal cual."),
+        ("RRC bruta modelo", "BRUTO_modelo = PND_modelo × IS_eff × (1 + g + mr)",
+         "g = 'RRC GTO' / 'RRC BEL' real del mes; mr = 'RRC MR' / 'RRC BEL' real del mes. Fórmula viva en la columna BRUTO_CAL."),
+        ("IRR y RRC neta modelo", "IRR_modelo = PND_modelo × IS_eff × c ;  NETO_modelo = BRUTO_modelo − IRR_modelo",
+         "c = 'RRC IRR' / 'RRC BEL' real del mes. Fórmula viva en NETO_CAL."),
+        ("Prima retenida", "PR = PE × (1 − ces)", "ces = prima cedida / prima emitida del ER real, por ramo y año contable (2023, 2024, 2025 YTD oct; 2026 usa 2025)."),
+        ("Prima devengada tomada", "PD_tomada(t) = PE(t) − [BRUTO(t) − BRUTO(t − 1)]",
+         "Misma fórmula que Integración Dim (ER_2026: prima emitida − variación de reserva de primas s/prima tomada). Real usa BRUTO real; modelo usa BRUTO_CAL."),
+        ("Prima devengada retenida", "PD_retenida(t) = PR(t) − [NETO(t) − NETO(t − 1)]", "Real usa NETO real; modelo usa NETO_CAL. La diferencia del mes anterior se toma dentro del mismo ramo."),
+        ("Conversión a MXN", "Monto_MXN(t) = Monto_USD(t) × TC de cierre(t)", "Como el ER: la variación de reserva del mes al TC del mes; el efecto cambiario del saldo no pasa por la prima devengada."),
+        ("Calibración de δ", "δ_ramo = argmin_δ Σ_t [ PND_modelo(ramo, t; δ) − PND_real(ramo, t) ]²",
+         f"Mínimos cuadrados sobre la serie mensual {CAL0}–{T1} (CAT desde {CAL0_GRUPO.get('CAT', CAL0)}). Malla de δ en pasos de 0.005; la parte no proporcional no depende de δ."),
+        ("Lectura de δ", "δ = (t − 1) / 2 × 30 / 365   ⇔   t = 1 + 2 δ × 365 / 30 meses de cuenta", "Regla M4 del MEC: δ = 0 es NT mensual; 0.082 trimestral; 0.123 cuatrimestral; 0.205 semestral."),
+        ("Métricas de ajuste", "ratio = Σ_t PND_modelo / Σ_t PND_real ;  MAPE = media_t |PND_modelo / PND_real − 1| ;  R² sobre la serie mensual", "Hoja Ajuste_PND. Como IS, g, mr y c son los reales, ratio(RRC modelo / RRC real) = ratio(PND modelo / PND real)."),
+        ("Error de prima devengada", "err% = (PD_modelo − PD_real) / PD_real", "Hojas Resumen y PD_anual_por_ramo, por año contable y por ramo. En rojo si |err%| > 2%."),
+    ]
+    ws = wb.create_sheet("Formulas")
+    banda(ws, "FÓRMULAS · CÓMO SE CALCULA CADA COLUMNA", "Orden de cálculo: FND → PND modelo → RRC modelo → prima devengada. Azul = lo que se compara (PND real vs PND calibrado); ámbar = celdas con fórmula Excel viva en la hoja Mensual.", 3)
+    for j, (h, w) in enumerate([("Concepto", 30), ("Fórmula", 78), ("Dónde sale y con qué datos", 110)], 1):
+        cabecera(ws, j, h); ws.column_dimensions[GCL(j)].width = w
+    for i, (a, b, cnota) in enumerate(FORMULAS, 4):
+        for j, v in enumerate((a, b, cnota), 1):
+            c = ws.cell(i, j, v); c.alignment = Alignment('left', 'top', wrap_text=True)
+            if j == 2:
+                c.font = Font(name='Consolas', size=9)
+            if i % 2 == 0:
+                c.fill = PatternFill('solid', fgColor=GRIS)
+        ws.row_dimensions[i].height = 48
+    ws.freeze_panes = 'A4'
+
+    # ---------------------------- Resumen ----------------------------
     res = []
     tot = anual[anual["Grupo"] == "TOTAL"]
     for v in variantes:
         for lado, lab in [("tom", "Tomada"), ("ret", "Retenida")]:
             for _, r in tot.iterrows():
-                res.append(dict(Variante=v, Lado=lab, Anio=int(r["Anio"]),
+                res.append(dict(Variante=v, Lado=lab, **{"Año": int(r["Año"])},
                                 PD_real=r[f"PD_{lado}_real"], PD_modelo=r[f"PD_{lado}_{v}"],
                                 error=r[f"err_{lado}_{v}"], **{"err%": r[f"err%_{lado}_{v}"]},
                                 PD_real_MXN=r[f"PD_{lado}_real_MXN"], PD_modelo_MXN=r[f"PD_{lado}_{v}_MXN"]))
     res = pd.DataFrame(res)
-    hoja("Resumen", "PRIMA DEVENGADA · REAL vs MODELO · TOTAL CARTERA (USD y MXN, sin fianzas)",
+    hoja("Resumen", "PRIMA DEVENGADA · REAL vs MODELO · TOTAL CARTERA (USD y MXN, sin fianzas) · por AÑO CONTABLE",
          "Real: prima emitida − ΔRRC bruta (tomada); prima retenida − ΔRRC neta (retenida), saldos base BEL-IRR-MR. "
          "Modelo: misma fórmula con RRC reconstruida = PND_modelo · IS · (1+g+mr) e IRR = BEL·c, con IS, g, mr, c reales. "
-         "2026 = enero–mayo. MXN = Δ mensual × TC de cierre.",
+         f"Año contable = año del mes de valuación (PERIODO); {T1 // 100} = enero–{['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'][T1 % 100 - 1]}. MXN = Δ mensual × TC de cierre. Variante CAL = FND calibrado.",
          res)
-    # Gráficas (openpyxl nativo) sobre los totales mensuales
+
+    # ---------------------------- Gráficas ----------------------------
     from openpyxl.chart import LineChart, Reference, Series
     from openpyxl.drawing.line import LineProperties
     tt = cmp[cmp["PERIODO"] >= CAL0].groupby("PERIODO")[["PND_real", "PND_NT_reg_m", "PND_MEC_pub", "PND_CAL", "BRUTO", "BRUTO_CAL", "BRUTO_MEC_pub"]].sum().reset_index()
-    tt.columns = ["PERIODO", "PND real (BEL/IS)", "PND NT registro mensual", "PND MEC publicado (cohorte vigencia)", "PND calibrado δ",
+    tt.insert(1, "Año", tt["PERIODO"] // 100)
+    tt.columns = ["PERIODO", "Año", "PND real (BEL/IS)", "PND NT registro mensual", "PND MEC publicado (cohorte vigencia)", "PND calibrado δ",
                   "RRC bruta real", "RRC bruta calibrado δ", "RRC bruta MEC publicado"]
-    ws = hoja("Graficas", "SERIES MENSUALES · TOTAL CARTERA (USD)", "Prima no devengada implícita y RRC bruta: real vs variantes", tt, ancho=16)
+    ws = hoja("Graficas", "SERIES MENSUALES · TOTAL CARTERA (USD)", "Prima no devengada implícita y RRC bruta: real vs variantes. Azul = PND real y PND calibrado (lo que se compara).", tt, ancho=16,
+              azules=("PND real (BEL/IS)", "PND calibrado δ"))
     n = len(tt) + 3
-    for (c1, c2, titulo, anchor) in [(2, 5, "Prima no devengada: real vs modelo", "K4"), (6, 8, "RRC bruta: real vs modelo", "K26")]:
+    for (c1, c2, titulo, anchor) in [(3, 6, "Prima no devengada: real vs modelo", "L4"), (7, 9, "RRC bruta: real vs modelo", "L26")]:
         ch = LineChart(); ch.title = titulo; ch.height = 10; ch.width = 22
         ch.y_axis.numFmt = '#,##0'; ch.x_axis.delete = False; ch.y_axis.delete = False
         for col, color in zip(range(c1, c2 + 1), ["1F4E79", "C9A961", "A6192E", "00573F", "5B2C6F"]):
@@ -548,9 +641,11 @@ def escribir_excel(cmp, anual, met, cal, tabla, variantes, real, is_ram, delta):
             ch.series.append(sr)
         ch.set_categories(Reference(ws, min_col=1, min_row=4, max_row=n))
         ws.add_chart(ch, anchor)
-    hoja("PD_anual_por_ramo", "PRIMA DEVENGADA POR RAMO Y AÑO · REAL vs VARIANTES (USD)",
-         "err% = (modelo − real) / real. 2026 = enero–mayo.", anual, ancho=15)
-    hoja("Ajuste_PND", "AJUSTE DE LA PRIMA NO DEVENGADA (≡ RRC) POR VARIANTE · 202301–202605",
+
+    # ---------------------------- Anuales y ajuste ----------------------------
+    hoja("PD_anual_por_ramo", "PRIMA DEVENGADA POR RAMO Y AÑO CONTABLE · REAL vs VARIANTES (USD)",
+         f"err% = (modelo − real) / real. Año contable = año del mes de valuación. {T1 // 100} = enero–{['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'][T1 % 100 - 1]}.", anual, ancho=15)
+    hoja("Ajuste_PND", f"AJUSTE DE LA PRIMA NO DEVENGADA (≡ RRC) POR VARIANTE · {CAL0}–{T1}",
          "ratio = Σ PND modelo / Σ PND real · MAPE = error absoluto medio mensual · R² sobre la serie mensual", met)
     hoja("Calibracion", "CALIBRACIÓN δ POR RAMO · FND = max(0, NT(k_registro) − δ) para proporcional/facultativo",
          "δ es el desplazamiento de la regla M4 del MEC (frecuencia de cuentas): δ = (t−1)/2·30/365 → t = 1 + 2δ·365/30 meses equivalentes",
@@ -558,24 +653,95 @@ def escribir_excel(cmp, anual, met, cal, tabla, variantes, real, is_ram, delta):
     t2 = tabla.reset_index().rename(columns={"index": "Vector"})
     hoja("TablaFND_calibrada", "TABLA FND CALIBRADA · % NO DEVENGADO POR ANTIGÜEDAD DE REGISTRO (k=0 mes de registro)",
          "Se aplica a proporcional y facultativo; el no proporcional sigue con prorrata exacta por fechas de vigencia.", t2, ancho=11)
-    cols = ["Grupo", "PERIODO", "PE", "PR", "PND_real", "BRUTO", "NETO"] + [f"PND_{v}" for v in variantes] + \
-           [f"BRUTO_{v}" for v in variantes] + ["PD_tom_real", "PD_ret_real"] + [f"PD_tom_{v}" for v in variantes] + [f"PD_ret_{v}" for v in variantes]
-    hoja("Mensual", "DETALLE MENSUAL POR RAMO (USD)", "PND = prima no devengada implícita (BEL/IS real) vs modelo; BRUTO = RRC bruta; PD = prima devengada", cmp[cols], ancho=13)
-    hoja("Real_parametros", "PARÁMETROS REALES USADOS (por ramo × mes)",
+
+    # ---------------------------- Mensual (con fórmulas vivas) ----------------------------
+    d = cmp.sort_values(["Grupo", "PERIODO"]).reset_index(drop=True)
+    otras = [v for v in variantes if v != "CAL"]
+    # (columna, 'v' valor / 'f' fórmula, columna de origen en cmp)
+    COLS = ([("Grupo", "v", "Grupo"), ("PERIODO", "v", "PERIODO"), ("Año", "v", "Año"), ("PE", "v", "PE"), ("ces", "v", "ces"),
+             ("PR", "f", None),
+             ("IS_eff", "v", "IS_eff"), ("g", "v", "g"), ("mr", "v", "mr"), ("c", "v", "c"), ("BEL_real", "v", "BEL"),
+             ("PND_real", "v", "PND_real"), ("PND_CAL", "v", "PND_CAL"),
+             ("ratio_CAL_real", "f", None),
+             ("BRUTO_real", "v", "BRUTO"), ("BRUTO_CAL", "f", None),
+             ("NETO_real", "v", "NETO"), ("NETO_CAL", "f", None),
+             ("dBRUTO_real", "f", None), ("dBRUTO_CAL", "f", None), ("dNETO_real", "f", None), ("dNETO_CAL", "f", None),
+             ("PD_tom_real", "f", None), ("PD_tom_CAL", "f", None), ("PD_ret_real", "f", None), ("PD_ret_CAL", "f", None)]
+            + [(f"PND_{v}", "v", f"PND_{v}") for v in otras]
+            + [(f"PD_tom_{v}", "v", f"PD_tom_{v}") for v in otras]
+            + [(f"PD_ret_{v}", "v", f"PD_ret_{v}") for v in otras])
+    L = {name: GCL(i + 1) for i, (name, _, _) in enumerate(COLS)}
+    G, PEc, CES, ISc, gc, mrc, cc = L["Grupo"], L["PE"], L["ces"], L["IS_eff"], L["g"], L["mr"], L["c"]
+
+    def dif(col):        # Δ contra el mes anterior del MISMO ramo; vacío en el primer mes de cada ramo
+        return lambda r, p: f'=IF({G}{r}={G}{p},{L[col]}{r}-{L[col]}{p},"")'
+
+    def pd_(base, dcol):  # prima devengada = base − Δreserva
+        return lambda r, p: f'=IF({L[dcol]}{r}="","",{L[base]}{r}-{L[dcol]}{r})'
+    FORM = {
+        "PR": lambda r, p: f"={PEc}{r}*(1-{CES}{r})",
+        "ratio_CAL_real": lambda r, p: f'=IF({L["PND_real"]}{r}=0,"",{L["PND_CAL"]}{r}/{L["PND_real"]}{r})',
+        "BRUTO_CAL": lambda r, p: f"={L['PND_CAL']}{r}*{ISc}{r}*(1+{gc}{r}+{mrc}{r})",
+        "NETO_CAL": lambda r, p: f"={L['BRUTO_CAL']}{r}-{L['PND_CAL']}{r}*{ISc}{r}*{cc}{r}",
+        "dBRUTO_real": dif("BRUTO_real"), "dBRUTO_CAL": dif("BRUTO_CAL"),
+        "dNETO_real": dif("NETO_real"), "dNETO_CAL": dif("NETO_CAL"),
+        "PD_tom_real": pd_("PE", "dBRUTO_real"), "PD_tom_CAL": pd_("PE", "dBRUTO_CAL"),
+        "PD_ret_real": pd_("PR", "dNETO_real"), "PD_ret_CAL": pd_("PR", "dNETO_CAL"),
+    }
+    COMENT = {
+        "PND_real": "PND real implícita = Σ_subramos BEL_subramo / IS_subramo (base BEL-IRR-MR: 'RRC BEL' y 'Ind Sin RRC' de HParametros Real). "
+                    "En esta hoja equivale a BEL_real / IS_eff. Es el REAL contra el que se compara el modelo.",
+        "PND_CAL": "PND calibrado = Σ_registros Prima_USD × FND, con FND = MIN(1, MAX(0, NT[k] − δ_ramo)), k = mes de valuación − mes de registro "
+                   "(proporcional y facultativo); prorrata por cohorte para el no proporcional. Es el MODELO.",
+        "IS_eff": "IS_eff = BEL_real / PND_real (índice de siniestralidad efectivo del grupo, real del mes).",
+        "g": "g = 'RRC GTO' / 'RRC BEL' real del mes.", "mr": "mr = 'RRC MR' / 'RRC BEL' real del mes.", "c": "c = 'RRC IRR' / 'RRC BEL' real del mes.",
+        "ces": "ces = prima cedida / prima emitida del ER real, por ramo y año contable.",
+        "BRUTO_CAL": "RRC bruta modelo = PND_CAL × IS_eff × (1 + g + mr).",
+        "NETO_CAL": "RRC neta modelo = BRUTO_CAL − PND_CAL × IS_eff × c.",
+        "PD_tom_real": "Prima devengada tomada real = PE − (BRUTO_real del mes − BRUTO_real del mes anterior).",
+        "PD_tom_CAL": "Prima devengada tomada modelo = PE − (BRUTO_CAL del mes − BRUTO_CAL del mes anterior).",
+        "PD_ret_real": "Prima devengada retenida real = PR − (NETO_real del mes − NETO_real del mes anterior).",
+        "PD_ret_CAL": "Prima devengada retenida modelo = PR − (NETO_CAL del mes − NETO_CAL del mes anterior).",
+        "ratio_CAL_real": "ratio = PND_CAL / PND_real. 1.00 = el modelo reproduce la reserva real del mes.",
+        "Año": "Año contable = ENTERO(PERIODO/100). PERIODO es el mes de valuación, no el año de suscripción.",
+    }
+    ws = wb.create_sheet("Mensual")
+    banda(ws, "DETALLE MENSUAL POR RAMO (USD) · AZUL = PND real vs PND calibrado · ÁMBAR = fórmulas Excel vivas",
+          "Cada fila es un ramo en un mes contable. Las columnas ámbar son fórmulas que se pueden auditar celda por celda; "
+          "las azules son las dos series que se comparan. Los Δ se calculan contra el mes anterior del mismo ramo (vacío en el primer mes). "
+          "Las columnas al final (PND_*, PD_*) son las demás variantes, como valores. Ver hoja Formulas.", len(COLS))
+    for j, (name, tipo, _) in enumerate(COLS, 1):
+        cabecera(ws, j, name, azul=(name in ("PND_real", "PND_CAL")), formula=(tipo == "f"), comentario=COMENT.get(name))
+        ws.column_dimensions[GCL(j)].width = 13 if name not in ("Grupo",) else 10
+    ws.row_dimensions[3].height = 40
+    for i, row in enumerate(d.itertuples(index=False), 4):
+        rr = row._asdict()
+        for j, (name, tipo, src) in enumerate(COLS, 1):
+            if tipo == "f":
+                celda(ws, i, j, FORM[name](i, i - 1), name, formula=True)
+            else:
+                celda(ws, i, j, rr[src], name, azul=(name in ("PND_real", "PND_CAL")))
+    ws.freeze_panes = 'D4'
+
+    hoja("Real_parametros", "PARÁMETROS REALES USADOS (por ramo × mes contable)",
          "IS_eff = BEL/PND implícita · g = gastos/BEL · mr = MR/BEL · c = IRR/BEL", real, ancho=13)
     sup = pd.DataFrame({"Supuesto": [
-        "Prima base: BD del MEC (PrimasNal, Tipo Póliza P*), fuente BD, origen Real, 201901–202605; fianzas (130–170) excluidas por no tener RRC en la base.",
+        f"Prima base: BD del MEC (PrimasNal, Tipo Póliza P*), fuente BD, origen Real, hasta {T1}; fianzas (130–170) excluidas por no tener RRC en la base.",
         "Conversión a USD al TC de cierre del mes de registro (base BEL-IRR-MR 2022+; 2019–2021 promedios Banxico aproximados).",
-        "Real = saldos BD_Montos_RRC_SONR (USD). AyE = RAM_30+34+37; CAT = RAM_71+73. Índices de siniestralidad: HParametros 'Real' (31/35/39 y 30/34/37 según fecha; TEV/Hidro para CAT con relleno de huecos).",
+        "Real = saldos BD_Montos_RRC_SONR (USD). AyE = RAM_30+34+37; CAT = RAM_71+73. Índices de siniestralidad: HParametros 'Real' (31/35/39 y 30/34/37 según fecha; TEV/Hidro para CAT desde 2024, antes se rellenan).",
         "Prima no devengada real implícita = Σ BEL_subramo / IS_subramo. IS efectivo, gasto, MR y % cesión se toman del real mes a mes.",
         "Prima retenida = prima emitida × (1 − % cedido anual del ER real por ramo: 2023, 2024, 2025 YTD oct; 2026 usa 2025).",
         "No proporcional (TipoRea 2): la BD del MEC no trae fin de vigencia por registro; se usa la curva PF+ de cartera por antigüedad de cohorte como proxy de la prorrata exacta.",
-        "Antigüedad de registro k_reg = mes de valuación − mes de registro (Periodo). Antigüedad de cohorte k_coh = mes de valuación − mes de inicio de vigencia.",
-        f"Ventana de calibración y reporte: {CAL0}–{T1}. Vectores MEC: m2_fnd_prorrata sobre Registros_Vigencia_MEC.csv, horizonte {H} meses; abre sólo Vida (decisión M3).",
+        "Antigüedad de registro k = mes de valuación − mes de registro (Periodo). El año de los reportes es el CONTABLE (año de PERIODO), no el de suscripción.",
+        f"Ventana de calibración y reporte: {CAL0}–{T1} (CAT desde {CAL0_GRUPO.get('CAT', CAL0)}). Vectores MEC: m2_fnd_prorrata sobre Registros_Vigencia_MEC.csv, horizonte {H} meses; abre sólo Vida (decisión M3).",
+        "Las columnas ámbar de la hoja Mensual son fórmulas Excel; sus valores se recalculan al abrir el archivo. Si Excel muestra ceros, pulsa F9 o activa el cálculo automático.",
     ]})
     hoja("Supuestos", "SUPUESTOS Y FUENTES", "", sup, ancho=160)
-    wb.save(os.path.join(OUT, "Validacion_Prima_Devengada.xlsx"))
-
+    # orden de hojas: Resumen primero, Formulas después
+    wb.move_sheet("Formulas", offset=-(len(wb.sheetnames) - 2))
+    ruta = os.path.join(OUT, "Validacion_Prima_Devengada.xlsx")
+    wb.save(ruta)
+    return ruta
 
 if __name__ == "__main__":
     main()

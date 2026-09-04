@@ -59,7 +59,16 @@ def _es_no_proporcional(xTipoRea) -> bool:
 zAñoPpto = 2025
 zAño= 2025
 zMes = 12
-xFolder = fr"C:\Users\{usuario}\OneDrive - GPV\Documentos - Transf. Operativa RPAT\Forecasts\2025\CSV Auxiliares"
+#%% CARPETA LOCAL — todos los insumos se leen y todas las salidas se escriben aquí
+# Por defecto es la carpeta donde está este script (ponlo en «…\OneDrive - GPV\Documents»).
+# Si quieres otra, escribe la ruta completa, p. ej.  CARPETA = r"C:\Users\tu.usuario\OneDrive - GPV\Documents"
+# Archivos que deben estar en CARPETA:
+#   AjManuales_SONR.csv · Subramo.csv · TablaBase_MetodoPropio.csv · TablaBase_MetodoPropio_ext.csv
+#   ParamSONR2025.csv · ParamSONR2025_lagsinc.csv · PNDmes.csv · FrecCol.csv · LlavesPol.csv
+#   Escenario_base_SONR.csv · PptoTecnico2025.csv · mec_devengamiento.py · delta_calibrado.json
+# La base de valuación (BaseValuacion.accdb) sigue leyéndose del servidor \\adsroma; eso no cambia.
+CARPETA = _DIR
+xFolder = CARPETA
 xAjManuales = pd.read_csv(f"{xFolder}\\AjManuales_SONR.csv")
 
 #### PPTO
@@ -274,7 +283,7 @@ def ConsultaMoneda_usd():
 
 ConsultaTC_usd = ConsultaMoneda_usd()
 TC_USD = ConsultaMoneda_usd()
-xFolder = r"C:\Users\aburtona\OneDrive - GPV\Documentos"
+xFolder = CARPETA
 fileName = f"{xFolder}\\TablaTCSONR.xlsx"
 TC_USD.to_excel(fileName, index=False)
 
@@ -510,7 +519,7 @@ def Metodo_propio():
 #%% FUNCIÓN CONSULTA PARA SONR PPTO
 def ConsultaPPTO2025(MES):
     
-    xFolder = fr"C:\Users\aburtona\OneDrive - GPV\Documentos - Transf. Operativa RPAT\Presupuestos\2025\02 Técnico\BD_PptoTécnico_2025"
+    xFolder = CARPETA
     xFile = fr"{xFolder}\PptoTecnico2025.csv"
     ConsultaP = pd.read_csv(xFile, thousands=',')
     ConsultaPPTO = ConsultaP[(ConsultaP["GL_ACCT"] > 6101000000) & (ConsultaP["GL_ACCT"] < 6108999999) & (ConsultaP["CALMONTH"] >= (zAño*100 + MES + 1))]
@@ -774,7 +783,7 @@ for mes in range(zMes):
     202806: {'NA': 0.498630136986301, '1': 0.498630136986301, '2': 0.458333333333333, '3': 0.499771689497717, '6': 0.293150684931507, '0': 0.0438356164383562, 'DEF': 0.499771689497717},
     202906: {'NA': 0.498630136986301, '1': 0.498630136986301, '2': 0.458333333333333, '3': 0.499771689497717, '6': 0.293150684931507, '0': 0.0438356164383562, 'DEF': 0.499771689497717}}
     ConsultaR_USD = ConsultaReal_USD(mes_calculo, zFechaValuacion, Meses)
-    xFolder = r"C:\Users\aburtona\OneDrive - GPV\Documentos"
+    xFolder = CARPETA
     fileName = f"{xFolder}\\ConsultaR_USD{mes_calculo}_E4.xlsx"
     ConsultaR_USD.to_excel(fileName, index=False)
     
@@ -844,7 +853,7 @@ for mes in range(zMes):
     auxSONR_sum = auxSONR_sum.reindex(columns=xColumnas)
 
     df.append(auxSONR_sum)
-    xFolder = r"C:\Users\aburtona\OneDrive - GPV\Documentos"
+    xFolder = CARPETA
     fileName = f"{xFolder}\\auxSONR_sum.xlsx"
     auxSONR_sum.to_excel(fileName, index=False)
 
@@ -858,8 +867,11 @@ df_concatenado = df_concatenado.drop_duplicates()
 Columnas = ['Reserva', 'Escenario', 'Tipo de Monto', 'Ramo', 'Periodo', 'Monto_MXN', 'Monto_USD']
 df_concatenado = df_concatenado[Columnas]
 
-xFolder = r"C:\Users\aburtona\OneDrive - GPV\Documentos"
-fileName = f"{xFolder}\\SONR_esc.xlsx"
+xFolder = CARPETA
+# v4: el nombre de la salida dice con qué FND se corrió, para poder comparar contra el output anterior
+# (SONR_esc.xlsx de la v3) sin pisarlo.
+fileName = f"{xFolder}\\{'SONR_esc_FNDcal.xlsx' if USAR_FND_CALIBRADO else 'SONR_esc_legado.xlsx'}"
+print(f"[SONR] Salida escrita en: {fileName}")
 df_concatenado.to_excel(fileName, index=False)
 
 

@@ -2,9 +2,9 @@
 
 Planeación Financiera (BP&A) · Reaseguradora Patria · septiembre 2026
 
-Generado con `scripts_actualizados/construir_input_mec.py` a partir de `BDReal26.xlsx` (hoja BD) y `FCST2026.xlsx` (hoja Ppto2026).
+Generado con `scripts_actualizados/construir_input_mec.py` a partir de `BDReal26.xlsx` (hoja BD) y `FCST2026.xlsx` (hoja Ppto2026). Es la corrida de muestra con los archivos que había en la conversación; cubre sólo 2026.
 
-Reproducir: poner los dos Excel, el script y `tc_mensual_bd.csv` en la misma carpeta y correr `python3 construir_input_mec.py`. El corte está en las constantes `FRONTERA_REAL = 202607` y `VENTANA_PPTO = (202608, 202612)`.
+**Para la corrida definitiva** el script ya busca primero la BD histórica del MEC (`BD_PptoTécnicoRPAT_GENERADA.xlsx`, la que se actualizó a julio) y sólo si no la encuentra cae en `BDReal26.xlsx`. Con la histórica el input trae toda la historia 2019–julio 2026 más agosto–diciembre del FCST, y `Registros_Vigencia_MEC.csv` sí se regenera porque la BD cubre más de 24 meses. Pon en una carpeta la BD histórica, `FCST2026.xlsx`, el script y (opcional) `tc_mensual_bd.csv`, y corre `python construir_input_mec.py`. El corte está en las constantes `FRONTERA_REAL = 202607` y `VENTANA_PPTO = (202608, 202612)`; lo que la BD traiga después de la frontera se descarta (regla `V20`). La guía completa de la carpeta local está en `scripts_actualizados/LEEME_carpeta_local.md`.
 
 ## Lo que quedó
 
@@ -26,7 +26,7 @@ Para referencia: el presupuesto 2026 de Integración Dim trae 23,367 M y el refo
 
 **1. El FCST viene en dólares y se convirtió a pesos.** Todas sus filas traen `Moneda = 31` (USD) y su total, 1,215.7 M USD, corresponde a la cifra de control de 21,882.6 M que el propio archivo trae arriba, con un TC plano de 18.0. Aquí se convirtió mes a mes con el TC de cierre de la base BEL-IRR-MR (17.62 en agosto a 18.00 en diciembre), que da 9,072 M para agosto–diciembre; con el TC plano de 18.0 habrían sido 9,169 M, un 1% más. La regla `V16` deja constancia de la conversión. Si prefieres correr todo en dólares, `MONEDA = "USD"` y no se convierte nada.
 
-**2. La cohorte es el mes contable, no el año de suscripción.** El input se organiza por fecha contable: cada fila es un movimiento que entra a los libros en un mes, y ese mes es su cohorte. Como el FCST no trae vigencia, sus filas cohortan en su propio mes de registro y quedan en antigüedad 0. El año de suscripción (2021 a 2025 en este archivo) se conserva en la columna `AnioSusc` como dato descriptivo, sin usarse como ancla. Queda en la regla `V19`.
+**2. La cohorte es el mes contable, no el año de suscripción.** El input se organiza por fecha contable: cada fila es un movimiento que entra a los libros en un mes, y ese mes es su cohorte. Como el FCST no trae vigencia, sus filas cohortan en su propio mes de registro y quedan en antigüedad 0. El año de suscripción (2021 a 2025 en este archivo) se conserva en la columna `AñoSusc` como dato descriptivo, sin usarse como ancla. Queda en la regla `V19`.
 
 Vale la pena decir por qué: anclar la cohorte a enero del año de suscripción —como hacía la fuente de la herramienta— arrojaba los 9,072 M proyectados a antigüedades de 19 a 71 meses e inflaba el triángulo justo en ese tramo (hasta 10,238 M en la antigüedad 23 contra 2,000–3,000 M en los tramos vecinos), cuando en realidad ese movimiento acababa de entrar. Con la corrección los 9,072 M están en la antigüedad 0 y el resto del triángulo queda idéntico al centavo. La misma regla se aplicó a las fuentes alternas de la herramienta, que tenían el mismo anclaje.
 

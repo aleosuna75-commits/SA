@@ -103,10 +103,20 @@ Recomendación de recalibración periódica: correr `validar_prima_devengada.py`
 
 | Archivo | Contenido |
 |---|---|
+| `preparar_insumos.py` | construye `insumos/` a partir de los archivos crudos (`BD_ BEL - IRR - MR.xlsx`, `Input_MEC_Devengamiento.xlsx`, `Registros_Vigencia_MEC.csv`, Integración Dim opcional) que estén en la misma carpeta |
 | `validar_prima_devengada.py` | motor de reconstrucción, comparación y calibración; genera todo lo de `salidas/` |
+| `verificar_excel_formulas.py` | recalcula el Excel con LibreOffice y comprueba que las fórmulas de la hoja Mensual reproducen los valores de Python |
 | `fnd_calibrado.py` | tabla FND calibrada y funciones de integración para RRC / SONR |
 | `insumos/` | prima por ramo × cohorte × mes de registro (BD del MEC), saldos RRC reales, IS por ramo × mes, TC, vectores PF+ (horizonte 72), primas del ER real, vigencias del MEC |
-| `salidas/Validacion_Prima_Devengada.xlsx` | Resumen, PD anual por ramo, ajuste PND, calibración, tabla FND, detalle mensual, parámetros reales, gráficas, supuestos |
+| `salidas/Validacion_Prima_Devengada.xlsx` | Resumen, Formulas, Graficas, PD anual por ramo, ajuste PND, calibración, tabla FND, detalle mensual, parámetros reales, supuestos |
 | `salidas/*.csv`, `delta_calibrado.json` | mismas tablas en texto plano |
+| `scripts_actualizados/` | los scripts del MEC y de reservas ya modificados, con sus diffs, el comparador de outputs y `LEEME_carpeta_local.md` (qué archivo va en la carpeta local para correr cada paso) |
+| `input_mec_2026/` | input del MEC 2026: real enero–julio + FCST agosto–diciembre, con su `LEEME.md` |
 
-Correr: `python3 validar_prima_devengada.py` (pandas, numpy, openpyxl).
+Correr, desde una carpeta que tenga los archivos crudos: `python preparar_insumos.py` y luego `python validar_prima_devengada.py` (pandas, numpy, openpyxl). Los dos scripts se anclan a su propia carpeta.
+
+## Cómo leer el Excel
+
+- `Año` es el **año contable**: el mes de valuación de la RRC en la base BEL-IRR-MR (`PERIODO // 100`), es decir el mes en que el movimiento entra a los libros. No es el año de suscripción. `PERIODO` es el mes contable en formato AAAAMM.
+- Las columnas **azules** son la prima no devengada real (`PND_real`) y la del modelo calibrado con la que se compara (`PND_CAL`).
+- Las columnas **ámbar** de la hoja Mensual son fórmulas vivas de Excel, para auditar celda por celda cómo sale la prima devengada: `PR = PE × (1 − ces)`; `BRUTO_CAL = PND_CAL × IS_eff × (1 + g + mr)`; `NETO_CAL = BRUTO_CAL − PND_CAL × IS_eff × c`; `dBRUTO` y `dNETO` son la variación mes a mes dentro del mismo grupo; `PD_tom = PE − dBRUTO` y `PD_ret = PR − dNETO`, tanto para el real como para el modelo. Cada encabezado trae la fórmula en un comentario y la hoja `Formulas` las lista todas. Las verifica `verificar_excel_formulas.py` (diferencia máxima 5e-7 USD contra Python).

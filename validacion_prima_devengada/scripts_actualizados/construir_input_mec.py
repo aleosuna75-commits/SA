@@ -22,7 +22,7 @@
  QUÉ CAMBIÓ EN ESTA VERSIÓN
    El Input ahora arrastra tres campos que antes se leían y se tiraban, y sin los
    cuales no se puede auditar el FND ni recalibrarlo:
-     · AnioSusc      (Año Susc.)              -> permite verificar el filtro
+     · AñoSusc      (Año Susc.)              -> permite verificar el filtro
                       «Val(left(aPog_MesProc,4)) <= Susc» del reforecast RRC, que en
                       la validación deja la RRC en el 29% de la real.
      · FinVigAAAAMM  (Fecha Fin de Vigencia)  -> separa la prorrata exacta del no
@@ -117,13 +117,19 @@ def localizar_bd():
         if os.path.exists(RUTA_BD_EXPLICITA):
             return RUTA_BD_EXPLICITA
         raise SystemExit(f"[input] RUTA_BD_EXPLICITA no existe:\n  {RUTA_BD_EXPLICITA}")
-    patrones = ["BD_Ppto*.xls*", "BD*Tecnico*RPAT*.xls*", "BD*Técnico*RPAT*.xls*",
-                "BDReal*.xls*", "BD*Real*.xls*"]
+    # Dos niveles: primero la BD HISTÓRICA (BD_PptoTécnico…, con toda la historia de
+    # registro, actualizada al último cierre); sólo si no está, una BD parcial del año
+    # (BDReal26…). La histórica es la que alimenta la curva PF+ y la calibración.
+    niveles = [["BD_Ppto*.xls*", "BD*Tecnico*RPAT*.xls*", "BD*Técnico*RPAT*.xls*"],
+               ["BDReal*.xls*", "BD*Real*.xls*"]]
     cand = []
-    for p in patrones:
-        cand += glob.glob(os.path.join(BASE, p))
-        cand += glob.glob(os.path.join(BASE, "*", p))      # una subcarpeta de profundidad
-    cand = list(set(cand))
+    for patrones in niveles:
+        for p in patrones:
+            cand += glob.glob(os.path.join(BASE, p))
+            cand += glob.glob(os.path.join(BASE, "*", p))      # una subcarpeta de profundidad
+        cand = [c for c in set(cand) if not os.path.basename(c).startswith("~$")]
+        if cand:
+            break
     # Prioridad: primero el AÑO más alto que aparezca en el nombre (2027 > 2026 > sin año),
     # y a igualdad de año, el archivo más reciente. Así "BD_...2027" gana a "BD_...GENERADA".
     def _anio(f):
@@ -261,7 +267,7 @@ COLS41 = ['/ERP/CHRTACCT','/ERP/GL_ACCT','/ERP/CATEGORY','ZSOURCE','/ERP/CO_AREA
  'ZTIPVENTA','ZSEGMENTO','ZCICCULTV','/ERP/AMOUNT_T','/ERP/AMOUNT',
  'MANDT','ZREGIONRP']
 
-CANON = ['Fuente','LN2','Ramo','TipoRea','AnioSusc','CohorteAnio','CohorteAAAAMM',
+CANON = ['Fuente','LN2','Ramo','TipoRea','AñoSusc','CohorteAño','CohorteAAAAMM',
          'FinVigAAAAMM','MesesPeriodo','Periodo','Antiguedad','Origen','Moneda',
          'PrimaDevMes','PrimaDevAcum']
 
@@ -305,7 +311,7 @@ def fuente_bd():
             'Bloqueante aplicada')
     prim = prim[~sin_iv].copy(); iv = iv[~sin_iv]
     prim['CohorteAAAAMM'] = (iv.dt.year * 100 + iv.dt.month).astype(int)
-    prim['AnioSusc'] = pd.to_numeric(prim['Año Susc.'], errors='coerce')
+    prim['AñoSusc'] = pd.to_numeric(prim['Año Susc.'], errors='coerce')
     if col_fin is not None:
         fv = _a_fecha_serie(prim[col_fin])
         prim['FinVigAAAAMM'] = (fv.dt.year * 100 + fv.dt.month)
@@ -314,7 +320,7 @@ def fuente_bd():
     prim['MesesPeriodo'] = pd.to_numeric(prim[col_frec], errors='coerce') if col_frec else np.nan
     monto = 'PrimasNal' if MONEDA == 'Nal' else 'Primas USD'
     # dropna=False: si algún campo opcional viene vacío, la fila NO se pierde
-    llaves = ['LN2','Ramo','Tipo Rea','AnioSusc','CohorteAAAAMM','FinVigAAAAMM','MesesPeriodo','Periodo']
+    llaves = ['LN2','Ramo','Tipo Rea','AñoSusc','CohorteAAAAMM','FinVigAAAAMM','MesesPeriodo','Periodo']
     g = (prim.groupby(llaves, as_index=False, dropna=False)[monto]
              .sum().rename(columns={'Tipo Rea':'TipoRea', monto:'PrimaDevMes'}))
     g['Fuente'] = 'BD'
@@ -404,7 +410,7 @@ def fuente_fcst(path=None):
     COHORTE = MES CONTABLE. El input se organiza por FECHA CONTABLE: cada fila es un
     movimiento que ENTRA a los libros en un mes. El FCST no trae vigencia, así que su
     cohorte es su propio mes de registro y su antigüedad es 0. El año de suscripción se
-    conserva como dato descriptivo (AnioSusc), no como ancla.
+    conserva como dato descriptivo (AñoSusc), no como ancla.
 
     Anclar la cohorte a enero del año de suscripción —como hacía la herramienta— es lo
     que NO hay que hacer: se midió que arroja la prima proyectada a antigüedades de 19
@@ -437,7 +443,7 @@ def fuente_fcst(path=None):
     df['Ramo'] = pd.to_numeric(df['Ramo'], errors='coerce')
     colapsados = sorted(set(df['Ramo'].dropna().astype(int)) & set(HOMOLOGA_RAMO))
     df['Ramo'] = df['Ramo'].map(lambda r: HOMOLOGA_RAMO.get(int(r), int(r)) if pd.notna(r) else r)
-    df['AnioSusc'] = pd.to_numeric(df['AñoSusc'], errors='coerce')   # descriptivo
+    df['AñoSusc'] = pd.to_numeric(df['AñoSusc'], errors='coerce')   # descriptivo
     df['CohorteAAAAMM'] = df['Periodo']        # fecha contable: cuando entra el movimiento
     df['FinVigAAAAMM'] = np.nan
     df['MesesPeriodo'] = np.nan
@@ -469,14 +475,14 @@ def fuente_fcst(path=None):
     if g.empty:
         print(f"[input] Aviso: el FCST no tiene filas en la ventana {ini}–{fin}.")
         return None
-    g = (g.groupby(['LN2','Ramo','TipoRea','AnioSusc','CohorteAAAAMM','FinVigAAAAMM',
+    g = (g.groupby(['LN2','Ramo','TipoRea','AñoSusc','CohorteAAAAMM','FinVigAAAAMM',
                     'MesesPeriodo','Periodo'], as_index=False, dropna=False)['PrimaDevMes'].sum())
     g['Fuente'] = 'FCST'
     rep('V14', f'Subramos del FCST colapsados al grano de la BD {HOMOLOGA_RAMO}',
         f"{colapsados}", 'OK (homologación)')
     # V19 · deja constancia del criterio: la cohorte del FCST es su MES CONTABLE, no el
     # año de suscripción. El año de suscripción queda como dato descriptivo.
-    anios = [int(a) for a in sorted(g['AnioSusc'].dropna().unique())]
+    anios = [int(a) for a in sorted(g['AñoSusc'].dropna().unique())]
     rep('V19', 'FCST · cohorte = mes contable (fecha de ingreso del movimiento)',
         f"antigüedad 0 · años de suscripción presentes, sólo descriptivos: {anios}", 'OK')
     rep('V16', f'FCST · moneda de origen {MONEDA_FCST} -> input {MONEDA}',
@@ -511,13 +517,13 @@ def _normaliza_herramienta(df, fuente_tag, path):
     # así que el movimiento cohorta en el mes en que entra. (Antes se anclaba a enero
     # del año de suscripción, lo que enviaba la prima a antigüedades de varios años.)
     df['CohorteAAAAMM'] = pd.to_numeric(df['0CALMONTH'], errors='coerce')
-    df['AnioSusc'] = pd.to_numeric(df['ZSUSCYEAR'], errors='coerce')   # descriptivo
+    df['AñoSusc'] = pd.to_numeric(df['ZSUSCYEAR'], errors='coerce')   # descriptivo
     df['FinVigAAAAMM'] = np.nan      # la herramienta no trae vigencia por registro
     df['MesesPeriodo'] = np.nan      # ni periodicidad de cuentas
     df['Periodo'] = pd.to_numeric(df['0CALMONTH'], errors='coerce')
     # SOLO se usa la proyección de suscripción para la VENTANA Ppto (jul–dic del año frontera).
     df = df[(df['Periodo'] >= VENTANA_PPTO[0]) & (df['Periodo'] <= VENTANA_PPTO[1])]
-    g = (df.groupby(['LN2','Ramo','ZTIPOREAS','AnioSusc','CohorteAAAAMM','FinVigAAAAMM',
+    g = (df.groupby(['LN2','Ramo','ZTIPOREAS','AñoSusc','CohorteAAAAMM','FinVigAAAAMM',
                      'MesesPeriodo','Periodo'], as_index=False, dropna=False)['PrimaDevMes'].sum()
            .rename(columns={'ZTIPOREAS':'TipoRea'}))
     g['Fuente'] = f'{fuente_tag}-{ln}'
@@ -564,14 +570,14 @@ def fuentes_herramienta():
 # ====================== DERIVADOS Y VALIDACIONES ============================
 def derivar(df):
     df = df.copy()
-    for c in ('AnioSusc', 'FinVigAAAAMM', 'MesesPeriodo'):   # por si una fuente no los trae
+    for c in ('AñoSusc', 'FinVigAAAAMM', 'MesesPeriodo'):   # por si una fuente no los trae
         if c not in df.columns:
             df[c] = np.nan
     df['CohorteAAAAMM'] = pd.to_numeric(df['CohorteAAAAMM'], errors='coerce').fillna(0).astype(int)
     df['Periodo'] = pd.to_numeric(df['Periodo'], errors='coerce').fillna(0).astype(int)
-    df['CohorteAnio'] = df['CohorteAAAAMM'] // 100
+    df['CohorteAño'] = df['CohorteAAAAMM'] // 100
     # V4 cohortes inválidas (año fuera de rango)
-    malas = df['CohorteAnio'] < COHORTE_MIN
+    malas = df['CohorteAño'] < COHORTE_MIN
     if malas.any():
         rep('V4', f'Filas con cohorte inválida (año <{COHORTE_MIN}) excluidas',
             f"{int(malas.sum())} filas · monto {df.loc[malas,'PrimaDevMes'].sum():,.0f}", 'Bloqueante aplicada')
@@ -592,7 +598,7 @@ def derivar(df):
     return df[CANON]
 
 def validar(df):
-    dup = df.duplicated(subset=['Fuente','LN2','Ramo','TipoRea','AnioSusc','CohorteAAAAMM',
+    dup = df.duplicated(subset=['Fuente','LN2','Ramo','TipoRea','AñoSusc','CohorteAAAAMM',
                                 'FinVigAAAAMM','MesesPeriodo','Periodo']).sum()
     rep('V1','Llaves duplicadas', int(dup), 'OK' if dup==0 else 'BLOQUEANTE — revisar agregación')
     rep('V5','Moneda única de la corrida', df['Moneda'].nunique(), 'OK' if df['Moneda'].nunique()==1 else 'BLOQUEANTE')
@@ -676,8 +682,8 @@ def escribir(df):
     banda(ws,'COBERTURA POR FUENTE × LN2','filas · cohortes · periodos · monto total del mes (PrimaDevMes)',7)
     ws.append(['Fuente','LN2','Filas','Cohorte min','Cohorte max','Periodo min–max','Σ PrimaDevMes'])
     for c in ws[3]: c.font=Font(bold=True,color=BLANCO); c.fill=PatternFill('solid',fgColor=VERDE)
-    cov = (df.groupby(['Fuente','LN2']).agg(F=('PrimaDevMes','size'), c0=('CohorteAnio','min'),
-           c1=('CohorteAnio','max'), p0=('Periodo','min'), p1=('Periodo','max'), M=('PrimaDevMes','sum')).reset_index())
+    cov = (df.groupby(['Fuente','LN2']).agg(F=('PrimaDevMes','size'), c0=('CohorteAño','min'),
+           c1=('CohorteAño','max'), p0=('Periodo','min'), p1=('Periodo','max'), M=('PrimaDevMes','sum')).reset_index())
     for r in cov.itertuples(index=False):
         ws.append([r.Fuente, r.LN2, r.F, r.c0, r.c1, f"{r.p0}–{r.p1}", round(r.M)])
 
@@ -708,12 +714,21 @@ if __name__ == '__main__':
     registros_vigencia()
     # 2) Input canónico: REAL de la BD hasta FRONTERA_REAL + PROYECCIÓN del FCST en la
     #    VENTANA_PPTO. Si no hay FCST se cae a las fuentes alternas de la herramienta.
-    piezas = [fuente_bd()]
+    bd = fuente_bd()
     fcst = fuente_fcst()
     if fcst is not None:
-        piezas.append(fcst)
+        # La BD manda hasta FRONTERA_REAL; de ahí en adelante manda el FCST. Si la BD
+        # trae movimientos posteriores a la frontera (un mes parcial, por ejemplo), se
+        # excluyen para no sumarlos dos veces con la proyección.
+        tarde = bd['Periodo'] > FRONTERA_REAL
+        if tarde.any():
+            rep('V20', f'Filas de la BD posteriores a FRONTERA_REAL={FRONTERA_REAL} excluidas (las cubre el FCST)',
+                f"{int(tarde.sum())} filas · meses {sorted(bd.loc[tarde, 'Periodo'].unique().tolist())} · "
+                f"monto {bd.loc[tarde, 'PrimaDevMes'].sum():,.0f}", 'Aplicada')
+            bd = bd[~tarde]
+        piezas = [bd, fcst]
     else:
-        piezas += fuentes_herramienta()
+        piezas = [bd] + fuentes_herramienta()
     inp = derivar(pd.concat(piezas, ignore_index=True))
     validar(inp)
     escribir(inp)
