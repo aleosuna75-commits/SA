@@ -63,10 +63,11 @@ def revisa_param(ruta):
     # ---- 2. curvas de desarrollo
     print("\n  Curvas de desarrollo — '1 - LAG n' = fracción aún NO reportada tras n años")
     print(f"  {'ramo':>5s} {'IS':>6s} " + " ".join(f"{'n=' + str(i):>6s}" for i in range(1, 11)) + f" {'Σ':>6s}")
-    prob = {}
+    prob, curvas = {}, {}
     for r, s in P[P[PARS].notna().all(axis=1)].groupby("Ramo"):
         lag = np.array([s[c].mean() for c in LAGC])
         nr = 1 - lag
+        curvas[int(r)] = nr
         print(f"  {r:5d} {s['Ind Sin SONR Media'].mean():6.3f} " + " ".join(f"{x:6.3f}" for x in nr) + f" {nr.sum():6.2f}")
         p = []
         neg = [i + 1 for i, v in enumerate(nr) if v < -1e-9]
@@ -88,34 +89,62 @@ def revisa_param(ruta):
             print(f"      ramo {r}: " + "; ".join(p))
     else:
         print("\n  [ok] todas las curvas son decrecientes y están en [0, 1].")
-    return P
+    return curvas
 
 
-def revisa_tabla(ruta):
+def revisa_tabla(ruta, curvas=None):
+    """Cohortes NoLAG por ramo. `curvas` = {ramo: array '1-LAG'} para cruzarlo.
+
+    Cuenta cohortes DISTINTAS, no filas: TablaBase_MetodoPropio_ext.csv repite
+    cada (Ramo, NoLAG) por año, así que contar filas daba 40 y no 10.
+    """
     T = pd.read_csv(ruta)
-    print(f"\n{'=' * 96}\n{os.path.basename(ruta)}\n{'=' * 96}")
-    g = T.groupby("Ramo").NoLAG.agg(["count", "min", "max"])
-    mx = int(g["count"].max())
-    print(f"  cohortes NoLAG por ramo (el máximo del archivo es {mx}):")
+    print(f"\n{'=' * 96}\n{os.path.basename(ruta)}   ({len(T):,} filas)\n{'=' * 96}")
+    extra = [c for c in T.columns if c not in ("Ramo", "NoLAG")]
+    if extra:
+        print(f"  desglosada además por {extra} -> se cuentan cohortes DISTINTAS, no filas")
+    g = T.groupby("Ramo").NoLAG.agg(cohortes="nunique", minimo="min", maximo="max")
+    mx = int(g["cohortes"].max())
+    print(f"  cohortes NoLAG distintas por ramo (el máximo del archivo es {mx}):")
     for r, x in g.iterrows():
-        flag = "" if x["count"] == mx else f"   <-- sólo {int(x['count'])} cohortes, horizonte más corto"
-        print(f"      ramo {r:4d}: {int(x['count']):2d}  (NoLAG {int(x['min'])}..{int(x['max'])}){flag}")
+        n = int(x["cohortes"])
+        nota = ""
+        if n < mx:
+            nota = f"   <-- sólo {n} cohortes"
+            # ¿es coherente con la curva? si '1-LAG' ya es 0 más allá de la última
+            # cohorte, truncar ahí no cambia nada y NO es un defecto.
+            if curvas is not None and int(r) in curvas:
+                nr = curvas[int(r)]
+                if len(nr) > n and abs(nr[n:]).max() < 1e-9:
+                    nota += f": coherente, '1-LAG' ya es 0 desde n={n + 1}"
+                else:
+                    nota += f": INCOHERENTE, la curva aún aporta en n>{n}"
+        print(f"      ramo {r:4d}: {n:2d}  (NoLAG {int(x['minimo'])}..{int(x['maximo'])}){nota}")
 
 
 def main():
     base = sys.argv[1] if len(sys.argv) > 1 else os.path.dirname(os.path.abspath(__file__))
     print(f"Insumos SONR en: {base}")
     hay = False
+    curvas = None
     for f in sorted(os.listdir(base)):
         if f.lower().startswith("paramsonr") and f.lower().endswith(".csv"):
-            revisa_param(os.path.join(base, f)); hay = True
+            c = revisa_param(os.path.join(base, f)); hay = True
+            if curvas is None and c:
+                curvas = c            # las del primer ParamSONR, para cruzarlas abajo
     for f in sorted(os.listdir(base)):
         if f.lower().startswith("tablabase_metodopropio") and f.lower().endswith(".csv"):
-            revisa_tabla(os.path.join(base, f)); hay = True
+            revisa_tabla(os.path.join(base, f), curvas); hay = True
     if not hay:
         raise SystemExit(f"[diag] No encontré ParamSONR*.csv ni TablaBase_MetodoPropio*.csv en {base}")
-    print("\nRecordatorio: ReforecastSONR_aod.py lee ParamSONR2026_3+9.csv y FCST_SONR.py lee")
-    print("ParamSONR2026.csv. Si uno de los dos está incompleto, las dos corridas NO son comparables.")
+    print(f"\n{'=' * 96}\nDOS COSAS QUE NO SE VEN EN LOS ARCHIVOS\n{'=' * 96}")
+    print("  1. ReforecastSONR_aod.py lee ParamSONR2026_3+9.csv y FCST_SONR.py lee ParamSONR2026.csv.")
+    print("     Si uno de los dos está incompleto, las dos corridas NO son comparables.")
+    print("  2. Los dos escriben el MISMO SONR_esc.xlsx (y auxSONR_sum.xlsx y TablaTCSONR.xlsx)")
+    print("     en Documents\\Outputs: el que corra al final pisa al otro sin avisar.")
+    print("  3. TablaBase_MetodoPropio_ext.csv (la extensión anual 2026-2029) se lee pero NO se usa:")
+    print("     sólo aparece en líneas comentadas de Metodo_propio_reforecast, que además nunca se")
+    print("     llama. La proyección sale toda de Metodo_propio(), mensual.")
 
 
 if __name__ == "__main__":
