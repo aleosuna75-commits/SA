@@ -10,6 +10,41 @@ Si prefieres otra carpeta para los reforecast, la constante `CARPETA` al inicio 
 
 Requisitos: Python 3.9+ con `pandas`, `numpy`, `openpyxl` (y `pyodbc` para los reforecast, `pyxlsb` sólo si vas a leer Integración Dim en `.xlsb`).
 
+## Qué se corre y qué no
+
+Sólo cinco archivos se **corren**. El resto son módulos que los scripts importan solos, o archivos de consulta.
+
+| Archivo | ¿Se corre? | Qué hace |
+|---|---|---|
+| `construir_input_mec.py` | sí, paso 1 | arma el input del MEC |
+| `generar_output_mec.py` | sí, paso 1b | arma el output del MEC a partir de ese input |
+| `preparar_insumos.py` + `validar_prima_devengada.py` | sí, paso 2 | validan el FND contra la RRC real y recalibran los δ |
+| `reforecastRRC_v11_Esc1_ocl.py` y `ReforecastSONR_v4.py` | sí, paso 3 | las dos reservas |
+| `comparar_outputs_reservas.py` | sí, paso 4 | compara el output nuevo contra el anterior |
+| `mec_devengamiento.py` | **no** | módulo del MEC; lo importan solos el output del MEC y los dos reforecast. Nunca se corre a mano. |
+| `delta_calibrado.json` | **no** | los δ por ramo; lo leen los anteriores |
+| `fnd_calibrado.py` | **no hace falta** | módulo de consulta. Corrido a mano sólo imprime los δ y la tabla FND en pantalla; no lee ni escribe archivos y no tiene interruptor. Si lo borras no se rompe nada. |
+| `verificar_excel_formulas.py` | opcional | comprueba las fórmulas del Excel de validación |
+
+## Dónde está el interruptor `True` / `False`
+
+No está en `fnd_calibrado.py`. Está arriba de cada script que produce un resultado, en el bloque comentado `#%% FND CALIBRADO`:
+
+| Archivo | Línea (aprox.) | Constante | Gobierna |
+|---|---|---|---|
+| `reforecastRRC_v11_Esc1_ocl.py` | 46 | `USAR_FND_CALIBRADO = True` | la RRC |
+| `ReforecastSONR_v4.py` | 33 | `USAR_FND_CALIBRADO = True` | el SONR |
+| `mec_devengamiento.py` | 116 | `ConfigMEC.USAR_CALIBRADO = True` | el output del MEC |
+
+Se cambia editando esa línea en el archivo, con el bloc de notas o con VS Code, y volviendo a correr el script. No hay parámetro por línea de comandos.
+
+**Qué cambia:**
+
+- **`True`** — el factor de no devengamiento del proporcional y el facultativo sale de la tabla calibrada, indexada por **antigüedad de registro**: `FND = NT(k) − δ_ramo`, con `k` = mes de valuación − mes contable del registro, y δ el desplazamiento del ramo. Es lo que cuadra con la RRC real (razón 0.989, error medio mensual 3.1%). El no proporcional no cambia: sigue con la prorrata exacta por fechas de vigencia.
+- **`False`** — el factor sale de donde salía antes: los diccionarios `xPND` / `xPND2` que están escritos dentro del propio script, indexados por `CALMONTH` y por la frecuencia de la cuenta. Es decir, el script se comporta **exactamente** como la v10 (RRC) o la v3 (SONR).
+
+Los `False` no son para producción: son el control. Corres primero con `False` para confirmar que la versión nueva reproduce la anterior al centavo, y ya con esa certeza corres con `True` para ver el efecto puro del FND del modelo. Por eso la salida se llama distinto en cada caso.
+
 ## 1. Input del MEC · histórico actualizado a julio + presupuesto agosto–diciembre
 
 | Pon en la carpeta | Qué es |

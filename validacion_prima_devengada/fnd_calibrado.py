@@ -16,7 +16,21 @@
  El no proporcional (TipoRea 2) conserva la prorrata exacta por fechas de vigencia
  (cuando hay fechas) o la curva PF+ de cartera por antigüedad de cohorte.
 
- USO (sustituye la búsqueda en xPND dentro de ConsultaReal / zFND):
+ ESTE ARCHIVO NO ES UN PASO DEL PROCESO. Es un módulo de CONSULTA: no lee ningún
+ input, no escribe ningún archivo y no tiene interruptor. Corrido directamente
+ (python fnd_calibrado.py) sólo imprime los δ y la tabla FND en pantalla, para
+ poder verla sin abrir el Excel. El proceso — input, output del MEC y los dos
+ reforecast — usa mec_devengamiento.py, no este archivo.
+
+ DÓNDE ESTÁ EL INTERRUPTOR True / False (no está aquí):
+     reforecastRRC_v11_Esc1_ocl.py   USAR_FND_CALIBRADO   (bloque «FND CALIBRADO», arriba)
+     ReforecastSONR_v4.py            USAR_FND_CALIBRADO   (bloque «FND CALIBRADO», arriba)
+     mec_devengamiento.py            ConfigMEC.USAR_CALIBRADO   (gobierna el output del MEC)
+ True  = FND calibrado por antigüedad de REGISTRO (lo que cuadra con la RRC real).
+ False = comportamiento anterior, el FND sale de los diccionarios xPND / xPND2.
+ Ver LEEME_carpeta_local.md, sección 3.
+
+ USO como librería (sustituye la búsqueda en xPND dentro de ConsultaReal / zFND):
      from fnd_calibrado import fnd_calibrado, factor_no_devengado_cal
      f = fnd_calibrado(ramo=60, k_reg=3)                       # proporcional / facultativo
      f = factor_no_devengado_cal(row, mes_valuacion=202605)    # row del reforecast RRC
