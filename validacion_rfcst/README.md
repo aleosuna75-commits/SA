@@ -60,9 +60,18 @@ columna `LN2` de la hoja (que incluye `LN04008-Agro` y empata con la `LN` del
 forecast). Para comparar solo contra las LN que sí traen forecast, poner
 `PPTO_SOLO_LN_CON_FCST = True` al inicio del script.
 
+Las **gráficas por línea de negocio** y el `Resumen_LN` del Excel también toman
+el presupuesto por LN de la hoja `Ppto2026` (anual y Ago-Dic), porque el que trae
+`BD_RFCST26` se pegó contrato a contrato y pierde lo presupuestado que aún no
+registra prima (LN04006 mostraba 243.6 M cuando la hoja dice 372.0 M). En las
+**vistas Contrato / Cedente / MGA** el presupuesto se cruza con los filtros
+activos usando la tabla de `Ppto2026` por LN, tipo de reaseguro, corredor,
+compañía y contrato; con filtro de binder (los nombres de binder no empatan
+completos entre fuentes) o en LN que viven en dos vistas (4004, que la hoja no
+separa entre Contrato y Cedente) se conserva el presupuesto de la base.
+
 Los nombres de columna se configuran al inicio del script (`COL_PPTO`,
-`COLS_ANIO`, `COLS_PERIODO`, `COLS_LN_PPTO`). Las **gráficas por línea de
-negocio** siguen usando el presupuesto de `BD_RFCST26` sin cambios.
+`COLS_ANIO`, `COLS_PERIODO`, `COLS_LN_PPTO`, `COLS_PPTO_DIM`).
 
 ## Corrección de captura
 

@@ -150,6 +150,10 @@ COLS_PERIODO = ["MesPpto", "0FISCPER", "FISCPER", "Periodo", "Período", "Mes", 
 # LN2 trae la apertura fina (incluye LN04008-Agro) y empata con
 # la columna LN del forecast; LineaNegocio es la version agrupada
 COLS_LN_PPTO = ["LN2", "LíneaNegocio", "LineaNegocio"]
+# Dimensiones de la hoja que empatan con la base (codigos), para
+# cruzar el presupuesto en las vistas filtrables del dashboard
+COLS_PPTO_DIM = {"tiporea": "TipoRea", "corredor": "Corredor",
+                 "cia": "Compañía", "contrato": "Contrato"}
 MESES_AGODIC = [8, 9, 10, 11, 12]
 MESES_ENEJUL = [1, 2, 3, 4, 5, 6, 7]
 
@@ -402,6 +406,353 @@ df["Num_Flags"] = df[flags].sum(axis=1)
 df["Tiene_Alerta"] = df["Num_Flags"] > 0
 
 # =====================================================
+# PRESUPUESTO 2026 COMPLETO (hoja Ppto2026)
+# =====================================================
+# Solo alimenta las cifras GLOBALES. Si la hoja no existe
+# se avisa y se usa el ppto de BD_RFCST26.
+
+
+def _buscar_columna(cols, candidatas):
+    """Devuelve la primera columna cuyo nombre coincida (sin
+    distinguir mayusculas ni acentos de mas) con las candidatas."""
+    norm = {str(c).strip().upper(): c for c in cols}
+    for cand in candidatas:
+        if cand.strip().upper() in norm:
+            return norm[cand.strip().upper()]
+    return None
+
+
+def _meses_de(serie):
+    """Deriva el mes (1-12) de una columna de periodo, aceptando
+    1-12, AAAAMM y fechas."""
+    if pd.api.types.is_datetime64_any_dtype(serie):
+        return serie.dt.month
+
+    num = pd.to_numeric(serie, errors="coerce")
+
+    if num.notna().sum() == 0:
+        return None
+
+    maximo = num.max()
+
+    if maximo <= 12:
+        return num
+    if maximo >= 100_000:          # AAAAMM
+        return num % 100
+    if maximo <= 12_12:            # AAMM u otro compacto
+        return num % 100
+
+    return None
+
+
+def cargar_ppto2026(ruta, lns_forecast):
+
+    try:
+        crudo = pd.read_excel(ruta, sheet_name=HOJA_PPTO, header=None, nrows=12)
+    except ValueError:
+        print(f"AVISO: el libro no tiene la hoja '{HOJA_PPTO}'.")
+        print("       Las cifras globales usaran el ppto de BD_RFCST26,")
+        print("       que solo cubre contratos con prima registrada.")
+        return None
+
+    col_primas = COL_PPTO["Primas"]
+
+    fila = None
+    for i in range(len(crudo)):
+        if any(str(v).strip() == col_primas for v in crudo.iloc[i]):
+            fila = i
+            break
+
+    if fila is None:
+        print(f"AVISO: en la hoja '{HOJA_PPTO}' no se encontro la columna "
+              f"'{col_primas}'; se usa el ppto de BD_RFCST26.")
+        return None
+
+    p = pd.read_excel(ruta, sheet_name=HOJA_PPTO, header=fila)
+    p.columns = [str(c).strip() for c in p.columns]
+
+    faltantes = [c for c in COL_PPTO.values() if c not in p.columns]
+    if faltantes:
+        print(f"AVISO: a la hoja '{HOJA_PPTO}' le faltan columnas {faltantes}; "
+              "se usa el ppto de BD_RFCST26.")
+        return None
+
+    filas_totales = len(p)
+    excluidas = []
+
+    # Acotar al ejercicio presupuestado
+    col_anio = _buscar_columna(p.columns, COLS_ANIO)
+    if col_anio is not None:
+        anios = pd.to_numeric(p[col_anio], errors="coerce")
+        p = p[anios == ANIO_PPTO]
+        print(f"  {HOJA_PPTO}: filtrado {col_anio} = {ANIO_PPTO} "
+              f"({len(p):,} de {filas_totales:,} filas)")
+    else:
+        print(f"  AVISO: en '{HOJA_PPTO}' no se encontro columna de ejercicio "
+              f"{COLS_ANIO}; se suman las {filas_totales:,} filas de la hoja.")
+        print("         Verifica que la hoja solo contenga el presupuesto 2026.")
+
+    # Acotar a las lineas de negocio que si traen forecast
+    col_ln = _buscar_columna(p.columns, COLS_LN_PPTO)
+
+    if col_ln is not None:
+        ln_map = (p[col_ln].astype(str).str.strip()
+                  .str.replace(r"^LN0*", "", regex=True))
+        fuera = sorted(set(ln_map.unique()) - set(lns_forecast))
+
+        if fuera:
+            det = p.loc[ln_map.isin(fuera)].copy()
+            det["_LN"] = ln_map[ln_map.isin(fuera)]
+            agg = det.groupby("_LN")[list(COL_PPTO.values())].sum()
+            for ln, fila in agg.iterrows():
+                excluidas.append({
+                    "LN": ln,
+                    **{m: float(fila[c]) for m, c in COL_PPTO.items()},
+                })
+
+        if fuera:
+            resumen_fuera = ", ".join(
+                f"{e['LN']} ({e['Primas'] / 1e6:,.1f} M)" for e in excluidas)
+            if PPTO_SOLO_LN_CON_FCST:
+                p = p[ln_map.isin(lns_forecast)]
+                print(f"  {HOJA_PPTO}: excluidas por no tener forecast -> "
+                      f"{resumen_fuera}")
+            else:
+                print(f"  {HOJA_PPTO}: incluidas aunque aun no tienen forecast -> "
+                      f"{resumen_fuera}")
+    else:
+        print(f"  AVISO: en '{HOJA_PPTO}' no se encontro columna de linea de "
+              f"negocio {COLS_LN_PPTO}; se usan todas las LN de la hoja.")
+
+    # Separar Ago-Dic
+    col_periodo = _buscar_columna(p.columns, COLS_PERIODO)
+    meses = _meses_de(p[col_periodo]) if col_periodo is not None else None
+
+    if meses is None and col_periodo is not None:
+        print(f"  AVISO: no se pudo interpretar el periodo de '{col_periodo}'.")
+
+    ppto = {}
+
+    for medida, col in COL_PPTO.items():
+        vals = pd.to_numeric(p[col], errors="coerce").fillna(0)
+        d = {"anual": float(vals.sum())}
+        if meses is not None:
+            d["agodic"] = float(vals[meses.isin(MESES_AGODIC)].sum())
+            d["enejul"] = float(vals[meses.isin(MESES_ENEJUL)].sum())
+        ppto[medida] = d
+
+    # Presupuesto por LN (alimenta las graficas por linea de
+    # negocio y el Resumen_LN) y tabla por dimensiones (alimenta
+    # las vistas filtrables del dashboard)
+    por_ln, tabla = {}, []
+    if col_ln is not None:
+        p = p.copy()
+        p["_LN"] = ln_map.loc[p.index]
+        p["_AD"] = meses.loc[p.index].isin(MESES_AGODIC) if meses is not None else False
+        p["_EJ"] = meses.loc[p.index].isin(MESES_ENEJUL) if meses is not None else False
+        for m, col in COL_PPTO.items():
+            p[col] = pd.to_numeric(p[col], errors="coerce").fillna(0)
+
+        for ln, sub in p.groupby("_LN"):
+            por_ln[ln] = {}
+            for m, col in COL_PPTO.items():
+                por_ln[ln][m] = {"anual": float(sub[col].sum())}
+                if meses is not None:
+                    por_ln[ln][m]["agodic"] = float(sub.loc[sub["_AD"], col].sum())
+                    por_ln[ln][m]["enejul"] = float(sub.loc[sub["_EJ"], col].sum())
+
+        dims = [c for c in COLS_PPTO_DIM.values() if c in p.columns]
+        if len(dims) == len(COLS_PPTO_DIM):
+            for c in dims:
+                p[c] = pd.to_numeric(p[c], errors="coerce").fillna(0).astype(int)
+            agg = {}
+            for m, col in COL_PPTO.items():
+                agg[f"{m}_an"] = (col, "sum")
+            g = p.groupby(["_LN"] + dims).agg(**agg)
+            for m, col in COL_PPTO.items():
+                g[f"{m}_ad"] = p[p["_AD"]].groupby(["_LN"] + dims)[col].sum()
+            g = g.fillna(0).reset_index()
+            for _, fila in g.iterrows():
+                tabla.append([fila["_LN"]] + [int(fila[c]) for c in dims] + [
+                    round(float(fila[f"{m}_{k}"]))
+                    for m in COL_PPTO for k in ("an", "ad")
+                ])
+            print(f"  {HOJA_PPTO}: tabla por LN/tipo/corredor/compania/contrato "
+                  f"({len(tabla):,} combinaciones) para las vistas filtrables")
+        else:
+            print(f"  AVISO: faltan dimensiones {COLS_PPTO_DIM} en '{HOJA_PPTO}'; "
+                  "las vistas filtrables usan el ppto de la base.")
+
+    if meses is not None:
+        print(f"  {HOJA_PPTO}: periodo tomado de '{col_periodo}' "
+              "(Ago-Dic y Ene-Jul disponibles)")
+    else:
+        print(f"  AVISO: sin columna de periodo en '{HOJA_PPTO}'; el ppto "
+              "Ago-Dic global se toma de BD_RFCST26.")
+
+    for medida, d in ppto.items():
+        detalle = f"anual {d['anual'] / 1e6:,.1f} M"
+        if "agodic" in d:
+            detalle += f" · Ago-Dic {d['agodic'] / 1e6:,.1f} M"
+        print(f"  {HOJA_PPTO} · {medida}: {detalle}")
+
+    return ppto, excluidas, por_ln, tabla
+
+
+def _fmt_m_pre(v):
+    return f"{v / 1e6:,.1f} M"
+
+
+def _buscar_archivo(prefijo):
+    """Primer .xlsx cuyo nombre empiece con el prefijo, en Inputs
+    o junto al script (el mas reciente si hay varios)."""
+    candidatos = sorted(
+        {
+            os.path.join(carpeta, f)
+            for carpeta in (xInputs, xFolder)
+            if os.path.isdir(carpeta)
+            for f in os.listdir(carpeta)
+            if f.startswith(prefijo) and f.endswith(".xlsx")
+            and not f.startswith("~$")
+        },
+        key=os.path.getmtime,
+        reverse=True,
+    )
+    return candidatos[0] if candidatos else None
+
+
+def cargar_reales25():
+    """Reales 2025 completos desde BDFCST26 (anual y Ago-Dic por
+    medida). None si el archivo no esta disponible."""
+
+    ruta = _buscar_archivo(ARCHIVO_REALES)
+
+    if ruta is None:
+        print(f"AVISO: no se encontro {ARCHIVO_REALES}*.xlsx; los reales 2025")
+        print("       globales usaran los de BD_RFCST26 (solo lo devengado")
+        print("       contra el forecast).")
+        return None
+
+    try:
+        crudo = pd.read_excel(ruta, sheet_name=HOJA_REALES, header=None, nrows=8)
+    except ValueError:
+        print(f"AVISO: {os.path.basename(ruta)} no tiene la hoja '{HOJA_REALES}'; "
+              "se usan los reales de BD_RFCST26.")
+        return None
+
+    fila = None
+    for i in range(len(crudo)):
+        if any(str(x).strip() == "Periodo" for x in crudo.iloc[i]):
+            fila = i
+            break
+
+    if fila is None:
+        print(f"AVISO: en '{HOJA_REALES}' de {os.path.basename(ruta)} no se "
+              "encontro la columna 'Periodo'; se usan los reales de BD_RFCST26.")
+        return None
+
+    b = pd.read_excel(ruta, sheet_name=HOJA_REALES, header=fila)
+    b.columns = [str(c).strip() for c in b.columns]
+
+    faltantes = [c for c in COL_REALES.values() if c not in b.columns]
+    if faltantes:
+        print(f"AVISO: a '{HOJA_REALES}' le faltan columnas {faltantes}; "
+              "se usan los reales de BD_RFCST26.")
+        return None
+
+    per = pd.to_numeric(b["Periodo"], errors="coerce")
+    b = b[(per // 100) == ANIO_REALES]
+    mes = per % 100
+
+    reales = {}
+    for medida, col in COL_REALES.items():
+        vals = pd.to_numeric(b[col], errors="coerce").fillna(0)
+        reales[medida] = {
+            "anual": float(vals.sum()),
+            "agodic": float(vals[mes.isin(MESES_AGODIC)].sum()),
+        }
+
+    print(f"Reales 2025 completos ({os.path.basename(ruta)}):")
+    for medida, d in reales.items():
+        print(f"  {medida}: anual {d['anual'] / 1e6:,.1f} M · "
+              f"Ago-Dic {d['agodic'] / 1e6:,.1f} M")
+
+    return reales
+
+
+def cargar_catalogo_cedentes():
+    """Diccionario numero de cedente -> nombre, desde el catalogo.
+    Si no esta, se arma con los nombres de la propia base."""
+
+    ruta = _buscar_archivo(ARCHIVO_CATALOGO)
+
+    if ruta is not None:
+        try:
+            crudo = pd.read_excel(ruta, sheet_name=HOJA_CATALOGO, header=None,
+                                  nrows=6)
+            fila = None
+            for i in range(len(crudo)):
+                if any(str(x).strip() == COL_CAT_NUM for x in crudo.iloc[i]):
+                    fila = i
+                    break
+            if fila is not None:
+                c = pd.read_excel(ruta, sheet_name=HOJA_CATALOGO, header=fila)
+                c.columns = [str(x).strip() for x in c.columns]
+                if COL_CAT_NUM in c.columns and COL_CAT_NOMBRE in c.columns:
+                    num = pd.to_numeric(c[COL_CAT_NUM], errors="coerce")
+                    ok = num.notna() & c[COL_CAT_NOMBRE].notna()
+                    cat = {
+                        str(int(k)): str(v).strip()
+                        for k, v in zip(num[ok], c.loc[ok, COL_CAT_NOMBRE])
+                    }
+                    print(f"Catalogo de cedentes: {len(cat):,} numeros "
+                          f"({os.path.basename(ruta)})")
+                    return cat
+            print(f"AVISO: no se pudo leer el catalogo de {os.path.basename(ruta)}; "
+                  "se usan los nombres de la propia base.")
+        except Exception as e:
+            print(f"AVISO: error leyendo el catalogo ({e}); se usan los "
+                  "nombres de la propia base.")
+
+    cat = {}
+    nums = pd.to_numeric(df["Compañía"], errors="coerce")
+    for num, nombre in zip(nums, df["Compañía_Nombre"]):
+        if pd.notna(num) and pd.notna(nombre):
+            cat.setdefault(str(int(num)), str(nombre).strip())
+    print(f"Catalogo de cedentes: {len(cat):,} numeros (derivado de la base)")
+    return cat
+
+
+REAL2025 = cargar_reales25()
+
+FUENTE_REALES = ("BDFCST26 (2025 completo)" if REAL2025
+                 else "BD_RFCST26 (solo devengado)")
+
+CATALOGO_CED = cargar_catalogo_cedentes()
+
+print("Presupuesto 2026 completo:")
+_res_ppto = cargar_ppto2026(archivo, set(df["LN"].unique()))
+
+PPTO2026, PPTO_EXCLUIDAS, PPTO_LN, PPTO_TABLA = (
+    _res_ppto if _res_ppto else (None, [], {}, [])
+)
+
+if PPTO2026:
+    FUENTE_PPTO = f"hoja {HOJA_PPTO}"
+    FUENTE_PPTO += (", solo LN con forecast" if PPTO_SOLO_LN_CON_FCST
+                    else ", todas las LN presupuestadas")
+else:
+    FUENTE_PPTO = "BD_RFCST26 (solo contratos con prima)"
+
+# Las LN presupuestadas sin forecast no se avisan en el
+# dashboard: quedan documentadas en la consola y en la hoja
+# Ppto_Sin_Forecast del Excel
+if PPTO_EXCLUIDAS:
+    _txt = ", ".join(
+        f"LN{e['LN']} ({_fmt_m_pre(e['Primas'])})" for e in PPTO_EXCLUIDAS)
+    print(f"  Nota: {_txt} presupuestada(s) sin forecast en el RFCST")
+
+# =====================================================
 # RESUMENES
 # =====================================================
 
@@ -423,6 +774,16 @@ def resumen_por(claves):
         agg[f"{corto}_0812_25"] = (f"{m} 08-1225", "sum")
 
     r = df.groupby(claves).agg(**agg).reset_index()
+
+    # A nivel LN el presupuesto sale de la hoja Ppto2026: el que
+    # trae la base se pego contrato a contrato y pierde lo
+    # presupuestado que aun no registra prima
+    if list(claves) == ["LN"] and PPTO_LN:
+        for corto, m in zip(["P", "S", "C"], MEDIDAS):
+            for suf, k in (("_PPTO", "anual"), ("_PPTO_0812", "agodic"),
+                           ("_PPTO_0107", "enejul")):
+                nuevo = r["LN"].map(lambda ln: PPTO_LN.get(ln, {}).get(m, {}).get(k))
+                r[f"{corto}{suf}"] = nuevo.fillna(r[f"{corto}{suf}"])
 
     # Indices y desviaciones recalculados sobre agregados
     # (no promedio de razones)
@@ -734,309 +1095,6 @@ df["Impacto"] = np.where(
 excepciones = df[df["Semaforo_Global"] == "ROJO"].copy()
 
 excepciones = excepciones.sort_values("Impacto", ascending=False)
-
-# =====================================================
-# PRESUPUESTO 2026 COMPLETO (hoja Ppto2026)
-# =====================================================
-# Solo alimenta las cifras GLOBALES. Si la hoja no existe
-# se avisa y se usa el ppto de BD_RFCST26.
-
-
-def _buscar_columna(cols, candidatas):
-    """Devuelve la primera columna cuyo nombre coincida (sin
-    distinguir mayusculas ni acentos de mas) con las candidatas."""
-    norm = {str(c).strip().upper(): c for c in cols}
-    for cand in candidatas:
-        if cand.strip().upper() in norm:
-            return norm[cand.strip().upper()]
-    return None
-
-
-def _meses_de(serie):
-    """Deriva el mes (1-12) de una columna de periodo, aceptando
-    1-12, AAAAMM y fechas."""
-    if pd.api.types.is_datetime64_any_dtype(serie):
-        return serie.dt.month
-
-    num = pd.to_numeric(serie, errors="coerce")
-
-    if num.notna().sum() == 0:
-        return None
-
-    maximo = num.max()
-
-    if maximo <= 12:
-        return num
-    if maximo >= 100_000:          # AAAAMM
-        return num % 100
-    if maximo <= 12_12:            # AAMM u otro compacto
-        return num % 100
-
-    return None
-
-
-def cargar_ppto2026(ruta, lns_forecast):
-
-    try:
-        crudo = pd.read_excel(ruta, sheet_name=HOJA_PPTO, header=None, nrows=12)
-    except ValueError:
-        print(f"AVISO: el libro no tiene la hoja '{HOJA_PPTO}'.")
-        print("       Las cifras globales usaran el ppto de BD_RFCST26,")
-        print("       que solo cubre contratos con prima registrada.")
-        return None
-
-    col_primas = COL_PPTO["Primas"]
-
-    fila = None
-    for i in range(len(crudo)):
-        if any(str(v).strip() == col_primas for v in crudo.iloc[i]):
-            fila = i
-            break
-
-    if fila is None:
-        print(f"AVISO: en la hoja '{HOJA_PPTO}' no se encontro la columna "
-              f"'{col_primas}'; se usa el ppto de BD_RFCST26.")
-        return None
-
-    p = pd.read_excel(ruta, sheet_name=HOJA_PPTO, header=fila)
-    p.columns = [str(c).strip() for c in p.columns]
-
-    faltantes = [c for c in COL_PPTO.values() if c not in p.columns]
-    if faltantes:
-        print(f"AVISO: a la hoja '{HOJA_PPTO}' le faltan columnas {faltantes}; "
-              "se usa el ppto de BD_RFCST26.")
-        return None
-
-    filas_totales = len(p)
-    excluidas = []
-
-    # Acotar al ejercicio presupuestado
-    col_anio = _buscar_columna(p.columns, COLS_ANIO)
-    if col_anio is not None:
-        anios = pd.to_numeric(p[col_anio], errors="coerce")
-        p = p[anios == ANIO_PPTO]
-        print(f"  {HOJA_PPTO}: filtrado {col_anio} = {ANIO_PPTO} "
-              f"({len(p):,} de {filas_totales:,} filas)")
-    else:
-        print(f"  AVISO: en '{HOJA_PPTO}' no se encontro columna de ejercicio "
-              f"{COLS_ANIO}; se suman las {filas_totales:,} filas de la hoja.")
-        print("         Verifica que la hoja solo contenga el presupuesto 2026.")
-
-    # Acotar a las lineas de negocio que si traen forecast
-    col_ln = _buscar_columna(p.columns, COLS_LN_PPTO)
-
-    if col_ln is not None:
-        ln_map = (p[col_ln].astype(str).str.strip()
-                  .str.replace(r"^LN0*", "", regex=True))
-        fuera = sorted(set(ln_map.unique()) - set(lns_forecast))
-
-        if fuera:
-            det = p.loc[ln_map.isin(fuera)].copy()
-            det["_LN"] = ln_map[ln_map.isin(fuera)]
-            agg = det.groupby("_LN")[list(COL_PPTO.values())].sum()
-            for ln, fila in agg.iterrows():
-                excluidas.append({
-                    "LN": ln,
-                    **{m: float(fila[c]) for m, c in COL_PPTO.items()},
-                })
-
-        if fuera:
-            resumen_fuera = ", ".join(
-                f"{e['LN']} ({e['Primas'] / 1e6:,.1f} M)" for e in excluidas)
-            if PPTO_SOLO_LN_CON_FCST:
-                p = p[ln_map.isin(lns_forecast)]
-                print(f"  {HOJA_PPTO}: excluidas por no tener forecast -> "
-                      f"{resumen_fuera}")
-            else:
-                print(f"  {HOJA_PPTO}: incluidas aunque aun no tienen forecast -> "
-                      f"{resumen_fuera}")
-    else:
-        print(f"  AVISO: en '{HOJA_PPTO}' no se encontro columna de linea de "
-              f"negocio {COLS_LN_PPTO}; se usan todas las LN de la hoja.")
-
-    # Separar Ago-Dic
-    col_periodo = _buscar_columna(p.columns, COLS_PERIODO)
-    meses = _meses_de(p[col_periodo]) if col_periodo is not None else None
-
-    if meses is None and col_periodo is not None:
-        print(f"  AVISO: no se pudo interpretar el periodo de '{col_periodo}'.")
-
-    ppto = {}
-
-    for medida, col in COL_PPTO.items():
-        vals = pd.to_numeric(p[col], errors="coerce").fillna(0)
-        d = {"anual": float(vals.sum())}
-        if meses is not None:
-            d["agodic"] = float(vals[meses.isin(MESES_AGODIC)].sum())
-            d["enejul"] = float(vals[meses.isin(MESES_ENEJUL)].sum())
-        ppto[medida] = d
-
-    if meses is not None:
-        print(f"  {HOJA_PPTO}: periodo tomado de '{col_periodo}' "
-              "(Ago-Dic y Ene-Jul disponibles)")
-    else:
-        print(f"  AVISO: sin columna de periodo en '{HOJA_PPTO}'; el ppto "
-              "Ago-Dic global se toma de BD_RFCST26.")
-
-    for medida, d in ppto.items():
-        detalle = f"anual {d['anual'] / 1e6:,.1f} M"
-        if "agodic" in d:
-            detalle += f" · Ago-Dic {d['agodic'] / 1e6:,.1f} M"
-        print(f"  {HOJA_PPTO} · {medida}: {detalle}")
-
-    return ppto, excluidas
-
-
-def _fmt_m_pre(v):
-    return f"{v / 1e6:,.1f} M"
-
-
-def _buscar_archivo(prefijo):
-    """Primer .xlsx cuyo nombre empiece con el prefijo, en Inputs
-    o junto al script (el mas reciente si hay varios)."""
-    candidatos = sorted(
-        {
-            os.path.join(carpeta, f)
-            for carpeta in (xInputs, xFolder)
-            if os.path.isdir(carpeta)
-            for f in os.listdir(carpeta)
-            if f.startswith(prefijo) and f.endswith(".xlsx")
-            and not f.startswith("~$")
-        },
-        key=os.path.getmtime,
-        reverse=True,
-    )
-    return candidatos[0] if candidatos else None
-
-
-def cargar_reales25():
-    """Reales 2025 completos desde BDFCST26 (anual y Ago-Dic por
-    medida). None si el archivo no esta disponible."""
-
-    ruta = _buscar_archivo(ARCHIVO_REALES)
-
-    if ruta is None:
-        print(f"AVISO: no se encontro {ARCHIVO_REALES}*.xlsx; los reales 2025")
-        print("       globales usaran los de BD_RFCST26 (solo lo devengado")
-        print("       contra el forecast).")
-        return None
-
-    try:
-        crudo = pd.read_excel(ruta, sheet_name=HOJA_REALES, header=None, nrows=8)
-    except ValueError:
-        print(f"AVISO: {os.path.basename(ruta)} no tiene la hoja '{HOJA_REALES}'; "
-              "se usan los reales de BD_RFCST26.")
-        return None
-
-    fila = None
-    for i in range(len(crudo)):
-        if any(str(x).strip() == "Periodo" for x in crudo.iloc[i]):
-            fila = i
-            break
-
-    if fila is None:
-        print(f"AVISO: en '{HOJA_REALES}' de {os.path.basename(ruta)} no se "
-              "encontro la columna 'Periodo'; se usan los reales de BD_RFCST26.")
-        return None
-
-    b = pd.read_excel(ruta, sheet_name=HOJA_REALES, header=fila)
-    b.columns = [str(c).strip() for c in b.columns]
-
-    faltantes = [c for c in COL_REALES.values() if c not in b.columns]
-    if faltantes:
-        print(f"AVISO: a '{HOJA_REALES}' le faltan columnas {faltantes}; "
-              "se usan los reales de BD_RFCST26.")
-        return None
-
-    per = pd.to_numeric(b["Periodo"], errors="coerce")
-    b = b[(per // 100) == ANIO_REALES]
-    mes = per % 100
-
-    reales = {}
-    for medida, col in COL_REALES.items():
-        vals = pd.to_numeric(b[col], errors="coerce").fillna(0)
-        reales[medida] = {
-            "anual": float(vals.sum()),
-            "agodic": float(vals[mes.isin(MESES_AGODIC)].sum()),
-        }
-
-    print(f"Reales 2025 completos ({os.path.basename(ruta)}):")
-    for medida, d in reales.items():
-        print(f"  {medida}: anual {d['anual'] / 1e6:,.1f} M · "
-              f"Ago-Dic {d['agodic'] / 1e6:,.1f} M")
-
-    return reales
-
-
-def cargar_catalogo_cedentes():
-    """Diccionario numero de cedente -> nombre, desde el catalogo.
-    Si no esta, se arma con los nombres de la propia base."""
-
-    ruta = _buscar_archivo(ARCHIVO_CATALOGO)
-
-    if ruta is not None:
-        try:
-            crudo = pd.read_excel(ruta, sheet_name=HOJA_CATALOGO, header=None,
-                                  nrows=6)
-            fila = None
-            for i in range(len(crudo)):
-                if any(str(x).strip() == COL_CAT_NUM for x in crudo.iloc[i]):
-                    fila = i
-                    break
-            if fila is not None:
-                c = pd.read_excel(ruta, sheet_name=HOJA_CATALOGO, header=fila)
-                c.columns = [str(x).strip() for x in c.columns]
-                if COL_CAT_NUM in c.columns and COL_CAT_NOMBRE in c.columns:
-                    num = pd.to_numeric(c[COL_CAT_NUM], errors="coerce")
-                    ok = num.notna() & c[COL_CAT_NOMBRE].notna()
-                    cat = {
-                        str(int(k)): str(v).strip()
-                        for k, v in zip(num[ok], c.loc[ok, COL_CAT_NOMBRE])
-                    }
-                    print(f"Catalogo de cedentes: {len(cat):,} numeros "
-                          f"({os.path.basename(ruta)})")
-                    return cat
-            print(f"AVISO: no se pudo leer el catalogo de {os.path.basename(ruta)}; "
-                  "se usan los nombres de la propia base.")
-        except Exception as e:
-            print(f"AVISO: error leyendo el catalogo ({e}); se usan los "
-                  "nombres de la propia base.")
-
-    cat = {}
-    nums = pd.to_numeric(df["Compañía"], errors="coerce")
-    for num, nombre in zip(nums, df["Compañía_Nombre"]):
-        if pd.notna(num) and pd.notna(nombre):
-            cat.setdefault(str(int(num)), str(nombre).strip())
-    print(f"Catalogo de cedentes: {len(cat):,} numeros (derivado de la base)")
-    return cat
-
-
-REAL2025 = cargar_reales25()
-
-FUENTE_REALES = ("BDFCST26 (2025 completo)" if REAL2025
-                 else "BD_RFCST26 (solo devengado)")
-
-CATALOGO_CED = cargar_catalogo_cedentes()
-
-print("Presupuesto 2026 completo:")
-_res_ppto = cargar_ppto2026(archivo, set(df["LN"].unique()))
-
-PPTO2026, PPTO_EXCLUIDAS = _res_ppto if _res_ppto else (None, [])
-
-if PPTO2026:
-    FUENTE_PPTO = f"hoja {HOJA_PPTO}"
-    FUENTE_PPTO += (", solo LN con forecast" if PPTO_SOLO_LN_CON_FCST
-                    else ", todas las LN presupuestadas")
-else:
-    FUENTE_PPTO = "BD_RFCST26 (solo contratos con prima)"
-
-# Las LN presupuestadas sin forecast no se avisan en el
-# dashboard: quedan documentadas en la consola y en la hoja
-# Ppto_Sin_Forecast del Excel
-if PPTO_EXCLUIDAS:
-    _txt = ", ".join(
-        f"LN{e['LN']} ({_fmt_m_pre(e['Primas'])})" for e in PPTO_EXCLUIDAS)
-    print(f"  Nota: {_txt} presupuestada(s) sin forecast en el RFCST")
 
 # =====================================================
 # GLOBALES POR MEDIDA (P / S / C y P-S-C)
@@ -1914,9 +1972,39 @@ for _, row in df.iterrows():
         _txt(row["Compañía"]),
     ])
 
+# Apoyos para cruzar el presupuesto de Ppto2026 en las vistas
+# filtrables: mapa nombre->codigo de tipo de reaseguro, pais de
+# cada compania, LN presentes en cada vista y LN compartidas entre
+# vistas (4004 esta en Contrato y en Cedente y la hoja no separa
+# esa particion, por lo que ahi se conserva el ppto de la base)
+_tr_map = {}
+for cod, nom in zip(pd.to_numeric(df["Tipo Rea"], errors="coerce"), df["Tipo Reaseguro"]):
+    if pd.notna(cod) and pd.notna(nom):
+        _tr_map.setdefault(str(nom).strip(), int(cod))
+
+_cia_pais = {}
+for cod, pais in zip(pd.to_numeric(df["Compañía"], errors="coerce"), df["País"]):
+    if pd.notna(cod) and pd.notna(pais):
+        _cia_pais.setdefault(str(int(cod)), str(pais).strip())
+
+_card_lns = {}
+for card_nombre, idx_card in CARD_IDX.items():
+    _card_lns[idx_card] = sorted(df.loc[df["Cardinalidad"] == card_nombre, "LN"].unique())
+
+_ln_cards = {}
+for idx_card, lns in _card_lns.items():
+    for ln in lns:
+        _ln_cards.setdefault(ln, set()).add(idx_card)
+LNS_COMPARTIDAS = sorted(ln for ln, cs in _ln_cards.items() if len(cs) > 1)
+
 DATA_JS = {
     "rows": rows_js,
     "cat": CATALOGO_CED,
+    "ppto": PPTO_TABLA,
+    "tr": _tr_map,
+    "ciaPais": _cia_pais,
+    "cardLns": {str(k): v for k, v in _card_lns.items()},
+    "shared": LNS_COMPARTIDAS,
     "charts": charts_cfg,
     "cfg": {
         "umbralAmarillo": UMBRAL_AMARILLO,
@@ -1958,7 +2046,7 @@ for idx, nombre, sec_id, desc, t_alerta in sec3_defs:
           <button data-m="2">Costos</button>
         </div>
       </div>
-      <div class="nota">Con los filtros aplicados, por línea de negocio (USD)</div>
+      <div class="nota">Con los filtros aplicados, por línea de negocio (USD). El presupuesto sale de la hoja Ppto2026 cruzada por LN, tipo de reaseguro, corredor, compañía y contrato; con filtro de binder, o en LN compartidas entre vistas, se usa el ppto de la base.</div>
       <div id="ch3_{idx}"></div>
     </div>
     <div class="card donut-wrap">
@@ -2413,6 +2501,44 @@ function sums(rows, mi) {
 
 function ratio(a, b) { return Math.abs(b) > DATA.cfg.minDen ? a / b : null; }
 
+// Presupuesto por LN para la vista y los filtros activos. Sale de la
+// tabla de Ppto2026 (LN, tipo de reaseguro, corredor, compania,
+// contrato); cuando hay filtro de binder, o para LN compartidas entre
+// vistas, se usa el ppto que trae cada registro de la base.
+function budgets(card, rows) {
+  const f = state[card].f;
+  const usaBase = (7 in f) || !DATA.ppto.length;
+  const out = {};
+  const acc = (ln, mi, an, ad) => {
+    if (!out[ln]) out[ln] = [[0, 0], [0, 0], [0, 0]];
+    out[ln][mi][0] += an; out[ln][mi][1] += ad;
+  };
+  const lnsCard = new Set(DATA.cardLns[card] || []);
+  const shared = new Set(DATA.shared);
+  if (!usaBase) {
+    const trCode = f[2] !== undefined ? DATA.tr[f[2]] : null;
+    const ciaSet = f[5] !== undefined ? new Set(rows.map(r => r[14])) : null;
+    DATA.ppto.forEach(b => {
+      const [ln, tr, cor, cia, con, Pan, Pad, San, Sad, Can, Cad] = b;
+      if (!lnsCard.has(ln) || shared.has(ln)) return;
+      if (f[1] !== undefined && ln !== f[1]) return;
+      if (trCode !== null && trCode !== undefined && tr !== trCode) return;
+      if (f[4] !== undefined && String(cor) !== f[4]) return;
+      if (f[14] !== undefined && String(cia) !== f[14]) return;
+      if (f[6] !== undefined && String(con) !== f[6]) return;
+      if (f[3] !== undefined && (DATA.ciaPais[String(cia)] || '') !== f[3]) return;
+      if (ciaSet && !ciaSet.has(String(cia))) return;
+      acc(ln, 0, Pan, Pad); acc(ln, 1, San, Sad); acc(ln, 2, Can, Cad);
+    });
+  }
+  rows.forEach(r => {
+    if (usaBase || shared.has(r[1])) {
+      for (let mi = 0; mi < 3; mi++) acc(r[1], mi, r[11 + mi][3], r[11 + mi][4]);
+    }
+  });
+  return out;
+}
+
 function entKey(card, r) {
   if (card === 0) return r[5] + (r[6] !== '' ? ' · #' + r[6] : '');
   if (card === 1) return r[5];
@@ -2423,8 +2549,12 @@ function renderCard(card) {
   buildFilters(card);
   const rows = rowsFor(card, null);
 
-  // KPIs
+  // KPIs (el presupuesto sale de la hoja Ppto2026 cruzada con los filtros)
   const p = sums(rows, 0), s = sums(rows, 1);
+  const bud = budgets(card, rows);
+  const budTot = [0, 0];
+  Object.values(bud).forEach(v => { budTot[0] += v[0][0]; budTot[1] += v[0][1]; });
+  p.ppto = budTot[0]; p.p0812 = budTot[1];
   const varPpto = ratio(p.fcst, p.ppto), crec = ratio(p.fcst, p.r25);
   const desvInc = ratio(p.inc, p.p0812);
   const nR = rows.filter(r => r[8] === 2).length;
@@ -2455,7 +2585,7 @@ function renderCard(card) {
   lns.forEach(ln => {
     const sub = rows.filter(r => r[1] === ln);
     const o = sums(sub, mi);
-    serFcst.push(o.fcst); serPpto.push(o.ppto); serR25.push(o.r25);
+    serFcst.push(o.fcst); serPpto.push(bud[ln] ? bud[ln][mi][0] : 0); serR25.push(o.r25);
   });
   groupedBars('ch3_' + card, lns, [
     {n: MEDN[mi] + ' FCST 2026', c: S[0], v: serFcst},
@@ -2501,9 +2631,10 @@ function renderCard(card) {
     lns.map(ln => {
       const sub = rows.filter(r => r[1] === ln);
       const o = sums(sub, 0), so = sums(sub, 1), co = sums(sub, 2);
-      const vp = ratio(o.fcst, o.ppto), cr = o.r25 && Math.abs(o.r25) > DATA.cfg.materialidad
+      const bl = bud[ln] ? bud[ln][0] : [0, 0];
+      const vp = ratio(o.fcst, bl[0]), cr = o.r25 && Math.abs(o.r25) > DATA.cfg.materialidad
         ? o.fcst / o.r25 - 1 : null;
-      const di = ratio(o.inc, o.p0812);
+      const di = ratio(o.inc, bl[1]);
       const al = sub.filter(r => r[8] > 0).length;
       return '<tr><td>LN ' + esc(ln) + '</td><td class="num">' + sub.length + '</td>' +
         '<td class="num">' + fmtM(o.fcst) + '</td>' +
