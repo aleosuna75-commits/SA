@@ -48,11 +48,13 @@
 # =====================================================
 
 import os
+import re
 import json
 import math
 import time
 import getpass
 import warnings
+import unicodedata
 from datetime import datetime
 
 import numpy as np
@@ -96,7 +98,9 @@ xOutputs = os.path.join(xFolder, "Outputs")
 os.makedirs(xOutputs, exist_ok=True)
 
 # ---- Base del FCST 2027 (CSV de Suscripcion) ----
-ARCHIVO_FCST = "PptoTecnico2026.csv"
+# Se toma el primero que exista; la base con cesion manda porque
+# es la unica que permite separar tomado de retenido
+ARCHIVOS_FCST = ["PptoTecnico2027_ced.csv", "PptoTecnico2026.csv"]
 PREFIJO_FCST = "PptoTecnico"          # fallback: el .csv mas reciente
 
 ANIO_FCST = 2027                      # ejercicio que se valida
@@ -213,20 +217,32 @@ PESO_SIN = 0.30               # V2 siniestralidad implicita
 PESO_COS = 0.15               # V2 comisiones implicitas
 PESO_EST = 0.20               # V3 concentracion estacional
 
-# ---- Vista RETENIDO ----
-# La base actual NO trae una marca confiable de cesion /
-# retencion: hay dos banderas binarias candidatas (ver hoja
-# Retencion_Candidatas del Excel con la retencion implicita
-# de cada una). Hasta que Suscripcion confirme cual es:
+# ---- Vista RETENIDO (cesion por renglon) ----
+# La base con cesion (PptoTecnico2027_ced.csv) es la misma del
+# FCST con UNA columna extra: el % de cesion del renglon. De ahi:
 #
-#   COL_VISTA_RETENIDO = None      -> retenido = tomado (con aviso)
-#   COL_VISTA_RETENIDO = "Flag_A"  -> usa la bandera de la pos. 23
-#   COL_VISTA_RETENIDO = "Flag_C"  -> usa la bandera de la pos. 33
+#     cedido   = monto tomado x % de cesion
+#     retenido = tomado - cedido = tomado x (1 - % de cesion)
 #
-# Alternativa: % de retencion por LN capturado a mano, ej.
+# La columna se busca POR NOMBRE, no por posicion. Como los
+# encabezados del export vienen permutados respecto a las columnas
+# de datos, el nombre por si solo no basta: la posicion candidata
+# se verifica contra el contenido (numerico, no negativo y acotado
+# a 1 o a 100) y contra el layout del resto de columnas. Si el
+# nombre apunta a una posicion que no cuadra, se localiza por esa
+# verificacion y se avisa. Ver localizar_cesion().
+COL_CESION = "Prc_Ced"
+COL_CESION_ALIAS = ["Prc_Ced", "PrcCed", "Prc Ced", "Prc_Cesion", "PrcCesion",
+                    "% Cesion", "%Cesion", "Pct_Ces", "Porc_Ces", "ZPRCCED"]
+
+# Escape manual: si la deteccion automatica avisa que no puede
+# desambiguar, poner aqui la posicion (0-based) de la columna de
+# cesion en los DATOS (no en el encabezado) y se usa esa.
+POS_CESION = None
+
+# Respaldo manual: % de retencion por LN, si alguna vez hiciera
+# falta forzarlo sin que la base traiga la cesion, ej.
 #   RETENCION_LN = {"4001": 0.75, "4004": 0.60}
-COL_VISTA_RETENIDO = None
-VALOR_RETENIDO = 1            # valor de la bandera que marca lo retenido
 RETENCION_LN = {}
 
 # ---- Mapeo posicional del CSV ----
@@ -272,6 +288,22 @@ MAPEO_42 = {
 }
 
 LAYOUTS = {45: MAPEO_45, 42: MAPEO_42}
+
+# Perfil estructural de cada layout: posiciones cuyo contenido es
+# inconfundible. Es lo que permite ubicar la columna de cesion
+# aunque el encabezado venga permutado, porque al quitar la columna
+# equivocada estas posiciones dejan de cumplir su perfil.
+#   vacias      -> siempre nulas en el export
+#   constantes  -> un unico valor en todo el archivo
+#   enteras     -> numericas y sin parte decimal
+PERFIL_LAYOUT = {
+    45: {"vacias": [26, 31, 36, 37, 38, 42],
+         "constantes": [0, 2, 3, 4, 5, 10, 19, 23, 24, 40, 43],
+         "enteras": [1, 7, 12, 16, 18, 21, 33]},
+    42: {"vacias": [24, 29, 34, 35, 36, 40],
+         "constantes": [0, 1, 2, 3, 8, 17, 21, 22, 38, 41],
+         "enteras": [5, 10, 14, 16, 19, 31]},
+}
 
 # Columnas que varian dentro de un mismo negocio-concepto y por
 # eso NO forman parte de la llave cuando hay que reconstruir el
@@ -333,12 +365,208 @@ def _buscar_archivo(nombre_exacto, prefijo, extension):
     return candidatos[0]
 
 
-archivo = _buscar_archivo(ARCHIVO_FCST, PREFIJO_FCST, ".csv")
+archivo = None
+
+for _nombre_fcst in ARCHIVOS_FCST:
+    archivo = _buscar_archivo(_nombre_fcst, PREFIJO_FCST, ".csv")
+    if archivo is not None and os.path.basename(archivo) == _nombre_fcst:
+        break
 
 if archivo is None:
     raise FileNotFoundError(
-        f"No se encontro {ARCHIVO_FCST} ni {PREFIJO_FCST}*.csv en {xInputs} ni en {xFolder}"
+        f"No se encontro ninguna de {ARCHIVOS_FCST} ni {PREFIJO_FCST}*.csv "
+        f"en {xInputs} ni en {xFolder}"
     )
+
+
+# =====================================================
+# LOCALIZACION DE LA COLUMNA DE % DE CESION
+# =====================================================
+
+
+def _norm_txt(x):
+    """Nombre comparable: sin acentos, sin separadores, minusculas."""
+    t = unicodedata.normalize("NFKD", str(x))
+    t = "".join(c for c in t if not unicodedata.combining(c))
+    return re.sub(r"[^a-z0-9]", "", t.lower())
+
+
+def _num_col(serie):
+    return pd.to_numeric(
+        serie.astype(str).str.strip()
+        .str.replace(",", "", regex=False)
+        .str.replace("%", "", regex=False),
+        errors="coerce",
+    )
+
+
+def _perfil_cesion(serie):
+    """(cumple, escala) si la columna se comporta como un % de
+    cesion: numerica, sin negativos y acotada a 1 o a 100."""
+    v = _num_col(serie)
+
+    if v.notna().mean() < 0.80:
+        return False, 1.0
+
+    vv = v.dropna()
+    if vv.empty or vv.min() < -1e-9:
+        return False, 1.0
+
+    maximo = float(vv.max())
+    if maximo <= 1.0 + 1e-9:
+        return True, 1.0            # viene como fraccion (0.30)
+    if maximo <= 100.0 + 1e-9:
+        return True, 100.0          # viene como porcentaje (30)
+    return False, 1.0
+
+
+def _layout_ok(muestra, mapeo):
+    """Comprueba que las columnas caen donde dice el layout. Es lo
+    que permite ubicar la cesion aunque el encabezado este
+    permutado: solo hay una posicion cuya extraccion deja el resto
+    de las columnas en su sitio."""
+
+    pos = {campo: p for p, campo in mapeo.items()}
+
+    def texto(campo):
+        return muestra.iloc[:, pos[campo]].astype(str).str.strip()
+
+    pruebas = []
+
+    if "LN" in pos:
+        pruebas.append(texto("LN").str.match(r"^LN\d").mean() > 0.95)
+    if "Cuenta_LN" in pos:
+        pruebas.append(texto("Cuenta_LN").str.match(r"^40\d{8}$").mean() > 0.95)
+    if "Cuenta_Concepto" in pos:
+        pruebas.append(texto("Cuenta_Concepto").str.match(r"^[56]\d{9}$").mean() > 0.95)
+    if "Monto" in pos:
+        montos = _num_col(texto("Monto"))
+        # numerico Y variable: una columna constante tambien parsea
+        pruebas.append(montos.notna().mean() > 0.95 and montos.nunique() > 50)
+    if "Periodo" in pos:
+        pruebas.append(texto("Periodo").str.match(r"^\d{6,7}$").mean() > 0.95)
+    if "Anio" in pos:
+        pruebas.append(_num_col(texto("Anio")).between(2000, 2100).mean() > 0.95)
+    if "Mes" in pos:
+        pruebas.append(_num_col(texto("Mes")).between(1, 12).mean() > 0.95)
+    if "Region" in pos:
+        pruebas.append(texto("Region").str.match(r"^R\d+$").mean() > 0.90)
+    if "Moneda" in pos:
+        pruebas.append(texto("Moneda").str.match(r"^[A-Za-z]{3}$").mean() > 0.90)
+    if "Producto" in pos:
+        pruebas.append(texto("Producto").str.match(r"^A\d+$").mean() > 0.90)
+
+    # Perfil estructural: al quitar la columna equivocada, las
+    # posiciones entre esa y la de cesion se recorren y dejan de
+    # cumplir su perfil. Sin esto la busqueda por contenido no
+    # distingue la cesion de otras columnas decimales del export.
+    perfil = PERFIL_LAYOUT.get(len(muestra.columns), {})
+
+    for j in perfil.get("vacias", []):
+        pruebas.append(muestra.iloc[:, j].isna().mean() > 0.98)
+
+    for j in perfil.get("constantes", []):
+        pruebas.append(muestra.iloc[:, j].nunique(dropna=True) <= 1)
+
+    for j in perfil.get("enteras", []):
+        v = _num_col(muestra.iloc[:, j]).dropna()
+        pruebas.append(len(v) > 0 and (v % 1 == 0).mean() > 0.98)
+
+    return len(pruebas) >= 6 and all(pruebas)
+
+
+def localizar_cesion(df, encabezados):
+    """(df sin la columna de cesion, serie de cesion 0-1, detalle).
+
+    Prioriza el nombre del encabezado y verifica siempre contra el
+    contenido y el layout, porque los encabezados del export vienen
+    permutados respecto a las columnas de datos."""
+
+    n = len(df.columns)
+
+    if n in LAYOUTS:
+        return df, None, "el archivo no trae columna de % de cesión", None
+
+    if (n - 1) not in LAYOUTS:
+        raise ValueError(
+            f"El CSV trae {n} columnas: no coincide con ningun layout conocido "
+            f"({sorted(LAYOUTS)}) ni con uno de esos mas la columna de cesion."
+        )
+
+    mapeo = LAYOUTS[n - 1]
+    muestra = df.head(20_000)
+
+    norm = [_norm_txt(h) for h in encabezados]
+    alias = {_norm_txt(a) for a in COL_CESION_ALIAS}
+
+    # Escape manual: manda sobre cualquier deteccion
+    if POS_CESION is not None:
+        i = int(POS_CESION)
+        cumple, escala = _perfil_cesion(muestra.iloc[:, i])
+        if not cumple:
+            raise ValueError(
+                f"POS_CESION apunta a la posicion {i}, pero ahi el contenido no "
+                "se comporta como un % (numerico, sin negativos, acotado a 1 o 100)."
+            )
+        resto = df.iloc[:, [j for j in range(n) if j != i]]
+        cesion = (_num_col(df.iloc[:, i]) / escala).fillna(0.0).clip(0.0, 1.0)
+        det = f"posición {i} forzada a mano en POS_CESION"
+        if escala != 1.0:
+            det += f" · venía en escala 0-100, se dividió entre {escala:.0f}"
+        return resto, cesion, det, i
+
+    por_nombre = [i for i, h in enumerate(norm) if h in alias]
+
+    # Se recorren TODAS las posiciones y se junta la lista completa
+    # de candidatas, en vez de quedarse con la primera que pase: si
+    # hay mas de una hay que avisar, no adivinar
+    candidatas = []
+
+    for i in range(n):
+        cumple, escala = _perfil_cesion(muestra.iloc[:, i])
+        if not cumple:
+            continue
+        resto_muestra = muestra.iloc[:, [j for j in range(n) if j != i]]
+        if _layout_ok(resto_muestra, mapeo):
+            candidatas.append((i, escala))
+
+    coinciden = [c for c in candidatas if c[0] in por_nombre]
+
+    if coinciden:
+        i, escala = coinciden[0]
+        detalle = f"columna '{str(encabezados[i]).strip()}' (posición {i})"
+    elif len(candidatas) == 1:
+        i, escala = candidatas[0]
+        detalle = (f"posición {i} localizada por contenido; el encabezado "
+                   f"'{str(encabezados[i]).strip()}' de esa posición no "
+                   "corresponde porque el export trae los encabezados permutados")
+        if por_nombre:
+            detalle += (f" (el nombre '{COL_CESION}' aparece en la posición "
+                        f"{por_nombre[0]}, pero ahí los datos no son un %)")
+    elif len(candidatas) > 1:
+        raise ValueError(
+            f"El CSV trae {n} columnas y hay {len(candidatas)} que podrían ser el "
+            f"% de cesión (posiciones de datos {[c[0] for c in candidatas]}), y "
+            f"ninguna coincide con la del nombre '{COL_CESION}' en el encabezado "
+            f"(posición {por_nombre[0] if por_nombre else 's/d'}). Esto pasa porque "
+            "el export trae los encabezados permutados respecto a las columnas de "
+            "datos. Solución: dejar la columna de cesión AL FINAL del archivo, o "
+            f"indicar su posición de datos en POS_CESION (una de las candidatas)."
+        )
+    else:
+        raise ValueError(
+            f"El CSV trae {n} columnas (una más que el layout de {n - 1}) pero "
+            "ninguna se comporta como un % de cesión: debe ser numérica, sin "
+            f"negativos y acotada a 1 o a 100. Confirmar la columna '{COL_CESION}'."
+        )
+
+    resto = df.iloc[:, [j for j in range(n) if j != i]]
+    cesion = (_num_col(df.iloc[:, i]) / escala).fillna(0.0).clip(0.0, 1.0)
+
+    if escala != 1.0:
+        detalle += f" · venía en escala 0-100, se dividió entre {escala:.0f}"
+
+    return resto, cesion, detalle, i
 
 # =====================================================
 # CARGA DEL CSV (POSICIONAL)
@@ -349,6 +577,12 @@ print(f"Leyendo {archivo} ...")
 df = pd.read_csv(archivo, encoding="utf-8-sig", low_memory=False)
 
 ENCABEZADOS_ORIGINALES = [str(c).strip() for c in df.columns]
+
+# La columna de % de cesion se aparta antes de mapear por posicion:
+# asi el resto del archivo conserva el layout conocido sin importar
+# en que lugar la haya insertado el export
+df, CESION, DETALLE_CESION, POS_CESION_DET = localizar_cesion(
+    df, ENCABEZADOS_ORIGINALES)
 
 N_COLUMNAS_CSV = len(df.columns)
 
@@ -365,6 +599,8 @@ df.columns = [MAPEO_POSICIONAL.get(i, f"pos{i:02d}") for i in range(N_COLUMNAS_C
 
 if "Binder_Ppto" not in df.columns:
     df["Binder_Ppto"] = np.nan
+
+df["Prc_Cesion"] = CESION.to_numpy() if CESION is not None else 0.0
 
 df["Monto"] = pd.to_numeric(
     df["Monto"].astype(str).str.replace(",", "", regex=False), errors="coerce"
@@ -387,6 +623,11 @@ df["Binder_Ppto"] = (
     .astype(str).str.strip()
     .replace({"nan": "", "None": "", "0": "", "0.0": ""})
 )
+
+if CESION is not None:
+    print(f"  % de cesión: {DETALLE_CESION}")
+else:
+    print(f"  {DETALLE_CESION}: el retenido queda igual al tomado.")
 
 print(f"  {len(df):,} renglones ({N_COLUMNAS_CSV} columnas) · "
       f"LN: {df['LN'].nunique()} · cedentes: {df['Cedente'].nunique():,} · "
@@ -984,39 +1225,63 @@ CATALOGO_CED = cargar_catalogo_cedentes()
 # VISTA RETENIDO
 # =====================================================
 
-if COL_VISTA_RETENIDO in ("Flag_A", "Flag_C"):
-    _flag = pd.to_numeric(d_ok[COL_VISTA_RETENIDO], errors="coerce")
-    d_ok["_ret"] = np.where(_flag == VALOR_RETENIDO, 1.0, 0.0)
-    RETENIDO_MODO = f"bandera {COL_VISTA_RETENIDO} == {VALOR_RETENIDO}"
+# cedido = tomado x % de cesion · retenido = tomado - cedido
+if CESION is not None:
+    d_ok["_ces"] = d_ok["Prc_Cesion"]
+    RETENIDO_MODO = f"% de cesión por renglón ({COL_CESION}) · {DETALLE_CESION}"
     RETENIDO_REAL = True
 elif RETENCION_LN:
-    d_ok["_ret"] = d_ok["LN"].map(RETENCION_LN).fillna(1.0)
-    RETENIDO_MODO = "% de retencion capturado por LN (RETENCION_LN)"
+    d_ok["_ces"] = 1.0 - d_ok["LN"].map(RETENCION_LN).fillna(1.0)
+    RETENIDO_MODO = "% de retención capturado por LN (RETENCION_LN)"
     RETENIDO_REAL = True
 else:
-    d_ok["_ret"] = 1.0
-    RETENIDO_MODO = ("sin marca de retencion en la base: retenido = tomado "
-                     "(configurar COL_VISTA_RETENIDO o RETENCION_LN)")
+    d_ok["_ces"] = 0.0
+    RETENIDO_MODO = "la base no trae % de cesión: retenido = tomado"
     RETENIDO_REAL = False
 
+d_ok["_ret"] = 1.0 - d_ok["_ces"]
+d_ok["Valor_Ced"] = d_ok["Valor"] * d_ok["_ces"]
 d_ok["Valor_Ret"] = d_ok["Valor"] * d_ok["_ret"]
 
 print(f"Vista retenido: {RETENIDO_MODO}")
 
-# Retencion implicita de las banderas candidatas (documentacion)
-ret_candidatas = []
-for flag in ("Flag_A", "Flag_C"):
-    fv = pd.to_numeric(d_ok[flag], errors="coerce")
-    for cpt in ("P", "S", "C"):
-        sub = d_ok[d_ok["Concepto"] == cpt]
-        tot = sub["Valor"].sum()
-        ret = sub.loc[fv.reindex(sub.index) == VALOR_RETENIDO, "Valor"].sum()
-        ret_candidatas.append({
-            "Bandera": flag, "Concepto": CLAVE_MEDIDA[cpt],
-            f"Total {ANIO_FCST}": tot, f"Con bandera={VALOR_RETENIDO}": ret,
-            "Retencion implicita": ret / tot if abs(tot) > TOL else np.nan,
+# Retencion implicita por concepto y por LN, para el Excel
+def _pc_ces(num, den):
+    """Division protegida local: _rat se define mas adelante."""
+    return num / den if abs(den) > TOL else float("nan")
+
+
+_ces_filas = []
+
+for _cpt in ("P", "S", "C"):
+    _sub = d_ok[d_ok["Concepto"] == _cpt]
+    _tom = float(_sub["Valor"].sum())
+    _ced = float(_sub["Valor_Ced"].sum())
+    _ces_filas.append({
+        "LN": "Total", "Concepto": CLAVE_MEDIDA[_cpt],
+        "Tomado": _tom, "Cedido": _ced, "Retenido": _tom - _ced,
+        "% Cesión": _pc_ces(_ced, _tom), "% Retención": _pc_ces(_tom - _ced, _tom),
+    })
+
+for _ln_c in sorted(d_ok["LN"].unique(), key=lambda v: (len(v), v)):
+    for _cpt in ("P", "S", "C"):
+        _sub = d_ok[(d_ok["LN"] == _ln_c) & (d_ok["Concepto"] == _cpt)]
+        _tom = float(_sub["Valor"].sum())
+        _ced = float(_sub["Valor_Ced"].sum())
+        _ces_filas.append({
+            "LN": _ln_c, "Concepto": CLAVE_MEDIDA[_cpt],
+            "Tomado": _tom, "Cedido": _ced, "Retenido": _tom - _ced,
+            "% Cesión": _pc_ces(_ced, _tom), "% Retención": _pc_ces(_tom - _ced, _tom),
         })
-ret_candidatas = pd.DataFrame(ret_candidatas)
+
+cesion_df = pd.DataFrame(_ces_filas)
+
+if RETENIDO_REAL:
+    _rp = cesion_df.iloc[0]
+    print(f"  Primas: tomado {_rp['Tomado'] / 1e6:,.1f} M · "
+          f"cedido {_rp['Cedido'] / 1e6:,.1f} M · "
+          f"retenido {_rp['Retenido'] / 1e6:,.1f} M "
+          f"({_rp['% Retención']:.1%} de retención)")
 
 # =====================================================
 # AGREGADOS: GLOBAL Y ESTACIONALIDAD
@@ -1744,7 +2009,7 @@ dashboard = pd.DataFrame({
 parametros = pd.DataFrame({
     "Parametro": [
         "Archivo fuente", "Ejercicio validado", "Fuente RFCST 2026",
-        "Vista retenido", "Tolerancia (USD)", "Materialidad (USD)",
+        "Vista retenido", "Retención implícita de la prima", "Tolerancia (USD)", "Materialidad (USD)",
         "Umbral amarillo desviaciones", "Umbral rojo desviaciones",
         "Siniestralidad amarilla", "Siniestralidad roja",
         "Comisiones amarillo", "Comisiones rojo",
@@ -1759,7 +2024,8 @@ parametros = pd.DataFrame({
     ],
     "Valor": [
         os.path.basename(archivo), ANIO_FCST, FUENTE_RFCST,
-        RETENIDO_MODO, TOL, MATERIALIDAD,
+        RETENIDO_MODO,
+        (cesion_df.iloc[0]["% Retención"] if RETENIDO_REAL else 1.0), TOL, MATERIALIDAD,
         UMBRAL_AMARILLO, UMBRAL_ROJO,
         IND_SIN_AMARILLO, IND_SIN_ROJO,
         IND_COS_AMARILLO, IND_COS_ROJO,
@@ -1776,6 +2042,7 @@ parametros = pd.DataFrame({
         "CSV compartido por Suscripcion", "Anio del plan que se valida",
         "Base del RFCST 2026 para comparativas",
         "Como se calcula la vista retenido del dashboard",
+        "Retenido / tomado de la prima del ejercicio (ver hoja Cesion)",
         "Diferencias menores a este monto no generan alerta",
         "Negocios con prima menor a este monto no escalan a ROJO",
         "Desviacion relativa que marca AMARILLO",
@@ -1798,11 +2065,22 @@ parametros = pd.DataFrame({
     ],
 })
 
+# Se documenta el archivo tal como viene: las posiciones son las
+# del CSV original, con la columna de cesion en su lugar
+_campos_doc = []
+_k = 0
+
+for _i in range(len(ENCABEZADOS_ORIGINALES)):
+    if _i == POS_CESION_DET:
+        _campos_doc.append(f"{COL_CESION} (% de cesión)")
+    else:
+        _campos_doc.append(MAPEO_POSICIONAL.get(_k, "(no usado)"))
+        _k += 1
+
 mapeo_doc = pd.DataFrame({
-    "Posicion": list(range(N_COLUMNAS_CSV)),
+    "Posicion": list(range(len(ENCABEZADOS_ORIGINALES))),
     "Encabezado CSV (permutado)": ENCABEZADOS_ORIGINALES,
-    "Campo asignado": [MAPEO_POSICIONAL.get(i, "(no usado)")
-                       for i in range(N_COLUMNAS_CSV)],
+    "Campo asignado a esa columna de datos": _campos_doc,
 })
 
 calidad_df = pd.DataFrame(calidad)
@@ -1924,7 +2202,7 @@ with pd.ExcelWriter(salida_xlsx, engine="xlsxwriter") as writer:
     exportar(excepciones.head(500), "Excepciones")
     exportar(calidad_df, "Calidad_Datos")
     exportar(cuentas_df, "Cuentas_Concepto")
-    exportar(ret_candidatas, "Retencion_Candidatas")
+    exportar(cesion_df, "Cesion")
     exportar(mapeo_doc, "Mapeo_Columnas")
     exportar(parametros, "Parametros")
 
@@ -2268,14 +2546,26 @@ INFO_MEDIDAS = [
     ("Comisiones", "C", "&#129534;", False),
 ]
 
-AVISO_RET = ("" if RETENIDO_REAL else
-             '<div class="aviso-ret">&#9432; La base del FCST no trae la marca de '
-             'retencion: la vista retenido es igual a la tomada. Configura '
-             '<b>COL_VISTA_RETENIDO</b> o <b>RETENCION_LN</b> en el script cuando '
-             'Suscripcion confirme la marca.</div>')
+# Sin cesion en la base el retenido queda igual al tomado: se
+# senala con una nota discreta al pie, no con un banner
+AVISO_RET = ""
+
+if RETENIDO_REAL:
+    NOTA_RET = ('<div class="ast">Retenido = tomado − cedido, con el % de cesión '
+                'de cada renglón. El RFCST 2026, el ' + ETIQ_PPTO26 + ' y el Real '
+                '2025 son cifras de tomado, así que esta vista no los compara: '
+                'el contraste es contra el propio tomado del ejercicio.</div>')
+else:
+    NOTA_RET = ('<div class="ast">Retenido = tomado: la base cargada no trae la '
+                f'columna <b>{COL_CESION}</b> con el % de cesión.</div>')
 
 
-def _kpis_concepto(cpt, medida, icono, bueno_arriba, glob):
+def _kpis_concepto(cpt, medida, icono, bueno_arriba, glob, retenido=False):
+    """Tarjetas de un concepto. En la vista retenido NO se compara
+    contra RFCST 2026, FCST 2026 ni Real 2025: esas bases estan en
+    tomado y contrastarlas contra el retenido daria una caida que
+    solo refleja la cesion. Ahi el contraste es contra el propio
+    tomado del ejercicio."""
     g = glob[cpt]
     rf = RF_GLOB[cpt] if RF_GLOB else None
     fcst = g["anual"]
@@ -2291,16 +2581,29 @@ def _kpis_concepto(cpt, medida, icono, bueno_arriba, glob):
         txt_pico = "s/d"
     prom = tot / 12 if abs(tot) > TOL else float("nan")
 
-    k1 = _kpi(icono, f"{medida} {ETIQ_FCST}", _fmt_m(fcst),
-              _badge(var_rf, bueno_arriba,
-                     f"vs RFCST Dic26 ({_fmt_m(rf['fcst']) if rf else 's/d'})"),
-              f"{ETIQ_PPTO26}: {_fmt_m(rf['ppto']) if rf else 's/d'} · "
-              f"Real 2025: {_fmt_m(rf['real25']) if rf else 's/d'}")
-    k2 = _kpi("&#128200;", "Crecimiento vs RFCST 2026",
-              _fmt_pct(var_rf, signo=True),
-              f"{ETIQ_FCST} ({_fmt_m(fcst)}) vs RFCST Dic26 "
-              f"({_fmt_m(rf['fcst']) if rf else 's/d'})",
-              _badge(var_pp, bueno_arriba, f"vs {ETIQ_PPTO26}"))
+    if retenido:
+        tomado = GLOB_T[cpt]["anual"]
+        cedido = tomado - fcst
+        pct_ret = _rat(fcst, tomado)
+        k1 = _kpi(icono, f"{medida} retenido {ETIQ_FCST}", _fmt_m(fcst),
+                  f'<b class="neu">{_fmt_pct(pct_ret)}</b> del tomado '
+                  f"({_fmt_m(tomado)})",
+                  f"Cedido: {_fmt_m(cedido)}")
+        k2 = _kpi("&#128257;", "Cesión", _fmt_pct(_rat(cedido, tomado)),
+                  f"{_fmt_m(cedido)} cedidos de {_fmt_m(tomado)} tomados",
+                  f"Retenido: {_fmt_m(fcst)}")
+    else:
+        k1 = _kpi(icono, f"{medida} {ETIQ_FCST}", _fmt_m(fcst),
+                  _badge(var_rf, bueno_arriba,
+                         f"vs RFCST Dic26 ({_fmt_m(rf['fcst']) if rf else 's/d'})"),
+                  f"{ETIQ_PPTO26}: {_fmt_m(rf['ppto']) if rf else 's/d'} · "
+                  f"Real 2025: {_fmt_m(rf['real25']) if rf else 's/d'}")
+        k2 = _kpi("&#128200;", "Crecimiento vs RFCST 2026",
+                  _fmt_pct(var_rf, signo=True),
+                  f"{ETIQ_FCST} ({_fmt_m(fcst)}) vs RFCST Dic26 "
+                  f"({_fmt_m(rf['fcst']) if rf else 's/d'})",
+                  _badge(var_pp, bueno_arriba, f"vs {ETIQ_PPTO26}"))
+
     k3 = _kpi("&#128197;", "Estacionalidad", txt_pico,
               f"mes pico del anio · promedio mensual {_fmt_m(prom)}",
               f"total {ANIO_FCST}: {_fmt_m(tot)}")
@@ -2317,22 +2620,36 @@ for medida, cpt, icono, bueno_arriba in INFO_MEDIDAS:
       <button data-v="R">Retenido</button>
     </div></div>
   <div class="vista" id="v_{cpt}_T">{_kpis_concepto(cpt, medida, icono, bueno_arriba, GLOB_T)}</div>
-  <div class="vista oculto" id="v_{cpt}_R">{AVISO_RET}{_kpis_concepto(cpt, medida, icono, bueno_arriba, GLOB_R)}</div>"""
+  <div class="vista oculto" id="v_{cpt}_R">{_kpis_concepto(cpt, medida, icono, bueno_arriba, GLOB_R, retenido=True)}{NOTA_RET}</div>"""
     sec1_bloques.append(bloque)
 
 
-def _kpis_psc(glob, pct):
+def _kpis_psc(glob, pct, retenido=False):
     rf = RF_GLOB["PSC"] if RF_GLOB else None
     fcst = glob["PSC"]["anual"]
     var_rf = _rat(fcst, rf["fcst"]) - 1 if rf else float("nan")
-    k1 = _kpi("&#128176;", f"P-S-C {ETIQ_FCST}", _fmt_m(fcst),
-              _badge(var_rf, True,
-                     f"vs RFCST Dic26 ({_fmt_m(rf['fcst']) if rf else 's/d'})"),
-              f"{ETIQ_PPTO26}: {_fmt_m(rf['ppto']) if rf else 's/d'}")
-    k2 = _kpi("&#128202;", f"%P-S-C {ETIQ_FCST}", _fmt_pct(pct),
-              _badge(pct - pct_psc_rf if not math.isnan(pct_psc_rf) else None,
-                     True, "pts vs RFCST Dic26"),
-              f"RFCST Dic26: {_fmt_pct(pct_psc_rf)} · {ETIQ_PPTO26}: {_fmt_pct(pct_psc_ppto)}")
+
+    if retenido:
+        # Las bases 2026 y 2025 estan en tomado: el contraste util
+        # aqui es contra el propio P-S-C tomado del ejercicio
+        tomado = GLOB_T["PSC"]["anual"]
+        k1 = _kpi("&#128176;", f"P-S-C retenido {ETIQ_FCST}", _fmt_m(fcst),
+                  f'<b class="neu">{_fmt_pct(_rat(fcst, tomado))}</b> del P-S-C '
+                  f"tomado ({_fmt_m(tomado)})",
+                  f"Diferencia: {_fmt_m(fcst - tomado)}")
+        k2 = _kpi("&#128202;", f"%P-S-C retenido {ETIQ_FCST}", _fmt_pct(pct),
+                  _badge(pct - pct_psc_fcst, True, "pts vs el %P-S-C tomado"),
+                  f"Tomado: {_fmt_pct(pct_psc_fcst)}")
+    else:
+        k1 = _kpi("&#128176;", f"P-S-C {ETIQ_FCST}", _fmt_m(fcst),
+                  _badge(var_rf, True,
+                         f"vs RFCST Dic26 ({_fmt_m(rf['fcst']) if rf else 's/d'})"),
+                  f"{ETIQ_PPTO26}: {_fmt_m(rf['ppto']) if rf else 's/d'}")
+        k2 = _kpi("&#128202;", f"%P-S-C {ETIQ_FCST}", _fmt_pct(pct),
+                  _badge(pct - pct_psc_rf if not math.isnan(pct_psc_rf) else None,
+                         True, "pts vs RFCST Dic26"),
+                  f"RFCST Dic26: {_fmt_pct(pct_psc_rf)} · "
+                  f"{ETIQ_PPTO26}: {_fmt_pct(pct_psc_ppto)}")
     k3 = _kpi("&#9888;", "Composicion",
               f"{_fmt_pct(_rat(glob['S']['anual'], glob['P']['anual']))} S/P",
               f"Comisiones: {_fmt_pct(_rat(glob['C']['anual'], glob['P']['anual']))} de la prima",
@@ -2347,7 +2664,7 @@ sec1_psc = f"""
       <button data-v="R">Retenido</button>
     </div></div>
   <div class="vista" id="v_PSC_T">{_kpis_psc(GLOB_T, pct_psc_fcst)}</div>
-  <div class="vista oculto" id="v_PSC_R">{AVISO_RET}{_kpis_psc(GLOB_R, pct_psc_ret)}</div>
+  <div class="vista oculto" id="v_PSC_R">{_kpis_psc(GLOB_R, pct_psc_ret, retenido=True)}{NOTA_RET}</div>
   <div class="ast">* Falta el incremento a la reserva y los costos de cobertura.</div>"""
 
 sec1_graficas = f"""
@@ -2740,10 +3057,6 @@ PLANTILLA = """<!doctype html>
   .med-head h3.med { margin: 18px 0 10px; }
   .ast-mark { color: #fab219; }
   .ast { color: #898781; font-size: 12px; margin: 8px 2px 0; font-style: italic; }
-  .aviso-ret { grid-column: 1/-1; color: #fab219; font-size: 12px;
-    background: rgba(250,178,25,.08); border: 1px solid rgba(250,178,25,.25);
-    border-radius: 10px; padding: 9px 13px; margin-bottom: 10px; }
-  .aviso-ret b { color: #ffd97a; }
   .vista.oculto { display: none; }
   .grid { display: grid; gap: 14px; }
   .kpis { grid-template-columns: repeat(auto-fit, minmax(215px, 1fr)); }

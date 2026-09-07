@@ -138,11 +138,52 @@ se señalan en el motivo, pero eso por sí solo no levanta semáforo.
 En el dashboard, el semáforo de una entidad agregada es **el peor de sus
 negocios**; las columnas Rojos y Amarillos dicen cuántos lo provocaron.
 
-**Vista Retenido**: la base no trae una marca confiable de retención. Por
-default retenido = tomado (con aviso en el dashboard). Cuando Suscripción
-confirme la marca, configurar `COL_VISTA_RETENIDO` (hay dos banderas
-candidatas, ver hoja `Retencion_Candidatas`) o capturar `RETENCION_LN`
-(% de retención por LN).
+## Vista Retenido (cesión)
+
+La base con cesión, **`PptoTecnico2027_ced.csv`**, es la misma del FCST con una
+columna extra: el **% de cesión del renglón**. De ahí:
+
+```
+cedido   = monto tomado × % de cesión
+retenido = tomado − cedido = tomado × (1 − % de cesión)
+```
+
+Se aplica renglón por renglón, así que vale igual para primas, siniestros y
+comisiones. El script prefiere esta base sobre `PptoTecnico2026.csv` cuando
+ambas están en `Inputs/`.
+
+**Cómo se localiza la columna** (`localizar_cesion`): se busca **por nombre**
+(`Prc_Ced` y variantes, sin distinguir mayúsculas ni acentos), pero el nombre
+no basta porque los encabezados del export vienen permutados respecto a las
+columnas de datos. Por eso la posición candidata se verifica contra:
+
+1. **el contenido** — numérico, sin negativos y acotado a 1 (fracción) o a 100
+   (porcentaje; si viene así se divide entre 100 automáticamente); y
+2. **el layout del resto** — al apartar la columna correcta, las 45 restantes
+   vuelven a cumplir el perfil conocido del export (posiciones vacías,
+   constantes, enteras y campos con formato propio como LN, cuentas, periodo).
+
+Si el nombre apunta a una posición cuyos datos no cuadran, se localiza por esa
+verificación y se avisa en consola. Si hay más de una candidata y ninguna
+coincide con el nombre, el script **falla con un error explícito** en vez de
+adivinar — antes calcular mal el retenido en silencio. En ese caso se puede
+forzar la posición de datos con `POS_CESION`.
+
+> **Recomendación**: dejar la columna de cesión **al final del archivo** (es
+> donde la pone pandas al agregarla). Ahí la detección es directa y sin
+> ambigüedad.
+
+**Comparativos en la vista retenido**: el RFCST 2026, el FCST 2026 y el Real
+2025 son cifras de **tomado**. Contrastar el retenido del FCST 2027 contra
+ellas daría una caída que solo refleja la cesión, así que esa vista **no los
+compara**: cada tarjeta se contrasta contra el propio tomado del ejercicio y
+muestra el cedido y el % de retención. La hoja `Cesion` del Excel trae tomado,
+cedido, retenido y los porcentajes por LN y concepto.
+
+Si la base cargada no trae la columna, el retenido queda igual al tomado y se
+señala con una nota discreta al pie de la vista (no con un banner). Como
+respaldo manual existe `RETENCION_LN`, un % de retención por LN capturado a
+mano.
 
 **Granularidad de la estacionalidad 2026**: el CSV del FCST solo trae
 mensualizado el ejercicio 2027 (los demás años vienen como un renglón único en
