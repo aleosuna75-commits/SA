@@ -2637,6 +2637,9 @@ INFO_MEDIDAS = [
     ("Comisiones", "C", "&#129534;", False),
 ]
 
+# Concordancia de genero en los titulos de la vista retenido
+ADJ_RET = {"P": "retenidas", "S": "retenidos", "C": "retenidas"}
+
 # Sin cesion en la base el retenido queda igual al tomado: se
 # senala con una nota discreta al pie, no con un banner
 AVISO_RET = ""
@@ -2676,7 +2679,7 @@ def _kpis_concepto(cpt, medida, icono, bueno_arriba, glob, retenido=False):
         tomado = GLOB_T[cpt]["anual"]
         cedido = tomado - fcst
         pct_ret = _rat(fcst, tomado)
-        k1 = _kpi(icono, f"{medida} retenido {ETIQ_FCST}", _fmt_m(fcst),
+        k1 = _kpi(icono, f"{medida} {ADJ_RET[cpt]} {ETIQ_FCST}", _fmt_m(fcst),
                   f'<b class="neu">{_fmt_pct(pct_ret)}</b> del tomado '
                   f"({_fmt_m(tomado)})",
                   f"Cedido: {_fmt_m(cedido)}")
@@ -3818,6 +3821,7 @@ function selLN(sel, cb) {
 // concreta y se sincronizan con el filtro de la seccion.
 
 const ICO_MED = {P: '&#128181;', S: '&#9888;', C: '&#129534;'};
+const ADJ_RET = {P: 'retenidas', S: 'retenidos', C: 'retenidas'};
 const BUENO_MED = {P: true, S: false, C: false};
 
 function pintaKpisLN(lnSel) {
@@ -3839,7 +3843,8 @@ function pintaKpisLN(lnSel) {
       ? 'Cedido: ' + fmtM(o.p)
       : DATA.cfg.etiqPpto26 + ': ' + fmtM(o.p) + ' · Real 2025: ' + fmtM(o.r25);
     return '<div class="card kpi"><div class="t"><i>' + ICO_MED[cpt] + '</i>' +
-      MEDN[i] + (esRet() ? ' retenidas ' : ' ') + DATA.cfg.etiqFcst + suf + '</div>' +
+      MEDN[i] + (esRet() ? ' ' + ADJ_RET[cpt] + ' ' : ' ') +
+      DATA.cfg.etiqFcst + suf + '</div>' +
       '<div class="v">' + fmtM(o.f) + '</div>' +
       '<div class="d">' + linea2 + '</div>' +
       '<div class="d">' + linea3 + '</div></div>';
