@@ -157,6 +157,14 @@ PERIODO_MIN_CALIBRACION = 202301   # El negocio creció ~28x desde 2002; se cali
                                    # (None = toda la historia; 202401 = solo 2024+).
 HIST_MIN_PERIODO = 202001           # Inicio de las tendencias históricas (charts 2020-2025).
 
+# ----- Fecha de corte de la corrida (cierre técnico) -----
+# Último mes de proceso (AAAAMM) que se toma de Gonz como REAL. La proyección
+# arranca en el mes siguiente. Sirve para (1) ignorar filas de un mes todavía
+# abierto/parcial que ya estén cargadas en Gonz, y (2) forzar que el caché en
+# disco se regenere solo al cambiar el corte (el nombre del caché lo incluye),
+# sin tener que tocar FORZAR_RECARGA. None = usar hasta el último mes que haya.
+PERIODO_CORTE = 202608              # Cierre de agosto 2026
+
 # Inflación anual esperada para escalar la PROYECCIÓN a meses futuros (compuesta
 # mensualmente). Referencia: encuestas de expectativas Banxico/Citi (jun-jul 2026):
 # cierre 2026 ≈ 4.20%, cierre 2027 ≈ 3.84%. Se usa 3.75% como supuesto de mediano
@@ -616,7 +624,7 @@ def cargar_gonz(forzar=False):
     Usa caché en disco para evitar recargas (la consulta completa es lenta).
     Si el caché es incompatible con la versión actual de pandas, se regenera solo.
     """
-    cache_file = CACHE_DIR / "gonz_calibracion.pkl"
+    cache_file = CACHE_DIR / f"gonz_calibracion_{PERIODO_MIN_CALIBRACION or 'all'}_{PERIODO_CORTE or 'all'}.pkl"
     if cache_file.exists() and not forzar:
         print(f"  [i] Cargando Gonz desde caché ({cache_file.name})...")
         try:
@@ -649,11 +657,14 @@ def cargar_gonz(forzar=False):
             cols_a_traer.append(real)
 
     cols_sql = ", ".join(f"[{c}]" for c in cols_a_traer)
+    condiciones = []
     if PERIODO_MIN_CALIBRACION:
-        sql = (f"SELECT {cols_sql} FROM dbo_aMOG_MovGonzalo "
-               f"WHERE Val(aPOG_MesProc) >= {PERIODO_MIN_CALIBRACION}")
-    else:
-        sql = f"SELECT {cols_sql} FROM dbo_aMOG_MovGonzalo"
+        condiciones.append(f"Val(aPOG_MesProc) >= {PERIODO_MIN_CALIBRACION}")
+    if PERIODO_CORTE:
+        condiciones.append(f"Val(aPOG_MesProc) <= {PERIODO_CORTE}")
+    sql = f"SELECT {cols_sql} FROM dbo_aMOG_MovGonzalo"
+    if condiciones:
+        sql += " WHERE " + " AND ".join(condiciones)
 
     conn = conectar_gonz()
     try:
@@ -732,7 +743,7 @@ def cargar_serie_tc(forzar=False):
     dbo_aMOT_MovTipCambio (cMON_Id=31), ordenada por fecha.
     Devuelve un DataFrame con columnas [periodo, tc].
     """
-    cache_file = CACHE_DIR / "serie_tc.pkl"
+    cache_file = CACHE_DIR / f"serie_tc_{PERIODO_CORTE or 'all'}.pkl"
     if cache_file.exists() and not forzar:
         try:
             with open(cache_file, 'rb') as f:
@@ -5113,6 +5124,25 @@ def main():
         df_gonz = df_gonz[mp >= PERIODO_MIN_CALIBRACION].copy()
         print(f"  [i] Base de datos: desde {PERIODO_MIN_CALIBRACION} "
               f"-> {len(df_gonz):,} de {n_antes:,} filas")
+
+    # 1d. Fecha de corte: se descarta cualquier mes posterior (p. ej. un mes en
+    # curso cargado parcialmente) y se verifica que el mes de corte sí esté en Gonz.
+    if "aPOG_MesProc" in df_gonz.columns:
+        mp = pd.to_numeric(df_gonz["aPOG_MesProc"], errors="coerce")
+        if PERIODO_CORTE:
+            n_antes = len(df_gonz)
+            df_gonz = df_gonz[mp <= PERIODO_CORTE].copy()
+            if len(df_gonz) < n_antes:
+                print(f"  [i] Corte {PERIODO_CORTE}: se descartan {n_antes - len(df_gonz):,} filas "
+                      f"de meses posteriores al corte")
+            mp = pd.to_numeric(df_gonz["aPOG_MesProc"], errors="coerce")
+        ult_real = int(mp.max()) if mp.notna().any() else None
+        n_ult = int((mp == ult_real).sum()) if ult_real else 0
+        print(f"  [i] Último mes REAL en la base: {ult_real} ({n_ult:,} filas). "
+              f"La proyección arranca en {_sumar_meses(ult_real, 1) if ult_real else '?'}.")
+        if PERIODO_CORTE and ult_real and ult_real < PERIODO_CORTE:
+            print(f"  [!] ATENCIÓN: el corte es {PERIODO_CORTE} pero Gonz solo llega a {ult_real}. "
+                  f"Verifica que el cierre de ese mes ya esté cargado en Gonz antes de usar la corrida.")
 
     df_calib = df_gonz
     if MESES_CALIBRACION_RECIENTE and "aPOG_MesProc" in df_gonz.columns:
