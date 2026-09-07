@@ -245,6 +245,32 @@ POS_CESION = None
 #   RETENCION_LN = {"4001": 0.75, "4004": 0.60}
 RETENCION_LN = {}
 
+# ---- Candado de simulacion del % de cesion ----
+# Vista previa del tablero retenido MIENTRAS llega la base con la
+# columna de cesion. Es un interruptor binario:
+#
+#   SIMULAR_CESION = 1  -> si la base NO trae la columna de cesion,
+#                          se sortea un % de cesion aleatorio y el
+#                          retenido se calcula con el
+#   SIMULAR_CESION = 0  -> sin columna de cesion el retenido queda
+#                          igual al tomado (comportamiento normal)
+#
+# Si la base SI trae la columna, el candado se ignora: el dato real
+# siempre gana y el script lo avisa en consola. Las cifras
+# simuladas quedan marcadas en el tablero, en los reportes de
+# alertas y en la hoja Parametros, para que no se confundan nunca
+# con cifras de Suscripcion.
+#
+# El % se sortea UNA VEZ POR NEGOCIO (LN + cedente + contrato), no
+# por renglon: asi cada negocio conserva la misma retencion en los
+# 12 meses y en los tres conceptos, y las graficas se comportan
+# como se van a comportar con la cesion real. Con la semilla fija,
+# dos corridas dan exactamente los mismos porcentajes.
+SIMULAR_CESION = 0            # 1 = simular · 0 = apagado
+SIM_CESION_MIN = 0.0          # % de cesion minimo del sorteo
+SIM_CESION_MAX = 1.0          # % de cesion maximo del sorteo
+SIM_CESION_SEMILLA = 2027     # misma semilla, mismos porcentajes
+
 # ---- Mapeo posicional del CSV ----
 # Posicion -> campo, porque los encabezados del export vienen
 # permutados respecto a las columnas de datos. Hay dos layouts
@@ -1226,10 +1252,37 @@ CATALOGO_CED = cargar_catalogo_cedentes()
 # =====================================================
 
 # cedido = tomado x % de cesion · retenido = tomado - cedido
+# La cesion simulada (SIMULAR_CESION) solo entra si la base no
+# trae la columna: el dato real siempre gana
+RETENIDO_SIMULADO = False
+
 if CESION is not None:
     d_ok["_ces"] = d_ok["Prc_Cesion"]
     RETENIDO_MODO = f"% de cesión por renglón ({COL_CESION}) · {DETALLE_CESION}"
     RETENIDO_REAL = True
+    if SIMULAR_CESION:
+        print(f"  AVISO: SIMULAR_CESION = 1, pero la base trae la columna "
+              f"{COL_CESION}: se ignora el candado y se usa la cesión real.")
+elif SIMULAR_CESION:
+    # Un porcentaje por negocio (LN + cedente + contrato), no por
+    # renglon: la retencion queda pareja en los 12 meses y en P/S/C
+    _cod_sim, _neg_sim = pd.factorize(
+        d_ok["LN"].astype(str) + "|" + d_ok["Cedente"].astype(str)
+        + "|" + d_ok["Contrato"].astype(str)
+    )
+    _pct_sim = np.random.default_rng(SIM_CESION_SEMILLA).uniform(
+        SIM_CESION_MIN, SIM_CESION_MAX, len(_neg_sim)
+    )
+    d_ok["_ces"] = _pct_sim[_cod_sim]
+    RETENIDO_MODO = (f"SIMULADO · % de cesión aleatorio entre "
+                     f"{SIM_CESION_MIN:.0%} y {SIM_CESION_MAX:.0%} sorteado por "
+                     f"negocio (semilla {SIM_CESION_SEMILLA}) · cifras de "
+                     f"demostración, NO son cifras de Suscripción")
+    RETENIDO_REAL = True
+    RETENIDO_SIMULADO = True
+    print(f"  SIMULACION ACTIVA (SIMULAR_CESION = 1): % de cesión aleatorio "
+          f"entre {SIM_CESION_MIN:.0%} y {SIM_CESION_MAX:.0%} para "
+          f"{len(_neg_sim):,} negocios. La vista retenido es una MAQUETA.")
 elif RETENCION_LN:
     d_ok["_ces"] = 1.0 - d_ok["LN"].map(RETENCION_LN).fillna(1.0)
     RETENIDO_MODO = "% de retención capturado por LN (RETENCION_LN)"
@@ -2505,7 +2558,9 @@ def generar_reporte_alertas(ruta, filas, retenido=False):
     n_ama_r = len(filas) - n_rojo_r
 
     lg.write(0, 0, f"Reporte de alertas del {ETIQ_FCST} · PPTO Técnico"
-                   + (" · vista RETENIDO" if retenido else " · vista TOMADO"), f_t)
+                   + (" · vista RETENIDO" if retenido else " · vista TOMADO")
+                   + (" (CESION SIMULADA)" if retenido and RETENIDO_SIMULADO else ""),
+                   f_t)
     lg.write(1, 0, f"Generado {datetime.now().strftime('%d/%m/%Y %H:%M')} · "
                    f"{len(filas):,} negocios en ROJO o AMARILLO "
                    f"({n_rojo_r:,} rojos · {n_ama_r:,} amarillos) de "
@@ -2537,6 +2592,14 @@ def generar_reporte_alertas(ruta, filas, retenido=False):
                         "negocio: la prima única anual es lo normal en reaseguro.", f_w)
     lg.write(r0 + 2, 0, "Los negocios sin contraparte en el RFCST 2026 se señalan en "
                         "el motivo, pero eso por sí solo no levanta semáforo.", f_w)
+    if retenido and RETENIDO_SIMULADO:
+        lg.write(r0 + 4, 0, "SIMULACION: el % de cesión de esta corrida es "
+                            f"aleatorio (entre {SIM_CESION_MIN:.0%} y "
+                            f"{SIM_CESION_MAX:.0%} por negocio, semilla "
+                            f"{SIM_CESION_SEMILLA}), NO viene de Suscripción. "
+                            "Las cifras retenidas y cedidas son una maqueta "
+                            "para revisar el formato del reporte.", f_w)
+
     if retenido:
         lg.write(r0 + 3, 0, "Vista RETENIDO: las cifras son netas de cesión "
                             "(tomado − cedido). Los bloques de RFCST 2026, "
@@ -2641,10 +2704,26 @@ INFO_MEDIDAS = [
 ADJ_RET = {"P": "retenidas", "S": "retenidos", "C": "retenidas"}
 
 # Sin cesion en la base el retenido queda igual al tomado: se
-# senala con una nota discreta al pie, no con un banner
-AVISO_RET = ""
+# senala con una nota discreta al pie, no con un banner. La cesion
+# simulada si lleva banner: son cifras que no deben confundirse
+# con las de Suscripcion
+if RETENIDO_SIMULADO:
+    AVISO_RET = (
+        '<div class="aviso-sim solo-ret" id="aviso_sim">&#9888; Vista retenido en '
+        f'<b>modo simulación</b>: el % de cesión es aleatorio (entre '
+        f'{SIM_CESION_MIN:.0%} y {SIM_CESION_MAX:.0%} por negocio, semilla '
+        f'{SIM_CESION_SEMILLA}), no viene de Suscripción. Sirve para ver cómo '
+        f'queda el tablero; las cifras de retenido y cedido <b>no son '
+        f'válidas</b>. Se apaga con SIMULAR_CESION = 0 en el script.</div>')
+else:
+    AVISO_RET = ""
 
-if RETENIDO_REAL:
+if RETENIDO_SIMULADO:
+    NOTA_RET = ('<div class="ast">Retenido = tomado − cedido, con un % de cesión '
+                '<b>simulado</b> (aleatorio por negocio). Cifras de demostración: '
+                f'se sustituyen solas en cuanto la base traiga la columna '
+                f'<b>{COL_CESION}</b>.</div>')
+elif RETENIDO_REAL:
     NOTA_RET = ('<div class="ast">Retenido = tomado − cedido, con el % de cesión '
                 'de cada renglón. El RFCST 2026, el ' + ETIQ_PPTO26 + ' y el Real '
                 '2025 son cifras de tomado, así que esta vista no los compara: '
@@ -3353,6 +3432,10 @@ PLANTILLA = """<!doctype html>
     padding: 5px 12px; border-radius: 999px; cursor: pointer; font-family: inherit; }
   .toggle button.on { background: rgba(57,135,229,.2); color: #9ec5f4; }
   /* Textos que cambian con la vista activa */
+  .aviso-sim { margin: 0 0 16px; padding: 10px 14px; border-radius: 8px;
+    font-size: 12.5px; color: #fab219; background: rgba(250,178,25,.12);
+    border: 1px solid rgba(250,178,25,.35); }
+  .aviso-sim b { color: #fdd884; }
   body:not(.vista-ret) .solo-ret { display: none; }
   body.vista-ret .solo-tom { display: none; }
   .tgl-global { border-color: rgba(57,135,229,.45); }
@@ -3386,6 +3469,7 @@ PLANTILLA = """<!doctype html>
     html, body.print-ln { background: #0d0d0d !important; }
     body.print-ln { padding: 9mm 9mm 6mm !important; }
     body.print-ln > *:not(#sec-ln):not(header) { display: none !important; }
+    body.print-ln.vista-ret > #aviso_sim { display: block !important; }
     body.print-ln header.top { position: static !important; padding: 0 0 10px !important;
       margin-bottom: 14px !important; background: none !important; }
     body.print-ln nav.secs { display: none !important; }
@@ -3411,7 +3495,7 @@ PLANTILLA = """<!doctype html>
     <a href="#sec-negocios">Negocios</a>
   </nav>
 </header>
-
+__AVISO_SIM__
 <section id="sec-general" class="bloque">
   <div class="sec-head"><h2 class="sec-title">General</h2>
     <span class="sub">Totalidad de las líneas de negocio · cifras en dólares ·
@@ -4259,6 +4343,7 @@ html = (
     .replace("__ARCHIVO__", os.path.basename(archivo))
     .replace("__FUENTE_RFCST__", FUENTE_RFCST)
     .replace("__GENERADO__", datetime.now().strftime("%d/%m/%Y %H:%M"))
+    .replace("__AVISO_SIM__", AVISO_RET)
     .replace("__SEC1PSC__", sec1_psc)
     .replace("__SEC1GRAF__", sec1_graficas)
     .replace("__SEC1__", "".join(sec1_bloques))

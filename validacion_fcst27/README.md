@@ -207,6 +207,33 @@ señala con una nota discreta al pie de la vista (no con un banner). Como
 respaldo manual existe `RETENCION_LN`, un % de retención por LN capturado a
 mano.
 
+### Candado de simulación (`SIMULAR_CESION`)
+
+Interruptor binario en la configuración, para ver cómo queda el tablero
+retenido **mientras llega la base con la cesión**:
+
+| Valor | Efecto |
+|---|---|
+| `SIMULAR_CESION = 1` | Si la base **no** trae la columna de cesión, se sortea un % aleatorio y el retenido se calcula con él |
+| `SIMULAR_CESION = 0` | Comportamiento normal: sin columna de cesión, retenido = tomado |
+
+El rango y la semilla del sorteo se controlan con `SIM_CESION_MIN`,
+`SIM_CESION_MAX` (0 y 1 por omisión) y `SIM_CESION_SEMILLA`.
+
+Tres reglas del candado:
+
+1. **El dato real siempre gana.** Si la base trae `Prc_Ced`, el candado se
+   ignora aunque esté en 1, y el script lo avisa en consola.
+2. **El % se sortea por negocio** (LN + cedente + contrato), no por renglón:
+   así cada negocio conserva la misma retención en los 12 meses y en los tres
+   conceptos, y las gráficas se comportan como se van a comportar con la
+   cesión real. Con la semilla fija, dos corridas dan los mismos porcentajes.
+3. **Las cifras simuladas quedan marcadas** en todas las salidas: banner
+   amarillo arriba de la vista retenido del dashboard (que además sí sale en
+   la impresión de la sección de LN), nota al pie de cada bloque de tarjetas,
+   título y leyenda del `Reporte_Alertas_FCST27_Retenido.xlsx`, y el
+   parámetro `Vista retenido` de la hoja `Parametros`.
+
 **Granularidad de la estacionalidad 2026**: el CSV del FCST solo trae
 mensualizado el ejercicio 2027 (los demás años vienen como un renglón único en
 el periodo 6). Para el comparativo 2026 se usan dos bases adicionales:
