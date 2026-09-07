@@ -1,0 +1,121 @@
+--- ORIGINAL/PPTO_RRC.py
++++ ACTUALIZADO/PPTO_RRC.py
+@@ -3,8 +3,11 @@
+ import pandas as pd
+ import time
+ import warnings
++import os
++import sys
+ from datetime import datetime
+ import numpy as np
++usuario = "asunad"
+ warnings.filterwarnings('ignore')
+ start_time = time.perf_counter()
+ 
+@@ -19,6 +22,36 @@
+ AnioPiv_1 = zAñoPpto - 10
+ AnioPiv_2 = zAñoPpto - 3
+ 
++#%% FND CALIBRADO (MEC v3) — sustituye la búsqueda en xPND
++# mec_devengamiento.py y delta_calibrado.json se leen de la carpeta de Documents.
++CARPETA_FND = fr"C:\Users\{usuario}\OneDrive - GPV\Documents"
++if CARPETA_FND not in sys.path:
++    sys.path.insert(0, CARPETA_FND)
++import mec_devengamiento as mec
++
++USAR_FND_CALIBRADO = True   # False -> comportamiento idéntico al script original (xPND)
++DELTA_FND = mec.cargar_delta(CARPETA_FND)   # lee delta_calibrado.json de Documents si existe
++# El mes de valuación es el último de la ventana de xPND/xPND2 (xAños[Meses + 11]),
++# es decir el cierre del presupuesto: de ahí se cuenta la antigüedad de registro.
++MES_VALUACION = zAñoMesPPTO
++
++
++def fnd_cal(ramo, calmonth, valorfrec_legado=0.0, tiporea=None):
++    """FND de una cuenta proporcional/facultativa: tabla calibrada por antigüedad de
++    REGISTRO respecto al mes de valuación. `valorfrec_legado` es el valor de xPND que
++    se usaría hoy; se devuelve si el FND calibrado está desactivado o falta el mes."""
++    if not USAR_FND_CALIBRADO or MES_VALUACION is None:
++        return valorfrec_legado
++    try:                        # el NO proporcional (TipoRea 2) no cambia: conserva el valor de siempre.
++        if int(float(tiporea)) == 2:   # Hace falta aquí porque PORC_ND mira «Ramo in [71,73]» antes que
++            return valorfrec_legado    # TipoRea 2, y el CAT XL iría a la tabla calibrada sin esta guarda.
++    except Exception:
++        pass
++    k = mec.antiguedad_registro(MES_VALUACION, calmonth)
++    if k is None:
++        return valorfrec_legado
++    return 0.0 if k < 0 else mec.fnd_registro(ramo, k, DELTA_FND)
++
+ if zMes < 10:
+     AuxMes = 0
+ else:
+@@ -109,19 +142,19 @@
+ #Archivos Tablas Aux
+ 
+ import getpass
+-usuario = getpass.getuser()
++# usuario se declara arriba, junto con los parámetros iniciales
+ 
+-xFolder = fr"C:\Users\{usuario}\OneDrive - GPV\Planeación Financiera RPAT - Documents\Presupuestos\2026"
+-xRRC = pd.read_csv(f"{xFolder}\\6_Recalibración\\0_Integración\Inputs\ParametrosMens2026.csv")
+-xTablaCesion = pd.read_csv(f"{xFolder}\\4_Generacion\\03 Reservas\Inputs scripts\TablaCesion.csv")
+-xPais = pd.read_csv(f"{xFolder}\\4_Generacion\\0_Integración\Inputs scripts\Pais.csv")
+-xSubramo = pd.read_csv(f"{xFolder}\\4_Generacion\\0_Integración\Inputs scripts\Subramo.csv")
+-xFrecCol = pd.read_csv(f"{xFolder}\\4_Generacion\\0_Integración\Inputs scripts\FrecCol.csv")
+-xIS_BEL_MEDIA = pd.read_csv(f"{xFolder}\\4_Generacion\\0_Integración\Inputs scripts\IS_Cat.csv") #ACTUALIZAR
+-zAFUN = pd.read_csv(f"{xFolder}\\4_Generacion\\0_Integración\Inputs scripts\AFUN.csv")
+-xCesionPI = pd.read_csv(f"{xFolder}\\4_Generacion\\03 Reservas\Inputs scripts\CesionPI.csv") #AÑO PASADO
+-zFrecuencias = pd.read_csv(f"{xFolder}\\4_Generacion\\0_Integración\Inputs scripts\zFrecuencias.csv") #ACTUALIZAR
+-Cesion_Esp = pd.read_csv(f"{xFolder}\\4_Generacion\\0_Integración\Inputs scripts\Cesion ID Esp.csv") #ACTUALIZAR
++xFolder = fr"C:\Users\{usuario}\OneDrive - GPV\Archivos de Maria Osmara Camacho Lopez - Inputs"
++xRRC = pd.read_csv(f"{xFolder}\\ParametrosMens2026.csv")
++xTablaCesion = pd.read_csv(f"{xFolder}\\TablaCesion.csv")
++xPais = pd.read_csv(f"{xFolder}\\Pais.csv")
++xSubramo = pd.read_csv(f"{xFolder}\\Subramo.csv")
++xFrecCol = pd.read_csv(f"{xFolder}\\FrecCol.csv")
++xIS_BEL_MEDIA = pd.read_csv(f"{xFolder}\\IS_Cat.csv") #ACTUALIZAR
++zAFUN = pd.read_csv(f"{xFolder}\\AFUN.csv")
++xCesionPI = pd.read_csv(f"{xFolder}\\CesionPI.csv") #AÑO PASADO
++zFrecuencias = pd.read_csv(f"{xFolder}\\zFrecuencias.csv") #ACTUALIZAR
++Cesion_Esp = pd.read_csv(f"{xFolder}\\Cesion ID Esp.csv") #ACTUALIZAR
+ 
+ # Conexión y consulta BD Gonz
+ conn_str = (r'DRIVER={Microsoft Access Driver (*.mdb, *.accdb)};'
+@@ -309,7 +342,8 @@
+     
+ 
+     ConsultaR['VALORFREC'] =  ConsultaR.apply(
+-    lambda row: xPND.get(row['CALMONTH'], 0).get(str(row['FRECUENCIA']), 0),
++    lambda row: fnd_cal(row['Ramo'], row['CALMONTH'],
++                        xPND.get(row['CALMONTH'], 0).get(str(row['FRECUENCIA']), 0), row['TipoRea']),
+     axis=1)
+     
+ 
+@@ -351,7 +385,7 @@
+ def ConsultaPPTO2026():
+     global xPais, xSubramo, ConsultaTC, xRRC, xIS_BEL_MEDIA, BC, RCS, COC, tc_CIERRE, zAñoMesPPTO, zMes, zAFUN, AnioPiv_1, AnioPiv_2, xCesionPI, xTablaCesion, zFrecuencias, xPND2, Cesion_Esp
+     
+-    xFolder = fr"C:\Users\mocamachol\OneDrive - GPV\Planeación Financiera RPAT - Documents\Presupuestos\2026\6_Recalibración\xls"
++    xFolder = fr"C:\Users\{usuario}\OneDrive - GPV\Archivos de Maria Osmara Camacho Lopez - Inputs"
+     xFile = fr"{xFolder}\\BD_CtaMens_reservas_0526.xlsx"
+     
+     ConsultaP = pd.read_excel(xFile, thousands=',')
+@@ -463,7 +497,8 @@
+     ConsultaPPTO = ConsultaPPTO.drop(["71","73","2021","2022","2023","2024", "2025", "2026", "2027", "2028", "2029", "2030","202100","202200","202300","202400","202500","202600","202700", "202800","202900","203000", "Llave"], axis=1)
+     
+     ConsultaPPTO['PORC_ND'] =  ConsultaPPTO.apply(
+-    lambda row: xPND2.get(row['CALMONTH'], 0).get(row['FRECUENCIA'], 2),axis=1)
++    lambda row: fnd_cal(row['Ramo'], row['CALMONTH'],
++                        xPND2.get(row['CALMONTH'], 0).get(row['FRECUENCIA'], 2), row['ZTIPOREAS']),axis=1)
+ 
+ 
+ 
+@@ -530,7 +565,7 @@
+ auxPPTO_sum['Escenario'] = 'PPTO'
+ auxPPTO_sum['Monto_USD'] = auxPPTO_sum['Monto']
+ 
+-xFolder = fr"C:\Users\{usuario}\OneDrive - GPV\Planeación Financiera RPAT - Documents\Presupuestos\2026\6_Recalibración\03_Reservas\Outputs scripts\RRC"
++xFolder = fr"C:\Users\{usuario}\OneDrive - GPV\Documents\Outputs"
+ fileName = f"{xFolder}\\auxPPTO_sum_{zMes}.xlsx"
+ auxPPTO_sum.to_excel(fileName, index=False)
+ 

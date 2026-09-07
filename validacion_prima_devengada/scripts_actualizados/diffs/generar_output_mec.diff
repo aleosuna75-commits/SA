@@ -1,0 +1,19 @@
+--- ORIGINAL/generar output mec.py
++++ ACTUALIZADO/generar_output_mec.py
+@@ -79,9 +79,13 @@
+            0.09093866,0.0,0.0,0.0,0.0,0.0]
+ FRECS = [("Mensual",1),("Trimestral",3),("Cuatrimestral",4),("Semestral",6),("Anual",12)]
+ 
+-NOMBRE_RAMO = {10:'Vida',30:'Accidentes y Enfermedades',40:'Automóviles',50:'Diversos',
+-               60:'Incendio',70:'Terremoto / Cat',80:'Agrícola',90:'Marítimo y Transportes',
+-               100:'Crédito',110:'Responsabilidad Civil',130:'Fianzas Fidelidad',
++# Nombres corregidos: el catálogo de la casa (xNoRamo del reforecast RRC y el ER real)
++# tiene 40 = Responsabilidad Civil, 50 = MyT, 90 = Autos y 110 = Diversos. La v2 los
++# tenía cruzados de dos en dos y sólo afectaba etiquetas del output.
++NOMBRE_RAMO = {10:'Vida',30:'Accidentes y Enfermedades',40:'Responsabilidad Civil',
++               50:'Marítimo y Transportes',
++               60:'Incendio',70:'Terremoto / Cat',80:'Agrícola',90:'Automóviles',
++               100:'Crédito',110:'Diversos',130:'Fianzas Fidelidad',
+                140:'Fianzas Judicial',150:'Fianzas Administrativa',160:'Fianzas Crédito',
+                170:'Crédito a la Vivienda'}
+ 
