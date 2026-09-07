@@ -173,12 +173,34 @@ forzar la posición de datos con `POS_CESION`.
 > donde la pone pandas al agregarla). Ahí la detección es directa y sin
 > ambigüedad.
 
-**Comparativos en la vista retenido**: el RFCST 2026, el FCST 2026 y el Real
-2025 son cifras de **tomado**. Contrastar el retenido del FCST 2027 contra
-ellas daría una caída que solo refleja la cesión, así que esa vista **no los
-compara**: cada tarjeta se contrasta contra el propio tomado del ejercicio y
-muestra el cedido y el % de retención. La hoja `Cesion` del Excel trae tomado,
-cedido, retenido y los porcentajes por LN y concepto.
+**El dashboard completo en las dos vistas.** El switch **Tomado / Retenido**
+del encabezado cambia *todo*: los cuadros de General, los de Línea de Negocio,
+las comparativas por LN, las estacionalidades, la mensualización P·S·C, la
+sección de Negocios con sus filtros, semáforos y excepciones, y el reporte de
+alertas que se descarga. Las dos vistas tienen exactamente las mismas gráficas
+y tablas; lo único que cambia es la fuente de datos y aquello contra lo que se
+compara:
+
+| | Tomado | Retenido |
+|---|---|---|
+| Comparativa por LN | FCST 2027 · RFCST 2026 · FCST 2026 | Tomado · Cedido · Retenido |
+| Segunda gráfica | Variación vs RFCST 2026 | % de retención por LN |
+| Estacionalidad de una LN | vs RFCST 2026 y FCST 2026 | vs el tomado de esa misma LN |
+| KPI de negocios | Crecimiento vs RFCST 2026 | % de retención |
+| Reporte de alertas | `Reporte_Alertas_FCST27.xlsx` | `..._Retenido.xlsx` |
+
+**Por qué el retenido no se compara contra 2026**: el RFCST 2026, el FCST 2026
+y los reales son cifras de **tomado** — en la hoja `Ppto2026` las columnas
+`PmasRetro`, `SinReten` y `CostosNetosAdq` vienen en cero, así que no hay
+retenido de referencia en ninguna base. Contrastar el retenido del FCST 2027
+contra ellas daría una caída que solo refleja la cesión. Por eso esa vista se
+contrasta contra el **propio tomado del ejercicio** y muestra el cedido y el %
+de retención. Si más adelante llega el retenido del RFCST 2026, ahí sí tendría
+sentido volver a comparar.
+
+El Excel trae la hoja `Cesion` (tomado, cedido, retenido y porcentajes por LN y
+concepto) y las hojas `Resumen_LN_Ret` y `Resumen_Negocio_Ret` con las cifras
+netas.
 
 Si la base cargada no trae la columna, el retenido queda igual al tomado y se
 señala con una nota discreta al pie de la vista (no con un banner). Como

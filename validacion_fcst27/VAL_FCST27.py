@@ -1339,17 +1339,28 @@ else:
 LNS = sorted(d_ok["LN"].unique(), key=lambda v: (len(v), v))
 
 
-def resumen_ln():
+def resumen_ln(col_valor="Valor"):
+    """Resumen por LN sobre la columna de valor que se pida. En la
+    vista retenido los comparativos 2026 y 2025 quedan en blanco:
+    esas bases solo existen en tomado."""
+    retenido = col_valor != "Valor"
+
     filas = []
     for ln in LNS:
         sub = d_ok[d_ok["LN"] == ln]
-        g = agregado(sub, "Valor")
+        g = agregado(sub, col_valor)
+        gt = agregado(sub, "Valor")
         gr = agregado(sub, "Valor_Ret")
         fila = {"LN": ln,
                 "Primas": g["P"]["anual"], "Siniestros": g["S"]["anual"],
                 "Comisiones": g["C"]["anual"], "P_S_C": g["PSC"]["anual"],
+                "Primas_Tom": gt["P"]["anual"], "Siniestros_Tom": gt["S"]["anual"],
+                "Comisiones_Tom": gt["C"]["anual"], "P_S_C_Tom": gt["PSC"]["anual"],
                 "Primas_Ret": gr["P"]["anual"], "Siniestros_Ret": gr["S"]["anual"],
                 "Comisiones_Ret": gr["C"]["anual"], "P_S_C_Ret": gr["PSC"]["anual"]}
+        for _m, _cp in (("Primas", "P"), ("Siniestros", "S"), ("Comisiones", "C")):
+            fila[f"{_m}_Ced"] = gt[_cp]["anual"] - gr[_cp]["anual"]
+        fila["Pct_Retencion"] = _rat(gr["P"]["anual"], gt["P"]["anual"])
         fila["Ind_Sin"] = _rat(fila["Siniestros"], fila["Primas"])
         fila["Ind_Cos"] = _rat(fila["Comisiones"], fila["Primas"])
         fila["Pct_P_S_C"] = _rat(fila["P_S_C"], fila["Primas"])
@@ -1368,7 +1379,15 @@ def resumen_ln():
             fila["Pct_Mes_Pico"] = np.nan
             fila["Meses_Sin_Prima"] = 12
 
-        if RFCST is not None and ln in RFCST["por_ln"].index:
+        if retenido:
+            # El RFCST 2026, el ppto 2026 y los reales solo existen
+            # en tomado: compararlos contra el retenido daria una
+            # caida que solo refleja la cesion
+            for c in ("Primas_RFCST26", "Siniestros_RFCST26", "Comisiones_RFCST26",
+                      "Primas_FCST26", "Siniestros_FCST26", "Comisiones_FCST26",
+                      "Primas_Real25", "Siniestros_Real25", "Comisiones_Real25"):
+                fila[c] = np.nan
+        elif RFCST is not None and ln in RFCST["por_ln"].index:
             r = RFCST["por_ln"].loc[ln]
             fila["Primas_RFCST26"] = r["P_1226"]
             fila["Siniestros_RFCST26"] = r["S_1226"]
@@ -1399,6 +1418,10 @@ def resumen_ln():
 
 
 r_ln = resumen_ln()
+r_ln_R = resumen_ln("Valor_Ret")
+
+r_ln_R["Participacion_FCST27"] = r_ln_R["Primas"] / r_ln_R["Primas"].sum()
+r_ln_R["Participacion_RFCST26"] = np.nan
 
 r_ln["Participacion_FCST27"] = r_ln["Primas"] / r_ln["Primas"].sum()
 if RFCST is not None:
@@ -1508,12 +1531,12 @@ ranking["Ranking"] = ranking.index + 1
 # =====================================================
 
 
-def estacionalidad(sub):
+def estacionalidad(sub, col_valor="Valor"):
     """% del anio por mes para P, S y C (None si no hay base)."""
     out = {}
     for cpt in ("P", "S", "C"):
         s = sub[sub["Concepto"] == cpt]
-        por_mes = s.groupby("Mes")["Valor"].sum()
+        por_mes = s.groupby("Mes")[col_valor].sum()
         vals = np.array([float(por_mes.get(m, 0.0)) for m in range(1, 13)])
         tot = vals.sum()
         out[cpt] = list(np.round(vals / tot, 4)) if abs(tot) > TOL else None
@@ -1523,6 +1546,11 @@ def estacionalidad(sub):
 SEASON = {"_tot": estacionalidad(d_ok)}
 for ln in LNS:
     SEASON[ln] = estacionalidad(d_ok[d_ok["LN"] == ln])
+
+# Misma estacionalidad, sobre el retenido
+SEASON_R = {"_tot": estacionalidad(d_ok, "Valor_Ret")}
+for ln in LNS:
+    SEASON_R[ln] = estacionalidad(d_ok[d_ok["LN"] == ln], "Valor_Ret")
 
 est_filas = []
 for ln in ["_tot"] + LNS:
@@ -1794,68 +1822,94 @@ def evaluar_alertas(f, rf, ppto, r25, r26, conc, mes_pico):
     return sem, motivos, celdas, nota
 
 
-negocios = []
+def construir_negocios(col_valor="Valor"):
+    """Un registro por negocio sobre la columna de valor que se
+    pida. En la vista retenido no hay contraparte 2026 con la que
+    comparar, asi que las alertas usan solo los indices propios."""
+    retenido = col_valor != "Valor"
+    negocios = []
 
-for (ln, ced, cto, binder), sub in grp_neg:
+    for (ln, ced, cto, binder), sub in grp_neg:
 
-    g = {}
-    for cpt in ("P", "S", "C"):
-        s_cpt = sub[sub["Concepto"] == cpt]
-        por_mes = s_cpt.groupby("Mes")["Valor"].sum()
-        g[cpt] = [round(float(por_mes.get(m, 0.0))) for m in range(1, 13)]
+        g = {}
+        for cpt in ("P", "S", "C"):
+            s_cpt = sub[sub["Concepto"] == cpt]
+            por_mes = s_cpt.groupby("Mes")[col_valor].sum()
+            g[cpt] = [round(float(por_mes.get(m, 0.0))) for m in range(1, 13)]
 
-    f = {cpt: float(sum(g[cpt])) for cpt in ("P", "S", "C")}
+        f = {cpt: float(sum(g[cpt])) for cpt in ("P", "S", "C")}
 
-    llave = (ln, int(ced), int(cto))
-    rf = RF_NEG.get(llave, {}).get("rfcst") if llave in RF_NEG else None
-    ppto = RF_NEG.get(llave, {}).get("ppto") if llave in RF_NEG else None
-    r25 = RF_NEG.get(llave, {}).get("real25") if llave in RF_NEG else None
-    r26 = RL_NEG.get(llave)
+        llave = (ln, int(ced), int(cto))
+        rf = (None if retenido
+              else (RF_NEG.get(llave, {}).get("rfcst") if llave in RF_NEG else None))
 
-    tot_p = sum(abs(v) for v in g["P"])
-    if tot_p > TOL:
-        _idx = int(np.argmax([abs(v) for v in g["P"]]))
-        conc = abs(g["P"][_idx]) / tot_p
-        mes_pico = MESES_TXT[_idx]
-    else:
-        conc, mes_pico = float("nan"), ""
+        # Referencia con la que se contrasta el negocio en el
+        # dashboard: en tomado su equivalente del RFCST 2026, en
+        # retenido su propio tomado (de ahi sale el % de retencion)
+        if retenido:
+            ref = float(sub[sub["Concepto"] == "P"]["Valor"].sum())
+        else:
+            ref = rf["P"] if rf and abs(rf["P"]) > TOL else None
+        ppto = RF_NEG.get(llave, {}).get("ppto") if llave in RF_NEG else None
+        r25 = RF_NEG.get(llave, {}).get("real25") if llave in RF_NEG else None
+        r26 = RL_NEG.get(llave)
 
-    sem, motivos, celdas, nota = evaluar_alertas(f, rf, ppto, r25, r26, conc, mes_pico)
+        tot_p = sum(abs(v) for v in g["P"])
+        if tot_p > TOL:
+            _idx = int(np.argmax([abs(v) for v in g["P"]]))
+            conc = abs(g["P"][_idx]) / tot_p
+            mes_pico = MESES_TXT[_idx]
+        else:
+            conc, mes_pico = float("nan"), ""
 
-    regiones = sorted(set(sub["Region"].dropna().astype(str)))
-    paises = sorted(set(pd.to_numeric(sub["Pais_Cod"], errors="coerce")
-                        .dropna().astype(int).astype(str)))
-    corredores = sorted(set(sub["Corredor"].astype(int).astype(str)))
-    n_corredores = len(corredores)
-    monedas = sorted(set(sub["Moneda"].dropna().astype(str)))
+        sem, motivos, celdas, nota = evaluar_alertas(f, rf, ppto, r25, r26, conc, mes_pico)
 
-    negocios.append({
-        "LN": ln, "Cedente": int(ced), "Contrato": int(cto),
-        "Binder": str(binder or "").strip(),
-        "Region": "/".join(regiones), "Paises": "/".join(paises[:3]),
-        "Corredores": "/".join(corredores[:3]), "N_Corredores": n_corredores,
-        "Monedas": "/".join(monedas[:4]),
-        "f": f, "rf": rf, "ppto": ppto, "r25": r25, "r26": r26,
-        "meses": g, "conc": conc, "mes_pico": mes_pico,
-        "sem": sem, "motivos": motivos, "celdas": sorted(set(celdas)),
-        "nota": nota,
-    })
+        regiones = sorted(set(sub["Region"].dropna().astype(str)))
+        paises = sorted(set(pd.to_numeric(sub["Pais_Cod"], errors="coerce")
+                            .dropna().astype(int).astype(str)))
+        corredores = sorted(set(sub["Corredor"].astype(int).astype(str)))
+        n_corredores = len(corredores)
+        monedas = sorted(set(sub["Moneda"].dropna().astype(str)))
 
-neg_rows = [[
-    n["LN"], str(n["Cedente"]), str(n["Contrato"]),
-    n["Region"], n["Paises"], n["Corredores"], n["Monedas"],
-    round(n["f"]["P"]), round(n["f"]["S"]), round(n["f"]["C"]),
-    n["meses"]["P"], n["meses"]["S"], n["meses"]["C"],
-    n["sem"], " · ".join(n["motivos"]) + ((" · " if n["motivos"] else "") + n["nota"]
-                                          if n["nota"] else ""),
-    n["Binder"],
-    # Prima del MISMO negocio en el RFCST 2026 (None si no cruza):
-    # comparar contra el total del cedente mezclaba sus otras LN
-    (round(n["rf"]["P"]) if n["rf"] and abs(n["rf"]["P"]) > TOL else None),
-    # Corredores distintos: Suscripcion integra abriendo por
-    # corredor, asi que el conteo alterno permite reconciliar
-    n["N_Corredores"],
-] for n in negocios]
+        negocios.append({
+            "LN": ln, "Cedente": int(ced), "Contrato": int(cto),
+            "Binder": str(binder or "").strip(),
+            "Region": "/".join(regiones), "Paises": "/".join(paises[:3]),
+            "Corredores": "/".join(corredores[:3]), "N_Corredores": n_corredores,
+            "Monedas": "/".join(monedas[:4]),
+            "f": f, "rf": rf, "ppto": ppto, "r25": r25, "r26": r26,
+            "meses": g, "conc": conc, "mes_pico": mes_pico,
+            "sem": sem, "motivos": motivos, "celdas": sorted(set(celdas)),
+            "nota": nota, "ref": ref,
+        })
+
+    return negocios
+
+
+def filas_negocios(negocios):
+    """Layout que consume el dashboard."""
+    return [[
+        n["LN"], str(n["Cedente"]), str(n["Contrato"]),
+        n["Region"], n["Paises"], n["Corredores"], n["Monedas"],
+        round(n["f"]["P"]), round(n["f"]["S"]), round(n["f"]["C"]),
+        n["meses"]["P"], n["meses"]["S"], n["meses"]["C"],
+        n["sem"], " · ".join(n["motivos"]) + ((" · " if n["motivos"] else "") + n["nota"]
+                                              if n["nota"] else ""),
+        n["Binder"],
+        # Referencia de la vista: prima del mismo negocio en el
+        # RFCST 2026 (tomado) o su propio tomado (retenido)
+        (round(n["ref"]) if n["ref"] is not None and abs(n["ref"]) > TOL else None),
+        # Corredores distintos: Suscripcion integra abriendo por
+        # corredor, asi que el conteo alterno permite reconciliar
+        n["N_Corredores"],
+    ] for n in negocios]
+
+
+negocios = construir_negocios()
+negocios_R = construir_negocios("Valor_Ret")
+
+neg_rows = filas_negocios(negocios)
+neg_rows_R = filas_negocios(negocios_R)
 
 # Suscripcion integra abriendo tambien por corredor: el conteo
 # alterno se reporta para poder reconciliar sin cambiar el nivel
@@ -2117,6 +2171,20 @@ cols_ln = [
     "Score_Total", "Nivel_Riesgo", "Ranking",
 ]
 
+def _tabla_negocios(filas):
+    return pd.DataFrame(
+        [r[:3] + [r[15]] + r[3:10] + [r[13], r[14]] for r in filas],
+        columns=["LN", "Cedente", "Contrato", "Binder Ppto", "Region", "Paises",
+                 "Corredores", "Monedas", "Primas", "Siniestros", "Comisiones",
+                 "Semaforo", "Motivos"],
+    )
+
+
+neg_export_R = _tabla_negocios(neg_rows_R)
+neg_export_R["Semaforo"] = neg_export_R["Semaforo"].map(
+    {0: "VERDE", 1: "AMARILLO", 2: "ROJO"})
+neg_export_R = neg_export_R.sort_values("Primas", ascending=False)
+
 neg_export = pd.DataFrame(
     [r[:3] + [r[15]] + r[3:10] + [r[13], r[14]] for r in neg_rows],
     columns=["LN", "Cedente", "Contrato", "Binder Ppto", "Region", "Paises",
@@ -2196,9 +2264,11 @@ with pd.ExcelWriter(salida_xlsx, engine="xlsxwriter") as writer:
     exportar(dashboard, "Dashboard")
     exportar(resumen_global, "Resumen_Global")
     exportar(ranking[cols_ln], "Resumen_LN")
+    exportar(r_ln_R[[c for c in cols_ln if c in r_ln_R.columns]], "Resumen_LN_Ret")
     exportar(est_ln, "Estacionalidad_LN")
     exportar(r_ced, "Resumen_Cedente")
     exportar(neg_export, "Resumen_Negocio")
+    exportar(neg_export_R, "Resumen_Negocio_Ret")
     exportar(excepciones.head(500), "Excepciones")
     exportar(calidad_df, "Calidad_Datos")
     exportar(cuentas_df, "Cuentas_Concepto")
@@ -2219,6 +2289,7 @@ print(f"Excel generado: {salida_xlsx}")
 # alerta van marcadas en amarillo.
 
 salida_alertas = os.path.join(xOutputs, "Reporte_Alertas_FCST27.xlsx")
+salida_alertas_ret = os.path.join(xOutputs, "Reporte_Alertas_FCST27_Retenido.xlsx")
 
 # columna logica -> (letra, indice 0-based)
 COLS_REP = [
@@ -2294,7 +2365,7 @@ def _v(bloque, cpt):
     return float(v)
 
 
-def generar_reporte_alertas(ruta, filas):
+def generar_reporte_alertas(ruta, filas, retenido=False):
 
     wb = xlsxwriter.Workbook(ruta, {"nan_inf_to_errors": True})
     ws = wb.add_worksheet("Alertas")
@@ -2433,7 +2504,8 @@ def generar_reporte_alertas(ruta, filas):
     n_rojo_r = sum(1 for n in filas if n["sem"] == 2)
     n_ama_r = len(filas) - n_rojo_r
 
-    lg.write(0, 0, f"Reporte de alertas del {ETIQ_FCST} · PPTO Técnico", f_t)
+    lg.write(0, 0, f"Reporte de alertas del {ETIQ_FCST} · PPTO Técnico"
+                   + (" · vista RETENIDO" if retenido else " · vista TOMADO"), f_t)
     lg.write(1, 0, f"Generado {datetime.now().strftime('%d/%m/%Y %H:%M')} · "
                    f"{len(filas):,} negocios en ROJO o AMARILLO "
                    f"({n_rojo_r:,} rojos · {n_ama_r:,} amarillos) de "
@@ -2465,6 +2537,12 @@ def generar_reporte_alertas(ruta, filas):
                         "negocio: la prima única anual es lo normal en reaseguro.", f_w)
     lg.write(r0 + 2, 0, "Los negocios sin contraparte en el RFCST 2026 se señalan en "
                         "el motivo, pero eso por sí solo no levanta semáforo.", f_w)
+    if retenido:
+        lg.write(r0 + 3, 0, "Vista RETENIDO: las cifras son netas de cesión "
+                            "(tomado − cedido). Los bloques de RFCST 2026, "
+                            f"{ETIQ_PPTO26} y reales van vacíos porque esas bases "
+                            "solo existen en tomado, así que aquí las alertas se "
+                            "levantan con los índices del propio retenido.", f_w)
 
     lg.set_column(0, 0, 22)
     lg.set_column(1, 1, 62)
@@ -2475,23 +2553,36 @@ def generar_reporte_alertas(ruta, filas):
 
 
 # Semaforos por dimension para el reporte
-for _n in negocios:
-    _f = _n["f"]
-    _is = _rat(_f["S"], _f["P"])
-    _ic = _rat(_f["C"], _f["P"])
-    _vp = (_rat(_f["P"], _n["rf"]["P"], MATERIALIDAD) - 1
-           if _n["rf"] and abs(_n["rf"]["P"]) > TOL else float("nan"))
-    _n["semaforos"] = [semaforo_sin(_is), semaforo_costos(_ic),
-                       semaforo_desviacion(_vp),
-                       ["VERDE", "AMARILLO", "ROJO"][_n["sem"]]]
+def _marcar_semaforos(lista):
+    for n in lista:
+        f = n["f"]
+        ind_s = _rat(f["S"], f["P"])
+        ind_c = _rat(f["C"], f["P"])
+        var_p = (_rat(f["P"], n["rf"]["P"], MATERIALIDAD) - 1
+                 if n["rf"] and abs(n["rf"]["P"]) > TOL else float("nan"))
+        n["semaforos"] = [semaforo_sin(ind_s), semaforo_costos(ind_c),
+                          semaforo_desviacion(var_p),
+                          ["VERDE", "AMARILLO", "ROJO"][n["sem"]]]
 
-alertas_rep = sorted([n for n in negocios if n["sem"] > 0],
-                     key=lambda n: (-n["sem"], -abs(n["f"]["P"])))
+
+def _alertas_de(lista):
+    return sorted([n for n in lista if n["sem"] > 0],
+                  key=lambda n: (-n["sem"], -abs(n["f"]["P"])))
+
+
+_marcar_semaforos(negocios)
+_marcar_semaforos(negocios_R)
+
+alertas_rep = _alertas_de(negocios)
+alertas_rep_R = _alertas_de(negocios_R)
 
 generar_reporte_alertas(salida_alertas, alertas_rep)
+generar_reporte_alertas(salida_alertas_ret, alertas_rep_R, retenido=True)
 
 print(f"Reporte de alertas generado: {salida_alertas} "
       f"({len(alertas_rep):,} negocios)")
+print(f"Reporte de alertas retenido: {salida_alertas_ret} "
+      f"({len(alertas_rep_R):,} negocios)")
 
 # =====================================================
 # DASHBOARD HTML - PALETA Y FORMATOS
@@ -2614,11 +2705,7 @@ sec1_bloques = []
 
 for medida, cpt, icono, bueno_arriba in INFO_MEDIDAS:
     bloque = f"""
-  <div class="med-head"><h3 class="med">{medida} · {cpt}</h3>
-    <div class="toggle tgl-vista" data-cpt="{cpt}">
-      <button data-v="T" class="on">Tomado</button>
-      <button data-v="R">Retenido</button>
-    </div></div>
+  <h3 class="med">{medida} · {cpt}</h3>
   <div class="vista" id="v_{cpt}_T">{_kpis_concepto(cpt, medida, icono, bueno_arriba, GLOB_T)}</div>
   <div class="vista oculto" id="v_{cpt}_R">{_kpis_concepto(cpt, medida, icono, bueno_arriba, GLOB_R, retenido=True)}{NOTA_RET}</div>"""
     sec1_bloques.append(bloque)
@@ -2658,11 +2745,7 @@ def _kpis_psc(glob, pct, retenido=False):
 
 
 sec1_psc = f"""
-  <div class="med-head"><h3 class="med">P-S-C / %P-S-C <span class="ast-mark">*</span></h3>
-    <div class="toggle tgl-vista" data-cpt="PSC">
-      <button data-v="T" class="on">Tomado</button>
-      <button data-v="R">Retenido</button>
-    </div></div>
+  <h3 class="med">P-S-C / %P-S-C <span class="ast-mark">*</span></h3>
   <div class="vista" id="v_PSC_T">{_kpis_psc(GLOB_T, pct_psc_fcst)}</div>
   <div class="vista oculto" id="v_PSC_R">{_kpis_psc(GLOB_R, pct_psc_ret, retenido=True)}{NOTA_RET}</div>
   <div class="ast">* Falta el incremento a la reserva y los costos de cobertura.</div>"""
@@ -2732,49 +2815,104 @@ def _vals_pct(serie):
 
 LNS_LBL = [f"LN {ln}" for ln in LNS]
 
-charts_cfg = []
-
 _col_fcst = {"P": "Primas", "S": "Siniestros", "C": "Comisiones"}
 _col_rf = {"P": "Primas_RFCST26", "S": "Siniestros_RFCST26", "C": "Comisiones_RFCST26"}
 _col_pp = {"P": "Primas_FCST26", "S": "Siniestros_FCST26", "C": "Comisiones_FCST26"}
+_col_tom = {"P": "Primas_Tom", "S": "Siniestros_Tom", "C": "Comisiones_Tom"}
+_col_ced = {"P": "Primas_Ced", "S": "Siniestros_Ced", "C": "Comisiones_Ced"}
 
-for medida, cpt, _, bueno in INFO_MEDIDAS:
-    charts_cfg.append({
-        "el": f"ch_{cpt}_niv", "fmt": "m",
-        "cats": LNS_LBL,
-        "series": [
-            {"n": ETIQ_FCST, "c": S1, "v": _vals(r_ln[_col_fcst[cpt]])},
-            {"n": "RFCST 2026", "c": S2, "v": _vals(r_ln[_col_rf[cpt]])},
-            {"n": ETIQ_PPTO26, "c": S3, "v": _vals(r_ln[_col_pp[cpt]])},
-        ],
-    })
-    var = _ratio(r_ln[_col_fcst[cpt]], r_ln[_col_rf[cpt]], MATERIALIDAD) - 1
-    charts_cfg.append({
-        "el": f"ch_{cpt}_var", "fmt": "pct",
-        "cats": LNS_LBL,
-        "series": [
-            {"n": f"Var % {ETIQ_FCST} vs RFCST 2026", "c": S1,
-             "v": _vals_pct(var)},
-        ],
-    })
 
-charts_cfg.append({
-    "el": "ch_PSC_niv", "fmt": "m",
-    "cats": LNS_LBL,
-    "series": [
-        {"n": ETIQ_FCST, "c": S1, "v": _vals(r_ln["P_S_C"])},
-        {"n": "RFCST 2026", "c": S2, "v": _vals(r_ln["P_S_C_RFCST26"])},
-    ],
-})
+def construir_charts(r, retenido=False):
+    """Configuracion de las graficas por LN de una vista.
 
-charts_cfg.append({
-    "el": "ch_PSC_pct", "fmt": "pct",
-    "cats": LNS_LBL,
-    "series": [
-        {"n": ETIQ_FCST, "c": S1, "v": _vals_pct(r_ln["Pct_P_S_C"])},
-        {"n": "RFCST 2026", "c": S2, "v": _vals_pct(r_ln["Pct_P_S_C_RFCST"])},
-    ],
-})
+    En tomado la comparativa es contra 2026. En retenido no hay
+    contra que comparar (esas bases solo existen en tomado), asi
+    que la comparativa util es la descomposicion del propio
+    ejercicio: tomado, cedido y retenido."""
+
+    cfg = []
+
+    for medida, cpt, _, _bueno in INFO_MEDIDAS:
+        if retenido:
+            cfg.append({
+                "el": f"ch_{cpt}_niv", "fmt": "m",
+                "cats": LNS_LBL,
+                "series": [
+                    {"n": "Tomado", "c": S1, "v": _vals(r[_col_tom[cpt]])},
+                    {"n": "Cedido", "c": S2, "v": _vals(r[_col_ced[cpt]])},
+                    {"n": "Retenido", "c": S3, "v": _vals(r[_col_fcst[cpt]])},
+                ],
+            })
+            ret = _ratio(r[_col_fcst[cpt]], r[_col_tom[cpt]], MATERIALIDAD)
+            cfg.append({
+                "el": f"ch_{cpt}_var", "fmt": "pct",
+                "cats": LNS_LBL,
+                "series": [
+                    {"n": "% de retención sobre el tomado", "c": S3,
+                     "v": _vals_pct(ret)},
+                ],
+            })
+        else:
+            cfg.append({
+                "el": f"ch_{cpt}_niv", "fmt": "m",
+                "cats": LNS_LBL,
+                "series": [
+                    {"n": ETIQ_FCST, "c": S1, "v": _vals(r[_col_fcst[cpt]])},
+                    {"n": "RFCST 2026", "c": S2, "v": _vals(r[_col_rf[cpt]])},
+                    {"n": ETIQ_PPTO26, "c": S3, "v": _vals(r[_col_pp[cpt]])},
+                ],
+            })
+            var = _ratio(r[_col_fcst[cpt]], r[_col_rf[cpt]], MATERIALIDAD) - 1
+            cfg.append({
+                "el": f"ch_{cpt}_var", "fmt": "pct",
+                "cats": LNS_LBL,
+                "series": [
+                    {"n": f"Var % {ETIQ_FCST} vs RFCST 2026", "c": S1,
+                     "v": _vals_pct(var)},
+                ],
+            })
+
+    if retenido:
+        cfg.append({
+            "el": "ch_PSC_niv", "fmt": "m",
+            "cats": LNS_LBL,
+            "series": [
+                {"n": "P-S-C tomado", "c": S1, "v": _vals(r["P_S_C_Tom"])},
+                {"n": "P-S-C retenido", "c": S3, "v": _vals(r["P_S_C"])},
+            ],
+        })
+        cfg.append({
+            "el": "ch_PSC_pct", "fmt": "pct",
+            "cats": LNS_LBL,
+            "series": [
+                {"n": "%P-S-C tomado", "c": S1,
+                 "v": _vals_pct(_ratio(r["P_S_C_Tom"], r["Primas_Tom"], MATERIALIDAD))},
+                {"n": "%P-S-C retenido", "c": S3, "v": _vals_pct(r["Pct_P_S_C"])},
+            ],
+        })
+    else:
+        cfg.append({
+            "el": "ch_PSC_niv", "fmt": "m",
+            "cats": LNS_LBL,
+            "series": [
+                {"n": ETIQ_FCST, "c": S1, "v": _vals(r["P_S_C"])},
+                {"n": "RFCST 2026", "c": S2, "v": _vals(r["P_S_C_RFCST26"])},
+            ],
+        })
+        cfg.append({
+            "el": "ch_PSC_pct", "fmt": "pct",
+            "cats": LNS_LBL,
+            "series": [
+                {"n": ETIQ_FCST, "c": S1, "v": _vals_pct(r["Pct_P_S_C"])},
+                {"n": "RFCST 2026", "c": S2, "v": _vals_pct(r["Pct_P_S_C_RFCST"])},
+            ],
+        })
+
+    return cfg
+
+
+charts_cfg = construir_charts(r_ln)
+charts_cfg_R = construir_charts(r_ln_R, retenido=True)
 
 # Pie de pagina de las graficas de estacionalidad: declara el
 # ajuste Ago-Dic, que aplica unicamente al RFCST 2026
@@ -2812,13 +2950,18 @@ for medida, cpt, _, _b in INFO_MEDIDAS:
   <div class="grid dos2">
     <div class="card">
       <h2>{medida} por línea de negocio</h2>
-      <div class="nota">{ETIQ_FCST} vs RFCST acumulado a Dic 2026 y {ETIQ_PPTO26} (USD)</div>
+      <div class="nota"><span class="solo-tom">{ETIQ_FCST} vs RFCST acumulado a
+        Dic 2026 y {ETIQ_PPTO26} (USD)</span><span class="solo-ret">Descomposición
+        del {ETIQ_FCST}: tomado, cedido y retenido por LN (USD)</span></div>
       <div id="ch_{cpt}_niv"></div>
     </div>
     <div class="card">
-      <h2>Variación vs RFCST 2026 por línea de negocio</h2>
-      <div class="nota">Crecimiento implícito del {ETIQ_FCST} contra el RFCST Dic 2026.
-        LN sin base comparable no se grafican.</div>
+      <h2><span class="solo-tom">Variación vs RFCST 2026 por línea de negocio</span><span
+        class="solo-ret">% de retención por línea de negocio</span></h2>
+      <div class="nota"><span class="solo-tom">Crecimiento implícito del {ETIQ_FCST}
+        contra el RFCST Dic 2026. LN sin base comparable no se grafican.</span><span
+        class="solo-ret">Retenido sobre tomado de cada línea, con el % de cesión de
+        la base.</span></div>
       <div id="ch_{cpt}_var"></div>
     </div>
   </div>
@@ -2829,10 +2972,11 @@ for medida, cpt, _, _b in INFO_MEDIDAS:
         <select class="sel-ln" id="sel_line_{cpt}"></select>
       </div>
       <div class="nota">% del año {ANIO_FCST} que aporta cada mes. Con el filtro en
-        (Todas) se dibujan todas las LN; elige una para comparar su estacionalidad
-        contra la del RFCST 2026 y la del {ETIQ_PPTO26}.</div>
+        (Todas) se dibujan todas las LN; elige una para comparar<span class="solo-tom">
+        su estacionalidad contra la del RFCST 2026 y la del {ETIQ_PPTO26}</span><span
+        class="solo-ret"> el perfil retenido contra el tomado de esa misma línea</span>.</div>
       <div id="ch_line_{cpt}"></div>
-      <div class="ast">{PIE_EST}</div>
+      <div class="ast solo-tom">{PIE_EST}</div>
     </div>
   </div>""")
 
@@ -2841,13 +2985,14 @@ sec2_bloques.append(f"""
   <div class="grid dos2">
     <div class="card">
       <h2>P-S-C por línea de negocio</h2>
-      <div class="nota">Primas − Siniestros − Comisiones (USD)</div>
+      <div class="nota">Primas − Siniestros − Comisiones (USD)<span class="solo-ret">,
+        tomado contra retenido</span></div>
       <div id="ch_PSC_niv"></div>
     </div>
     <div class="card">
       <h2>%P-S-C por línea de negocio</h2>
-      <div class="nota">P-S-C como % de la prima. LN con prima menor a la
-        materialidad no se grafican.</div>
+      <div class="nota">P-S-C como % de la prima<span class="solo-ret"> del mismo
+        alcance</span>. LN con prima menor a la materialidad no se grafican.</div>
       <div id="ch_PSC_pct"></div>
     </div>
   </div>
@@ -2858,7 +3003,8 @@ sec2_bloques.append(f"""
   <div class="grid uno">
     <div class="card donut-doble">
       <div class="chart-head">
-        <h2>Mensualización de la estacionalidad {ETIQ_FCST}</h2>
+        <h2>Mensualización de la estacionalidad {ETIQ_FCST}<span class="solo-ret">
+          · retenido</span></h2>
         <select class="sel-ln" id="sel_ring_LN"></select>
       </div>
       <div class="nota">Anillo interior = primas · medio = siniestros · exterior =
@@ -2890,7 +3036,8 @@ sec3 = f"""
           <button data-m="2">Comisiones</button>
         </div>
       </div>
-      <div class="nota">Con los filtros aplicados (USD)</div>
+      <div class="nota">Con los filtros aplicados (USD)<span class="solo-ret">,
+        netas de cesión</span></div>
       <div id="ch3_neg"></div>
     </div>
     <div class="card donut-wrap">
@@ -2965,41 +3112,91 @@ def _num(v):
     return round(float(v))
 
 
-kpi_ln = {}
+def construir_kpi_ln(r, glob, retenido=False):
+    """Cuadros por LN de una vista. En retenido la referencia no es
+    2026 sino el propio tomado: r = tomado, p = cedido."""
+    kpi = {}
 
-for _, _fila in r_ln.iterrows():
-    kpi_ln[_fila["LN"]] = {
-        cpt: {"f": _num(_fila[c0]), "r": _num(_fila[c1]),
-              "p": _num(_fila[c2]), "r25": _num(_fila[c3])}
-        for cpt, (c0, c1, c2, c3) in _COLS_KPI.items()
-    }
+    for _, fila in r.iterrows():
+        if retenido:
+            kpi[fila["LN"]] = {
+                cpt: {"f": _num(fila[c0]), "r": _num(fila[_col_tom[cpt]]),
+                      "p": _num(fila[_col_ced[cpt]]), "r25": None}
+                for cpt, (c0, _c1, _c2, _c3) in _COLS_KPI.items()
+            }
+        else:
+            kpi[fila["LN"]] = {
+                cpt: {"f": _num(fila[c0]), "r": _num(fila[c1]),
+                      "p": _num(fila[c2]), "r25": _num(fila[c3])}
+                for cpt, (c0, c1, c2, c3) in _COLS_KPI.items()
+            }
 
-# El total replica los globales de la seccion General (incluye las
-# LN presupuestadas que aun no traen forecast 2027)
-kpi_ln["_tot"] = {
-    cpt: {"f": _num(GLOB_T[cpt]["anual"]),
-          "r": _num(RF_GLOB[cpt]["fcst"]) if RF_GLOB else None,
-          "p": _num(RF_GLOB[cpt]["ppto"]) if RF_GLOB else None,
-          "r25": _num(RF_GLOB[cpt]["real25"]) if RF_GLOB else None}
-    for cpt in ("P", "S", "C")
+    if retenido:
+        kpi["_tot"] = {
+            cpt: {"f": _num(GLOB_R[cpt]["anual"]),
+                  "r": _num(GLOB_T[cpt]["anual"]),
+                  "p": _num(GLOB_T[cpt]["anual"] - GLOB_R[cpt]["anual"]),
+                  "r25": None}
+            for cpt in ("P", "S", "C")
+        }
+    else:
+        # El total replica los globales de General (incluye las LN
+        # presupuestadas que aun no traen forecast 2027)
+        kpi["_tot"] = {
+            cpt: {"f": _num(GLOB_T[cpt]["anual"]),
+                  "r": _num(RF_GLOB[cpt]["fcst"]) if RF_GLOB else None,
+                  "p": _num(RF_GLOB[cpt]["ppto"]) if RF_GLOB else None,
+                  "r25": _num(RF_GLOB[cpt]["real25"]) if RF_GLOB else None}
+            for cpt in ("P", "S", "C")
+        }
+
+    return kpi
+
+
+kpi_ln = construir_kpi_ln(r_ln, GLOB_T)
+kpi_ln_R = construir_kpi_ln(r_ln_R, GLOB_R, retenido=True)
+
+def _season_js(season):
+    return {k: {c: (season[k][c] if season[k][c] else None)
+                for c in ("P", "S", "C")} for k in season}
+
+
+# Todo lo que cambia entre tomado y retenido va por vista: el
+# dashboard es el mismo y solo cambia la fuente de datos
+VISTAS_JS = {
+    "T": {
+        "lnKpi": kpi_ln,
+        "charts": charts_cfg,
+        "season": _season_js(SEASON),
+        "neg": neg_rows,
+        "part": {
+            "fcst": _vals(r_ln["Primas"]),
+            "rfcst": (_vals(r_ln["Primas_RFCST26"]) if RFCST is not None else None),
+            "etiq": ["RFCST 2026"],
+        },
+        "glob": {c: round(GLOB_T[c]["anual"]) for c in ("P", "S", "C")},
+    },
+    "R": {
+        "lnKpi": kpi_ln_R,
+        "charts": charts_cfg_R,
+        "season": _season_js(SEASON_R),
+        "neg": neg_rows_R,
+        "part": {
+            "fcst": _vals(r_ln_R["Primas"]),
+            "rfcst": _vals(r_ln["Primas"]),
+            "etiq": ["Tomado"],
+        },
+        "glob": {c: round(GLOB_R[c]["anual"]) for c in ("P", "S", "C")},
+    },
 }
 
 DATA_JS = {
     "lns": LNS,
-    "lnKpi": kpi_ln,
     "meses": MESES_TXT,
-    "charts": charts_cfg,
-    "season": {k: {c: (SEASON[k][c] if SEASON[k][c] else None)
-                   for c in ("P", "S", "C")} for k in SEASON},
+    "vistas": VISTAS_JS,
     # Estacionalidad 2026 (RFCST y FCST 2026) para comparar
-    # contra la mensualizacion del FCST 2027
+    # contra la mensualizacion del FCST 2027 (solo en tomado)
     "season26": SEASON26,
-    "part": {
-        "lns": LNS,
-        "fcst": _vals(r_ln["Primas"]),
-        "rfcst": (_vals(r_ln["Primas_RFCST26"]) if RFCST is not None else None),
-    },
-    "neg": neg_rows,
     "cat": CATALOGO_CED,
     "cfg": {
         "umbralAmarillo": UMBRAL_AMARILLO,
@@ -3010,11 +3207,14 @@ DATA_JS = {
         "materialidad": MATERIALIDAD,
         "anio": ANIO_FCST,
         "hayRfcst": RFCST is not None,
+        "hayCesion": RETENIDO_REAL,
         "etiqFcst": ETIQ_FCST,
         "etiqPpto26": ETIQ_PPTO26,
         # A partir de agosto el RFCST 2026 va ajustado: se dibuja
         # punteado de ese mes en adelante
         "ajusteDesde": len(MESES_ENEJUL),
+        "repTom": os.path.basename(salida_alertas),
+        "repRet": os.path.basename(salida_alertas_ret),
     },
 }
 
@@ -3149,6 +3349,15 @@ PLANTILLA = """<!doctype html>
   .toggle button { background: none; border: none; color: #898781; font-size: 11.5px;
     padding: 5px 12px; border-radius: 999px; cursor: pointer; font-family: inherit; }
   .toggle button.on { background: rgba(57,135,229,.2); color: #9ec5f4; }
+  /* Textos que cambian con la vista activa */
+  body:not(.vista-ret) .solo-ret { display: none; }
+  body.vista-ret .solo-tom { display: none; }
+  .tgl-global { border-color: rgba(57,135,229,.45); }
+  .tgl-global button { font-size: 12.5px; padding: 6px 16px; }
+  .tgl-global button.on { background: rgba(57,135,229,.28); color: #cfe2fb; }
+  body.vista-ret .tgl-global { border-color: rgba(25,158,112,.55); }
+  body.vista-ret .tgl-global button.on { background: rgba(25,158,112,.28);
+    color: #9fe0c6; }
   .sel-ln { background: #0d0d0d; color: #ffffff; border: 1px solid #383835;
     border-radius: 8px; padding: 5px 9px; font-size: 12px; font-family: inherit;
     max-width: 340px; }
@@ -3188,6 +3397,10 @@ PLANTILLA = """<!doctype html>
 
 <header class="top">
   <h1>Validación FCST __ANIO__ · PPTO Técnico</h1>
+  <div class="toggle tgl-global" id="tgl_vista">
+    <button data-v="T" class="on">Tomado</button>
+    <button data-v="R">Retenido</button>
+  </div>
   <span class="sub">__ARCHIVO__ · RFCST 2026: __FUENTE_RFCST__ · generado __GENERADO__</span>
   <nav class="secs">
     <a href="#sec-general">General</a>
@@ -3208,8 +3421,8 @@ __SEC1GRAF__
 
 <section id="sec-ln" class="bloque">
   <div class="sec-head"><h2 class="sec-title">Línea de Negocio</h2>
-    <span class="sub">Mismas vistas, por LN · cifras en dólares · estacionalidad
-      mensual del FCST __ANIO__</span></div>
+    <span class="sub">Mismas vistas, por LN · cifras en dólares<span class="solo-ret">
+      · netas de cesión</span> · estacionalidad mensual del FCST __ANIO__</span></div>
 __SEC2KPI__
 __SEC2__
 </section>
@@ -3217,8 +3430,8 @@ __SEC2__
 __SEC3__
 
 <div class="acciones">
-  <a class="btn-print" href="Reporte_Alertas_FCST27.xlsx" download>
-    &#128229; Descargar reporte de alertas (__N_ALERTAS__ negocios)
+  <a class="btn-print" id="btn-reporte" href="Reporte_Alertas_FCST27.xlsx" download>
+    &#128229; Descargar reporte de alertas · tomado (__N_ALERTAS__ negocios)
   </a>
   <button type="button" class="btn-print" id="btn-print-ln">
     &#128424; Imprimir PDF (Línea de Negocio)
@@ -3242,6 +3455,13 @@ const LNC = ['#3987e5', '#d95926', '#199e70', '#8f6fe8', '#d34f8f', '#c9a227',
              '#4fb3c9', '#7a9e57', '#b06b4c'];
 const MESC = ['#2c5f8a', '#e07b39', '#2e7d52', '#3fa7c4', '#9c5fb5', '#7ab648',
               '#1f4e5f', '#b5541c', '#3d6b35', '#4589b0', '#6a3d75', '#245c31'];
+
+// Vista activa del dashboard: 'T' tomado · 'R' retenido. Todo lo
+// que se dibuja sale de DATA.vistas[VISTA], asi que las dos vistas
+// tienen exactamente las mismas graficas, tablas y alertas.
+let VISTA = 'T';
+const V = () => DATA.vistas[VISTA];
+const esRet = () => VISTA === 'R';
 
 function esc(s) {
   return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -3521,31 +3741,57 @@ function chipSem(s) {
 
 function ratio(a, b) { return Math.abs(b) > DATA.cfg.minDen ? a / b : null; }
 
-// ------- Seccion 1: toggles tomado / retenido -------
-document.querySelectorAll('.tgl-vista').forEach(tgl => {
-  const cpt = tgl.dataset.cpt;
-  tgl.querySelectorAll('button').forEach(btn => {
-    btn.addEventListener('click', () => {
-      tgl.querySelectorAll('button').forEach(b => b.classList.toggle('on', b === btn));
-      document.getElementById('v_' + cpt + '_T').classList.toggle('oculto', btn.dataset.v !== 'T');
-      document.getElementById('v_' + cpt + '_R').classList.toggle('oculto', btn.dataset.v !== 'R');
-    });
-  });
-});
+// ------- Switch global tomado / retenido -------
+// Cambia la vista de TODO el dashboard: cuadros, gráficas,
+// estacionalidades, negocios, alertas y el reporte descargable.
+function aplicaVista(v) {
+  VISTA = v;
+  document.body.classList.toggle('vista-ret', v === 'R');
+
+  document.querySelectorAll('#tgl_vista button').forEach(b =>
+    b.classList.toggle('on', b.dataset.v === v));
+
+  // General: los cuadros de cada concepto vienen pre-renderizados
+  document.querySelectorAll('section#sec-general .vista').forEach(el =>
+    el.classList.toggle('oculto', !el.id.endsWith('_' + v)));
+
+  pintaParticipacion();
+  pintaEstGlobal();
+
+  // Línea de Negocio: se repinta respetando el filtro de LN activo
+  const selLN2 = document.getElementById('sel_kpi_ln');
+  filtraSeccionLN(selLN2 ? selLN2.value : '');
+
+  // Negocios y el enlace del reporte de alertas
+  renderNeg();
+
+  const btn = document.getElementById('btn-reporte');
+  if (btn) {
+    btn.setAttribute('href', v === 'R' ? DATA.cfg.repRet : DATA.cfg.repTom);
+    btn.innerHTML = '&#128229; Descargar reporte de alertas · ' +
+      (v === 'R' ? 'retenido' : 'tomado') + ' (' +
+      V().neg.filter(r => r[13] > 0).length.toLocaleString('en-US') + ' negocios)';
+  }
+}
+
+document.querySelectorAll('#tgl_vista button').forEach(btn =>
+  btn.addEventListener('click', () => aplicaVista(btn.dataset.v)));
 
 // ------- Seccion 1: dona de participacion por LN -------
-(function () {
-  const p = DATA.part;
-  const rings = [{n: 'PPTO/FCST ' + DATA.cfg.anio, v: p.fcst.map(v => v === null ? 0 : Math.max(v, 0))}];
-  if (p.rfcst) rings.push({n: 'RFCST 2026', v: p.rfcst.map(v => v === null ? 0 : Math.max(v, 0))});
+function pintaParticipacion() {
+  const p = V().part;
+  const rings = [{n: (esRet() ? 'Retenido ' : 'PPTO/FCST ') + DATA.cfg.anio,
+                  v: p.fcst.map(v => v === null ? 0 : Math.max(v, 0))}];
+  if (p.rfcst) rings.push({n: p.etiq[0],
+                           v: p.rfcst.map(v => v === null ? 0 : Math.max(v, 0))});
   const tot = p.fcst.reduce((a, b) => a + (b || 0), 0);
-  ringDonut('ch_part', rings, p.lns.map(l => 'LN ' + l), LNC,
-    fmtM(tot, 0), 'prima FCST ' + DATA.cfg.anio);
-})();
+  ringDonut('ch_part', rings, DATA.lns.map(l => 'LN ' + l), LNC,
+    fmtM(tot, 0), 'prima ' + (esRet() ? 'retenida ' : '') + DATA.cfg.anio);
+}
 
 // ------- Seccion 1: dona de estacionalidad global -------
 function ringsEstacion(lnKey) {
-  const s = DATA.season[lnKey];
+  const s = V().season[lnKey];
   if (!s) return [];
   return [
     {n: 'Primas', v: s.P},
@@ -3554,8 +3800,10 @@ function ringsEstacion(lnKey) {
   ];
 }
 
-ringDonut('ch_est_glob', ringsEstacion('_tot'), MESES, MESC,
-  DATA.cfg.anio, 'estacionalidad');
+function pintaEstGlobal() {
+  ringDonut('ch_est_glob', ringsEstacion('_tot'), MESES, MESC,
+    DATA.cfg.anio, esRet() ? 'retenido' : 'estacionalidad');
+}
 
 function selLN(sel, cb) {
   sel.innerHTML = '<option value="">(Todas las LN)</option>' + DATA.lns.map(l =>
@@ -3575,26 +3823,33 @@ const BUENO_MED = {P: true, S: false, C: false};
 function pintaKpisLN(lnSel) {
   const cont = document.getElementById('kpi_ln');
   if (!cont) return;
-  const d = DATA.lnKpi[lnSel || '_tot'] || {};
+  const d = V().lnKpi[lnSel || '_tot'] || {};
   const suf = lnSel ? ' · LN ' + lnSel : '';
   cont.innerHTML = ['P', 'S', 'C'].map((cpt, i) => {
     const o = d[cpt] || {};
     const varRf = (o.r !== null && o.r !== undefined &&
                    Math.abs(o.r) > DATA.cfg.minDen) ? o.f / o.r - 1 : null;
+    // En retenido no hay bases 2026 con que comparar: el contraste
+    // es contra el propio tomado, y la tercera linea da el cedido
+    const linea2 = esRet()
+      ? '<b class="neu">' + fmtPct(o.r ? o.f / o.r : null) + '</b> del tomado (' +
+        fmtM(o.r) + ')'
+      : badge(varRf, BUENO_MED[cpt], 'vs RFCST Dic26 (' + fmtM(o.r) + ')');
+    const linea3 = esRet()
+      ? 'Cedido: ' + fmtM(o.p)
+      : DATA.cfg.etiqPpto26 + ': ' + fmtM(o.p) + ' · Real 2025: ' + fmtM(o.r25);
     return '<div class="card kpi"><div class="t"><i>' + ICO_MED[cpt] + '</i>' +
-      MEDN[i] + ' ' + DATA.cfg.etiqFcst + suf + '</div>' +
+      MEDN[i] + (esRet() ? ' retenidas ' : ' ') + DATA.cfg.etiqFcst + suf + '</div>' +
       '<div class="v">' + fmtM(o.f) + '</div>' +
-      '<div class="d">' + badge(varRf, BUENO_MED[cpt],
-        'vs RFCST Dic26 (' + fmtM(o.r) + ')') + '</div>' +
-      '<div class="d">' + DATA.cfg.etiqPpto26 + ': ' + fmtM(o.p) +
-      ' · Real 2025: ' + fmtM(o.r25) + '</div></div>';
+      '<div class="d">' + linea2 + '</div>' +
+      '<div class="d">' + linea3 + '</div></div>';
   }).join('');
 }
 
 // Comparativas por LN (niveles, variacion y P-S-C): con una LN
 // elegida se deja solo su columna, con (Todas) se dibujan todas
 function pintaChartsLN(lnSel) {
-  DATA.charts.forEach(c => {
+  V().charts.forEach(c => {
     let cats = c.cats, series = c.series;
     if (lnSel) {
       const i = c.cats.indexOf('LN ' + lnSel);
@@ -3617,8 +3872,20 @@ const pintaLineaLN = {};
       // Una sola LN: se compara su mensualizacion contra el
       // perfil 2026. Las series 2026 van punteadas porque esa
       // base solo separa Ene-Jul de Ago-Dic (perfil por bloques)
-      const v = DATA.season[lnSel] ? DATA.season[lnSel][cpt] : null;
-      series = [{n: 'LN ' + lnSel + ' · ' + DATA.cfg.etiqFcst, c: S[0], v: v || []}];
+      const v = V().season[lnSel] ? V().season[lnSel][cpt] : null;
+      series = [{n: 'LN ' + lnSel + (esRet() ? ' · retenido' : ' · ' + DATA.cfg.etiqFcst),
+                 c: S[0], v: v || []}];
+
+      if (esRet()) {
+        // Las bases 2026 solo existen en tomado: aqui el contraste
+        // util es el perfil de la propia LN antes de ceder
+        const t = DATA.vistas.T.season[lnSel];
+        if (t && t[cpt]) series.push({n: 'LN ' + lnSel + ' · tomado', c: S[1],
+                                      v: t[cpt], dash: '5 4'});
+        lineChart('ch_line_' + cpt, series);
+        return;
+      }
+
       const s26 = DATA.season26[lnSel];
       if (s26 && s26[cpt]) {
         // El RFCST va solido hasta julio (forma del real 2026) y
@@ -3631,13 +3898,13 @@ const pintaLineaLN = {};
       }
       if (series.length === 1) {
         // Sin base 2026 comparable: al menos el total como referencia
-        const t = DATA.season._tot[cpt];
+        const t = V().season._tot[cpt];
         if (t) series.push({n: 'Total ' + DATA.cfg.etiqFcst, c: '#898781', v: t, dash: '3 3'});
       }
     } else {
       series = DATA.lns.map((ln, i) => ({
         n: 'LN ' + ln, c: LNC[i % LNC.length],
-        v: (DATA.season[ln] && DATA.season[ln][cpt]) || [],
+        v: (V().season[ln] && V().season[ln][cpt]) || [],
       })).filter(s => s.v && s.v.length);
     }
     lineChart('ch_line_' + cpt, series);
@@ -3674,7 +3941,6 @@ function filtraSeccionLN(lnSel) {
 
 const selSeccionLN = document.getElementById('sel_kpi_ln');
 if (selSeccionLN) selLN(selSeccionLN, filtraSeccionLN);
-filtraSeccionLN('');
 
 // ------- Seccion 3: negocios -------
 // Fila: [0 ln, 1 cedente, 2 contrato, 3 region, 4 paises, 5 corredores,
@@ -3692,7 +3958,7 @@ function nombreCed(c) {
 }
 
 function rowsNeg(skip) {
-  return DATA.neg.filter(r => {
+  return V().neg.filter(r => {
     for (const k in stateNeg.f) {
       if (+k === skip) continue;
       const v = stateNeg.f[k];
@@ -3799,18 +4065,24 @@ function renderNeg() {
   const crec = (pR !== 0) ? pF / pR - 1 : null;
 
   document.getElementById('kpi_neg').innerHTML =
-    '<div class="card kpi"><div class="t"><i>&#128181;</i>Prima FCST ' + DATA.cfg.anio +
+    '<div class="card kpi"><div class="t"><i>&#128181;</i>Prima ' +
+    (esRet() ? 'retenida ' : '') + 'FCST ' + DATA.cfg.anio +
     '</div><div class="v">' + fmtM(P) + '</div><div class="d">' +
     lista.length.toLocaleString('en-US') + ' entidades · ' +
     rows.length.toLocaleString('en-US') + ' negocios (' +
     rows.reduce((a, r) => a + (r[17] || 1), 0).toLocaleString('en-US') +
     ' abriendo por corredor)</div></div>' +
-    '<div class="card kpi"><div class="t"><i>&#128200;</i>Crecimiento vs RFCST 2026</div>' +
-    '<div class="v">' + fmtPct(crec, true) + '</div>' +
-    '<div class="d">' + (DATA.cfg.hayRfcst
-      ? nCruz.toLocaleString('en-US') + ' de ' + rows.length.toLocaleString('en-US') +
-        ' negocios con contraparte: FCST ' + fmtM(pF) + ' vs RFCST ' + fmtM(pR)
-      : 'sin base RFCST 2026 disponible') + '</div></div>' +
+    (esRet()
+      ? '<div class="card kpi"><div class="t"><i>&#128257;</i>Retención</div>' +
+        '<div class="v">' + fmtPct(pR ? pF / pR : null) + '</div>' +
+        '<div class="d">retenido ' + fmtM(pF) + ' de ' + fmtM(pR) +
+        ' tomados · cedido ' + fmtM(pR - pF) + '</div></div>'
+      : '<div class="card kpi"><div class="t"><i>&#128200;</i>Crecimiento vs RFCST 2026</div>' +
+        '<div class="v">' + fmtPct(crec, true) + '</div>' +
+        '<div class="d">' + (DATA.cfg.hayRfcst
+          ? nCruz.toLocaleString('en-US') + ' de ' + rows.length.toLocaleString('en-US') +
+            ' negocios con contraparte: FCST ' + fmtM(pF) + ' vs RFCST ' + fmtM(pR)
+          : 'sin base RFCST 2026 disponible') + '</div></div>') +
     '<div class="card kpi"><div class="t"><i>&#9888;</i>Índices implícitos</div>' +
     '<div class="v">' + fmtPct(ratio(Sv, P)) + '</div>' +
     '<div class="d">siniestralidad S/P · comisiones ' + fmtPct(ratio(Cv, P)) + '</div></div>' +
@@ -3837,18 +4109,19 @@ function renderNeg() {
   document.getElementById('rs_neg').innerHTML = top.length ?
     '<table><thead><tr><th>Entidad</th><th>LN</th><th>Región</th>' +
     '<th class="num">Negocios</th><th class="num">Primas</th>' +
-    '<th class="num">vs RFCST 26</th>' +
+    '<th class="num">' + (esRet() ? '% retención' : 'vs RFCST 26') + '</th>' +
     '<th class="num">Siniestros</th><th class="num">Comisiones</th>' +
     '<th class="num">S/P</th><th class="num">C/P</th><th class="num">%P-S-C</th>' +
     '<th class="num">Rojos</th><th class="num">Amarillos</th>' +
     '<th>Semáforo</th></tr></thead><tbody>' +
     top.map(e => {
       // Solo la parte del negocio que tiene contraparte en 2026
-      const cr = (e.nR && Math.abs(e.R) > DATA.cfg.minDen) ? e.P / e.R - 1 : null;
+      const cr = (e.nR && Math.abs(e.R) > DATA.cfg.minDen)
+        ? (esRet() ? e.P / e.R : e.P / e.R - 1) : null;
       return '<tr><td>' + esc(e.label) + '</td><td>' + esc([...e.lns].join(', ')) +
         '</td><td>' + esc([...e.reg].join(', ')) + '</td>' +
         '<td class="num">' + e.n + '</td><td class="num">' + fmtM(e.P) + '</td>' +
-        '<td class="num">' + fmtPct(cr, true) + '</td>' +
+        '<td class="num">' + fmtPct(cr, !esRet()) + '</td>' +
         '<td class="num">' + fmtM(e.S) + '</td><td class="num">' + fmtM(e.C) + '</td>' +
         '<td class="num">' + fmtPct(ratio(e.S, e.P)) + '</td>' +
         '<td class="num">' + fmtPct(ratio(e.C, e.P)) + '</td>' +
@@ -3941,7 +4214,8 @@ document.querySelectorAll('#tglx_neg button').forEach(btn => {
   });
 });
 
-renderNeg();
+// Arranque: deja todo el dashboard en la vista tomado
+aplicaVista('T');
 
 // Imprimir solo la seccion Linea de Negocio
 const btnPrint = document.getElementById('btn-print-ln');
