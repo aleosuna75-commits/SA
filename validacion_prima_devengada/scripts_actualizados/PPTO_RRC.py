@@ -37,9 +37,9 @@ MES_VALUACION = zAñoMesPPTO
 
 
 def fnd_cal(ramo, calmonth, valorfrec_legado=0.0, tiporea=None):
-    """FND de una cuenta proporcional/facultativa: tabla calibrada por antigüedad de
-    REGISTRO respecto al mes de valuación. `valorfrec_legado` es el valor de xPND que
-    se usaría hoy; se devuelve si el FND calibrado está desactivado o falta el mes."""
+    """FND de una cuenta proporcional/facultativa: el valor de xPND DESPLAZADO por el
+    delta del ramo. `valorfrec_legado` es el valor de xPND que se usaría hoy; se
+    devuelve tal cual si el FND calibrado está apagado, falta el mes o es TipoRea 2."""
     if not USAR_FND_CALIBRADO or MES_VALUACION is None:
         return valorfrec_legado
     try:                        # el NO proporcional (TipoRea 2) no cambia: conserva el valor de siempre.
@@ -50,7 +50,10 @@ def fnd_cal(ramo, calmonth, valorfrec_legado=0.0, tiporea=None):
     k = mec.antiguedad_registro(MES_VALUACION, calmonth)
     if k is None:
         return valorfrec_legado
-    return 0.0 if k < 0 else mec.fnd_registro(ramo, k, DELTA_FND)
+    # DESPLAZAMIENTO del legado, no sustitución: clip(VALORFREC - delta_ramo, 0, 1).
+    # Con delta = 0 devuelve la tabla xPND bit a bit, así que el modelo no puede
+    # salir estructuralmente peor que el legado; sólo lo corre donde hace falta.
+    return mec.fnd_desplazado(ramo, valorfrec_legado, k, DELTA_FND)
 
 if zMes < 10:
     AuxMes = 0

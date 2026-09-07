@@ -45,7 +45,9 @@ def fnd_modelo(xRamo, clave, legado):
     k = XPND_K.get(clave)
     if k is None:
         return legado
-    return mec.fnd_registro(xRamo, k, DELTA_FND)
+    # DESPLAZAMIENTO del valor de la tabla, no sustitución: con delta = 0 devuelve
+    # exactamente el legado, así que el modelo no puede salir peor por construcción.
+    return mec.fnd_desplazado(xRamo, legado, k, DELTA_FND)
 
 
 def _es_no_proporcional(xTipoRea) -> bool:

@@ -409,6 +409,41 @@ def fnd_registro(ramo, k_reg, delta: dict | None = None,
     return float(np.clip(NT_MENSUAL[int(k_reg)] - d, 0.0, 1.0))
 
 
+def fnd_desplazado(ramo, valorfrec_legado, k_reg, delta: dict | None = None,
+                   cfg: ConfigMEC = ConfigMEC()) -> float:
+    """FND del modelo como DESPLAZAMIENTO del FND legado, no como sustituto.
+
+        FND = clip(VALORFREC_legado - delta_ramo, 0, 1)
+
+    Esta forma ANIDA al legado: con delta = 0 devuelve exactamente el valor de la
+    tabla xPND, bit a bit. Por eso el modelo no puede salir estructuralmente peor:
+    si un ramo no necesita ajuste, su delta se calibra en cero y se queda con el
+    legado.
+
+    La forma anterior, clip(NT(k) - delta_ramo, 0, 1), NO anidaba: reemplazaba el
+    escalonamiento por frecuencia de la tabla por un desplazamiento por ramo, o sea
+    tiraba informacion para meter otra, y por eso podia empeorar.
+
+    Fuera de la ventana de 12 meses el legado ya vale 0 y no hay nada que
+    desplazar: se devuelve 0, como el legado.
+    """
+    if k_reg is None or k_reg < 0 or k_reg >= 12:
+        return 0.0
+    dd = delta or cfg.DELTA_RAMO
+    try:
+        rr = int(float(ramo))
+    except (TypeError, ValueError):
+        rr = None
+    d = dd[rr] if (rr is not None and rr in dd) else dd.get(ramo_de_tabla(ramo, cfg), 0.0)
+    try:
+        base = float(valorfrec_legado)
+    except (TypeError, ValueError):
+        return 0.0
+    if base <= 0.0:
+        return 0.0          # el legado ya lo da por devengado; un delta negativo no lo revierte
+    return float(np.clip(base - d, 0.0, 1.0))
+
+
 def tabla_registro(delta: dict | None = None, horizonte: int = 12,
                    cfg: ConfigMEC = ConfigMEC()) -> pd.DataFrame:
     """Tabla publicable ramo × antigüedad de registro (el objeto que consume RRC)."""
