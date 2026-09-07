@@ -394,7 +394,18 @@ def fnd_registro(ramo, k_reg, delta: dict | None = None,
     """FND de una cuenta proporcional/facultativa registrada hace k_reg meses."""
     if k_reg is None or k_reg < 0 or k_reg >= 12:
         return 0.0
-    d = (delta or cfg.DELTA_RAMO).get(ramo_de_tabla(ramo, cfg), 0.0)
+    # δ por SUBRAMO si el diccionario lo trae; si no, por grupo, como siempre.
+    # Dentro de un grupo los subramos no se mueven igual (en AyE, 31 y 35 piden
+    # +0.115 y 39 pide 0.000), y un solo δ para los tres empeora los tres.
+    dd = delta or cfg.DELTA_RAMO
+    try:
+        rr = int(float(ramo))
+    except (TypeError, ValueError):
+        rr = None
+    if rr is not None and rr in dd:
+        d = dd[rr]
+    else:
+        d = dd.get(ramo_de_tabla(ramo, cfg), 0.0)
     return float(np.clip(NT_MENSUAL[int(k_reg)] - d, 0.0, 1.0))
 
 
