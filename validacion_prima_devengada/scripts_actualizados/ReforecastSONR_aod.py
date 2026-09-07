@@ -17,6 +17,11 @@ if CARPETA_FND not in sys.path:
 import mec_devengamiento as mec
 
 USAR_FND_CALIBRADO = True   # False -> comportamiento idéntico al script original (xPND)
+
+# Volcado de diagnóstico del SONR: detalle intermedio de Metodo_propio(), para separar
+# cuánto de la desviación es prima y cuánto es LAG x IS. No altera ningún cálculo.
+DUMP_DIAGNOSTICO = True
+CARPETA_DIAG = fr"C:\Users\{usuario}\OneDrive - GPV\Documents\Outputs\diag_sonr"
 DELTA_FND = mec.cargar_delta(CARPETA_FND)   # lee delta_calibrado.json de Documents si existe
 
 
@@ -468,7 +473,42 @@ def Metodo_propio():
     ####MERGE BASE DE CAPITAL (Archivo MR y desviaciones para RRC y SONR)
     Tbase_mp_['MR'] = Tbase_mp_.apply(lambda row: (row['Desviacion'] / -BC) * BC2, axis=1)
 
-    
+    # ---- VOLCADO DE DIAGNÓSTICO ---------------------------------------------------
+    # Escribe el detalle intermedio para poder separar cuánto de la desviación del SONR
+    # está en la PRIMA y cuánto en LAG x IS. Son archivos chicos (100 y ~2 mil filas).
+    # Ponlo en False cuando ya no haga falta; no cambia ningún número de la corrida.
+    if DUMP_DIAGNOSTICO:
+        try:
+            os.makedirs(CARPETA_DIAG, exist_ok=True)
+            cols = ['Ramo', 'NoLAG', 'AñoMes', 'AñoSusc', 'Fecha Inicio', 'Fecha Fin', 'Llave',
+                    'Prima Dev', 'LAG', 'Ind Sin SONR Media', 'Ind Sin SONR 99.5%',
+                    'Factor_Ret', 'BEL_RIESGO', 'IRR', 'Desviacion', 'MR']
+            Tbase_mp_.reindex(columns=cols).to_csv(
+                os.path.join(CARPETA_DIAG, f'debug_Tbase_{Meses}.csv'), index=False, encoding='utf-8-sig')
+            # la prima que entra, por ramo y mes contable, con su FND medio
+            cF, cD, cP = f'FND_{Meses}', f'Dev_{Meses}', f'PrimaDev_{Meses}_Val'
+            if all(c in ConsultaR.columns for c in (cF, cD, cP)):
+                # agregaciones simples a propósito: groupby.apply cambió de firma entre
+                # versiones de pandas y aquí no vale la pena arriesgar la corrida
+                a = ConsultaR.copy()
+                a['_pw'] = a['PmaTomOri'].abs()
+                a['_fw'] = a[cF] * a['_pw']
+                a['_dw'] = a[cD] * a['_pw']
+                r = a.groupby(['Ramo_filt', 'CALMONTH', 'TipoRea'], as_index=False).agg(
+                    n=('PmaTomOri', 'size'), PmaTomOri=('PmaTomOri', 'sum'),
+                    PrimaDev_Val=(cP, 'sum'), _pw=('_pw', 'sum'),
+                    _fw=('_fw', 'sum'), _dw=('_dw', 'sum'))
+                den = r['_pw'].replace(0, float('nan'))
+                r['FND_medio'] = r['_fw'] / den
+                r['Dev_medio'] = r['_dw'] / den
+                r = r.drop(columns=['_pw', '_fw', '_dw'])
+                r['mes_valuacion'] = Meses
+                r.to_csv(os.path.join(CARPETA_DIAG, f'debug_ConsultaR_{Meses}.csv'),
+                         index=False, encoding='utf-8-sig')
+            print(f'[SONR][{Meses}] diagnóstico escrito en {CARPETA_DIAG}')
+        except Exception as _e:
+            print(f'[SONR][{Meses}] no pude escribir el diagnóstico: {_e}')
+    # -------------------------------------------------------------------------------
 
     return Tbase_mp_
 
