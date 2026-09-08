@@ -100,7 +100,7 @@ os.makedirs(xOutputs, exist_ok=True)
 # ---- Base del FCST 2027 (CSV de Suscripcion) ----
 # Se toma el primero que exista; la base con cesion manda porque
 # es la unica que permite separar tomado de retenido
-ARCHIVOS_FCST = ["PptoTecnico2027_ced.csv", "PptoTecnico2026.csv"]
+ARCHIVOS_FCST = ["PptoTecnico2027_Ced.csv", "PptoTecnico2026.csv"]
 PREFIJO_FCST = "PptoTecnico"          # fallback: el .csv mas reciente
 
 ANIO_FCST = 2027                      # ejercicio que se valida
@@ -231,9 +231,10 @@ PESO_EST = 0.20               # V3 concentracion estacional
 # a 1 o a 100) y contra el layout del resto de columnas. Si el
 # nombre apunta a una posicion que no cuadra, se localiza por esa
 # verificacion y se avisa. Ver localizar_cesion().
-COL_CESION = "Prc_Ced"
-COL_CESION_ALIAS = ["Prc_Ced", "PrcCed", "Prc Ced", "Prc_Cesion", "PrcCesion",
-                    "% Cesion", "%Cesion", "Pct_Ces", "Porc_Ces", "ZPRCCED"]
+COL_CESION = "PRCT_CED"
+COL_CESION_ALIAS = ["PRCT_CED", "Prct_Ced", "Prc_Ced", "PrcCed", "Prc Ced",
+                    "Prc_Cesion", "PrcCesion", "% Cesion", "%Cesion",
+                    "Pct_Ces", "Porc_Ces", "ZPRCCED", "ZPRCTCED"]
 
 # Escape manual: si la deteccion automatica avisa que no puede
 # desambiguar, poner aqui la posicion (0-based) de la columna de
@@ -315,6 +316,46 @@ MAPEO_42 = {
 
 LAYOUTS = {45: MAPEO_45, 42: MAPEO_42}
 
+# ---- Mapeo por NOMBRE del encabezado ----
+# Los exports traen los nombres tecnicos de SAP. Cuando el
+# encabezado cuadra con los datos, identificar las columnas por
+# nombre es mas robusto que por posicion: la base aguanta columnas
+# nuevas (el _ID y el PRCT_CED de la base con cesion) o
+# reordenadas sin tocar el mapeo posicional. El mapeo armado por
+# nombre SIEMPRE se verifica contra el contenido (_layout_ok); si
+# no pasa, se cae al mapeo por posicion de siempre.
+MAPEO_NOMBRES = {
+    "erpglacct": "Cuenta_Concepto",   # /ERP/GL_ACCT
+    "erpfuncarea": "LN",              # /ERP/FUNCAREA
+    "zpaiscedn": "Pais_Cod",
+    "erptwaers": "Moneda",            # /ERP/TWAERS
+    "erpcostcntr": "Cuenta_LN",       # /ERP/COSTCNTR
+    "erpproftctr": "Producto",        # /ERP/PROFTCTR
+    "zcontrato": "Contrato",
+    "0fiscper": "Periodo",
+    "0fiscyear": "Anio",
+    "0calmonth2": "Mes",
+    "zdistchrp": "Flag_A",
+    "ztiporeas": "Flag_B",
+    "ztipoces": "TipoRea_Cod",
+    "zsuscyear": "Anio_Susc",
+    "zcedente": "Cedente",
+    "zcorredor": "Corredor",
+    "ztipventa": "Flag_C",
+    "erpamount": "Monto",             # /ERP/AMOUNT (no AMOUNT_T)
+    "zregionrp": "Region",
+    "binderppto": "Binder_Ppto",
+    "archivoorigen": "Archivo_Origen",
+}
+
+# Sin estos campos el mapeo por nombre no sirve y se usa el
+# posicional (Binder_Ppto no entra: puede no venir en el export)
+CAMPOS_MINIMOS = {
+    "Cuenta_Concepto", "LN", "Cuenta_LN", "Producto", "Moneda", "Contrato",
+    "Cedente", "Corredor", "Periodo", "Anio", "Mes", "Anio_Susc", "Monto",
+    "Region",
+}
+
 # Perfil estructural de cada layout: posiciones cuyo contenido es
 # inconfundible. Es lo que permite ubicar la columna de cesion
 # aunque el encabezado venga permutado, porque al quitar la columna
@@ -362,10 +403,15 @@ CLAVE_MEDIDA = {"P": "Primas", "S": "Siniestros", "C": "Comisiones"}
 def _buscar_archivo(nombre_exacto, prefijo, extension):
     """Nombre exacto en Inputs o junto al script; si no, el
     archivo prefijo*extension mas reciente (avisando)."""
+    # Sin distinguir mayusculas: el export llega indistintamente
+    # como ..._ced.csv o ..._Ced.csv
+    objetivo = nombre_exacto.lower()
     for carpeta in (xInputs, xFolder):
-        ruta = os.path.join(carpeta, nombre_exacto)
-        if os.path.exists(ruta):
-            return ruta
+        if not os.path.isdir(carpeta):
+            continue
+        for f in sorted(os.listdir(carpeta)):
+            if f.lower() == objetivo:
+                return os.path.join(carpeta, f)
 
     candidatos = sorted(
         {
@@ -395,7 +441,8 @@ archivo = None
 
 for _nombre_fcst in ARCHIVOS_FCST:
     archivo = _buscar_archivo(_nombre_fcst, PREFIJO_FCST, ".csv")
-    if archivo is not None and os.path.basename(archivo) == _nombre_fcst:
+    if (archivo is not None
+            and os.path.basename(archivo).lower() == _nombre_fcst.lower()):
         break
 
 if archivo is None:
@@ -444,6 +491,51 @@ def _perfil_cesion(serie):
     if maximo <= 100.0 + 1e-9:
         return True, 100.0          # viene como porcentaje (30)
     return False, 1.0
+
+
+def _escala_cesion(v):
+    """(escala, avisos) de la columna de cesion ya localizada.
+
+    La escala se decide con el percentil 99 y no con el maximo: un
+    solo renglon mal capturado (un 1.5 en una columna de
+    fracciones) no puede cambiar la lectura de toda la columna, que
+    dividiria entre 100 y dejaria el retenido inflado. Los valores
+    fuera de rango se avisan y se recortan."""
+
+    vv = v.dropna()
+
+    if vv.empty:
+        raise ValueError(
+            f"La columna '{COL_CESION}' viene vacía o no es numérica.")
+
+    if v.notna().mean() < 0.80:
+        raise ValueError(
+            f"La columna '{COL_CESION}' trae {1 - v.notna().mean():.0%} de "
+            "valores no numéricos: no se puede usar como % de cesión.")
+
+    p99 = float(vv.quantile(0.99))
+
+    if p99 <= 1.0 + 1e-9:
+        escala = 1.0                # fraccion (0.30)
+    elif p99 <= 100.0 + 1e-9:
+        escala = 100.0              # porcentaje (30)
+    else:
+        raise ValueError(
+            f"La columna '{COL_CESION}' no se comporta como un %: su percentil "
+            f"99 es {p99:,.2f}. Debe venir en fracción (0-1) o en porcentaje "
+            "(0-100).")
+
+    avisos = []
+    n_neg = int((vv < -1e-9).sum())
+    n_alto = int((vv > escala + 1e-9).sum())
+
+    if n_neg:
+        avisos.append(f"{n_neg:,} renglones con % negativo (se toman como 0)")
+    if n_alto:
+        avisos.append(f"{n_alto:,} renglones por arriba de "
+                      f"{'1' if escala == 1.0 else '100'} (se recortan a 100%)")
+
+    return escala, avisos
 
 
 def _layout_ok(muestra, mapeo):
@@ -499,6 +591,73 @@ def _layout_ok(muestra, mapeo):
         pruebas.append(len(v) > 0 and (v % 1 == 0).mean() > 0.98)
 
     return len(pruebas) >= 6 and all(pruebas)
+
+
+def mapeo_por_encabezado(encabezados, muestra):
+    """{posicion: campo} armado con los NOMBRES del encabezado, o
+    None si los nombres no alcanzan o no cuadran con los datos.
+
+    Es el camino preferente: identificar por nombre deja que el
+    export agregue columnas (el _ID y el PRCT_CED de la base con
+    cesion) sin que haya que tocar el mapeo posicional. Lo que lo
+    hace seguro es que el resultado se verifica contra el
+    contenido igual que el mapeo por posicion."""
+
+    mapeo = {}
+
+    for i, h in enumerate(encabezados):
+        campo = MAPEO_NOMBRES.get(_norm_txt(h))
+        if campo is None or campo in mapeo.values():
+            continue
+        mapeo[i] = campo
+
+    if not CAMPOS_MINIMOS.issubset(set(mapeo.values())):
+        return None
+
+    return mapeo if _layout_ok(muestra, mapeo) else None
+
+
+def cesion_por_nombre(df, encabezados, usadas):
+    """(serie de cesion 0-1, detalle, posicion) con el layout ya
+    resuelto por nombre. La columna se busca por su nombre entre
+    las que no ocupo ningun otro campo, y se verifica que el
+    contenido se comporte como un %."""
+
+    if POS_CESION is not None:
+        i = int(POS_CESION)
+        det = f"posición {i} forzada a mano en POS_CESION"
+    else:
+        alias = {_norm_txt(a) for a in COL_CESION_ALIAS}
+        pos = [i for i, h in enumerate(encabezados)
+               if _norm_txt(h) in alias and i not in usadas]
+
+        if not pos:
+            return None, f"el archivo no trae la columna '{COL_CESION}'", None
+
+        if len(pos) > 1:
+            raise ValueError(
+                f"El encabezado trae {len(pos)} columnas con nombre de % de "
+                f"cesión (posiciones {pos}: "
+                f"{[str(encabezados[i]).strip() for i in pos]}). Dejar una sola "
+                "o indicar cuál en POS_CESION."
+            )
+
+        i = pos[0]
+        det = f"columna '{str(encabezados[i]).strip()}' (posición {i})"
+
+    # La escala se revisa sobre la columna completa, no sobre una
+    # muestra: es el dato del que cuelga todo el retenido
+    v = _num_col(df.iloc[:, i])
+    escala, avisos = _escala_cesion(v)
+    cesion = (v / escala).fillna(0.0).clip(0.0, 1.0)
+
+    if escala != 1.0:
+        det += f" · venía en escala 0-100, se dividió entre {escala:.0f}"
+
+    for a in avisos:
+        print(f"  AVISO % de cesión: {a}.")
+
+    return cesion, det, i
 
 
 def localizar_cesion(df, encabezados):
@@ -603,25 +762,71 @@ print(f"Leyendo {archivo} ...")
 df = pd.read_csv(archivo, encoding="utf-8-sig", low_memory=False)
 
 ENCABEZADOS_ORIGINALES = [str(c).strip() for c in df.columns]
+N_COLUMNAS_ARCHIVO = len(df.columns)
 
-# La columna de % de cesion se aparta antes de mapear por posicion:
-# asi el resto del archivo conserva el layout conocido sin importar
-# en que lugar la haya insertado el export
-df, CESION, DETALLE_CESION, POS_CESION_DET = localizar_cesion(
-    df, ENCABEZADOS_ORIGINALES)
+# Primero se intenta armar el layout con los NOMBRES del
+# encabezado, verificandolo contra el contenido. Asi el script
+# aguanta columnas nuevas (el _ID y el PRCT_CED de la base con
+# cesion) sin tocar nada. Si los nombres no alcanzan o no cuadran,
+# se cae al mapeo por posicion de siempre, que aparta la columna
+# de cesion antes de mapear.
+MAPEO_NOMBRE = mapeo_por_encabezado(ENCABEZADOS_ORIGINALES, df.head(20_000))
 
-N_COLUMNAS_CSV = len(df.columns)
+if MAPEO_NOMBRE is not None:
+    CESION, DETALLE_CESION, POS_CESION_DET = cesion_por_nombre(
+        df, ENCABEZADOS_ORIGINALES, set(MAPEO_NOMBRE))
 
-if N_COLUMNAS_CSV not in LAYOUTS:
-    raise ValueError(
-        f"El CSV trae {N_COLUMNAS_CSV} columnas y solo hay layout para "
-        f"{sorted(LAYOUTS)}. Cambio el export: revisar MAPEO_45 / MAPEO_42."
-    )
+    _orden = sorted(MAPEO_NOMBRE)
+    df = df.iloc[:, _orden].copy()
+    df.columns = [MAPEO_NOMBRE[i] for i in _orden]
 
-MAPEO_POSICIONAL = LAYOUTS[N_COLUMNAS_CSV]
-_POS_NO_LLAVE = POS_NO_LLAVE[N_COLUMNAS_CSV]
+    MAPEO_POSICIONAL = dict(enumerate(df.columns))
+    N_COLUMNAS_CSV = len(df.columns)
+    _POS_NO_LLAVE = set()
+    METODO_LAYOUT = (f"columnas identificadas por el nombre del encabezado "
+                     f"({len(MAPEO_NOMBRE)} campos de {N_COLUMNAS_ARCHIVO} "
+                     f"columnas del archivo)")
+    print(f"  layout por nombre de encabezado: {len(MAPEO_NOMBRE)} campos "
+          f"de {N_COLUMNAS_ARCHIVO} columnas.")
 
-df.columns = [MAPEO_POSICIONAL.get(i, f"pos{i:02d}") for i in range(N_COLUMNAS_CSV)]
+    MAPA_ARCHIVO = dict(MAPEO_NOMBRE)
+    if POS_CESION_DET is not None:
+        MAPA_ARCHIVO[POS_CESION_DET] = "% de cesión"
+else:
+    df, CESION, DETALLE_CESION, POS_CESION_DET = localizar_cesion(
+        df, ENCABEZADOS_ORIGINALES)
+
+    N_COLUMNAS_CSV = len(df.columns)
+
+    if N_COLUMNAS_CSV not in LAYOUTS:
+        raise ValueError(
+            f"El CSV trae {N_COLUMNAS_ARCHIVO} columnas: los nombres del "
+            f"encabezado no alcanzaron para identificarlas (faltan campos de "
+            f"{sorted(CAMPOS_MINIMOS)} en MAPEO_NOMBRES, o el contenido no "
+            f"cuadra) y {N_COLUMNAS_CSV} no coincide con ningun layout "
+            f"posicional ({sorted(LAYOUTS)}). Cambio el export: revisar "
+            f"MAPEO_NOMBRES / MAPEO_45 / MAPEO_42."
+        )
+
+    MAPEO_POSICIONAL = LAYOUTS[N_COLUMNAS_CSV]
+    _POS_NO_LLAVE = POS_NO_LLAVE.get(N_COLUMNAS_CSV, set())
+    METODO_LAYOUT = f"mapeo posicional de {N_COLUMNAS_CSV} columnas"
+
+    df.columns = [MAPEO_POSICIONAL.get(i, f"pos{i:02d}")
+                  for i in range(N_COLUMNAS_CSV)]
+
+    # La cesion se aparto del df, asi que las posiciones del
+    # archivo se recorren una a partir de ella
+    MAPA_ARCHIVO = {}
+    _k = 0
+    for _i in range(N_COLUMNAS_ARCHIVO):
+        if _i == POS_CESION_DET:
+            MAPA_ARCHIVO[_i] = "% de cesión"
+            continue
+        _campo = MAPEO_POSICIONAL.get(_k)
+        if _campo:
+            MAPA_ARCHIVO[_i] = _campo
+        _k += 1
 
 if "Binder_Ppto" not in df.columns:
     df["Binder_Ppto"] = np.nan
@@ -655,7 +860,7 @@ if CESION is not None:
 else:
     print(f"  {DETALLE_CESION}: el retenido queda igual al tomado.")
 
-print(f"  {len(df):,} renglones ({N_COLUMNAS_CSV} columnas) · "
+print(f"  {len(df):,} renglones ({N_COLUMNAS_ARCHIVO} columnas) · "
       f"LN: {df['LN'].nunique()} · cedentes: {df['Cedente'].nunique():,} · "
       f"contratos: {df['Contrato'].nunique():,} · "
       f"anios fiscales: {df['Anio'].min()}-{df['Anio'].max()}")
@@ -810,10 +1015,22 @@ def _chk(check, detalle, n, monto):
                     "Renglones": int(n), "Monto USD": float(monto)})
 
 
-_chk("Encabezados permutados",
-     "El CSV trae los nombres de columna en otro orden que los datos; "
-     "se leyo con el mapeo posicional de la hoja Mapeo_Columnas.",
+_chk("Identificacion de columnas", f"{METODO_LAYOUT} (ver hoja Mapeo_Columnas).",
      0, 0)
+
+# La cesion en 0 o en 100% no es un error, pero conviene tenerla a
+# la vista: es la diferencia entre un negocio que se retiene
+# completo y uno que se cede completo
+if CESION is not None:
+    for _lim, _txt in ((0.0, "0%"), (1.0, "100%")):
+        _sel = d_ok[(d_ok["Prc_Cesion"] <= _lim) if _lim == 0.0
+                    else (d_ok["Prc_Cesion"] >= _lim)]
+        _chk(f"Cesión en {_txt}",
+             f"Renglones del ejercicio con % de cesión en {_txt} "
+             + ("(se retienen completos)" if _lim == 0.0
+                else "(se ceden completos)")
+             + ". El monto es de primas.",
+             len(_sel), _sel.loc[_sel["Concepto"] == "P", "Valor"].sum())
 
 _chk("Origen del concepto P/S/C",
      f"Concepto tomado de: {METODO_CONCEPTO}."
@@ -1258,7 +1475,7 @@ RETENIDO_SIMULADO = False
 
 if CESION is not None:
     d_ok["_ces"] = d_ok["Prc_Cesion"]
-    RETENIDO_MODO = f"% de cesión por renglón ({COL_CESION}) · {DETALLE_CESION}"
+    RETENIDO_MODO = f"% de cesión por renglón · {DETALLE_CESION}"
     RETENIDO_REAL = True
     if SIMULAR_CESION:
         print(f"  AVISO: SIMULAR_CESION = 1, pero la base trae la columna "
@@ -2115,7 +2332,7 @@ dashboard = pd.DataFrame({
 
 parametros = pd.DataFrame({
     "Parametro": [
-        "Archivo fuente", "Ejercicio validado", "Fuente RFCST 2026",
+        "Archivo fuente", "Layout del CSV", "Ejercicio validado", "Fuente RFCST 2026",
         "Vista retenido", "Retención implícita de la prima", "Tolerancia (USD)", "Materialidad (USD)",
         "Umbral amarillo desviaciones", "Umbral rojo desviaciones",
         "Siniestralidad amarilla", "Siniestralidad roja",
@@ -2130,7 +2347,7 @@ parametros = pd.DataFrame({
         "Generado por", "Fecha de ejecucion",
     ],
     "Valor": [
-        os.path.basename(archivo), ANIO_FCST, FUENTE_RFCST,
+        os.path.basename(archivo), METODO_LAYOUT, ANIO_FCST, FUENTE_RFCST,
         RETENIDO_MODO,
         (cesion_df.iloc[0]["% Retención"] if RETENIDO_REAL else 1.0), TOL, MATERIALIDAD,
         UMBRAL_AMARILLO, UMBRAL_ROJO,
@@ -2146,7 +2363,9 @@ parametros = pd.DataFrame({
         usuario, datetime.now().strftime("%Y-%m-%d %H:%M"),
     ],
     "Descripcion": [
-        "CSV compartido por Suscripcion", "Anio del plan que se valida",
+        "CSV compartido por Suscripcion",
+        "Como se identificaron las columnas (ver hoja Mapeo_Columnas)",
+        "Anio del plan que se valida",
         "Base del RFCST 2026 para comparativas",
         "Como se calcula la vista retenido del dashboard",
         "Retenido / tomado de la prima del ejercicio (ver hoja Cesion)",
@@ -2174,20 +2393,14 @@ parametros = pd.DataFrame({
 
 # Se documenta el archivo tal como viene: las posiciones son las
 # del CSV original, con la columna de cesion en su lugar
-_campos_doc = []
-_k = 0
-
-for _i in range(len(ENCABEZADOS_ORIGINALES)):
-    if _i == POS_CESION_DET:
-        _campos_doc.append(f"{COL_CESION} (% de cesión)")
-    else:
-        _campos_doc.append(MAPEO_POSICIONAL.get(_k, "(no usado)"))
-        _k += 1
-
 mapeo_doc = pd.DataFrame({
-    "Posicion": list(range(len(ENCABEZADOS_ORIGINALES))),
-    "Encabezado CSV (permutado)": ENCABEZADOS_ORIGINALES,
-    "Campo asignado a esa columna de datos": _campos_doc,
+    "Posicion": list(range(N_COLUMNAS_ARCHIVO)),
+    "Encabezado CSV": ENCABEZADOS_ORIGINALES,
+    "Campo asignado a esa columna de datos": [
+        MAPA_ARCHIVO.get(_i, "(no usado)") for _i in range(N_COLUMNAS_ARCHIVO)],
+    "Como se identifico": [
+        ("nombre del encabezado" if MAPEO_NOMBRE is not None else "posicion")
+        if _i in MAPA_ARCHIVO else "" for _i in range(N_COLUMNAS_ARCHIVO)],
 })
 
 calidad_df = pd.DataFrame(calidad)

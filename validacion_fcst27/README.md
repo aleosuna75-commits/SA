@@ -8,7 +8,7 @@ del RFCST 2026).
 
 | Archivo | Obligatorio | Uso |
 |---|---|---|
-| `PptoTecnico2026.csv` (o `PptoTecnico*.csv` más reciente) | Sí | FCST 2027 de Suscripción (export SAP BW) |
+| `PptoTecnico2027_Ced.csv` (o `PptoTecnico*.csv` más reciente) | Sí | FCST 2027 de Suscripción (export SAP BW), con la columna `PRCT_CED` del % de cesión |
 | `BD_RFCST_26_act.xlsx` (o `BD_RFCST*.xlsx`) | No | Comparativas vs RFCST 2026 / FCST 2026 / Real 2025, y la estacionalidad mensual del FCST 2026 (hoja `Ppto2026`) |
 | `BDReal26.xlsx` (hoja `BD`) | No | Real 2026 mensual: da la forma con la que se abre el Ene-Jul del RFCST |
 | `Catalogo*.xlsx` (hoja `Valores`, columnas `Ced` / `CedenteRP`) | No | Nombres de cedentes en el dashboard |
@@ -68,10 +68,19 @@ python VAL_FCST27.py
 
 ## Notas importantes sobre el export de Suscripción
 
-**Encabezados permutados**: los nombres de columna del CSV no corresponden al
-orden real de los datos (típico del export de BW). El script lee por posición
-con el layout correspondiente al ancho del archivo (45 o 42 columnas),
-documentado en la hoja `Mapeo_Columnas` del Excel.
+**Cómo se identifican las columnas**: el export trae los nombres técnicos de
+SAP (`/ERP/GL_ACCT`, `/ERP/FUNCAREA`, `ZCEDENTE`, `PRCT_CED`, …). El script
+intenta primero armar el layout **por nombre de encabezado** (`MAPEO_NOMBRES`)
+y **siempre lo verifica contra el contenido** — LN con formato `LN0…`, cuentas
+contables, periodo, año, mes, región, moneda y un monto numérico y variable.
+Si pasa, se usa; así la base aguanta columnas nuevas (el `_ID` y el `PRCT_CED`
+de la base con cesión) o reordenadas sin tocar nada.
+
+Si los nombres no alcanzan o no cuadran con los datos, cae al **mapeo
+posicional** de siempre, con el layout correspondiente al ancho del archivo
+(45 o 42 columnas). Cuál de los dos caminos se usó queda escrito en el
+parámetro *Layout del CSV* y, columna por columna, en la hoja
+`Mapeo_Columnas` del Excel.
 
 **Concepto P/S/C**: el export de 45 columnas trae la cuenta contable que
 identifica el concepto. El catálogo `CUENTAS_CONCEPTO` lo traduce:
@@ -140,8 +149,9 @@ negocios**; las columnas Rojos y Amarillos dicen cuántos lo provocaron.
 
 ## Vista Retenido (cesión)
 
-La base con cesión, **`PptoTecnico2027_ced.csv`**, es la misma del FCST con una
-columna extra: el **% de cesión del renglón**. De ahí:
+La base con cesión, **`PptoTecnico2027_Ced.csv`**, es la misma del FCST con dos
+columnas extra: `_ID` (consecutivo del renglón, no se usa) y **`PRCT_CED`**, el
+**% de cesión del renglón** en fracción (0-1). De ahí:
 
 ```
 cedido   = monto tomado × % de cesión
@@ -152,26 +162,27 @@ Se aplica renglón por renglón, así que vale igual para primas, siniestros y
 comisiones. El script prefiere esta base sobre `PptoTecnico2026.csv` cuando
 ambas están en `Inputs/`.
 
-**Cómo se localiza la columna** (`localizar_cesion`): se busca **por nombre**
-(`Prc_Ced` y variantes, sin distinguir mayúsculas ni acentos), pero el nombre
-no basta porque los encabezados del export vienen permutados respecto a las
-columnas de datos. Por eso la posición candidata se verifica contra:
+**Cómo se localiza la columna**: **por nombre** (`PRCT_CED`, `Prc_Ced` y
+variantes en `COL_CESION_ALIAS`, sin distinguir mayúsculas ni acentos), en
+cualquier posición del archivo. Cuando el layout se resolvió por nombre de
+encabezado, la columna de cesión se toma de ahí directo; cuando se resolvió
+por posición, `localizar_cesion()` la aparta verificándola contra el contenido
+y contra el perfil estructural del resto de columnas.
 
-1. **el contenido** — numérico, sin negativos y acotado a 1 (fracción) o a 100
-   (porcentaje; si viene así se divide entre 100 automáticamente); y
-2. **el layout del resto** — al apartar la columna correcta, las 45 restantes
-   vuelven a cumplir el perfil conocido del export (posiciones vacías,
-   constantes, enteras y campos con formato propio como LN, cuentas, periodo).
+**Escala**: se decide con el **percentil 99** de la columna completa, no con el
+máximo — así un renglón mal capturado (un 1.5 en una columna de fracciones) no
+cambia la lectura de toda la columna. Si el p99 ≤ 1 se lee como fracción; si
+está entre 1 y 100 se divide entre 100; arriba de eso el script falla con un
+error explícito. Los valores negativos y los que rebasan el tope se recortan y
+**se avisan en consola con su conteo**.
 
-Si el nombre apunta a una posición cuyos datos no cuadran, se localiza por esa
-verificación y se avisa en consola. Si hay más de una candidata y ninguna
-coincide con el nombre, el script **falla con un error explícito** en vez de
-adivinar — antes calcular mal el retenido en silencio. En ese caso se puede
-forzar la posición de datos con `POS_CESION`.
+El script falla con un error explícito —en vez de adivinar— si hay dos
+columnas con nombre de cesión, si la columna no es numérica, o si el layout no
+se puede resolver ni por nombre ni por posición. Antes eso que calcular mal el
+retenido en silencio. Para forzar una posición de datos existe `POS_CESION`.
 
-> **Recomendación**: dejar la columna de cesión **al final del archivo** (es
-> donde la pone pandas al agregarla). Ahí la detección es directa y sin
-> ambigüedad.
+La hoja `Calidad_Datos` reporta cuántos renglones traen cesión en 0% (se
+retienen completos) y cuántos en 100% (se ceden completos), con su prima.
 
 **El dashboard completo en las dos vistas.** El switch **Tomado / Retenido**
 del encabezado cambia *todo*: los cuadros de General, los de Línea de Negocio,
@@ -222,7 +233,7 @@ El rango y la semilla del sorteo se controlan con `SIM_CESION_MIN`,
 
 Tres reglas del candado:
 
-1. **El dato real siempre gana.** Si la base trae `Prc_Ced`, el candado se
+1. **El dato real siempre gana.** Si la base trae `PRCT_CED`, el candado se
    ignora aunque esté en 1, y el script lo avisa en consola.
 2. **El % se sortea por negocio** (LN + cedente + contrato), no por renglón:
    así cada negocio conserva la misma retención en los 12 meses y en los tres
