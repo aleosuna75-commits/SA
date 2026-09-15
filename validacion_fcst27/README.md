@@ -16,10 +16,20 @@ del RFCST 2026).
 Sin la base del RFCST el script corre igual y las comparativas se muestran
 como `s/d`.
 
-> **La base del FCST se lee en CSV, no en xlsx.** El export completo trae más
-> de 1.7 millones de renglones y una hoja de Excel aguanta 1,048,576: guardarlo
-> como `.xlsx` lo **trunca en silencio**. Si Suscripción comparte el
-> `PptoTecnico2027.xlsx`, hay que pedir el CSV o exportarlo antes de correr.
+La base del FCST se busca por nombre, en este orden: `PptoTecnico2027_Ced`
+(tomado + % de cesión), `PptoTecnico2027` (solo tomado) y `PptoTecnico2026`
+(nombre del export anterior). Si no aparece ninguno se usa el `PptoTecnico*`
+más reciente de la carpeta, avisando cuál tomó.
+
+**`.csv` y `.xlsx`, con prioridad siempre del CSV.** La extensión se decide
+por fuera del nombre: primero se recorren los tres nombres buscando `.csv` y
+solo si no aparece ninguno se recorren otra vez buscando `.xlsx`. Así un CSV de
+menor prioridad en la lista le gana a cualquier XLSX.
+
+> Conviene que la base llegue en CSV. El XLSX se lee bastante más lento y una
+> hoja de Excel no pasa de 1,048,576 renglones, así que una base grande
+> guardada en ese formato queda truncada; si la hoja llega al límite, el script
+> lo avisa.
 
 ## Cómo correr
 

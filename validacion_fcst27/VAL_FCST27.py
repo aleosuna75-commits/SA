@@ -104,11 +104,18 @@ os.makedirs(xOutputs, exist_ok=True)
 # distinguir mayusculas, y si no aparece ninguno se usa el
 # PptoTecnico*.csv mas reciente de la carpeta (avisando).
 ARCHIVOS_FCST = [
-    "PptoTecnico2027_Ced.csv",        # tomado + % de cesion
-    "PptoTecnico2027.csv",            # solo tomado
-    "PptoTecnico2026.csv",            # nombre del export anterior
+    "PptoTecnico2027_Ced",            # tomado + % de cesion
+    "PptoTecnico2027",                # solo tomado
+    "PptoTecnico2026",                # nombre del export anterior
 ]
-PREFIJO_FCST = "PptoTecnico"          # fallback: el .csv mas reciente
+
+# Formatos aceptados, en orden de prioridad: el CSV manda SIEMPRE.
+# Primero se recorren todos los nombres buscando .csv y solo si no
+# aparece ninguno se vuelven a recorrer buscando .xlsx, asi que un
+# csv de menor prioridad en la lista le gana a cualquier xlsx.
+EXT_FCST = [".csv", ".xlsx"]
+
+PREFIJO_FCST = "PptoTecnico"          # fallback: el archivo mas reciente
 
 ANIO_FCST = 2027                      # ejercicio que se valida
 
@@ -460,21 +467,31 @@ def _buscar_archivo(nombre_exacto, prefijo, extension):
 
 archivo = None
 
-# Primero se prueban todos los nombres de la lista, en orden de
-# prioridad; el comodin PptoTecnico*.csv solo entra si no aparece
-# ninguno, para que no avise de un fallback que no se va a usar
-for _nombre_fcst in ARCHIVOS_FCST:
-    archivo = _buscar_exacto(_nombre_fcst)
+# La extension va por fuera: se recorren todos los nombres
+# buscando .csv y solo si no aparece ninguno se recorren de nuevo
+# buscando .xlsx. El comodin PptoTecnico* entra al final, con la
+# misma prioridad de formato, para no avisar de un fallback que no
+# se va a usar
+for _ext in EXT_FCST:
+    for _nombre_fcst in ARCHIVOS_FCST:
+        archivo = _buscar_exacto(_nombre_fcst + _ext)
+        if archivo is not None:
+            break
     if archivo is not None:
         break
 
 if archivo is None:
-    archivo = _buscar_archivo(ARCHIVOS_FCST[0], PREFIJO_FCST, ".csv")
+    for _ext in EXT_FCST:
+        archivo = _buscar_archivo(ARCHIVOS_FCST[0] + _ext, PREFIJO_FCST, _ext)
+        if archivo is not None:
+            break
 
 if archivo is None:
     raise FileNotFoundError(
-        f"No se encontro ninguna de {ARCHIVOS_FCST} ni {PREFIJO_FCST}*.csv "
-        f"en {xInputs} ni en {xFolder}"
+        "No se encontro la base del FCST en "
+        f"{xInputs} ni en {xFolder}: se buscaron "
+        + ", ".join(n + e for e in EXT_FCST for n in ARCHIVOS_FCST)
+        + f" y {PREFIJO_FCST}*" + "/".join(EXT_FCST)
     )
 
 
@@ -573,7 +590,10 @@ def _layout_ok(muestra, mapeo):
     pos = {campo: p for p, campo in mapeo.items()}
 
     def texto(campo):
-        return muestra.iloc[:, pos[campo]].astype(str).str.strip()
+        # el .0 de un entero leido como flotante (pasa al venir de
+        # xlsx) no debe tumbar las validaciones de formato
+        return (muestra.iloc[:, pos[campo]].astype(str).str.strip()
+                .str.replace(r"\.0$", "", regex=True))
 
     pruebas = []
 
@@ -785,7 +805,38 @@ def localizar_cesion(df, encabezados):
 
 print(f"Leyendo {archivo} ...")
 
-df = pd.read_csv(archivo, encoding="utf-8-sig", low_memory=False)
+LIMITE_XLSX = 1_048_576          # renglones de una hoja de Excel
+
+
+def leer_base(ruta):
+    """La base del FCST desde .csv o .xlsx.
+
+    El csv es el formato natural del export y el que se busca
+    primero; el xlsx se acepta para cuando Suscripcion comparte la
+    base ya abierta en Excel. Ese formato tiene dos pegas y se
+    avisan: es mucho mas lento de leer y no puede pasar del limite
+    de renglones de una hoja, asi que una base grande guardada en
+    xlsx queda truncada."""
+
+    if ruta.lower().endswith((".xlsx", ".xlsm")):
+        print("  formato xlsx: la lectura es bastante mas lenta que en csv.")
+        d = pd.read_excel(ruta, sheet_name=0, dtype=object)
+
+        vacios = int(d.isna().all(axis=1).sum())
+        if vacios:
+            d = d.dropna(how="all").reset_index(drop=True)
+            print(f"  se descartaron {vacios:,} renglones vacios de la hoja.")
+
+        if len(d) >= LIMITE_XLSX - 1:
+            print(f"  AVISO: la hoja llega al limite de renglones de Excel "
+                  f"({LIMITE_XLSX:,}), asi que la base pudo quedar TRUNCADA al "
+                  f"guardarse en xlsx. Conviene pedir el csv.")
+        return d
+
+    return pd.read_csv(ruta, encoding="utf-8-sig", low_memory=False)
+
+
+df = leer_base(archivo)
 
 ENCABEZADOS_ORIGINALES = [str(c).strip() for c in df.columns]
 N_COLUMNAS_ARCHIVO = len(df.columns)
