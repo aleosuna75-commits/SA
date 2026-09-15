@@ -98,9 +98,16 @@ xOutputs = os.path.join(xFolder, "Outputs")
 os.makedirs(xOutputs, exist_ok=True)
 
 # ---- Base del FCST 2027 (CSV de Suscripcion) ----
-# Se toma el primero que exista; la base con cesion manda porque
-# es la unica que permite separar tomado de retenido
-ARCHIVOS_FCST = ["PptoTecnico2027_Ced.csv", "PptoTecnico2026.csv"]
+# Se toma el primero de la lista que exista, en ese orden de
+# prioridad: la base con cesion manda porque es la unica que
+# permite separar tomado de retenido. El nombre se busca sin
+# distinguir mayusculas, y si no aparece ninguno se usa el
+# PptoTecnico*.csv mas reciente de la carpeta (avisando).
+ARCHIVOS_FCST = [
+    "PptoTecnico2027_Ced.csv",        # tomado + % de cesion
+    "PptoTecnico2027.csv",            # solo tomado
+    "PptoTecnico2026.csv",            # nombre del export anterior
+]
 PREFIJO_FCST = "PptoTecnico"          # fallback: el .csv mas reciente
 
 ANIO_FCST = 2027                      # ejercicio que se valida
@@ -406,11 +413,10 @@ CLAVE_MEDIDA = {"P": "Primas", "S": "Siniestros", "C": "Comisiones"}
 # =====================================================
 
 
-def _buscar_archivo(nombre_exacto, prefijo, extension):
-    """Nombre exacto en Inputs o junto al script; si no, el
-    archivo prefijo*extension mas reciente (avisando)."""
-    # Sin distinguir mayusculas: el export llega indistintamente
-    # como ..._ced.csv o ..._Ced.csv
+def _buscar_exacto(nombre_exacto):
+    """Ruta del archivo con ese nombre exacto en Inputs o junto al
+    script, sin distinguir mayusculas: el export llega
+    indistintamente como ..._ced.csv o ..._Ced.csv."""
     objetivo = nombre_exacto.lower()
     for carpeta in (xInputs, xFolder):
         if not os.path.isdir(carpeta):
@@ -418,6 +424,15 @@ def _buscar_archivo(nombre_exacto, prefijo, extension):
         for f in sorted(os.listdir(carpeta)):
             if f.lower() == objetivo:
                 return os.path.join(carpeta, f)
+    return None
+
+
+def _buscar_archivo(nombre_exacto, prefijo, extension):
+    """Nombre exacto en Inputs o junto al script; si no, el
+    archivo prefijo*extension mas reciente (avisando)."""
+    ruta = _buscar_exacto(nombre_exacto)
+    if ruta is not None:
+        return ruta
 
     candidatos = sorted(
         {
@@ -445,11 +460,16 @@ def _buscar_archivo(nombre_exacto, prefijo, extension):
 
 archivo = None
 
+# Primero se prueban todos los nombres de la lista, en orden de
+# prioridad; el comodin PptoTecnico*.csv solo entra si no aparece
+# ninguno, para que no avise de un fallback que no se va a usar
 for _nombre_fcst in ARCHIVOS_FCST:
-    archivo = _buscar_archivo(_nombre_fcst, PREFIJO_FCST, ".csv")
-    if (archivo is not None
-            and os.path.basename(archivo).lower() == _nombre_fcst.lower()):
+    archivo = _buscar_exacto(_nombre_fcst)
+    if archivo is not None:
         break
+
+if archivo is None:
+    archivo = _buscar_archivo(ARCHIVOS_FCST[0], PREFIJO_FCST, ".csv")
 
 if archivo is None:
     raise FileNotFoundError(
