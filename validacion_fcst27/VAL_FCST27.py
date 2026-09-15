@@ -389,15 +389,12 @@ CUENTAS_CONCEPTO = {
     "5310010000": "C",
 }
 
-# Respaldo por prefijo, para cuentas nuevas del mismo grupo.
-# Se abre a la FAMILIA completa (dos digitos) y no al subgrupo:
-# antes el respaldo de siniestros era "5402", asi que una cuenta
-# nueva de siniestros fuera de ese subgrupo (5403..., 5404...) no
-# entraba en ningun concepto, se iba a "X" y quedaba FUERA de las
-# cifras. Con la familia "54" cualquier cuenta de siniestros entra;
-# el catalogo explicito sigue mandando para las cuentas conocidas y
-# toda cuenta que no este en el catalogo se reporta en consola y en
-# las hojas Cuentas_Concepto y Cuadre_Conceptos.
+# Respaldo por prefijo para cuentas que no esten en el catalogo,
+# al nivel de FAMILIA (dos digitos) y no al de subgrupo: asi una
+# subcuenta nueva entra en su concepto en vez de quedarse sin
+# clasificar y salir de las cifras. El catalogo explicito manda
+# para las cuentas conocidas, y toda cuenta resuelta por prefijo
+# se reporta en consola y en la hoja Cuentas_Concepto.
 #   61xx -> primas · 54xx -> siniestros · 53xx -> costos de adquisicion
 PREFIJOS_CONCEPTO = [("61", "P"), ("54", "S"), ("53", "C")]
 
@@ -934,9 +931,8 @@ if "Cuenta_Concepto" in df.columns:
             print(f"    cuenta {_c} -> {_i['Concepto']} · "
                   f"{_i['Renglones']:,} renglones · {_i['Monto'] / 1e6:,.2f} M")
 
-    # Una cuenta que no cae en ningun concepto sale de las cifras
-    # sin hacer ruido: es exactamente como se pierde el monto de
-    # una LN. Aqui se grita, con el desglose por LN
+    # Una cuenta que no cae en ningun concepto saldria de las
+    # cifras sin hacer ruido: se avisa con el desglose por LN
     _sin = df["Concepto"].eq("X")
     if _sin.any():
         print(f"  ATENCION: {_sin.sum():,} renglones no se pudieron asignar a "
@@ -2442,9 +2438,8 @@ mapeo_doc = pd.DataFrame({
 #
 #   monto del export = -primas + siniestros + comisiones + sin clasificar
 #
-# Si una LN no cuadra contra otra fuente, esta hoja dice si es
-# porque hay monto sin clasificar (una cuenta que no cae en ningun
-# concepto) o porque hay renglones con el signo al reves.
+# El descuadre, el monto sin clasificar y los renglones con el
+# signo contrario al esperado quedan a la vista en la hoja.
 _cu = []
 
 for _ln_q in sorted(d["LN"].astype(str).unique(), key=lambda v: (len(v), v)):
@@ -2504,9 +2499,8 @@ calidad_df = pd.DataFrame(calidad)
 # Catalogo de cuentas usado para clasificar el concepto, con lo
 # que aporta cada una al ejercicio validado
 if "Cuenta_Concepto" in d.columns:
-    # Se abre por LN ademas de por cuenta: cuando una LN no cuadra,
-    # lo primero que hay que ver es que cuenta usa y en que
-    # concepto cayo
+    # Se abre por LN ademas de por cuenta, para ver que cuenta usa
+    # cada linea y en que concepto cayo
     _cta_res = (d.groupby([d["LN"].astype(str),
                            d["Cuenta_Concepto"].astype(str), "Concepto"])["Monto"]
                 .agg(["size", "sum"]).reset_index())

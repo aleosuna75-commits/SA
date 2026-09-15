@@ -102,14 +102,12 @@ C/P 18.5%, contra 44.6% y 20.2% del RFCST.
 
 **Cuentas nuevas.** Lo que no está en el catálogo se resuelve por **familia de
 dos dígitos** (`PREFIJOS_CONCEPTO`): `61` → primas, `54` → siniestros, `53` →
-costos de adquisición. Antes el respaldo de siniestros era el subgrupo `5402`,
-así que una subcuenta nueva de siniestros (`5403…`, `5404…`) no caía en ningún
-concepto, se marcaba `X` y **salía de las cifras sin hacer ruido**: era
-exactamente la forma en que una LN dejaba de cuadrar contra el resumen. Ahora
-entra en su concepto, y además:
+costos de adquisición. La familia y no el subgrupo, para que una subcuenta
+nueva (`5403…`, `5404…`) entre en su concepto en vez de quedarse sin clasificar
+y salir de las cifras. Además:
 
 - se imprime en consola cada cuenta fuera del catálogo con su monto;
-- si algo sigue sin clasificar, sale un **ATENCIÓN con el desglose por LN y
+- si algo queda sin clasificar, sale un **ATENCIÓN con el desglose por LN y
   cuenta** y el monto que queda fuera;
 - la hoja `Cuentas_Concepto` abre por **LN × cuenta × concepto**, marcando si
   la cuenta está en el catálogo o entró por prefijo.
@@ -126,8 +124,7 @@ monto del export = −primas + siniestros + comisiones + sin clasificar
 La columna **Cuadre (debe ser 0)** verifica esa identidad, **Sin clasificar**
 dice cuánto monto quedó fuera, y las tres últimas columnas muestran los
 renglones capturados con el signo contrario al esperado (primas en positivo,
-siniestros o comisiones en negativo). Si una LN no cuadra contra otra fuente,
-esta hoja dice si es por monto perdido, por signos o por ninguna de las dos.
+siniestros o comisiones en negativo).
 
 > El export anterior (42 columnas) no traía esa cuenta y el concepto se
 > reconstruía por la estructura del archivo. Esa ruta sigue como respaldo,
