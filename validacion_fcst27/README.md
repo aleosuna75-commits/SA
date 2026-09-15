@@ -16,6 +16,11 @@ del RFCST 2026).
 Sin la base del RFCST el script corre igual y las comparativas se muestran
 como `s/d`.
 
+> **La base del FCST se lee en CSV, no en xlsx.** El export completo trae más
+> de 1.7 millones de renglones y una hoja de Excel aguanta 1,048,576: guardarlo
+> como `.xlsx` lo **trunca en silencio**. Si Suscripción comparte el
+> `PptoTecnico2027.xlsx`, hay que pedir el CSV o exportarlo antes de correr.
+
 ## Cómo correr
 
 ```
@@ -28,7 +33,8 @@ python VAL_FCST27.py
 - **`VAL_FCST27.xlsx`** — Dashboard de KPIs, Resumen_Global (tomado/retenido
   vs RFCST/Ppto), Resumen_LN con semáforos y score de riesgo,
   Estacionalidad_LN, Resumen_Cedente, Resumen_Negocio, Excepciones,
-  Calidad_Datos, Retencion_Candidatas, Mapeo_Columnas y Parametros.
+  Calidad_Datos, Cuentas_Concepto, Cuadre_LN, Cesion, Mapeo_Columnas y
+  Parametros.
 - **`Reporte_Alertas_FCST27.xlsx`** — un renglón por negocio en ROJO o
   AMARILLO, con el mismo formato del reporte de alertas del RFCST 2026:
   identificación (LN, cedente, contrato, binder, país, región, corredor),
@@ -92,9 +98,36 @@ identifica el concepto. El catálogo `CUENTAS_CONCEPTO` lo traduce:
 | 5310010000 | Comisiones |
 
 El mapeo se validó contra el RFCST 2026 y el real 2026: produce S/P 44.1% y
-C/P 18.5%, contra 44.6% y 20.2% del RFCST. La hoja `Cuentas_Concepto` del
-Excel muestra cuánto aporta cada cuenta; si aparece una cuenta nueva se
-clasifica por prefijo y se reporta en `Calidad_Datos`.
+C/P 18.5%, contra 44.6% y 20.2% del RFCST.
+
+**Cuentas nuevas.** Lo que no está en el catálogo se resuelve por **familia de
+dos dígitos** (`PREFIJOS_CONCEPTO`): `61` → primas, `54` → siniestros, `53` →
+costos de adquisición. Antes el respaldo de siniestros era el subgrupo `5402`,
+así que una subcuenta nueva de siniestros (`5403…`, `5404…`) no caía en ningún
+concepto, se marcaba `X` y **salía de las cifras sin hacer ruido**: era
+exactamente la forma en que una LN dejaba de cuadrar contra el resumen. Ahora
+entra en su concepto, y además:
+
+- se imprime en consola cada cuenta fuera del catálogo con su monto;
+- si algo sigue sin clasificar, sale un **ATENCIÓN con el desglose por LN y
+  cuenta** y el monto que queda fuera;
+- la hoja `Cuentas_Concepto` abre por **LN × cuenta × concepto**, marcando si
+  la cuenta está en el catálogo o entró por prefijo.
+
+### Hoja `Cuadre_LN`
+
+Cuadre de la cuenta contable a las cifras publicadas, una línea por LN. La
+identidad tiene que cerrar:
+
+```
+monto del export = −primas + siniestros + comisiones + sin clasificar
+```
+
+La columna **Cuadre (debe ser 0)** verifica esa identidad, **Sin clasificar**
+dice cuánto monto quedó fuera, y las tres últimas columnas muestran los
+renglones capturados con el signo contrario al esperado (primas en positivo,
+siniestros o comisiones en negativo). Si una LN no cuadra contra otra fuente,
+esta hoja dice si es por monto perdido, por signos o por ninguna de las dos.
 
 > El export anterior (42 columnas) no traía esa cuenta y el concepto se
 > reconstruía por la estructura del archivo. Esa ruta sigue como respaldo,

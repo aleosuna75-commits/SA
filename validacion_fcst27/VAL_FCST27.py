@@ -389,8 +389,17 @@ CUENTAS_CONCEPTO = {
     "5310010000": "C",
 }
 
-# Respaldo por prefijo, para cuentas nuevas del mismo grupo
-PREFIJOS_CONCEPTO = [("61", "P"), ("5402", "S"), ("5310", "C")]
+# Respaldo por prefijo, para cuentas nuevas del mismo grupo.
+# Se abre a la FAMILIA completa (dos digitos) y no al subgrupo:
+# antes el respaldo de siniestros era "5402", asi que una cuenta
+# nueva de siniestros fuera de ese subgrupo (5403..., 5404...) no
+# entraba en ningun concepto, se iba a "X" y quedaba FUERA de las
+# cifras. Con la familia "54" cualquier cuenta de siniestros entra;
+# el catalogo explicito sigue mandando para las cuentas conocidas y
+# toda cuenta que no este en el catalogo se reporta en consola y en
+# las hojas Cuentas_Concepto y Cuadre_Conceptos.
+#   61xx -> primas · 54xx -> siniestros · 53xx -> costos de adquisicion
+PREFIJOS_CONCEPTO = [("61", "P"), ("54", "S"), ("53", "C")]
 
 MEDIDAS = ["Primas", "Siniestros", "Comisiones"]
 CLAVE_MEDIDA = {"P": "Primas", "S": "Siniestros", "C": "Comisiones"}
@@ -919,7 +928,29 @@ if "Cuenta_Concepto" in df.columns:
                                Concepto=("Concepto", "first"))
                           .to_dict("index"))
         print(f"AVISO: {len(CUENTAS_NUEVAS)} cuenta(s) fuera del catalogo "
-              "CUENTAS_CONCEPTO; se clasificaron por prefijo (ver Calidad_Datos).")
+              "CUENTAS_CONCEPTO; se clasificaron por prefijo (ver Calidad_Datos):")
+        for _c, _i in sorted(CUENTAS_NUEVAS.items(),
+                             key=lambda kv: -abs(kv[1]["Monto"])):
+            print(f"    cuenta {_c} -> {_i['Concepto']} · "
+                  f"{_i['Renglones']:,} renglones · {_i['Monto'] / 1e6:,.2f} M")
+
+    # Una cuenta que no cae en ningun concepto sale de las cifras
+    # sin hacer ruido: es exactamente como se pierde el monto de
+    # una LN. Aqui se grita, con el desglose por LN
+    _sin = df["Concepto"].eq("X")
+    if _sin.any():
+        print(f"  ATENCION: {_sin.sum():,} renglones no se pudieron asignar a "
+              f"P/S/C y quedan FUERA de las cifras "
+              f"({df.loc[_sin, 'Monto'].sum() / 1e6:,.2f} M):")
+        _res = (df.loc[_sin]
+                .groupby([df.loc[_sin, "LN"].astype(str),
+                          df.loc[_sin, "Cuenta_Concepto"].astype(str)])["Monto"]
+                .agg(["size", "sum"]))
+        for (_ln, _c), _f in _res.iterrows():
+            print(f"    LN {_ln} · cuenta {_c} · {int(_f['size']):,} renglones · "
+                  f"{_f['sum'] / 1e6:,.2f} M")
+        print("    Agregar esas cuentas a CUENTAS_CONCEPTO o a "
+              "PREFIJOS_CONCEPTO y volver a correr.")
 
     print("Concepto tomado de la cuenta contable del export.")
     METODO_CONCEPTO = "cuenta contable (columna del export)"
@@ -2403,19 +2434,91 @@ mapeo_doc = pd.DataFrame({
         if _i in MAPA_ARCHIVO else "" for _i in range(N_COLUMNAS_ARCHIVO)],
 })
 
+# =====================================================
+# CUADRE POR LN (de la cuenta contable a las cifras)
+# =====================================================
+# Para cada LN: el monto tal como viene en el export contra las
+# tres cifras que se publican. La identidad tiene que cerrar:
+#
+#   monto del export = -primas + siniestros + comisiones + sin clasificar
+#
+# Si una LN no cuadra contra otra fuente, esta hoja dice si es
+# porque hay monto sin clasificar (una cuenta que no cae en ningun
+# concepto) o porque hay renglones con el signo al reves.
+_cu = []
+
+for _ln_q in sorted(d["LN"].astype(str).unique(), key=lambda v: (len(v), v)):
+    _s = d[d["LN"].astype(str) == _ln_q]
+    _p = float(_s.loc[_s["Concepto"] == "P", "Valor"].sum())
+    _si = float(_s.loc[_s["Concepto"] == "S", "Valor"].sum())
+    _co = float(_s.loc[_s["Concepto"] == "C", "Valor"].sum())
+    _xx = float(_s.loc[~_s["Concepto"].isin(["P", "S", "C"]), "Monto"].sum())
+    _tot = float(_s["Monto"].sum())
+    _cu.append({
+        "LN": _ln_q,
+        "Renglones": int(len(_s)),
+        "Monto del export": _tot,
+        "Primas": _p,
+        "Siniestros": _si,
+        "Comisiones": _co,
+        "Sin clasificar": _xx,
+        "Cuadre (debe ser 0)": _tot - (-_p + _si + _co + _xx),
+        "Cuentas distintas": int(_s["Cuenta_Concepto"].astype(str).nunique())
+        if "Cuenta_Concepto" in _s.columns else 0,
+        "Primas con signo +": float(
+            _s.loc[(_s["Concepto"] == "P") & (_s["Monto"] > 0), "Monto"].sum()),
+        "Siniestros con signo -": float(
+            _s.loc[(_s["Concepto"] == "S") & (_s["Monto"] < 0), "Monto"].sum()),
+        "Comisiones con signo -": float(
+            _s.loc[(_s["Concepto"] == "C") & (_s["Monto"] < 0), "Monto"].sum()),
+    })
+
+cuadre_ln = pd.DataFrame(_cu)
+
+_desc = cuadre_ln[cuadre_ln["Cuadre (debe ser 0)"].abs() > TOL]
+if len(_desc):
+    print("ATENCION: el cuadre de la cuenta contable no cierra en "
+          f"{len(_desc)} LN (ver hoja Cuadre_LN):")
+    for _, _f in _desc.iterrows():
+        print(f"    LN {_f['LN']}: descuadre {_f['Cuadre (debe ser 0)']:,.2f}")
+
+_conx = cuadre_ln[cuadre_ln["Sin clasificar"].abs() > TOL]
+if len(_conx):
+    print("ATENCION: hay monto sin clasificar por LN (queda fuera de las "
+          "cifras, ver hoja Cuadre_LN):")
+    for _, _f in _conx.iterrows():
+        print(f"    LN {_f['LN']}: {_f['Sin clasificar'] / 1e6:,.2f} M")
+
+_sig = cuadre_ln[(cuadre_ln["Siniestros con signo -"].abs() > MATERIALIDAD)
+                 | (cuadre_ln["Comisiones con signo -"].abs() > MATERIALIDAD)]
+if len(_sig):
+    print("AVISO: hay siniestros o comisiones capturados en negativo "
+          "(restan del total, ver hoja Cuadre_LN):")
+    for _, _f in _sig.iterrows():
+        print(f"    LN {_f['LN']}: siniestros "
+              f"{_f['Siniestros con signo -'] / 1e6:,.2f} M · comisiones "
+              f"{_f['Comisiones con signo -'] / 1e6:,.2f} M")
+
 calidad_df = pd.DataFrame(calidad)
 
 # Catalogo de cuentas usado para clasificar el concepto, con lo
 # que aporta cada una al ejercicio validado
 if "Cuenta_Concepto" in d.columns:
-    _cta_res = (d.groupby([d["Cuenta_Concepto"].astype(str), "Concepto"])["Monto"]
+    # Se abre por LN ademas de por cuenta: cuando una LN no cuadra,
+    # lo primero que hay que ver es que cuenta usa y en que
+    # concepto cayo
+    _cta_res = (d.groupby([d["LN"].astype(str),
+                           d["Cuenta_Concepto"].astype(str), "Concepto"])["Monto"]
                 .agg(["size", "sum"]).reset_index())
-    _cta_res.columns = ["Cuenta", "Concepto", "Renglones", f"Monto {ANIO_FCST}"]
+    _cta_res.columns = ["LN", "Cuenta", "Concepto", "Renglones",
+                        f"Monto {ANIO_FCST}"]
     _cta_res["Concepto"] = _cta_res["Concepto"].map(
         {**CLAVE_MEDIDA, "X": "SIN CLASIFICAR"})
     _cta_res["En catalogo"] = np.where(
         _cta_res["Cuenta"].isin(CUENTAS_CONCEPTO), "Si", "No (por prefijo)")
-    cuentas_df = _cta_res.sort_values(f"Monto {ANIO_FCST}", key=abs, ascending=False)
+    cuentas_df = _cta_res.sort_values(
+        ["LN", f"Monto {ANIO_FCST}"], key=lambda c: abs(c) if c.name == f"Monto {ANIO_FCST}" else c,
+        ascending=[True, False])
 else:
     cuentas_df = pd.DataFrame(
         {"Nota": ["El export de 42 columnas no trae la cuenta del concepto."]})
@@ -2538,6 +2641,7 @@ with pd.ExcelWriter(salida_xlsx, engine="xlsxwriter") as writer:
     exportar(excepciones.head(500), "Excepciones")
     exportar(calidad_df, "Calidad_Datos")
     exportar(cuentas_df, "Cuentas_Concepto")
+    exportar(cuadre_ln, "Cuadre_LN")
     exportar(cesion_df, "Cesion")
     exportar(mapeo_doc, "Mapeo_Columnas")
     exportar(parametros, "Parametros")
