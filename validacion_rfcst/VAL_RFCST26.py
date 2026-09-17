@@ -53,7 +53,12 @@ if _faltantes:
 
 warnings.filterwarnings("ignore")
 
+# Sello de version: se imprime al arrancar y se muestra en el
+# encabezado del dashboard, para saber que version se ejecuto
+VERSION = "v2026.09.17"
+
 inicio = time.perf_counter()
+print(f"VAL_RFCST26 {VERSION}")
 
 usuario = getpass.getuser()
 
@@ -2236,7 +2241,7 @@ PLANTILLA = """<!doctype html>
 
 <header class="top">
   <h1>Validación RFCST 2026 · 7+5</h1>
-  <span class="sub">Corte Julio 2026 · __ARCHIVO__ · generado __GENERADO__</span>
+  <span class="sub">Corte Julio 2026 · __ARCHIVO__ · generado __GENERADO__ · script __VERSION__</span>
   <nav class="secs">
     <a href="#sec-general">General</a>
     <a href="#sec-ln">Línea de Negocio</a>
@@ -2720,6 +2725,7 @@ salida_html = os.path.join(xOutputs, "Dashboard_RFCST26.html")
 html = (
     PLANTILLA
     .replace("__ARCHIVO__", os.path.basename(archivo))
+    .replace("__VERSION__", VERSION)
     .replace("__FUENTE_PPTO__", FUENTE_PPTO)
     .replace("__FUENTE_REALES__", FUENTE_REALES)
     .replace("__N_ALERTAS__", f"{N_ALERTAS:,}")
