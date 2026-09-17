@@ -516,6 +516,43 @@ def _num_col(serie):
     )
 
 
+def _num_cesion(serie):
+    """Numerico de la columna de cesion, distinguiendo la coma
+    decimal de la coma de miles.
+
+    En un export guardado con configuracion regional en espanol el
+    porcentaje llega como "0,0411". Quitarle la coma lo convierte
+    en 411 y el retenido saldria disparatado, asi que aqui se
+    decide por el contenido: si la mayoria de los valores son
+    digitos con UNA coma y sin punto, la coma es decimal."""
+
+    t = (serie.astype(str).str.strip()
+         .str.replace("%", "", regex=False)
+         .str.replace("\u00a0", "", regex=False))
+
+    lleno = t[t.ne("") & t.ne("nan") & t.ne("None")]
+    con_coma = lleno[lleno.str.contains(",", regex=False)]
+
+    # La coma es decimal si: hay comas, no hay ni un punto en toda
+    # la columna, cada valor con coma son digitos-coma-digitos, y
+    # no todos tienen exactamente tres decimales (eso serian grupos
+    # de miles). El resto de los renglones puede venir sin coma
+    # ("0"), por eso no se mide sobre la columna completa
+    coma_decimal = (
+        len(con_coma) > 0
+        and not lleno.str.contains(".", regex=False).any()
+        and bool(con_coma.str.match(r"^-?\d+,\d+$").all())
+        and con_coma.str.match(r"^-?\d+,\d{3}$").mean() < 0.9
+    )
+
+    if coma_decimal:
+        t = t.str.replace(",", ".", regex=False)
+    else:
+        t = t.str.replace(",", "", regex=False)
+
+    return pd.to_numeric(t, errors="coerce"), coma_decimal
+
+
 def _perfil_cesion(serie):
     """(cumple, escala) si la columna se comporta como un % de
     cesion: numerica, sin negativos y acotada a 1 o a 100."""
@@ -681,19 +718,33 @@ def cesion_por_nombre(df, encabezados, usadas):
             return None, f"el archivo no trae la columna '{COL_CESION}'", None
 
         if len(pos) > 1:
-            raise ValueError(
-                f"El encabezado trae {len(pos)} columnas con nombre de % de "
-                f"cesión (posiciones {pos}: "
-                f"{[str(encabezados[i]).strip() for i in pos]}). Dejar una sola "
-                "o indicar cuál en POS_CESION."
-            )
+            # Con varias candidatas manda la que se llama igual que
+            # COL_CESION; si tampoco asi se desempata, se falla en
+            # vez de adivinar
+            exacto = [k for k in pos
+                      if _norm_txt(encabezados[k]) == _norm_txt(COL_CESION)]
+            if len(exacto) == 1:
+                print(f"  AVISO: hay {len(pos)} columnas con nombre de % de "
+                      f"cesión ({[str(encabezados[k]).strip() for k in pos]}); "
+                      f"se usa '{COL_CESION}'.")
+                pos = exacto
+            else:
+                raise ValueError(
+                    f"El encabezado trae {len(pos)} columnas con nombre de % de "
+                    f"cesión (posiciones {pos}: "
+                    f"{[str(encabezados[k]).strip() for k in pos]}) y ninguna se "
+                    f"llama exactamente '{COL_CESION}'. Dejar una sola o indicar "
+                    "cuál en POS_CESION."
+                )
 
         i = pos[0]
         det = f"columna '{str(encabezados[i]).strip()}' (posición {i})"
 
     # La escala se revisa sobre la columna completa, no sobre una
     # muestra: es el dato del que cuelga todo el retenido
-    v = _num_col(df.iloc[:, i])
+    v, coma_decimal = _num_cesion(df.iloc[:, i])
+    if coma_decimal:
+        det += " · venía con coma decimal (0,0411)"
     escala, avisos = _escala_cesion(v)
     cesion = (v / escala).fillna(0.0).clip(0.0, 1.0)
 

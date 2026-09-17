@@ -209,6 +209,17 @@ encabezado, la columna de cesión se toma de ahí directo; cuando se resolvió
 por posición, `localizar_cesion()` la aparta verificándola contra el contenido
 y contra el perfil estructural del resto de columnas.
 
+**Formato del número**: se distingue la coma decimal de la coma de miles. Un
+export guardado con configuración regional en español trae el porcentaje como
+`0,0411`; quitarle la coma lo volvería 411 y el retenido saldría disparatado.
+La coma se toma como decimal cuando no hay ningún punto en la columna y los
+valores con coma son dígitos a ambos lados sin pinta de grupos de miles; el
+script dice en consola cuál de las dos lecturas usó.
+
+**Varias columnas con nombre de cesión**: manda la que se llame exactamente
+como `COL_CESION` (avisando cuáles había); si ninguna desempata, falla en vez
+de adivinar.
+
 **Escala**: se decide con el **percentil 99** de la columna completa, no con el
 máximo — así un renglón mal capturado (un 1.5 en una columna de fracciones) no
 cambia la lectura de toda la columna. Si el p99 ≤ 1 se lee como fracción; si
