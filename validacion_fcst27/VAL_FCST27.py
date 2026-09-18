@@ -959,7 +959,25 @@ else:
 if "Binder_Ppto" not in df.columns:
     df["Binder_Ppto"] = np.nan
 
-df["Prc_Cesion"] = CESION.to_numpy() if CESION is not None else 0.0
+if CESION is not None:
+    df["Prc_Cesion"] = CESION.to_numpy()
+elif "Prc_Cesion" in df.columns:
+    # El layout ya mapeo la cesion como un campo mas (pasa cuando
+    # se agrega la columna al mapeo posicional). Se usa esa, en vez
+    # de dejarla en cero y calcular un retenido igual al tomado
+    _v_ces, _coma_ces = _num_cesion(df["Prc_Cesion"])
+    _esc_ces, _av_ces = _escala_cesion(_v_ces)
+    df["Prc_Cesion"] = (_v_ces / _esc_ces).fillna(0.0).clip(0.0, 1.0)
+    CESION = df["Prc_Cesion"]
+    DETALLE_CESION = "columna 'Prc_Cesion' del mapeo de columnas"
+    if _esc_ces != 1.0:
+        DETALLE_CESION += f" · venía en escala 0-100, se dividió entre {_esc_ces:.0f}"
+    if _coma_ces:
+        DETALLE_CESION += " · venía con coma decimal (0,0411)"
+    for _a in _av_ces:
+        print(f"  AVISO % de cesión: {_a}.")
+else:
+    df["Prc_Cesion"] = 0.0
 
 df["Monto"] = pd.to_numeric(
     df["Monto"].astype(str).str.replace(",", "", regex=False), errors="coerce"
@@ -1657,6 +1675,12 @@ else:
     d_ok["_ces"] = 0.0
     RETENIDO_MODO = "la base no trae % de cesión: retenido = tomado"
     RETENIDO_REAL = False
+    print("ATENCION: no se localizo el % de cesion, asi que NO se multiplica "
+          "nada y el retenido sale igual al tomado.")
+    print(f"    El script busca una columna llamada '{COL_CESION}' (o alguno "
+          f"de sus alias) en el archivo, o un campo 'Prc_Cesion' en el mapeo "
+          f"de columnas.")
+    print(f"    Detalle de la busqueda: {DETALLE_CESION}.")
 
 d_ok["_ret"] = 1.0 - d_ok["_ces"]
 d_ok["Valor_Ced"] = d_ok["Valor"] * d_ok["_ces"]

@@ -216,6 +216,13 @@ La coma se toma como decimal cuando no hay ningún punto en la columna y los
 valores con coma son dígitos a ambos lados sin pinta de grupos de miles; el
 script dice en consola cuál de las dos lecturas usó.
 
+**Si la cesión se agrega al mapeo de columnas** (un layout posicional con un
+campo llamado `Prc_Cesion`), el script la toma de ahí: antes ese campo se
+sobrescribía con cero y el retenido salía igual al tomado sin que nada lo
+dijera. Y cuando de plano no se localiza el porcentaje, el aviso es explícito
+—dice que no se multiplicó nada y dónde busca la columna—, porque esa es la
+única forma de que la vista retenido salga silenciosamente mal.
+
 **Varias columnas con nombre de cesión**: manda la que se llame exactamente
 como `COL_CESION` (avisando cuáles había); si ninguna desempata, falla en vez
 de adivinar.
