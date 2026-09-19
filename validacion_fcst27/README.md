@@ -160,6 +160,35 @@ Todo eso se imprime en consola y se declara al pie de la gráfica. El tramo
 extendido **solo alimenta la estacionalidad**: el acumulado por negocio que usa
 el reporte de alertas sigue siendo el de la base en dólares.
 
+### Estacionalidad por LN o por ramo
+
+Cada gráfica de estacionalidad trae un selector **Por LN / Por ramo**. El ramo
+no viene en ninguna base como nombre, así que se resuelve con dos catálogos
+sacados de la hoja `Valores` del libro del RFCST:
+
+| Fuente | De dónde sale el ramo | Cobertura |
+|---|---|---|
+| FCST 2027 | centro de beneficio (`/ERP/PROFTCTR`) → `CAT_RAMO` | 100% |
+| Real 2026 (`BD_082026.xlsx`) | subramo (`SRamo`) → `CAT_SUBRAMO` | 100% |
+| FCST 2026 (`Ppto2026`) | subramo (`Subramo`) → `CAT_SUBRAMO` | 100% |
+| **RFCST 2026** | no trae ramo; por llave de contrato solo cruza 24.5% | **no se dibuja** |
+
+Por eso en vista por ramo **no aparece el RFCST 2026**: mostrarlo con una
+cuarta parte de la prima sería peor que no mostrarlo.
+
+Dos detalles del catálogo que importan:
+
+- el ramo se resuelve por **subramo** y no por la columna `Ramo` de las bases
+  operativas, porque esa agrupa 31/35/39 en 30 y 71/73 en 70, y no llegaría al
+  mismo corte que el catálogo de centros de beneficio;
+- en vista por ramo el real 2026 sale **completo del export operativo**
+  (ene-ago), no de la base en dólares: esa solo trae el ramo agrupado, y
+  mezclar las dos daría claves distintas. Por eso ese tramo va convertido con
+  el tipo de cambio implícito, y el pie de la gráfica lo declara.
+
+El filtro maestro de la sección es por LN, así que al usarlo las gráficas
+vuelven a la vista por LN.
+
 ### Hoja `Cuadre_LN`
 
 Cuadre de la cuenta contable a las cifras publicadas, una línea por LN. La

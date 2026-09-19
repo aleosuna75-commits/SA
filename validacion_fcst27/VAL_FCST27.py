@@ -157,6 +157,99 @@ SIGNO_INVERTIDO_RFCST = {
 # Se llena al cargar la base; alimenta la hoja Calidad_Datos
 CORRECCIONES_SIGNO = []
 
+# ---- Ramo: segunda dimension de la estacionalidad ----
+# El export del FCST no trae el ramo, pero si el centro de
+# beneficio (/ERP/PROFTCTR), que lo determina. El catalogo sale de
+# la hoja Valores del libro del RFCST (CeBe -> Ramo) y cubre el
+# 100% de los renglones de la base actual; si aparece un centro
+# nuevo se avisa en consola y ese renglon queda sin ramo.
+SIN_RAMO = "(sin ramo)"
+
+CAT_RAMO = {
+    # Acc Per.
+    "A331003100": "Acc Per.", "A331003200": "Acc Per.", "A331003300": "Acc Per.",
+    # Agropecuario
+    "A081000000": "Agropecuario", "A082000000": "Agropecuario", "A083000000": "Agropecuario",
+    # Autos
+    "A091000000": "Autos", "A092000000": "Autos", "A093000000": "Autos", "A094000000": "Autos",
+    "A094000001": "Autos", "A095000000": "Autos",
+    # Crédito
+    "A100000000": "Crédito", "A100000001": "Crédito", "A100000002": "Crédito",
+    # Diversos
+    "A111000000": "Diversos", "A111000008": "Diversos", "A111000009": "Diversos", "A112000000": "Diversos",
+    "A112000001": "Diversos", "A112000002": "Diversos", "A112000003": "Diversos", "A112000004": "Diversos",
+    "A112000005": "Diversos", "A112000009": "Diversos",
+    # Fianzas
+    "A131000000": "Fianzas", "A132000000": "Fianzas", "A133000000": "Fianzas", "A134000000": "Fianzas",
+    "A141000000": "Fianzas", "A142000000": "Fianzas", "A151000000": "Fianzas", "A152000000": "Fianzas",
+    "A153000000": "Fianzas", "A161000000": "Fianzas", "A162000000": "Fianzas", "A163000000": "Fianzas",
+    "A164000000": "Fianzas", "A165000000": "Fianzas", "A165000001": "Fianzas", "A171000000": "Fianzas",
+    "A172000000": "Fianzas", "A173000000": "Fianzas", "A174000000": "Fianzas",
+    # GMM
+    "A332003400": "GMM", "A332003500": "GMM", "A332003600": "GMM",
+    # HyORH
+    "A073000000": "HyORH", "A073000001": "HyORH", "A075000000": "HyORH",
+    # Incendio
+    "A060000000": "Incendio", "A060000001": "Incendio",
+    # MyT
+    "A051000000": "MyT", "A051000001": "MyT", "A051000002": "MyT", "A052000000": "MyT",
+    "A052000002": "MyT", "A052000003": "MyT", "A052000004": "MyT", "A052000005": "MyT",
+    "A052000006": "MyT",
+    # Resp. Civil
+    "A041000000": "Resp. Civil", "A042000000": "Resp. Civil", "A043000000": "Resp. Civil", "A044000000": "Resp. Civil",
+    "A044000001": "Resp. Civil", "A044000002": "Resp. Civil", "A044000003": "Resp. Civil", "A044000004": "Resp. Civil",
+    # Salud
+    "A333003700": "Salud", "A333003800": "Salud", "A333003900": "Salud",
+    # Terremoto
+    "A071000000": "Terremoto",
+    # Vida
+    "A011000000": "Vida", "A012000000": "Vida", "A013000000": "Vida", "A021000000": "Vida",
+    "A022000000": "Vida", "A023000000": "Vida", "A024000000": "Vida", "A025000000": "Vida",
+    "A600000000": "Vida",
+}
+
+# Las bases operativas no traen el nombre del ramo sino el codigo
+# de subramo, y con un corte mas fino que el de la columna Ramo
+# (que agrupa 31/35/39 en 30 y 71/73 en 70). Por eso el ramo de
+# esas bases se resuelve por SUBRAMO, que si llega al mismo nivel
+# que el catalogo de centros de beneficio.
+CAT_SUBRAMO = {
+    # Acc Per.
+    30: "Acc Per.", 31: "Acc Per.", 32: "Acc Per.", 33: "Acc Per.",
+    # Agropecuario
+    80: "Agropecuario", 81: "Agropecuario", 82: "Agropecuario", 83: "Agropecuario",
+    # Autos
+    90: "Autos", 91: "Autos", 92: "Autos", 93: "Autos", 94: "Autos", 95: "Autos", 96: "Autos",
+    # Crédito
+    100: "Crédito", 101: "Crédito", 102: "Crédito",
+    # Diversos
+    110: "Diversos", 111: "Diversos", 112: "Diversos", 113: "Diversos", 114: "Diversos", 115: "Diversos", 116: "Diversos", 117: "Diversos",
+    118: "Diversos", 119: "Diversos",
+    # Fianzas
+    130: "Fianzas", 131: "Fianzas", 132: "Fianzas", 133: "Fianzas", 134: "Fianzas", 140: "Fianzas", 141: "Fianzas", 142: "Fianzas",
+    150: "Fianzas", 151: "Fianzas", 152: "Fianzas", 153: "Fianzas", 160: "Fianzas", 161: "Fianzas", 162: "Fianzas", 163: "Fianzas",
+    164: "Fianzas", 165: "Fianzas", 166: "Fianzas", 170: "Fianzas", 171: "Fianzas", 172: "Fianzas", 173: "Fianzas", 174: "Fianzas",
+    # GMM
+    34: "GMM", 35: "GMM", 36: "GMM",
+    # HyORH
+    70: "HyORH", 72: "HyORH", 73: "HyORH", 74: "HyORH",
+    # Incendio
+    60: "Incendio", 61: "Incendio", 62: "Incendio",
+    # MyT
+    50: "MyT", 51: "MyT", 52: "MyT", 53: "MyT", 54: "MyT", 55: "MyT", 56: "MyT", 57: "MyT",
+    58: "MyT", 5510: "MyT",
+    # Resp. Civil
+    40: "Resp. Civil", 41: "Resp. Civil", 42: "Resp. Civil", 43: "Resp. Civil", 44: "Resp. Civil", 45: "Resp. Civil", 46: "Resp. Civil", 47: "Resp. Civil",
+    48: "Resp. Civil",
+    # Salud
+    37: "Salud", 38: "Salud", 39: "Salud",
+    # Terremoto
+    71: "Terremoto",
+    # Vida
+    10: "Vida", 11: "Vida", 12: "Vida", 13: "Vida", 20: "Vida", 21: "Vida", 22: "Vida", 23: "Vida",
+    24: "Vida", 25: "Vida", 120: "Vida",
+}
+
 # ---- Reales mensuales por ejercicio (opcionales) ----
 # Cada base da los meses cerrados de su ejercicio por LN y
 # concepto. Se usan para dos cosas:
@@ -1001,6 +1094,16 @@ else:
 if "Binder_Ppto" not in df.columns:
     df["Binder_Ppto"] = np.nan
 
+# Ramo: el export no lo trae, sale del centro de beneficio
+df["Ramo"] = df["Producto"].astype(str).str.strip().map(CAT_RAMO)
+_sin_ramo = df["Ramo"].isna()
+if _sin_ramo.any():
+    _cb = sorted(df.loc[_sin_ramo, "Producto"].astype(str).str.strip().unique())
+    print(f"AVISO: {int(_sin_ramo.sum()):,} renglones con un centro de beneficio "
+          f"fuera de CAT_RAMO ({_cb[:6]}{'...' if len(_cb) > 6 else ''}); "
+          f"quedan como '{SIN_RAMO}'.")
+df["Ramo"] = df["Ramo"].fillna(SIN_RAMO)
+
 if CESION is not None:
     df["Prc_Cesion"] = CESION.to_numpy()
 elif "Prc_Cesion" in df.columns:
@@ -1472,10 +1575,17 @@ def _buscar_columna(cols, candidatas):
     return None
 
 
-def _mensual_por_ln(b, col_ln, meses, cols_medida, etiqueta):
-    """{LN: {concepto: [12 montos]}} mas el total, a partir de una
-    base con una fila por movimiento y su mes."""
-    ln = b[col_ln].map(_norm_ln)
+def _ramo_de_subramo(v):
+    """Nombre del ramo a partir del codigo de subramo."""
+    n = pd.to_numeric(v, errors="coerce")
+    return CAT_SUBRAMO.get(int(n)) if pd.notna(n) else None
+
+
+def _mensual_por_ln(b, col_ln, meses, cols_medida, etiqueta, norm=None):
+    """{clave: {concepto: [12 montos]}} mas el total, a partir de
+    una base con una fila por movimiento y su mes. La clave sale de
+    aplicar `norm` a la columna indicada (por omision, la LN)."""
+    ln = b[col_ln].map(norm or _norm_ln)
 
     out = {}
     for cpt, col in cols_medida.items():
@@ -1621,6 +1731,34 @@ def extender_real(base, cfg):
                 serie[mes - 1] = float(v)
             por_ln["_tot"][cpt][mes - 1] = total
 
+    # Apertura por ramo: sale de ESTE export para todos sus meses,
+    # no solo para los nuevos. La base en dolares trae el ramo
+    # agrupado (31/35/39 en 30, 71/73 en 70) y no llega al nivel
+    # del catalogo, asi que mezclarlas daria claves distintas
+    col_sr = _buscar_columna(b.columns, ["SRamo", "Subramo", "SubRamo"])
+    if col_sr is not None:
+        por_ramo = {}
+        ramo = b[col_sr].map(_ramo_de_subramo)
+        for cpt in cfg["cols"]:
+            if tc.get(cpt) in (None, 0.0):
+                continue
+            t = (pd.DataFrame({"_r": ramo, "_m": b["_mes"],
+                               "_v": b[f"_{cpt}"] / tc[cpt]})
+                 .pivot_table(index="_r", columns="_m", values="_v",
+                              aggfunc="sum", fill_value=0.0))
+            for m in range(1, 13):
+                if m not in t.columns:
+                    t[m] = 0.0
+            t = t[[m for m in range(1, 13)]]
+            for k, fila in t.iterrows():
+                por_ramo.setdefault(k, {})[cpt] = [float(v) for v in fila]
+            por_ramo.setdefault("_tot", {})[cpt] = [float(v) for v in t.sum()]
+        base["por_ramo"] = por_ramo
+        base["meses_ramo"] = sorted(int(m) for m in b["_mes"].unique())
+        cob_ra = ramo.notna().mean()
+        print(f"  {nombre}: apertura por ramo con el subramo · "
+              f"{len(por_ramo) - 1} ramos · cubre {cob_ra:.1%} de los renglones")
+
     base["meses"] = sorted(set(base["meses"]) | set(nuevos))
     base["extension"] = {
         "archivo": nombre,
@@ -1728,7 +1866,8 @@ def cargar_real(cfg):
 
     return {"anio": anio, "por_ln": datos, "meses": obs,
             "por_negocio": por_negocio, "archivo": os.path.basename(ruta),
-            "ln_por_llave": ln_por_llave, "extension": None}
+            "ln_por_llave": ln_por_llave, "extension": None,
+            "por_ramo": {}, "meses_ramo": []}
 
 
 def cargar_ppto26():
@@ -1776,14 +1915,21 @@ def cargar_ppto26():
     if mes.max() and mes.max() > 12:          # viene como AAAAMM
         mes = mes % 100
 
-    datos = _mensual_por_ln(b, col_ln, mes, COL_PPTO26,
-                            f"{os.path.basename(ruta)} · {HOJA_PPTO26}")
+    etq = f"{os.path.basename(ruta)} · {HOJA_PPTO26}"
+    datos = _mensual_por_ln(b, col_ln, mes, COL_PPTO26, etq)
+
+    # La misma apertura por ramo, via subramo
+    col_sr = _buscar_columna(b.columns, ["Subramo", "SRamo", "SubRamo"])
+    por_ramo = (_mensual_por_ln(b, col_sr, mes, COL_PPTO26, etq,
+                                norm=_ramo_de_subramo)
+                if col_sr is not None else {})
 
     tot = datos.get("_tot", {}).get("P", [0] * 12)
     print(f"Ppto {ANIO_REAL26} mensual (hoja {HOJA_PPTO26}): "
-          f"12 meses · primas {sum(tot) / 1e6:,.1f} M")
+          f"12 meses · primas {sum(tot) / 1e6:,.1f} M"
+          + (f" · {len(por_ramo) - 1} ramos" if por_ramo else " · sin subramo"))
 
-    return {"por_ln": datos, "archivo": f"{os.path.basename(ruta)} · {HOJA_PPTO26}"}
+    return {"por_ln": datos, "por_ramo": por_ramo, "archivo": etq}
 
 
 RFCST = cargar_rfcst26()
@@ -2214,6 +2360,19 @@ SEASON_R = {"_tot": estacionalidad(d_ok, "Valor_Ret")}
 for ln in LNS:
     SEASON_R[ln] = estacionalidad(d_ok[d_ok["LN"] == ln], "Valor_Ret")
 
+# Y la misma, abierta por ramo en vez de por LN
+RAMOS = sorted(r for r in d_ok["Ramo"].unique() if str(r) != "nan")
+
+SEASON_RA = {"_tot": estacionalidad(d_ok)}
+SEASON_RA_R = {"_tot": estacionalidad(d_ok, "Valor_Ret")}
+for ra in RAMOS:
+    _sub_ra = d_ok[d_ok["Ramo"] == ra]
+    SEASON_RA[ra] = estacionalidad(_sub_ra)
+    SEASON_RA_R[ra] = estacionalidad(_sub_ra, "Valor_Ret")
+
+print(f"Ramos en el ejercicio {ANIO_FCST}: {len(RAMOS)} "
+      f"({', '.join(RAMOS[:6])}{'...' if len(RAMOS) > 6 else ''})")
+
 
 # =====================================================
 # ESTACIONALIDAD 2026 (RFCST 2026 y FCST 2026)
@@ -2306,7 +2465,7 @@ def perfil_ppto26(ln, cpt, fila_rf):
     return [round(v, 4) for v in forma] if forma else None
 
 
-def perfil_real(anio, ln, cpt, fila_rf):
+def perfil_real(anio, clave, cpt, den=None, dim="ln"):
     """Perfil mensual de un real observado, para graficarlo junto a
     los presupuestos.
 
@@ -2321,12 +2480,12 @@ def perfil_real(anio, ln, cpt, fila_rf):
     if base is None:
         return None
 
-    meses = _meses_de(base, ln, cpt)
-    if not meses:
-        return None
+    fuente = base["por_ln"] if dim == "ln" else base.get("por_ramo") or {}
+    obs = base["meses"] if dim == "ln" else base.get("meses_ramo") or []
 
-    obs = base["meses"]
-    if not obs:
+    fila = fuente.get(clave)
+    meses = fila.get(cpt) if fila else None
+    if not meses or not obs:
         return None
 
     if len(obs) >= 12:
@@ -2334,13 +2493,8 @@ def perfil_real(anio, ln, cpt, fila_rf):
         return [round(v, 4) for v in forma] if forma else None
 
     ult = max(obs)
-
-    if anio == ANIO_REAL26:
-        den = (float(fila_rf.get(f"{cpt}_0726", 0.0))
-               + float(fila_rf.get(f"{cpt}_08-1226", 0.0)))
-    else:
-        den = sum(meses[:ult])
-
+    if den is None or not math.isfinite(den) or abs(den) <= TOL:
+        den = sum(meses[:ult])          # sin referencia, su propio acumulado
     if not math.isfinite(den) or abs(den) <= TOL:
         return None
 
@@ -2356,9 +2510,40 @@ if RFCST is not None:
         SEASON26[_ln] = {
             cpt: {"rfcst": perfil_rfcst26(_ln, cpt, _fila),
                   "ppto": perfil_ppto26(_ln, cpt, _fila),
-                  "reales": {str(a): perfil_real(a, _ln, cpt, _fila)
-                             for a in sorted(REALES, reverse=True)}}
+                  "reales": {
+                      str(a): perfil_real(
+                          a, _ln, cpt,
+                          (float(_fila.get(f"{cpt}_0726", 0.0))
+                           + float(_fila.get(f"{cpt}_08-1226", 0.0)))
+                          if a == ANIO_REAL26 else None)
+                      for a in sorted(REALES, reverse=True)}}
             for cpt in ("P", "S", "C")
+        }
+
+
+# La misma comparativa, por ramo. Aqui no hay RFCST: esa base no
+# trae ramo y por llave de contrato apenas cruza una cuarta parte
+# de la prima, asi que en esta vista no se dibuja. El ejercicio en
+# curso se normaliza contra el año del FCST 2026, que si viene
+# abierto por ramo.
+SEASON26_RA = {}
+
+_pp_ra = (PPTO26 or {}).get("por_ramo") or {}
+
+for _ra in ["_tot"] + RAMOS:
+    _fila_pp = _pp_ra.get(_ra) or {}
+    SEASON26_RA[_ra] = {}
+    for cpt in ("P", "S", "C"):
+        _mpp = _fila_pp.get(cpt)
+        _forma_pp = _forma(_mpp) if _mpp else None
+        _den = sum(_mpp) if _mpp else None
+        SEASON26_RA[_ra][cpt] = {
+            "rfcst": None,
+            "ppto": [round(v, 4) for v in _forma_pp] if _forma_pp else None,
+            "reales": {str(a): perfil_real(a, _ra, cpt,
+                                           _den if a == ANIO_REAL26 else None,
+                                           dim="ramo")
+                       for a in sorted(REALES, reverse=True)},
         }
 
 # Hoja de estacionalidad: una linea por LN, concepto y serie, con
@@ -3774,6 +3959,31 @@ else:
         f"{ETIQ_PPTO26} es plano dentro de cada bloque (Ene-Jul / Ago-Dic).",
     ] + _pie_reales)
 
+# Pie de la vista por ramo: el criterio es otro, porque ahi no hay
+# RFCST y el real sale completo del export operativo
+_pie_ra = ["* Por ramo no se dibuja el RFCST 2026: esa base no trae ramo y por "
+           "llave de contrato apenas cruza una cuarta parte de la prima. El ramo "
+           f"del {ETIQ_FCST} sale del centro de beneficio y el de las bases "
+           "reales del subramo."]
+
+for _a in sorted(REALES, reverse=True):
+    _b = REALES[_a]
+    if not _b.get("por_ramo"):
+        continue
+    _mm = _b.get("meses_ramo") or []
+    _ext = _b.get("extension") or {}
+    _tramo = (f"{MESES_TXT[min(_mm) - 1]}-{MESES_TXT[max(_mm) - 1]}" if _mm else "")
+    if len(_mm) >= 12:
+        _pie_ra.append(f"El real {_a} es el año cerrado, como % de su propio año.")
+    else:
+        _pie_ra.append(
+            f"El real {_a} ({_ext.get('archivo', 's/d')}) va de {_tramo} y cada mes "
+            f"se grafica como % del año del {ETIQ_PPTO26}"
+            + (f"; viene en pesos y se convirtió con el tipo de cambio implícito "
+               f"{_ext['tc']:,.2f}." if _ext.get("tc") else "."))
+
+PIE_EST_RA = " ".join(_pie_ra)
+
 # KPIs de la seccion por LN: mismos cuadros que en General pero
 # recalculados a la linea que elija el area de suscripcion
 sec2_kpis = f"""
@@ -3813,15 +4023,21 @@ for medida, cpt, _, _b in INFO_MEDIDAS:
     <div class="card">
       <div class="chart-head">
         <h2>Estacionalidad mensual · {medida.lower()}</h2>
+        <div class="toggle tgl-dim" id="tgl_dim_{cpt}">
+          <button data-d="LN" class="on">Por LN</button>
+          <button data-d="RA">Por ramo</button>
+        </div>
         <select class="sel-ln" id="sel_line_{cpt}"></select>
       </div>
       <div class="nota">% del año {ANIO_FCST} que aporta cada mes. Con el filtro en
-        (Todas) se dibujan todas las LN; elige una para comparar<span class="solo-tom">
-        su estacionalidad contra la del RFCST 2026, la del {ETIQ_PPTO26} y la de los
-        ejercicios reales</span><span
-        class="solo-ret"> el perfil retenido contra el tomado de esa misma línea</span>.</div>
+        (Todas) se dibujan todas las líneas de la dimensión elegida; elige una para
+        comparar<span class="solo-tom"> su estacionalidad contra la del RFCST 2026,
+        la del {ETIQ_PPTO26} y la de los ejercicios reales</span><span
+        class="solo-ret"> el perfil retenido contra el tomado</span>. Por ramo no se
+        dibuja el RFCST 2026: esa base no trae ramo.</div>
       <div id="ch_line_{cpt}"></div>
-      <div class="ast solo-tom">{PIE_EST}</div>
+      <div class="ast solo-tom pie-est" data-dim="LN">{PIE_EST}</div>
+      <div class="ast solo-tom pie-est oculto" data-dim="RA">{PIE_EST_RA}</div>
     </div>
   </div>""")
 
@@ -4013,6 +4229,7 @@ VISTAS_JS = {
         "lnKpi": kpi_ln,
         "charts": charts_cfg,
         "season": _season_js(SEASON),
+        "seasonRamo": _season_js(SEASON_RA),
         "neg": neg_rows,
         "part": {
             "fcst": _vals(r_ln["Primas"]),
@@ -4025,6 +4242,7 @@ VISTAS_JS = {
         "lnKpi": kpi_ln_R,
         "charts": charts_cfg_R,
         "season": _season_js(SEASON_R),
+        "seasonRamo": _season_js(SEASON_RA_R),
         "neg": neg_rows_R,
         "part": {
             "fcst": _vals(r_ln_R["Primas"]),
@@ -4042,6 +4260,8 @@ DATA_JS = {
     # Estacionalidad 2026 (RFCST y FCST 2026) para comparar
     # contra la mensualizacion del FCST 2027 (solo en tomado)
     "season26": SEASON26,
+    "season26ramo": SEASON26_RA,
+    "ramos": RAMOS,
     "cat": CATALOGO_CED,
     "cfg": {
         "umbralAmarillo": UMBRAL_AMARILLO,
@@ -4103,6 +4323,7 @@ PLANTILLA = """<!doctype html>
   .ast-mark { color: #fab219; }
   .ast { color: #898781; font-size: 12px; margin: 8px 2px 0; font-style: italic; }
   .vista.oculto { display: none; }
+  .pie-est.oculto { display: none; }
   .grid { display: grid; gap: 14px; }
   .kpis { grid-template-columns: repeat(auto-fit, minmax(215px, 1fr)); }
   .card { background: #1a1a19; border: 1px solid rgba(255,255,255,0.10);
@@ -4199,6 +4420,8 @@ PLANTILLA = """<!doctype html>
     font-size: 12.5px; color: #fab219; background: rgba(250,178,25,.12);
     border: 1px solid rgba(250,178,25,.35); }
   .aviso-sim b { color: #fdd884; }
+  .tgl-dim { margin-left: auto; }
+  .tgl-dim button { font-size: 11.5px; padding: 3px 10px; }
   body:not(.vista-ret) .solo-ret { display: none; }
   body.vista-ret .solo-tom { display: none; }
   .tgl-global { border-color: rgba(57,135,229,.45); }
@@ -4717,30 +4940,43 @@ function pintaChartsLN(lnSel) {
 }
 
 const pintaLineaLN = {};
+const ponDimEst = {};
+
+// Dimension de cada grafica de estacionalidad: 'LN' o 'RA' (ramo).
+// El ramo sale del centro de beneficio en el FCST y del subramo en
+// las bases reales, asi que las dos dimensiones conviven
+const DIM_EST = {P: 'LN', S: 'LN', C: 'LN'};
+
+const datosEst = cpt => DIM_EST[cpt] === 'RA'
+  ? {season: V().seasonRamo, season26: DATA.season26ramo,
+     claves: DATA.ramos, pref: '', seasonT: DATA.vistas.T.seasonRamo}
+  : {season: V().season, season26: DATA.season26,
+     claves: DATA.lns, pref: 'LN ', seasonT: DATA.vistas.T.season};
 
 ['P', 'S', 'C'].forEach(cpt => {
 
   function pintaLinea(lnSel) {
+    const D = datosEst(cpt);
     let series;
     if (lnSel) {
       // Una sola LN: se compara su mensualizacion contra el
       // perfil 2026. Las series 2026 van punteadas porque esa
       // base solo separa Ene-Jul de Ago-Dic (perfil por bloques)
-      const v = V().season[lnSel] ? V().season[lnSel][cpt] : null;
-      series = [{n: 'LN ' + lnSel + (esRet() ? ' · retenido' : ' · ' + DATA.cfg.etiqFcst),
+      const v = D.season[lnSel] ? D.season[lnSel][cpt] : null;
+      series = [{n: D.pref + lnSel + (esRet() ? ' · retenido' : ' · ' + DATA.cfg.etiqFcst),
                  c: S[0], v: v || []}];
 
       if (esRet()) {
         // Las bases 2026 solo existen en tomado: aqui el contraste
-        // util es el perfil de la propia LN antes de ceder
-        const t = DATA.vistas.T.season[lnSel];
-        if (t && t[cpt]) series.push({n: 'LN ' + lnSel + ' · tomado', c: S[1],
+        // util es el perfil propio antes de ceder
+        const t = D.seasonT[lnSel];
+        if (t && t[cpt]) series.push({n: D.pref + lnSel + ' · tomado', c: S[1],
                                       v: t[cpt], dash: '5 4'});
         lineChart('ch_line_' + cpt, series);
         return;
       }
 
-      const s26 = DATA.season26[lnSel];
+      const s26 = D.season26[lnSel];
       if (s26 && s26[cpt]) {
         // El RFCST va solido hasta julio (forma del real 2026) y
         // punteado de agosto en adelante (tramo ajustado)
@@ -4759,13 +4995,13 @@ const pintaLineaLN = {};
       }
       if (series.length === 1) {
         // Sin base 2026 comparable: al menos el total como referencia
-        const t = V().season._tot[cpt];
+        const t = D.season._tot[cpt];
         if (t) series.push({n: 'Total ' + DATA.cfg.etiqFcst, c: '#898781', v: t, dash: '3 3'});
       }
     } else {
-      series = DATA.lns.map((ln, i) => ({
-        n: 'LN ' + ln, c: LNC[i % LNC.length],
-        v: (V().season[ln] && V().season[ln][cpt]) || [],
+      series = D.claves.map((k, i) => ({
+        n: D.pref + k, c: LNC[i % LNC.length],
+        v: (D.season[k] && D.season[k][cpt]) || [],
       })).filter(s => s.v && s.v.length);
     }
     lineChart('ch_line_' + cpt, series);
@@ -4774,7 +5010,41 @@ const pintaLineaLN = {};
   pintaLineaLN[cpt] = pintaLinea;
 
   const selL = document.getElementById('sel_line_' + cpt);
-  if (selL) selLN(selL, pintaLinea);
+
+  function llenaSel() {
+    const D = datosEst(cpt);
+    const todas = DIM_EST[cpt] === 'RA' ? '(Todos los ramos)' : '(Todas las LN)';
+    selL.innerHTML = '<option value="">' + todas + '</option>' + D.claves.map(k =>
+      '<option value="' + esc(k) + '">' + D.pref + esc(k) + '</option>').join('');
+  }
+
+  if (selL) {
+    llenaSel();
+    selL.addEventListener('change', () => pintaLinea(selL.value));
+  }
+
+  const tgl = document.getElementById('tgl_dim_' + cpt);
+
+  // Cambia la dimension de esta grafica y deja el selector y los
+  // botones en su sitio. Lo usa tambien el filtro maestro de la
+  // seccion, que es por LN: al filtrar ahi, la grafica vuelve a LN
+  ponDimEst[cpt] = (d, repinta) => {
+    if (DIM_EST[cpt] === d) return;
+    DIM_EST[cpt] = d;
+    if (tgl) tgl.querySelectorAll('button').forEach(
+      b => b.classList.toggle('on', b.dataset.d === d));
+    llenaSel();
+    if (selL) selL.value = '';
+    const card = document.getElementById('ch_line_' + cpt).closest('.card');
+    if (card) card.querySelectorAll('.pie-est').forEach(
+      e => e.classList.toggle('oculto', e.dataset.dim !== d));
+    if (repinta !== false) pintaLinea('');
+  };
+
+  if (tgl) {
+    tgl.querySelectorAll('button').forEach(btn => btn.addEventListener(
+      'click', () => ponDimEst[cpt](btn.dataset.d)));
+  }
 });
 
 // Mensualizacion P·S·C: una sola dona al final de la seccion
@@ -4792,6 +5062,9 @@ function filtraSeccionLN(lnSel) {
   pintaKpisLN(lnSel);
   pintaChartsLN(lnSel);
   ['P', 'S', 'C'].forEach(cpt => {
+    // El filtro maestro es por LN: si la grafica estaba por ramo,
+    // se regresa a LN para que el filtro tenga sentido
+    if (ponDimEst[cpt]) ponDimEst[cpt]('LN', false);
     const selL = document.getElementById('sel_line_' + cpt);
     if (selL) selL.value = lnSel;
     pintaLineaLN[cpt](lnSel);
