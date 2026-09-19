@@ -174,6 +174,38 @@ BASES_REALES = [
 COL_REAL26 = {"P": "Primas USD", "S": "Siniestros USD", "C": "Comisiones USD"}
 COL_REAL26_LN = ["LN2", "LN"]
 
+# Llave de contrato para repartir por LN los meses que lleguen del
+# export operativo, que no trae esa columna. Va en cascada, de la
+# mas especifica a la mas laxa: cada renglon se resuelve con el
+# primer nivel que lo cruce. El anio de suscripcion sale del
+# segundo nivel porque la LN es del contrato y no de la cohorte,
+# y exigirlo deja fuera los renglones de cohortes nuevas.
+NIVELES_LLAVE = [
+    (["Tipo Rea", "Corredor", "Compañía", "Num Contrato", "Año Susc."],
+     ["TipoRea", "CorrTom", "CiaTom", "CtoTom", "Susc"]),
+    (["Tipo Rea", "Corredor", "Compañía", "Num Contrato"],
+     ["TipoRea", "CorrTom", "CiaTom", "CtoTom"]),
+    (["Compañía", "Num Contrato"], ["CiaTom", "CtoTom"]),
+]
+
+# ---- Export operativo que extiende un real (opcional) ----
+# Cierra antes que la base en dolares, asi que trae meses que
+# aquella todavia no tiene. No trae LN ni dolares: los meses que le
+# faltan a la base en dolares se toman de aqui, convertidos con el
+# tipo de cambio implicito de los meses que ambas comparten y
+# repartidos por LN con la llave de contrato. Lo aproximado del
+# tramo se declara al pie de la grafica.
+#   P: prima tomada (viene en negativo, como en el export del FCST)
+#   S: siniestros tomados
+#   C: costo de adquisicion = comision + utilidad + corretaje,
+#      que es la columna Cos... y no la Com...
+BASES_REALES_CRUDAS = [
+    {"anio": 2026, "archivo": "BD_082026.xlsx", "prefijo": "BD_0",
+     "col_mes": "aPOG_MesProc",
+     "cols": {"P": ("PriTomNal5", -1.0), "S": ("SinTomNal5", 1.0),
+              "C": ("CosTomNal5", 1.0)}},
+]
+
 # Ejercicio cuyo real abre el acumulado a julio del RFCST
 ANIO_REAL26 = 2026
 
@@ -1466,6 +1498,145 @@ def _mensual_por_ln(b, col_ln, meses, cols_medida, etiqueta):
     return out
 
 
+def _llave_contrato(df, cols):
+    """Llave de contrato comparable entre bases: los numeros van
+    sin decimales y el texto sin espacios."""
+    partes = []
+    for c in cols:
+        v = pd.to_numeric(df[c], errors="coerce")
+        t = df[c].astype(str).str.strip()
+        t = t.mask(v.notna(), v.fillna(0).round().astype("int64").astype(str))
+        partes.append(t)
+    return partes[0].str.cat(partes[1:], sep="|")
+
+
+def extender_real(base, cfg):
+    """Agrega al real de un ejercicio los meses que trae el export
+    operativo y la base en dolares todavia no.
+
+    Ese export no trae ni LN ni dolares, asi que el tramo nuevo se
+    convierte con el tipo de cambio implicito de los meses que las
+    dos bases comparten y se reparte por LN con la llave de
+    contrato de la base en dolares. Lo que no cruza se prorratea
+    entre las LN que si cruzaron. Todo eso se reporta y se declara
+    al pie de la grafica."""
+
+    ruta = _buscar_archivo(cfg["archivo"], cfg["prefijo"], ".xlsx")
+    if ruta is None:
+        return base
+
+    nombre = os.path.basename(ruta)
+    col_mes = cfg["col_mes"]
+
+    try:
+        crudo = pd.read_excel(ruta, sheet_name=0, header=None, nrows=10)
+    except ValueError:
+        print(f"AVISO: no se pudo leer {nombre}.")
+        return base
+
+    fila = next((i for i in range(len(crudo))
+                 if any(str(v).strip() == col_mes for v in crudo.iloc[i])), None)
+    if fila is None:
+        print(f"AVISO: {nombre} no trae la columna '{col_mes}'.")
+        return base
+
+    b = pd.read_excel(ruta, sheet_name=0, header=fila)
+    b.columns = [str(c).strip() for c in b.columns]
+
+    faltan = [c for c, _ in cfg["cols"].values() if c not in b.columns]
+    if faltan:
+        print(f"AVISO: a {nombre} le faltan columnas {faltan}.")
+        return base
+
+    per = pd.to_numeric(b[col_mes], errors="coerce")
+    b = b[(per // 100) == cfg["anio"]].copy()
+    if b.empty:
+        print(f"AVISO: {nombre} no trae renglones del {cfg['anio']}.")
+        return base
+
+    b["_mes"] = (per % 100).loc[b.index].astype(int)
+    for cpt, (col, signo) in cfg["cols"].items():
+        b[f"_{cpt}"] = signo * pd.to_numeric(b[col], errors="coerce").fillna(0.0)
+
+    nuevos = sorted(set(b["_mes"].unique()) - set(base["meses"]))
+    traslape = sorted(set(b["_mes"].unique()) & set(base["meses"]))
+
+    if not nuevos:
+        print(f"  {nombre}: no agrega meses al real {cfg['anio']} "
+              f"(la base en dólares ya llega a {max(base['meses'])}).")
+        return base
+    if not traslape:
+        print(f"AVISO: {nombre} no comparte ningun mes con el real "
+              f"{cfg['anio']}; sin traslape no hay tipo de cambio y no se "
+              f"puede extender.")
+        return base
+
+    # Tipo de cambio implicito por concepto, sobre el traslape
+    tc = {}
+    for cpt in cfg["cols"]:
+        num = float(b.loc[b["_mes"].isin(traslape), f"_{cpt}"].sum())
+        den = sum(base["por_ln"]["_tot"][cpt][m - 1] for m in traslape)
+        tc[cpt] = num / den if abs(den) > TOL else None
+
+    if tc.get("P") is None:
+        print(f"AVISO: no se pudo calcular el tipo de cambio de {nombre}.")
+        return base
+
+    # Reparto por LN: cada renglon se resuelve con el primer nivel
+    # de llave que lo cruce
+    dicc = base.get("ln_por_llave") or []
+    # object y no float: en la columna van etiquetas de LN
+    b["_ln"] = pd.Series([None] * len(b), index=b.index, dtype=object)
+    for _niv, (_, cols_crudo) in enumerate(NIVELES_LLAVE):
+        if _niv >= len(dicc) or not dicc[_niv]:
+            continue
+        if not all(c in b.columns for c in cols_crudo):
+            continue
+        pend = b["_ln"].isna()
+        if not pend.any():
+            break
+        b.loc[pend, "_ln"] = _llave_contrato(b[pend], cols_crudo).map(dicc[_niv])
+    cubre = b.loc[b["_mes"].isin(nuevos), "_ln"].notna()
+    peso_p = b.loc[b["_mes"].isin(nuevos), "_P"]
+    cobertura = (peso_p[cubre].sum() / peso_p.sum()) if abs(peso_p.sum()) > TOL else 0.0
+
+    por_ln = base["por_ln"]
+    for mes in nuevos:
+        sub = b[b["_mes"] == mes]
+        for cpt in cfg["cols"]:
+            if tc.get(cpt) in (None, 0.0):
+                continue
+            total = float(sub[f"_{cpt}"].sum()) / tc[cpt]
+            g = sub.dropna(subset=["_ln"]).groupby("_ln")[f"_{cpt}"].sum() / tc[cpt]
+            asignado = float(g.sum())
+            resto = total - asignado
+            if abs(asignado) > TOL and abs(resto) > TOL:
+                g = g + g / asignado * resto          # el no cruzado, a prorrata
+            for ln, v in g.items():
+                fila_ln = por_ln.setdefault(ln, {})
+                serie = fila_ln.get(cpt)
+                if serie is None:
+                    serie = [0.0] * 12
+                    fila_ln[cpt] = serie
+                serie[mes - 1] = float(v)
+            por_ln["_tot"][cpt][mes - 1] = total
+
+    base["meses"] = sorted(set(base["meses"]) | set(nuevos))
+    base["extension"] = {
+        "archivo": nombre,
+        "meses": nuevos,
+        "tc": tc["P"],
+        "cobertura": cobertura,
+    }
+
+    txt = ", ".join(MESES_TXT[m - 1] for m in nuevos)
+    print(f"Real {cfg['anio']} extendido con {nombre}: se agrega {txt} · "
+          f"tipo de cambio implícito {tc['P']:,.2f} (traslape "
+          f"{MESES_TXT[traslape[0] - 1]}-{MESES_TXT[traslape[-1] - 1]}) · "
+          f"{cobertura:.1%} de la prima cruza con una LN")
+    return base
+
+
 def cargar_real(cfg):
     """Real mensual de un ejercicio, por LN y concepto.
 
@@ -1536,13 +1707,28 @@ def cargar_real(cfg):
         por_negocio = {k: {c: float(v[c]) for c in ("P", "S", "C")}
                        for k, v in _agg.iterrows()}
 
+    # Diccionario llave de contrato -> LN, para poder repartir por
+    # LN los meses que lleguen de un export sin esa columna
+    ln_por_llave = []
+    for _cols_usd, _ in NIVELES_LLAVE:
+        _d = {}
+        if all(c in b.columns for c in _cols_usd):
+            _t = pd.DataFrame({"k": _llave_contrato(b, _cols_usd),
+                               "ln": b[col_ln].map(_norm_ln)}).dropna()
+            for _k, _g in _t.groupby("k")["ln"]:
+                _u = _g.unique()
+                if len(_u) == 1:
+                    _d[_k] = _u[0]
+        ln_por_llave.append(_d)
+
     obs = sorted({int(m) for m in meses.dropna().unique()})
     tot = datos.get("_tot", {}).get("P", [0] * 12)
     print(f"Real {anio} mensual ({os.path.basename(ruta)}): "
           f"meses {obs[0]}-{obs[-1]} · primas {sum(tot) / 1e6:,.1f} M")
 
     return {"anio": anio, "por_ln": datos, "meses": obs,
-            "por_negocio": por_negocio, "archivo": os.path.basename(ruta)}
+            "por_negocio": por_negocio, "archivo": os.path.basename(ruta),
+            "ln_por_llave": ln_por_llave, "extension": None}
 
 
 def cargar_ppto26():
@@ -1615,6 +1801,11 @@ for _cfg_real in BASES_REALES:
     _base_real = cargar_real(_cfg_real)
     if _base_real is not None:
         REALES[_cfg_real["anio"]] = _base_real
+
+for _cfg_crudo in BASES_REALES_CRUDAS:
+    _b = REALES.get(_cfg_crudo["anio"])
+    if _b is not None:
+        REALES[_cfg_crudo["anio"]] = extender_real(_b, _cfg_crudo)
 
 REAL26 = REALES.get(ANIO_REAL26)
 
@@ -3555,9 +3746,19 @@ for _a in sorted(REALES, reverse=True):
         _ult = MESES_TXT[max(_b['meses']) - 1]
         _den = ("el año completo del RFCST 2026" if _a == ANIO_REAL26
                 else f"su propio acumulado a {_ult.lower()}")
-        _pie_reales.append(
-            f"El real {_a} ({_b['archivo']}) solo tiene cerrado hasta {_ult.lower()}: "
-            f"la línea corta ahí y cada mes se grafica como % de {_den}.")
+        _txt = (f"El real {_a} ({_b['archivo']}) solo tiene cerrado hasta "
+                f"{_ult.lower()}: la línea corta ahí y cada mes se grafica como "
+                f"% de {_den}.")
+        _ext = _b.get("extension")
+        if _ext:
+            _mm = ", ".join(MESES_TXT[m - 1] for m in _ext["meses"])
+            _txt += (f" {_mm.capitalize()} viene de {_ext['archivo']}, que cierra "
+                     f"antes pero no trae LN ni dólares: se convirtió con el tipo "
+                     f"de cambio implícito de los meses que ambas bases comparten "
+                     f"({_ext['tc']:,.2f}) y se repartió por LN con la llave de "
+                     f"contrato, que cruza el {_ext['cobertura']:.0%} de la prima "
+                     f"(el resto va a prorrata).")
+        _pie_reales.append(_txt)
 
 if REAL26 is not None or PPTO26 is not None:
     PIE_EST = " ".join([

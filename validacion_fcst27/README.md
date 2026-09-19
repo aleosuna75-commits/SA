@@ -10,7 +10,9 @@ del RFCST 2026).
 |---|---|---|
 | `PptoTecnico2027_Ced.csv` (o `PptoTecnico*.csv` más reciente) | Sí | FCST 2027 de Suscripción (export SAP BW), con la columna `PRCT_CED` del % de cesión |
 | `BD_RFCST_26_act.xlsx` (o `BD_RFCST*.xlsx`) | No | Comparativas vs RFCST 2026 / FCST 2026 / Real 2025, y la estacionalidad mensual del FCST 2026 (hoja `Ppto2026`) |
-| `BDReal26.xlsx` (hoja `BD`) | No | Real 2026 mensual: da la forma con la que se abre el Ene-Jul del RFCST |
+| `BDReal26.xlsx` (hoja `BD`) | No | Real 2026 mensual por LN y en dólares: da la forma con la que se abre el Ene-Jul del RFCST y se grafica como serie propia |
+| `BDReal25.xlsx` (mismo formato) | No | Real 2025 mensual, como serie propia en la estacionalidad |
+| `BD_082026.xlsx` (export operativo) | No | Extiende el real 2026 con los meses que la base en dólares todavía no tiene |
 | `Catalogo*.xlsx` (hoja `Valores`, columnas `Ced` / `CedenteRP`) | No | Nombres de cedentes en el dashboard |
 
 Sin la base del RFCST el script corre igual y las comparativas se muestran
@@ -121,6 +123,42 @@ y salir de las cifras. Además:
   cuenta** y el monto que queda fuera;
 - la hoja `Cuentas_Concepto` abre por **LN × cuenta × concepto**, marcando si
   la cuenta está en el catálogo o entró por prefijo.
+
+### Estacionalidad: ejercicios reales
+
+Las gráficas comparan la mensualización del FCST 2027 contra el RFCST 2026, el
+FCST 2026 y **los ejercicios reales**. Cada real se configura en
+`BASES_REALES` (archivo y año); basta con dejarlo en `Inputs/`.
+
+La normalización es lo único delicado, porque hay años incompletos:
+
+| Serie | Denominador | Por qué |
+|---|---|---|
+| Año cerrado (2025) | su propio año | es su estacionalidad |
+| Año del RFCST (2026), con meses abiertos | el año completo del RFCST 2026 | así se lee mes a mes contra esa curva: la separación entre las dos líneas es cuánto va adelantado o atrasado el real contra el plan |
+| Cualquier otro año incompleto | su propio acumulado | no hay contra qué referenciarlo |
+
+Los meses sin dato van en `null`, así que la línea corta en el último mes
+cerrado. El pie de la gráfica declara el criterio de cada serie.
+
+**Extensión con el export operativo.** `BD_082026.xlsx` cierra antes que la
+base en dólares, pero no trae LN ni dólares. Los meses que le faltan a la base
+en dólares se toman de ahí (`BASES_REALES_CRUDAS`):
+
+- los importes salen de `PriTomNal5`, `SinTomNal5` y **`CosTomNal5`** — la de
+  costo, que es comisión + utilidad + corretaje, no la de comisión sola: con
+  `ComTomNal5` el tipo de cambio implícito se va a 15 en vez de 17.4;
+- se convierten con el **tipo de cambio implícito de los meses que ambas bases
+  comparten**, calculado por concepto;
+- se reparten por LN con una **cascada de llaves de contrato** (tipo rea +
+  corredor + compañía + contrato + año susc., luego sin el año, luego compañía
+  + contrato). El año de suscripción sale del segundo nivel porque la LN es del
+  contrato y no de la cohorte: exigirlo baja la cobertura de 95% a 80%. Lo que
+  no cruza se prorratea entre las LN que sí cruzaron.
+
+Todo eso se imprime en consola y se declara al pie de la gráfica. El tramo
+extendido **solo alimenta la estacionalidad**: el acumulado por negocio que usa
+el reporte de alertas sigue siendo el de la base en dólares.
 
 ### Hoja `Cuadre_LN`
 
