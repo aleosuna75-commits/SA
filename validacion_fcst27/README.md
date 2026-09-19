@@ -163,8 +163,18 @@ el reporte de alertas sigue siendo el de la base en dólares.
 ### Estacionalidad por LN o por ramo
 
 Cada gráfica de estacionalidad trae un selector **Por LN / Por ramo**. El ramo
-no viene en ninguna base como nombre, así que se resuelve con dos catálogos
-sacados de la hoja `Valores` del libro del RFCST:
+se maneja con su **código** (`Ramo 60`, `Ramo 110`…), igual que la LN, y se
+resuelve con dos catálogos sacados de la hoja `Valores` del libro del RFCST:
+
+```
+ 10 Vida          31 Acc Per.     39 Salud        50 MyT        71 Terremoto
+ 20 Vida (pens.)  35 GMM          40 Resp. Civil  60 Incendio   73 HyORH
+ 80 Agropecuario  90 Autos       100 Crédito     110 Diversos  130 Fianzas
+```
+
+Los dos caminos (centro de beneficio y subramo) devuelven exactamente el mismo
+juego de 15 códigos, así que las fuentes cruzan sin traducción intermedia.
+
 
 | Fuente | De dónde sale el ramo | Cobertura |
 |---|---|---|

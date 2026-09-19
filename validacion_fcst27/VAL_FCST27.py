@@ -160,52 +160,64 @@ CORRECCIONES_SIGNO = []
 # ---- Ramo: segunda dimension de la estacionalidad ----
 # El export del FCST no trae el ramo, pero si el centro de
 # beneficio (/ERP/PROFTCTR), que lo determina. El catalogo sale de
-# la hoja Valores del libro del RFCST (CeBe -> Ramo) y cubre el
-# 100% de los renglones de la base actual; si aparece un centro
-# nuevo se avisa en consola y ese renglon queda sin ramo.
-SIN_RAMO = "(sin ramo)"
+# la hoja Valores del libro del RFCST y cubre el 100% de los
+# renglones de la base actual; si aparece un centro nuevo se avisa
+# en consola y ese renglon queda sin ramo.
+#
+# El ramo se maneja con su CODIGO, no con el nombre:
+#   10 Vida · 20 Vida (pensiones) · 31 Acc Per. · 35 GMM ·
+#   39 Salud · 40 Resp. Civil · 50 MyT · 60 Incendio ·
+#   71 Terremoto · 73 HyORH · 80 Agropecuario · 90 Autos ·
+#   100 Credito · 110 Diversos · 130 Fianzas
+SIN_RAMO = "s/r"
 
 CAT_RAMO = {
-    # Acc Per.
-    "A331003100": "Acc Per.", "A331003200": "Acc Per.", "A331003300": "Acc Per.",
-    # Agropecuario
-    "A081000000": "Agropecuario", "A082000000": "Agropecuario", "A083000000": "Agropecuario",
-    # Autos
-    "A091000000": "Autos", "A092000000": "Autos", "A093000000": "Autos", "A094000000": "Autos",
-    "A094000001": "Autos", "A095000000": "Autos",
-    # Crédito
-    "A100000000": "Crédito", "A100000001": "Crédito", "A100000002": "Crédito",
-    # Diversos
-    "A111000000": "Diversos", "A111000008": "Diversos", "A111000009": "Diversos", "A112000000": "Diversos",
-    "A112000001": "Diversos", "A112000002": "Diversos", "A112000003": "Diversos", "A112000004": "Diversos",
-    "A112000005": "Diversos", "A112000009": "Diversos",
-    # Fianzas
-    "A131000000": "Fianzas", "A132000000": "Fianzas", "A133000000": "Fianzas", "A134000000": "Fianzas",
-    "A141000000": "Fianzas", "A142000000": "Fianzas", "A151000000": "Fianzas", "A152000000": "Fianzas",
-    "A153000000": "Fianzas", "A161000000": "Fianzas", "A162000000": "Fianzas", "A163000000": "Fianzas",
-    "A164000000": "Fianzas", "A165000000": "Fianzas", "A165000001": "Fianzas", "A171000000": "Fianzas",
-    "A172000000": "Fianzas", "A173000000": "Fianzas", "A174000000": "Fianzas",
-    # GMM
-    "A332003400": "GMM", "A332003500": "GMM", "A332003600": "GMM",
-    # HyORH
-    "A073000000": "HyORH", "A073000001": "HyORH", "A075000000": "HyORH",
-    # Incendio
-    "A060000000": "Incendio", "A060000001": "Incendio",
-    # MyT
-    "A051000000": "MyT", "A051000001": "MyT", "A051000002": "MyT", "A052000000": "MyT",
-    "A052000002": "MyT", "A052000003": "MyT", "A052000004": "MyT", "A052000005": "MyT",
-    "A052000006": "MyT",
-    # Resp. Civil
-    "A041000000": "Resp. Civil", "A042000000": "Resp. Civil", "A043000000": "Resp. Civil", "A044000000": "Resp. Civil",
-    "A044000001": "Resp. Civil", "A044000002": "Resp. Civil", "A044000003": "Resp. Civil", "A044000004": "Resp. Civil",
-    # Salud
-    "A333003700": "Salud", "A333003800": "Salud", "A333003900": "Salud",
-    # Terremoto
-    "A071000000": "Terremoto",
-    # Vida
-    "A011000000": "Vida", "A012000000": "Vida", "A013000000": "Vida", "A021000000": "Vida",
-    "A022000000": "Vida", "A023000000": "Vida", "A024000000": "Vida", "A025000000": "Vida",
-    "A600000000": "Vida",
+    # 10 · Vida
+    "A011000000": "10", "A012000000": "10", "A013000000": "10",
+    "A600000000": "10",
+    # 20 · Vida
+    "A021000000": "20", "A022000000": "20", "A023000000": "20",
+    "A024000000": "20", "A025000000": "20",
+    # 31 · Acc Per.
+    "A331003100": "31", "A331003200": "31", "A331003300": "31",
+    # 35 · GMM
+    "A332003400": "35", "A332003500": "35", "A332003600": "35",
+    # 39 · Salud
+    "A333003700": "39", "A333003800": "39", "A333003900": "39",
+    # 40 · Resp. Civil
+    "A041000000": "40", "A042000000": "40", "A043000000": "40",
+    "A044000000": "40", "A044000001": "40", "A044000002": "40",
+    "A044000003": "40", "A044000004": "40",
+    # 50 · MyT
+    "A051000000": "50", "A051000001": "50", "A051000002": "50",
+    "A052000000": "50", "A052000002": "50", "A052000003": "50",
+    "A052000004": "50", "A052000005": "50", "A052000006": "50",
+    # 60 · Incendio
+    "A060000000": "60", "A060000001": "60",
+    # 71 · Terremoto
+    "A071000000": "71",
+    # 73 · HyORH
+    "A073000000": "73", "A073000001": "73", "A075000000": "73",
+    # 80 · Agropecuario
+    "A081000000": "80", "A082000000": "80", "A083000000": "80",
+    # 90 · Autos
+    "A091000000": "90", "A092000000": "90", "A093000000": "90",
+    "A094000000": "90", "A094000001": "90", "A095000000": "90",
+    # 100 · Crédito
+    "A100000000": "100", "A100000001": "100", "A100000002": "100",
+    # 110 · Diversos
+    "A111000000": "110", "A111000008": "110", "A111000009": "110",
+    "A112000000": "110", "A112000001": "110", "A112000002": "110",
+    "A112000003": "110", "A112000004": "110", "A112000005": "110",
+    "A112000009": "110",
+    # 130 · Fianzas
+    "A131000000": "130", "A132000000": "130", "A133000000": "130",
+    "A134000000": "130", "A141000000": "130", "A142000000": "130",
+    "A151000000": "130", "A152000000": "130", "A153000000": "130",
+    "A161000000": "130", "A162000000": "130", "A163000000": "130",
+    "A164000000": "130", "A165000000": "130", "A165000001": "130",
+    "A171000000": "130", "A172000000": "130", "A173000000": "130",
+    "A174000000": "130",
 }
 
 # Las bases operativas no traen el nombre del ramo sino el codigo
@@ -214,40 +226,41 @@ CAT_RAMO = {
 # esas bases se resuelve por SUBRAMO, que si llega al mismo nivel
 # que el catalogo de centros de beneficio.
 CAT_SUBRAMO = {
-    # Acc Per.
-    30: "Acc Per.", 31: "Acc Per.", 32: "Acc Per.", 33: "Acc Per.",
-    # Agropecuario
-    80: "Agropecuario", 81: "Agropecuario", 82: "Agropecuario", 83: "Agropecuario",
-    # Autos
-    90: "Autos", 91: "Autos", 92: "Autos", 93: "Autos", 94: "Autos", 95: "Autos", 96: "Autos",
-    # Crédito
-    100: "Crédito", 101: "Crédito", 102: "Crédito",
-    # Diversos
-    110: "Diversos", 111: "Diversos", 112: "Diversos", 113: "Diversos", 114: "Diversos", 115: "Diversos", 116: "Diversos", 117: "Diversos",
-    118: "Diversos", 119: "Diversos",
-    # Fianzas
-    130: "Fianzas", 131: "Fianzas", 132: "Fianzas", 133: "Fianzas", 134: "Fianzas", 140: "Fianzas", 141: "Fianzas", 142: "Fianzas",
-    150: "Fianzas", 151: "Fianzas", 152: "Fianzas", 153: "Fianzas", 160: "Fianzas", 161: "Fianzas", 162: "Fianzas", 163: "Fianzas",
-    164: "Fianzas", 165: "Fianzas", 166: "Fianzas", 170: "Fianzas", 171: "Fianzas", 172: "Fianzas", 173: "Fianzas", 174: "Fianzas",
-    # GMM
-    34: "GMM", 35: "GMM", 36: "GMM",
-    # HyORH
-    70: "HyORH", 72: "HyORH", 73: "HyORH", 74: "HyORH",
-    # Incendio
-    60: "Incendio", 61: "Incendio", 62: "Incendio",
-    # MyT
-    50: "MyT", 51: "MyT", 52: "MyT", 53: "MyT", 54: "MyT", 55: "MyT", 56: "MyT", 57: "MyT",
-    58: "MyT", 5510: "MyT",
-    # Resp. Civil
-    40: "Resp. Civil", 41: "Resp. Civil", 42: "Resp. Civil", 43: "Resp. Civil", 44: "Resp. Civil", 45: "Resp. Civil", 46: "Resp. Civil", 47: "Resp. Civil",
-    48: "Resp. Civil",
-    # Salud
-    37: "Salud", 38: "Salud", 39: "Salud",
-    # Terremoto
-    71: "Terremoto",
-    # Vida
-    10: "Vida", 11: "Vida", 12: "Vida", 13: "Vida", 20: "Vida", 21: "Vida", 22: "Vida", 23: "Vida",
-    24: "Vida", 25: "Vida", 120: "Vida",
+    # 10 · Vida
+    10: "10", 11: "10", 12: "10", 13: "10", 120: "10",
+    # 20 · Vida
+    20: "20", 21: "20", 22: "20", 23: "20", 24: "20", 25: "20",
+    # 31 · Acc Per.
+    30: "31", 31: "31", 32: "31", 33: "31",
+    # 35 · GMM
+    34: "35", 35: "35", 36: "35",
+    # 39 · Salud
+    37: "39", 38: "39", 39: "39",
+    # 40 · Resp. Civil
+    40: "40", 41: "40", 42: "40", 43: "40", 44: "40", 45: "40", 46: "40", 47: "40",
+    48: "40",
+    # 50 · MyT
+    50: "50", 51: "50", 52: "50", 53: "50", 54: "50", 55: "50", 56: "50", 57: "50",
+    58: "50", 5510: "50",
+    # 60 · Incendio
+    60: "60", 61: "60", 62: "60",
+    # 71 · Terremoto
+    71: "71",
+    # 73 · HyORH
+    70: "73", 72: "73", 73: "73", 74: "73",
+    # 80 · Agropecuario
+    80: "80", 81: "80", 82: "80", 83: "80",
+    # 90 · Autos
+    90: "90", 91: "90", 92: "90", 93: "90", 94: "90", 95: "90", 96: "90",
+    # 100 · Crédito
+    100: "100", 101: "100", 102: "100",
+    # 110 · Diversos
+    110: "110", 111: "110", 112: "110", 113: "110", 114: "110", 115: "110", 116: "110", 117: "110",
+    118: "110", 119: "110",
+    # 130 · Fianzas
+    130: "130", 131: "130", 132: "130", 133: "130", 134: "130", 140: "130", 141: "130", 142: "130",
+    150: "130", 151: "130", 152: "130", 153: "130", 160: "130", 161: "130", 162: "130", 163: "130",
+    164: "130", 165: "130", 166: "130", 170: "130", 171: "130", 172: "130", 173: "130", 174: "130",
 }
 
 # ---- Reales mensuales por ejercicio (opcionales) ----
@@ -1576,7 +1589,7 @@ def _buscar_columna(cols, candidatas):
 
 
 def _ramo_de_subramo(v):
-    """Nombre del ramo a partir del codigo de subramo."""
+    """Codigo de ramo a partir del codigo de subramo."""
     n = pd.to_numeric(v, errors="coerce")
     return CAT_SUBRAMO.get(int(n)) if pd.notna(n) else None
 
@@ -2361,7 +2374,8 @@ for ln in LNS:
     SEASON_R[ln] = estacionalidad(d_ok[d_ok["LN"] == ln], "Valor_Ret")
 
 # Y la misma, abierta por ramo en vez de por LN
-RAMOS = sorted(r for r in d_ok["Ramo"].unique() if str(r) != "nan")
+RAMOS = sorted((r for r in d_ok["Ramo"].unique() if str(r) != "nan"),
+               key=lambda v: (0, int(v)) if str(v).isdigit() else (1, 0))
 
 SEASON_RA = {"_tot": estacionalidad(d_ok)}
 SEASON_RA_R = {"_tot": estacionalidad(d_ok, "Valor_Ret")}
@@ -4949,7 +4963,7 @@ const DIM_EST = {P: 'LN', S: 'LN', C: 'LN'};
 
 const datosEst = cpt => DIM_EST[cpt] === 'RA'
   ? {season: V().seasonRamo, season26: DATA.season26ramo,
-     claves: DATA.ramos, pref: '', seasonT: DATA.vistas.T.seasonRamo}
+     claves: DATA.ramos, pref: 'Ramo ', seasonT: DATA.vistas.T.seasonRamo}
   : {season: V().season, season26: DATA.season26,
      claves: DATA.lns, pref: 'LN ', seasonT: DATA.vistas.T.season};
 
