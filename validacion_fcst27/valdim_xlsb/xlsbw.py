@@ -112,12 +112,17 @@ def colinfo(c1, c2, ancho_chars):
     return rec(60, struct.pack('<IIIIH', c1, c2, int(ancho_chars*256 + 5*256/7), 0, 0x0002))
 
 def pane(xsplit, ysplit):
-    "BrtPane: paneles inmovilizados (xsplit columnas, ysplit filas)"
-    return rec(151, struct.pack('<ddIIIB', float(xsplit), float(ysplit), int(ysplit), int(xsplit), 0, 0x03))
+    "BrtPane: paneles inmovilizados (xsplit columnas, ysplit filas). pnnAct: 0 ambos, 2 solo filas, 1 solo columnas"
+    pnn = 0 if (xsplit and ysplit) else (2 if ysplit else 1)
+    return rec(151, struct.pack('<ddIIIB', float(xsplit), float(ysplit), int(ysplit), int(xsplit), pnn, 0x03))
 
-def rowhdr(r):
-    # rw, ixfe, miyRw, flags, flags2, ccolspan=0
-    return rec(0, struct.pack('<IIHHBI', r, 0, 300, 0, 0, 0))
+def sel(pnn):
+    "BrtSel: pnn, rwAct, colAct, dwRfxAct, cref=1, rfx(0,0,0,0)"
+    return rec(152, struct.pack('<IIIII', pnn, 0, 0, 0, 1) + struct.pack('<IIII', 0, 0, 0, 0))
+
+def rowhdr(r, cmin=0, cmax=0):
+    "BrtRowHdr: rw, ixfe, miyRw, flags, flags2, ccolspan=1 + BrtColSpan(colMic, colLast), como escribe Excel"
+    return rec(0, struct.pack('<IIHHBI', r, 0, 300, 0, 0, 1) + struct.pack('<II', cmin, cmax))
 
 # ---------- hoja ----------
 WSVIEW = bytes.fromhex('980300000000000000000000000040000000640000000000000000000000')
@@ -147,8 +152,12 @@ def sheet_bin(rows, ncols, cols=None, freeze=None):
     r1, r2 = (rr[0], rr[-1]) if rr else (0, 0)
     out += rec(148, struct.pack('<IIII', r1, r2, 0, max(ncols - 1, 0)))
     out += rec(133); out += rec(137, WSVIEW)
-    if freeze: out += pane(*freeze)
-    out += rec(152, SEL)
+    if freeze:
+        out += pane(*freeze)
+        xs, ys = freeze
+        for p in ([3,1,2,0] if (xs and ys) else ([3,2] if ys else [3,1])): out += sel(p)
+    else:
+        out += sel(3)
     out += rec(138); out += rec(134)
     out += rec(485, FMTPR)
     if cols:
@@ -157,8 +166,9 @@ def sheet_bin(rows, ncols, cols=None, freeze=None):
         out += rec(391)
     out += rec(145)
     for r in rr:
-        out += rowhdr(r)
-        for cb in rows[r]:
+        cs = rows[r]
+        out += rowhdr(r, _col_de(cs[0]), _col_de(cs[-1])) if cs else rowhdr(r)
+        for cb in cs:
             out += cb
     out += rec(146)
     out += rec(130)

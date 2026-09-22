@@ -11,7 +11,7 @@ COLOR_AUTO_BG = bytes.fromhex('03400000000000ff')             # igual que los re
 COLOR_NONE    = bytes.fromhex('0140000000000000')             # como los bordes dg=0 del libro
 
 def font(pt, bold=False, italic=False, rgb='000000', name='Arial'):
-    grbit = 0x0002 if italic else 0
+    grbit = (0x0001 if bold else 0) | (0x0002 if italic else 0)     # Excel marca bit0 en negritas
     return rec(43, struct.pack('<HHHHBBBB', int(pt*20), grbit, 700 if bold else 400, 0, 0, 2, 0, 0)
                    + color_rgb(rgb) + b'\x00' + wstr(name))
 
