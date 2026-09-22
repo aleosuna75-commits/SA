@@ -37,7 +37,8 @@ def ref(r, c, crel=False, rrel=False):
     return struct.pack('<BIH', 0x44, r, _colf(c, crel, rrel))
 
 def area(r1, r2, c1, c2):
-    return struct.pack('<BIIHH', 0x45, r1, r2, _colf(c1), _colf(c2))
+    "PtgArea clase REFERENCIA (0x25). Con clase valor (0x45) Excel lo lee como @rango y SUM da #VALUE!"
+    return struct.pack('<BIIHH', 0x25, r1, r2, _colf(c1), _colf(c2))
 
 def num(v):
     if float(v).is_integer() and 0 <= v <= 65535:

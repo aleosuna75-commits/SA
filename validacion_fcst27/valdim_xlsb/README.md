@@ -47,6 +47,31 @@ Observaciones adicionales que salieron del análisis:
 11,307 fórmulas (6,336 `SUMIFS`), ninguna cifra capturada. El libro queda en su
 modo de cálculo manual; las hojas se guardan ya calculadas y `calcChain` no se toca.
 
+## Reparar el libro después de editarlo en Excel
+
+`reparar.py` toma el libro tal como lo dejó el usuario (con columnas u hojas borradas)
+y, sin cambiar su disposición:
+
+1. Cambia `SUM(_xlfn.SINGLE(rango))` por `SUM(rango)`. Las primeras versiones de
+   `xlsbw.area()` escribían el rango con clase *valor* (`0x45`); Excel lo interpreta
+   como `@rango` y la suma da `#VALUE!` en cuanto recalcula. Ya se escribe con clase
+   *referencia* (`0x25`).
+2. Reemplaza las referencias que quedaron en `#REF!` porque se borró la columna a la que
+   apuntaban (hoy: `Val_Resumen!E7:E26`, el ¿Cuadra? de Ramo) por `ABS(D{fila})<0.005`.
+3. Recalcula el valor guardado de todas las fórmulas de las hojas `Val_*` con
+   `evaluador.py`, porque el libro está en cálculo manual.
+
+Todo lo demás se copia byte a byte. `verificar3.py` comprueba integridad, relee y
+reevalúa cada fórmula, y compara celda por celda contra la versión validada
+trasladando las columnas borradas.
+
+```bash
+cp <libro editado>.xlsb USR.xlsb
+cp <libro validado>.xlsb MIO.xlsb        # para la comparación
+python3 reparar.py                      # escribe FCST_2027_Cesion.xlsb
+python3 verificar3.py
+```
+
 ## Cómo se escribe el `.xlsb`
 
 LibreOffice no abre este libro y `pyxlsb` es solo lectura. `xlsbw.py` genera los
@@ -66,6 +91,8 @@ originales conservan sus bytes comprimidos.
 | `xlsbw.py`, `estilos.py`, `empaquetar2.py` | Escritura del `.xlsb` |
 | `construir2.py` | Arma las siete hojas |
 | `verificar2.py` | Auditoría: integridad, estilos, orden de celdas y reevaluación de todas las fórmulas |
+| `reparar.py`, `evaluador.py`, `verificar3.py` | Reparación del libro editado en Excel y su auditoría |
+| `render.py` | Vista previa HTML de las hojas con los estilos reales del libro |
 | `analisis.py`, `comparar.py`, `construir.py`, `verificar.py`, `empaquetar.py`, `load_ctamens.py` | Versión anterior (ValDim vs recálculo), se conserva por referencia |
 
 ## Cómo correrlo
