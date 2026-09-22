@@ -128,7 +128,8 @@ def main():
     pend = [(h, colrow(*k)) for h in H for k in FORM[h] if CEL[h][k][0] is None]
     print(f'recalculo: {it+1} pasadas; formulas sin valor: {len(pend)} {pend[:5]}')
     if pend: sys.exit(1)
-    valores = {h: {k: CEL[h][k][0] for k in FORM[h]} for h in H}
+    norm = lambda v: 0.0 if (isinstance(v, float) and v == 0.0) else v      # sin -0.0, como escribe Excel
+    valores = {h: {k: norm(CEL[h][k][0]) for k in FORM[h]} for h in H}
     st = reescribir(SRC, DST, cambios, valores)
     os.remove(TMP)
     pickle.dump(dict(CEL=CEL, FORM=FORM, cambios={h: sorted(v) for h,v in cambios.items()}), open('reparado.pkl','wb'))
