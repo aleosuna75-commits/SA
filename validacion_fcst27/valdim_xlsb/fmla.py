@@ -122,6 +122,8 @@ def parse(rgce, ctx, base=None):
                 (cc,) = struct.unpack_from('<H', rgce, p); p += 2 + 2*(cc+1)
             else:
                 p += 2
+            if g & 0x10 and st:   # PtgAttrSum: SUM() de un solo argumento
+                st[-1] = 'SUM(' + st[-1] + ')'
             continue
         if pt == 0x18:
             p += 1 + 4 if rgce[p] == 0x01 else 1+4

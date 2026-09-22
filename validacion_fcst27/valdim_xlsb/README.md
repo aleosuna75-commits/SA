@@ -1,104 +1,83 @@
-# Validación de las vistas por dimensión de `FCST_2027_Cesion.xlsb`
+# ER vs vistas de ER — validación por dimensión de `FCST_2027_Cesion.xlsb`
 
-Herramienta para auditar la hoja `ValDim` del libro del presupuesto y devolver el
-resultado **dentro del mismo libro**, en hojas nuevas armadas con fórmulas que
-apuntan a las celdas de origen.
+Herramienta que evalúa cada renglón del estado de resultados de las vistas
+`ER_ram`, `ER_ln`, `ER_reg` y `ER_tre` para **cada miembro** (como si el selector
+`A6` se pusiera en cada uno), suma los miembros y los compara contra el renglón
+equivalente de la hoja `ER`. El resultado se entrega **dentro del mismo libro**, en
+siete hojas nuevas armadas con fórmulas que apuntan a las celdas de origen.
 
-## Qué encontró
+## Resultado
 
-La hoja `ValDim` compara, para cada dimensión, la suma de sus miembros contra el
-global del presupuesto. Hoy muestra descuadres en las cuatro vistas. Al recalcular
-esas mismas sumas directo de `CtaMens` con la fórmula del propio libro, **las cuatro
-dimensiones cuadran contra el global en 0.00**:
+Las cuatro vistas reproducen ER en **13 de los 20 renglones** (diferencia 0.00 en
+todos los meses). Los otros 7 no cuadran por la misma cantidad en las cuatro
+dimensiones, es decir, no es un problema de datos sino de fuentes distintas:
 
-| Dimensión | Descuadre que muestra ValDim (prima, dic) | Descuadre real |
-|---|---:|---:|
-| Ramo | 165,162,122.33 | 0.00 |
-| Línea de negocio | 1,329,234.26 | 0.00 |
-| Región | −153,749,220.68 | 0.00 |
-| Tipo de reaseguro | −767,645,968.60 | 0.00 |
+| Renglón de la vista | Diferencia (dic.) | Por qué |
+|---|---:|---|
+| 17 Siniestros Ocurridos | −41,811,767.85 | ER agrega `CAT!H27:S27` + `CAT!H83:S83` (eventos CAT globales); la vista toma `CtaMens!AC×xEvCat + AD`, en cero |
+| 24 Siniestros Netos | −27,419,200.81 | Lo anterior menos los recuperados CAT `CAT!H41:S41` + `CAT!H84:S84` (14,392,567.04) |
+| 31 Gastos Generales | −38,249,042.87 | ER toma `Gastos!C12:N12`; la vista suma `CtaMens!AF`, en cero |
+| 20, 28, 33, 35 | — | Resultados que arrastran las tres anteriores |
 
-El descuadre no está en los datos. Está en cómo se llena `ValDim`:
+Las tres diferencias se comprueban al centavo con fórmulas en `Val_Resumen`.
 
-- De las 31 filas de miembro, **solo la primera de cada vista tiene fórmula**
-  (`ValDim!O10 = ER_ram!P$9`, y su equivalente en LN, Región y Tipo Rea).
-  Las 27 restantes son **valores pegados**: 552 celdas constantes contra 96 con fórmula.
-- Esa única fila viva muestra el miembro que tenga seleccionado el combo de la vista
-  (`ER_ram!A6`, `ER_ln!A6`, `ER_reg!A6`, `ER_tre!A6`), no el que dice su rótulo.
-  Hoy Región está parada en `R06` bajo el rótulo `R01`, y Tipo Rea en `3` bajo el rótulo `1`.
-- Dos etiquetas de `ValDim` no empatan con el detalle: `Crédito` (con acento) contra
-  `Credito` (sin acento) en `CtaMens`, y `LN04008` contra `LN04008-Agro`.
-  `GMM`, `Crédito`, `LN04008` y `LN04009` no tienen ni un renglón con ese nombre exacto.
+Observaciones adicionales que salieron del análisis:
 
-## Cómo se arman las cifras del libro
-
-```
-ValDim!O3   = ER!Q$5      = -SUMIFS(CtaMens!Q; CtaMens!B;61; CtaMens!A;mes)   (global prima)
-ValDim!O4   = ER!Q$17     =  SUMIFS(CtaMens!Q; CtaMens!B;53; CtaMens!A;mes)   (global comisiones)
-ValDim!O10  = ER_ram!P$9  = -SUMIFS(CtaMens!Q; B;61; A;mes; R;ER_ram!A6)      (miembro de Ramo)
-ValDim!AC10 = ER_ln!P$9   -> filtra por CtaMens!C     ValDim!AQ10 = ER_reg!P$9 -> CtaMens!E
-ValDim!BE10 = ER_tre!P$9  -> filtra por CtaMens!L
-```
-
-Columnas de `CtaMens` (encabezado real en la fila 3, datos de la fila 4 a la 201,234):
-`A` mes, `B` familia de cuenta (61 prima / 53 comisiones / 54 siniestros), `C` línea de
-negocio, `E` región, `L` tipo de reaseguro, `Q` monto, `R` ramo.
+- `ValDim` no sirve como validación: de sus 31 filas de miembro solo la primera de
+  cada vista tiene fórmula (`=ER_x!P$9`); las otras 27 son valores pegados, y esa
+  fila viva muestra el miembro del selector, no el de su rótulo. `Val_ValDim` lo
+  documenta miembro por miembro.
+- Etiquetas: `Crédito` (con acento, en `2_Reservas`) y `Credito` (sin acento, en
+  `CtaMens`) son dos filas distintas; `LN04008-Agro` está en `CtaMens` pero no en la
+  tabla de reservas, y `LN04008`/`LN04009` al revés. `GMM` y `Crédito` no tienen
+  renglones en `CtaMens` pero sí reservas, así que hay que incluirlos.
+- Los totales de SONR que usa ER (`2_Reservas` filas 118 y 136) dejan fuera la fila
+  de Fianzas (117 y 135), que hoy está en cero.
+- `Gastos!C5:N5` rotula los meses como 2026; conviene confirmar que la fila 12 es 2027.
 
 ## Hojas que se agregan al libro
 
 | Hoja | Contenido |
 |---|---|
-| `Val_Resumen` | Veredicto por dimensión y concepto: suma según ValDim vs suma recalculada, contra el global |
-| `Val_Ramo`, `Val_LN`, `Val_Region`, `Val_TRea` | Miembro por miembro y mes por mes, en tres bloques: lo que muestra ValDim (`=ValDim!...`), el recálculo (`SUMIFS` sobre `CtaMens`) y la diferencia |
-| `Val_Origen` | Rastreo de cada cifra: celda, fórmula tal cual está en el libro, valor vivo, mapa de columnas de `CtaMens`, censo de celdas vivas vs pegadas y en qué miembro está parado cada combo |
+| `Val_Resumen` | Los 20 renglones × 4 dimensiones a diciembre: suma de miembros, ER, diferencia y `¿Cuadra?`; abajo, la comprobación de las tres diferencias con los importes de `CAT` y `Gastos` |
+| `Val_Ramo`, `Val_LN`, `Val_Region`, `Val_TRea` | Un bloque por renglón: cada miembro con la fórmula de la vista, mes a mes acumulado; suma, ER y diferencia |
+| `Val_Origen` | Fórmula de cada renglón en la vista y en ER, mapa de columnas de `CtaMens`, tablas de `2_Reservas`, universo de miembros y selectores vivos |
+| `Val_ValDim` | Por qué `ValDim` muestra descuadres |
 
-Todo va en fórmulas: 3,259 en total, ninguna cifra capturada a mano.
+11,307 fórmulas (6,336 `SUMIFS`), ninguna cifra capturada. El libro queda en su
+modo de cálculo manual; las hojas se guardan ya calculadas y `calcChain` no se toca.
 
-## Por qué se escribe el `.xlsb` a mano
+## Cómo se escribe el `.xlsb`
 
-LibreOffice no abre este libro (`source file could not be loaded`) y `pyxlsb` es solo
-lectura, así que no hay forma de convertirlo ni de reescribirlo con una librería. Los
-módulos `xlsbw.py` y `empaquetar.py` generan los registros BIFF12 de las hojas nuevas y
-las insertan en el ZIP del libro original. Las 229 partes originales se copian
-intactas byte a byte; solo cambian `workbook.bin` (se agregan las hojas y se amplía la
-tabla de referencias externas), los rels, `[Content_Types].xml` y `sharedStrings.bin`.
-Se elimina `calcChain.bin` para que Excel lo reconstruya, que es lo que se acostumbra
-al agregar hojas fuera de Excel.
+LibreOffice no abre este libro y `pyxlsb` es solo lectura. `xlsbw.py` genera los
+registros BIFF12 de las hojas (celdas, fórmulas `rgce`, anchos, paneles),
+`estilos.py` anexa fuentes, rellenos, bordes y `cellXfs` a `styles.bin` copiando el
+formato de los registros existentes, y `empaquetar2.py` copia el ZIP original y solo
+reemplaza o añade las partes que cambian (`zip -u`), de modo que los 229 componentes
+originales conservan sus bytes comprimidos.
 
 ## Módulos
 
 | Archivo | Para qué |
 |---|---|
-| `biff.py` | Lector de registros BIFF12 y mapa de hojas |
-| `fmla.py` | Decodifica `rgce` a fórmula legible (tabla de funciones verificada contra el propio libro) |
-| `dump.py` | Recorre una hoja y devuelve celda, valor y fórmula |
-| `xlsbw.py` | Escritor: registros de celda, codificación de fórmulas y armado de la hoja |
-| `empaquetar.py` | Inserta las hojas en el ZIP del libro |
-| `load_ctamens.py` | Lee `CtaMens` respetando las columnas de Excel |
-| `analisis.py` | Calcula las 12 columnas mensuales de cada miembro |
-| `comparar.py` | Reporte en pantalla de ValDim contra el recálculo |
-| `construir.py` | Arma las seis hojas y genera el libro |
-| `verificar.py` | Auditoría del archivo generado |
+| `biff.py`, `fmla.py`, `dump.py` | Lector BIFF12, decodificador de fórmulas (tabla de funciones verificada contra el libro), volcado de celdas |
+| `load_ctamens2.py` | Lee `CtaMens` con todas las columnas que usan las vistas |
+| `motor.py` | Evalúa los 20 renglones por miembro y valida contra las vistas vivas |
+| `xlsbw.py`, `estilos.py`, `empaquetar2.py` | Escritura del `.xlsb` |
+| `construir2.py` | Arma las siete hojas |
+| `verificar2.py` | Auditoría: integridad, estilos, orden de celdas y reevaluación de todas las fórmulas |
+| `analisis.py`, `comparar.py`, `construir.py`, `verificar.py`, `empaquetar.py`, `load_ctamens.py` | Versión anterior (ValDim vs recálculo), se conserva por referencia |
 
 ## Cómo correrlo
 
 ```bash
 cp <ruta>/FCST_2027_Cesion.xlsb FCST.xlsb
-python3 load_ctamens.py     # cachea CtaMens (~35 s)
-python3 analisis.py         # calcula y guarda analisis.pkl
-python3 construir.py        # escribe FCST_2027_Cesion.xlsb con las seis hojas
-python3 verificar.py        # audita el resultado
+python3 load_ctamens2.py     # ~35 s
+python3 motor.py             # valida contra las vistas y guarda motor.pkl
+python3 construir2.py        # escribe FCST_2027_Cesion.xlsb
+python3 verificar2.py        # audita el resultado
 ```
 
-`construir.py` necesita `valdim.pkl` (volcado de `ValDim`), que se genera con `dump.py`
-sobre la hoja `ValDim`.
-
-## Qué verifica `verificar.py`
-
-1. Las 229 partes originales quedan idénticas.
-2. Ninguna de las 3,259 fórmulas quedó mal codificada.
-3. Los 792 `SUMIFS` se vuelven a leer del archivo, se evalúan contra `CtaMens` y se
-   comparan con el valor guardado — desviación máxima 0.000000.
-4. Las 744 referencias `=ValDim!...` apuntan a la celda y al valor correctos.
-5. Las 1,464 sumas y restas internas son consistentes.
-6. El libro completo se abre y se recorre con `pyxlsb`.
+`construir2.py` necesita además `valdim.pkl` (volcado de `ValDim` con `dump.py`) y
+`celdas_ref.pkl` (valores de `ER`, `2_Reservas`, `Parámetros`, `Inicio`, `CAT`,
+`Gastos` y las vistas, generado con `dump.py`).

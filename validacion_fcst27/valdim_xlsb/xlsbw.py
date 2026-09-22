@@ -52,6 +52,15 @@ def funcvar(nargs, iftab):
     return struct.pack('<BBH', 0x42, nargs, iftab)
 
 UMINUS = b'\x13'; SUB = b'\x04'; ADD = b'\x03'; MUL = b'\x05'; DIV = b'\x06'
+LT = b'\x09'; CONCAT = b'\x08'; PAREN = b'\x15'
+
+def func_fix(iftab):
+    "PtgFunc clase valor (aridad fija, p.ej. ABS=24)"
+    return struct.pack('<BH', 0x41, iftab)
+
+def name(idx):
+    "PtgName clase valor, indice 1-based en la tabla de nombres"
+    return struct.pack('<BI', 0x43, idx)
 IF_SUMIFS = 482; IF_SUM = 4
 
 # ---------- celdas ----------
@@ -93,6 +102,19 @@ def c_fmla_str(col, cached, rgce, style=0):
     body += struct.pack('<I', len(rgce)) + rgce + struct.pack('<I', 0)
     return rec(8, body)
 
+def c_fmla_bool(col, cached, rgce, style=0):
+    body = _cellhdr(col, style) + bytes([1 if cached else 0]) + struct.pack('<H', 0)
+    body += struct.pack('<I', len(rgce)) + rgce + struct.pack('<I', 0)
+    return rec(10, body)
+
+def colinfo(c1, c2, ancho_chars):
+    "BrtColInfo: ancho en 1/256 de caracter"
+    return rec(60, struct.pack('<IIIIH', c1, c2, int(ancho_chars*256 + 5*256/7), 0, 0x0002))
+
+def pane(xsplit, ysplit):
+    "BrtPane: paneles inmovilizados (xsplit columnas, ysplit filas)"
+    return rec(151, struct.pack('<ddIIIB', float(xsplit), float(ysplit), int(ysplit), int(xsplit), 0, 0x03))
+
 def rowhdr(r):
     # rw, ixfe, miyRw, flags, flags2, ccolspan=0
     return rec(0, struct.pack('<IIHHBI', r, 0, 300, 0, 0, 0))
@@ -109,13 +131,13 @@ def _col_de(celda):
     p += 1
     return struct.unpack_from('<I', celda, p)[0]
 
-def sheet_bin(rows, ncols):
+def sheet_bin(rows, ncols, cols=None, freeze=None):
     """rows: dict {fila0: [bytes de celdas]}. Ordena las celdas por columna."""
     orden = {}
     for r, cs in rows.items():
         pares = sorted(((_col_de(c), i, c) for i, c in enumerate(cs)), key=lambda x: (x[0], x[1]))
-        cols = [p[0] for p in pares]
-        if len(set(cols)) != len(cols):
+        _cc = [p[0] for p in pares]
+        if len(set(_cc)) != len(_cc):
             raise ValueError(f'fila {r+1}: columnas repetidas')
         orden[r] = [p[2] for p in pares]
     rows = orden
@@ -124,9 +146,15 @@ def sheet_bin(rows, ncols):
     rr = sorted(rows)
     r1, r2 = (rr[0], rr[-1]) if rr else (0, 0)
     out += rec(148, struct.pack('<IIII', r1, r2, 0, max(ncols - 1, 0)))
-    out += rec(133); out += rec(137, WSVIEW); out += rec(152, SEL)
+    out += rec(133); out += rec(137, WSVIEW)
+    if freeze: out += pane(*freeze)
+    out += rec(152, SEL)
     out += rec(138); out += rec(134)
     out += rec(485, FMTPR)
+    if cols:
+        out += rec(390)
+        for c1, c2, w in cols: out += colinfo(c1, c2, w)
+        out += rec(391)
     out += rec(145)
     for r in rr:
         out += rowhdr(r)
