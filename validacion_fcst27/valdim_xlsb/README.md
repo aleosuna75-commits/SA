@@ -99,9 +99,22 @@ región a la que se atribuyen 110,563.30 de attritional.
 `aplicar_cat.py` escribe esos importes en `CtaMens`, agrega la hoja `Val_CAT` (todo en
 fórmulas: dónde entra hoy el CAT al ER, el reparto mes a mes y por Cebe × territorio, y los
 casos sin prima), recalcula los valores guardados de las hojas `Val_*` y enciende
-`fFullCalcOnLoad` para que Excel recalcule las vistas al abrir. Como las celdas de `CtaMens`
-pasan de RK a número de 8 bytes, se elimina `binaryIndex23.bin` (índice opcional que Excel
-regenera al guardar).
+`fFullCalcOnLoad` para que Excel recalcule las vistas al abrir. Como las celdas cambian de
+tamaño, se eliminan los índices binarios (`binaryIndexNN.bin`, opcionales, que Excel regenera
+al guardar) de toda hoja que se reescribe: `CtaMens` y las hojas `Val_*`. `reparar.py` hace lo
+mismo; la primera versión de la reparación los dejaba desfasados.
+
+Observaciones que no se cambiaron porque son decisiones del modelo:
+
+- `CAT!T14:T25` (primer año) usa la tasa de Terremoto `Z$8` en las 12 filas; los años
+  siguientes usan la tasa por tipo (fila 7 Ultramar, 8 Terremoto, 9 Hidro). Con esa lógica el
+  attritional 2027 sería 50,102,582.76 en vez de 41,811,767.85. `Integración2026` hace lo mismo.
+- Las tasas `CAT!Z7:Z9` de 2027 son las mismas constantes que en `Integración2026` eran de 2026.
+- El "Ajuste para Londres" (`CAT!T32:T33`, 8.4 M) no entra en ningún total.
+- `ER_ram!E47:P60` suma `CtaMens!AC` sin multiplicar por `xEvCat`: con `AC` lleno, su control
+  de la fila 66 muestra los eventos CAT como diferencia para Incendio, Terremoto y HyORH.
+- Si `xEvCat` fuera 1, la fila 24 de las vistas no cuadraría: el ER resta `CAT!84` (6 M de
+  eventos Ultramar) y las vistas no, y `AB` entra con signo contrario.
 
 ```bash
 python3 load_int.py NUESTRO.xlsb nuestro_ctamens.pkl

@@ -4,7 +4,7 @@
  (2) cambia Val_Resumen!E7:E26 (#REF! porque se borro la columna de Val_Ramo) por ABS(D)<0.005,
  (3) recalcula el valor guardado de todas las formulas de las hojas Val_* (el libro esta en calculo manual).
  Todo lo demas se copia byte a byte."""
-import zipfile, struct, shutil, subprocess, os, tempfile, pickle, sys
+import zipfile, struct, shutil, subprocess, os, tempfile, pickle, sys, re
 from biff import sheet_map, colrow
 from xlsbw import rec, wstr
 import fmla, dump, evaluador
@@ -70,8 +70,26 @@ def reescribir(src, dst, cambios_rgce, valores):
                     continue
             out += raw
         partes[SM[h]] = bytes(out); stats[h] = nc
+    # los indices binarios (opcionales) de las hojas reescritas quedarian desfasados: se quitan y Excel los regenera
+    borrar = []
+    cts = z.read('[Content_Types].xml').decode('utf-8'); cts0 = cts
+    for h in H:
+        rels_h = SM[h].replace('worksheets/', 'worksheets/_rels/') + '.rels'
+        if rels_h not in z.namelist(): continue
+        rtxt = z.read(rels_h).decode('utf-8')
+        objetivo = re.findall(r'<Relationship [^>]*xlBinaryIndex[^>]*Target="([^"]+)"[^>]*/>', rtxt)
+        if not objetivo: continue
+        parte_idx = 'xl/worksheets/' + objetivo[0]; borrar.append(parte_idx)
+        cts = re.sub(r'<Override PartName="/' + re.escape(parte_idx) + r'"[^>]*/>', '', cts)
+        rtxt2 = re.sub(r'<Relationship [^>]*xlBinaryIndex[^>]*/>', '', rtxt)
+        if re.search(r'<Relationship ', rtxt2): partes[rels_h] = rtxt2.encode('utf-8')
+        else: borrar.append(rels_h)
+    if cts != cts0: partes['[Content_Types].xml'] = cts.encode('utf-8')
     z.close()
     shutil.copyfile(src, dst)
+    if borrar:
+        r = subprocess.run(['zip', '-d', '-q', os.path.abspath(dst)] + borrar, capture_output=True, text=True)
+        if r.returncode: raise RuntimeError(r.stderr)
     with tempfile.TemporaryDirectory() as td:
         for nombre, data in partes.items():
             p = os.path.join(td, nombre); os.makedirs(os.path.dirname(p), exist_ok=True); open(p,'wb').write(data)

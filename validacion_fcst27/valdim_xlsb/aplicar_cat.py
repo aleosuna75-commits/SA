@@ -211,11 +211,19 @@ def fase_a():
     # CtaMens
     cm, n_rep, sub = reescribir_ctamens(z.read(SM['CtaMens']))
     partes[SM['CtaMens']] = cm
-    rels_cm = SM['CtaMens'].replace('worksheets/', 'worksheets/_rels/') + '.rels'
-    rtxt = z.read(rels_cm).decode('utf-8')
-    rtxt2 = re.sub(r'<Relationship [^>]*xlBinaryIndex[^>]*/>', '', rtxt); assert rtxt2 != rtxt
-    partes[rels_cm] = rtxt2.encode('utf-8')
-    bidx = 'xl/worksheets/binaryIndex23.bin'; assert bidx in z.namelist()
+    # indices binarios (opcionales) de toda hoja que se reescribe: quedarian desfasados; Excel los regenera
+    borrar = []
+    for h in ['CtaMens'] + H_VAL[:-1]:
+        rels_h = SM[h].replace('worksheets/', 'worksheets/_rels/') + '.rels'
+        if rels_h not in z.namelist(): continue
+        rtxt = z.read(rels_h).decode('utf-8')
+        objetivo = re.findall(r'<Relationship [^>]*xlBinaryIndex[^>]*Target="([^"]+)"[^>]*/>', rtxt)
+        if not objetivo: continue
+        borrar.append('xl/worksheets/' + objetivo[0])
+        rtxt2 = re.sub(r'<Relationship [^>]*xlBinaryIndex[^>]*/>', '', rtxt)
+        if re.search(r'<Relationship ', rtxt2): partes[rels_h] = rtxt2.encode('utf-8')
+        else: borrar.append(rels_h)
+    for b in borrar: assert b in z.namelist(), b
     # hoja nueva
     val_cat = hoja_val_cat()
     usados = {int(m) for m in re.findall(r'worksheets/sheet(\d+)\.bin', ' '.join(z.namelist()))}
@@ -239,22 +247,33 @@ def fase_a():
     partes['xl/workbook.bin'] = bytes(out)
     rels = rels.replace('</Relationships>', f'<Relationship Id="{rid_nuevo}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="{parte_nueva.replace("xl/","")}"/></Relationships>')
     partes['xl/_rels/workbook.bin.rels'] = rels.encode('utf-8')
-    cts2 = re.sub(r'<Override PartName="/xl/worksheets/binaryIndex23\.bin"[^>]*/>', '', cts); assert cts2 != cts
+    cts2 = cts
+    for b in borrar:
+        if 'binaryIndex' in b:
+            c3 = re.sub(r'<Override PartName="/' + re.escape(b) + r'"[^>]*/>', '', cts2); assert c3 != cts2, b; cts2 = c3
     cts2 = cts2.replace('</Types>', f'<Override PartName="/{parte_nueva}" ContentType="application/vnd.ms-excel.worksheet"/></Types>')
     partes['[Content_Types].xml'] = cts2.encode('utf-8')
     o = bytearray()
     for rid, pl, raw in records_raw(z.read('xl/sharedStrings.bin')):
         if rid == 159:
             tot, uni = struct.unpack_from('<II', pl, 0)
-            o += W.rec(159, struct.pack('<II', tot + len(P.nuevas), uni + len(P.nuevas)) + pl[8:]); continue
+            usos = sum(1 for _rid, _pl in records(val_cat) if _rid == 7)
+            o += W.rec(159, struct.pack('<II', tot + usos, uni + len(P.nuevas)) + pl[8:]); continue
         if rid == 160:
             for s in P.nuevas: o += W.rec(19, b'\x00' + W.wstr(s))
         o += raw
     partes['xl/sharedStrings.bin'] = bytes(o)
     partes[parte_nueva] = val_cat
+    app = z.read('docProps/app.xml').decode('utf-8')
+    m = re.search(r'(<vt:lpstr>Hojas de c[^<]*</vt:lpstr></vt:variant><vt:variant><vt:i4>)(\d+)(</vt:i4>)', app)
+    if m and '<vt:lpstr>Val_TRea</vt:lpstr>' in app:
+        app = app[:m.start(2)] + str(int(m.group(2)) + 1) + app[m.end(2):]
+        app = re.sub(r'(<TitlesOfParts><vt:vector size=")(\d+)(")', lambda k: k.group(1) + str(int(k.group(2)) + 1) + k.group(3), app)
+        app = app.replace('<vt:lpstr>Val_TRea</vt:lpstr>', '<vt:lpstr>Val_TRea</vt:lpstr><vt:lpstr>Val_CAT</vt:lpstr>')
+        partes['docProps/app.xml'] = app.encode('utf-8')
     z.close()
-    empaquetar(SRC, TMP, partes, [bidx])
-    return dict(n_rep=n_rep, sub=sub, parte_nueva=parte_nueva, cadenas=len(P.nuevas))
+    empaquetar(SRC, TMP, partes, borrar)
+    return dict(n_rep=n_rep, parte_nueva=parte_nueva, cadenas=len(P.nuevas), borradas=borrar)
 
 # ======================================================= fase B: valores guardados
 def fase_b():
