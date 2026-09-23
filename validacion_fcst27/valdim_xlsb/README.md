@@ -72,6 +72,44 @@ python3 reparar.py                      # escribe FCST_2027_Cesion.xlsb
 python3 verificar3.py
 ```
 
+## CAT y Gastos Generales en `CtaMens`
+
+Las vistas `ER_*` toman los siniestros CAT de `CtaMens!AC` (eventos), `AD` (attritional) y
+`AE` (CAT cedido), y los gastos de `CtaMens!AF`. El ER los toma directo de las hojas `CAT`
+(filas 27, 41, 83, 84) y `Gastos` (fila 12). En el FCST 2027 esas columnas venían en cero,
+por eso los renglones 17, 24 y 31 (y los resultados 20, 28, 33, 35) no cuadraban.
+
+`Integración2026_Dim_10` sí las trae llenas, y la regla se dedujo de sus datos:
+
+| Columna | Origen | Reparto |
+|---|---|---|
+| `AD` | `CAT!H14:S25` (Cebe × territorio × mes) | entre renglones B=61 del mismo Cebe, territorio y mes, en proporción a `MONTO` |
+| `AE` | `AD` | × % de cesión: 0.25 Ultramar (`CAT!Z38`), 0.86 Terremoto (`Z39`), 0.30 Hidro (`Z40`) |
+| `AC` | `CAT!H49:S66` | igual que `AD` |
+| `AF` | `Gastos!C12:N12` (mes) | entre todos los renglones B=61 del mes, en proporción a `MONTO` |
+
+Reaplicada a los 293,186 renglones de `Integración2026`, reproduce `AC` y `AF` exactos,
+`AD` con diferencia máxima de 0.05 por renglón y `AE` de 0.01.
+
+En 2027 hay 6 combinaciones Cebe × territorio × mes con attritional (y 6 con eventos) sin
+prima en el mes (A071 R04 y R06). Se reparten en el mismo Cebe y mes entre los territorios
+de la misma clase de cesión; así se conserva mes, ramo y % de cesión, y solo cambia la
+región a la que se atribuyen 110,563.30 de attritional.
+
+`aplicar_cat.py` escribe esos importes en `CtaMens`, agrega la hoja `Val_CAT` (todo en
+fórmulas: dónde entra hoy el CAT al ER, el reparto mes a mes y por Cebe × territorio, y los
+casos sin prima), recalcula los valores guardados de las hojas `Val_*` y enciende
+`fFullCalcOnLoad` para que Excel recalcule las vistas al abrir. Como las celdas de `CtaMens`
+pasan de RK a número de 8 bytes, se elimina `binaryIndex23.bin` (índice opcional que Excel
+regenera al guardar).
+
+```bash
+python3 load_int.py NUESTRO.xlsb nuestro_ctamens.pkl
+python3 cat_reparto.py        # reparto.pkl
+python3 aplicar_cat.py        # FCST_2027_Cesion.xlsb
+python3 verificar4.py
+```
+
 ## Cómo se escribe el `.xlsb`
 
 LibreOffice no abre este libro y `pyxlsb` es solo lectura. `xlsbw.py` genera los
@@ -92,7 +130,9 @@ originales conservan sus bytes comprimidos.
 | `construir2.py` | Arma las siete hojas |
 | `verificar2.py` | Auditoría: integridad, estilos, orden de celdas y reevaluación de todas las fórmulas |
 | `reparar.py`, `evaluador.py`, `verificar3.py` | Reparación del libro editado en Excel y su auditoría |
-| `render.py` | Vista previa HTML de las hojas con los estilos reales del libro |
+| `render.py`, `render2.py` | Vista previa HTML de las hojas con los estilos reales del libro |
+| `load_int.py`, `flujo.py` | Carga completa de `CtaMens` y lectura parcial de hojas grandes |
+| `cat_reparto.py`, `aplicar_cat.py`, `evaluador2.py`, `verificar4.py` | Reparto de CAT y Gastos en `CtaMens`, hoja `Val_CAT` y su auditoría |
 | `analisis.py`, `comparar.py`, `construir.py`, `verificar.py`, `empaquetar.py`, `load_ctamens.py` | Versión anterior (ValDim vs recálculo), se conserva por referencia |
 
 ## Cómo correrlo
