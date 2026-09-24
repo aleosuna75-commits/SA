@@ -10,7 +10,9 @@ de LN, TR, cedente y corredor.
 1. Descomprime la carpeta de logouts en **Documentos**, por ejemplo
    `C:\Users\<usuario>\Documents\CIFRAS AJUSTADAS`. Si al descomprimir queda
    una carpeta dentro de otra, o si está una o dos carpetas más abajo
-   (`Documentos\PPTO 2027\CIFRAS AJUSTADAS`), también la encuentra.
+   (`Documentos\PPTO 2027\CIFRAS AJUSTADAS`), también la encuentra. Si hay
+   varias (por ejemplo, la del año pasado), usa la de logouts más recientes y
+   te avisa en consola cuáles más encontró.
 2. Abre `base_cesion.py` en VSCode y da clic en **Run Python File** (▷, arriba
    a la derecha).
 3. La primera vez instala solo `openpyxl` y `pandas` si no los tienes (o si
@@ -50,9 +52,17 @@ Columnas de `Base_Cesion`:
   % Com. Cedido 2027–2031.
 - **Control:** GS, versión del archivo, `Versión vigente` y observaciones.
 
-Los nombres salen del catálogo de la hoja `Valores` del PptoTécnico. Excel lo
-guarda dentro de cada logout, así que no hace falta tener abierto el archivo
-del presupuesto.
+Los nombres salen del catálogo del PptoTécnico (rangos `xAFUN`, `xTIPOREA`,
+`xCEDENTES` y `xCORREDORES` de la hoja `Valores`). Excel guarda ese catálogo
+dentro de cada logout, así que no hace falta tener abierto el archivo del
+presupuesto. Cada documento toma los nombres de su propio logout.
+
+La columna `Archivo` trae la ruta del logout dentro de la carpeta leída, así que
+se distinguen los archivos con el mismo nombre en subcarpetas distintas.
+
+`Versión vigente` marca la versión más alta de cada documento (misma LN, TR,
+cedente, corredor, contrato y tipo de venta) y reconoce copias como
+`...-v2 (1).xlsx` o `...-v2 - copia.xlsx`.
 
 ## De dónde sale cada dato del logout
 

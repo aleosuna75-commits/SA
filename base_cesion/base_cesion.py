@@ -95,18 +95,17 @@ ARRASTRAR_ULTIMO_ANIO = False
 # True = abrir el Excel generado al terminar (solo Windows / macOS).
 ABRIR_AL_TERMINAR = True
 
-# Catálogo de nombres: hoja del PptoTécnico guardada en caché dentro del logout,
-# columna del código -> columnas con los datos que se agregan a la base.
+# Catálogo de nombres: el logout guarda en caché la hoja "Valores" del PptoTécnico
+# y trae los nombres definidos que apuntan a cada catálogo (p. ej.
+# xCEDENTES = [1]Valores!$AR$2:$AV$999). Por llave de la base:
+#   (nombre definido, columna de respaldo si no existe el nombre,
+#    {columna en la base: desplazamiento desde la columna del código})
 HOJA_CATALOGO = "Valores"
 CATALOGOS = {
-    "LN": ("BH", ["Nombre LN"]),
-    "TR": ("V", ["TR desc."]),
-    "Cedente": ("AR", ["Nombre Cedente", "País Cedente", "Grupo Cedente"]),
-    "Corredor": ("AX", ["Nombre Corredor"]),
-}
-COLUMNAS_CATALOGO = {  # nombre en la base -> columna en la hoja Valores
-    "Nombre LN": "BI", "TR desc.": "W", "Nombre Cedente": "AS",
-    "País Cedente": "AU", "Grupo Cedente": "AV", "Nombre Corredor": "AY",
+    "LN": ("xAFUN", "BH", {"Nombre LN": 1}),
+    "TR": ("xTIPOREA", "V", {"TR desc.": 1}),
+    "Cedente": ("xCEDENTES", "AR", {"Nombre Cedente": 1, "País Cedente": 3, "Grupo Cedente": 4}),
+    "Corredor": ("xCORREDORES", "AX", {"Nombre Corredor": 1}),
 }
 TR_DESC_RESPALDO = {1: "Proporcional", 2: "No Proporcional", 3: "Facultativo"}
 
@@ -123,10 +122,13 @@ def revisar_paquete(modulo):
         paquete = importlib.import_module(modulo)
     except Exception as error:  # no instalado, o instalado pero roto (p. ej. choque con numpy)
         return f"{modulo}: {type(error).__name__}: {error}"
-    version = tuple(int(x) for x in re.findall(r"\d+", getattr(paquete, "__version__", "0"))[:2])
+    texto_version = getattr(paquete, "__version__", None)
+    if texto_version is None:  # p. ej. una carpeta "pandas" junto al script, no el paquete real
+        return f"{modulo}: no está instalado (se encontró {getattr(paquete, '__path__', '?')})"
+    version = tuple(int(x) for x in re.findall(r"\d+", str(texto_version))[:2])
     minimo = MINIMOS[modulo]
     if version < minimo:
-        return f"{modulo} {paquete.__version__} es muy viejo (se necesita {minimo[0]}.{minimo[1]} o más)"
+        return f"{modulo} {texto_version} es muy viejo (se necesita {minimo[0]}.{minimo[1]} o más)"
     return ""
 
 
@@ -136,19 +138,23 @@ def asegurar_paquetes():
     if not problemas:
         return
     requisitos = [f"{m}>={MINIMOS[m][0]}.{MINIMOS[m][1]}" for m in problemas]
+    comando = f'"{sys.executable}" -m pip install --upgrade ' + " ".join(f'"{r}"' for r in requisitos)
     a_mano = ("\nInstálala a mano desde la terminal de VSCode con:\n"
-              f'    "{sys.executable}" -m pip install --upgrade {" ".join(requisitos)}\n'
-              "Si la red de la oficina usa proxy, agrega: --proxy http://usuario:clave@proxy:puerto")
+              + (f"    & {comando}\n    (en PowerShell; en cmd, sin el '&' inicial)\n" if os.name == "nt"
+                 else f"    {comando}\n")
+              + "Si la red de la oficina usa proxy, agrega: --proxy http://usuario:clave@proxy:puerto")
     if os.environ.get("BASE_CESION_REINTENTO"):
         sys.exit("La paquetería sigue fallando después de instalarla:\n  "
                  + "\n  ".join(problemas.values()) + a_mano)
 
     print("Instalando / actualizando paquetería: " + ", ".join(requisitos) + " ...")
+    print("(Si tarda más de un par de minutos, probablemente la red bloquea pypi.org.)")
     pip = [sys.executable, "-m", "pip"]
     silencio = {"stdout": subprocess.DEVNULL, "stderr": subprocess.DEVNULL}
     if subprocess.call(pip + ["--version"], **silencio) != 0:  # este Python no trae pip
         subprocess.call([sys.executable, "-m", "ensurepip", "--upgrade"], **silencio)
-    base = pip + ["install", "--upgrade", "--disable-pip-version-check"] + requisitos
+    base = pip + ["install", "--upgrade", "--disable-pip-version-check",
+                  "--timeout", "20", "--retries", "1"] + requisitos
     intentos = [base]
     if sys.prefix == getattr(sys, "base_prefix", sys.prefix):  # --user no aplica dentro de un venv
         intentos.append(base[:4] + ["--user"] + base[4:])
@@ -166,7 +172,7 @@ asegurar_paquetes()
 import pandas as pd  # noqa: E402
 from openpyxl import load_workbook  # noqa: E402
 from openpyxl.styles import Alignment, Font, PatternFill  # noqa: E402
-from openpyxl.utils import get_column_letter  # noqa: E402
+from openpyxl.utils import column_index_from_string, get_column_letter  # noqa: E402
 
 
 # ------------------------------------------------------------------------------
@@ -287,37 +293,64 @@ def elegir_carpeta_con_ventana():
         return None
 
 
+def logout_mas_reciente(carpeta):
+    fechas = [p.stat().st_mtime for p in carpeta.glob("**/*")
+              if es_logout(p) and p.suffix.lower() in EXT_SOPORTADAS]
+    return max(fechas, default=0)
+
+
 def ubicar_carpeta(ruta_argumento):
+    """(carpeta a leer, otras carpetas candidatas que se descartaron)."""
     if ruta_argumento:
-        return Path(ruta_argumento).expanduser()
+        return Path(ruta_argumento), []
     if CARPETA_LOGOUTS:
-        return Path(CARPETA_LOGOUTS).expanduser()
+        return Path(CARPETA_LOGOUTS), []
 
     # NOMBRE_CARPETA dentro de Documentos, hasta dos niveles abajo
-    # (p. ej. "Documentos\\PPTO\\CIFRAS AJUSTADAS"; acepta "CIFRAS_AJUSTADAS").
+    # (p. ej. "Documentos\\PPTO 2027\\CIFRAS AJUSTADAS"; acepta "CIFRAS_AJUSTADAS").
+    # Si hay varias (p. ej. la del año pasado), se toma la de logouts más recientes.
     objetivo = normalizar(NOMBRE_CARPETA).replace("_", " ")
     documentos = carpetas_documentos()
+    candidatas, vistas = [], set()
     for docs in documentos:
         for c in [docs / NOMBRE_CARPETA, *docs.glob("*/"), *docs.glob("*/*/")]:
-            if (c.is_dir() and normalizar(c.name).replace("_", " ") == objetivo
-                    and hay_logouts(c, BUSCAR_EN_SUBCARPETAS)):
-                return c
+            try:
+                real = c.resolve()
+                if (str(real).lower() not in vistas and c.is_dir()
+                        and normalizar(c.name).replace("_", " ") == objetivo
+                        and hay_logouts(c, BUSCAR_EN_SUBCARPETAS)):
+                    vistas.add(str(real).lower())
+                    candidatas.append(c)
+            except OSError:  # carpetas sin permiso de lectura
+                continue
+    if BUSCAR_EN_SUBCARPETAS:  # una carpeta dentro de otra candidata ya se lee con ella
+        reales = [c.resolve() for c in candidatas]
+        candidatas = [c for c, r in zip(candidatas, reales) if not any(o in r.parents for o in reales)]
+    if candidatas:
+        candidatas.sort(key=logout_mas_reciente, reverse=True)
+        return candidatas[0], candidatas[1:]
 
-    # Logouts junto al script (sin bajar a subcarpetas, y nunca Documentos completo).
-    prohibidas = {str(p).lower() for p in documentos + [Path.home()]}
+    # Logouts junto al script (la carpeta del script solo en su primer nivel, y
+    # nunca Documentos ni la carpeta de usuario completas).
+    prohibidas = {str(p.resolve()).lower() for p in documentos + [Path.home()]}
     junto_al_script = Path(__file__).resolve().parent
-    for c in (junto_al_script / NOMBRE_CARPETA, junto_al_script):
-        if c.is_dir() and str(c).lower() not in prohibidas and hay_logouts(c, False):
-            return c
+    for c, recursivo in ((junto_al_script / NOMBRE_CARPETA, BUSCAR_EN_SUBCARPETAS), (junto_al_script, False)):
+        if c.is_dir() and str(c.resolve()).lower() not in prohibidas and hay_logouts(c, recursivo):
+            return c, []
 
     print(f'No encontré la carpeta "{NOMBRE_CARPETA}" en Documentos.')
     ruta = elegir_carpeta_con_ventana()
     if ruta is None:
-        texto = input("Pega la ruta de la carpeta con los logouts: ").strip().strip('"')
+        try:
+            texto = input("Pega la ruta de la carpeta con los logouts: ")
+        except EOFError:
+            texto = ""
+        # Quita comillas y el "& '...'" que agrega PowerShell al arrastrar una carpeta
+        texto = re.sub(r"^&\s*", "", texto.strip()).strip().strip("'\"")
         ruta = Path(texto) if texto else None
     if ruta is None:
         sys.exit("No se indicó carpeta. Fin.")
-    return ruta
+    return ruta, []
 
 
 def listar_logouts(carpeta):
@@ -372,14 +405,23 @@ def leer_filas(ruta, formulas):
         wb.close()
 
 
-def leer_logout(ruta):
+def nombre_relativo(ruta, carpeta):
+    """Identificador del archivo: su ruta dentro de la carpeta leída (distingue subcarpetas)."""
+    try:
+        return str(ruta.relative_to(carpeta))
+    except ValueError:
+        return ruta.name
+
+
+def leer_logout(ruta, carpeta):
     """Devuelve (registro, lista_de_validaciones) para un archivo."""
     avisos = []
+    archivo = nombre_relativo(ruta, carpeta)
 
     def avisar(nivel, tipo, detalle):
-        avisos.append({"Archivo": ruta.name, "Nivel": nivel, "Tipo": tipo, "Detalle": detalle})
+        avisos.append({"Archivo": archivo, "Nivel": nivel, "Tipo": tipo, "Detalle": detalle})
 
-    registro = {"Archivo": ruta.name}
+    registro = {"Archivo": archivo}
     hoja, filas = leer_filas(ruta, formulas=False)
     if hoja != HOJA_LOGOUT:
         avisar("Revisar", "Hoja no encontrada", f'No existe la hoja "{HOJA_LOGOUT}"; se leyó "{hoja}".')
@@ -397,7 +439,7 @@ def leer_logout(ruta):
     # Fórmulas guardadas sin valor calculado (se leerían como celda vacía).
     _, crudas = leer_filas(ruta, formulas=True)
     sin_valor = [f"{get_column_letter(j + 1)}{i + 1}"
-                 for i in sorted(fila_de.values()) for j in range(1, MAX_COLUMNAS)
+                 for i in sorted(fila_de.values()) for j in range(1, COL_PRIMER_ANIO + NUM_ANIOS - 1)
                  if isinstance(crudas[i][j], str) and crudas[i][j].startswith("=")
                  and filas[i][j] is None]
     if sin_valor:
@@ -474,8 +516,14 @@ def leer_logout(ruta):
     registro["Años con cesión"] = ", ".join(map(str, capturados)) or None
 
     # --- Consistencia con el nombre del archivo ---------------------------------
-    m = PATRON_NOMBRE.match(ruta.stem)
-    registro["Versión archivo"] = int(m["version"]) if m else None
+    # Sin sufijos de copia: "... -v2 (1)" (descarga repetida), "... -v2 - copia" (Explorador)
+    nombre_limpio = re.sub(r"(\s*(\(\d+\)|-\s*(copia|copy)(\s*\(\d+\))?))+$", "", ruta.stem,
+                           flags=re.IGNORECASE)
+    m = PATRON_NOMBRE.match(nombre_limpio)
+    version = re.findall(r"-v(\d+)", nombre_limpio, flags=re.IGNORECASE)
+    registro["Versión archivo"] = int(version[-1]) if version else None
+    if nombre_limpio != ruta.stem:
+        avisar("Info", "Copia de archivo", f"El nombre trae un sufijo de copia: '{ruta.stem[len(nombre_limpio):]}'")
     if not m:
         avisar("Info", "Nombre de archivo no estándar",
                "No sigue Logout_<LN>_r<TR>_b<corredor>_e<cedente>[_c<contrato>]-<venta>-v<n>")
@@ -505,7 +553,7 @@ def leer_logout(ruta):
         avisar("Revisar", "Falta % de cesión",
                f"Retro Espec. + Fronting = {especifica:.0%} pero no hay % de cesión capturado")
     if especifica > TOLERANCIA and cesion_capturada and \
-            all((registro[f"% Cesión {a}"] or 0) <= TOLERANCIA for a in ANIOS):
+            all(abs(registro[f"% Cesión {a}"] or 0) <= TOLERANCIA for a in ANIOS):
         avisar("Revisar", "Cesión 0% con Retro Espec./Fronting",
                f"Retro Espec. + Fronting = {especifica:.0%} pero el % de cesión capturado es 0%")
     if capturado and cesion_capturada and especifica <= TOLERANCIA:
@@ -536,60 +584,117 @@ def leer_logout(ruta):
 # CATÁLOGO DE NOMBRES (caché de la hoja "Valores" del PptoTécnico en el logout)
 # ------------------------------------------------------------------------------
 NS = "{http://schemas.openxmlformats.org/spreadsheetml/2006/main}"
+NS_REL = "{http://schemas.openxmlformats.org/officeDocument/2006/relationships}"
+NS_PKG = "{http://schemas.openxmlformats.org/package/2006/relationships}"
+PATRON_RANGO_EXTERNO = re.compile(
+    r"'?\[(?P<libro>\d+)\](?P<hoja>[^'!]+)'?!\$?(?P<col>[A-Z]+)\$?(?P<ini>\d+):\$?[A-Z]+\$?(?P<fin>\d+)")
 
 
-def leer_catalogo(ruta):
-    """{'Cedente': {'39': {'Nombre Cedente': ..., ...}}, ...} desde los vínculos externos del logout."""
+def ubicar_catalogos(libro):
+    """{clave: (parte externalLink, hoja, columna del código, fila inicial, fila final)}.
+
+    Sigue los nombres definidos del logout (xCEDENTES = [1]Valores!$AR$2:$AV$999, ...)
+    hasta la parte del zip que guarda el caché de ese libro externo. Si el logout no
+    trae el nombre definido, usa la columna de respaldo en el primer vínculo que tenga
+    la hoja HOJA_CATALOGO con datos."""
+    raiz = ElementTree.fromstring(libro.read("xl/workbook.xml"))
+    rels = ElementTree.fromstring(libro.read("xl/_rels/workbook.xml.rels"))
+    destinos = {r.get("Id"): r.get("Target", "") for r in rels.iter(NS_PKG + "Relationship")}
+    partes = []
+    for ref in raiz.iter(NS + "externalReference"):
+        destino = destinos.get(ref.get(NS_REL + "id"), "")
+        partes.append(destino.lstrip("/") if destino.startswith("/") else "xl/" + destino)
+    definidos = {d.get("name", "").lower(): (d.text or "").strip() for d in raiz.iter(NS + "definedName")}
+
+    ubicaciones = {}
+    for clave, (nombre_definido, col_respaldo, _) in CATALOGOS.items():
+        m = PATRON_RANGO_EXTERNO.fullmatch(definidos.get(nombre_definido.lower(), ""))
+        if m and 1 <= int(m["libro"]) <= len(partes):
+            ubicaciones[clave] = (partes[int(m["libro"]) - 1], m["hoja"], m["col"], int(m["ini"]), int(m["fin"]))
+    faltan = [c for c in CATALOGOS if c not in ubicaciones]
+    if faltan:
+        numero = lambda p: int(re.sub(r"\D", "", p) or 0)  # noqa: E731
+        for parte in sorted((p for p in libro.namelist()
+                             if re.fullmatch(r"xl/externalLinks/externalLink\d+\.xml", p)), key=numero):
+            hoja = leer_hoja_en_cache(libro.read(parte), HOJA_CATALOGO)
+            for clave in list(faltan):
+                col = CATALOGOS[clave][1]
+                if any(col in celdas for celdas in hoja.values()):
+                    ubicaciones[clave] = (parte, HOJA_CATALOGO, col, 1, 10 ** 7)
+                    faltan.remove(clave)
+    return ubicaciones
+
+
+def leer_hoja_en_cache(xml, hoja):
+    """{fila: {columna: texto}} de una hoja guardada en caché en un externalLinkN.xml."""
+    raiz = ElementTree.fromstring(xml)
+    hojas = [h.get("val") for h in raiz.iter(NS + "sheetName")]
+    if hoja not in hojas:
+        return {}
+    indice = str(hojas.index(hoja))
+    tabla = {}
+    for datos in raiz.iter(NS + "sheetData"):
+        if datos.get("sheetId") != indice:
+            continue
+        for fila in datos.iter(NS + "row"):
+            for c in fila.iter(NS + "cell"):
+                v = c.find(NS + "v")
+                m = re.fullmatch(r"([A-Z]+)(\d+)", c.get("r", ""))
+                if m and v is not None and v.text and v.text.strip():
+                    tabla.setdefault(int(m[2]), {})[m[1]] = v.text.strip()
+    return tabla
+
+
+def catalogo_del_logout(ruta, cache):
+    """{'Cedente': {'39': {'Nombre Cedente': ..., ...}}, ...} con el caché del propio logout.
+
+    `cache` guarda cada catálogo ya leído, identificado por el CRC de su parte en el
+    zip: los logouts de un mismo PptoTécnico traen el mismo catálogo y se lee una vez."""
     catalogo = {clave: {} for clave in CATALOGOS}
     with zipfile.ZipFile(ruta) as libro:
-        for parte in libro.namelist():
-            if not re.fullmatch(r"xl/externalLinks/externalLink\d+\.xml", parte):
-                continue
-            raiz = ElementTree.fromstring(libro.read(parte))
-            hojas = [h.get("val") for h in raiz.iter(NS + "sheetName")]
-            if HOJA_CATALOGO not in hojas:
-                continue
-            indice = str(hojas.index(HOJA_CATALOGO))
-            for datos in raiz.iter(NS + "sheetData"):
-                if datos.get("sheetId") != indice:
-                    continue
-                for fila in datos.iter(NS + "row"):
-                    celdas = {}
-                    for c in fila.iter(NS + "cell"):
-                        v = c.find(NS + "v")
-                        if v is not None and v.text:
-                            celdas[re.match(r"[A-Z]+", c.get("r", "")).group()] = v.text.strip()
-                    for clave, (col_codigo, campos) in CATALOGOS.items():
-                        codigo = clave_codigo(celdas.get(col_codigo))
-                        if codigo is not None:
-                            catalogo[clave].setdefault(
-                                codigo, {campo: celdas.get(COLUMNAS_CATALOGO[campo]) for campo in campos})
+        for clave, (parte, hoja, col, ini, fin) in ubicar_catalogos(libro).items():
+            info = libro.getinfo(parte)
+            llave_hoja = (info.CRC, info.file_size, hoja)
+            if llave_hoja not in cache:
+                cache[llave_hoja] = leer_hoja_en_cache(libro.read(parte), hoja)
+            llave = llave_hoja + (clave, col, ini, fin)
+            if llave not in cache:
+                tabla, codigos = cache[llave_hoja], {}
+                n_col = column_index_from_string(col)
+                campos = CATALOGOS[clave][2]
+                for fila in sorted(f for f in tabla if ini <= f <= fin):
+                    codigo = clave_codigo(tabla[fila].get(col))
+                    if codigo is not None:
+                        codigos.setdefault(codigo, {campo: tabla[fila].get(get_column_letter(n_col + desp))
+                                                    for campo, desp in campos.items()})
+                cache[llave] = codigos
+            catalogo[clave] = cache[llave]
     return catalogo
 
 
 def agregar_nombres(registros):
-    """Pone los nombres del catálogo; solo abre el catálogo de los archivos con códigos nuevos."""
-    catalogo = {clave: {} for clave in CATALOGOS}
-    leidos = 0
+    """Pone los nombres del catálogo del propio logout; si ahí falta un código, usa el de
+    los demás logouts de la carpeta. Devuelve cuántos logouts traían catálogo."""
+    cache, propios = {}, []
+    combinado = {clave: {} for clave in CATALOGOS}
     for reg in registros:
-        if any(clave_codigo(reg[clave]) not in catalogo[clave]
-               for clave in CATALOGOS if reg[clave] is not None):
-            try:
-                nuevo = leer_catalogo(Path(reg["Ruta"]))
-            except Exception:
-                continue
-            leidos += 1
-            for clave, codigos in nuevo.items():
-                for codigo, datos in codigos.items():
-                    catalogo[clave].setdefault(codigo, datos)
-    for reg in registros:
-        for clave, (_, campos) in CATALOGOS.items():
-            datos = catalogo[clave].get(clave_codigo(reg[clave]), {})
+        try:
+            propio = catalogo_del_logout(Path(reg["Ruta"]), cache)
+        except Exception:  # sin vínculos externos, zip raro, etc.
+            propio = {clave: {} for clave in CATALOGOS}
+        propios.append(propio)
+        for clave, codigos in propio.items():
+            for codigo, datos in codigos.items():
+                combinado[clave].setdefault(codigo, datos)
+    for reg, propio in zip(registros, propios):
+        for clave, (_, _, campos) in CATALOGOS.items():
+            codigo = clave_codigo(reg[clave])
+            datos = propio[clave].get(codigo) or combinado[clave].get(codigo) or {}
             for campo in campos:
                 reg[campo] = datos.get(campo)
         if reg["TR desc."] is None:
             reg["TR desc."] = TR_DESC_RESPALDO.get(reg["TR"])
-    return catalogo, leidos
+    return sum(any(p.values()) for p in propios)
 
 
 # ------------------------------------------------------------------------------
@@ -608,15 +713,15 @@ COLUMNAS_BASE = (
 
 def construir_base(carpeta, archivos, no_soportados):
     registros = []
-    validaciones = [{"Archivo": p.name, "Nivel": "Error", "Tipo": "Formato no soportado",
+    validaciones = [{"Archivo": nombre_relativo(p, carpeta), "Nivel": "Error", "Tipo": "Formato no soportado",
                      "Detalle": f"{p.suffix} no se puede leer; abrirlo en Excel y guardarlo como .xlsx"}
                     for p in no_soportados]
     for n, ruta in enumerate(archivos, 1):
         print(f"  [{n}/{len(archivos)}] {ruta.name}")
         try:
-            registro, avisos = leer_logout(ruta)
+            registro, avisos = leer_logout(ruta, carpeta)
         except Exception as error:  # archivo dañado, protegido, abierto, etc.
-            validaciones.append({"Archivo": ruta.name, "Nivel": "Error",
+            validaciones.append({"Archivo": nombre_relativo(ruta, carpeta), "Nivel": "Error",
                                  "Tipo": "No se pudo leer", "Detalle": f"{type(error).__name__}: {error}"})
             continue
         registros.append(registro)
@@ -626,25 +731,23 @@ def construir_base(carpeta, archivos, no_soportados):
         return pd.DataFrame(columns=COLUMNAS_BASE), pd.DataFrame(
             validaciones, columns=["Archivo", "Nivel", "Tipo", "Detalle"])
 
-    catalogo, leidos = agregar_nombres(registros)
-    if leidos == 0 or not any(catalogo.values()):
+    if agregar_nombres(registros) == 0:
         validaciones.append({"Archivo": "(todos)", "Nivel": "Info", "Tipo": "Sin catálogo de nombres",
                              "Detalle": f'Los logouts no traen la hoja "{HOJA_CATALOGO}" en caché; '
                                         "las columnas de nombre quedan vacías."})
     else:
         for reg in registros:
             sin_nombre = [clave for clave in ("Cedente", "Corredor")
-                          if reg[clave] is not None and reg[CATALOGOS[clave][1][0]] is None]
+                          if reg[clave] is not None and reg[f"Nombre {clave}"] is None]
             if sin_nombre:
                 validaciones.append({"Archivo": reg["Archivo"], "Nivel": "Info", "Tipo": "Código sin nombre",
                                      "Detalle": ", ".join(f"{c} {reg[c]}" for c in sin_nombre)
-                                     + " no aparece en el catálogo del logout"})
+                                     + " no aparece en el catálogo de los logouts"})
 
     # Aviso de carpeta: nadie trae el último año (posible recorte del logout)
     ultimo = ANIOS[-1]
-    if any(r["_capturados_cesion"] for r in registros) and \
-            not any(ultimo in r["_capturados_cesion"] for r in registros):
-        multi = sum(len(r["_capturados_cesion"]) > 1 for r in registros)
+    multi = sum(len(r["_capturados_cesion"]) > 1 for r in registros)
+    if multi and not any(ultimo in r["_capturados_cesion"] for r in registros):
         col = get_column_letter(COL_PRIMER_ANIO + NUM_ANIOS - 1)
         validaciones.append({
             "Archivo": "(todos)", "Nivel": "Revisar", "Tipo": f"Ningún logout trae {ultimo}",
@@ -663,8 +766,11 @@ def construir_base(carpeta, archivos, no_soportados):
     for c in [c for c in COLUMNAS_BASE if c.startswith("%") and c in base.columns]:
         base[c] = pd.to_numeric(base[c], errors="coerce").astype("float64")
 
-    # Versiones del mismo documento: la vigente es la de mayor -vN (y, si empatan, la más reciente)
+    # Versiones del mismo documento: la vigente es la de mayor -vN (y, si empatan, la más
+    # reciente). Los archivos sin ninguna llave (libros vacíos, otra hoja) no se agrupan.
     llave = base[LLAVES].astype(object).where(base[LLAVES].notna(), "").astype(str).agg("|".join, axis=1)
+    sin_llave = base[LLAVES].isna().all(axis=1)
+    llave = llave.where(~sin_llave, "#" + base["Archivo"].astype(str))
     fecha = base["Ruta"].map(lambda r: os.path.getmtime(r) if os.path.exists(r) else 0)
     orden = base.assign(_llave=llave, _fecha=fecha, _v=base["Versión archivo"].fillna(0))
     vigentes = set(orden.sort_values(["_v", "_fecha"]).groupby("_llave").tail(1).index)
@@ -684,8 +790,8 @@ def construir_base(carpeta, archivos, no_soportados):
     base["Observaciones"] = base["Archivo"].map(resumen_obs)
     base = base.reindex(columns=COLUMNAS_BASE)
     base = base.sort_values(["LN", "TR", "Cedente", "Corredor", "Contrato", "Archivo"],
-                            key=lambda s: s.astype(str) if s.name in ("LN", "Archivo")
-                            else pd.to_numeric(s, errors="coerce"),
+                            key=lambda s: s.map(lambda v: "" if pd.isna(v) else str(v))
+                            if s.name in ("LN", "Archivo") else pd.to_numeric(s, errors="coerce"),
                             na_position="first")
     orden_nivel = {"Error": 0, "Revisar": 1, "Info": 2}
     val = val.sort_values(["Nivel", "Archivo", "Tipo"],
@@ -733,12 +839,13 @@ def construir_resumen(base):
     return pd.concat([resumen, pd.DataFrame([total])], ignore_index=True)
 
 
-def construir_notas(carpeta, n_archivos):
+def construir_notas(carpeta, n_archivos, otras_carpetas):
     col = get_column_letter
     anios = f"{col(COL_PRIMER_ANIO)}..{col(COL_PRIMER_ANIO + NUM_ANIOS - 1)}"
     filas = [
         ("Generado", datetime.now().strftime("%Y-%m-%d %H:%M")),
         ("Carpeta leída", str(carpeta)),
+        ("Otras carpetas encontradas (no leídas)", ", ".join(map(str, otras_carpetas)) or "Ninguna"),
         ("Archivos leídos", n_archivos),
         ("Hoja del logout", HOJA_LOGOUT),
         ("LN", "Línea de Negocio, col. B"),
@@ -749,8 +856,10 @@ def construir_notas(carpeta, n_archivos):
         ("Contrato", "Contrato, col. B (vacío si el documento no tiene contrato)"),
         ("Tipo Venta / % Renov.", "Tipo Venta, col. B / col. C"),
         ("MGA / GS", "MGA, col. B / col. F (casilla GS de la tabla de cesión)"),
+        ("Archivo", "Ruta del logout dentro de la carpeta leída"),
         ("Nombre LN, TR desc., Nombre / País / Grupo Cedente, Nombre Corredor",
-         f'Catálogo de la hoja "{HOJA_CATALOGO}" del PptoTécnico, guardado en caché dentro de cada logout'),
+         "Catálogo del PptoTécnico (nombres definidos " + ", ".join(c[0] for c in CATALOGOS.values())
+         + ") que Excel guarda en caché dentro de cada logout; se usa el del propio logout"),
         ("% Tradicional ... % Retención", "Porcentaje, cols. B..E (tabla Tipo Retrocesión)"),
         ("% Cesión <año>", f"Porcentaje de Cesión, cols. {anios} = {ANIOS[0]}..{ANIOS[-1]}. Es el valor "
                            "capturado por la LN; no está multiplicado por % Retro Espec. + % Fronting"),
@@ -815,7 +924,8 @@ def main():
     parser.add_argument("--salida", help="Carpeta donde guardar el Excel (opcional)")
     args = parser.parse_args()
 
-    carpeta = ubicar_carpeta(args.carpeta)
+    carpeta, otras_carpetas = ubicar_carpeta(args.carpeta)
+    carpeta = carpeta.expanduser().resolve()
     if not carpeta.is_dir():
         sys.exit(f"La carpeta no existe: {carpeta}")
     archivos, no_soportados = listar_logouts(carpeta)
@@ -824,13 +934,15 @@ def main():
 
     subcarpetas = sorted({str(p.parent.relative_to(carpeta)) for p in archivos})
     print(f"Leyendo {len(archivos)} logouts de: {carpeta}")
+    for otra in otras_carpetas:
+        print(f"  OJO: también encontré {otra}; se usa la de logouts más recientes.")
     if len(subcarpetas) > 1:
         print(f"  (vienen de {len(subcarpetas)} subcarpetas: {', '.join(subcarpetas)})")
     base, validaciones = construir_base(carpeta, archivos, no_soportados)
 
     lns = sorted(base["LN"].dropna().astype(str).unique()) if not base.empty else []
     etiqueta_ln = lns[0] if len(lns) == 1 else ("varias_LN" if lns else "sin_LN")
-    destino = Path(args.salida or CARPETA_SALIDA or carpeta.parent).expanduser()
+    destino = Path(args.salida or CARPETA_SALIDA or carpeta.parent).expanduser().resolve()
     salida = destino / f"Base_Cesion_{etiqueta_ln}_{datetime.now():%Y%m%d_%H%M%S}.xlsx"
 
     hojas = {
@@ -838,7 +950,7 @@ def main():
         "Cesion_Anual": construir_anual(base),
         "Resumen": construir_resumen(base),
         "Validaciones": validaciones,
-        "Notas": construir_notas(carpeta, len(archivos)),
+        "Notas": construir_notas(carpeta, len(archivos), otras_carpetas),
     }
     try:
         destino.mkdir(parents=True, exist_ok=True)
