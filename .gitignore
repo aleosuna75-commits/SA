@@ -11,3 +11,8 @@ venv/
 # Datos descargados por el extractor (se regeneran)
 world-master/
 world.tar.gz
+
+# Base de cesión: datos de las LN y salidas (uso interno, no se versionan)
+base_cesion/**/*.xlsx
+base_cesion/**/*.xlsm
+base_cesion/CIFRAS AJUSTADAS/
