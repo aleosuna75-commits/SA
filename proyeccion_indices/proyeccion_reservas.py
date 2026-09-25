@@ -146,6 +146,7 @@ SALIDA_BD_DANOS = SALIDAS / "BD_ BEL - IRR - MR_Proyeccion.xlsx"
 SALIDA_BD_RFV = SALIDAS / "BD_ RFV_Proyeccion.xlsx"
 SALIDA_DIAGNOSTICO = SALIDAS / "Diagnostico_Proyeccion.xlsx"
 SALIDA_GRAFICAS = SALIDAS / "Graficas_Proyeccion.pdf"
+SALIDA_DASHBOARD = SALIDAS / "Dashboard_Indices_Reservas.xlsx"   # lo arma dashboard.py al final
 
 PERIODO_INICIO = 202609          # primer mes proyectado
 PERIODO_FIN = 202712             # ultimo mes proyectado
@@ -174,6 +175,7 @@ REGENERAR_BD_RFV = True          # True = vuelve a llenar BD_ RFV en cada corrid
                                  # no existe o alguna entrada tiene fecha mas reciente
 COLOR_RESALTADO = "DDEBF7"
 GENERAR_GRAFICAS = True
+GENERAR_DASHBOARD = True         # dashboards de Excel (indices y reservas, real vs proyeccion)
 N_PROCESOS = None                # None = automatico (nucleos-1); 1 = sin paralelismo
 
 # Parametros del torneo de modelos
@@ -1562,7 +1564,7 @@ def escribir_diagnostico(resultados: dict, periodos_proy: list[int], alertas_gen
         for a in r.alertas:
             ws.append([k[0], f"{k[1]} | {k[2]} | ramo {k[3]}", a])
     _formato_tabla(ws, negrita, encab)
-    wb.save(SALIDA_DIAGNOSTICO)
+    guardar_libro(wb, SALIDA_DIAGNOSTICO)
 
 
 def _formato_tabla(ws, negrita, encab):
@@ -1677,9 +1679,12 @@ def _bd_rfv_desactualizada() -> bool:
     return any(p.exists() and p.stat().st_mtime > t_salida for p in entradas)
 
 
+UMBRAL_CIFRA = 1.0   # USD; debajo es ruido de redondeo de SAP (p.ej. 3e-12) y cuenta como cero
+
+
 def revisar_periodos(bd: BDMontos, nombre: str, ultimo: int, periodos_proy: list[int], alertas: list):
     """Evita proyectar sobre cifras reales y usar un mes historico vacio como si fuera cero real."""
-    con_datos = sorted({p for (c, p, r), v in bd.valores.items() if p in periodos_proy and abs(v) > 0})
+    con_datos = sorted({p for (c, p, r), v in bd.valores.items() if p in periodos_proy and abs(v) > UMBRAL_CIFRA})
     if con_datos and not SOBRESCRIBIR_PERIODOS_CON_DATOS:
         raise SystemExit(f"{nombre}: los meses {con_datos} ya tienen cifras (reales?) y se sobrescribirian con la "
                          f"proyeccion. Mueve PERIODO_INICIO al mes siguiente al ultimo real o pon "
@@ -1687,14 +1692,20 @@ def revisar_periodos(bd: BDMontos, nombre: str, ultimo: int, periodos_proy: list
     previo = indice_a_periodo(periodo_a_indice(ultimo) - 1)
     incompletos = []
     for concepto in bd.conceptos:
-        tenia = any(abs(bd.valores.get((concepto, previo, r), 0.0)) > 0 for r in bd.cols_ramo)
-        tiene = any(abs(bd.valores.get((concepto, ultimo, r), 0.0)) > 0 for r in bd.cols_ramo)
+        tenia = any(abs(bd.valores.get((concepto, previo, r), 0.0)) > UMBRAL_CIFRA for r in bd.cols_ramo)
+        tiene = any(abs(bd.valores.get((concepto, ultimo, r), 0.0)) > UMBRAL_CIFRA for r in bd.cols_ramo)
         if tenia and not tiene:
             incompletos.append(concepto)
     if incompletos:
         raise SystemExit(f"{nombre}: el mes {ultimo} (ultimo real, PERIODO_INICIO - 1) no tiene cifras en "
                          f"{incompletos}, aunque {previo} si. Carga ese mes completo o ajusta PERIODO_INICIO.")
-    if not any(abs(v) > 0 for (c, p, r), v in bd.valores.items() if p <= ultimo):
+    for concepto in bd.conceptos:            # un ramo que se quedo en cero puede ser real (cartera extinta)
+        for r in bd.cols_ramo:
+            if (abs(bd.valores.get((concepto, previo, r), 0.0)) > UMBRAL_CIFRA
+                    and abs(bd.valores.get((concepto, ultimo, r), 0.0)) <= UMBRAL_CIFRA):
+                alertas.append((nombre, f"{concepto} RAM_{r}", f"Tiene cifra en {previo} y 0 en {ultimo} (ultimo real): "
+                                                               "confirma que el mes esta completo"))
+    if not any(abs(v) > UMBRAL_CIFRA for (c, p, r), v in bd.valores.items() if p <= ultimo):
         raise SystemExit(f"{nombre}: la historia esta vacia (todo en cero).")
 
 
@@ -1705,10 +1716,12 @@ def main():
     ultimo = indice_a_periodo(periodo_a_indice(PERIODO_INICIO) - 1)
     h = len(periodos_proy)
     print(f"Proyeccion {periodos_proy[0]} - {periodos_proy[-1]} ({h} meses). Historia hasta {ultimo}.", flush=True)
-    salidas = [SALIDA_BD_DANOS, SALIDA_BD_RFV, SALIDA_DIAGNOSTICO] + ([SALIDA_GRAFICAS] if GENERAR_GRAFICAS else [])
-    verificar_escritura(salidas + [ARCHIVO_BD_RFV])
+    regenerar_rfv = _bd_rfv_desactualizada()
+    salidas = ([SALIDA_BD_DANOS, SALIDA_BD_RFV, SALIDA_DIAGNOSTICO] + ([SALIDA_GRAFICAS] if GENERAR_GRAFICAS else [])
+               + ([SALIDA_DASHBOARD] if GENERAR_DASHBOARD else []) + ([ARCHIVO_BD_RFV] if regenerar_rfv else []))
+    verificar_escritura(salidas)
 
-    if _bd_rfv_desactualizada():
+    if regenerar_rfv:
         print("Llenando BD_ RFV desde los Res_Rvas (llenar_bd_rfv.py) ...", flush=True)
         import llenar_bd_rfv  # noqa: WPS433
         llenar_bd_rfv.llenar()
@@ -1803,6 +1816,14 @@ def main():
             graficas_ok = True
         except Exception as e:  # noqa: BLE001
             print(f"   No se pudieron generar las graficas: {e!r}")
+    dashboard_ok = False
+    if GENERAR_DASHBOARD:
+        try:
+            import dashboard  # noqa: WPS433
+            dashboard.generar(SALIDA_DASHBOARD)
+            dashboard_ok = True
+        except Exception as e:  # noqa: BLE001
+            print(f"   No se pudo generar el dashboard: {e!r}")
 
     print("\nRESUMEN")
     print(f"   {SALIDA_BD_DANOS.name}: {info_danos['actualizados']} renglones actualizados, "
@@ -1814,6 +1835,9 @@ def main():
     if GENERAR_GRAFICAS:
         print(f"   Graficas: {SALIDA_GRAFICAS.name}" if graficas_ok
               else "   Graficas: NO se actualizaron (ver mensaje arriba)")
+    if GENERAR_DASHBOARD:
+        print(f"   Dashboard: {SALIDA_DASHBOARD.name}" if dashboard_ok
+              else "   Dashboard: NO se actualizo (ver mensaje arriba)")
     n_alertas = len(alertas) + sum(len(r.alertas) for r in resultados.values())
     print(f"   Alertas a revisar: {n_alertas} (hoja 'Alertas' del diagnostico)")
     print(f"   Tiempo total: {time.time() - t0:,.0f} s")

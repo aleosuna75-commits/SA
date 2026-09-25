@@ -6,6 +6,7 @@ Dos scripts de Python pensados para correr desde VSCode (F5 o *Run Python File*)
 |---|---|
 | `llenar_bd_rfv.py` | Llena **BD_ RFV** (ramos de Fianzas 130–170) desde `Res_Rvas_2025` y `Res_Rvas_2026`, con el mismo criterio con el que se llenó a mano la BD de Daños. |
 | `proyeccion_reservas.py` | Proyecta de **202609 a 202712** `HParametros_2026` (índices y LAGs “Real”), `BD_Montos_RRC_SONR` (Daños) y `BD_ RFV` (Fianzas), con el mismo formato de los archivos originales. |
+| `dashboard.py` | Arma los **dashboards de Excel** de índices y reservas (real y proyectado) a partir de las salidas. Lo llama `proyeccion_reservas.py` al final; también se puede correr solo (ver sección 5). |
 | `excel_fiel.py` | Módulo auxiliar que usan los dos scripts para guardar los libros sin perder formato (ver sección 4). |
 | `tipo_cambio.py` | Supuesto de tipo de cambio de Inversiones (`TC_Real_Esti.xlsx`, hoja TC: **FCST** 2026 y **FCST 2027**) que se escribe en la columna TC. Actualízalo cuando haya un nuevo pronóstico. |
 
@@ -18,14 +19,15 @@ Dos scripts de Python pensados para correr desde VSCode (F5 o *Run Python File*)
    - `salidas/BD_ RFV_Proyeccion.xlsx`
    - `salidas/Diagnostico_Proyeccion.xlsx`: metodología, validación, modelos por serie, intervalos y alertas.
    - `salidas/Graficas_Proyeccion.pdf`: historia contra proyección de cada serie.
+   - `salidas/Dashboard_Indices_Reservas.xlsx`: dashboards interactivos (sección 5).
 
 Los parámetros (periodos, tipo de cambio 2027, resaltado de celdas, etc.) están en la sección **CONFIGURACIÓN** al inicio de cada script.
 
 Protecciones incluidas:
 
-- Si algún archivo de salida está abierto en Excel, el script avisa **antes** de calcular.
+- Si algún archivo de salida está abierto en Excel, o no se puede escribir en `salidas/`, el script avisa **antes** de calcular.
 - Si algún mes a proyectar ya trae cifras reales, se detiene en lugar de sobrescribirlas. En ese caso mueve `PERIODO_INICIO`.
-- Si el último mes real (`PERIODO_INICIO − 1`) está vacío en algún concepto que el mes anterior sí traía (mes cargado a medias), también se detiene.
+- Si el último mes real (`PERIODO_INICIO − 1`) está vacío en algún concepto que el mes anterior sí traía (mes cargado a medias), también se detiene. Si solo falta un ramo, lo deja como alerta en el diagnóstico (puede ser una cartera extinta). Las cifras menores a 1 USD (ruido de redondeo de SAP, como 3e-12) cuentan como cero.
 
 > Las carpetas `entradas/` y `salidas/` y cualquier `.xlsx` están excluidas de git (el repositorio es público y los datos son confidenciales).
 
@@ -131,3 +133,21 @@ Siguen perdiéndose metadatos no visibles:
 - las celdas con texto vacío (`''`), que quedan en blanco.
 
 Excel recalcula las fórmulas al abrir.
+
+## 5. Dashboards (`Dashboard_Indices_Reservas.xlsx`)
+
+Con el estilo del ejemplo: panel de navegación con selectores a la izquierda, banda de indicadores y paneles de gráficas. Azul = real, naranja punteado = proyección, gris = banda al 80% o ramos no seleccionados. No usa macros: los selectores son listas desplegables que alimentan fórmulas (`SUMIFS`) y las gráficas se recalculan al cambiar la selección.
+
+| Hoja | Contenido |
+|---|---|
+| **Dashboard Índices** | Selectores: ramo, índice o LAG y periodo. Indicadores: último real, promedio real de 12 meses, proyección a dic-26 y dic-27, variación. Gráficas: evolución mensual 2021–2027 con banda al 80%, comparativo por ramo (el ramo elegido resaltado), patrón de desarrollo LAG 1–10 (ago-24, ago-25, ago-26 y dic-27 proyectado). Tabla resumen de los índices del ramo. |
+| **Dashboard Reservas** | Selectores: reserva (RRC, SONR, RFV), concepto, ramo (o “Todos”) y moneda (USD, o MXN con el TC de cada mes). Indicadores: real ago-26, proyección dic-26 y dic-27, crecimiento anual proyectado, crecimiento real de 12 meses y % cedido. Gráficas: mensual 2025–2027, histórico 2022–2027, por ramo y por concepto. |
+| **Análisis** | Tablas fijas con mapa de calor: índices por ramo (real contra dic-27), totales de reservas por concepto (dic-24 a dic-27) y el método elegido en la validación. |
+| **BD_Indices**, **BD_Reservas** | Las bases que alimentan los dashboards, como tablas de Excel con filtros. |
+
+- Se regenera en cada corrida de la proyección (`GENERAR_DASHBOARD`). Para rehacerlo sin volver a proyectar, corre `dashboard.py`.
+- `#N/D` o `s/d` = sin dato para esa combinación; por ejemplo, TEV e Hidro no tienen índices de SONR ni LAGs.
+- Si cambias la reserva y el concepto o el ramo elegidos no existen en ella (por ejemplo GTO en SONR), aparece un aviso bajo los selectores.
+- Hereda la etiqueta de sensibilidad **USO INTERNO** y el pie de página de la BD de origen.
+- Está pensado para Excel. En LibreOffice las fórmulas funcionan, pero los `#N/D` se dibujan como cero en las líneas.
+

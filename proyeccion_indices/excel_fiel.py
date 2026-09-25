@@ -109,10 +109,12 @@ def restaurar_encabezados(original: Path, salida: Path) -> int:
 
 
 def verificar_escritura(rutas) -> None:
-    """Falla de inmediato (antes del calculo) si alguna salida esta abierta en Excel o en otro programa."""
-    bloqueadas = []
+    """Falla de inmediato (antes del calculo) si alguna salida esta abierta en Excel o en otro programa, o si
+    no se puede escribir en su carpeta."""
+    bloqueadas, carpetas = [], set()
     for ruta in rutas:
         ruta = Path(ruta)
+        carpetas.add(ruta.parent)
         if ruta.exists():
             try:
                 with open(ruta, "a"):
@@ -122,6 +124,12 @@ def verificar_escritura(rutas) -> None:
     if bloqueadas:
         raise SystemExit("Cierra estos archivos (estan abiertos en Excel u otro programa) y vuelve a correr: "
                          + ", ".join(bloqueadas))
+    for carpeta in carpetas:
+        try:
+            with tempfile.TemporaryFile(dir=str(carpeta)):
+                pass
+        except OSError as e:
+            raise SystemExit(f"No se puede escribir en la carpeta {carpeta}: {e}") from e
 
 
 def _permisos_normales(ruta) -> None:
@@ -139,7 +147,10 @@ def guardar_libro(wb, ruta: Path, original: Path | None = None) -> None:
     ruta = Path(ruta)
     parche_precision()
     fijar_esquema_columnas(wb)
-    fd, tmp = tempfile.mkstemp(suffix=".xlsx", dir=str(ruta.parent))
+    try:
+        fd, tmp = tempfile.mkstemp(suffix=".xlsx", dir=str(ruta.parent))
+    except OSError as e:
+        raise SystemExit(f"No se puede escribir en la carpeta {ruta.parent}: {e}") from e
     os.close(fd)
     try:
         wb.save(tmp)
