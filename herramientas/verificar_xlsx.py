@@ -10,13 +10,18 @@ Comprueba que dos .xlsx tienen exactamente el mismo contenido.
   compartido se comparan por el texto, no por su número de índice.
 - El zip debe ser coherente (encabezados locales = directorio central) y
   guardar las partes en el mismo orden físico que el original.
-- Compatibilidad con lectores conocidos: las celdas con fórmula compartida
-  deben conservar r (openpyxl) y sólo puede faltar r en filas cuyo número es
-  el de la fila anterior + 1 (WPS).
+- Compatibilidad con lectores conocidos: la reducción no puede dejar sin r
+  celdas con fórmula compartida (openpyxl) ni celdas en filas cuyo número no
+  es el de la fila anterior + 1 (WPS).
 
-Con --quitada NOMBRE se acepta que esa hoja ya no esté: se exige que falten
-sólo ella y sus partes propias, y se muestran los cambios en el índice del
-libro, relaciones, tipos y propiedades para revisarlos.
+- El paquete debe ser coherente: todo XML bien formado, todo destino de
+  relación existe y toda parte tiene tipo de contenido.
+
+Con --quitada NOMBRE se acepta que esa hoja ya no esté. Se calcula desde el
+original qué partes le pertenecían sólo a ella (más calcChain) y se exige que
+falten exactamente ésas; los nombres definidos, la hoja activa, las
+relaciones, los tipos de contenido y los títulos de docProps/app.xml deben
+ser los del original menos la hoja. Los cambios se muestran para revisarlos.
 
 Uso:
     python3 herramientas/verificar_xlsx.py ORIGINAL.xlsx REDUCIDO.xlsx
@@ -37,6 +42,9 @@ import zlib
 from lxml import etree
 
 NS = "{http://schemas.openxmlformats.org/spreadsheetml/2006/main}"
+R = "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+CT = "http://schemas.openxmlformats.org/package/2006/content-types"
+VT = "http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes"
 TEXTOS = "xl/sharedStrings.xml"
 AJUSTADAS = {"xl/workbook.xml", "xl/_rels/workbook.xml.rels",
              "[Content_Types].xml", "docProps/app.xml", TEXTOS}
@@ -49,18 +57,143 @@ def columna(letras):
     return n
 
 
-def hojas(z):
+def resolver(parte, destino):
+    if destino.startswith("/"):
+        return posixpath.normpath(destino[1:])
+    return posixpath.normpath(posixpath.join(posixpath.dirname(parte), destino))
+
+
+def ruta_rels(parte):
+    return posixpath.join(posixpath.dirname(parte), "_rels",
+                          posixpath.basename(parte) + ".rels")
+
+
+def relaciones(partes, parte):
+    """[(Id, Type, destino)] de una parte; destino None si es externo."""
+    raiz = etree.fromstring(partes[ruta_rels(parte)]) if ruta_rels(parte) in partes else []
+    return [(r.get("Id"), r.get("Type"),
+             None if r.get("TargetMode") == "External" else resolver(parte, r.get("Target")))
+            for r in raiz]
+
+
+def hojas(partes):
     """{nombre de hoja: parte} en el orden del libro."""
-    rels = {}
-    for e in re.findall(rb"<Relationship\b[^>]*/>", z.read("xl/_rels/workbook.xml.rels")):
-        rid = re.search(rb'\sId="([^"]*)"', e).group(1)
-        destino = re.search(rb'\sTarget="([^"]*)"', e).group(1).decode()
-        rels[rid] = posixpath.normpath(posixpath.join("xl", destino))
-    salida = {}
-    for e in re.findall(rb"<sheet\b[^>]*/>", z.read("xl/workbook.xml")):
-        nombre = html.unescape(re.search(rb'\sname="([^"]*)"', e).group(1).decode())
-        salida[nombre] = rels[re.search(rb'\s\w+:id="([^"]*)"', e).group(1)]
-    return salida
+    rels = {i: d for i, _, d in relaciones(partes, "xl/workbook.xml")}
+    libro = etree.fromstring(partes["xl/workbook.xml"])
+    return {h.get("name"): rels[h.get(f"{{{R}}}id")] for h in libro.iter(f"{NS}sheet")}
+
+
+def estructura(partes):
+    """Problemas de coherencia del paquete: XML, relaciones y tipos."""
+    problemas = []
+    tipos = etree.fromstring(partes["[Content_Types].xml"])
+    por_ext = {d.get("Extension").lower() for d in tipos.iter(f"{{{CT}}}Default")}
+    por_parte = {o.get("PartName").lower() for o in tipos.iter(f"{{{CT}}}Override")}
+    for n, datos in partes.items():
+        if n.endswith("/"):
+            continue
+        if n.endswith((".xml", ".rels", ".vml")):
+            try:
+                etree.fromstring(datos, etree.XMLParser(huge_tree=True))
+            except etree.XMLSyntaxError as e:
+                problemas.append(f"{n}: XML mal formado ({e})")
+                continue
+        if ("/" + n).lower() not in por_parte and n.rsplit(".", 1)[-1].lower() not in por_ext:
+            problemas.append(f"{n}: sin tipo de contenido")
+        if n.endswith(".rels"):
+            origen = posixpath.dirname(posixpath.dirname(n))
+            origen = posixpath.join(origen, posixpath.basename(n)[:-5]) if origen else ""
+            for _, _, d in relaciones(partes, origen):
+                if d is not None and d not in partes:
+                    problemas.append(f"{n}: apunta a {d}, que no existe")
+    for o in por_parte:
+        if o[1:] not in {n.lower() for n in partes}:
+            problemas.append(f"[Content_Types].xml: tipo para {o}, que no existe")
+    return problemas
+
+
+def propias(partes, hoja):
+    """Partes alcanzables sólo desde `hoja` (incluida), con sus .rels."""
+    quitar, cambio = {hoja}, True
+    while cambio:
+        cambio = False
+        vivos = [""] + [p for p in partes if p not in quitar and not p.endswith("/")]
+        usados = {d for p in vivos for _, _, d in relaciones(partes, p)}
+        for p in list(quitar):
+            for _, _, d in relaciones(partes, p):
+                if d in partes and d not in quitar and d not in usados:
+                    quitar.add(d)
+                    cambio = True
+    return quitar | {ruta_rels(p) for p in quitar if ruta_rels(p) in partes}
+
+
+def libro_semantico(partes):
+    """Hojas, nombres definidos y vista del libro, con índices por nombre."""
+    libro = etree.fromstring(partes["xl/workbook.xml"])
+    nombres = [h.get("name") for h in libro.iter(f"{NS}sheet")]
+    hojas_ = [(h.get("name"), h.get("sheetId"), h.get("state")) for h in libro.iter(f"{NS}sheet")]
+    definidos = sorted(
+        (d.get("name"), nombres[int(d.get("localSheetId"))] if d.get("localSheetId") else None,
+         tuple(sorted((k, v) for k, v in d.attrib.items() if k not in ("name", "localSheetId"))),
+         d.text) for d in libro.iter(f"{NS}definedName"))
+    hoja = lambda i: nombres[int(i)] if int(i) < len(nombres) else f"#{i} (no existe)"
+    vistas = [(hoja(v.get("activeTab", 0)), hoja(v.get("firstSheet", 0)))
+              for v in libro.iter(f"{NS}workbookView")]
+    return hojas_, definidos, vistas
+
+
+def titulos_app(partes):
+    if "docProps/app.xml" not in partes:
+        return None
+    raiz = etree.fromstring(partes["docProps/app.xml"])
+    titulos = [t.text for t in raiz.iter(f"{{{VT}}}lpstr")
+               if t.getparent().getparent() is not None
+               and t.getparent().getparent().tag.endswith("TitlesOfParts")]
+    pares = [v.text for v in raiz.iter(f"{{{VT}}}i4")]
+    return titulos[:int(pares[0])] if pares else titulos
+
+
+def revisar_quitadas(pa, pb, quitadas):
+    """Compara el paquete reducido con el original menos las hojas quitadas."""
+    problemas = []
+    hojas_a = hojas(pa)
+    esperado = dict(pa)
+    for nombre in quitadas:
+        if nombre not in hojas_a:
+            return [f"el original no tiene la hoja {nombre!r}"]
+        propias_ = propias(esperado, hojas_a[nombre])
+        cadena = [d for _, t, d in relaciones(esperado, "xl/workbook.xml")
+                  if t.endswith("/calcChain")]
+        for p in propias_ | ({cadena[0]} if cadena else set()):
+            esperado.pop(p, None)
+    faltan = set(pa) - set(pb)
+    if faltan != set(pa) - set(esperado):
+        problemas.append(f"partes quitadas {sorted(faltan)}; se esperaban "
+                         f"{sorted(set(pa) - set(esperado))}")
+    hojas_ea, def_a, vis_a = libro_semantico(pa)
+    hojas_eb, def_b, vis_b = libro_semantico(pb)
+    if [h for h in hojas_ea if h[0] not in quitadas] != hojas_eb:
+        problemas.append("xl/workbook.xml: la lista de hojas no es la original menos la quitada")
+    if [d for d in def_a if d[1] not in quitadas] != def_b:
+        problemas.append("xl/workbook.xml: los nombres definidos cambiaron")
+    if vis_a != vis_b:
+        problemas.append(f"xl/workbook.xml: la hoja activa/primera cambió {vis_a} -> {vis_b}")
+    rels_a = {(t, d) for _, t, d in relaciones(pa, "xl/workbook.xml")
+              if d is None or d in esperado}
+    rels_b = {(t, d) for _, t, d in relaciones(pb, "xl/workbook.xml")}
+    if rels_a != rels_b:
+        problemas.append(f"xl/_rels/workbook.xml.rels: {rels_a ^ rels_b}")
+    tipos = lambda p: {(e.tag, tuple(sorted(e.attrib.items())))
+                       for e in etree.fromstring(p["[Content_Types].xml"])}
+    esperados = {t for t in tipos(pa) if dict(t[1]).get("PartName", "/")[1:] in esperado
+                 or "PartName" not in dict(t[1])}
+    if esperados != tipos(pb):
+        problemas.append(f"[Content_Types].xml: {esperados ^ tipos(pb)}")
+    ta = titulos_app(pa)
+    if ta is not None and [t for t in ta if t not in quitadas] != titulos_app(pb):
+        problemas.append("docProps/app.xml: los títulos de hojas no coinciden")
+    return problemas
+
 
 
 def textos(z):
@@ -104,6 +237,9 @@ def celdas(xml, sst):
     avisos = {"compartida sin r": 0, "sin r tras salto de fila": 0}
     fila_prev = 0
     for fila in datos:
+        if not isinstance(fila.tag, str):  # comentario o instrucción: se compara tal cual
+            orden.append((fila_prev, etree.tostring(fila)))
+            continue
         if fila.tag != f"{NS}row":
             raise ValueError(f"elemento inesperado en sheetData: {fila.tag}")
         r = int(fila.get("r")) if fila.get("r") else fila_prev + 1
@@ -112,6 +248,9 @@ def celdas(xml, sst):
         filas.append((r, dict(fila.attrib), fila.text, fila.tail))
         col_prev = 0
         for c in fila:
+            if not isinstance(c.tag, str):
+                orden.append((r, etree.tostring(c)))
+                continue
             if c.tag != f"{NS}c":
                 raise ValueError(f"fila {r}: elemento inesperado {c.tag}")
             ref = c.get("r")
@@ -175,7 +314,16 @@ def main(original, reducido, quitadas):
         print("zip: las partes no están en el orden físico del original")
         errores += 1
     with zipfile.ZipFile(original) as za, zipfile.ZipFile(reducido) as zb:
-        hojas_a, hojas_b = hojas(za), hojas(zb)
+        pa = {n: za.read(n) for n in za.namelist()}
+        pb = {n: zb.read(n) for n in zb.namelist()}
+        for p in estructura(pb):
+            print(f"paquete: {p}")
+            errores += 1
+        if quitadas:
+            for p in revisar_quitadas(pa, pb, quitadas):
+                print(f"hoja quitada: {p}")
+                errores += 1
+        hojas_a, hojas_b = hojas(pa), hojas(pb)
         esperadas = [h for h in hojas_a if h not in quitadas]
         if list(hojas_b) != esperadas:
             print(f"Hojas distintas: {list(hojas_b)} vs {esperadas}")
@@ -225,10 +373,15 @@ def main(original, reducido, quitadas):
             parte_a = hojas_a[nombre]
             a, b = za.read(parte_a), zb.read(parte_b)
             antes = errores
+            if b"<sheetData" not in a:
+                if a != b:
+                    print(f"{nombre}: distinta")
+                    errores += 1
+                continue
             if fuera_de_datos(a) != fuera_de_datos(b):
                 print(f"{nombre}: cambió algo fuera de sheetData")
                 errores += 1
-            filas_a, celdas_a, orden_a, _ = celdas(a, sst_a)
+            filas_a, celdas_a, orden_a, avisos_a = celdas(a, sst_a)
             filas_b, celdas_b, orden_b, avisos = celdas(b, sst_b)
             if filas_a != filas_b:
                 print(f"{nombre}: filas distintas")
@@ -239,8 +392,9 @@ def main(original, reducido, quitadas):
                 print(f"{nombre}: {len(dif):,} celdas distintas, p. ej. {sorted(dif)[:5]}")
                 errores += 1
             for aviso, n in avisos.items():
-                if n:
-                    print(f"{nombre}: {n:,} celdas {aviso} (algunos lectores las acomodan mal)")
+                if n > avisos_a[aviso]:  # sólo cuenta lo que introdujo la reducción
+                    print(f"{nombre}: {n - avisos_a[aviso]:,} celdas {aviso} "
+                          "(algunos lectores las acomodan mal)")
                     errores += 1
             if errores == antes:
                 con_valor = sum(1 for v in celdas_a.values() if v[1])

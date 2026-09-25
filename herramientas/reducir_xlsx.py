@@ -60,7 +60,15 @@ TEXTOS = "xl/sharedStrings.xml"
 TIPOS = "[Content_Types].xml"
 PROPIEDADES = "docProps/app.xml"
 RELACION = re.compile(rb"<Relationship\b[^>]*/>")
-CELDA_TEXTO = re.compile(rb'(<c\b[^>]*?\st="s"[^>]*>)<v>(\d+)</v>')
+CELDA_TEXTO = re.compile(rb'(<c\b[^>]*?\st=(["\'])s\2[^>]*>)<v>(\d+)</v>')
+ES_TEXTO = re.compile(rb'<c\b[^>]*?\st=["\']s["\']')
+NOMBRE_DEFINIDO = re.compile(rb"<definedName\b[^>]*?(?:/>|>.*?</definedName>)", re.S)
+FORMULA = re.compile(
+    rb"<((?:\w+:)?(?:f|formula|formula1|formula2|definedName))\b[^>/]*>(.*?)</\1>", re.S)
+# Referencia 3D (Hoja1:Hoja3!A1 o 'Hoja 1:Hoja 3'!A1).
+TRES_D = re.compile(
+    r"'(?:[^']|'')*:(?:[^']|'')*'!"
+    r"|[^\s'!(),;=+\-*/&<>:\"{}\[\]^%]+:[^\s'!(),;=+\-*/&<>:\"{}\[\]^%]+!")
 
 
 def columna(letras):
@@ -100,6 +108,8 @@ def quitar_direcciones(xml):
         return xml, 0
     if b"<!--" in cuerpo or b"<![CDATA[" in cuerpo or b"<?" in cuerpo:
         return xml, 0
+    if len(re.findall(rb"<row[ >/]", cuerpo)) != len(re.findall(rb'<row\b[^>]*?\sr="', cuerpo)):
+        return xml, 0
 
     partes, ultimo, quitadas = [], 0, 0
     fila, col_prev, contigua = None, 0, False
@@ -132,22 +142,53 @@ def ruta_rels(parte):
                           posixpath.basename(parte) + ".rels")
 
 
+def resolver(parte, destino):
+    """Ruta de la parte a la que apunta `destino` desde `parte`."""
+    if destino.startswith("/"):
+        return posixpath.normpath(destino[1:])
+    return posixpath.normpath(posixpath.join(posixpath.dirname(parte), destino))
+
+
 def destinos(partes, parte):
     """Partes internas a las que apunta una parte ("" es la raíz)."""
     rels = partes.get(ruta_rels(parte))
     if rels is None:
         return []
-    salida = []
-    for etiqueta in RELACION.findall(rels):
-        if atributo(etiqueta, b"TargetMode") == "External":
+    return [resolver(parte, atributo(e, b"Target")) for e in RELACION.findall(rels)
+            if atributo(e, b"TargetMode") != "External"]
+
+
+def formulas(datos):
+    """Texto de las fórmulas y nombres definidos de una parte XML."""
+    return [html.unescape(m.group(2).decode("utf-8", "replace"))
+            for m in FORMULA.finditer(datos)]
+
+
+def revisar_referencias(partes, quitar, nombre, tablas):
+    """Se detiene si algo que se queda puede depender de la hoja a quitar."""
+    directa = re.compile(r"(?<![\w.\]])" + re.escape(nombre) + r"!", re.I)
+    citada = "'" + nombre.replace("'", "''") + "'!"
+    fuente = re.compile(rb'\ssheet="' + re.escape(
+        html.escape(nombre, quote=True).encode()) + rb'"')
+    indirectas = 0
+    for p, datos in partes.items():
+        if p in quitar or p == PROPIEDADES or not p.endswith((".xml", ".vml")):
             continue
-        destino = atributo(etiqueta, b"Target")
-        if destino.startswith("/"):
-            salida.append(destino[1:])
-        else:
-            salida.append(posixpath.normpath(
-                posixpath.join(posixpath.dirname(parte), destino)))
-    return salida
+        if fuente.search(datos):
+            raise SystemExit(f"{p} usa la hoja {nombre!r} como origen (tabla dinámica)")
+        for f in formulas(datos):
+            if citada.lower() in f.lower() or directa.search(f):
+                raise SystemExit(f"{p} tiene una fórmula que usa la hoja {nombre!r}: {f}")
+            if TRES_D.search(f):
+                raise SystemExit(f"{p} tiene una referencia 3D ({f}); no se puede "
+                                 "asegurar que no incluya la hoja a quitar")
+            for t in tablas:
+                if re.search(re.escape(t) + r"\s*\[", f, re.I):
+                    raise SystemExit(f"{p} usa la tabla {t!r} de la hoja {nombre!r}: {f}")
+            indirectas += "INDIRECT" in f.upper()
+    if indirectas:
+        print(f"AVISO: {indirectas} fórmulas usan INDIRECTO; si alguna arma el nombre "
+              f"de la hoja {nombre!r}, dará error")
 
 
 def quitar_hoja(partes, nombre):
@@ -160,9 +201,7 @@ def quitar_hoja(partes, nombre):
     idx = nombres.index(nombre)
     rid = re.search(rb'\s\w+:id="([^"]*)"', etiquetas[idx]).group(1)
 
-    # Nada que se quede puede apuntar a la hoja (fórmulas, nombres, gráficas).
     escapado = html.escape(nombre, quote=False).encode("utf-8")
-    ref = re.compile(re.escape(escapado) + rb"(?:'|&apos;)?!")
 
     def sin_nombres_locales(m):
         etiqueta = m.group(0)
@@ -174,37 +213,38 @@ def quitar_hoja(partes, nombre):
             if n > idx:
                 etiqueta = etiqueta.replace(
                     local.group(0), b'localSheetId="%d"' % (n - 1), 1)
-        if ref.search(etiqueta):
-            raise SystemExit(f"El nombre definido {etiqueta!r} usa la hoja {nombre!r}")
         return etiqueta
 
-    libro = re.sub(rb"<definedName\b[^>]*>.*?</definedName>",
-                   sin_nombres_locales, libro, flags=re.S)
-    libro = libro.replace(b"<definedNames></definedNames>", b"")
+    libro = NOMBRE_DEFINIDO.sub(sin_nombres_locales, libro)
+    libro = re.sub(rb"<definedNames>\s*</definedNames>", b"", libro)
     libro = libro.replace(etiquetas[idx], b"", 1)
     vista = re.search(rb"<workbookView\b[^>]*>", libro)
     if vista:
         nueva = vista.group(0)
         for campo in (b"activeTab", b"firstSheet"):
             m = re.search(rb"\s" + campo + rb'="(\d+)"', nueva)
-            if not m:
-                continue
-            n = int(m.group(1))
+            n = int(m.group(1)) if m else 0
             if campo == b"activeTab" and n == idx:
                 raise SystemExit(f"{nombre!r} es la hoja activa; actívese otra primero")
-            if n > idx or n >= len(nombres) - 1:
+            if m and (n > idx or n >= len(nombres) - 1):
                 nueva = nueva.replace(
                     m.group(0), b" " + campo + b'="%d"' % max(n - 1, 0), 1)
         libro = libro.replace(vista.group(0), nueva, 1)
     partes[LIBRO] = libro
 
-    # Relación del libro a la hoja.
+    # Relación del libro a la hoja; calcChain se quita (Excel lo rehace) porque
+    # lista celdas de la hoja borrada.
     rels_libro = ruta_rels(LIBRO)
-    hoja = None
+    hoja, cadena = None, None
     for etiqueta in RELACION.findall(partes[rels_libro]):
+        tipo = atributo(etiqueta, b"Type") or ""
         if atributo(etiqueta, b"Id") == rid.decode():
-            hoja = posixpath.normpath(posixpath.join("xl", atributo(etiqueta, b"Target")))
-            partes[rels_libro] = partes[rels_libro].replace(etiqueta, b"", 1)
+            hoja = resolver(LIBRO, atributo(etiqueta, b"Target"))
+        elif tipo.endswith("/calcChain"):
+            cadena = resolver(LIBRO, atributo(etiqueta, b"Target"))
+        else:
+            continue
+        partes[rels_libro] = partes[rels_libro].replace(etiqueta, b"", 1)
     if hoja not in partes:
         raise SystemExit(f"No se encontró la parte de la hoja {nombre!r}")
 
@@ -219,17 +259,22 @@ def quitar_hoja(partes, nombre):
                 if d in partes and d not in quitar and d not in usados:
                     quitar.add(d)
                     cambio = True
+    if cadena in partes:
+        quitar.add(cadena)
     quitar |= {ruta_rels(p) for p in quitar if ruta_rels(p) in partes}
 
-    for p, datos in partes.items():
-        if p not in quitar and p not in (LIBRO, PROPIEDADES) and ref.search(datos):
-            raise SystemExit(f"{p} hace referencia a la hoja {nombre!r}")
+    tablas = []
+    for p in quitar:
+        if p.startswith("xl/tables/"):
+            tablas += [atributo(e, n) for e in re.findall(rb"<table\b[^>]*>", partes[p])
+                       for n in (b"name", b"displayName") if atributo(e, n)]
+    revisar_referencias(partes, quitar, nombre, tablas)
 
     for p in quitar:
         del partes[p]
         partes[TIPOS] = re.sub(
-            rb'<Override PartName="/' + re.escape(p.encode()) + rb'"[^>]*/>',
-            b"", partes[TIPOS])
+            rb'<Override\b[^>]*\bPartName="/' + re.escape(p.encode()) + rb'"[^>]*/>',
+            b"", partes[TIPOS], flags=re.I)
 
     # Propiedades del documento: lista de títulos de hojas.
     app = partes.get(PROPIEDADES)
@@ -265,9 +310,9 @@ def podar_textos(partes):
     usados, total = set(), 0
     for p in hojas:
         celdas = CELDA_TEXTO.findall(partes[p])
-        if len(celdas) != len(re.findall(rb'<c\b[^>]*?\st="s"', partes[p])):
+        if len(celdas) != len(ES_TEXTO.findall(partes[p])):
             raise SystemExit(f"{p}: celda de texto con formato inesperado")
-        usados.update(int(v) for _, v in celdas)
+        usados.update(int(v) for _, _, v in celdas)
         total += len(celdas)
     if len(usados) == len(items):
         return 0
@@ -275,7 +320,7 @@ def podar_textos(partes):
     nuevo = {viejo: i for i, viejo in enumerate(orden)}
     for p in hojas:
         partes[p] = CELDA_TEXTO.sub(
-            lambda m: m.group(1) + b"<v>%d</v>" % nuevo[int(m.group(2))], partes[p])
+            lambda m: m.group(1) + b"<v>%d</v>" % nuevo[int(m.group(3))], partes[p])
     cabeza = sst[:items[0].start()]
     cabeza = re.sub(rb'(<sst\b[^>]*?\scount=")\d+', rb"\g<1>%d" % total, cabeza)
     cabeza = re.sub(rb'(<sst\b[^>]*?\suniqueCount=")\d+', rb"\g<1>%d" % len(orden), cabeza)
