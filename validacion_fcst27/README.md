@@ -13,6 +13,7 @@ del RFCST 2026).
 | `BDReal26.xlsx` (hoja `BD`) | No | Real 2026 mensual por LN y en dólares: da la forma con la que se abre el Ene-Jul del RFCST y se grafica como serie propia |
 | `BDReal25.xlsx` (mismo formato) | No | Real 2025 mensual, como serie propia en la estacionalidad |
 | `BD_082026.xlsx` (export operativo) | No | Extiende el real 2026 con los meses que la base en dólares todavía no tiene |
+| `BD_2025.xlsx` (mismo export, del 2025) | No | Real 2025 mensual por LN y por ramo, como serie propia en la estacionalidad; se usa sola si no hay `BDReal25.xlsx` |
 | `Catalogo*.xlsx` (hoja `Valores`, columnas `Ced` / `CedenteRP`) | No | Nombres de cedentes en el dashboard |
 
 Sin la base del RFCST el script corre igual y las comparativas se muestran
@@ -160,6 +161,23 @@ Todo eso se imprime en consola y se declara al pie de la gráfica. El tramo
 extendido **solo alimenta la estacionalidad**: el acumulado por negocio que usa
 el reporte de alertas sigue siendo el de la base en dólares.
 
+**Un real armado solo con el export.** `BD_2025.xlsx` es el mismo export, pero
+del 2025, y ese año no tiene base en dólares. En ese caso el export arma el
+real por sí solo:
+
+- se queda **en pesos**: como el año cerrado se grafica como % de su propio
+  total, la moneda no mueve la curva;
+- la LN se toma con la misma cascada de llaves, contra el diccionario de la
+  base en dólares **2026** (la LN es del contrato, así que un contrato
+  renovado cruza). Lo que no cruza va a prorrata. Si cruza menos de
+  `MIN_COBERTURA_LN` (50%) de la prima, por LN solo se dibuja el total, y el
+  pie lo dice;
+- por ramo sale del subramo, igual que el real 2026, con cobertura completa.
+
+Si algún día llega `BDReal25.xlsx`, esa base manda por LN y `BD_2025.xlsx`
+queda para la vista por ramo (convertida con el tipo de cambio implícito de
+los meses que comparten).
+
 ### Estacionalidad por LN o por ramo
 
 Cada gráfica de estacionalidad trae un selector **Por LN / Por ramo**. El ramo
@@ -180,6 +198,7 @@ juego de 15 códigos, así que las fuentes cruzan sin traducción intermedia.
 |---|---|---|
 | FCST 2027 | centro de beneficio (`/ERP/PROFTCTR`) → `CAT_RAMO` | 100% |
 | Real 2026 (`BD_082026.xlsx`) | subramo (`SRamo`) → `CAT_SUBRAMO` | 100% |
+| Real 2025 (`BD_2025.xlsx`) | subramo (`SRamo`) → `CAT_SUBRAMO` | 100% |
 | FCST 2026 (`Ppto2026`) | subramo (`Subramo`) → `CAT_SUBRAMO` | 100% |
 | **RFCST 2026** | no trae ramo; por llave de contrato solo cruza 24.5% | **no se dibuja** |
 

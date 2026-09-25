@@ -305,12 +305,23 @@ NIVELES_LLAVE = [
 #   S: siniestros tomados
 #   C: costo de adquisicion = comision + utilidad + corretaje,
 #      que es la columna Cos... y no la Com...
+# Si el ejercicio no tiene base en dolares (hoy el 2025), el export
+# arma su real por si solo: se queda en pesos, porque en la
+# estacionalidad cada año se grafica como % de su propio total, y
+# la LN se toma de la llave de contrato de la base en dolares 2026.
+_COLS_CRUDAS = {"P": ("PriTomNal5", -1.0), "S": ("SinTomNal5", 1.0),
+                "C": ("CosTomNal5", 1.0)}
 BASES_REALES_CRUDAS = [
     {"anio": 2026, "archivo": "BD_082026.xlsx", "prefijo": "BD_0",
-     "col_mes": "aPOG_MesProc",
-     "cols": {"P": ("PriTomNal5", -1.0), "S": ("SinTomNal5", 1.0),
-              "C": ("CosTomNal5", 1.0)}},
+     "col_mes": "aPOG_MesProc", "cols": _COLS_CRUDAS},
+    {"anio": 2025, "archivo": "BD_2025.xlsx", "prefijo": "BD_2025",
+     "col_mes": "aPOG_MesProc", "cols": _COLS_CRUDAS},
 ]
+
+# Parte minima de la prima que tiene que cruzar con una LN para que
+# un real armado solo con el export se dibuje LN por LN; debajo de
+# eso por LN solo va su total (por ramo no aplica: sale del subramo)
+MIN_COBERTURA_LN = 0.50
 
 # Ejercicio cuyo real abre el acumulado a julio del RFCST
 ANIO_REAL26 = 2026
@@ -1633,6 +1644,138 @@ def _llave_contrato(df, cols):
     return partes[0].str.cat(partes[1:], sep="|")
 
 
+def _leer_crudo(cfg):
+    """Renglones del ejercicio en el export operativo, con el mes en
+    `_mes` y cada concepto ya con su signo en `_P`, `_S` y `_C`.
+    Devuelve (base, nombre del archivo), o (None, None) si no hay
+    archivo o no se puede usar."""
+
+    ruta = _buscar_archivo(cfg["archivo"], cfg["prefijo"], ".xlsx")
+    if ruta is None:
+        return None, None
+
+    nombre = os.path.basename(ruta)
+    col_mes = cfg["col_mes"]
+
+    try:
+        crudo = pd.read_excel(ruta, sheet_name=0, header=None, nrows=10)
+    except ValueError:
+        print(f"AVISO: no se pudo leer {nombre}.")
+        return None, nombre
+
+    fila = next((i for i in range(len(crudo))
+                 if any(str(v).strip() == col_mes for v in crudo.iloc[i])), None)
+    if fila is None:
+        print(f"AVISO: {nombre} no trae la columna '{col_mes}'.")
+        return None, nombre
+
+    b = pd.read_excel(ruta, sheet_name=0, header=fila)
+    b.columns = [str(c).strip() for c in b.columns]
+
+    faltan = [c for c, _ in cfg["cols"].values() if c not in b.columns]
+    if faltan:
+        print(f"AVISO: a {nombre} le faltan columnas {faltan}.")
+        return None, nombre
+
+    per = pd.to_numeric(b[col_mes], errors="coerce")
+    b = b[(per // 100) == cfg["anio"]].copy()
+    if b.empty:
+        print(f"AVISO: {nombre} no trae renglones del {cfg['anio']}.")
+        return None, nombre
+
+    b["_mes"] = (per % 100).loc[b.index].astype(int)
+    for cpt, (col, signo) in cfg["cols"].items():
+        b[f"_{cpt}"] = signo * pd.to_numeric(b[col], errors="coerce").fillna(0.0)
+    return b, nombre
+
+
+def _asignar_ln_crudo(b, dicc):
+    """Pone en `_ln` la LN de cada renglon del export: cada uno se
+    resuelve con el primer nivel de llave de contrato que lo cruce."""
+    dicc = dicc or []
+    # object y no float: en la columna van etiquetas de LN
+    b["_ln"] = pd.Series([None] * len(b), index=b.index, dtype=object)
+    for _niv, (_, cols_crudo) in enumerate(NIVELES_LLAVE):
+        if _niv >= len(dicc) or not dicc[_niv]:
+            continue
+        if not all(c in b.columns for c in cols_crudo):
+            continue
+        pend = b["_ln"].isna()
+        if not pend.any():
+            break
+        b.loc[pend, "_ln"] = _llave_contrato(b[pend], cols_crudo).map(dicc[_niv])
+
+
+def _cobertura_ln(b, meses):
+    """Parte de la prima de esos meses que cruzo con una LN."""
+    sel = b["_mes"].isin(meses)
+    peso_p = b.loc[sel, "_P"]
+    cubre = b.loc[sel, "_ln"].notna()
+    return (peso_p[cubre].sum() / peso_p.sum()) if abs(peso_p.sum()) > TOL else 0.0
+
+
+def _repartir_ln_crudo(b, meses, cpts, tc, por_ln, solo_total=False):
+    """Escribe en `por_ln` los meses indicados del export, por LN y
+    en total. Lo que no cruza con una LN se prorratea entre las que
+    si cruzaron, asi que las LN suman el total del mes."""
+    tot = por_ln.setdefault("_tot", {})
+    for cpt in cpts:
+        tot.setdefault(cpt, [0.0] * 12)
+    for mes in meses:
+        sub = b[b["_mes"] == mes]
+        for cpt in cpts:
+            if tc.get(cpt) in (None, 0.0):
+                continue
+            total = float(sub[f"_{cpt}"].sum()) / tc[cpt]
+            tot[cpt][mes - 1] = total
+            if solo_total:
+                continue
+            g = sub.dropna(subset=["_ln"]).groupby("_ln")[f"_{cpt}"].sum() / tc[cpt]
+            asignado = float(g.sum())
+            resto = total - asignado
+            if abs(asignado) > TOL and abs(resto) > TOL:
+                g = g + g / asignado * resto          # el no cruzado, a prorrata
+            for ln, v in g.items():
+                fila_ln = por_ln.setdefault(ln, {})
+                serie = fila_ln.get(cpt)
+                if serie is None:
+                    serie = [0.0] * 12
+                    fila_ln[cpt] = serie
+                serie[mes - 1] = float(v)
+
+
+def _por_ramo_crudo(b, cpts, tc, nombre):
+    """Apertura por ramo de todos los meses del export, via el
+    subramo. Devuelve (por_ramo, meses), o ({}, []) si el export no
+    trae subramo."""
+    col_sr = _buscar_columna(b.columns, ["SRamo", "Subramo", "SubRamo"])
+    if col_sr is None:
+        print(f"AVISO: {nombre} no trae subramo; no se abre por ramo.")
+        return {}, []
+
+    por_ramo = {}
+    ramo = b[col_sr].map(_ramo_de_subramo)
+    for cpt in cpts:
+        if tc.get(cpt) in (None, 0.0):
+            continue
+        t = (pd.DataFrame({"_r": ramo, "_m": b["_mes"],
+                           "_v": b[f"_{cpt}"] / tc[cpt]})
+             .pivot_table(index="_r", columns="_m", values="_v",
+                          aggfunc="sum", fill_value=0.0))
+        for m in range(1, 13):
+            if m not in t.columns:
+                t[m] = 0.0
+        t = t[[m for m in range(1, 13)]]
+        for k, fila in t.iterrows():
+            por_ramo.setdefault(k, {})[cpt] = [float(v) for v in fila]
+        por_ramo.setdefault("_tot", {})[cpt] = [float(v) for v in t.sum()]
+
+    cob_ra = ramo.notna().mean()
+    print(f"  {nombre}: apertura por ramo con el subramo · "
+          f"{len(por_ramo) - 1} ramos · cubre {cob_ra:.1%} de los renglones")
+    return por_ramo, sorted(int(m) for m in b["_mes"].unique())
+
+
 def extender_real(base, cfg):
     """Agrega al real de un ejercicio los meses que trae el export
     operativo y la base en dolares todavia no.
@@ -1644,50 +1787,13 @@ def extender_real(base, cfg):
     entre las LN que si cruzaron. Todo eso se reporta y se declara
     al pie de la grafica."""
 
-    ruta = _buscar_archivo(cfg["archivo"], cfg["prefijo"], ".xlsx")
-    if ruta is None:
+    b, nombre = _leer_crudo(cfg)
+    if b is None:
         return base
-
-    nombre = os.path.basename(ruta)
-    col_mes = cfg["col_mes"]
-
-    try:
-        crudo = pd.read_excel(ruta, sheet_name=0, header=None, nrows=10)
-    except ValueError:
-        print(f"AVISO: no se pudo leer {nombre}.")
-        return base
-
-    fila = next((i for i in range(len(crudo))
-                 if any(str(v).strip() == col_mes for v in crudo.iloc[i])), None)
-    if fila is None:
-        print(f"AVISO: {nombre} no trae la columna '{col_mes}'.")
-        return base
-
-    b = pd.read_excel(ruta, sheet_name=0, header=fila)
-    b.columns = [str(c).strip() for c in b.columns]
-
-    faltan = [c for c, _ in cfg["cols"].values() if c not in b.columns]
-    if faltan:
-        print(f"AVISO: a {nombre} le faltan columnas {faltan}.")
-        return base
-
-    per = pd.to_numeric(b[col_mes], errors="coerce")
-    b = b[(per // 100) == cfg["anio"]].copy()
-    if b.empty:
-        print(f"AVISO: {nombre} no trae renglones del {cfg['anio']}.")
-        return base
-
-    b["_mes"] = (per % 100).loc[b.index].astype(int)
-    for cpt, (col, signo) in cfg["cols"].items():
-        b[f"_{cpt}"] = signo * pd.to_numeric(b[col], errors="coerce").fillna(0.0)
 
     nuevos = sorted(set(b["_mes"].unique()) - set(base["meses"]))
     traslape = sorted(set(b["_mes"].unique()) & set(base["meses"]))
 
-    if not nuevos:
-        print(f"  {nombre}: no agrega meses al real {cfg['anio']} "
-              f"(la base en dólares ya llega a {max(base['meses'])}).")
-        return base
     if not traslape:
         print(f"AVISO: {nombre} no comparte ningun mes con el real "
               f"{cfg['anio']}; sin traslape no hay tipo de cambio y no se "
@@ -1705,72 +1811,25 @@ def extender_real(base, cfg):
         print(f"AVISO: no se pudo calcular el tipo de cambio de {nombre}.")
         return base
 
-    # Reparto por LN: cada renglon se resuelve con el primer nivel
-    # de llave que lo cruce
-    dicc = base.get("ln_por_llave") or []
-    # object y no float: en la columna van etiquetas de LN
-    b["_ln"] = pd.Series([None] * len(b), index=b.index, dtype=object)
-    for _niv, (_, cols_crudo) in enumerate(NIVELES_LLAVE):
-        if _niv >= len(dicc) or not dicc[_niv]:
-            continue
-        if not all(c in b.columns for c in cols_crudo):
-            continue
-        pend = b["_ln"].isna()
-        if not pend.any():
-            break
-        b.loc[pend, "_ln"] = _llave_contrato(b[pend], cols_crudo).map(dicc[_niv])
-    cubre = b.loc[b["_mes"].isin(nuevos), "_ln"].notna()
-    peso_p = b.loc[b["_mes"].isin(nuevos), "_P"]
-    cobertura = (peso_p[cubre].sum() / peso_p.sum()) if abs(peso_p.sum()) > TOL else 0.0
-
-    por_ln = base["por_ln"]
-    for mes in nuevos:
-        sub = b[b["_mes"] == mes]
-        for cpt in cfg["cols"]:
-            if tc.get(cpt) in (None, 0.0):
-                continue
-            total = float(sub[f"_{cpt}"].sum()) / tc[cpt]
-            g = sub.dropna(subset=["_ln"]).groupby("_ln")[f"_{cpt}"].sum() / tc[cpt]
-            asignado = float(g.sum())
-            resto = total - asignado
-            if abs(asignado) > TOL and abs(resto) > TOL:
-                g = g + g / asignado * resto          # el no cruzado, a prorrata
-            for ln, v in g.items():
-                fila_ln = por_ln.setdefault(ln, {})
-                serie = fila_ln.get(cpt)
-                if serie is None:
-                    serie = [0.0] * 12
-                    fila_ln[cpt] = serie
-                serie[mes - 1] = float(v)
-            por_ln["_tot"][cpt][mes - 1] = total
-
     # Apertura por ramo: sale de ESTE export para todos sus meses,
-    # no solo para los nuevos. La base en dolares trae el ramo
-    # agrupado (31/35/39 en 30, 71/73 en 70) y no llega al nivel
-    # del catalogo, asi que mezclarlas daria claves distintas
-    col_sr = _buscar_columna(b.columns, ["SRamo", "Subramo", "SubRamo"])
-    if col_sr is not None:
-        por_ramo = {}
-        ramo = b[col_sr].map(_ramo_de_subramo)
-        for cpt in cfg["cols"]:
-            if tc.get(cpt) in (None, 0.0):
-                continue
-            t = (pd.DataFrame({"_r": ramo, "_m": b["_mes"],
-                               "_v": b[f"_{cpt}"] / tc[cpt]})
-                 .pivot_table(index="_r", columns="_m", values="_v",
-                              aggfunc="sum", fill_value=0.0))
-            for m in range(1, 13):
-                if m not in t.columns:
-                    t[m] = 0.0
-            t = t[[m for m in range(1, 13)]]
-            for k, fila in t.iterrows():
-                por_ramo.setdefault(k, {})[cpt] = [float(v) for v in fila]
-            por_ramo.setdefault("_tot", {})[cpt] = [float(v) for v in t.sum()]
+    # no solo para los nuevos, y aunque no agregue ninguno. La base
+    # en dolares trae el ramo agrupado (31/35/39 en 30, 71/73 en 70)
+    # y no llega al nivel del catalogo, asi que mezclarlas daria
+    # claves distintas
+    por_ramo, meses_ramo = _por_ramo_crudo(b, cfg["cols"], tc, nombre)
+    if por_ramo:
         base["por_ramo"] = por_ramo
-        base["meses_ramo"] = sorted(int(m) for m in b["_mes"].unique())
-        cob_ra = ramo.notna().mean()
-        print(f"  {nombre}: apertura por ramo con el subramo · "
-              f"{len(por_ramo) - 1} ramos · cubre {cob_ra:.1%} de los renglones")
+        base["meses_ramo"] = meses_ramo
+        base["ramo_crudo"] = {"archivo": nombre, "tc": tc["P"]}
+
+    if not nuevos:
+        print(f"  {nombre}: no agrega meses al real {cfg['anio']} "
+              f"(la base en dólares ya llega a {max(base['meses'])}).")
+        return base
+
+    _asignar_ln_crudo(b, base.get("ln_por_llave"))
+    cobertura = _cobertura_ln(b, nuevos)
+    _repartir_ln_crudo(b, nuevos, cfg["cols"], tc, base["por_ln"])
 
     base["meses"] = sorted(set(base["meses"]) | set(nuevos))
     base["extension"] = {
@@ -1788,6 +1847,47 @@ def extender_real(base, cfg):
     return base
 
 
+def real_desde_crudo(cfg, dicc):
+    """Real de un ejercicio armado solo con el export operativo,
+    cuando no hay base en dolares de ese año.
+
+    Se queda en la moneda del export: en la estacionalidad cada
+    ejercicio se grafica como % de su propio año, asi que la moneda
+    no mueve la curva. La LN sale de la llave de contrato de la base
+    en dolares del RFCST (`dicc`); si cruza menos de
+    MIN_COBERTURA_LN de la prima, por LN solo se dibuja el total."""
+
+    b, nombre = _leer_crudo(cfg)
+    if b is None:
+        return None
+
+    anio = cfg["anio"]
+    cpts = list(cfg["cols"])
+    tc = {cpt: 1.0 for cpt in cpts}
+    meses = sorted(int(m) for m in b["_mes"].unique())
+
+    _asignar_ln_crudo(b, dicc)
+    cobertura = _cobertura_ln(b, meses)
+    con_ln = cobertura >= MIN_COBERTURA_LN
+
+    por_ln = {}
+    _repartir_ln_crudo(b, meses, cpts, tc, por_ln, solo_total=not con_ln)
+    por_ramo, meses_ramo = _por_ramo_crudo(b, cpts, tc, nombre)
+
+    tot = por_ln["_tot"]["P"]
+    print(f"Real {anio} mensual ({nombre}, export operativo en pesos): "
+          f"meses {meses[0]}-{meses[-1]} · primas {sum(tot) / 1e6:,.1f} M · "
+          f"{cobertura:.1%} de la prima cruza con una LN"
+          + ("" if con_ln else
+             f" (menos de {MIN_COBERTURA_LN:.0%}: por LN solo va el total)"))
+
+    return {"anio": anio, "por_ln": por_ln, "meses": meses,
+            "por_negocio": {}, "archivo": nombre, "ln_por_llave": [],
+            "extension": None, "por_ramo": por_ramo, "meses_ramo": meses_ramo,
+            "ramo_crudo": {"archivo": nombre, "tc": None},
+            "crudo": {"cobertura": cobertura, "con_ln": con_ln}}
+
+
 def cargar_real(cfg):
     """Real mensual de un ejercicio, por LN y concepto.
 
@@ -1803,9 +1903,15 @@ def cargar_real(cfg):
         if anio == ANIO_REAL26:
             print(f"AVISO: no se encontro {cfg['archivo']}; la estacionalidad del")
             print("       RFCST 2026 usara un perfil plano Ene-Jul / Ago-Dic.")
+        elif any(c["anio"] == anio
+                 and _buscar_archivo(c["archivo"], c["prefijo"], ".xlsx")
+                 for c in BASES_REALES_CRUDAS):
+            print(f"  No hay {cfg['archivo']}: el real {anio} sale solo del "
+                  f"export operativo.")
         else:
-            print(f"AVISO: no se encontro {cfg['archivo']}; la estacionalidad no "
-                  f"va a traer la serie del real {anio}.")
+            print(f"AVISO: no se encontro {cfg['archivo']} ni el export operativo "
+                  f"del {anio}; la estacionalidad no va a traer la serie del "
+                  f"real {anio}.")
         return None
 
     try:
@@ -1965,6 +2071,11 @@ for _cfg_crudo in BASES_REALES_CRUDAS:
     _b = REALES.get(_cfg_crudo["anio"])
     if _b is not None:
         REALES[_cfg_crudo["anio"]] = extender_real(_b, _cfg_crudo)
+    else:
+        _dicc = (REALES.get(ANIO_REAL26) or {}).get("ln_por_llave")
+        _b = real_desde_crudo(_cfg_crudo, _dicc)
+        if _b is not None:
+            REALES[_cfg_crudo["anio"]] = _b
 
 REAL26 = REALES.get(ANIO_REAL26)
 
@@ -3937,7 +4048,24 @@ charts_cfg_R = construir_charts(r_ln_R, retenido=True)
 _pie_reales = []
 for _a in sorted(REALES, reverse=True):
     _b = REALES[_a]
-    if len(_b["meses"]) >= 12:
+    _cr = _b.get("crudo")
+    if _cr:
+        _txt = (f"El real {_a} sale de {_b['archivo']}, el export operativo, que "
+                f"viene en pesos y sin LN: como cada mes se grafica como % de su "
+                f"propio año, la moneda no mueve la curva.")
+        if _cr["con_ln"]:
+            _txt += (f" La LN se asignó con la llave de contrato del real "
+                     f"{ANIO_REAL26}, que cruza el {_cr['cobertura']:.0%} de la "
+                     f"prima (el resto va a prorrata).")
+        else:
+            _txt += (f" Por LN solo se dibuja en el total: la llave de contrato "
+                     f"del real {ANIO_REAL26} apenas cruza el "
+                     f"{_cr['cobertura']:.0%} de la prima.")
+        if len(_b["meses"]) < 12:
+            _txt += (f" Solo trae hasta {MESES_TXT[max(_b['meses']) - 1]}: la "
+                     f"línea corta ahí y cada mes es % de su propio acumulado.")
+        _pie_reales.append(_txt)
+    elif len(_b["meses"]) >= 12:
         _pie_reales.append(
             f"El real {_a} ({_b['archivo']}) es el año cerrado, graficado como "
             f"% de su propio año.")
@@ -3985,16 +4113,20 @@ for _a in sorted(REALES, reverse=True):
     if not _b.get("por_ramo"):
         continue
     _mm = _b.get("meses_ramo") or []
-    _ext = _b.get("extension") or {}
+    _ext = _b.get("ramo_crudo") or {}
     _tramo = (f"{MESES_TXT[min(_mm) - 1]}-{MESES_TXT[max(_mm) - 1]}" if _mm else "")
+    _mon = (f"; viene en pesos y se convirtió con el tipo de cambio implícito "
+            f"{_ext['tc']:,.2f}" if _ext.get("tc") else
+            "; viene en pesos, que no mueve la curva porque es % de su propio año")
     if len(_mm) >= 12:
-        _pie_ra.append(f"El real {_a} es el año cerrado, como % de su propio año.")
+        _pie_ra.append(f"El real {_a} ({_ext.get('archivo', 's/d')}) es el año "
+                       f"cerrado, como % de su propio año{_mon}.")
     else:
+        _pct = (f"del año del {ETIQ_PPTO26}" if _a == ANIO_REAL26
+                else "de su propio acumulado")
         _pie_ra.append(
             f"El real {_a} ({_ext.get('archivo', 's/d')}) va de {_tramo} y cada mes "
-            f"se grafica como % del año del {ETIQ_PPTO26}"
-            + (f"; viene en pesos y se convirtió con el tipo de cambio implícito "
-               f"{_ext['tc']:,.2f}." if _ext.get("tc") else "."))
+            f"se grafica como % {_pct}{_mon}.")
 
 PIE_EST_RA = " ".join(_pie_ra)
 
