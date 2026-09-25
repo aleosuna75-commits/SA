@@ -103,6 +103,7 @@ def restaurar_encabezados(original: Path, salida: Path) -> int:
                 datos = reemplazos[item.filename].encode("utf-8") if item.filename in reemplazos \
                     else zs.read(item.filename)
                 zt.writestr(item, datos)
+    _permisos_normales(tmp)
     os.replace(tmp, salida)
     return len(reemplazos)
 
@@ -123,6 +124,16 @@ def verificar_escritura(rutas) -> None:
                          + ", ".join(bloqueadas))
 
 
+def _permisos_normales(ruta) -> None:
+    """mkstemp crea archivos 0600; se dejan con los permisos por omision del sistema (umask)."""
+    try:
+        mascara = os.umask(0)
+        os.umask(mascara)
+        os.chmod(ruta, 0o666 & ~mascara)
+    except OSError:
+        pass
+
+
 def guardar_libro(wb, ruta: Path, original: Path | None = None) -> None:
     """Guarda con los parches de fidelidad, de forma atomica y con mensaje claro si el archivo esta abierto."""
     ruta = Path(ruta)
@@ -137,6 +148,7 @@ def guardar_libro(wb, ruta: Path, original: Path | None = None) -> None:
                 restaurar_encabezados(original, Path(tmp))
             except Exception as e:  # noqa: BLE001
                 print(f"   Aviso: no se pudo restaurar el encabezado/pie de pagina original de {ruta.name}: {e!r}")
+        _permisos_normales(tmp)
         try:
             os.replace(tmp, ruta)
         except PermissionError as e:
