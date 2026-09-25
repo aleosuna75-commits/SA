@@ -2,14 +2,15 @@
 
 `base_cesion.py` lee los logouts de una LN (hoja `ParamPPTO`) y genera un Excel
 con el % de cesión de cada documento: **LN, nivel (cedente / contrato /
-binder), TR, cedente, corredor, contrato, MGA / binder y % de cesión
+binder), TR, cedente, corredor, contrato, binder y % de cesión
 2027–2031**, con los nombres de LN, TR, cedente y corredor.
 
 ## Cómo correrlo
 
 1. Deja cada LN en su carpeta: `LN4001`, `LN4002`, …, `LN4006`, … Pueden
-   estar en Documentos (o una o dos carpetas más abajo, por ejemplo
-   `Documentos\Presupuesto 2027\LN4006`) o junto al script.
+   estar en Documentos, Escritorio o Descargas (o hasta tres carpetas más
+   abajo, por ejemplo `Documentos\Presupuesto 2027\LN4006`) o junto al
+   script.
 2. Abre `base_cesion.py` en VSCode y cambia **solo esta línea** al inicio:
 
    ```python
@@ -30,8 +31,13 @@ Detalles:
   `11 CCUW Carga.xlsx`.
 - **Si la carpeta quedó dentro de otra** al descomprimir
   (`LN4006\LN4006\...`), también la encuentra.
-- **Si hay dos carpetas de la misma LN,** usa la de archivos más recientes y
-  avisa.
+- **Si hay dos carpetas de la misma LN** (por ejemplo, `LN4006` y
+  `LN4006 - copia`), usa primero la de `CARPETA_LNS` o la que está junto al
+  script. Si empatan, usa la de archivos más recientes, y siempre avisa.
+- **Si eliges a mano una carpeta que contiene varias LN,** la separa en sus
+  carpetas LN.
+- **`LN = "LN4008"` con sublíneas** (`LN4008-Agro`, `LN4008-Vida`) las
+  procesa todas.
 - **Para moverlo:** basta con copiar el script junto a las carpetas LN, o
   escribir en `CARPETA_LNS` la carpeta que las contiene.
 - **La primera vez** instala solo `openpyxl` y `pandas` si faltan.
@@ -42,7 +48,7 @@ El script clasifica cada documento según lo que trae el logout:
 
 | Nivel | Cuándo |
 |---|---|
-| **Binder** | La casilla MGA es Verdadero, o trae nombre de MGA / binder. |
+| **Binder** | La casilla MGA es Verdadero, o trae Binder general / Binder segmentado. |
 | **Contrato** | No hay MGA, pero sí contrato. |
 | **Cedente** | Sin contrato ni MGA. |
 
@@ -50,9 +56,14 @@ La hoja `Cardinalidad_LN` dice cuántos documentos hay de cada nivel en cada LN
 y cuál es la cardinalidad de la línea (el nivel más granular que aparece). Si
 hay más de un nivel, lo marca como "mixta".
 
-La llave de cada documento incluye cedente, contrato, MGA y binder. Así, los
-binders de un mismo cedente (por ejemplo, los de CCUW en LN4006) no se toman
-como documentos repetidos.
+La llave de cada documento incluye nivel, cedente, corredor, contrato, los
+dos nombres de binder y el tipo de venta. Así, los binders de un mismo cedente
+(por ejemplo, los 10 de CCUW en LN4006) no se toman como documentos repetidos.
+
+Aplicando esta regla, **LN4003 sale "Contrato (mixta)"**: 99 de sus 133
+logouts traen contrato (14 de ellos con el 99, todos TR 3 Facultativo) y 34
+no. Además, hay cedentes con dos documentos que solo se distinguen por el
+contrato (954, 1143 y 1293).
 
 ## Qué trae el Excel
 
@@ -73,7 +84,7 @@ Columnas de `Base_Cesion`:
   - TR y su descripción;
   - Cedente con nombre, país y grupo;
   - Corredor y su nombre;
-  - Contrato, `Es MGA`, `MGA` y `Binder`.
+  - Contrato, `Es MGA`, `Binder general` y `Binder segmentado`.
 - **Del documento:** Of. Rep., Tipo Venta, % Renov.
 - **Tipo de retrocesión:** % Tradicional, % Retro Espec., % Fronting,
   % Retención.
@@ -90,14 +101,16 @@ Las filas se ubican por su etiqueta en la columna A.
 | LN / TR / Cedente | Línea de Negocio / Tipo Reas. / Compañía | B |
 | Corredor | Corredor (la primera vez que aparece) | B |
 | Contrato | Contrato | B |
-| Es MGA / MGA / Binder / GS | MGA | B / C / E / F |
+| Es MGA / Binder general / Binder segmentado / GS | MGA | B / C / E / F |
 | Tipo Venta / % Renov. | Tipo Venta | B / C |
 | % Tradicional, Retro Espec., Fronting, Retención | Porcentaje | B, C, D, E |
 | % Cesión 2027 … 2031 | Porcentaje de Cesión | 5 columnas desde `Col. 1er año` |
 | % Com. Cedido 2027 … 2031 | % Comisiones del Cedido | 5 columnas desde `Col. 1er año` |
 
-`MGA` (col. C) es lo que se eligió en el campo MGA del PRESUPUESTO; `Binder`
-(col. E) es el nombre del binder, que coincide con el nombre del archivo.
+`Binder general` (col. C) es el binder elegido en el PRESUPUESTO (celda E18,
+nombre `yBind`; por ejemplo, "Cargo Corp Marine" agrupa 8 binders de CCUW).
+`Binder segmentado` (col. E) es el binder específico, por ejemplo
+"Cargo Corp Hull". El nombre del archivo suele ser una abreviatura de él.
 
 Los nombres salen del catálogo del PptoTécnico que Excel guarda dentro de cada
 logout (rangos `xAFUN`, `xTIPOREA`, `xCEDENTES` y `xCORREDORES`).
@@ -108,11 +121,15 @@ El recuadro de la plantilla es de 5 celdas, **B…F = 2027…2031**, y así vien
 por ejemplo, los logouts de LN4006.
 
 Los de LN4003 (Fianzas) traen el 2027 en la columna C, recorridos una
-columna, y nunca traen 2031. Por eso el script lo detecta solo por LN:
+columna, y nunca traen 2031. Por eso el script lo detecta para cada LN, según
+la LN del propio logout (así, un logout de otra LN que se coló en la carpeta
+no cambia a los demás):
 
-- **B:** si algún logout de la LN trae dato en la columna B.
-- **C:** si ninguno lo trae. En ese caso lo avisa en consola y en
+- **B:** si la mayoría de los logouts de la LN trae dato en la columna B.
+- **C:** si la mayoría empieza en C. En ese caso lo avisa en consola y en
   `Validaciones`, porque probablemente esa herramienta no exporta 2031.
+- **Mezcla:** si hay logouts de los dos tipos, avisa "Columna del primer año
+  mixta" y marca los de la minoría.
 
 La columna `Col. 1er año` dice qué se usó. Si hiciera falta, se puede fijar
 con `COLUMNA_PRIMER_ANIO = "B"` o `"C"`.
@@ -133,7 +150,8 @@ con `COLUMNA_PRIMER_ANIO = "B"` o `"C"`.
   - comisión sin % de cesión;
   - cesión que no empieza en 2027;
   - binder con la casilla MGA en Falso;
-  - MGA sin nombre;
+  - casilla MGA sin nombre de binder;
+  - columna del primer año mixta;
   - logout de otra LN dentro de la carpeta;
   - documento repetido;
   - valor fuera de las columnas esperadas;
@@ -141,7 +159,9 @@ con `COLUMNA_PRIMER_ANIO = "B"` o `"C"`.
   - ningún logout trae 2031.
 - **Info:**
   - cesión que no viene en todos los años;
-  - años distintos entre cesión y comisión;
+  - cesión sin % de comisión, o años distintos entre cesión y comisión;
+  - binder con un solo nombre (general o segmentado);
+  - TR, cedente o corredor vacíos (distintos de 0);
   - archivos que no son logout o están en `.xlsb`/`.xls`;
   - código sin nombre en el catálogo.
 
@@ -153,7 +173,7 @@ con `COLUMNA_PRIMER_ANIO = "B"` o `"C"`.
 | `CARPETA_LNS` | Carpeta que contiene las carpetas LN, si no están en Documentos ni junto al script. |
 | `CARPETA_LOGOUTS` | Ruta directa a una carpeta de logouts (ignora `LN`). |
 | `CARPETA_SALIDA` | Dónde guardar el Excel. |
-| `COLUMNA_PRIMER_ANIO` | `"AUTO"` (por omisión), `"B"` o `"C"`. |
+| `COLUMNA_PRIMER_ANIO` | `"AUTO"` (por omisión, lo que haga la mayoría), `"B"` o `"C"`. |
 | `ARRASTRAR_ULTIMO_ANIO` | `True` hace que, si un documento trae solo 2027, los años siguientes tomen ese %. |
 | `ABRIR_AL_TERMINAR` | Abrir el Excel al final. |
 
