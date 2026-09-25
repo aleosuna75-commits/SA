@@ -1,0 +1,8 @@
+# Datos confidenciales: nunca se versionan (el repositorio es publico)
+*.xlsx
+*.xlsm
+*.xls
+*.csv
+entradas/
+salidas/
+__pycache__/
