@@ -9,10 +9,16 @@ Qué hace (y por qué es sin pérdida):
    la celda va en la siguiente columna. Se conserva siempre que hay un salto
    de columnas, así que cada celda queda exactamente en la misma posición.
    Algunos programas (p. ej. WPS) escriben la dirección en cada celda y eso
-   es la mayor parte del peso comprimido. También se conserva en las celdas
-   con fórmula compartida, porque algunos lectores (openpyxl) la necesitan.
+   es la mayor parte del peso comprimido. Se conserva también:
+   - en las celdas con fórmula compartida, porque openpyxl la usa para
+     traducirlas;
+   - en toda fila cuyo número no es el de la fila anterior + 1, porque WPS
+     coloca las celdas sin r en (fila anterior + 1) en vez de en su fila.
 2. Vuelve a comprimir el paquete con Zopfli (deflate estándar, compatible
-   con Excel) en lugar de la compresión rápida original.
+   con Excel) en lugar de la compresión rápida original. Las partes se
+   escriben en el mismo orden físico que en el original: los detectores de
+   tipo de archivo (libmagic, que usan muchos portales de carga) reconocen
+   un .xlsx por los nombres de las primeras partes del zip.
 3. Recomprime las imágenes PNG con oxipng. Sólo se usa la versión nueva si
    es más ligera y tiene exactamente los mismos píxeles que la original.
 
@@ -71,9 +77,14 @@ def formula_compartida(xml, pos):
     las fórmulas compartidas, así que en esas celdas se deja r.
     """
     fin = xml.find(b">", pos)
-    if xml[fin - 1:fin] == b"/" or not xml.startswith(b"<f", fin + 1):
+    if xml[fin - 1:fin] == b"/":
         return False
-    return b't="shared"' in xml[fin + 1:xml.find(b">", fin + 1)]
+    k = fin + 1
+    while xml[k:k + 1] in (b" ", b"\t", b"\r", b"\n"):
+        k += 1
+    if xml[k:k + 3] not in (b"<f ", b"<f>", b"<f/"):
+        return False
+    return b't="shared"' in xml[k:xml.find(b">", k)]
 
 
 def quitar_direcciones(xml):
@@ -82,21 +93,26 @@ def quitar_direcciones(xml):
     fin = xml.find(b"</sheetData>")
     if inicio < 0 or fin < 0:
         return xml, 0
-    # Toda celda debe empezar con <c r="..."; si no, no tocamos la hoja.
+    # Toda celda debe empezar con <c r="..." y no debe haber comentarios,
+    # CDATA ni instrucciones que confundan el recorrido; si no, no se toca.
     cuerpo = xml[inicio:fin]
     if len(re.findall(rb"<c[ >/]", cuerpo)) != len(re.findall(rb'<c r="', cuerpo)):
         return xml, 0
+    if b"<!--" in cuerpo or b"<![CDATA[" in cuerpo or b"<?" in cuerpo:
+        return xml, 0
 
     partes, ultimo, quitadas = [], 0, 0
-    fila, col_prev = None, 0
+    fila, col_prev, contigua = None, 0, False
     for m in TOKEN.finditer(xml, inicio, fin):
         if m.group(1) is not None:
-            fila, col_prev = int(m.group(1)), 0
+            nueva = int(m.group(1))
+            contigua = nueva == (fila or 0) + 1
+            fila, col_prev = nueva, 0
             continue
         if fila is None or int(m.group(3)) != fila:
             raise ValueError(f"celda {m.group(0)!r} fuera de su fila {fila}")
         col = columna(m.group(2))
-        if col == col_prev + 1 and not formula_compartida(xml, m.end()):
+        if contigua and col == col_prev + 1 and not formula_compartida(xml, m.end()):
             partes.append(xml[ultimo:m.start()])
             partes.append(b"<c")
             ultimo = m.end()
@@ -297,38 +313,42 @@ def comprimir(datos, rapido=False):
 
 
 def reempaquetar(destino, entradas, rapido=False):
-    """Construye el zip a mano (zipfile no permite usar Zopfli)."""
+    """Construye el zip a mano (zipfile no permite usar Zopfli).
+
+    Las entradas se escriben en el orden físico del original y el directorio
+    central en el orden de `entradas` (el del directorio central original).
+    """
     # Las partes más grandes primero, para repartir mejor el trabajo.
     orden = sorted(range(len(entradas)), key=lambda i: -len(entradas[i][1]))
     with ProcessPoolExecutor() as pool:
         hechos = dict(zip(orden, pool.map(
             comprimir, [entradas[i][1] for i in orden], [rapido] * len(orden))))
-    locales, central, pos = [], [], 0
-    for i, (info, datos) in enumerate(entradas):
+    fisico = sorted(range(len(entradas)), key=lambda i: entradas[i][0].header_offset)
+    locales, centrales, pos = [], {}, 0
+    for i in fisico:
+        info, datos = entradas[i]
         nombre = info.filename.encode("utf-8")
         es_dir = info.filename.endswith("/")
         comp = b"" if es_dir else hechos[i]
         metodo = 0 if es_dir else 8
+        necesita = info.extract_version if es_dir else max(info.extract_version, 20)
         crc = zlib.crc32(datos) & 0xFFFFFFFF
         dt = info.date_time
         hora = (dt[3] << 11) | (dt[4] << 5) | (dt[5] // 2)
         fecha = ((dt[0] - 1980) << 9) | (dt[1] << 5) | dt[2]
         bandera = 0x800 if any(ord(ch) > 127 for ch in info.filename) else 0
-        cab = struct.pack(
-            "<IHHHHHIIIHH", 0x04034B50, 20, bandera, metodo, hora, fecha,
+        locales.append(struct.pack(
+            "<IHHHHHIIIHH", 0x04034B50, necesita, bandera, metodo, hora, fecha,
             crc, len(comp), len(datos), len(nombre), 0,
-        )
-        locales.append(cab + nombre + comp)
-        central.append(
-            struct.pack(
-                "<IHHHHHHIIIHHHHHII", 0x02014B50, 20, 20, bandera, metodo,
-                hora, fecha, crc, len(comp), len(datos), len(nombre), 0, 0,
-                0, 0, info.external_attr & 0xFFFFFFFF, pos,
-            )
-            + nombre
-        )
+        ) + nombre + comp)
+        centrales[i] = struct.pack(
+            "<IHHHHHHIIIHHHHHII", 0x02014B50,
+            (info.create_system << 8) | info.create_version, necesita, bandera,
+            metodo, hora, fecha, crc, len(comp), len(datos), len(nombre), 0, 0,
+            0, 0, info.external_attr & 0xFFFFFFFF, pos,
+        ) + nombre
         pos += len(locales[-1])
-    dir_central = b"".join(central)
+    dir_central = b"".join(centrales[i] for i in range(len(entradas)))
     fin = struct.pack(
         "<IHHHHIIH", 0x06054B50, 0, 0, len(entradas), len(entradas),
         len(dir_central), pos, 0,

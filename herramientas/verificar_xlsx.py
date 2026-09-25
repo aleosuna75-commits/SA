@@ -8,6 +8,11 @@ Comprueba que dos .xlsx tienen exactamente el mismo contenido.
   fórmula y valor. La posición de las celdas sin r se calcula como indica
   el estándar: columna de la celda anterior + 1. Las celdas de texto
   compartido se comparan por el texto, no por su número de índice.
+- El zip debe ser coherente (encabezados locales = directorio central) y
+  guardar las partes en el mismo orden físico que el original.
+- Compatibilidad con lectores conocidos: las celdas con fórmula compartida
+  deben conservar r (openpyxl) y sólo puede faltar r en filas cuyo número es
+  el de la fila anterior + 1 (WPS).
 
 Con --quitada NOMBRE se acepta que esa hoja ya no esté: se exige que falten
 sólo ella y sus partes propias, y se muestran los cambios en el índice del
@@ -24,8 +29,10 @@ import html
 import io
 import posixpath
 import re
+import struct
 import sys
 import zipfile
+import zlib
 
 from lxml import etree
 
@@ -62,18 +69,51 @@ def textos(z):
     return re.findall(rb"<si(?:\s*/>|>.*?</si>)", z.read(TEXTOS), re.S)
 
 
+def revisar_zip(ruta):
+    """Recorre los encabezados locales; devuelve (problemas, orden físico)."""
+    datos = open(ruta, "rb").read()
+    problemas = []
+    with zipfile.ZipFile(ruta) as z:
+        infos = sorted(z.infolist(), key=lambda i: i.header_offset)
+        fin_anterior = 0
+        for info in infos:
+            p = info.header_offset
+            if p != fin_anterior:
+                problemas.append(f"{info.filename}: hueco o traslape antes de la entrada")
+            (firma, _, _, metodo, _, _, crc, comp, tam, n, extra) = struct.unpack(
+                "<IHHHHHIIIHH", datos[p:p + 30])
+            nombre = datos[p + 30:p + 30 + n].decode("utf-8")
+            if (firma, nombre, metodo, crc, comp, tam) != (
+                    0x04034B50, info.filename, info.compress_type, info.CRC,
+                    info.compress_size, info.file_size):
+                problemas.append(f"{info.filename}: encabezado local distinto del central")
+            inicio = p + 30 + n + extra
+            flujo = datos[inicio:inicio + info.compress_size]
+            crudo = zlib.decompress(flujo, -15) if metodo == 8 else flujo
+            if len(crudo) != tam or zlib.crc32(crudo) & 0xFFFFFFFF != crc:
+                problemas.append(f"{info.filename}: CRC o tamaño incorrecto")
+            fin_anterior = inicio + info.compress_size
+    return problemas, [i.filename for i in infos]
+
+
 def celdas(xml, sst):
-    """Devuelve {(fila, col): (atributos, hijos)} y los atributos de filas."""
+    """Devuelve filas, {(fila, col): contenido}, orden y avisos de compatibilidad."""
     raiz = etree.fromstring(xml, etree.XMLParser(huge_tree=True))
     datos = raiz.find(f"{NS}sheetData")
     filas, mapa, orden = [], {}, []
+    avisos = {"compartida sin r": 0, "sin r tras salto de fila": 0}
     fila_prev = 0
     for fila in datos:
+        if fila.tag != f"{NS}row":
+            raise ValueError(f"elemento inesperado en sheetData: {fila.tag}")
         r = int(fila.get("r")) if fila.get("r") else fila_prev + 1
+        contigua = r == fila_prev + 1
         fila_prev = r
-        filas.append((r, dict(fila.attrib)))
+        filas.append((r, dict(fila.attrib), fila.text, fila.tail))
         col_prev = 0
         for c in fila:
+            if c.tag != f"{NS}c":
+                raise ValueError(f"fila {r}: elemento inesperado {c.tag}")
             ref = c.get("r")
             if ref:
                 m = re.fullmatch(r"([A-Z]+)(\d+)", ref)
@@ -82,17 +122,32 @@ def celdas(xml, sst):
                 col = columna(m.group(1))
             else:
                 col = col_prev + 1
+                f = c.find(f"{NS}f")
+                if f is not None and f.get("t") == "shared":
+                    avisos["compartida sin r"] += 1
+                if not contigua:
+                    avisos["sin r tras salto de fila"] += 1
             if col <= col_prev:
                 raise ValueError(f"fila {r}: columna {col} fuera de orden")
             col_prev = col
             attrs = {k: v for k, v in c.attrib.items() if k != "r"}
-            if attrs.get("t") == "s":
-                hijos = sst[int(c.find(f"{NS}v").text)]
-            else:
-                hijos = b"".join(etree.tostring(h, method="c14n") for h in c)
-            mapa[(r, col)] = (attrs, hijos)
+            hijos = []
+            for h in c:
+                if attrs.get("t") == "s" and h.tag == f"{NS}v":
+                    hijos.append(b"<v>" + sst[int(h.text)] + b"</v>")
+                else:
+                    hijos.append(etree.tostring(h, method="c14n"))
+            mapa[(r, col)] = (attrs, b"".join(hijos), c.text, c.tail)
             orden.append((r, col))
-    return filas, mapa, orden
+    return filas, mapa, orden, avisos
+
+
+def fuera_de_datos(xml):
+    i = xml.find(b"<sheetData")
+    j = xml.find(b"</sheetData>")
+    if j < 0:  # <sheetData/>
+        return xml[:i], xml[xml.find(b">", i) + 1:]
+    return xml[:i], xml[j:]
 
 
 def mismos_pixeles(a, b):
@@ -100,10 +155,6 @@ def mismos_pixeles(a, b):
 
     ia, ib = Image.open(io.BytesIO(a)), Image.open(io.BytesIO(b))
     return ia.size == ib.size and ia.convert("RGBA").tobytes() == ib.convert("RGBA").tobytes()
-
-
-def fuera_de_datos(xml):
-    return xml[: xml.find(b"<sheetData")], xml[xml.find(b"</sheetData>") :]
 
 
 def diferencias(nombre, a, b):
@@ -115,6 +166,14 @@ def diferencias(nombre, a, b):
 
 def main(original, reducido, quitadas):
     errores = 0
+    problemas, fisico_b = revisar_zip(reducido)
+    for p in problemas:
+        print(f"zip: {p}")
+        errores += 1
+    _, fisico_a = revisar_zip(original)
+    if [n for n in fisico_a if n in fisico_b] != fisico_b:
+        print("zip: las partes no están en el orden físico del original")
+        errores += 1
     with zipfile.ZipFile(original) as za, zipfile.ZipFile(reducido) as zb:
         hojas_a, hojas_b = hojas(za), hojas(zb)
         esperadas = [h for h in hojas_a if h not in quitadas]
@@ -169,8 +228,8 @@ def main(original, reducido, quitadas):
             if fuera_de_datos(a) != fuera_de_datos(b):
                 print(f"{nombre}: cambió algo fuera de sheetData")
                 errores += 1
-            filas_a, celdas_a, orden_a = celdas(a, sst_a)
-            filas_b, celdas_b, orden_b = celdas(b, sst_b)
+            filas_a, celdas_a, orden_a, _ = celdas(a, sst_a)
+            filas_b, celdas_b, orden_b, avisos = celdas(b, sst_b)
             if filas_a != filas_b:
                 print(f"{nombre}: filas distintas")
                 errores += 1
@@ -179,8 +238,12 @@ def main(original, reducido, quitadas):
                        if celdas_a.get(k) != celdas_b.get(k)}
                 print(f"{nombre}: {len(dif):,} celdas distintas, p. ej. {sorted(dif)[:5]}")
                 errores += 1
+            for aviso, n in avisos.items():
+                if n:
+                    print(f"{nombre}: {n:,} celdas {aviso} (algunos lectores las acomodan mal)")
+                    errores += 1
             if errores == antes:
-                con_valor = sum(1 for _, h in celdas_a.values() if h)
+                con_valor = sum(1 for v in celdas_a.values() if v[1])
                 print(f"{nombre}: {len(filas_a):,} filas, {len(celdas_a):,} celdas "
                       f"({con_valor:,} con contenido) idénticas")
     print("OK: contenido idéntico" if not errores else f"{errores} diferencias")
