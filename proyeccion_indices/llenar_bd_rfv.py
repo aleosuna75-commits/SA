@@ -24,10 +24,11 @@ BD_Montos_RRC_SONR (ramos de Danos) del archivo "BD_ BEL - IRR - MR":
     que en la hoja de referencia.
   * RCONT: la contingencia SAP de 2026 (BASE!L) ya viene en USD y se copia tal
     cual. En Res_Rvas_2025 el bloque SAP de contingencia de BacktestingFIANZAS
-    esta vacio; el saldo SAP total del mismo concepto (misma fuente BASE!L, USD)
-    esta en la hoja BacktestingCATAS_ ("RESERVA DE CONTINGENCIA" / "SALDO
-    TOTAL") y se reparte por ramo con la mezcla observada en 2026. Esas celdas
-    llevan un comentario con su procedencia (ver RCONT_COMPLETAR_CON_TOTAL_SAP).
+    esta vacio; el saldo total real de la reserva de contingencia (USD) esta en
+    la hoja BacktestingCATAS_ ("RESERVA DE CONTINGENCIA" / "SALDO TOTAL", que
+    viene del archivo FIA; el renglon siguiente liga a BASE!L14 con diferencias
+    menores a 0.1%) y se reparte por ramo con la mezcla observada en 2026. Esas
+    celdas llevan un comentario con su procedencia (ver RCONT_COMPLETAR_CON_TOTAL_SAP).
   * 202512 se convierte con el TC de la BD (18.008). En Res_Rvas_2025 la fila 7
     de BacktestingFIANZAS trae 18.08 capturado a mano (error de dedo: RRC, SONR
     y la columna TC de la BD dicen 18.008); el script lo reporta.
@@ -38,6 +39,7 @@ Los paquetes que falten se instalan solos en el interprete activo.
 from __future__ import annotations
 
 import importlib
+import os
 import subprocess
 import sys
 
@@ -51,18 +53,30 @@ def _asegurar_paquetes(paquetes: dict[str, str]) -> None:
         except ImportError:
             faltantes.append(nombre_pip)
     if faltantes:
-        print(f"Instalando paquetes faltantes: {', '.join(faltantes)} ...")
-        subprocess.check_call([sys.executable, "-m", "pip", "install", "--quiet", *faltantes])
+        print(f"Instalando paquetes faltantes: {', '.join(faltantes)} ...", flush=True)
+        try:
+            subprocess.check_call([sys.executable, "-m", "pip", "install", "--quiet", *faltantes])
+        except subprocess.CalledProcessError as e:
+            raise SystemExit(f"No se pudieron instalar {faltantes} (sin internet, proxy o permisos). Instalalos "
+                             f"manualmente con: {sys.executable} -m pip install {' '.join(faltantes)}") from e
+        # si pip instalo en la carpeta de usuario (Python 'para todos los usuarios' en Windows), agregarla
+        import site
+        usuario = site.getusersitepackages()
+        if os.path.isdir(usuario) and usuario not in sys.path:
+            site.addsitedir(usuario)
+        importlib.invalidate_caches()
 
 
 _asegurar_paquetes({"openpyxl": "openpyxl>=3.1"})
 
 import re  # noqa: E402
-import shutil  # noqa: E402
 from pathlib import Path  # noqa: E402
 
 import openpyxl  # noqa: E402
 from openpyxl.comments import Comment  # noqa: E402
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from excel_fiel import guardar_libro, verificar_escritura  # noqa: E402
 
 # =============================================================================
 # CONFIGURACION
@@ -95,9 +109,9 @@ MAPEO_CONCEPTOS = {
 RCONT_DIVIDIR_ENTRE_TC_EN_ARCHIVOS_USD = False
 
 # En Res_Rvas_2025 el bloque SAP de CONTIGENCIA SDO de BacktestingFIANZAS esta
-# vacio. El saldo SAP total de la reserva de contingencia (misma fuente BASE!L,
-# en USD) si existe en la hoja BacktestingCATAS_ ("RESERVA DE CONTINGENCIA" /
-# "SALDO TOTAL"), sin desglose por ramo.
+# vacio. El saldo total real de la reserva de contingencia (en USD) si existe en
+# la hoja BacktestingCATAS_ ("RESERVA DE CONTINGENCIA" / "SALDO TOTAL"), sin
+# desglose por ramo.
 #   True  = se usa ese total y se reparte por ramo con la mezcla observada en los
 #           meses que si traen desglose (2026); cada celda lleva un comentario.
 #   False = se deja en 0 (copia estricta de BacktestingFIANZAS).
@@ -222,8 +236,8 @@ def llenar():
         print(f"[fuente] {f['archivo']}: moneda {f['moneda']}, periodos SAP {f['periodos'][0]}-{f['periodos'][-1]}")
 
     SALIDAS.mkdir(parents=True, exist_ok=True)
-    shutil.copyfile(ARCHIVO_BD_RFV, ARCHIVO_SALIDA)
-    wb = openpyxl.load_workbook(ARCHIVO_SALIDA)
+    verificar_escritura([ARCHIVO_SALIDA])
+    wb = openpyxl.load_workbook(ARCHIVO_BD_RFV)          # la plantilla no se modifica
     ws = wb[HOJA_BD]
 
     encabezados = {_norm(ws.cell(3, c).value): c for c in range(1, ws.max_column + 1) if ws.cell(3, c).value}
@@ -262,8 +276,7 @@ def llenar():
             advertencias.append(
                 f"{concepto} {periodo}: TC de la BD = {tc_bd} (usado) vs TC en {fuente['archivo']} "
                 f"fila 7 = {tc_fuente}")
-        resumen.append((concepto, periodo, fuente["archivo"], fuente["moneda"],
-                        sum(ws.cell(r, c).value for c in cols_ramo.values())))
+        resumen.append((concepto, periodo, r, fuente["archivo"], fuente["moneda"]))
 
     # ---------------------------------- RCONT sin desglose SAP: total SAP x mezcla
     if RCONT_COMPLETAR_CON_TOTAL_SAP:
@@ -329,11 +342,15 @@ def llenar():
                     f"Cierre {per} {inv[bloque]} RAM_{ramo}: BD = {valores[clave]:,.0f} vs 'REAL CIERRE' "
                     f"de {f['archivo']} = {v_cierre:,.0f} (dif {valores[clave] - v_cierre:,.0f})")
 
-    wb.save(ARCHIVO_SALIDA)
+    guardar_libro(wb, ARCHIVO_SALIDA, original=ARCHIVO_BD_RFV)   # atomico: si algo fallo antes, no hay salida
 
-    print("\nResumen (suma de ramos, USD):")
-    for concepto, periodo, archivo, moneda, total in resumen:
-        print(f"  {concepto:<10} {periodo}  {archivo:<20} {moneda}  {total:>18,.0f}")
+    print("\nResumen (suma de ramos, USD; valores finales escritos):")
+    for concepto, periodo, r, archivo, moneda in resumen:
+        total = sum(ws.cell(r, c).value or 0.0 for c in cols_ramo.values())
+        origen = f"{archivo} ({moneda})"
+        if ws.cell(r, next(iter(cols_ramo.values()))).comment is not None:
+            origen = "BacktestingCATAS_ (USD, total repartido por ramo)"
+        print(f"  {concepto:<10} {periodo}  {origen:<46} {total:>18,.0f}")
     if advertencias:
         print("\nADVERTENCIAS / CRUCES A REVISAR:")
         for a in advertencias:

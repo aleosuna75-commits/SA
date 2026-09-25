@@ -32,14 +32,16 @@ b) Modelos: Ingenuo (caminata aleatoria), Ingenuo estacional, Media 12m, Suaviza
    (efectos multiplicativos, garantiza positividad); razones y LAGs en escala original.
 c) Seleccion con validacion fuera de muestra del METODO COMPLETO: se simula haber
    proyectado desde 8 cortes historicos a 1-16 meses con cada procedimiento candidato
-   (modelos solos y combinaciones de pesos iguales) y, por tipo de serie (montos,
-   indices, razones, LAGs), se elige el de menor AvgRelMAE (error relativo al ingenuo).
-   Con la historia a 202608 resultaron: montos -> Theta (12% menos error que el
-   ingenuo); indices -> Ingenuo + Media 12m; razones -> Ingenuo + SES; LAGs -> Ingenuo
-   + Theta. En esa misma validacion, elegir el modelo serie por serie ("torneo") fue
-   menos preciso, por eso es solo un modo alternativo (MODO_SELECCION = "torneo").
-d) Backtest rolling-origin por serie (todos los modelos, mismos cortes): da el MASE de
-   cada modelo por serie (hoja Series_Modelos), los intervalos al 80% y una red de
+   (modelos solos y combinaciones de pesos iguales). Montos: menor WAPE (pondera por USD),
+   desempate por sesgo agregado. Indices, razones y LAGs: menor AvgRelMAE (error relativo
+   al ingenuo) y, si su IC bootstrap al 90% incluye 1, el mejor procedimiento sin tendencia.
+   Con la historia a 202608 resultaron: montos -> Theta + Holt amortiguado; indices ->
+   Ingenuo + Media 12m; razones -> Ingenuo + SES; LAGs -> Ingenuo. Elegir el modelo serie
+   por serie ("torneo") fue menos preciso y queda como modo alternativo. Los montos se
+   modelan en USD: modelar en MXN y convertir con el TC real fue menos preciso (Danos y
+   Fianzas); se puede cambiar en MODELAR_EN_MXN.
+d) Backtest rolling-origin por serie (todos los modelos, mismos cortes, sin fuga): da el
+   MASE de cada modelo por serie (hoja Series_Modelos), los intervalos al 80% y una red de
    seguridad: si en la propia serie el procedimiento validado es > 1.5x peor que el
    ingenuo (p.ej. cambio de regimen), se usa el ensamble propio de esa serie.
 e) Reglas actuariales / de calidad de datos (todas reportadas en la hoja "Alertas"):
@@ -47,7 +49,10 @@ e) Reglas actuariales / de calidad de datos (todas reportadas en la hoja "Alerta
        - parametros "en escalon" (se actualizan esporadicamente, >=50% de meses sin
          cambio) -> se mantiene el ultimo valor;
        - series cortas (<18 obs) -> SES;
-       - razones y LAGs se acotan al rango historico observado;
+       - razones y LAGs se acotan al rango historico observado y al dominio actuarial
+         (cesion en [0, 1], %GTO y %MR >= 0);
+       - RCONT con factores por mes del trimestre (acumula meses 1-2, libera en el 3);
+       - alerta de saltos atipicos en el ultimo mes;
        - 99.5% >= media cuando asi ha sido siempre en la historia del ramo;
        - textos con espacios / celdas vacias se limpian; huecos <= 6 meses se interpolan
          y con huecos mayores solo se usa la historia posterior;
@@ -80,7 +85,17 @@ def _asegurar_paquetes(paquetes: dict[str, str]) -> None:
             faltantes.append(nombre_pip)
     if faltantes:
         print(f"Instalando paquetes faltantes: {', '.join(faltantes)} ...", flush=True)
-        subprocess.check_call([sys.executable, "-m", "pip", "install", "--quiet", *faltantes])
+        try:
+            subprocess.check_call([sys.executable, "-m", "pip", "install", "--quiet", *faltantes])
+        except subprocess.CalledProcessError as e:
+            raise SystemExit(f"No se pudieron instalar {faltantes} (sin internet, proxy o permisos). Instalalos "
+                             f"manualmente con: {sys.executable} -m pip install {' '.join(faltantes)}") from e
+        # si pip instalo en la carpeta de usuario (Python 'para todos los usuarios' en Windows), agregarla
+        import site
+        usuario = site.getusersitepackages()
+        if os.path.isdir(usuario) and usuario not in sys.path:
+            site.addsitedir(usuario)
+        importlib.invalidate_caches()
 
 
 _asegurar_paquetes({
@@ -95,7 +110,6 @@ _asegurar_paquetes({
 import math  # noqa: E402
 
 import re  # noqa: E402
-import shutil  # noqa: E402
 import time  # noqa: E402
 import warnings  # noqa: E402
 from concurrent.futures import ProcessPoolExecutor  # noqa: E402
@@ -113,6 +127,9 @@ from scipy.stats import norm as _normal  # noqa: E402
 from statsmodels.tsa.arima.model import ARIMA  # noqa: E402
 from statsmodels.tsa.forecasting.theta import ThetaModel  # noqa: E402
 from statsmodels.tsa.holtwinters import ExponentialSmoothing, SimpleExpSmoothing  # noqa: E402
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from excel_fiel import guardar_libro, verificar_escritura  # noqa: E402
 
 # =============================================================================
 # CONFIGURACION
@@ -148,6 +165,7 @@ PARES_MEDIA_995 = [("Ind Sin RRC", "Ind sin RRC 99.5%"), ("Ind Sin SONR Media", 
 TC_PROYECCION: dict[int, float] = {}
 
 RESALTAR_PROYECCION = False      # True = relleno azul claro en celdas proyectadas
+SOBRESCRIBIR_PERIODOS_CON_DATOS = False  # False = se detiene si algun mes a proyectar ya trae cifras
 COLOR_RESALTADO = "DDEBF7"
 GENERAR_GRAFICAS = True
 N_PROCESOS = None                # None = automatico (nucleos-1); 1 = sin paralelismo
@@ -169,6 +187,9 @@ MAX_HUECO_INTERPOLABLE = 6       # huecos mas largos cortan la historia
 MODO_SELECCION = "validado"
 MIN_SERIES_VALIDACION = 5        # series minimas de un tipo para validar; si no, PROCEDIMIENTO_RESPALDO
 MAX_INTERPOLADOS_VALIDACION = 3  # la validacion solo usa series con a lo mas 3 meses interpolados
+TOLERANCIA_WAPE = 0.02           # montos: procedimientos a <= 2% del mejor WAPE se desempatan por sesgo
+N_BOOTSTRAP = 2000               # remuestreos (por serie) para el IC90 del AvgRelMAE
+CORTES_PISO_INTERVALO = 6        # con menos cortes de backtest, piso de caminata aleatoria a los intervalos
 FACTOR_RESPALDO_SERIE = 1.5      # red de seguridad: si en el backtest de la propia serie el procedimiento
                                  # validado es > 1.5x peor que el ingenuo, se usa el ensamble propio de la serie
 MAX_MODELOS_ENSAMBLE = 3
@@ -190,6 +211,14 @@ ESTRUCTURA = {
     },
 }
 MESES_MEZCLA = 8                 # meses recientes para repartir por ramo los totales (RCONT)
+# Moneda en que se modelan los montos. En USD por evidencia: en backtest, modelar en MXN (historia USD x
+# TC real) y convertir con el TC real futuro fue MENOS preciso que modelar directo en USD, tanto en Danos
+# (WAPE 22.5% vs 19.8%, 21 series) como en Fianzas (RFV BRUTO 7.4% vs 6.0%): las reservas se comportan como
+# montos en dolares. True = modelar en MXN y convertir con el TC de cada mes proyectado de la BD.
+MODELAR_EN_MXN = {"DANOS": False, "FIANZAS": False}
+ESTACIONALIDAD_TRIMESTRAL = ("RCONT",)   # acumula en meses 1-2 del trimestre y libera en el 3
+DOMINIO_CESION = (0.0, 1.0)      # IRR/BRUTO entre 0 y 100%
+DOMINIO_RAZON_BEL = (0.0, None)  # GTO/BEL y MR/BEL no negativos
 
 warnings.filterwarnings("ignore")
 
@@ -352,13 +381,15 @@ PROCEDIMIENTOS_CANDIDATOS = {
     "Ingenuo + SES + Media 12m": ["Ingenuo", "SES", "Media 12m"],
     "SES + Holt amortiguado + Theta": ["SES", "Holt amortiguado", "Theta"],
 }
-# Respaldo si un tipo no tiene suficientes series para validar (resultado de la validacion con
-# la historia a 202608: niveles Theta 0.88, indices 0.95, razones 0.99, LAGs 1.00 de AvgRelMAE)
+PROCEDIMIENTOS_SIN_TENDENCIA = {"Ingenuo", "SES", "Media 12m", "Ingenuo + SES", "Ingenuo + Media 12m",
+                                "Ingenuo + SES + Media 12m"}
+# Respaldo si un tipo no tiene suficientes series para validar (resultado de la validacion con la
+# historia a 202608)
 PROCEDIMIENTO_RESPALDO = {
-    "nivel": "Theta",
-    "indice": "Ingenuo + SES + Media 12m",
+    "nivel": "Theta + Holt amortiguado",
+    "indice": "Ingenuo + Media 12m",
     "razon": "Ingenuo + SES",
-    "lag": "Ingenuo + Theta",
+    "lag": "Ingenuo",
 }
 
 
@@ -371,6 +402,9 @@ class Serie:
     ultimo_periodo: int          # ultimo mes real global (la proyeccion arranca al mes siguiente)
     h: int                       # meses a proyectar
     procedimiento: tuple = ()    # modelos a combinar (pesos iguales); vacio = torneo por serie
+    trimestral: bool = False     # estacionalidad por mes del trimestre (p.ej. RCONT)
+    dominio: tuple = (None, None)  # cotas actuariales (min, max) de la serie proyectada
+    moneda: str = ""             # moneda en que se modela (montos)
 
 
 @dataclass
@@ -388,6 +422,7 @@ class Resultado:
     mase_ensamble: float = math.nan                  # MASE backtest de la combinacion final
     alertas: list = field(default_factory=list)
     n_cortes: int = 0
+    moneda: str = ""
     historia_periodos: list = field(default_factory=list)
     historia_valores: list = field(default_factory=list)
 
@@ -514,28 +549,50 @@ def _pronosticar(serie: Serie) -> Resultado:
 
     usar_log = tipo in ("nivel", "indice") and np.all(y > 0)
     res.transformacion = "log" if usar_log else "ninguna"
+    res.moneda = serie.moneda
     z = np.log(y) if usar_log else y.copy()
+    mes0 = per[0] % 100 - 1
+    zq = _cuantil_normal()
+    trimestral = serie.trimestral and n >= 12
+    if trimestral:
+        res.transformacion += " + factores por mes del trimestre"
 
     def inv(v):
         return np.exp(v) if usar_log else v
 
-    mes0 = per[0] % 100 - 1
-    zq = _cuantil_normal()
+    def pred(m, z_tr, hz, orden):
+        """Pronostico en escala original desde el entrenamiento z_tr (con estacionalidad trimestral
+        estimada solo con z_tr, para no usar informacion futura)."""
+        if trimestral:
+            f = _factores_trimestrales(z_tr, mes0)
+            q = (mes0 + np.arange(len(z_tr) + hz)) % 12 % 3
+            s = f[q]
+            return inv(_ajustar(m, z_tr - s[:len(z_tr)], hz, mes0, orden) + s[len(z_tr):])
+        return inv(_ajustar(m, z_tr, hz, mes0, orden))
+
+    # alerta de atipico en el ultimo mes (salto > 3 desviaciones de los cambios mensuales)
+    if tipo in ("nivel", "indice") and n >= 13:
+        d = np.diff(z)
+        sd_d = np.std(d[:-1], ddof=1)
+        if sd_d > 0 and abs(d[-1] - np.mean(d[:-1])) > 3 * sd_d:
+            res.alertas.append(f"Salto atipico en el ultimo mes ({(y[-1] / y[-2] - 1):+.1%}); revisar si es un "
+                               "evento puntual que se liberara")
 
     # series cortas: SES
     if n < MIN_OBS_TORNEO:
         try:
-            pz = _ajustar("SES", z, hh, mes0, None) if n >= 6 else _m_ingenuo(z, hh)
+            pron = pred("SES", z, hh, None) if n >= 6 else inv(_m_ingenuo(z, hh))
             res.regla = "Serie corta: SES" if n >= 6 else "Serie corta: ultimo valor"
         except Exception:  # noqa: BLE001
-            pz = _m_ingenuo(z, hh)
+            pron = inv(_m_ingenuo(z, hh))
             res.regla = "Serie corta: ultimo valor"
-        sd = np.std(np.diff(z), ddof=1) if n > 2 else 0.0
-        banda = zq * sd * np.sqrt(np.arange(1, hh + 1))
-        p, li, ls = _salida(inv(pz), inv(pz - banda), inv(pz + banda))
+        sd = (np.std(np.diff(z), ddof=1) if n > 2 else 0.0) * np.sqrt(np.arange(1, hh + 1))
+        li, ls = (pron * np.exp(-zq * sd), pron * np.exp(zq * sd)) if usar_log else (pron - zq * sd,
+                                                                                     pron + zq * sd)
+        p, li, ls = _salida(pron, li, ls)
         res.pronostico, res.li, res.ls = list(p), list(li), list(ls)
         res.alertas.append(f"Solo {n} observaciones: proyeccion de baja confiabilidad")
-        return _post_proceso(res, y, tipo)
+        return _post_proceso(res, y, tipo, serie.dominio)
 
     # ---------------- backtest rolling-origin por serie (mismos cortes para todos los modelos)
     procedimiento = [m for m in serie.procedimiento if n >= CATALOGO[m][1] + 2]
@@ -549,9 +606,14 @@ def _pronosticar(serie: Serie) -> Resultado:
         if len(origenes) >= MIN_CORTES_CV or not exigentes:
             break
         candidatos = [m for m in candidatos if m not in exigentes]
-    orden_arima = seleccionar_arima(z) if "ARIMA" in candidatos else None
-    if orden_arima is None and "ARIMA" in candidatos:
-        candidatos.remove("ARIMA")
+    # orden ARIMA: en el backtest se elige solo con la historia hasta el primer corte (sin fuga de
+    # informacion); para la proyeccion final, con toda la historia
+    orden_cv = orden_final = None
+    if "ARIMA" in candidatos and origenes:
+        orden_cv = seleccionar_arima(z[:min(origenes)])
+        orden_final = seleccionar_arima(z)
+        if orden_cv is None or orden_final is None:
+            candidatos.remove("ARIMA")
     escala = np.mean(np.abs(np.diff(y)))
     if not np.isfinite(escala) or escala <= 0:
         escala = max(np.mean(np.abs(y)), 1e-12)
@@ -563,10 +625,9 @@ def _pronosticar(serie: Serie) -> Resultado:
         hz = min(h_cv, n - o)
         for m in candidatos:
             try:
-                pz = _ajustar(m, z[:o], hz, mes0, orden_arima)
-                if not np.all(np.isfinite(pz)):
+                pr = pred(m, z[:o], hz, orden_cv)
+                if not np.all(np.isfinite(pr)):
                     continue
-                pr = inv(pz)
                 pred_cv[m][o] = pr
                 for k in range(hz):
                     errores[m][k].append(abs(pr[k] - y[o + k]))
@@ -607,9 +668,9 @@ def _pronosticar(serie: Serie) -> Resultado:
     finales = {}
     for m in pesos:
         try:
-            pz = _ajustar(m, z, hh, mes0, orden_arima)
-            if np.all(np.isfinite(pz)):
-                finales[m] = inv(pz)
+            pr = pred(m, z, hh, orden_final)
+            if np.all(np.isfinite(pr)):
+                finales[m] = pr
         except Exception:  # noqa: BLE001
             res.alertas.append(f"No se pudo ajustar {m}; se omite de la combinacion")
     if not finales:
@@ -639,6 +700,9 @@ def _pronosticar(serie: Serie) -> Resultado:
     por_h = [np.mean(e) for e in abs_ens if e]
     res.mase_ensamble = float(np.mean(por_h) / escala) if por_h else math.nan
     sd = _sd_por_horizonte(resid, hh)
+    if len(origenes) < CORTES_PISO_INTERVALO:
+        # pocos cortes de backtest (series cortas): piso de caminata aleatoria con la volatilidad observada
+        sd = np.maximum(sd, np.std(np.diff(z), ddof=1) * np.sqrt(np.arange(1, hh + 1)))
     if usar_log:
         li, ls = pron * np.exp(-zq * sd), pron * np.exp(zq * sd)
     else:
@@ -647,7 +711,7 @@ def _pronosticar(serie: Serie) -> Resultado:
     res.pronostico, res.li, res.ls = list(p), list(li), list(ls)
     if "Ingenuo" in puntajes and np.isfinite(res.mase_ensamble) and res.mase_ensamble > puntajes["Ingenuo"] * 1.10:
         res.alertas.append("En el backtest de esta serie la proyeccion no supera al ultimo valor (ingenuo)")
-    return _post_proceso(res, y, tipo)
+    return _post_proceso(res, y, tipo, serie.dominio)
 
 
 def _mase_combinacion(modelos, pred_cv, origenes, y, h_cv, escala):
@@ -687,8 +751,12 @@ def _trabajo_validacion(args):
 def validar_procedimientos(series: list[Serie]):
     """Backtest del metodo completo: para cada serie con historia suficiente se simula haber proyectado
     desde varios cortes pasados (ventanas completas de H_CV meses) con cada procedimiento candidato, y se
-    compara contra lo real. Se elige por tipo el de menor AvgRelMAE (MAE relativo al ingenuo, media
-    geometrica entre series; < 1 = mejor que el ultimo valor)."""
+    compara contra lo real. Criterio de seleccion por tipo de serie:
+      * montos (nivel): WAPE = suma de errores absolutos / suma de montos reales (pondera por USD); entre
+        los procedimientos a menos de TOLERANCIA_WAPE del mejor, el de menor sesgo agregado a 13-16 meses.
+      * indices, razones y LAGs (adimensionales): AvgRelMAE = media geometrica entre series del error
+        relativo al ingenuo. Si su IC bootstrap al 90% incluye 1 (no mejora significativamente al ingenuo),
+        se elige el mejor procedimiento SIN tendencia (principio de parsimonia)."""
     trabajos, reales = [], {}
     for s in series:
         res, prep = preparar(s)
@@ -702,55 +770,97 @@ def validar_procedimientos(series: list[Serie]):
                     if o >= MIN_OBS_ESTACIONAL]
         if len(origenes) < 3:
             continue
-        reales[s.clave] = (y, s.tipo)
+        reales[s.clave] = (y, s.tipo, prep["per"])
         trabajos += [(s.clave, s.tipo, y, o, H_CV) for o in origenes]
     print(f"   Validacion del metodo: {len(reales)} series, {len(trabajos)} pronosticos fuera de muestra",
           flush=True)
     salidas = _mapear(_trabajo_validacion, trabajos)
-    # errores por procedimiento
-    filas = []
+
+    # errores por procedimiento, solo en cortes donde el procedimiento Y el ingenuo tienen pronostico
+    filas = []                     # (tipo, procedimiento, clave, periodo_corte, h, pronostico, real)
     for clave, tipo, o, sal in salidas:
-        y, _ = reales[clave]
+        y, _, per = reales[clave]
+        if "Ingenuo" not in sal:
+            continue
         for nombre, comp in PROCEDIMIENTOS_CANDIDATOS.items():
             if not all(m in sal for m in comp):
                 continue
             f = np.mean([sal[m] for m in comp], axis=0)
             for k in range(H_CV):
-                a = y[o + k]
-                filas.append((tipo, nombre, clave, k + 1, abs(f[k] - a), (f[k] - a) / abs(a) if a else math.nan))
+                filas.append((tipo, nombre, clave, per[o - 1], k + 1, float(f[k]), float(y[o + k])))
+    rng = np.random.default_rng(12345)
     tabla, seleccion = [], {}
     for tipo in ("nivel", "indice", "razon", "lag"):
         ft = [f for f in filas if f[0] == tipo]
         if not ft:
             continue
-        base = {}
-        for _, nombre, clave, _, e, _ in ft:
-            if nombre == "Ingenuo":
-                base[clave] = base.get(clave, 0.0) + e
+        cortes_ok = {}             # (clave, corte) disponibles por procedimiento
+        for _, nombre, clave, corte, _, _, _ in ft:
+            cortes_ok.setdefault(nombre, set()).add((clave, corte))
         resumen = []
         for nombre in PROCEDIMIENTOS_CANDIDATOS:
             fp = [f for f in ft if f[1] == nombre]
             if not fp:
                 continue
-            por_serie = {}
-            for _, _, clave, _, e, _ in fp:
-                por_serie[clave] = por_serie.get(clave, 0.0) + e
-            rel = [por_serie[c] / base[c] for c in por_serie if base.get(c, 0) > 0 and por_serie[c] > 0]
-            if not rel:
+            comunes = cortes_ok[nombre] & cortes_ok.get("Ingenuo", set())
+            fp = [f for f in fp if (f[2], f[3]) in comunes]
+            fb = [f for f in ft if f[1] == "Ingenuo" and (f[2], f[3]) in comunes]
+            e_proc, e_base = {}, {}
+            for f in fp:
+                e_proc[f[2]] = e_proc.get(f[2], 0.0) + abs(f[5] - f[6])
+            for f in fb:
+                e_base[f[2]] = e_base.get(f[2], 0.0) + abs(f[5] - f[6])
+            claves = [c for c in e_proc if e_base.get(c, 0) > 0 and e_proc[c] > 0]
+            if not claves:
                 continue
-            ape = lambda h1, h2: float(np.nanmean([abs(f[5]) for f in fp if h1 <= f[3] <= h2]) * 100)  # noqa: E731
+            logrel = np.log(np.array([e_proc[c] / e_base[c] for c in claves]))
+            boot = [np.exp(np.mean(rng.choice(logrel, size=len(logrel)))) for _ in range(N_BOOTSTRAP)]
+            suma_real = sum(abs(f[6]) for f in fp)
+            agregado = {}
+            for f in fp:
+                if f[4] >= 13:
+                    a = agregado.setdefault((f[3], f[4]), [0.0, 0.0])
+                    a[0] += f[5]
+                    a[1] += f[6]
+            sesgo_agr = float(np.mean([(F - A) / abs(A) for F, A in agregado.values() if A])) * 100 \
+                if agregado else math.nan
+            ape = lambda h1, h2: float(np.nanmean(  # noqa: E731
+                [abs(f[5] - f[6]) / abs(f[6]) for f in fp if h1 <= f[4] <= h2 and f[6]]) * 100)
             resumen.append({
-                "Tipo": tipo, "Procedimiento": nombre, "AvgRelMAE": float(np.exp(np.mean(np.log(rel)))),
-                "% series mejor que ingenuo": float(np.mean(np.array(rel) < 1)), "Series": len(rel),
+                "Tipo": tipo, "Procedimiento": nombre,
+                "WAPE %": float(sum(abs(f[5] - f[6]) for f in fp) / suma_real * 100) if suma_real else math.nan,
+                "AvgRelMAE": float(np.exp(np.mean(logrel))),
+                "IC90 inf": float(np.quantile(boot, 0.05)), "IC90 sup": float(np.quantile(boot, 0.95)),
+                "% series mejor que ingenuo": float(np.mean(logrel < 0)), "Series": len(claves),
                 "MAPE 1-6": ape(1, 6), "MAPE 7-12": ape(7, 12), "MAPE 13-16": ape(13, 16),
-                "Sesgo % 13-16": float(np.nanmean([f[5] for f in fp if f[3] >= 13]) * 100),
+                "Sesgo agregado % 13-16": sesgo_agr,
+                "Tendencia": "no" if nombre in PROCEDIMIENTOS_SIN_TENDENCIA else "si",
             })
-        resumen.sort(key=lambda d: d["AvgRelMAE"])
-        if resumen and resumen[0]["Series"] >= MIN_SERIES_VALIDACION:
-            seleccion[tipo] = resumen[0]["Procedimiento"]
-        for d in resumen:
-            d["Seleccionado"] = "SI" if seleccion.get(tipo) == d["Procedimiento"] else ""
-        tabla += resumen
+        if not resumen:
+            continue
+        elegido, motivo = None, ""
+        if tipo == "nivel":
+            mejor = min(d["WAPE %"] for d in resumen)
+            cerca = [d for d in resumen if d["WAPE %"] <= mejor * (1 + TOLERANCIA_WAPE)]
+            elegido = min(cerca, key=lambda d: abs(d["Sesgo agregado % 13-16"]))
+            motivo = (f"menor WAPE (error ponderado por monto); entre los {len(cerca)} a menos de "
+                      f"{TOLERANCIA_WAPE:.0%} del mejor, el de menor sesgo agregado")
+        else:
+            orden = sorted(resumen, key=lambda d: d["AvgRelMAE"])
+            elegido = orden[0]
+            motivo = "menor AvgRelMAE"
+            if elegido["IC90 sup"] >= 1 and elegido["Tendencia"] == "si":
+                sin_tend = [d for d in orden if d["Tendencia"] == "no"]
+                if sin_tend:
+                    elegido = sin_tend[0]
+                    motivo = ("la mejora del mejor procedimiento no es significativa (IC90 incluye 1): se usa el "
+                              "mejor procedimiento sin tendencia")
+        if elegido["Series"] >= MIN_SERIES_VALIDACION:
+            seleccion[tipo] = elegido["Procedimiento"]
+        orden_tabla = sorted(resumen, key=lambda d: d["WAPE %"] if tipo == "nivel" else d["AvgRelMAE"])
+        for d in orden_tabla:
+            d["Seleccionado"] = ("SI: " + motivo) if seleccion.get(tipo) == d["Procedimiento"] else ""
+        tabla += orden_tabla
     return tabla, seleccion
 
 
@@ -788,15 +898,36 @@ def _sd_por_horizonte(resid, hh):
     return np.maximum.accumulate(sd) if k0 >= 0 else sd
 
 
-def _post_proceso(res: Resultado, y, tipo):
+def _factores_trimestrales(z, mes0):
+    """Factores (escala log) por mes del trimestre: promedio de la desviacion contra la media movil
+    centrada de 3 meses, normalizados a suma cero."""
+    q = (mes0 + np.arange(len(z))) % 12 % 3
+    dev = [[] for _ in range(3)]
+    for t in range(1, len(z) - 1):
+        dev[q[t]].append(z[t] - np.mean(z[t - 1:t + 2]))
+    f = np.array([np.mean(d) if d else 0.0 for d in dev])
+    return f - f.mean()
+
+
+def _post_proceso(res: Resultado, y, tipo, dominio=(None, None)):
     p = np.array(res.pronostico, dtype=float)
     li = np.array(res.li, dtype=float)
     ls = np.array(res.ls, dtype=float)
+
     if tipo in ("razon", "lag"):
         lo, hi = float(np.nanmin(y)), float(np.nanmax(y))
         if np.any(p < lo - 1e-12) or np.any(p > hi + 1e-12):
             res.alertas.append(f"Proyeccion acotada al rango historico [{lo:.4f}, {hi:.4f}]")
         p, li, ls = np.clip(p, lo, hi), np.clip(li, lo, hi), np.clip(ls, lo, hi)
+    # dominio actuarial (despues del rango historico, para que siempre prevalezca)
+    lo_d, hi_d = dominio
+    if lo_d is not None or hi_d is not None:
+        lo_d = -np.inf if lo_d is None else lo_d
+        hi_d = np.inf if hi_d is None else hi_d
+        if np.any(p < lo_d - 1e-12) or np.any(p > hi_d + 1e-12):
+            res.alertas.append(f"Proyeccion fuera del dominio actuarial [{lo_d}, {hi_d}]: se acota "
+                               "(la historia reciente ya estaba fuera; revisar el dato)")
+        p, li, ls = np.clip(p, lo_d, hi_d), np.clip(li, lo_d, hi_d), np.clip(ls, lo_d, hi_d)
     if tipo == "nivel":
         p, li, ls = np.maximum(p, 0), np.maximum(li, 0), np.maximum(ls, 0)
     if tipo in ("nivel", "indice") and len(y) > len(p) and np.all(y > 0):
@@ -878,18 +1009,54 @@ def leer_bd_montos(ruta: Path) -> BDMontos:
                     conceptos)
 
 
-def series_montos(bd: BDMontos, libro: str, reservas: dict, ultimo: int, h: int) -> list[Serie]:
-    """reservas = {"RRC": {"nivel": "BEL", "razones_bel": [...], "cesion": "IRR"}, ...} o la
-    estructura de Fianzas. Construye las series driver (nivel y razones)."""
+def tc_para_periodo(bd: BDMontos, p: int) -> float:
+    """TC con que se escribe (y se convierte) cada mes proyectado: el de la BD si el renglon ya existe;
+    si no, TC_PROYECCION o el ultimo TC de la BD."""
+    if p in bd.tc:
+        return bd.tc[p]
+    return TC_PROYECCION.get(p, bd.tc[max(bd.tc)])
+
+
+def leer_tc_real(bd: BDMontos, ultimo: int) -> dict:
+    """TC real con que la fuente SAP convirtio cada mes a USD (fila 7 de BacktestingRRC, columnas SAP, de
+    los Res_Rvas en entradas/). Se usa para regresar la historia a MXN; donde no hay dato se usa la BD."""
+    tc = {p: v for p, v in bd.tc.items() if p <= ultimo}
+    for ruta in sorted(ENTRADAS.glob("Res_Rvas_*.xlsx")):
+        try:
+            wb = openpyxl.load_workbook(ruta, read_only=True, data_only=True)
+            if "BacktestingRRC" not in wb.sheetnames:
+                continue
+            filas = list(wb["BacktestingRRC"].iter_rows(min_row=1, max_row=8, values_only=True))
+            wb.close()
+        except Exception:  # noqa: BLE001
+            continue
+        for c, escenario in enumerate(filas[0]):
+            per, v = filas[7][c], filas[6][c]
+            if norm(escenario) == "SAP" and isinstance(per, (int, float)) and isinstance(v, (int, float)) \
+                    and int(per) <= ultimo:
+                tc[int(per)] = float(v)
+    return tc
+
+
+def series_montos(bd: BDMontos, libro: str, reservas: dict, ultimo: int, h: int,
+                  tc_hist: dict | None = None) -> list[Serie]:
+    """reservas = {"RRC": {"nivel": "BEL", "razones_bel": [...], "cesion": "IRR"}, ...}. Construye las
+    series driver (nivel y razones). Si tc_hist se indica, los montos se modelan en MXN (USD x TC real)."""
     periodos = sorted({p for (_, p) in bd.filas if p <= ultimo})
     periodos = rango_periodos(periodos[0], ultimo)
+    moneda = "MXN" if tc_hist else "USD"
+
+    def a_moneda(v, p):
+        return v * tc_hist[p] if tc_hist and not math.isnan(v) else v
+
     series = []
     for pref, est in reservas.items():
         for ramo in bd.cols_ramo:
             def val(conc, p):
                 return bd.valores.get((f"{pref} {conc}".strip(), p, ramo), math.nan)
-            nivel = [val(est["nivel"], p) for p in periodos]
-            series.append(Serie((libro, pref, est["nivel"], ramo), "nivel", periodos, nivel, ultimo, h))
+            nivel = [a_moneda(val(est["nivel"], p), p) for p in periodos]
+            series.append(Serie((libro, pref, est["nivel"], ramo), "nivel", periodos, nivel, ultimo, h,
+                                moneda=moneda))
             for conc in est.get("razones_bel", []):
                 raz = []
                 for p in periodos:
@@ -897,7 +1064,7 @@ def series_montos(bd: BDMontos, libro: str, reservas: dict, ultimo: int, h: int)
                     raz.append(x / b if (b and not math.isnan(b) and abs(b) >= UMBRAL_CERO_MONTOS
                                          and not math.isnan(x)) else math.nan)
                 series.append(Serie((libro, pref, f"{conc}/{est['nivel']}", ramo), "razon", periodos, raz,
-                                    ultimo, h))
+                                    ultimo, h, dominio=DOMINIO_RAZON_BEL))
             if est.get("cesion"):
                 raz = []
                 for p in periodos:
@@ -906,11 +1073,14 @@ def series_montos(bd: BDMontos, libro: str, reservas: dict, ultimo: int, h: int)
                     raz.append(x / br if (br and not math.isnan(br) and abs(br) >= UMBRAL_CERO_MONTOS
                                           and not math.isnan(x)) else math.nan)
                 series.append(Serie((libro, pref, f"{est['cesion']}/BRUTO", ramo), "razon", periodos, raz,
-                                    ultimo, h))
+                                    ultimo, h, dominio=DOMINIO_CESION))
         # conceptos que se proyectan como total y se reparten por ramo con la mezcla reciente (p.ej. RCONT)
         for conc in est.get("totales_con_mezcla", []):
-            serie = [sum(bd.valores.get((norm(conc), p, r), 0.0) for r in bd.cols_ramo) for p in periodos]
-            series.append(Serie((libro, pref, f"{conc} TOTAL", "TOTAL"), "nivel", periodos, serie, ultimo, h))
+            serie = [a_moneda(sum(bd.valores.get((norm(conc), p, r), 0.0) for r in bd.cols_ramo), p)
+                     for p in periodos]
+            series.append(Serie((libro, pref, f"{conc} TOTAL", "TOTAL"), "nivel", periodos, serie, ultimo, h,
+                                trimestral=norm(conc) in {norm(c) for c in ESTACIONALIDAD_TRIMESTRAL},
+                                moneda=moneda))
     return series
 
 
@@ -932,13 +1102,16 @@ def periodo_ultimo_real(periodos_proy: list[int]) -> int:
     return indice_a_periodo(periodo_a_indice(periodos_proy[0]) - 1)
 
 
-def derivar_montos(bd: BDMontos, libro: str, reservas: dict, resultados: dict, periodos_proy: list[int]):
-    """Aplica las identidades contables y regresa {(concepto, periodo, ramo): valor}."""
+def derivar_montos(bd: BDMontos, libro: str, reservas: dict, resultados: dict, periodos_proy: list[int],
+                   en_mxn: bool = False):
+    """Aplica las identidades contables y regresa {(concepto, periodo, ramo): valor en USD}. Si los montos
+    se modelaron en MXN se convierten con el TC de cada mes proyectado (el mismo que se escribe en la BD)."""
+    tc_proy = np.array([tc_para_periodo(bd, p) for p in periodos_proy]) if en_mxn else 1.0
     salida = {}
     for pref, est in reservas.items():
         for ramo in bd.cols_ramo:
             nivel = np.array(resultados[(libro, pref, est["nivel"], ramo)].pronostico, dtype=float)
-            nivel = np.nan_to_num(nivel, nan=0.0)
+            nivel = np.nan_to_num(nivel, nan=0.0) / tc_proy
             comps = {}
             for conc in est.get("razones_bel", []):
                 r = np.nan_to_num(np.array(resultados[(libro, pref, f"{conc}/{est['nivel']}", ramo)].pronostico),
@@ -959,7 +1132,7 @@ def derivar_montos(bd: BDMontos, libro: str, reservas: dict, resultados: dict, p
                 valores[f"{pref} {conc}"] = v
             for conc in est.get("totales_con_mezcla", []):
                 total = np.nan_to_num(np.array(resultados[(libro, pref, f"{conc} TOTAL", "TOTAL")].pronostico),
-                                      nan=0.0)
+                                      nan=0.0) / tc_proy
                 mezcla = mezcla_reciente(bd, conc, periodo_ultimo_real(periodos_proy), MESES_MEZCLA)
                 valores[conc] = total * mezcla[ramo]
             for conc, arr in valores.items():
@@ -985,7 +1158,7 @@ def escribir_bd_montos(bd: BDMontos, proy: dict, periodos_proy: list[int], ruta_
     ws = bd.ws
     relleno = PatternFill("solid", fgColor=COLOR_RESALTADO) if RESALTAR_PROYECCION else None
     ultima_col = ws.max_column
-    tc_ultimo = bd.tc[max(bd.tc)]                    # ultimo TC disponible en la BD
+
     faltan = {c for (c, _, _) in proy} - set(bd.conceptos)
     if faltan:
         raise ValueError(f"Conceptos proyectados que no existen en la BD: {faltan}")
@@ -1025,7 +1198,7 @@ def escribir_bd_montos(bd: BDMontos, proy: dict, periodos_proy: list[int], ruta_
                     ws.row_dimensions[r].height = ws.row_dimensions[plantilla].height
                 ws.cell(r, bd.col_concepto).value = ws.cell(plantilla, bd.col_concepto).value
                 ws.cell(r, bd.col_periodo).value = p
-                ws.cell(r, bd.col_tc).value = TC_PROYECCION.get(p, bd.tc.get(p, tc_ultimo))
+                ws.cell(r, bd.col_tc).value = tc_para_periodo(bd, p)
                 for ramo, col in bd.cols_ramo.items():
                     ws.cell(r, col).value = proy[(c, p, ramo)]
                     if relleno:
@@ -1102,7 +1275,9 @@ def leer_hparametros(wb) -> HParam:
     return HParam(ws, cols, historia, ultimos[ultimo], ultimo, textos, lags_cero)
 
 
-def series_hparametros(hp: HParam, h: int) -> list[Serie]:
+def series_hparametros(hp: HParam, h: int, ultimo: int) -> list[Serie]:
+    """ultimo = ultimo mes real global (PERIODO_INICIO - 1): si el ultimo 'Real' de la hoja es anterior, el
+    mecanismo de rezago proyecta desde el ultimo dato y entrega exactamente los meses a proyectar."""
     series = []
     for ramo, _ in hp.ramos_activos:
         clave_ramo = str(ramo).strip()
@@ -1116,7 +1291,7 @@ def series_hparametros(hp: HParam, h: int) -> list[Serie]:
                 valores = [hist.get(p, math.nan) for p in periodos]
             tipo = "indice" if nombre in INDICES else "lag"
             series.append(Serie(("HPARAM", HOJA_PARAMETROS, nombre, clave_ramo), tipo, periodos, valores,
-                                hp.ultimo, h))
+                                ultimo, h))
     return series
 
 
@@ -1201,22 +1376,37 @@ def escribir_diagnostico(resultados: dict, periodos_proy: list[int], alertas_gen
         ("METODOLOGIA", ""),
         ("1. Coherencia contable", "Se proyectan drivers (BEL / BRUTO y razones) y se derivan las demas lineas: "
                                    "RRC: BRUTO = BEL+GTO+MR, IRR = %ces*BRUTO, NETO = BRUTO-IRR; SONR: BRUTO = BEL+MR; "
-                                   "RFV: NETO = BRUTO-IRR."),
-        ("2. Modelos evaluados", "Ingenuo, Ingenuo estacional, Media 12m, SES, Holt amortiguado, Holt-Winters "
+                                   "RFV: NETO = BRUTO-IRR; RCONT: total con factores por mes del trimestre, repartido "
+                                   "por ramo con la mezcla de los ultimos 8 meses."),
+        ("2. Moneda", "Montos modelados en USD: en backtest, modelar en MXN y convertir con el TC real fue menos "
+                      "preciso (Danos WAPE 22.5% vs 19.8%; Fianzas 7.4% vs 6.0%). Libros en MXN (MODELAR_EN_MXN): "
+                      + (", ".join(k for k, v in MODELAR_EN_MXN.items() if v) or "ninguno") + "."),
+        ("3. Modelos evaluados", "Ingenuo, Ingenuo estacional, Media 12m, SES, Holt amortiguado, Holt-Winters "
                                  "amortiguado, Theta, ARIMA (AICc), Regresion log-lineal con estacionalidad."),
-        ("3. Seleccion", "Validacion fuera de muestra del metodo completo (hoja Validacion_Metodo): se simula haber "
-                         f"proyectado desde {CV_ORIGENES} cortes historicos a 1-16 meses y, por tipo de serie "
-                         "(montos, indices, razones, LAGs), se elige la combinacion de modelos de menor error "
-                         "relativo al ingenuo (AvgRelMAE). En cada serie se corre ademas un backtest rolling-origin "
-                         "con todos los modelos (MASE por modelo en Series_Modelos) que da los intervalos."
+        ("4. Seleccion", "Validacion fuera de muestra del metodo completo (hoja Validacion_Metodo): se simula haber "
+                         f"proyectado desde {CV_ORIGENES} cortes historicos a 1-16 meses. Montos: menor WAPE (error "
+                         "ponderado por USD) con desempate por sesgo agregado. Indices, razones y LAGs: menor "
+                         "AvgRelMAE; si la mejora vs el ingenuo no es significativa (IC90), procedimiento sin tendencia. "
+                         "En cada serie hay ademas un backtest con todos los modelos (MASE en Series_Modelos) que da "
+                         "los intervalos y la red de seguridad (si el procedimiento es > 1.5x peor que el ingenuo en la "
+                         "propia serie, se usa el ensamble propio)."
                          + ("" if MODO_SELECCION == "validado" else " MODO TORNEO: cada serie usa su propio ensamble.")),
-        ("4. Transformaciones", "Montos e indices en logaritmos; razones y LAGs en escala original, acotadas al "
-                                "rango historico."),
-        ("5. Intervalos", f"{NIVEL_INTERVALO:.0%} a partir del error del ensamble en el backtest por horizonte."),
-        ("6. Reglas", "Series en cero -> 0; parametros en escalon -> ultimo valor; series cortas -> SES; "
-                      "99.5% >= media si siempre lo fue; limpieza de textos y LAG=0 marcadores."),
-        ("7. Tipo de cambio", "Meses existentes conservan el TC de la BD; meses nuevos usan TC_PROYECCION o el "
-                              "ultimo TC disponible."),
+        ("5. Transformaciones", "Montos e indices en logaritmos (la proyeccion es la mediana); razones y LAGs en "
+                                "escala original, acotadas al rango historico y al dominio actuarial (cesion en [0,1], "
+                                "%GTO y %MR >= 0)."),
+        ("6. Intervalos", f"{NIVEL_INTERVALO:.0%} a partir del error de la proyeccion en el backtest por horizonte "
+                          "(con piso de caminata aleatoria si hay pocos cortes)."),
+        ("7. Reglas", "Series en cero -> 0; parametros en escalon -> ultimo valor; series cortas -> SES; "
+                      "99.5% >= media si siempre lo fue; limpieza de textos y LAG=0 marcadores; alerta de saltos "
+                      "atipicos en el ultimo mes."),
+        ("8. Tipo de cambio", "Meses que ya existen en la BD conservan su TC (202609-202612 = supuesto de la BD); "
+                              "meses nuevos usan TC_PROYECCION o, si no se indica, el ultimo TC de la BD "
+                              f"({resumen.get('tc_ultimo', '')})."),
+        ("9. Sesgo conocido", "En la validacion (2023-2026, periodo de fuerte crecimiento) las proyecciones de montos a "
+                              "13-16 meses quedaron en promedio por debajo de lo real (ver 'Sesgo agregado' del "
+                              "procedimiento elegido). Los modelos amortiguan la tendencia: si el plan de negocio "
+                              "prevé un crecimiento sostenido, conviene contrastarlo."),
+        ("Versiones", resumen.get("versiones", "")),
         ("", ""),
         ("Interpretacion MASE", "Error absoluto medio del backtest promediado en horizontes de 1 a 16 meses, "
                                 "dividido entre la variacion mensual tipica de la serie. Al ser multi-horizonte, "
@@ -1239,26 +1429,43 @@ def escribir_diagnostico(resultados: dict, periodos_proy: list[int], alertas_gen
     # Validacion fuera de muestra del metodo
     if tabla_validacion:
         ws = wb.create_sheet("Validacion_Metodo")
-        cols = ["Tipo", "Procedimiento", "Seleccionado", "AvgRelMAE", "% series mejor que ingenuo", "Series",
-                "MAPE 1-6", "MAPE 7-12", "MAPE 13-16", "Sesgo % 13-16"]
+        cols = ["Tipo", "Procedimiento", "Seleccionado", "WAPE %", "AvgRelMAE", "IC90 inf", "IC90 sup",
+                "% series mejor que ingenuo", "Series", "MAPE 1-6", "MAPE 7-12", "MAPE 13-16",
+                "Sesgo agregado % 13-16", "Tendencia"]
         ws.append(cols)
         for d in tabla_validacion:
             ws.append([d.get(c) for c in cols])
         _formato_tabla(ws, negrita, encab)
         for fila in ws.iter_rows(min_row=2):
-            fila[3].number_format = "0.000"
-            fila[4].number_format = "0%"
-            for c in fila[6:]:
-                c.number_format = "0.0"
+            for c in fila:
+                encabezado = ws.cell(1, c.column).value
+                if encabezado in ("AvgRelMAE", "IC90 inf", "IC90 sup"):
+                    c.number_format = "0.000"
+                elif encabezado == "% series mejor que ingenuo":
+                    c.number_format = "0%"
+                elif encabezado in ("WAPE %", "MAPE 1-6", "MAPE 7-12", "MAPE 13-16", "Sesgo agregado % 13-16"):
+                    c.number_format = "0.0"
         nota = ws.max_row + 2
-        ws.cell(nota, 1, "AvgRelMAE = media geometrica, entre series, del error absoluto del procedimiento dividido "
-                         "entre el del ingenuo (ultimo valor), en pronosticos fuera de muestra desde 8 cortes "
-                         "historicos a 1-16 meses. < 1 = mas preciso que el ingenuo. Se selecciona el menor.")
+        notas = [
+            "Pronosticos fuera de muestra desde 8 cortes historicos, horizontes 1-16 meses (backtest del metodo "
+            "completo). Solo series con datos genuinos (<= 3 meses interpolados).",
+            "WAPE % = suma de errores absolutos / suma de valores reales (pondera por monto). Criterio para montos: "
+            "menor WAPE; entre los que estan a <= 2% del mejor, el de menor |sesgo agregado|.",
+            "AvgRelMAE = media geometrica entre series del error del procedimiento / error del ingenuo (< 1 = mejor "
+            "que repetir el ultimo valor), con IC bootstrap al 90%. Criterio para indices, razones y LAGs: menor "
+            "AvgRelMAE; si su IC incluye 1, el mejor procedimiento sin tendencia (parsimonia).",
+            "Sesgo agregado % 13-16 = (suma proyectada - suma real) / suma real por corte y horizonte, promedio a "
+            "13-16 meses. Negativo = la proyeccion quedo por debajo de lo real (en 2023-2026 hubo fuerte "
+            "crecimiento).",
+        ]
+        for i, texto in enumerate(notas):
+            ws.cell(nota + i, 1, texto)
 
     # Series y modelos
     ws = wb.create_sheet("Series_Modelos")
     todos_modelos = list(CATALOGO)
-    cab = (["Libro", "Grupo", "Serie", "Ramo", "Tipo", "Transformacion", "Obs", "Cortes backtest", "Desde", "Regla",
+    cab = (["Libro", "Grupo", "Serie", "Ramo", "Tipo", "Moneda modelo", "Transformacion", "Obs", "Cortes backtest",
+            "Desde", "Regla",
             "Modelos proyeccion (peso)", "MASE proyeccion"] + [f"MASE {m}" for m in todos_modelos]
            + ["Ultimo real", f"Proy {periodos_proy[0]}", f"Proy {periodos_proy[-1]}", "Var % vs ultimo real",
               "Alertas"])
@@ -1267,7 +1474,7 @@ def escribir_diagnostico(resultados: dict, periodos_proy: list[int], alertas_gen
         ult = r.historia_valores[-1] if r.historia_valores else math.nan
         fin = r.pronostico[-1] if r.pronostico else math.nan
         var = (fin / ult - 1) if (ult and not math.isnan(ult) and not math.isnan(fin) and ult != 0) else None
-        fila = [k[0], k[1], k[2], k[3], r.tipo, r.transformacion, r.n_obs, r.n_cortes or None,
+        fila = [k[0], k[1], k[2], k[3], r.tipo, r.moneda, r.transformacion, r.n_obs, r.n_cortes or None,
                 r.historia_periodos[0] if r.historia_periodos else None, r.regla,
                 ", ".join(f"{m} ({w:.0%})" for m, w in r.pesos.items()),
                 None if math.isnan(r.mase_ensamble) else r.mase_ensamble]
@@ -1401,6 +1608,40 @@ def graficar(resultados: dict, derivados: dict, historia_montos: dict, periodos_
 # =============================================================================
 # PROCESO PRINCIPAL
 # =============================================================================
+def _versiones() -> str:
+    from importlib.metadata import PackageNotFoundError, version
+    partes = [f"Python {sys.version.split()[0]}"]
+    for paquete in ("openpyxl", "numpy", "pandas", "scipy", "statsmodels", "matplotlib"):
+        try:
+            partes.append(f"{paquete} {version(paquete)}")
+        except PackageNotFoundError:
+            continue
+    return ", ".join(partes)
+
+
+def _bd_rfv_desactualizada() -> bool:
+    """La BD_ RFV llena se regenera si no existe o si alguna entrada es mas reciente."""
+    if not ARCHIVO_BD_RFV.exists():
+        return True
+    entradas = list(ENTRADAS.glob("Res_Rvas_*.xlsx")) + [ENTRADAS / "BD_ RFV.xlsx"]
+    t_salida = ARCHIVO_BD_RFV.stat().st_mtime
+    return any(p.exists() and p.stat().st_mtime > t_salida for p in entradas)
+
+
+def revisar_periodos(bd: BDMontos, nombre: str, ultimo: int, periodos_proy: list[int], alertas: list):
+    """Evita proyectar sobre cifras reales y usar un mes historico vacio como si fuera cero real."""
+    con_datos = sorted({p for (c, p, r), v in bd.valores.items() if p in periodos_proy and abs(v) > 0})
+    if con_datos and not SOBRESCRIBIR_PERIODOS_CON_DATOS:
+        raise SystemExit(f"{nombre}: los meses {con_datos} ya tienen cifras (reales?) y se sobrescribirian con la "
+                         f"proyeccion. Mueve PERIODO_INICIO al mes siguiente al ultimo real o pon "
+                         f"SOBRESCRIBIR_PERIODOS_CON_DATOS = True.")
+    if not any(abs(v) > 0 for (c, p, r), v in bd.valores.items() if p == ultimo):
+        raise SystemExit(f"{nombre}: el mes {ultimo} (ultimo real, PERIODO_INICIO - 1) no tiene cifras. Carga ese "
+                         f"mes en la BD o ajusta PERIODO_INICIO.")
+    if not any(abs(v) > 0 for (c, p, r), v in bd.valores.items() if p <= ultimo):
+        raise SystemExit(f"{nombre}: la historia esta vacia (todo en cero).")
+
+
 def main():
     t0 = time.time()
     SALIDAS.mkdir(parents=True, exist_ok=True)
@@ -1408,22 +1649,30 @@ def main():
     ultimo = indice_a_periodo(periodo_a_indice(PERIODO_INICIO) - 1)
     h = len(periodos_proy)
     print(f"Proyeccion {periodos_proy[0]} - {periodos_proy[-1]} ({h} meses). Historia hasta {ultimo}.", flush=True)
+    salidas = [SALIDA_BD_DANOS, SALIDA_BD_RFV, SALIDA_DIAGNOSTICO] + ([SALIDA_GRAFICAS] if GENERAR_GRAFICAS else [])
+    verificar_escritura(salidas + [ARCHIVO_BD_RFV])
 
-    if not ARCHIVO_BD_RFV.exists():
-        print("No existe la BD_ RFV llena; se ejecuta llenar_bd_rfv.py ...", flush=True)
-        sys.path.insert(0, str(CARPETA))
+    if _bd_rfv_desactualizada():
+        print("La BD_ RFV llena no existe o hay entradas mas recientes; se ejecuta llenar_bd_rfv.py ...",
+              flush=True)
         import llenar_bd_rfv  # noqa: WPS433
         llenar_bd_rfv.llenar()
+    print(f"   BD_ RFV usada: {ARCHIVO_BD_RFV.name} "
+          f"({datetime.fromtimestamp(ARCHIVO_BD_RFV.stat().st_mtime):%Y-%m-%d %H:%M})", flush=True)
 
     alertas = []
     print("Leyendo archivos ...", flush=True)
-    shutil.copyfile(ARCHIVO_BD_DANOS, SALIDA_BD_DANOS)
-    shutil.copyfile(ARCHIVO_BD_RFV, SALIDA_BD_RFV)
-    bd_danos = leer_bd_montos(SALIDA_BD_DANOS)
-    bd_rfv = leer_bd_montos(SALIDA_BD_RFV)
+    bd_danos = leer_bd_montos(ARCHIVO_BD_DANOS)
+    bd_rfv = leer_bd_montos(ARCHIVO_BD_RFV)
+    revisar_periodos(bd_danos, "BD Daños", ultimo, periodos_proy, alertas)
+    revisar_periodos(bd_rfv, "BD RFV", ultimo, periodos_proy, alertas)
     hp = leer_hparametros(bd_danos.wb)
-    if hp.ultimo != ultimo:
-        alertas.append(("HPARAM", "Ultimo mes Real", f"El ultimo 'Real' es {hp.ultimo}; se proyecta desde ahi"))
+    if hp.ultimo > ultimo:
+        raise SystemExit(f"{HOJA_PARAMETROS}: ya hay renglones '{TIPO_INDICE_BASE}' de {hp.ultimo}, posteriores a "
+                         f"{ultimo}. Mueve PERIODO_INICIO.")
+    if hp.ultimo < ultimo:
+        alertas.append(("HPARAM", "Ultimo mes Real", f"El ultimo '{TIPO_INDICE_BASE}' es {hp.ultimo}; los indices "
+                                                     f"se proyectan desde ahi hasta cubrir {periodos_proy[0]}"))
     if hp.textos_limpiados:
         alertas.append(("HPARAM", "Limpieza", f"{hp.textos_limpiados} celdas con numeros guardados como texto "
                                               "(p.ej. espacios \\xa0) se convirtieron a numero"))
@@ -1432,7 +1681,7 @@ def main():
                                                         "(el patron acumulado ya superaba 50%)"))
 
     # Revision de identidades en la historia (deben cumplirse para que la derivacion sea valida)
-    for libro, bd, reglas in (("DANOS", bd_danos, ESTRUCTURA["DANOS"]),):
+    for libro, bd in (("DANOS", bd_danos), ("FIANZAS", bd_rfv)):
         for (c, p, ramo), v in bd.valores.items():
             if p > ultimo or not c.endswith("NETO"):
                 continue
@@ -1442,12 +1691,17 @@ def main():
             if abs(v - (bruto - irr)) > 1.0:
                 alertas.append((libro, f"{c} {p} RAM_{ramo}", "La historia no cumple NETO = BRUTO - IRR"))
 
-    estructura_rfv = ESTRUCTURA["FIANZAS"]
+    tc_hist = {}
+    for libro, bd in (("DANOS", bd_danos), ("FIANZAS", bd_rfv)):
+        if MODELAR_EN_MXN.get(libro):
+            tc_hist[libro] = leer_tc_real(bd, ultimo)
+            alertas.append(("METODO", f"Moneda {libro}", "Montos modelados en MXN (historia USD x TC real de SAP) y "
+                                                         "convertidos a USD con el TC de cada mes proyectado de la BD"))
 
     print("Construyendo series ...", flush=True)
-    series = (series_montos(bd_danos, "DANOS", ESTRUCTURA["DANOS"], ultimo, h)
-              + series_montos(bd_rfv, "FIANZAS", estructura_rfv, ultimo, h)
-              + series_hparametros(hp, h))
+    series = (series_montos(bd_danos, "DANOS", ESTRUCTURA["DANOS"], ultimo, h, tc_hist.get("DANOS"))
+              + series_montos(bd_rfv, "FIANZAS", ESTRUCTURA["FIANZAS"], ultimo, h, tc_hist.get("FIANZAS"))
+              + series_hparametros(hp, h, ultimo))
     tabla_validacion, seleccion = [], {}
     if MODO_SELECCION == "validado":
         print("Validando procedimientos fuera de muestra (backtest del metodo completo) ...", flush=True)
@@ -1465,15 +1719,17 @@ def main():
     ajustar_orden_indices(hp, resultados, alertas)
 
     print("Aplicando identidades contables y escribiendo archivos ...", flush=True)
-    proy_danos = derivar_montos(bd_danos, "DANOS", ESTRUCTURA["DANOS"], resultados, periodos_proy)
-    proy_rfv = derivar_montos(bd_rfv, "FIANZAS", estructura_rfv, resultados, periodos_proy)
+    proy_danos = derivar_montos(bd_danos, "DANOS", ESTRUCTURA["DANOS"], resultados, periodos_proy,
+                                en_mxn="DANOS" in tc_hist)
+    proy_rfv = derivar_montos(bd_rfv, "FIANZAS", ESTRUCTURA["FIANZAS"], resultados, periodos_proy,
+                              en_mxn="FIANZAS" in tc_hist)
     validar(proy_danos, proy_rfv)
 
     info_danos = escribir_bd_montos(bd_danos, proy_danos, periodos_proy, SALIDA_BD_DANOS)
     n_hp = escribir_hparametros(hp, resultados, periodos_proy)
-    bd_danos.wb.save(SALIDA_BD_DANOS)
+    guardar_libro(bd_danos.wb, SALIDA_BD_DANOS, original=ARCHIVO_BD_DANOS)
     info_rfv = escribir_bd_montos(bd_rfv, proy_rfv, periodos_proy, SALIDA_BD_RFV)
-    bd_rfv.wb.save(SALIDA_BD_RFV)
+    guardar_libro(bd_rfv.wb, SALIDA_BD_RFV, original=ENTRADAS / "BD_ RFV.xlsx")
 
     historia = {
         "DANOS": {k: v for k, v in bd_danos.valores.items() if k[1] <= ultimo},
@@ -1481,12 +1737,15 @@ def main():
     }
     segundos = time.time() - t0
     escribir_diagnostico(resultados, periodos_proy, alertas, {"DANOS": proy_danos, "FIANZAS": proy_rfv},
-                         {"ultimo": ultimo, "segundos": segundos, "seleccion": seleccion},
+                         {"ultimo": ultimo, "segundos": segundos, "seleccion": seleccion,
+                          "tc_ultimo": bd_danos.tc[max(bd_danos.tc)], "versiones": _versiones()},
                          tabla_validacion)
+    graficas_ok = False
     if GENERAR_GRAFICAS:
         print("Generando graficas ...", flush=True)
         try:
             graficar(resultados, {"DANOS": proy_danos, "FIANZAS": proy_rfv}, historia, periodos_proy)
+            graficas_ok = True
         except Exception as e:  # noqa: BLE001
             print(f"   No se pudieron generar las graficas: {e!r}")
 
@@ -1495,8 +1754,10 @@ def main():
           f"{info_danos['nuevos']} renglones nuevos en {HOJA_MONTOS}; {n_hp} renglones nuevos en {HOJA_PARAMETROS}")
     print(f"   {SALIDA_BD_RFV.name}: {info_rfv['actualizados']} renglones actualizados, "
           f"{info_rfv['nuevos']} renglones nuevos")
-    print(f"   Diagnostico: {SALIDA_DIAGNOSTICO.name}" + (f" | Graficas: {SALIDA_GRAFICAS.name}"
-                                                          if GENERAR_GRAFICAS else ""))
+    print(f"   Diagnostico: {SALIDA_DIAGNOSTICO.name}")
+    if GENERAR_GRAFICAS:
+        print(f"   Graficas: {SALIDA_GRAFICAS.name}" if graficas_ok
+              else "   Graficas: NO se actualizaron (ver mensaje arriba)")
     n_alertas = len(alertas) + sum(len(r.alertas) for r in resultados.values())
     print(f"   Alertas a revisar: {n_alertas} (hoja 'Alertas' del diagnostico)")
     print(f"   Tiempo total: {time.time() - t0:,.0f} s")
