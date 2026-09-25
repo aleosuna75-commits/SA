@@ -1,146 +1,169 @@
 # Base de % de cesión desde los logouts del PPTO
 
-`base_cesion.py` lee todos los logouts de una carpeta (hoja `ParamPPTO`) y
-genera un Excel con el % de cesión de cada documento: **LN, TR, cedente,
-corredor, contrato, tipo de venta y % de cesión 2027–2031**, con los nombres
-de LN, TR, cedente y corredor.
+`base_cesion.py` lee los logouts de una LN (hoja `ParamPPTO`) y genera un Excel
+con el % de cesión de cada documento: **LN, nivel (cedente / contrato /
+binder), TR, cedente, corredor, contrato, MGA / binder y % de cesión
+2027–2031**, con los nombres de LN, TR, cedente y corredor.
 
-## Cómo correrlo en VSCode
+## Cómo correrlo
 
-1. Descomprime la carpeta de logouts en **Documentos**, por ejemplo
-   `C:\Users\<usuario>\Documents\CIFRAS AJUSTADAS`. Si al descomprimir queda
-   una carpeta dentro de otra, o si está una o dos carpetas más abajo
-   (`Documentos\PPTO 2027\CIFRAS AJUSTADAS`), también la encuentra. Si hay
-   varias (por ejemplo, la del año pasado), usa la de logouts más recientes y
-   te avisa en consola cuáles más encontró.
-2. Abre `base_cesion.py` en VSCode y da clic en **Run Python File** (▷, arriba
-   a la derecha).
-3. La primera vez instala solo `openpyxl` y `pandas` si no los tienes (o si
-   están muy viejos) y se reinicia solo.
-4. Al terminar abre el Excel `Base_Cesion_<LN>_<fecha>.xlsx`, que queda
-   guardado junto a la carpeta de logouts (en Documentos).
+1. Deja cada LN en su carpeta: `LN4001`, `LN4002`, …, `LN4006`, … Pueden
+   estar en Documentos (o una o dos carpetas más abajo, por ejemplo
+   `Documentos\Presupuesto 2027\LN4006`) o junto al script.
+2. Abre `base_cesion.py` en VSCode y cambia **solo esta línea** al inicio:
 
-Si la carpeta tiene otro nombre o está en otro lado, hay tres opciones:
+   ```python
+   LN = "LN4006"      # o "LN4001", "LN4003", ... o "TODAS"
+   ```
 
-- Si no la encuentra, el script abre una ventana para elegirla.
-- Escribe la ruta en `CARPETA_LOGOUTS` al inicio del script.
-- Pásala desde la terminal:
-  `python base_cesion.py "C:\Users\<usuario>\Documents\OTRA CARPETA" --salida "C:\Users\<usuario>\Desktop"`
+3. Da clic en **Run Python File** (▷).
+4. Al terminar abre `Base_Cesion_LN4006_<fecha>.xlsx`, que se guarda junto a
+   las carpetas de las LN.
 
-La búsqueda incluye subcarpetas, así que puedes poner los logouts de varias LN
-en carpetas separadas dentro de una misma carpeta y generar una sola base.
+Con `LN = "TODAS"` procesa todas las carpetas LN que encuentre y genera una
+sola base, `Base_Cesion_TODAS_<fecha>.xlsx`, con la columna `Carpeta LN`.
+
+Detalles:
+
+- **Nombres de los archivos:** no importan. Un archivo es logout si tiene la
+  hoja `ParamPPTO`, así que sirven tanto `Logout_LN04003_r1_...xlsx` como
+  `11 CCUW Carga.xlsx`.
+- **Si la carpeta quedó dentro de otra** al descomprimir
+  (`LN4006\LN4006\...`), también la encuentra.
+- **Si hay dos carpetas de la misma LN,** usa la de archivos más recientes y
+  avisa.
+- **Para moverlo:** basta con copiar el script junto a las carpetas LN, o
+  escribir en `CARPETA_LNS` la carpeta que las contiene.
+- **La primera vez** instala solo `openpyxl` y `pandas` si faltan.
+
+## Cardinalidad: nivel de cada documento
+
+El script clasifica cada documento según lo que trae el logout:
+
+| Nivel | Cuándo |
+|---|---|
+| **Binder** | La casilla MGA es Verdadero, o trae nombre de MGA / binder. |
+| **Contrato** | No hay MGA, pero sí contrato. |
+| **Cedente** | Sin contrato ni MGA. |
+
+La hoja `Cardinalidad_LN` dice cuántos documentos hay de cada nivel en cada LN
+y cuál es la cardinalidad de la línea (el nivel más granular que aparece). Si
+hay más de un nivel, lo marca como "mixta".
+
+La llave de cada documento incluye cedente, contrato, MGA y binder. Así, los
+binders de un mismo cedente (por ejemplo, los de CCUW en LN4006) no se toman
+como documentos repetidos.
 
 ## Qué trae el Excel
 
 | Hoja | Contenido |
 |---|---|
-| `Base_Cesion` | Una fila por documento, con todas las columnas de la base (lista abajo). |
-| `Cesion_Anual` | La misma información en una fila por documento y año, lista para tablas dinámicas. |
-| `Resumen` | Por LN y TR (solo versiones vigentes): documentos, documentos con % de cesión y mín./promedio/máx. del % de cesión 2027. |
-| `Validaciones` | Inconsistencias a revisar con la LN (ver abajo). |
-| `Notas` | De qué celda del logout sale cada columna. |
+| `Base_Cesion` | Una fila por documento. |
+| `Cesion_Anual` | Una fila por documento y año, lista para tablas dinámicas. |
+| `Resumen` | Por LN, nivel y TR: documentos, documentos con % de cesión y mín./promedio/máx. del % de cesión 2027. |
+| `Cardinalidad_LN` | Por LN: documentos de cada nivel, cardinalidad y columna del primer año. |
+| `Validaciones` | Inconsistencias a revisar con la LN. |
+| `Notas` | De qué celda sale cada columna y qué carpetas se leyeron. |
 
 Columnas de `Base_Cesion`:
 
-- **Llaves y nombres:** LN y nombre, TR y descripción (Proporcional / No
-  Proporcional / Facultativo), Cedente con nombre, país y grupo, Corredor y
-  nombre.
-- **Datos del documento:** Of. Rep., Contrato, Tipo Venta, % Renov., MGA.
-- **Tipo de retrocesión:** % Tradicional, % Retro Espec., % Fronting y
+- **Llaves:**
+  - Archivo, Carpeta LN y Nivel;
+  - LN y su nombre;
+  - TR y su descripción;
+  - Cedente con nombre, país y grupo;
+  - Corredor y su nombre;
+  - Contrato, `Es MGA`, `MGA` y `Binder`.
+- **Del documento:** Of. Rep., Tipo Venta, % Renov.
+- **Tipo de retrocesión:** % Tradicional, % Retro Espec., % Fronting,
   % Retención.
-- **Cesión:** `Cesión capturada`, `Años con cesión`, **% Cesión 2027–2031** y
+- **Cesión:** `Cesión capturada`, `Años con cesión`, **% Cesión 2027–2031**,
   % Com. Cedido 2027–2031.
-- **Control:** GS, versión del archivo, `Versión vigente` y observaciones.
-
-Los nombres salen del catálogo del PptoTécnico (rangos `xAFUN`, `xTIPOREA`,
-`xCEDENTES` y `xCORREDORES` de la hoja `Valores`). Excel guarda ese catálogo
-dentro de cada logout, así que no hace falta tener abierto el archivo del
-presupuesto. Cada documento toma los nombres de su propio logout.
-
-La columna `Archivo` trae la ruta del logout dentro de la carpeta leída, así que
-se distinguen los archivos con el mismo nombre en subcarpetas distintas.
-
-`Versión vigente` marca la versión más alta de cada documento (misma LN, TR,
-cedente, corredor, contrato y tipo de venta) y reconoce copias como
-`...-v2 (1).xlsx` o `...-v2 - copia.xlsx`.
+- **Control:** GS, `Col. 1er año`, versión, `Versión vigente`, Observaciones.
 
 ## De dónde sale cada dato del logout
 
-Las filas se ubican por su etiqueta en la columna A, así que el script sigue
-funcionando aunque el logout agregue o mueva renglones.
+Las filas se ubican por su etiqueta en la columna A.
 
-| Columna de la base | Renglón del logout (columna A) | Columnas |
+| Columna de la base | Renglón del logout | Columnas |
 |---|---|---|
-| LN | Línea de Negocio | B |
-| TR | Tipo Reas. | B |
-| Cedente | Compañía | B |
+| LN / TR / Cedente | Línea de Negocio / Tipo Reas. / Compañía | B |
 | Corredor | Corredor (la primera vez que aparece) | B |
 | Contrato | Contrato | B |
+| Es MGA / MGA / Binder / GS | MGA | B / C / E / F |
 | Tipo Venta / % Renov. | Tipo Venta | B / C |
-| % Tradicional, % Retro Espec., % Fronting, % Retención | Porcentaje | B, C, D, E |
-| % Cesión 2027 … 2031 | Porcentaje de Cesión | C … G |
-| % Com. Cedido 2027 … 2031 | % Comisiones del Cedido | C … G |
-| GS | MGA | F |
+| % Tradicional, Retro Espec., Fronting, Retención | Porcentaje | B, C, D, E |
+| % Cesión 2027 … 2031 | Porcentaje de Cesión | 5 columnas desde `Col. 1er año` |
+| % Com. Cedido 2027 … 2031 | % Comisiones del Cedido | 5 columnas desde `Col. 1er año` |
 
-El % de cesión es el valor que capturó la LN. No está multiplicado por el
-% de Retro Espec. + Fronting.
+`MGA` (col. C) es lo que se eligió en el campo MGA del PRESUPUESTO; `Binder`
+(col. E) es el nombre del binder, que coincide con el nombre del archivo.
 
-### Ojo con 2031
+Los nombres salen del catálogo del PptoTécnico que Excel guarda dentro de cada
+logout (rangos `xAFUN`, `xTIPOREA`, `xCEDENTES` y `xCORREDORES`).
 
-En los logouts, la columna B de "Porcentaje de Cesión" siempre viene vacía y
-el 2027 cae en la columna C. Sin embargo, el recuadro con formato del logout es
-de 5 celdas (B…F), y en esta LN los dos documentos que capturaron varios años
-llegan solo hasta 2030 (columna F). Ningún logout trae dato en G (2031).
+### Columna del primer año (2027)
 
-Puede ser que la macro del logout recorte el último año. Para confirmarlo,
-captura la cesión 2027–2031 en un PRESUPUESTO (celdas M34:Q34), genera su
-logout y revisa en qué celdas cae. Si cambia la alineación, basta con ajustar
-`COL_PRIMER_ANIO` al inicio del script.
+El recuadro de la plantilla es de 5 celdas, **B…F = 2027…2031**, y así vienen,
+por ejemplo, los logouts de LN4006.
 
-Mientras ningún logout traiga 2031, el script lo avisa en consola y en
-`Validaciones`.
+Los de LN4003 (Fianzas) traen el 2027 en la columna C, recorridos una
+columna, y nunca traen 2031. Por eso el script lo detecta solo por LN:
+
+- **B:** si algún logout de la LN trae dato en la columna B.
+- **C:** si ninguno lo trae. En ese caso lo avisa en consola y en
+  `Validaciones`, porque probablemente esa herramienta no exporta 2031.
+
+La columna `Col. 1er año` dice qué se usó. Si hiciera falta, se puede fijar
+con `COLUMNA_PRIMER_ANIO = "B"` o `"C"`.
 
 ## Validaciones que revisa
 
-- **Error**:
-  - un archivo que no se puede abrir o que tiene formato `.xls`/`.xlsb`;
+- **Error:**
+  - archivo que no se puede abrir;
   - etiquetas que no aparecen;
-  - un % capturado como texto que no es número;
+  - % capturado como texto que no es número;
   - fórmulas guardadas sin valor;
-  - un dato en la columna B de los años;
-  - un nombre de archivo que no coincide con el contenido (LN, TR, corredor,
-    cedente, contrato).
-- **Revisar**:
-  - un % negativo o mayor a 100% (por ejemplo, 80 en lugar de 80%);
-  - un reparto por tipo de retrocesión vacío o que no suma 100%;
+  - nombre `Logout_...` que no coincide con el contenido.
+- **Revisar:**
+  - % negativo o mayor a 100%;
+  - reparto por tipo de retrocesión vacío o que no suma 100%;
   - Retro Espec. o Fronting sin % de cesión, o con cesión en 0%;
   - % de cesión con el documento 100% Tradicional;
-  - comisión del cedido sin % de cesión;
-  - venta combinada sin % Renov.;
-  - un documento repetido en varias versiones;
-  - un valor fuera de las columnas esperadas;
-  - que ningún logout traiga 2031.
-- **Info**:
-  - % de cesión que no viene en todos los años;
+  - comisión sin % de cesión;
+  - cesión que no empieza en 2027;
+  - binder con la casilla MGA en Falso;
+  - MGA sin nombre;
+  - logout de otra LN dentro de la carpeta;
+  - documento repetido;
+  - valor fuera de las columnas esperadas;
+  - años recorridos una columna;
+  - ningún logout trae 2031.
+- **Info:**
+  - cesión que no viene en todos los años;
   - años distintos entre cesión y comisión;
-  - % Renov. en una venta no combinada;
-  - un código que no está en el catálogo.
+  - archivos que no son logout o están en `.xlsb`/`.xls`;
+  - código sin nombre en el catálogo.
 
 ## Ajustes al inicio del script
 
 | Variable | Para qué |
 |---|---|
-| `CARPETA_LOGOUTS` | Ruta fija de la carpeta de logouts. |
+| `LN` | La LN a procesar (`"LN4006"`) o `"TODAS"`. |
+| `CARPETA_LNS` | Carpeta que contiene las carpetas LN, si no están en Documentos ni junto al script. |
+| `CARPETA_LOGOUTS` | Ruta directa a una carpeta de logouts (ignora `LN`). |
 | `CARPETA_SALIDA` | Dónde guardar el Excel. |
-| `ARRASTRAR_ULTIMO_ANIO` | `True` hace que, si la LN capturó solo 2027, los años siguientes tomen ese mismo %. Por omisión (`False`) los deja vacíos. |
-| `PRIMER_ANIO`, `COL_PRIMER_ANIO` | Primer año presupuestado y la columna donde cae (C). |
+| `COLUMNA_PRIMER_ANIO` | `"AUTO"` (por omisión), `"B"` o `"C"`. |
+| `ARRASTRAR_ULTIMO_ANIO` | `True` hace que, si un documento trae solo 2027, los años siguientes tomen ese %. |
 | `ABRIR_AL_TERMINAR` | Abrir el Excel al final. |
+
+Desde la terminal también se puede:
+`python base_cesion.py --ln LN4006` o `python base_cesion.py "C:\ruta\a\una\carpeta"`.
 
 ## Si la instalación automática falla
 
 Normalmente pasa por el proxy de la oficina. El script muestra el comando para
-instalar a mano desde la terminal de VSCode (con el mismo Python que tienes
-seleccionado), algo como:
+instalar a mano desde la terminal de VSCode, algo como:
 
 ```
 python -m pip install --upgrade "pandas>=1.1" "openpyxl>=3.0"

@@ -3,55 +3,49 @@
 ================================================================================
   BASE DE % DE CESIÓN — Logouts del Presupuesto Técnico (hoja ParamPPTO)
 ================================================================================
-Recorre una carpeta con los logouts de una o varias LN (archivos
-"Logout_<LN>_r<TR>_b<corredor>_e<cedente>[_c<contrato>]-<TipoVenta>-v<n>.xlsx")
-y arma una base con el % de cesión de cada documento:
+Lee los logouts de una LN (o de todas) y arma una base con el % de cesión de
+cada documento:
 
-    LN · TR · Cedente · Corredor · Contrato · Tipo de venta · % de cesión
+    LN · Nivel · TR · Cedente · Corredor · Contrato · MGA / Binder · % de cesión
+
+USO: cambia la línea  LN = "..."  de abajo y dale "Run Python File" (▷) en VSCode.
+     El script busca la carpeta con ese nombre (LN4001, LN4002, ...) en
+     Documentos, junto al script o en CARPETA_LNS. Con LN = "TODAS" procesa
+     todas las carpetas LN que encuentre y genera una sola base.
+
+CARDINALIDAD: cada documento se clasifica según lo que traiga el logout
+  * Binder   -> trae MGA (casilla MGA = Verdadero, o nombre de MGA / binder)
+  * Contrato -> sin MGA, pero con contrato
+  * Cedente  -> sin contrato ni MGA
+La hoja "Cardinalidad_LN" resume cuántos documentos de cada nivel tiene cada LN.
 
 CÓMO SE LEE CADA LOGOUT (hoja ParamPPTO)
 ----------------------------------------
-Las filas se ubican por su ETIQUETA en la columna A (no por número de fila),
-así que si el logout agrega o mueve renglones el script sigue funcionando.
+Los archivos se reconocen por su contenido (hoja ParamPPTO), no por su nombre,
+y las filas se ubican por su ETIQUETA en la columna A.
 
   Línea de Negocio ........ B          -> LN
   Tipo Reas. .............. B          -> TR
-  Of. Rep. ................ B
   Compañía ................ B          -> Cedente
   Corredor (1a aparición) . B          -> Corredor del documento
   Contrato ................ B
   Tipo Venta .............. B  (y C = % Renov. cuando es "Comb. Nuevo y Renov.")
-  MGA ..................... B  (y F = casilla GS)
-  Porcentaje .............. B..E       -> Tradicional, Retro Espec., Fronting,
-                                          Retención (tabla "Tipo Retrocesión")
-  Porcentaje de Cesión .... C..G       -> 2027..2031
-  % Comisiones del Cedido . C..G       -> 2027..2031
+  MGA ..................... B = ¿es MGA?, C = MGA, E = Binder, F = casilla GS
+  Porcentaje .............. B..E       -> Tradicional, Retro Espec., Fronting, Retención
+  Porcentaje de Cesión .... 5 años     -> 2027..2031
+  % Comisiones del Cedido . 5 años     -> 2027..2031
 
-Los NOMBRES de LN, TR, cedente y corredor salen del catálogo (hoja "Valores" del
-PptoTécnico) que Excel guarda en caché dentro de cada logout.
+AÑOS: el recuadro del logout es B..F (2027..2031), y así vienen, por ejemplo,
+los de LN4006. Los de LN4003 (Fianzas) traen el 2027 en C, recorridos una
+columna, y no traen 2031. Por eso la columna del primer año se detecta sola
+por LN: si algún logout de la LN trae dato en B, 2027 = B; si ninguno, 2027 = C.
+La base dice en "Col. 1er año" qué se usó en cada documento.
 
-OJO CON 2031: en los logouts la columna B de "Porcentaje de Cesión" siempre
-viene vacía y el 2027 cae en C, pero el recuadro con formato del logout es B..F
-(5 celdas). Si ningún logout trae dato en G (2031), el script lo avisa: puede
-ser que la macro del logout recorte el último año. Confírmalo capturando la
-cesión 2027-2031 en un PRESUPUESTO (M34:Q34) y viendo en qué celdas del logout caen.
+Los NOMBRES de LN, TR, cedente y corredor salen del catálogo del PptoTécnico que
+Excel guarda en caché dentro de cada logout.
 
-SALIDA
-------
-Un Excel "Base_Cesion_<LN>_<fecha>.xlsx" con las hojas:
-  * Base_Cesion   una fila por documento (formato ancho, años en columnas)
-  * Cesion_Anual  una fila por documento y año (lista para tablas dinámicas)
-  * Resumen       conteos por LN y TR
-  * Validaciones  inconsistencias a revisar con la LN
-  * Notas         de dónde sale cada columna
-
-CÓMO CORRERLO
--------------
-En VSCode: abrir este archivo y dar clic en "Run Python File" (▷). Busca la
-carpeta "CIFRAS AJUSTADAS" en Documentos; si no la encuentra, abre una ventana
-para elegirla. También se puede indicar la ruta:
-
-    python base_cesion.py "C:\\Users\\<usuario>\\Documents\\CIFRAS AJUSTADAS"
+SALIDA: "Base_Cesion_<LN>_<fecha>.xlsx" junto a la carpeta de la LN, con las
+hojas Base_Cesion, Cesion_Anual, Resumen, Cardinalidad_LN, Validaciones y Notas.
 
 Si falta openpyxl o pandas (o están muy viejos), el script los instala solo con pip.
 ================================================================================
@@ -71,25 +65,34 @@ from pathlib import Path
 from xml.etree import ElementTree
 
 
-# ------------------------------------------------------------------------------
-# CONFIGURACIÓN (ajustar aquí si cambia algo)
-# ------------------------------------------------------------------------------
-# Ruta de la carpeta con los logouts. Vacío = buscar NOMBRE_CARPETA en Documentos.
-CARPETA_LOGOUTS = r""
-NOMBRE_CARPETA = "CIFRAS AJUSTADAS"
-BUSCAR_EN_SUBCARPETAS = True
+# ==============================================================================
+#   >>> CAMBIA SOLO ESTA LÍNEA <<<   LN a procesar: "LN4001", "LN4002", ... o "TODAS"
+LN = "LN4006"
+# ==============================================================================
 
-# Dónde guardar el Excel de salida. Vacío = carpeta que contiene a los logouts.
+
+# ------------------------------------------------------------------------------
+# CONFIGURACIÓN (normalmente no hace falta tocar nada de aquí para abajo)
+# ------------------------------------------------------------------------------
+# Carpeta que contiene las carpetas LN4001, LN4002, ... Vacío = buscarlas junto al
+# script y en Documentos (hasta dos niveles abajo).
+CARPETA_LNS = r""
+
+# Ruta directa a una carpeta con logouts. Si se llena, se usa esta e ignora LN.
+CARPETA_LOGOUTS = r""
+
+# Dónde guardar el Excel de salida. Vacío = la carpeta que contiene a la(s) LN.
 CARPETA_SALIDA = r""
 
 HOJA_LOGOUT = "ParamPPTO"
 PRIMER_ANIO = 2027
 NUM_ANIOS = 5
-COL_PRIMER_ANIO = 3  # columna C = 2027 en "Porcentaje de Cesión" y "% Comisiones"
+# Columna donde cae el primer año en "Porcentaje de Cesión" y "% Comisiones":
+# "AUTO" = se detecta por LN (B si algún logout trae dato en B, si no C); o fijar "B" / "C".
+COLUMNA_PRIMER_ANIO = "AUTO"
 
-# Si una LN capturó la cesión solo para algunos años (típicamente solo 2027),
-# True = los años siguientes toman el último valor capturado. False = se dejan
-# vacíos tal como vienen en el logout.
+# Si un documento trae la cesión solo en algunos años (p. ej. solo 2027):
+# True = los años siguientes toman el último valor capturado; False = se dejan vacíos.
 ARRASTRAR_ULTIMO_ANIO = False
 
 # True = abrir el Excel generado al terminar (solo Windows / macOS).
@@ -236,9 +239,10 @@ def a_si_no(valor):
 
 
 # ------------------------------------------------------------------------------
-# UBICAR LA CARPETA DE LOGOUTS
+# UBICAR LAS CARPETAS DE LAS LN
 # ------------------------------------------------------------------------------
 EXT_SOPORTADAS = (".xlsx", ".xlsm")
+EXT_NO_SOPORTADAS = (".xls", ".xlsb")
 
 
 def carpetas_documentos():
@@ -270,76 +274,81 @@ def carpetas_documentos():
     return unicas
 
 
-def es_logout(ruta):
-    return ruta.name.lower().startswith("logout_") and not ruta.name.startswith("~$")
+def es_excel_candidato(ruta):
+    """Archivos que podrían ser logouts (no temporales de Office ni salidas de este script)."""
+    nombre = ruta.name.lower()
+    return not nombre.startswith("~$") and not nombre.startswith("base_cesion_")
 
 
-def hay_logouts(carpeta, recursivo):
-    patron = "**/*" if recursivo else "*"
-    return any(es_logout(p) and p.suffix.lower() in EXT_SOPORTADAS for p in carpeta.glob(patron))
+def excels_en(carpeta, extensiones=EXT_SOPORTADAS):
+    return sorted((p for p in carpeta.glob("**/*")
+                   if p.suffix.lower() in extensiones and es_excel_candidato(p) and p.is_file()),
+                  key=lambda p: str(p).lower())
 
 
-def elegir_carpeta_con_ventana():
+def partes_ln(texto):
+    """'LN04006' / 'LN4006' / 'ln 4006' -> (4006, ''); 'LN4008-Agro' -> (4008, 'agro'); si no, None."""
+    m = re.fullmatch(r"ln[\s_-]*0*(\d+)(.*)", normalizar(texto))
+    return (int(m[1]), re.sub(r"[^a-z0-9]", "", m[2])) if m else None
+
+
+def etiqueta_ln(partes):
+    return f"LN{partes[0]}" + (f"-{partes[1].title()}" if partes[1] else "")
+
+
+def mas_reciente(carpeta):
+    return max((p.stat().st_mtime for p in excels_en(carpeta)), default=0)
+
+
+def buscar_carpetas_ln():
+    """{(número, sufijo): [carpetas]} con las carpetas LN#### que tienen archivos Excel."""
+    raices = []
+    if CARPETA_LNS:
+        raices.append((Path(CARPETA_LNS).expanduser(), 1))
+    junto_al_script = Path(__file__).resolve().parent
+    raices += [(junto_al_script, 1), (junto_al_script.parent, 1)]
+    raices += [(docs, 3) for docs in carpetas_documentos()]  # Documentos\LN, Documentos\X\LN, ...\X\Y\LN
+
+    encontradas, vistas = {}, set()
+    for raiz, niveles in raices:
+        if not raiz.is_dir():
+            continue
+        candidatas = [raiz] + [c for n in range(1, niveles + 1) for c in raiz.glob("/".join(["*"] * n) + "/")]
+        for c in candidatas:
+            try:
+                partes = partes_ln(c.name)
+                real = str(c.resolve()).lower()
+                if partes is None or real in vistas or not c.is_dir() or not excels_en(c):
+                    continue
+                vistas.add(real)
+                encontradas.setdefault(partes, []).append(c)
+            except OSError:  # carpetas sin permiso de lectura
+                continue
+    # Una carpeta LN dentro de otra de la misma LN (zip descomprimido dos veces) se lee con la de afuera
+    for partes, lista in encontradas.items():
+        reales = [c.resolve() for c in lista]
+        encontradas[partes] = [c for c, r in zip(lista, reales)
+                               if not any(o in r.parents for o in reales if o != r)]
+    return encontradas
+
+
+def elegir_carpeta_con_ventana(titulo):
     try:
         import tkinter as tk
         from tkinter import filedialog
         raiz = tk.Tk()
         raiz.withdraw()
         raiz.attributes("-topmost", True)
-        ruta = filedialog.askdirectory(title="Elige la carpeta con los logouts")
+        ruta = filedialog.askdirectory(title=titulo)
         raiz.destroy()
         return Path(ruta) if ruta else None
     except Exception:
         return None
 
 
-def logout_mas_reciente(carpeta):
-    fechas = [p.stat().st_mtime for p in carpeta.glob("**/*")
-              if es_logout(p) and p.suffix.lower() in EXT_SOPORTADAS]
-    return max(fechas, default=0)
-
-
-def ubicar_carpeta(ruta_argumento):
-    """(carpeta a leer, otras carpetas candidatas que se descartaron)."""
-    if ruta_argumento:
-        return Path(ruta_argumento), []
-    if CARPETA_LOGOUTS:
-        return Path(CARPETA_LOGOUTS), []
-
-    # NOMBRE_CARPETA dentro de Documentos, hasta dos niveles abajo
-    # (p. ej. "Documentos\\PPTO 2027\\CIFRAS AJUSTADAS"; acepta "CIFRAS_AJUSTADAS").
-    # Si hay varias (p. ej. la del año pasado), se toma la de logouts más recientes.
-    objetivo = normalizar(NOMBRE_CARPETA).replace("_", " ")
-    documentos = carpetas_documentos()
-    candidatas, vistas = [], set()
-    for docs in documentos:
-        for c in [docs / NOMBRE_CARPETA, *docs.glob("*/"), *docs.glob("*/*/")]:
-            try:
-                real = c.resolve()
-                if (str(real).lower() not in vistas and c.is_dir()
-                        and normalizar(c.name).replace("_", " ") == objetivo
-                        and hay_logouts(c, BUSCAR_EN_SUBCARPETAS)):
-                    vistas.add(str(real).lower())
-                    candidatas.append(c)
-            except OSError:  # carpetas sin permiso de lectura
-                continue
-    if BUSCAR_EN_SUBCARPETAS:  # una carpeta dentro de otra candidata ya se lee con ella
-        reales = [c.resolve() for c in candidatas]
-        candidatas = [c for c, r in zip(candidatas, reales) if not any(o in r.parents for o in reales)]
-    if candidatas:
-        candidatas.sort(key=logout_mas_reciente, reverse=True)
-        return candidatas[0], candidatas[1:]
-
-    # Logouts junto al script (la carpeta del script solo en su primer nivel, y
-    # nunca Documentos ni la carpeta de usuario completas).
-    prohibidas = {str(p.resolve()).lower() for p in documentos + [Path.home()]}
-    junto_al_script = Path(__file__).resolve().parent
-    for c, recursivo in ((junto_al_script / NOMBRE_CARPETA, BUSCAR_EN_SUBCARPETAS), (junto_al_script, False)):
-        if c.is_dir() and str(c.resolve()).lower() not in prohibidas and hay_logouts(c, recursivo):
-            return c, []
-
-    print(f'No encontré la carpeta "{NOMBRE_CARPETA}" en Documentos.')
-    ruta = elegir_carpeta_con_ventana()
+def pedir_carpeta(mensaje):
+    print(mensaje)
+    ruta = elegir_carpeta_con_ventana("Elige la carpeta con los logouts")
     if ruta is None:
         try:
             texto = input("Pega la ruta de la carpeta con los logouts: ")
@@ -350,16 +359,42 @@ def ubicar_carpeta(ruta_argumento):
         ruta = Path(texto) if texto else None
     if ruta is None:
         sys.exit("No se indicó carpeta. Fin.")
-    return ruta, []
+    return ruta
 
 
-def listar_logouts(carpeta):
-    """(logouts .xlsx/.xlsm, logouts en otro formato que no se pueden leer)."""
-    patron = "**/*" if BUSCAR_EN_SUBCARPETAS else "*"
-    todos = sorted((p for p in carpeta.glob(patron) if p.is_file() and es_logout(p)),
-                   key=lambda p: str(p).lower())
-    return ([p for p in todos if p.suffix.lower() in EXT_SOPORTADAS],
-            [p for p in todos if p.suffix.lower() not in EXT_SOPORTADAS])
+def ubicar_grupos(ruta_argumento, ln_pedida):
+    """Lista de (etiqueta, carpeta) a procesar y avisos sobre carpetas descartadas."""
+    avisos = []
+    if ruta_argumento or CARPETA_LOGOUTS:
+        carpeta = Path(ruta_argumento or CARPETA_LOGOUTS).expanduser().resolve()
+        return [(carpeta.name, carpeta)], avisos
+
+    encontradas = buscar_carpetas_ln()
+
+    def elegir(partes, lista):
+        lista = sorted(lista, key=mas_reciente, reverse=True)
+        for otra in lista[1:]:
+            avisos.append(f"{etiqueta_ln(partes)}: también encontré {otra}; se usa la de archivos más recientes.")
+        return lista[0].resolve()
+
+    if normalizar(ln_pedida) in ("todas", "todos", "*"):
+        if not encontradas:
+            carpeta = pedir_carpeta("No encontré carpetas LN#### (LN4001, LN4002, ...) junto al script "
+                                    "ni en Documentos.")
+            return [(carpeta.name, carpeta.resolve())], avisos
+        grupos = [(etiqueta_ln(p), elegir(p, lista)) for p, lista in sorted(encontradas.items())]
+        return grupos, avisos
+
+    pedida = partes_ln(ln_pedida)
+    if pedida is None:
+        sys.exit(f'LN = "{ln_pedida}" no parece una LN. Usa, por ejemplo, LN = "LN4006" o LN = "TODAS".')
+    exactas = encontradas.get(pedida)
+    # Si no hay carpeta con el nombre exacto, se acepta "LN4006 Líneas Especiales" y similares.
+    parecidas = [c for p, lista in encontradas.items() if p[0] == pedida[0] and not pedida[1] for c in lista]
+    if exactas or parecidas:
+        return [(etiqueta_ln(pedida), elegir(pedida, exactas or parecidas))], avisos
+    carpeta = pedir_carpeta(f'No encontré la carpeta "{ln_pedida}" junto al script ni en Documentos.')
+    return [(etiqueta_ln(pedida), carpeta.expanduser().resolve())], avisos
 
 
 # ------------------------------------------------------------------------------
@@ -388,21 +423,48 @@ ETIQUETAS = {
 }
 TIPOS_RETRO = ["Tradicional", "Retro Espec.", "Fronting", "Retención"]
 ANIOS = list(range(PRIMER_ANIO, PRIMER_ANIO + NUM_ANIOS))
+NIVELES = ["Cedente", "Contrato", "Binder"]  # de menos a más granular
 MAX_FILAS_ENCABEZADO = 40
 MAX_COLUMNAS = 26  # A..Z: se lee de más para detectar valores fuera de lugar
 
 
 def leer_filas(ruta, formulas):
-    """Primeras filas de la hoja del logout. formulas=True trae el texto de las fórmulas."""
+    """(hoja leída, primeras filas, ¿es logout?). formulas=True trae el texto de las fórmulas."""
     wb = load_workbook(ruta, read_only=True, data_only=not formulas, keep_links=False)
     try:
         ws = wb[HOJA_LOGOUT] if HOJA_LOGOUT in wb.sheetnames else wb.worksheets[0]
         filas = [list(f) + [None] * (MAX_COLUMNAS - len(f))
                  for f in ws.iter_rows(min_row=1, max_row=MAX_FILAS_ENCABEZADO,
                                        max_col=MAX_COLUMNAS, values_only=True)]
-        return ws.title, filas
+        es_logout = ws.title == HOJA_LOGOUT or bool(filas and normalizar(filas[0][0]) == "linea de negocio")
+        return ws.title, filas, es_logout
     finally:
         wb.close()
+
+
+def ubicar_filas(filas):
+    """{clave interna: índice de fila} según las etiquetas de la columna A."""
+    fila_de = {}
+    for i, fila in enumerate(filas):
+        clave = ETIQUETAS.get(normalizar(fila[0]))
+        if clave and clave not in fila_de:
+            fila_de[clave] = i
+    return fila_de
+
+
+def columna_primer_anio(lecturas):
+    """Columna (2 = B, 3 = C) donde cae el primer año para un grupo de logouts de una LN."""
+    if str(COLUMNA_PRIMER_ANIO).upper() in ("B", "C"):
+        return 2 if str(COLUMNA_PRIMER_ANIO).upper() == "B" else 3
+    usa_b = usa_c = False
+    for _, filas, _ in lecturas:
+        fila_de = ubicar_filas(filas)
+        for clave in ("cesion", "comision"):
+            if clave in fila_de:
+                fila = filas[fila_de[clave]]
+                usa_b |= not vacio(fila[1])
+                usa_c |= any(not vacio(v) for v in fila[2:2 + NUM_ANIOS])
+    return 3 if usa_c and not usa_b else 2
 
 
 def nombre_relativo(ruta, carpeta):
@@ -413,33 +475,33 @@ def nombre_relativo(ruta, carpeta):
         return ruta.name
 
 
-def leer_logout(ruta, carpeta):
-    """Devuelve (registro, lista_de_validaciones) para un archivo."""
+def texto_limpio(valor):
+    return None if vacio(valor) else str(valor).strip()
+
+
+def leer_logout(ruta, archivo, lectura, col_ini):
+    """Devuelve (registro, lista_de_validaciones) para un archivo ya leído."""
     avisos = []
-    archivo = nombre_relativo(ruta, carpeta)
 
     def avisar(nivel, tipo, detalle):
         avisos.append({"Archivo": archivo, "Nivel": nivel, "Tipo": tipo, "Detalle": detalle})
 
     registro = {"Archivo": archivo}
-    hoja, filas = leer_filas(ruta, formulas=False)
+    hoja, filas, _ = lectura
     if hoja != HOJA_LOGOUT:
         avisar("Revisar", "Hoja no encontrada", f'No existe la hoja "{HOJA_LOGOUT}"; se leyó "{hoja}".')
 
-    fila_de = {}
-    for i, fila in enumerate(filas):
-        clave = ETIQUETAS.get(normalizar(fila[0]))
-        if clave and clave not in fila_de:
-            fila_de[clave] = i
+    fila_de = ubicar_filas(filas)
     faltan = [k for k in ETIQUETAS.values() if k not in fila_de]
     if faltan:
         avisar("Error", "Etiquetas no encontradas",
                "No se encontraron en la columna A: " + ", ".join(faltan))
 
     # Fórmulas guardadas sin valor calculado (se leerían como celda vacía).
-    _, crudas = leer_filas(ruta, formulas=True)
+    _, crudas, _ = leer_filas(ruta, formulas=True)
+    ultima_col = max(6, col_ini + NUM_ANIOS - 1)
     sin_valor = [f"{get_column_letter(j + 1)}{i + 1}"
-                 for i in sorted(fila_de.values()) for j in range(1, COL_PRIMER_ANIO + NUM_ANIOS - 1)
+                 for i in sorted(fila_de.values()) for j in range(1, ultima_col)
                  if isinstance(crudas[i][j], str) and crudas[i][j].startswith("=")
                  and filas[i][j] is None]
     if sin_valor:
@@ -478,8 +540,25 @@ def leer_logout(ruta, carpeta):
     registro["Contrato"] = a_codigo(celda("contrato", 2))
     registro["Tipo Venta"] = celda("tipo_venta", 2)
     registro["% Renov."] = porcentaje("tipo_venta", 3, "% Renov.")
-    registro["MGA"] = a_si_no(celda("mga", 2))
+    registro["Es MGA"] = a_si_no(celda("mga", 2))
+    registro["MGA"] = texto_limpio(celda("mga", 3))
+    registro["Binder"] = texto_limpio(celda("mga", 5))
     registro["GS"] = a_si_no(celda("mga", 6))
+
+    # --- Cardinalidad del documento -----------------------------------------------
+    tiene_nombre_mga = bool(registro["MGA"] or registro["Binder"])
+    if registro["Es MGA"] == "Sí" or tiene_nombre_mga:
+        registro["Nivel"] = "Binder"
+    elif registro["Contrato"] is not None:
+        registro["Nivel"] = "Contrato"
+    else:
+        registro["Nivel"] = "Cedente"
+    if registro["Es MGA"] == "Sí" and not tiene_nombre_mga:
+        avisar("Revisar", "MGA sin nombre", "La casilla MGA es Verdadero pero no trae nombre de MGA ni de binder")
+    if registro["Es MGA"] == "No" and tiene_nombre_mga:
+        avisar("Revisar", "Binder con MGA = Falso",
+               f"Trae MGA/binder ({registro['MGA'] or registro['Binder']}) pero la casilla MGA es Falso; "
+               "se clasifica como Binder")
 
     # --- Tipo de retrocesión ----------------------------------------------------
     total = 0.0
@@ -494,7 +573,8 @@ def leer_logout(ruta, carpeta):
     valores_fuera("retro", range(2, 2 + len(TIPOS_RETRO)), "Porcentaje (Tipo Retrocesión)")
 
     # --- % de cesión y % comisiones del cedido por año --------------------------
-    cols_anios = range(COL_PRIMER_ANIO, COL_PRIMER_ANIO + NUM_ANIOS)
+    registro["Col. 1er año"] = get_column_letter(col_ini)
+    cols_anios = range(col_ini, col_ini + NUM_ANIOS)
     for clave, prefijo in (("cesion", "% Cesión"), ("comision", "% Com. Cedido")):
         valores = [porcentaje(clave, c, f"{prefijo} {anio}") for c, anio in zip(cols_anios, ANIOS)]
         registro[f"_capturados_{clave}"] = [a for a, v in zip(ANIOS, valores) if v is not None]
@@ -504,11 +584,14 @@ def leer_logout(ruta, carpeta):
                     valores[i] = valores[i - 1]
         for anio, v in zip(ANIOS, valores):
             registro[f"{prefijo} {anio}"] = v
-        if not vacio(celda(clave, 2)):
-            avisar("Error", "Valor en la columna B de años",
-                   f"{prefijo}: B={celda(clave, 2)}. En los logouts la columna B viene vacía y 2027 cae "
-                   f"en C; si ahora trae dato, revisar si cambió la alineación de años.")
-        valores_fuera(clave, [2, *cols_anios], prefijo)
+        validas = list(cols_anios)
+        if col_ini > 2:  # la columna B queda antes del primer año
+            validas.append(2)
+            if not vacio(celda(clave, 2)):
+                avisar("Error", "Valor en la columna B de años",
+                       f"{prefijo}: B={celda(clave, 2)}, pero en esta LN el {PRIMER_ANIO} cae en "
+                       f"{get_column_letter(col_ini)}; revisar la alineación de años.")
+        valores_fuera(clave, validas, prefijo)
 
     capturados = registro["_capturados_cesion"]
     cesion_capturada = bool(capturados)
@@ -519,15 +602,12 @@ def leer_logout(ruta, carpeta):
     # Sin sufijos de copia: "... -v2 (1)" (descarga repetida), "... -v2 - copia" (Explorador)
     nombre_limpio = re.sub(r"(\s*(\(\d+\)|-\s*(copia|copy)(\s*\(\d+\))?))+$", "", ruta.stem,
                            flags=re.IGNORECASE)
-    m = PATRON_NOMBRE.match(nombre_limpio)
     version = re.findall(r"-v(\d+)", nombre_limpio, flags=re.IGNORECASE)
     registro["Versión archivo"] = int(version[-1]) if version else None
     if nombre_limpio != ruta.stem:
         avisar("Info", "Copia de archivo", f"El nombre trae un sufijo de copia: '{ruta.stem[len(nombre_limpio):]}'")
-    if not m:
-        avisar("Info", "Nombre de archivo no estándar",
-               "No sigue Logout_<LN>_r<TR>_b<corredor>_e<cedente>[_c<contrato>]-<venta>-v<n>")
-    else:
+    m = PATRON_NOMBRE.match(nombre_limpio)
+    if m:  # solo los logouts que se llaman Logout_<LN>_r.._b.._e..: el nombre trae las llaves
         esperado = {"LN": m["ln"], "TR": int(m["tr"]), "Corredor": int(m["corredor"]),
                     "Cedente": int(m["cedente"]),
                     "Contrato": int(m["contrato"]) if m["contrato"] else None}
@@ -566,7 +646,11 @@ def leer_logout(ruta, carpeta):
     if cesion_capturada and set(capturados) != set(registro["_capturados_comision"]):
         avisar("Info", "Años distintos en cesión y comisión",
                f"Cesión: {capturados}; Comisión: {registro['_capturados_comision']}")
-    if cesion_capturada and len(capturados) < NUM_ANIOS:
+    if cesion_capturada and capturados[0] > PRIMER_ANIO:
+        avisar("Revisar", f"Cesión sin {PRIMER_ANIO}",
+               f"La cesión empieza en {capturados[0]} (col. "
+               f"{get_column_letter(col_ini + capturados[0] - PRIMER_ANIO)}); falta {PRIMER_ANIO}")
+    elif cesion_capturada and len(capturados) < NUM_ANIOS:
         avisar("Info", "Cesión no viene en todos los años del logout",
                "Años con cesión: " + ", ".join(map(str, capturados)))
     es_combinada = "comb" in normalizar(registro["Tipo Venta"])
@@ -698,38 +782,93 @@ def agregar_nombres(registros):
 
 
 # ------------------------------------------------------------------------------
-# ARMADO DE LA BASE Y ESCRITURA DEL EXCEL
+# ARMADO DE LA BASE
 # ------------------------------------------------------------------------------
-LLAVES = ["LN", "TR", "Cedente", "Corredor", "Contrato", "Tipo Venta"]
+LLAVES = ["LN", "TR", "Cedente", "Corredor", "Contrato", "MGA", "Binder", "Tipo Venta"]
 COLUMNAS_BASE = (
-    ["Archivo", "LN", "Nombre LN", "TR", "TR desc.", "Cedente", "Nombre Cedente", "País Cedente",
-     "Grupo Cedente", "Corredor", "Nombre Corredor", "Of. Rep.", "Contrato", "Tipo Venta",
-     "% Renov.", "MGA"]
+    ["Archivo", "Carpeta LN", "LN", "Nombre LN", "Nivel", "TR", "TR desc.", "Cedente", "Nombre Cedente",
+     "País Cedente", "Grupo Cedente", "Corredor", "Nombre Corredor", "Contrato", "Es MGA", "MGA", "Binder",
+     "Of. Rep.", "Tipo Venta", "% Renov."]
     + [f"% {t}" for t in TIPOS_RETRO] + ["% Total Retrocesión", "Cesión capturada", "Años con cesión"]
     + [f"% Cesión {a}" for a in ANIOS] + [f"% Com. Cedido {a}" for a in ANIOS]
-    + ["GS", "Versión archivo", "Versión vigente", "Observaciones", "Ruta"]
+    + ["GS", "Col. 1er año", "Versión archivo", "Versión vigente", "Observaciones", "Ruta"]
 )
+COLUMNAS_VALIDACIONES = ["Archivo", "Nivel", "Tipo", "Detalle"]
 
 
-def construir_base(carpeta, archivos, no_soportados):
-    registros = []
-    validaciones = [{"Archivo": nombre_relativo(p, carpeta), "Nivel": "Error", "Tipo": "Formato no soportado",
-                     "Detalle": f"{p.suffix} no se puede leer; abrirlo en Excel y guardarlo como .xlsx"}
-                    for p in no_soportados]
+def leer_grupo(etiqueta, carpeta, raiz_relativa, validaciones):
+    """Lee los logouts de la carpeta de una LN. Devuelve (registros, columna del primer año)."""
+    archivos = excels_en(carpeta)
+    for p in excels_en(carpeta, EXT_NO_SOPORTADAS):
+        validaciones.append({"Archivo": nombre_relativo(p, raiz_relativa), "Nivel": "Info",
+                             "Tipo": "Formato no leído",
+                             "Detalle": f"{p.suffix} no se puede leer; si es un logout, guárdalo como .xlsx"})
+    print(f"{etiqueta}: {len(archivos)} archivos en {carpeta}")
+
+    lecturas = []
     for n, ruta in enumerate(archivos, 1):
         print(f"  [{n}/{len(archivos)}] {ruta.name}")
+        archivo = nombre_relativo(ruta, raiz_relativa)
         try:
-            registro, avisos = leer_logout(ruta, carpeta)
+            lectura = leer_filas(ruta, formulas=False)
         except Exception as error:  # archivo dañado, protegido, abierto, etc.
-            validaciones.append({"Archivo": nombre_relativo(ruta, carpeta), "Nivel": "Error",
-                                 "Tipo": "No se pudo leer", "Detalle": f"{type(error).__name__}: {error}"})
+            validaciones.append({"Archivo": archivo, "Nivel": "Error", "Tipo": "No se pudo leer",
+                                 "Detalle": f"{type(error).__name__}: {error}"})
             continue
+        if not lectura[2]:
+            validaciones.append({"Archivo": archivo, "Nivel": "Info", "Tipo": "No es logout",
+                                 "Detalle": f'No tiene la hoja "{HOJA_LOGOUT}"; no se incluye en la base'})
+            continue
+        lecturas.append((ruta, archivo, lectura))
+
+    col_ini = columna_primer_anio([lectura for _, _, lectura in lecturas])
+    registros = []
+    for ruta, archivo, lectura in lecturas:
+        try:
+            registro, avisos = leer_logout(ruta, archivo, lectura, col_ini)
+        except Exception as error:
+            validaciones.append({"Archivo": archivo, "Nivel": "Error", "Tipo": "No se pudo leer",
+                                 "Detalle": f"{type(error).__name__}: {error}"})
+            continue
+        registro["Carpeta LN"] = etiqueta
         registros.append(registro)
         validaciones.extend(avisos)
 
+    # Avisos de la LN completa
+    esperada = partes_ln(etiqueta)
+    for reg in registros:
+        partes = partes_ln(reg["LN"])
+        if esperada and partes and partes[0] != esperada[0]:
+            validaciones.append({"Archivo": reg["Archivo"], "Nivel": "Revisar", "Tipo": "Logout de otra LN",
+                                 "Detalle": f"El logout es de {reg['LN']} y está en la carpeta {etiqueta}"})
+    con_cesion = [r for r in registros if r["_capturados_cesion"]]
+    if COLUMNA_PRIMER_ANIO == "AUTO" and col_ini == 3 and con_cesion:
+        validaciones.append({
+            "Archivo": f"({etiqueta})", "Nivel": "Revisar", "Tipo": "Años recorridos una columna",
+            "Detalle": f"Ningún logout de {etiqueta} trae dato en la col. B del % de cesión: se toma "
+                       f"C = {PRIMER_ANIO}. El recuadro del logout es B..F (así vienen otras LN), así que "
+                       f"probablemente la herramienta de esta LN recorre los años y no exporta {ANIOS[-1]}."})
+    ultimo = ANIOS[-1]
+    multi = sum(len(r["_capturados_cesion"]) > 1 for r in registros)
+    if multi and not any(ultimo in r["_capturados_cesion"] for r in registros):
+        col = get_column_letter(col_ini + NUM_ANIOS - 1)
+        validaciones.append({
+            "Archivo": f"({etiqueta})", "Nivel": "Revisar", "Tipo": f"Ningún logout trae {ultimo}",
+            "Detalle": f"Ningún documento de {etiqueta} tiene % de cesión en la col. {col} ({ultimo}); "
+                       f"{multi} documento(s) capturaron varios años y todos terminan antes."})
+    return registros, col_ini
+
+
+def construir_base(grupos, raiz_relativa):
+    registros, validaciones, columnas_por_ln = [], [], {}
+    for etiqueta, carpeta in grupos:
+        regs, col_ini = leer_grupo(etiqueta, carpeta, raiz_relativa, validaciones)
+        registros += regs
+        columnas_por_ln[etiqueta] = get_column_letter(col_ini)
+
     if not registros:
-        return pd.DataFrame(columns=COLUMNAS_BASE), pd.DataFrame(
-            validaciones, columns=["Archivo", "Nivel", "Tipo", "Detalle"])
+        return (pd.DataFrame(columns=COLUMNAS_BASE),
+                pd.DataFrame(validaciones, columns=COLUMNAS_VALIDACIONES), columnas_por_ln)
 
     if agregar_nombres(registros) == 0:
         validaciones.append({"Archivo": "(todos)", "Nivel": "Info", "Tipo": "Sin catálogo de nombres",
@@ -743,18 +882,6 @@ def construir_base(carpeta, archivos, no_soportados):
                 validaciones.append({"Archivo": reg["Archivo"], "Nivel": "Info", "Tipo": "Código sin nombre",
                                      "Detalle": ", ".join(f"{c} {reg[c]}" for c in sin_nombre)
                                      + " no aparece en el catálogo de los logouts"})
-
-    # Aviso de carpeta: nadie trae el último año (posible recorte del logout)
-    ultimo = ANIOS[-1]
-    multi = sum(len(r["_capturados_cesion"]) > 1 for r in registros)
-    if multi and not any(ultimo in r["_capturados_cesion"] for r in registros):
-        col = get_column_letter(COL_PRIMER_ANIO + NUM_ANIOS - 1)
-        validaciones.append({
-            "Archivo": "(todos)", "Nivel": "Revisar", "Tipo": f"Ningún logout trae {ultimo}",
-            "Detalle": f"Ningún documento tiene % de cesión en la col. {col} ({ultimo}); {multi} documento(s) "
-                       f"capturaron varios años y todos terminan antes. El recuadro del logout es de 5 celdas "
-                       f"(B..F) y B siempre viene vacía: confirmar en un PRESUPUESTO (M34:Q34) si el logout "
-                       f"recorta el último año."})
 
     base = pd.DataFrame(registros)
 
@@ -779,29 +906,34 @@ def construir_base(carpeta, archivos, no_soportados):
         if len(grupo) < 2:
             continue
         for i, fila in grupo.iterrows():
-            otros = [os.path.relpath(r, carpeta) for r in grupo.drop(index=i)["Ruta"]]
+            otros = grupo.drop(index=i)["Archivo"].astype(str)
             validaciones.append({"Archivo": fila["Archivo"], "Nivel": "Revisar", "Tipo": "Documento repetido",
                                  "Detalle": f"Versión vigente: {fila['Versión vigente']}. Misma LN/TR/Cedente/"
-                                            f"Corredor/Contrato/Venta que: " + ", ".join(otros)})
+                                            f"Corredor/Contrato/MGA/Binder/Venta que: " + ", ".join(otros)})
 
-    val = pd.DataFrame(validaciones, columns=["Archivo", "Nivel", "Tipo", "Detalle"])
+    val = pd.DataFrame(validaciones, columns=COLUMNAS_VALIDACIONES)
     resumen_obs = (val[val["Nivel"] != "Info"].groupby("Archivo")["Tipo"]
                    .apply(lambda s: "; ".join(dict.fromkeys(s))))
     base["Observaciones"] = base["Archivo"].map(resumen_obs)
     base = base.reindex(columns=COLUMNAS_BASE)
-    base = base.sort_values(["LN", "TR", "Cedente", "Corredor", "Contrato", "Archivo"],
+    texto = ("Carpeta LN", "LN", "MGA", "Binder", "Archivo")
+    base = base.sort_values(["Carpeta LN", "LN", "TR", "Cedente", "Corredor", "Contrato", "MGA", "Binder",
+                             "Archivo"],
                             key=lambda s: s.map(lambda v: "" if pd.isna(v) else str(v))
-                            if s.name in ("LN", "Archivo") else pd.to_numeric(s, errors="coerce"),
+                            if s.name in texto else pd.to_numeric(s, errors="coerce"),
                             na_position="first")
     orden_nivel = {"Error": 0, "Revisar": 1, "Info": 2}
     val = val.sort_values(["Nivel", "Archivo", "Tipo"],
                           key=lambda s: s.map(orden_nivel) if s.name == "Nivel" else s)
-    return base.reset_index(drop=True), val.reset_index(drop=True)
+    return base.reset_index(drop=True), val.reset_index(drop=True), columnas_por_ln
 
 
+# ------------------------------------------------------------------------------
+# HOJAS DE SALIDA
+# ------------------------------------------------------------------------------
 def construir_anual(base):
-    ids = ["Archivo", "LN", "TR", "TR desc.", "Cedente", "Nombre Cedente", "Corredor", "Nombre Corredor",
-           "Contrato", "Tipo Venta", "Cesión capturada", "Versión vigente"]
+    ids = ["Archivo", "Carpeta LN", "LN", "Nivel", "TR", "TR desc.", "Cedente", "Nombre Cedente", "Corredor",
+           "Nombre Corredor", "Contrato", "MGA", "Binder", "Tipo Venta", "Cesión capturada", "Versión vigente"]
     filas = []
     for _, doc in base.iterrows():
         for anio in ANIOS:
@@ -818,20 +950,23 @@ def construir_anual(base):
 
 
 def construir_resumen(base):
-    """Solo versiones vigentes; los % fuera de 0..100% no entran a mín./promedio/máx."""
+    """Por LN, nivel y TR. Solo versiones vigentes; los % fuera de 0..100% no entran a mín./promedio/máx."""
     if base.empty:
         return pd.DataFrame()
     b = base[base["Versión vigente"].eq("Sí")]
     col = f"% Cesión {PRIMER_ANIO}"
     b = b.assign(_con=b["Cesión capturada"].eq("Sí"), _obs=b["Observaciones"].notna(),
                  _pct=b[col].where(b[col].between(0, 1)),
-                 _desc=b["TR desc."].fillna(""), _nom=b["Nombre LN"].fillna(""))
+                 _desc=b["TR desc."].fillna(""), _nom=b["Nombre LN"].fillna(""), _ln=b["LN"].fillna(""),
+                 _nivel=pd.Categorical(b["Nivel"], categories=NIVELES))
     nombres = {"Documentos": ("Archivo", "count"), "Con % cesión": ("_con", "sum"),
                "Con observaciones": ("_obs", "sum"), f"% Cesión {PRIMER_ANIO} mín.": ("_pct", "min"),
                f"% Cesión {PRIMER_ANIO} promedio simple": ("_pct", "mean"),
                f"% Cesión {PRIMER_ANIO} máx.": ("_pct", "max")}
-    resumen = b.groupby(["LN", "_nom", "TR", "_desc"], dropna=False).agg(**nombres).reset_index()
-    resumen = resumen.rename(columns={"_nom": "Nombre LN", "_desc": "TR desc."})
+    resumen = (b.groupby(["_ln", "_nom", "_nivel", "TR", "_desc"], dropna=False, observed=True)
+               .agg(**nombres).reset_index()
+               .rename(columns={"_ln": "LN", "_nom": "Nombre LN", "_nivel": "Nivel", "_desc": "TR desc."}))
+    resumen["Nivel"] = resumen["Nivel"].astype(str)
     total = {"LN": "TOTAL", "Documentos": len(b), "Con % cesión": int(b["_con"].sum()),
              "Con observaciones": int(b["_obs"].sum()), f"% Cesión {PRIMER_ANIO} mín.": b["_pct"].min(),
              f"% Cesión {PRIMER_ANIO} promedio simple": b["_pct"].mean(),
@@ -839,41 +974,66 @@ def construir_resumen(base):
     return pd.concat([resumen, pd.DataFrame([total])], ignore_index=True)
 
 
-def construir_notas(carpeta, n_archivos, otras_carpetas):
-    col = get_column_letter
-    anios = f"{col(COL_PRIMER_ANIO)}..{col(COL_PRIMER_ANIO + NUM_ANIOS - 1)}"
+def construir_cardinalidad(base, columnas_por_ln):
+    """Una fila por carpeta de LN: cuántos documentos hay de cada nivel y cuál es el de la LN."""
+    filas = []
+    for etiqueta, col in columnas_por_ln.items():
+        b = base[base["Carpeta LN"].eq(etiqueta) & base["Versión vigente"].eq("Sí")] if not base.empty else base
+        conteo = {n: int(b["Nivel"].eq(n).sum()) for n in NIVELES} if not b.empty else dict.fromkeys(NIVELES, 0)
+        presentes = [n for n in NIVELES if conteo[n]]
+        if not presentes:
+            cardinalidad = "Sin documentos"
+        elif len(presentes) == 1:
+            cardinalidad = presentes[0]
+        else:
+            cardinalidad = f"{presentes[-1]} (mixta: " + ", ".join(f"{n} {conteo[n]}" for n in presentes) + ")"
+        filas.append({
+            "Carpeta LN": etiqueta,
+            "LN": ", ".join(sorted(b["LN"].dropna().astype(str).unique())) if not b.empty else "",
+            "Nombre LN": ", ".join(sorted(b["Nombre LN"].dropna().astype(str).unique())) if not b.empty else "",
+            "Documentos": len(b), **{f"Nivel {n}": conteo[n] for n in NIVELES},
+            "Cardinalidad": cardinalidad,
+            "Con % cesión": int(b["Cesión capturada"].eq("Sí").sum()) if not b.empty else 0,
+            "Col. 1er año": col,
+        })
+    return pd.DataFrame(filas)
+
+
+def construir_notas(grupos, n_documentos, avisos_carpetas):
     filas = [
         ("Generado", datetime.now().strftime("%Y-%m-%d %H:%M")),
-        ("Carpeta leída", str(carpeta)),
-        ("Otras carpetas encontradas (no leídas)", ", ".join(map(str, otras_carpetas)) or "Ninguna"),
-        ("Archivos leídos", n_archivos),
-        ("Hoja del logout", HOJA_LOGOUT),
-        ("LN", "Línea de Negocio, col. B"),
-        ("TR", "Tipo Reas., col. B"),
-        ("Cedente", "Compañía, col. B"),
-        ("Corredor", "Corredor (primera aparición, fila del documento), col. B"),
-        ("Of. Rep.", "Of. Rep., col. B"),
-        ("Contrato", "Contrato, col. B (vacío si el documento no tiene contrato)"),
-        ("Tipo Venta / % Renov.", "Tipo Venta, col. B / col. C"),
-        ("MGA / GS", "MGA, col. B / col. F (casilla GS de la tabla de cesión)"),
+        ("LN pedida", LN),
+        *[(f"Carpeta leída ({etiqueta})", str(carpeta)) for etiqueta, carpeta in grupos],
+        ("Avisos de carpetas", " | ".join(avisos_carpetas) or "Ninguno"),
+        ("Documentos en la base", n_documentos),
+        ("Hoja del logout", f"{HOJA_LOGOUT} (los archivos se reconocen por esta hoja, no por su nombre)"),
         ("Archivo", "Ruta del logout dentro de la carpeta leída"),
+        ("Nivel", "Binder si la casilla MGA es Verdadero o trae nombre de MGA/binder; si no, Contrato si trae "
+                  "contrato; si no, Cedente"),
+        ("Cardinalidad_LN", "Por LN, cuántos documentos (versiones vigentes) hay de cada nivel; la cardinalidad "
+                            "de la LN es el nivel más granular que aparece"),
+        ("LN / TR / Cedente / Corredor / Contrato", "Línea de Negocio / Tipo Reas. / Compañía / Corredor "
+                                                    "(primera aparición) / Contrato, col. B"),
+        ("Es MGA / MGA / Binder / GS", "Fila MGA: col. B / C / E / F"),
+        ("Tipo Venta / % Renov.", "Tipo Venta, col. B / col. C"),
         ("Nombre LN, TR desc., Nombre / País / Grupo Cedente, Nombre Corredor",
          "Catálogo del PptoTécnico (nombres definidos " + ", ".join(c[0] for c in CATALOGOS.values())
          + ") que Excel guarda en caché dentro de cada logout; se usa el del propio logout"),
         ("% Tradicional ... % Retención", "Porcentaje, cols. B..E (tabla Tipo Retrocesión)"),
-        ("% Cesión <año>", f"Porcentaje de Cesión, cols. {anios} = {ANIOS[0]}..{ANIOS[-1]}. Es el valor "
-                           "capturado por la LN; no está multiplicado por % Retro Espec. + % Fronting"),
-        ("% Com. Cedido <año>", f"% Comisiones del Cedido, cols. {anios} = {ANIOS[0]}..{ANIOS[-1]}"),
-        ("Advertencia último año", f"El recuadro con formato del logout es B..F y la col. B siempre viene "
-                                   f"vacía; si ningún logout trae dato en {col(COL_PRIMER_ANIO + NUM_ANIOS - 1)}"
-                                   f" ({ANIOS[-1]}), confirmar si la macro del logout lo exporta"),
-        ("Cesión capturada / Años con cesión", "Años con al menos un % de cesión en el logout"),
+        ("% Cesión <año> / % Com. Cedido <año>",
+         f"Porcentaje de Cesión / % Comisiones del Cedido, 5 columnas desde 'Col. 1er año' = "
+         f"{ANIOS[0]}..{ANIOS[-1]}. Es el valor capturado por la LN; no está multiplicado por "
+         "% Retro Espec. + % Fronting"),
+        ("Col. 1er año", "B si algún logout de la LN trae dato en la col. B (recuadro B..F de la plantilla); "
+                         "si ninguno, C (herramienta que recorre los años una columna, p. ej. LN4003)"
+                         if COLUMNA_PRIMER_ANIO == "AUTO" else f"Fijada en {COLUMNA_PRIMER_ANIO}"),
         ("Años sin captura", "Se arrastró el último año capturado" if ARRASTRAR_ULTIMO_ANIO
          else "Se dejan vacíos, tal como vienen en el logout"),
-        ("Versión archivo", "Sufijo -vN del nombre del archivo (no es la fila 'Versión' del logout)"),
-        ("Versión vigente", "Sí = la versión más alta de cada documento (misma LN/TR/Cedente/Corredor/"
-                            "Contrato/Venta); si empatan, la modificada más recientemente"),
-        ("Resumen", "Solo versiones vigentes; los % fuera de 0%..100% no entran a mín./promedio/máx."),
+        ("Versión archivo", "Sufijo -vN del nombre del archivo, si lo trae"),
+        ("Versión vigente", "Sí = la versión más alta de cada documento (misma LN/TR/Cedente/Corredor/Contrato/"
+                            "MGA/Binder/Venta); si empatan, la modificada más recientemente"),
+        ("Resumen / Cardinalidad_LN", "Solo versiones vigentes; los % fuera de 0%..100% no entran a "
+                                      "mín./promedio/máx."),
         ("Observaciones", "Resumen de la hoja Validaciones (niveles Error y Revisar)"),
     ]
     return pd.DataFrame(filas, columns=["Concepto", "Detalle"])
@@ -920,37 +1080,44 @@ def main():
     except Exception:
         pass
     parser = argparse.ArgumentParser(description="Base de % de cesión a partir de los logouts del PPTO.")
-    parser.add_argument("carpeta", nargs="?", help="Carpeta con los logouts (opcional)")
+    parser.add_argument("carpeta", nargs="?", help="Carpeta con los logouts (opcional; si no, se usa LN)")
+    parser.add_argument("--ln", help='LN a procesar, p. ej. LN4006 o TODAS (opcional; si no, se usa LN)')
     parser.add_argument("--salida", help="Carpeta donde guardar el Excel (opcional)")
     args = parser.parse_args()
+    ln_pedida = args.ln or LN
 
-    carpeta, otras_carpetas = ubicar_carpeta(args.carpeta)
-    carpeta = carpeta.expanduser().resolve()
-    if not carpeta.is_dir():
-        sys.exit(f"La carpeta no existe: {carpeta}")
-    archivos, no_soportados = listar_logouts(carpeta)
-    if not archivos and not no_soportados:
-        sys.exit(f"No hay archivos Logout_*.xlsx en: {carpeta}")
+    grupos, avisos_carpetas = ubicar_grupos(args.carpeta, ln_pedida)
+    for _, carpeta in grupos:
+        if not carpeta.is_dir():
+            sys.exit(f"La carpeta no existe: {carpeta}")
+    for aviso in avisos_carpetas:
+        print(f"OJO: {aviso}")
+    if not any(excels_en(c) for _, c in grupos):
+        sys.exit("No hay archivos .xlsx en: " + ", ".join(str(c) for _, c in grupos))
 
-    subcarpetas = sorted({str(p.parent.relative_to(carpeta)) for p in archivos})
-    print(f"Leyendo {len(archivos)} logouts de: {carpeta}")
-    for otra in otras_carpetas:
-        print(f"  OJO: también encontré {otra}; se usa la de logouts más recientes.")
-    if len(subcarpetas) > 1:
-        print(f"  (vienen de {len(subcarpetas)} subcarpetas: {', '.join(subcarpetas)})")
-    base, validaciones = construir_base(carpeta, archivos, no_soportados)
+    # Rutas de "Archivo": dentro de la carpeta de la LN, o desde la carpeta que las contiene si son varias
+    raiz_relativa = grupos[0][1] if len(grupos) == 1 else Path(os.path.commonpath([c for _, c in grupos]))
+    base, validaciones, columnas_por_ln = construir_base(grupos, raiz_relativa)
 
-    lns = sorted(base["LN"].dropna().astype(str).unique()) if not base.empty else []
-    etiqueta_ln = lns[0] if len(lns) == 1 else ("varias_LN" if lns else "sin_LN")
-    destino = Path(args.salida or CARPETA_SALIDA or carpeta.parent).expanduser().resolve()
-    salida = destino / f"Base_Cesion_{etiqueta_ln}_{datetime.now():%Y%m%d_%H%M%S}.xlsx"
+    if len(grupos) > 1:
+        etiqueta = "TODAS"
+    elif partes_ln(grupos[0][0]):
+        etiqueta = grupos[0][0]
+    else:
+        lns = sorted(base["LN"].dropna().astype(str).unique()) if not base.empty else []
+        etiqueta = lns[0] if len(lns) == 1 else ("varias_LN" if lns else "sin_LN")
+    contenedora = grupos[0][1].parent if len(grupos) == 1 else raiz_relativa
+    destino = Path(args.salida or CARPETA_SALIDA or contenedora).expanduser().resolve()
+    salida = destino / f"Base_Cesion_{etiqueta}_{datetime.now():%Y%m%d_%H%M%S}.xlsx"
 
+    cardinalidad = construir_cardinalidad(base, columnas_por_ln)
     hojas = {
         "Base_Cesion": base,
         "Cesion_Anual": construir_anual(base),
         "Resumen": construir_resumen(base),
+        "Cardinalidad_LN": cardinalidad,
         "Validaciones": validaciones,
-        "Notas": construir_notas(carpeta, len(archivos), otras_carpetas),
+        "Notas": construir_notas(grupos, len(base), avisos_carpetas),
     }
     try:
         destino.mkdir(parents=True, exist_ok=True)
@@ -959,18 +1126,20 @@ def main():
         sys.exit(f"No se pudo guardar {salida}:\n  {error}\n"
                  f"Revisa que puedas escribir en {destino} o indica otra carpeta con --salida o CARPETA_SALIDA.")
 
-    con_cesion = int(base["Cesión capturada"].eq("Sí").sum()) if not base.empty else 0
-    solo_primero = int(base["Años con cesión"].eq(str(PRIMER_ANIO)).sum()) if not base.empty else 0
     niveles = validaciones["Nivel"].value_counts() if not validaciones.empty else {}
-    print("\n" + "=" * 70)
-    print(f"Documentos en la base ......... {len(base)} (de {len(archivos) + len(no_soportados)} archivos)")
-    print(f"Con % de cesión capturado ..... {con_cesion} ({solo_primero} solo en {PRIMER_ANIO})")
-    print("Validaciones .................. " +
-          ", ".join(f"{k}: {niveles.get(k, 0)}" for k in ("Error", "Revisar", "Info")))
-    if not validaciones.empty and validaciones["Tipo"].str.startswith("Ningún logout trae").any():
-        print(f"OJO: ningún logout trae % de cesión {ANIOS[-1]}; ver hoja Validaciones.")
-    print(f"Archivo generado .............. {salida}")
-    print("=" * 70)
+    print("\n" + "=" * 78)
+    print(f"{'LN':<14}{'Docs':>6}{'Con cesión':>12}   {'Col. 1er año':<14}Cardinalidad")
+    for _, fila in cardinalidad.iterrows():
+        print(f"{fila['Carpeta LN']:<14}{fila['Documentos']:>6}{fila['Con % cesión']:>12}   "
+              f"{fila['Col. 1er año']:<14}{fila['Cardinalidad']}")
+    print("-" * 78)
+    print("Validaciones .......... " + ", ".join(f"{k}: {niveles.get(k, 0)}" for k in ("Error", "Revisar", "Info")))
+    if not validaciones.empty:
+        for tipo in ("Años recorridos una columna", f"Ningún logout trae {ANIOS[-1]}"):
+            for archivo in validaciones.loc[validaciones["Tipo"].eq(tipo), "Archivo"]:
+                print(f"OJO {archivo}: {tipo.lower()}; ver hoja Validaciones.")
+    print(f"Archivo generado ...... {salida}")
+    print("=" * 78)
 
     if ABRIR_AL_TERMINAR:
         try:
