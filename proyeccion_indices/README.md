@@ -7,11 +7,12 @@ Dos scripts de Python pensados para correr desde VSCode (F5 o *Run Python File*)
 | `llenar_bd_rfv.py` | Llena **BD_ RFV** (ramos de Fianzas 130–170) desde `Res_Rvas_2025` y `Res_Rvas_2026`, con el mismo criterio con el que se llenó a mano la BD de Daños. |
 | `proyeccion_reservas.py` | Proyecta de **202609 a 202712** `HParametros_2026` (índices y LAGs “Real”), `BD_Montos_RRC_SONR` (Daños) y `BD_ RFV` (Fianzas), con el mismo formato de los archivos originales. |
 | `excel_fiel.py` | Módulo auxiliar que usan los dos scripts para guardar los libros sin perder formato (ver sección 4). |
+| `tipo_cambio.py` | Supuesto de tipo de cambio de Inversiones (`TC_Real_Esti.xlsx`, hoja TC: **FCST** 2026 y **FCST 2027**) que se escribe en la columna TC. Actualízalo cuando haya un nuevo pronóstico. |
 
 ## Cómo correrlo
 
 1. Copia los cuatro archivos a `proyeccion_indices/entradas/`: `BD_ BEL - IRR - MR.xlsx`, `BD_ RFV.xlsx`, `Res_Rvas_2025.xlsx` y `Res_Rvas_2026.xlsx`.
-2. Ejecuta `proyeccion_reservas.py`. Tarda unos 2 minutos. Si `salidas/BD_ RFV.xlsx` no existe o alguna entrada es más reciente que ella, primero corre solo el llenado. Genera:
+2. Ejecuta `proyeccion_reservas.py`. Tarda unos 2–3 minutos; en cada corrida vuelve a llenar la BD de Fianzas desde los Res_Rvas (`REGENERAR_BD_RFV`). Genera:
    - `salidas/BD_ RFV.xlsx`: la BD de Fianzas llena, sin proyección.
    - `salidas/BD_ BEL - IRR - MR_Proyeccion.xlsx`
    - `salidas/BD_ RFV_Proyeccion.xlsx`
@@ -24,7 +25,7 @@ Protecciones incluidas:
 
 - Si algún archivo de salida está abierto en Excel, el script avisa **antes** de calcular.
 - Si algún mes a proyectar ya trae cifras reales, se detiene en lugar de sobrescribirlas. En ese caso mueve `PERIODO_INICIO`.
-- Si el último mes real (`PERIODO_INICIO − 1`) está vacío, también se detiene.
+- Si el último mes real (`PERIODO_INICIO − 1`) está vacío en algún concepto que el mes anterior sí traía (mes cargado a medias), también se detiene.
 
 > Las carpetas `entradas/` y `salidas/` y cualquier `.xlsx` están excluidas de git (el repositorio es público y los datos son confidenciales).
 
@@ -53,7 +54,7 @@ El criterio se obtuvo reconstruyendo celda por celda la hoja de referencia de Da
 - **RCONT 2025.** El bloque SAP de contingencia de `BacktestingFIANZAS` 2025 está vacío. El saldo total real de la reserva de contingencia (USD) sí está en `Res_Rvas_2025 › BacktestingCATAS_` (“RESERVA DE CONTINGENCIA / SALDO TOTAL”); viene del archivo FIA y el renglón siguiente liga a `BASE!L14` con diferencias menores a 0.1%. Se repartió por ramo con la mezcla de 2026 (160 ≈ 88.9%, 150 ≈ 6.6%, 170 ≈ 3.4%, 140 ≈ 1.1%, 130 = 0). Cada celda lleva un comentario con su procedencia. Para dejar 0: `RCONT_COMPLETAR_CON_TOTAL_SAP = False`.
 - El valor 3,461,331 de *REAL CIERRE* 202512 en el ramo 130 viene de un archivo de presupuesto y **no** se usa.
 - En la fuente SAP, **202602 = 202601 reconvertido con el TC de febrero**: el MXN no cambió en el archivo fuente. Pasa también en RRC de Daños.
-- La columna TC de las BD para **202606–202608** es una interpolación hacia 18.00. El TC real con el que SAP convirtió esos meses fue 17.4986, 17.3207 y 16.9971. No afecta los montos en USD, pero TC × USD no reproduce el MXN de esos meses.
+- **Columna TC**: se reemplaza con el supuesto de Inversiones de `tipo_cambio.py`. Para 202606–202608 la plantilla traía una interpolación hacia 18.00; ahora lleva el TC real con el que SAP convirtió esos meses (17.4986, 17.3207, 16.9971), así que TC × USD reproduce el MXN. Para 202609–202612 lleva el FCST (17.2228 … 17.9000, que es la interpolación lineal exacta de 16.9971 a 17.90). No cambia ningún monto: 2026 ya viene en USD y 2025 usa su propio TC, que no cambia. Para conservar el TC de la plantilla: `ACTUALIZAR_TC_CON_FCST = False`.
 
 ## 2. Proyección: metodología
 
@@ -76,11 +77,13 @@ Resultados con historia a 202608 (159 series, 1,256 pronósticos fuera de muestr
 
 | Tipo de serie | Procedimiento elegido | Evidencia |
 |---|---|---|
-| Montos (BEL / BRUTO / RCONT) | **Theta + Holt amortiguado** | WAPE 19.7% (ingenuo 24.0%); sesgo agregado a 13–16 m −14% (ingenuo −31%) |
+| Montos (BEL / BRUTO / RCONT) | **Theta + Holt amortiguado** | WAPE 19.7% (ingenuo 24.0%); sesgo agregado a 13–16 m −14% (ingenuo ≈ −30%) |
 | Índices (Ind Sin …) | **Ingenuo + Media 12m** | AvgRelMAE 0.942, IC90 [0.906, 0.981]; mejora en 82% de las series |
-| Razones (%GTO, %MR, %cesión) | **Ingenuo + SES** | AvgRelMAE 0.991 |
-| LAGs | **Ingenuo** (sin deriva) | Ningún procedimiento mejora significativamente al último valor |
+| Razones (%GTO, %MR, %cesión) | **Ingenuo + SES** | AvgRelMAE 0.991 (no es significativamente mejor que el ingenuo, pero tampoco supone tendencia: suaviza el último dato) |
+| LAGs | **Ingenuo** (sin deriva) | El mejor, Ingenuo + Theta, supone tendencia y no mejora significativamente al último valor |
 
+- La validación de montos usa las 21 series BEL de Daños con historia suficiente; Fianzas (20 meses) no alcanza para validar y se le aplica el mismo procedimiento por extensión.
+- Regla de parsimonia: si el intervalo de confianza del mejor procedimiento incluye 1 **y** el procedimiento supone tendencia, se usa el mejor procedimiento sin tendencia. Los procedimientos sin tendencia se consideran igual de parsimoniosos.
 - Elegir el modelo serie por serie (“torneo”) fue menos preciso. Queda como modo alternativo: `MODO_SELECCION = "torneo"`.
 - **Moneda**: los montos se modelan en USD. En backtest, modelar en MXN y convertir con el TC real fue menos preciso en Daños (WAPE 22.5% vs 19.8%) y en Fianzas (7.4% vs 6.0%). Se puede cambiar con `MODELAR_EN_MXN`.
 - **Sesgo conocido**: en 2023–2026 hubo un crecimiento muy fuerte. Los modelos amortiguan la tendencia y a 13–16 meses quedaron en promedio 14% por debajo de lo real. Si el plan de negocio prevé un crecimiento sostenido, conviene contrastarlo.
@@ -93,7 +96,7 @@ Resultados con historia a 202608 (159 series, 1,256 pronósticos fuera de muestr
 **e) Reglas actuariales y de calidad de datos** (todas reportadas en la hoja `Alertas`):
 
 - **Dominio actuarial**: cesión (IRR/BRUTO) en [0, 1] y %GTO, %MR ≥ 0. Razones y LAGs se acotan además al rango histórico.
-- **RCONT**: se proyecta con factores por mes del trimestre (acumula en los meses 1–2 y libera en el 3), que redujeron el error del backtest de 8.8% a 5.2%.
+- **RCONT**: se proyecta con factores por mes del trimestre (acumula en los meses 1–2 y libera en el 3). En un backtest con 7 cortes (12 a 18 meses de entrenamiento), el MAPE con Theta + Holt bajó de 8.6% a 6.2%. Con tan poca historia la cifra es indicativa.
 - **Series especiales**:
   - Las series en cero en los últimos 6 meses se proyectan en cero.
   - Los parámetros “en escalón” conservan el último valor.
@@ -109,7 +112,7 @@ Resultados con historia a 202608 (159 series, 1,256 pronósticos fuera de muestr
 
 - **BD_Montos_RRC_SONR** (Daños y Fianzas): se llenan los renglones 202609–202612 (que venían en 0) y se agregan al final los bloques 2027, en el mismo orden de conceptos del bloque 2026. Se copia el formato de la fila equivalente de 2026 y se trasladan las fórmulas `RVATOT` / `RVA_SEXC`.
 - **HParametros_2026**: se agregan al final los renglones 202609–202712 de los 13 ramos activos, en el mismo orden del último bloque “Real”. `Tipo de Indice` = **“Proyección”**, y el filtro de la hoja se amplía a “Real” + “Proyección”.
-- **TC**: los meses que ya existen conservan el TC de la BD. Los meses de 2027 usan `TC_PROYECCION` o, si no se indica, el último TC de la BD (202612 = 18.00, que es el supuesto de presupuesto de la propia BD).
+- **TC**: la columna TC de 2026 y 2027 lleva el supuesto de Inversiones de `tipo_cambio.py`: FCST 2026 (202601–202608 real) y FCST 2027, de 17.95 a 18.50. Como los montos se modelan en USD, el TC no cambia las cifras proyectadas.
 - Opcional: `RESALTAR_PROYECCION = True` pinta de azul claro las celdas proyectadas.
 
 ## 4. Fidelidad de los archivos

@@ -77,6 +77,7 @@ from openpyxl.comments import Comment  # noqa: E402
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from excel_fiel import guardar_libro, verificar_escritura  # noqa: E402
+from tipo_cambio import TC_FCST  # noqa: E402
 
 # =============================================================================
 # CONFIGURACION
@@ -116,6 +117,11 @@ RCONT_DIVIDIR_ENTRE_TC_EN_ARCHIVOS_USD = False
 #           meses que si traen desglose (2026); cada celda lleva un comentario.
 #   False = se deja en 0 (copia estricta de BacktestingFIANZAS).
 RCONT_COMPLETAR_CON_TOTAL_SAP = True
+
+# Columna TC: se actualiza con el supuesto de Inversiones (tipo_cambio.py: FCST 2026 / FCST 2027) en los
+# meses que trae. 202601-202608 = TC real de SAP (la plantilla traia una interpolacion en 202606-202608).
+# No afecta los montos de 2026 (ya vienen en USD); 2025 se convierte con el TC de la BD (no cambia).
+ACTUALIZAR_TC_CON_FCST = True
 PREFIJO_HOJA_TOTAL_CONTINGENCIA = "BacktestingCATAS"
 
 FORMATO_NUMERO = "#,##0"                             # igual que la BD de Danos
@@ -246,6 +252,15 @@ def llenar():
 
     resumen = []
     advertencias = []
+    if ACTUALIZAR_TC_CON_FCST:
+        cambios = 0
+        for r in range(4, ws.max_row + 1):
+            periodo = ws.cell(r, col_periodo).value
+            if _es_periodo(periodo) and int(periodo) in TC_FCST and ws.cell(r, col_tc).value != TC_FCST[int(periodo)]:
+                ws.cell(r, col_tc).value = TC_FCST[int(periodo)]
+                cambios += 1
+        if cambios:
+            advertencias.append(f"TC actualizado con el supuesto de Inversiones (tipo_cambio.py) en {cambios} renglones")
     for r in range(4, ws.max_row + 1):
         concepto = _norm(ws.cell(r, col_concepto).value)
         periodo = ws.cell(r, col_periodo).value

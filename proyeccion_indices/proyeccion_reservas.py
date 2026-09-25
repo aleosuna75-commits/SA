@@ -130,6 +130,7 @@ from statsmodels.tsa.holtwinters import ExponentialSmoothing, SimpleExpSmoothing
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from excel_fiel import guardar_libro, verificar_escritura  # noqa: E402
+from tipo_cambio import TC_FCST  # noqa: E402
 
 # =============================================================================
 # CONFIGURACION
@@ -159,13 +160,18 @@ INDICES = ["Ind Sin RRC", "Ind sin RRC 99.5%", "Ind Sin SONR Media", "Ind Sin SO
 LAGS = [f"LAG {i}" for i in range(1, 11)]
 PARES_MEDIA_995 = [("Ind Sin RRC", "Ind sin RRC 99.5%"), ("Ind Sin SONR Media", "Ind Sin SONR 99.5%")]
 
-# Tipo de cambio de los meses nuevos (los meses que ya existen en la BD conservan su TC).
-# Ejemplo: TC_PROYECCION = {202701: 18.25, 202702: 18.30}. Lo que no se indique toma el
-# ultimo TC disponible en la BD (supuesto de caminata aleatoria del tipo de cambio).
-TC_PROYECCION: dict[int, float] = {}
+# Tipo de cambio que se escribe en la columna TC: supuesto de Inversiones (tipo_cambio.py, tomado de
+# TC_Real_Esti.xlsx hoja TC: FCST para 2026 y FCST 2027 para 2027). Se aplica a los renglones nuevos y,
+# si ACTUALIZAR_TC_EXISTENTES, tambien a los renglones que ya existen de esos meses (p.ej. 202606-202612,
+# que en la BD traian una interpolacion). Meses sin dato toman el ultimo TC de la BD.
+# Los montos se modelan en USD, asi que el TC no cambia las cifras proyectadas (salvo con MODELAR_EN_MXN).
+TC_PROYECCION: dict[int, float] = dict(TC_FCST)
+ACTUALIZAR_TC_EXISTENTES = True
 
 RESALTAR_PROYECCION = False      # True = relleno azul claro en celdas proyectadas
 SOBRESCRIBIR_PERIODOS_CON_DATOS = False  # False = se detiene si algun mes a proyectar ya trae cifras
+REGENERAR_BD_RFV = True          # True = vuelve a llenar BD_ RFV en cada corrida (tarda ~20 s); False = solo si
+                                 # no existe o alguna entrada tiene fecha mas reciente
 COLOR_RESALTADO = "DDEBF7"
 GENERAR_GRAFICAS = True
 N_PROCESOS = None                # None = automatico (nucleos-1); 1 = sin paralelismo
@@ -535,7 +541,7 @@ def pronosticar(serie: Serie) -> Resultado:
 def _pronosticar(serie: Serie) -> Resultado:
     res, prep = preparar(serie)
     if prep is None:
-        return res
+        return _aplicar_dominio(res, serie.dominio)
     tipo, h = serie.tipo, serie.h
     y, per, brecha = prep["y"], prep["per"], prep["brecha"]
     n = len(y)
@@ -700,9 +706,15 @@ def _pronosticar(serie: Serie) -> Resultado:
     por_h = [np.mean(e) for e in abs_ens if e]
     res.mase_ensamble = float(np.mean(por_h) / escala) if por_h else math.nan
     sd = _sd_por_horizonte(resid, hh)
+    s_hist = s_proy = None
+    if trimestral:
+        f_q = _factores_trimestrales(z, mes0)
+        s_todo = f_q[(mes0 + np.arange(n + hh)) % 12 % 3]
+        s_hist, s_proy = s_todo[:n], s_todo[n:]
     if len(origenes) < CORTES_PISO_INTERVALO:
         # pocos cortes de backtest (series cortas): piso de caminata aleatoria con la volatilidad observada
-        sd = np.maximum(sd, np.std(np.diff(z), ddof=1) * np.sqrt(np.arange(1, hh + 1)))
+        z_ds = z - s_hist if trimestral else z
+        sd = np.maximum(sd, np.std(np.diff(z_ds), ddof=1) * np.sqrt(np.arange(1, hh + 1)))
     if usar_log:
         li, ls = pron * np.exp(-zq * sd), pron * np.exp(zq * sd)
     else:
@@ -711,7 +723,10 @@ def _pronosticar(serie: Serie) -> Resultado:
     res.pronostico, res.li, res.ls = list(p), list(li), list(ls)
     if "Ingenuo" in puntajes and np.isfinite(res.mase_ensamble) and res.mase_ensamble > puntajes["Ingenuo"] * 1.10:
         res.alertas.append("En el backtest de esta serie la proyeccion no supera al ultimo valor (ingenuo)")
-    return _post_proceso(res, y, tipo, serie.dominio)
+    ajuste = None
+    if trimestral and usar_log:
+        ajuste = (np.exp(s_hist), np.exp(s_proy[brecha:]))
+    return _post_proceso(res, y, tipo, serie.dominio, ajuste)
 
 
 def _mase_combinacion(modelos, pred_cv, origenes, y, h_cv, escala):
@@ -815,20 +830,27 @@ def validar_procedimientos(series: list[Serie]):
                 continue
             logrel = np.log(np.array([e_proc[c] / e_base[c] for c in claves]))
             boot = [np.exp(np.mean(rng.choice(logrel, size=len(logrel)))) for _ in range(N_BOOTSTRAP)]
-            suma_real = sum(abs(f[6]) for f in fp)
-            agregado = {}
-            for f in fp:
-                if f[4] >= 13:
-                    a = agregado.setdefault((f[3], f[4]), [0.0, 0.0])
-                    a[0] += f[5]
-                    a[1] += f[6]
-            sesgo_agr = float(np.mean([(F - A) / abs(A) for F, A in agregado.values() if A])) * 100 \
-                if agregado else math.nan
+            # WAPE y sesgo agregado por libro (cada libro en su propia moneda) y promedio entre libros
+            wape_libro, sesgo_libro = [], []
+            for libro in sorted({f[2][0] for f in fp}):
+                fl = [f for f in fp if f[2][0] == libro]
+                suma_real = sum(abs(f[6]) for f in fl)
+                if suma_real:
+                    wape_libro.append(sum(abs(f[5] - f[6]) for f in fl) / suma_real * 100)
+                agregado = {}
+                for f in fl:
+                    if f[4] >= 13:
+                        a = agregado.setdefault((f[3], f[4]), [0.0, 0.0])
+                        a[0] += f[5]
+                        a[1] += f[6]
+                if agregado:
+                    sesgo_libro.append(float(np.mean([(F - A) / abs(A) for F, A in agregado.values() if A])) * 100)
+            sesgo_agr = float(np.mean(sesgo_libro)) if sesgo_libro else math.nan
             ape = lambda h1, h2: float(np.nanmean(  # noqa: E731
                 [abs(f[5] - f[6]) / abs(f[6]) for f in fp if h1 <= f[4] <= h2 and f[6]]) * 100)
             resumen.append({
                 "Tipo": tipo, "Procedimiento": nombre,
-                "WAPE %": float(sum(abs(f[5] - f[6]) for f in fp) / suma_real * 100) if suma_real else math.nan,
+                "WAPE %": float(np.mean(wape_libro)) if wape_libro else math.nan,
                 "AvgRelMAE": float(np.exp(np.mean(logrel))),
                 "IC90 inf": float(np.quantile(boot, 0.05)), "IC90 sup": float(np.quantile(boot, 0.95)),
                 "% series mejor que ingenuo": float(np.mean(logrel < 0)), "Series": len(claves),
@@ -909,7 +931,29 @@ def _factores_trimestrales(z, mes0):
     return f - f.mean()
 
 
-def _post_proceso(res: Resultado, y, tipo, dominio=(None, None)):
+def _recortar_dominio(res: Resultado, p, li, ls, dominio):
+    lo_d, hi_d = dominio
+    if lo_d is None and hi_d is None:
+        return p, li, ls
+    lo_d = -np.inf if lo_d is None else lo_d
+    hi_d = np.inf if hi_d is None else hi_d
+    if np.any(p < lo_d - 1e-12) or np.any(p > hi_d + 1e-12):
+        res.alertas.append(f"Proyeccion fuera del dominio actuarial [{lo_d}, {hi_d}]: se acota "
+                           "(la historia reciente ya estaba fuera; revisar el dato)")
+    return np.clip(p, lo_d, hi_d), np.clip(li, lo_d, hi_d), np.clip(ls, lo_d, hi_d)
+
+
+def _aplicar_dominio(res: Resultado, dominio) -> Resultado:
+    """Dominio actuarial para las series resueltas por una regla (constante, escalon, etc.)."""
+    p = np.array(res.pronostico, dtype=float)
+    if np.all(np.isnan(p)):
+        return res
+    p, li, ls = _recortar_dominio(res, p, np.array(res.li, dtype=float), np.array(res.ls, dtype=float), dominio)
+    res.pronostico, res.li, res.ls = [float(v) for v in p], [float(v) for v in li], [float(v) for v in ls]
+    return res
+
+
+def _post_proceso(res: Resultado, y, tipo, dominio=(None, None), ajuste=None):
     p = np.array(res.pronostico, dtype=float)
     li = np.array(res.li, dtype=float)
     ls = np.array(res.ls, dtype=float)
@@ -920,24 +964,18 @@ def _post_proceso(res: Resultado, y, tipo, dominio=(None, None)):
             res.alertas.append(f"Proyeccion acotada al rango historico [{lo:.4f}, {hi:.4f}]")
         p, li, ls = np.clip(p, lo, hi), np.clip(li, lo, hi), np.clip(ls, lo, hi)
     # dominio actuarial (despues del rango historico, para que siempre prevalezca)
-    lo_d, hi_d = dominio
-    if lo_d is not None or hi_d is not None:
-        lo_d = -np.inf if lo_d is None else lo_d
-        hi_d = np.inf if hi_d is None else hi_d
-        if np.any(p < lo_d - 1e-12) or np.any(p > hi_d + 1e-12):
-            res.alertas.append(f"Proyeccion fuera del dominio actuarial [{lo_d}, {hi_d}]: se acota "
-                               "(la historia reciente ya estaba fuera; revisar el dato)")
-        p, li, ls = np.clip(p, lo_d, hi_d), np.clip(li, lo_d, hi_d), np.clip(ls, lo_d, hi_d)
+    p, li, ls = _recortar_dominio(res, p, li, ls, dominio)
     if tipo == "nivel":
         p, li, ls = np.maximum(p, 0), np.maximum(li, 0), np.maximum(ls, 0)
     if tipo in ("nivel", "indice") and len(y) > len(p) and np.all(y > 0):
         k = len(p)
-        cambios = np.abs(np.log(y[k:] / y[:-k]))
-        if len(cambios) and p[-1] > 0:
-            cambio = abs(math.log(p[-1] / y[-1]))
+        yy, pp = (y, p) if ajuste is None else (y / ajuste[0], p / ajuste[1])   # sin estacionalidad trimestral
+        cambios = np.abs(np.log(yy[k:] / yy[:-k]))
+        if len(cambios) and pp[-1] > 0:
+            cambio = abs(math.log(pp[-1] / yy[-1]))
             if cambio > np.max(cambios) * 1.0 + 1e-12:
                 res.alertas.append(
-                    f"Cambio proyectado a {k} meses ({(p[-1] / y[-1] - 1):+.1%}) mayor al maximo historico "
+                    f"Cambio proyectado a {k} meses ({(pp[-1] / yy[-1] - 1):+.1%}) mayor al maximo historico "
                     f"a {k} meses ({(math.exp(np.max(cambios)) - 1):.1%})")
     res.pronostico, res.li, res.ls = [float(v) for v in p], [float(v) for v in li], [float(v) for v in ls]
     return res
@@ -1010,11 +1048,13 @@ def leer_bd_montos(ruta: Path) -> BDMontos:
 
 
 def tc_para_periodo(bd: BDMontos, p: int) -> float:
-    """TC con que se escribe (y se convierte) cada mes proyectado: el de la BD si el renglon ya existe;
-    si no, TC_PROYECCION o el ultimo TC de la BD."""
+    """TC con que se escribe (y se convierte) cada mes: TC_PROYECCION (supuesto de Inversiones) si lo trae
+    (y, para renglones existentes, solo si ACTUALIZAR_TC_EXISTENTES); si no, el de la BD o su ultimo TC."""
+    if p in TC_PROYECCION and (ACTUALIZAR_TC_EXISTENTES or p not in bd.tc):
+        return TC_PROYECCION[p]
     if p in bd.tc:
         return bd.tc[p]
-    return TC_PROYECCION.get(p, bd.tc[max(bd.tc)])
+    return bd.tc[max(bd.tc)]
 
 
 def leer_tc_real(bd: BDMontos, ultimo: int) -> dict:
@@ -1170,6 +1210,15 @@ def escribir_bd_montos(bd: BDMontos, proy: dict, periodos_proy: list[int], ruta_
                            default=10 ** 9) for c in conceptos_bd}
     orden = sorted(conceptos_bd, key=lambda c: primera_fila[c])
     fila_nueva = ws.max_row + 1
+    # 0) TC de los renglones existentes segun el supuesto de Inversiones
+    tc_cambiados = 0
+    if ACTUALIZAR_TC_EXISTENTES:
+        for (c, p), r in bd.filas.items():
+            if p in TC_PROYECCION:
+                nuevo = TC_PROYECCION[p]
+                if ws.cell(r, bd.col_tc).value != nuevo:
+                    ws.cell(r, bd.col_tc).value = nuevo
+                    tc_cambiados += 1
     # 1) periodos que ya existen (p.ej. 202609-202612 en ceros)
     for (c, p), r in list(bd.filas.items()):
         if p in periodos_proy and c in conceptos_bd:
@@ -1210,7 +1259,7 @@ def escribir_bd_montos(bd: BDMontos, proy: dict, periodos_proy: list[int], ruta_
         ini, fin = ws.auto_filter.ref.split(":")
         col_fin = re.match(r"[A-Z]+", fin).group()
         ws.auto_filter.ref = f"{ini}:{col_fin}{ws.max_row}"
-    return {"actualizados": actualizados, "nuevos": nuevos}
+    return {"actualizados": actualizados, "nuevos": nuevos, "tc_cambiados": tc_cambiados}
 
 
 def _fila_plantilla(bd: BDMontos, concepto: str, periodo: int) -> int:
@@ -1399,9 +1448,9 @@ def escribir_diagnostico(resultados: dict, periodos_proy: list[int], alertas_gen
         ("7. Reglas", "Series en cero -> 0; parametros en escalon -> ultimo valor; series cortas -> SES; "
                       "99.5% >= media si siempre lo fue; limpieza de textos y LAG=0 marcadores; alerta de saltos "
                       "atipicos en el ultimo mes."),
-        ("8. Tipo de cambio", "Meses que ya existen en la BD conservan su TC (202609-202612 = supuesto de la BD); "
-                              "meses nuevos usan TC_PROYECCION o, si no se indica, el ultimo TC de la BD "
-                              f"({resumen.get('tc_ultimo', '')})."),
+        ("8. Tipo de cambio", "Columna TC = supuesto de Inversiones (TC_Real_Esti.xlsx, hoja TC: FCST 2026 y "
+                              "FCST 2027), en tipo_cambio.py; 202601-202608 = TC real de SAP. Los montos se "
+                              "modelan en USD, por lo que el TC no altera las cifras proyectadas."),
         ("9. Sesgo conocido", "En la validacion (2023-2026, periodo de fuerte crecimiento) las proyecciones de montos a "
                               "13-16 meses quedaron en promedio por debajo de lo real (ver 'Sesgo agregado' del "
                               "procedimiento elegido). Los modelos amortiguan la tendencia: si el plan de negocio "
@@ -1487,14 +1536,14 @@ def escribir_diagnostico(resultados: dict, periodos_proy: list[int], alertas_gen
 
     # Pronosticos (drivers con intervalos)
     ws = wb.create_sheet("Pronosticos_Drivers")
-    ws.append(["Libro", "Grupo", "Serie", "Ramo", "Periodo", "Pronostico", f"LI {NIVEL_INTERVALO:.0%}",
+    ws.append(["Libro", "Grupo", "Serie", "Ramo", "Moneda", "Periodo", "Pronostico", f"LI {NIVEL_INTERVALO:.0%}",
                f"LS {NIVEL_INTERVALO:.0%}"])
     for k, r in sorted(resultados.items(), key=lambda kv: tuple(str(x) for x in kv[0])):
         for i, p in enumerate(periodos_proy):
             v = r.pronostico[i]
             if v is None or math.isnan(v):
                 continue
-            ws.append([k[0], k[1], k[2], k[3], p, v, r.li[i], r.ls[i]])
+            ws.append([k[0], k[1], k[2], k[3], r.moneda or "-", p, v, r.li[i], r.ls[i]])
     _formato_tabla(ws, negrita, encab)
 
     # Montos derivados (lo que se escribio en las BD)
@@ -1620,8 +1669,8 @@ def _versiones() -> str:
 
 
 def _bd_rfv_desactualizada() -> bool:
-    """La BD_ RFV llena se regenera si no existe o si alguna entrada es mas reciente."""
-    if not ARCHIVO_BD_RFV.exists():
+    """La BD_ RFV llena se regenera siempre (REGENERAR_BD_RFV) o si no existe o alguna entrada es mas reciente."""
+    if REGENERAR_BD_RFV or not ARCHIVO_BD_RFV.exists():
         return True
     entradas = list(ENTRADAS.glob("Res_Rvas_*.xlsx")) + [ENTRADAS / "BD_ RFV.xlsx"]
     t_salida = ARCHIVO_BD_RFV.stat().st_mtime
@@ -1635,9 +1684,16 @@ def revisar_periodos(bd: BDMontos, nombre: str, ultimo: int, periodos_proy: list
         raise SystemExit(f"{nombre}: los meses {con_datos} ya tienen cifras (reales?) y se sobrescribirian con la "
                          f"proyeccion. Mueve PERIODO_INICIO al mes siguiente al ultimo real o pon "
                          f"SOBRESCRIBIR_PERIODOS_CON_DATOS = True.")
-    if not any(abs(v) > 0 for (c, p, r), v in bd.valores.items() if p == ultimo):
-        raise SystemExit(f"{nombre}: el mes {ultimo} (ultimo real, PERIODO_INICIO - 1) no tiene cifras. Carga ese "
-                         f"mes en la BD o ajusta PERIODO_INICIO.")
+    previo = indice_a_periodo(periodo_a_indice(ultimo) - 1)
+    incompletos = []
+    for concepto in bd.conceptos:
+        tenia = any(abs(bd.valores.get((concepto, previo, r), 0.0)) > 0 for r in bd.cols_ramo)
+        tiene = any(abs(bd.valores.get((concepto, ultimo, r), 0.0)) > 0 for r in bd.cols_ramo)
+        if tenia and not tiene:
+            incompletos.append(concepto)
+    if incompletos:
+        raise SystemExit(f"{nombre}: el mes {ultimo} (ultimo real, PERIODO_INICIO - 1) no tiene cifras en "
+                         f"{incompletos}, aunque {previo} si. Carga ese mes completo o ajusta PERIODO_INICIO.")
     if not any(abs(v) > 0 for (c, p, r), v in bd.valores.items() if p <= ultimo):
         raise SystemExit(f"{nombre}: la historia esta vacia (todo en cero).")
 
@@ -1653,8 +1709,7 @@ def main():
     verificar_escritura(salidas + [ARCHIVO_BD_RFV])
 
     if _bd_rfv_desactualizada():
-        print("La BD_ RFV llena no existe o hay entradas mas recientes; se ejecuta llenar_bd_rfv.py ...",
-              flush=True)
+        print("Llenando BD_ RFV desde los Res_Rvas (llenar_bd_rfv.py) ...", flush=True)
         import llenar_bd_rfv  # noqa: WPS433
         llenar_bd_rfv.llenar()
     print(f"   BD_ RFV usada: {ARCHIVO_BD_RFV.name} "
@@ -1738,7 +1793,7 @@ def main():
     segundos = time.time() - t0
     escribir_diagnostico(resultados, periodos_proy, alertas, {"DANOS": proy_danos, "FIANZAS": proy_rfv},
                          {"ultimo": ultimo, "segundos": segundos, "seleccion": seleccion,
-                          "tc_ultimo": bd_danos.tc[max(bd_danos.tc)], "versiones": _versiones()},
+                          "versiones": _versiones()},
                          tabla_validacion)
     graficas_ok = False
     if GENERAR_GRAFICAS:
@@ -1751,9 +1806,10 @@ def main():
 
     print("\nRESUMEN")
     print(f"   {SALIDA_BD_DANOS.name}: {info_danos['actualizados']} renglones actualizados, "
-          f"{info_danos['nuevos']} renglones nuevos en {HOJA_MONTOS}; {n_hp} renglones nuevos en {HOJA_PARAMETROS}")
+          f"{info_danos['nuevos']} renglones nuevos en {HOJA_MONTOS}; {n_hp} renglones nuevos en {HOJA_PARAMETROS}; "
+          f"TC actualizado en {info_danos['tc_cambiados']} renglones")
     print(f"   {SALIDA_BD_RFV.name}: {info_rfv['actualizados']} renglones actualizados, "
-          f"{info_rfv['nuevos']} renglones nuevos")
+          f"{info_rfv['nuevos']} renglones nuevos; TC actualizado en {info_rfv['tc_cambiados']} renglones")
     print(f"   Diagnostico: {SALIDA_DIAGNOSTICO.name}")
     if GENERAR_GRAFICAS:
         print(f"   Graficas: {SALIDA_GRAFICAS.name}" if graficas_ok

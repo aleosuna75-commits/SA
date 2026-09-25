@@ -12,8 +12,10 @@ Ademas, el guardado es atomico (archivo temporal + reemplazo) y avisa si el arch
 """
 from __future__ import annotations
 
+import html
 import math
 import os
+import posixpath
 import re
 import shutil
 import tempfile
@@ -27,7 +29,7 @@ _SAFE_STRING_ORIGINAL = _writer_celdas.safe_string
 
 def _safe_string_17(value):
     if isinstance(value, float) and math.isfinite(value):
-        return repr(value)
+        return repr(float(value))          # float() normaliza subclases (p.ej. np.float64)
     return _SAFE_STRING_ORIGINAL(value)
 
 
@@ -52,14 +54,14 @@ def _hojas_xml(z: zipfile.ZipFile) -> dict:
         rid = re.search(r'\bId="([^"]+)"', rel)
         tgt = re.search(r'\bTarget="([^"]+)"', rel)
         if rid and tgt:
-            t = tgt.group(1).lstrip("/")
-            destino[rid.group(1)] = t if t.startswith("xl/") else "xl/" + t
+            t = html.unescape(tgt.group(1))
+            destino[rid.group(1)] = posixpath.normpath(t.lstrip("/") if t.startswith("/") else posixpath.join("xl", t))
     hojas = {}
     for hoja in re.findall(r"<sheet\b[^>]*>", wbxml):
         nombre = re.search(r'\bname="([^"]+)"', hoja)
         rid = re.search(r'\br:id="([^"]+)"', hoja)
         if nombre and rid and rid.group(1) in destino:
-            hojas[nombre.group(1)] = destino[rid.group(1)]
+            hojas[html.unescape(nombre.group(1))] = destino[rid.group(1)]
     return hojas
 
 
@@ -89,6 +91,9 @@ def restaurar_encabezados(original: Path, salida: Path) -> int:
             xml = zs.read(ruta).decode("utf-8")
             if _PATRON_HF.search(xml):
                 reemplazos[ruta] = _PATRON_HF.sub(lambda _m: bloque, xml, count=1)
+            else:
+                print(f"   Aviso: la hoja '{nombre}' perdio su encabezado/pie de pagina al guardar "
+                      "(p.ej. etiqueta de sensibilidad); revisalo en Excel.")
         if not reemplazos:
             return 0
         fd, tmp = tempfile.mkstemp(suffix=".xlsx", dir=str(Path(salida).parent))
@@ -128,7 +133,10 @@ def guardar_libro(wb, ruta: Path, original: Path | None = None) -> None:
     try:
         wb.save(tmp)
         if original is not None:
-            restaurar_encabezados(original, Path(tmp))
+            try:
+                restaurar_encabezados(original, Path(tmp))
+            except Exception as e:  # noqa: BLE001
+                print(f"   Aviso: no se pudo restaurar el encabezado/pie de pagina original de {ruta.name}: {e!r}")
         try:
             os.replace(tmp, ruta)
         except PermissionError as e:
