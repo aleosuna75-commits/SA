@@ -6,7 +6,8 @@ Dos scripts de Python pensados para correr desde VSCode (F5 o *Run Python File*)
 |---|---|
 | `llenar_bd_rfv.py` | Llena **BD_ RFV** (ramos de Fianzas 130–170) desde `Res_Rvas_2025` y `Res_Rvas_2026`, con el mismo criterio con el que se llenó a mano la BD de Daños. |
 | `proyeccion_reservas.py` | Proyecta de **202609 a 202712** `HParametros_2026` (índices y LAGs “Real”), `BD_Montos_RRC_SONR` (Daños) y `BD_ RFV` (Fianzas), con el mismo formato de los archivos originales, usando suavizamiento exponencial (Holt / Holt-Winters / SES). |
-| `dashboard.py` | Arma los **dashboards de Excel** de índices y reservas (real y proyectado) a partir de las salidas. Lo llama `proyeccion_reservas.py` al final; también se puede correr solo (ver sección 5). |
+| `dashboard.py` | Arma el **dashboard de Excel** de índices y reservas (real y proyectado) a partir de las salidas. Lo llama `proyeccion_reservas.py` al final; también se puede correr solo (ver sección 5). |
+| `dashboard_html.py` | Arma el mismo dashboard en **HTML** (un solo archivo, sin internet), con tooltips, vista de tabla y modo oscuro. |
 | `excel_fiel.py` | Módulo auxiliar que usan los dos scripts para guardar los libros sin perder formato (ver sección 4). |
 | `tipo_cambio.py` | Supuesto de tipo de cambio de Inversiones (`TC_Real_Esti.xlsx`, hoja TC: **FCST** 2026 y **FCST 2027**) que se escribe en la columna TC. Actualízalo cuando haya un nuevo pronóstico. |
 
@@ -19,7 +20,7 @@ Dos scripts de Python pensados para correr desde VSCode (F5 o *Run Python File*)
    - `salidas/BD_ RFV_Proyeccion.xlsx`
    - `salidas/Diagnostico_Proyeccion.xlsx`: metodología, validación, modelos por serie, intervalos y alertas.
    - `salidas/Graficas_Proyeccion.pdf`: historia contra proyección de cada serie.
-   - `salidas/Dashboard_Indices_Reservas.xlsx`: dashboards interactivos (sección 5).
+   - `salidas/Dashboard_Indices_Reservas.xlsx` y `.html`: dashboards interactivos (sección 5).
 
 Los parámetros (periodos, tipo de cambio 2027, resaltado de celdas, etc.) están en la sección **CONFIGURACIÓN** al inicio de cada script.
 
@@ -138,7 +139,9 @@ Siguen perdiéndose metadatos no visibles:
 
 Excel recalcula las fórmulas al abrir.
 
-## 5. Dashboards (`Dashboard_Indices_Reservas.xlsx`)
+## 5. Dashboards (`Dashboard_Indices_Reservas.xlsx` y `.html`)
+
+Hay dos versiones con el mismo contenido: la de **Excel** (para quien trabaja dentro del libro) y la de **HTML** (`Dashboard_Indices_Reservas.html`, un solo archivo de ~400 KB que se abre con doble clic en cualquier navegador, sin internet ni instalación, y se puede mandar por correo). La HTML tiene además tooltip al pasar el cursor (o con las flechas del teclado), vista de tabla en cada gráfica, modo claro/oscuro y se acomoda al celular. Los datos van incrustados en el archivo, así que lleva la misma etiqueta de uso interno.
 
 Con el estilo del ejemplo: panel de navegación con selectores a la izquierda, banda de indicadores y paneles de gráficas. Azul = real, naranja punteado = proyección, gris = banda al 80% o ramos no seleccionados. No usa macros: los selectores son listas desplegables que alimentan fórmulas (`SUMIFS`) y las gráficas se recalculan al cambiar la selección.
 
@@ -149,7 +152,7 @@ Con el estilo del ejemplo: panel de navegación con selectores a la izquierda, b
 | **Análisis** | Tablas fijas con mapa de calor: índices por ramo (real contra dic-27), totales de reservas por concepto (dic-24 a dic-27) y el modelo por tipo de serie con su error de backtest. |
 | **BD_Indices**, **BD_Reservas** | Las bases que alimentan los dashboards, como tablas de Excel con filtros. |
 
-- Se regenera en cada corrida de la proyección (`GENERAR_DASHBOARD`). Para rehacerlo sin volver a proyectar, corre `dashboard.py`.
+- Los dos se regeneran en cada corrida de la proyección (`GENERAR_DASHBOARD`). Para rehacerlos sin volver a proyectar, corre `dashboard.py` (Excel) o `dashboard_html.py` (HTML).
 - `#N/D` o `s/d` = sin dato para esa combinación; por ejemplo, TEV e Hidro no tienen índices de SONR ni LAGs.
 - Si cambias la reserva y el concepto o el ramo elegidos no existen en ella (por ejemplo GTO en SONR), aparece un aviso bajo los selectores.
 - Hereda la etiqueta de sensibilidad **USO INTERNO** y el pie de página de la BD de origen.

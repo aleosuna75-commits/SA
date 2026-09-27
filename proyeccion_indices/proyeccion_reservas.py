@@ -145,6 +145,7 @@ SALIDA_BD_RFV = SALIDAS / "BD_ RFV_Proyeccion.xlsx"
 SALIDA_DIAGNOSTICO = SALIDAS / "Diagnostico_Proyeccion.xlsx"
 SALIDA_GRAFICAS = SALIDAS / "Graficas_Proyeccion.pdf"
 SALIDA_DASHBOARD = SALIDAS / "Dashboard_Indices_Reservas.xlsx"   # lo arma dashboard.py al final
+SALIDA_DASHBOARD_HTML = SALIDAS / "Dashboard_Indices_Reservas.html"  # lo arma dashboard_html.py (un solo archivo)
 
 PERIODO_INICIO = 202609          # primer mes proyectado
 PERIODO_FIN = 202712             # ultimo mes proyectado
@@ -173,7 +174,7 @@ REGENERAR_BD_RFV = True          # True = vuelve a llenar BD_ RFV en cada corrid
                                  # no existe o alguna entrada tiene fecha mas reciente
 COLOR_RESALTADO = "DDEBF7"
 GENERAR_GRAFICAS = True
-GENERAR_DASHBOARD = True         # dashboards de Excel (indices y reservas, real vs proyeccion)
+GENERAR_DASHBOARD = True         # dashboards de indices y reservas (real vs proyeccion): Excel y HTML
 N_PROCESOS = None                # None = automatico (nucleos-1); 1 = sin paralelismo
 
 # Modelo de proyeccion por tipo de serie (todos de la familia de suavizamiento exponencial de Holt-Winters)
@@ -1319,7 +1320,8 @@ def main():
     print(f"Proyeccion {periodos_proy[0]} - {periodos_proy[-1]} ({h} meses). Historia hasta {ultimo}.", flush=True)
     regenerar_rfv = _bd_rfv_desactualizada()
     salidas = ([SALIDA_BD_DANOS, SALIDA_BD_RFV, SALIDA_DIAGNOSTICO] + ([SALIDA_GRAFICAS] if GENERAR_GRAFICAS else [])
-               + ([SALIDA_DASHBOARD] if GENERAR_DASHBOARD else []) + ([ARCHIVO_BD_RFV] if regenerar_rfv else []))
+               + ([SALIDA_DASHBOARD, SALIDA_DASHBOARD_HTML] if GENERAR_DASHBOARD else [])
+               + ([ARCHIVO_BD_RFV] if regenerar_rfv else []))
     verificar_escritura(salidas)
 
     if regenerar_rfv:
@@ -1405,14 +1407,20 @@ def main():
             graficas_ok = True
         except Exception as e:  # noqa: BLE001
             print(f"   No se pudieron generar las graficas: {e!r}")
-    dashboard_ok = False
+    dashboard_ok = html_ok = False
     if GENERAR_DASHBOARD:
         try:
             import dashboard  # noqa: WPS433
             dashboard.generar(SALIDA_DASHBOARD)
             dashboard_ok = True
         except Exception as e:  # noqa: BLE001
-            print(f"   No se pudo generar el dashboard: {e!r}")
+            print(f"   No se pudo generar el dashboard de Excel: {e!r}")
+        try:
+            import dashboard_html  # noqa: WPS433
+            dashboard_html.generar(SALIDA_DASHBOARD_HTML)
+            html_ok = True
+        except Exception as e:  # noqa: BLE001
+            print(f"   No se pudo generar el dashboard HTML: {e!r}")
 
     print("\nRESUMEN")
     print(f"   {SALIDA_BD_DANOS.name}: {info_danos['actualizados']} renglones actualizados, "
@@ -1425,8 +1433,10 @@ def main():
         print(f"   Graficas: {SALIDA_GRAFICAS.name}" if graficas_ok
               else "   Graficas: NO se actualizaron (ver mensaje arriba)")
     if GENERAR_DASHBOARD:
-        print(f"   Dashboard: {SALIDA_DASHBOARD.name}" if dashboard_ok
-              else "   Dashboard: NO se actualizo (ver mensaje arriba)")
+        print(f"   Dashboard Excel: {SALIDA_DASHBOARD.name}" if dashboard_ok
+              else "   Dashboard Excel: NO se actualizo (ver mensaje arriba)")
+        print(f"   Dashboard HTML: {SALIDA_DASHBOARD_HTML.name}" if html_ok
+              else "   Dashboard HTML: NO se actualizo (ver mensaje arriba)")
     n_alertas = len(alertas) + sum(len(r.alertas) for r in resultados.values())
     print(f"   Alertas a revisar: {n_alertas} (hoja 'Alertas' del diagnostico)")
     print(f"   Tiempo total: {time.time() - t0:,.0f} s")
