@@ -330,7 +330,8 @@ const fmt = (v, d) => { if (v == null || !isFinite(v)) return 's/d'; if (Math.ab
 const varPct = (base, v) => (base > 0 && v != null && isFinite(v)) ? v / base - 1 : null;   // variacion solo con base positiva
 const decimalesPaso = (ts, minimo) => { const paso = ts.length > 1 ? Math.abs(ts[1] - ts[0]) : 1; return Math.max(minimo || 0, Math.min(6, Math.ceil(-Math.log10(paso) - 1e-9))); };
 const fmtPct = v => (v == null || !isFinite(v)) ? 's/d' : (v > 0 ? '+' : v < 0 ? '−' : '') + nf(1).format(Math.abs(v) * 100) + ' %';
-const cssVar = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const cssVar = n => `var(${n})`;                    // las marcas usan la variable: siguen al tema y a la impresion
+const cssHex = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
 const el = (tag, attrs = {}, ...hijos) => {
   const e = document.createElement(tag);
   for (const [k, v] of Object.entries(attrs)) {
@@ -670,7 +671,7 @@ function colorDivergente(v, lim) {
     const pa = a.match(/\w\w/g).map(h => parseInt(h, 16)), pb = b.match(/\w\w/g).map(h => parseInt(h, 16));
     return 'rgb(' + pa.map((c, i) => Math.round(c + (pb[i] - c) * f)).join(',') + ')';
   };
-  const mid = cssVar('--div-mid'), pole = t < 0 ? cssVar('--div-neg') : cssVar('--div-pos');
+  const mid = cssHex('--div-mid'), pole = t < 0 ? cssHex('--div-neg') : cssHex('--div-pos');
   return mezcla(mid, pole, Math.abs(t) * 0.75);
 }
 
