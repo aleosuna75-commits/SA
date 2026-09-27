@@ -25,38 +25,36 @@ a) Coherencia contable. No se proyectan todas las lineas por separado: se proyec
               MR = m*BEL ; BRUTO = BEL+MR ; IRR = c*BRUTO ; NETO = BRUTO-IRR
        RFV :  BRUTO (nivel), c = IRR/BRUTO ; IRR = c*BRUTO ; NETO = BRUTO-IRR
               RCONT: se proyecta el total y se reparte por ramo con la mezcla de los ultimos 8 meses.
-b) Modelos: Ingenuo (caminata aleatoria), Ingenuo estacional, Media 12m, Suavizamiento
-   exponencial simple (SES), Holt con tendencia amortiguada, Holt-Winters amortiguado
-   (estacionalidad 12), Metodo Theta, ARIMA (orden por AICc) y Regresion log-lineal
-   (tendencia + estacionalidad mensual). Montos e indices se modelan en logaritmos
-   (efectos multiplicativos, garantiza positividad); razones y LAGs en escala original.
-c) Seleccion con validacion fuera de muestra del METODO COMPLETO: se simula haber
-   proyectado desde 8 cortes historicos a 1-16 meses con cada procedimiento candidato
-   (modelos solos y combinaciones de pesos iguales). Montos: menor WAPE (pondera por USD),
-   desempate por sesgo agregado. Indices, razones y LAGs: menor AvgRelMAE (error relativo
-   al ingenuo) y, si su IC bootstrap al 90% incluye 1, el mejor procedimiento sin tendencia.
-   Con la historia a 202608 resultaron: montos -> Theta + Holt amortiguado; indices ->
-   Ingenuo + Media 12m; razones -> Ingenuo + SES; LAGs -> Ingenuo. Elegir el modelo serie
-   por serie ("torneo") fue menos preciso y queda como modo alternativo. Los montos se
-   modelan en USD: modelar en MXN y convertir con el TC real fue menos preciso (Danos y
-   Fianzas); se puede cambiar en MODELAR_EN_MXN.
-d) Backtest rolling-origin por serie (todos los modelos, mismos cortes, sin fuga): da el
-   MASE de cada modelo por serie (hoja Series_Modelos), los intervalos al 80% y una red de
-   seguridad: si en la propia serie el procedimiento validado es > 1.5x peor que el
-   ingenuo (p.ej. cambio de regimen), se usa el ensamble propio de esa serie.
-e) Reglas actuariales / de calidad de datos (todas reportadas en la hoja "Alertas"):
+b) Un solo tipo de modelo: suavizamiento exponencial (familia Holt-Winters), en la variante
+   que corresponde a cada tipo de serie (MODELO_POR_TIPO):
+       - montos (BEL, BRUTO) e indices de HParametros -> Holt con tendencia amortiguada, en
+         logaritmos (crecimiento porcentual, siempre positivo);
+       - LAGs (patron de desarrollo) -> Holt con tendencia amortiguada, no negativos (en algunos
+         ramos el patron acumulado supera 1, asi que no se acota por arriba);
+       - razones (%GTO, %MR, %cedido) -> SES (nivel suavizado, sin tendencia: dependen de los
+         contratos y en el backtest la tendencia no ayudo);
+       - RCONT -> Holt-Winters amortiguado con estacionalidad por mes del trimestre (acumula en
+         los meses 1-2 y libera en el 3).
+   Los parametros se estiman por maxima verosimilitud dentro de cotas (COTAS_SUAVIZAMIENTO):
+   alpha ~ 1 (la proyeccion arranca del ultimo dato real), beta <= 0.15 (la tendencia es la de los
+   ultimos anos, no la del ultimo mes) y phi entre 0.80 y 0.95 (se amortigua hacia adelante). Los
+   intervalos al 80% salen del propio modelo.
+c) Backtest por serie: se vuelve a proyectar desde 16, 12 y 8 meses antes del final y se mide el
+   error contra lo real, del modelo y de las alternativas simples (ultimo valor y SES). Se
+   reporta por serie (Series_Modelos) y por tipo (Backtest); no cambia el modelo.
+d) Reglas actuariales / de calidad de datos (todas reportadas en la hoja "Alertas"):
        - series en cero en los ultimos 6 meses -> se proyectan en cero;
        - parametros "en escalon" (se actualizan esporadicamente, >=50% de meses sin
          cambio) -> se mantiene el ultimo valor;
-       - series cortas (<18 obs) -> SES;
-       - razones y LAGs se acotan al rango historico observado y al dominio actuarial
-         (cesion en [0, 1], %GTO y %MR >= 0);
-       - RCONT con factores por mes del trimestre (acumula meses 1-2, libera en el 3);
-       - alerta de saltos atipicos en el ultimo mes;
+       - series cortas (<12 obs) -> SES; (<4 obs) -> ultimo valor;
+       - dominio actuarial: cesion en [0, 1], %GTO y %MR >= 0, LAGs >= 0, montos >= 0;
+       - alerta de saltos atipicos en el ultimo mes y de cambios proyectados mayores a los
+         observados en la historia;
        - 99.5% >= media cuando asi ha sido siempre en la historia del ramo;
        - textos con espacios / celdas vacias se limpian; huecos <= 6 meses se interpolan
          y con huecos mayores solo se usa la historia posterior;
        - LAG en 0 despues de que el patron acumulado ya supero 50% se trata como faltante.
+   Los montos se modelan en USD (modelar en MXN y convertir con el TC fue menos preciso).
 
 USO: abrir en VSCode y ejecutar (F5 o "Run Python File"). Los paquetes que falten se
 instalan automaticamente en el interprete activo. Parametros en la seccion CONFIGURACION.
@@ -123,10 +121,9 @@ import openpyxl  # noqa: E402
 from openpyxl.formula.translate import Translator  # noqa: E402
 from openpyxl.styles import Alignment, Font, PatternFill  # noqa: E402
 from openpyxl.utils import get_column_letter  # noqa: E402
+import pandas as pd  # noqa: E402
 from scipy.stats import norm as _normal  # noqa: E402
-from statsmodels.tsa.arima.model import ARIMA  # noqa: E402
-from statsmodels.tsa.forecasting.theta import ThetaModel  # noqa: E402
-from statsmodels.tsa.holtwinters import ExponentialSmoothing, SimpleExpSmoothing  # noqa: E402
+from statsmodels.tsa.exponential_smoothing.ets import ETSModel  # noqa: E402
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from excel_fiel import guardar_libro, verificar_escritura  # noqa: E402
@@ -178,30 +175,32 @@ GENERAR_GRAFICAS = True
 GENERAR_DASHBOARD = True         # dashboards de Excel (indices y reservas, real vs proyeccion)
 N_PROCESOS = None                # None = automatico (nucleos-1); 1 = sin paralelismo
 
-# Parametros del torneo de modelos
-CV_ORIGENES = 8                  # fechas de corte del backtest
-CV_PASO = 2                      # meses entre fechas de corte
-MIN_ENTRENAMIENTO = 12           # obs minimas para ajustar en cada corte
-MIN_OBS_TORNEO = 18              # con menos obs no hay torneo (SES / ultimo valor)
-MIN_OBS_ESTACIONAL = 24          # obs minimas para modelos estacionales (2 ciclos)
-H_CV = 16                        # horizonte maximo evaluado en el backtest
-MIN_CORTES_CV = 4                # cortes minimos del backtest
+# Modelo de proyeccion por tipo de serie (todos de la familia de suavizamiento exponencial de Holt-Winters)
+MODELO_POR_TIPO = {
+    "nivel": "Holt amortiguado",     # montos (BEL, BRUTO): nivel + tendencia amortiguada, en logaritmos
+    "indice": "Holt amortiguado",    # indices de HParametros, en logaritmos
+    "lag": "Holt amortiguado",       # patron de desarrollo (LAG 1-10), escala original, no negativo
+    "razon": "SES",                  # %GTO, %MR y %cedido: dependen de los contratos -> nivel suavizado sin tendencia
+}
+# RCONT (ESTACIONALIDAD_TRIMESTRAL) usa Holt-Winters amortiguado con estacionalidad por mes del trimestre.
+# Cotas de los parametros (se estiman por maxima verosimilitud dentro de ellas):
+#   * alpha (nivel) ~ 1: la proyeccion arranca del ultimo dato real, sin escalon entre lo real y lo proyectado
+#     (statsmodels no admite alpha = 1 exacto; 0.99 es equivalente en la practica);
+#   * beta (tendencia) entre 0.02 y 0.15: la tendencia es el promedio suavizado de los cambios de los ultimos
+#     anos, no la del ultimo mes;
+#   * phi (amortiguacion) entre 0.80 y 0.95: la tendencia se reduce entre 5% y 20% cada mes hacia adelante.
+#   En RCONT (Holt-Winters trimestral) el nivel si se suaviza (alpha >= 0.2) para separar la estacionalidad.
+# Sin cotas, en series cortas o ruidosas la estimacion cae en casos degenerados (alpha = 0 ignora el nivel
+# actual; beta alto convierte un salto de un mes en tendencia; phi = 0.98 extrapola casi lineal) que en el
+# backtest fueron peores.
+COTAS_SUAVIZAMIENTO = {"smoothing_level": (0.90, 0.99), "smoothing_trend": (0.02, 0.15), "damping_trend": (0.80, 0.95)}
+COTAS_ESTACIONAL = {**COTAS_SUAVIZAMIENTO, "smoothing_level": (0.20, 0.99)}
+MIN_OBS_HOLT = 12                # con menos observaciones se usa SES
+MIN_OBS_SES = 4                  # con menos observaciones se mantiene el ultimo valor
+MIN_OBS_TRIMESTRAL = 12          # observaciones minimas para estimar la estacionalidad trimestral
+CORTES_BACKTEST = (16, 12, 8)    # meses antes del final desde los que se re-proyecta para medir el error
+MIN_ENTRENAMIENTO = 18           # observaciones minimas para un corte del backtest
 MAX_HUECO_INTERPOLABLE = 6       # huecos mas largos cortan la historia
-# Seleccion del metodo de proyeccion:
-#   "validado" = por tipo de serie se usa el procedimiento con menor error en la validacion fuera
-#                de muestra del metodo completo (se recalcula en cada corrida)  <- recomendado
-#   "torneo"   = cada serie elige su propio ensamble con su backtest (mas flexible, pero en la
-#                validacion con estos datos resulto menos preciso que "validado")
-MODO_SELECCION = "validado"
-MIN_SERIES_VALIDACION = 5        # series minimas de un tipo para validar; si no, PROCEDIMIENTO_RESPALDO
-MAX_INTERPOLADOS_VALIDACION = 3  # la validacion solo usa series con a lo mas 3 meses interpolados
-TOLERANCIA_WAPE = 0.02           # montos: procedimientos a <= 2% del mejor WAPE se desempatan por sesgo
-N_BOOTSTRAP = 2000               # remuestreos (por serie) para el IC90 del AvgRelMAE
-CORTES_PISO_INTERVALO = 6        # con menos cortes de backtest, piso de caminata aleatoria a los intervalos
-FACTOR_RESPALDO_SERIE = 1.5      # red de seguridad: si en el backtest de la propia serie el procedimiento
-                                 # validado es > 1.5x peor que el ingenuo, se usa el ensamble propio de la serie
-MAX_MODELOS_ENSAMBLE = 3
-TOLERANCIA_ENSAMBLE = 1.5        # entran al ensamble los modelos con error <= 1.5 x el mejor
 UMBRAL_CERO_MONTOS = 1.0         # |monto| < 1 USD se considera 0
 MESES_CERO_EXTINTA = 6           # ultimos N meses en cero -> serie extinta
 UMBRAL_ESCALON = 0.5             # >= 50% de meses sin cambio -> parametro en escalon
@@ -227,6 +226,7 @@ MODELAR_EN_MXN = {"DANOS": False, "FIANZAS": False}
 ESTACIONALIDAD_TRIMESTRAL = ("RCONT",)   # acumula en meses 1-2 del trimestre y libera en el 3
 DOMINIO_CESION = (0.0, 1.0)      # IRR/BRUTO entre 0 y 100%
 DOMINIO_RAZON_BEL = (0.0, None)  # GTO/BEL y MR/BEL no negativos
+DOMINIO_LAG = (0.0, None)        # patron de desarrollo acumulado (en ramos como el 31 supera 1: no se acota arriba)
 
 warnings.filterwarnings("ignore")
 
@@ -271,134 +271,19 @@ def norm(t) -> str:
 
 
 # =============================================================================
-# MODELOS
+# MODELOS: suavizamiento exponencial (familia Holt-Winters)
 # =============================================================================
-def _m_ingenuo(z, h):
-    return np.repeat(z[-1], h)
-
-
-def _m_ingenuo_estacional(z, h):
-    n = len(z)
-    return np.array([z[n + i - 12 * (i // 12 + 1)] for i in range(h)])
-
-
-def _m_media12(z, h):
-    return np.repeat(np.mean(z[-12:]), h)
-
-
-def _m_ses(z, h):
-    return SimpleExpSmoothing(z, initialization_method="estimated").fit().forecast(h)
-
-
-def _m_holt_amortiguado(z, h):
-    return ExponentialSmoothing(z, trend="add", damped_trend=True,
-                                initialization_method="estimated").fit().forecast(h)
-
-
-def _m_hw_amortiguado(z, h):
-    return ExponentialSmoothing(z, trend="add", damped_trend=True, seasonal="add", seasonal_periods=12,
-                                initialization_method="estimated").fit().forecast(h)
-
-
-def _m_theta(z, h):
-    estacional = len(z) >= 24
-    return np.asarray(ThetaModel(z, period=12, deseasonalize=estacional, method="additive")
-                      .fit().forecast(h))
-
-
-ORDENES_ARIMA = [((0, 1, 1), "n"), ((1, 1, 0), "n"), ((1, 1, 1), "n"), ((0, 1, 1), "t"),
-                 ((1, 0, 0), "c"), ((2, 0, 0), "c")]
-
-
-def _aicc(res, n):
-    k = len(res.params)
-    return res.aic + (2 * k * (k + 1)) / max(n - k - 1, 1)
-
-
-def seleccionar_arima(z):
-    mejor, mejor_aicc = None, math.inf
-    for orden, tendencia in ORDENES_ARIMA:
-        try:
-            res = ARIMA(z, order=orden, trend=tendencia).fit()
-            a = _aicc(res, len(z))
-            if np.isfinite(a) and a < mejor_aicc:
-                mejor, mejor_aicc = (orden, tendencia), a
-        except Exception:  # noqa: BLE001
-            continue
-    return mejor
-
-
-def _m_arima(z, h, orden=None):
-    orden = orden or seleccionar_arima(z)
-    if orden is None:
-        raise ValueError("sin ARIMA valido")
-    return ARIMA(z, order=orden[0], trend=orden[1]).fit().forecast(h)
-
-
-def _m_regresion(z, h, mes0=0):
-    """Regresion (en la escala transformada) con tendencia lineal y dummies de mes
-    (si hay >=36 obs) sobre las ultimas 36 observaciones. mes0 = mes calendario (0-11)
-    de la primera observacion de z."""
-    n = len(z)
-    k = min(n, 36)
-    t = np.arange(n - k, n + h, dtype=float)
-    meses = (mes0 + np.arange(n - k, n + h)) % 12
-    X = [np.ones_like(t), t]
-    if k >= 36:
-        for m in range(1, 12):
-            X.append((meses == m).astype(float))
-    X = np.column_stack(X)
-    beta, *_ = np.linalg.lstsq(X[:k], z[n - k:], rcond=None)
-    return X[k:] @ beta
-
-
-CATALOGO = {
-    "Ingenuo": (_m_ingenuo, 1, False),
-    "Ingenuo estacional": (_m_ingenuo_estacional, MIN_OBS_ESTACIONAL, True),
-    "Media 12m": (_m_media12, 12, False),
-    "SES": (_m_ses, 8, False),
-    "Holt amortiguado": (_m_holt_amortiguado, 10, False),
-    "Holt-Winters amortiguado": (_m_hw_amortiguado, MIN_OBS_ESTACIONAL, True),
-    "Theta": (_m_theta, 10, False),
-    "ARIMA": (_m_arima, 12, False),
-    "Regresion log-lineal": (_m_regresion, 12, False),
+# Todos son casos de un mismo modelo: nivel + tendencia amortiguada + estacionalidad.
+#   SES                = solo nivel (la serie no tiene tendencia)
+#   Holt amortiguado   = nivel + tendencia que se va amortiguando (phi) hacia adelante
+#   Holt-Winters       = ademas, estacionalidad (aqui solo la trimestral de RCONT)
+MODELOS = {
+    "SES": dict(),
+    "Holt amortiguado": dict(trend="add", damped_trend=True),
+    "Holt-Winters amortiguado (trimestral)": dict(trend="add", damped_trend=True, seasonal="add",
+                                                  seasonal_periods=3),
 }
-
-MODELOS_POR_TIPO = {            # candidatos del backtest por serie (diagnostico / modo "torneo")
-    "nivel": ["Ingenuo", "Ingenuo estacional", "SES", "Holt amortiguado", "Holt-Winters amortiguado",
-              "Theta", "ARIMA", "Regresion log-lineal"],
-    "indice": ["Ingenuo", "Ingenuo estacional", "Media 12m", "SES", "Holt amortiguado",
-               "Holt-Winters amortiguado", "Theta", "ARIMA", "Regresion log-lineal"],
-    "razon": ["Ingenuo", "Media 12m", "SES", "Holt amortiguado", "Holt-Winters amortiguado", "Theta", "ARIMA"],
-    "lag": ["Ingenuo", "Media 12m", "SES", "Holt amortiguado", "Theta"],
-}
-
-# Procedimientos candidatos (combinaciones de pesos iguales) que se comparan en la validacion
-# fuera de muestra del metodo completo; se elige, por tipo de serie, el de menor error.
-MODELOS_BASE_VALIDACION = ["Ingenuo", "SES", "Holt amortiguado", "Theta", "Media 12m"]
-PROCEDIMIENTOS_CANDIDATOS = {
-    "Ingenuo": ["Ingenuo"],
-    "SES": ["SES"],
-    "Holt amortiguado": ["Holt amortiguado"],
-    "Theta": ["Theta"],
-    "Media 12m": ["Media 12m"],
-    "Ingenuo + SES": ["Ingenuo", "SES"],
-    "Ingenuo + Theta": ["Ingenuo", "Theta"],
-    "Ingenuo + Media 12m": ["Ingenuo", "Media 12m"],
-    "Theta + Holt amortiguado": ["Theta", "Holt amortiguado"],
-    "Ingenuo + SES + Media 12m": ["Ingenuo", "SES", "Media 12m"],
-    "SES + Holt amortiguado + Theta": ["SES", "Holt amortiguado", "Theta"],
-}
-PROCEDIMIENTOS_SIN_TENDENCIA = {"Ingenuo", "SES", "Media 12m", "Ingenuo + SES", "Ingenuo + Media 12m",
-                                "Ingenuo + SES + Media 12m"}
-# Respaldo si un tipo no tiene suficientes series para validar (resultado de la validacion con la
-# historia a 202608)
-PROCEDIMIENTO_RESPALDO = {
-    "nivel": "Theta + Holt amortiguado",
-    "indice": "Ingenuo + Media 12m",
-    "razon": "Ingenuo + SES",
-    "lag": "Ingenuo",
-}
+ULTIMO_VALOR = "Ultimo valor"
 
 
 @dataclass
@@ -409,7 +294,6 @@ class Serie:
     valores: list[float]         # nan = sin dato
     ultimo_periodo: int          # ultimo mes real global (la proyeccion arranca al mes siguiente)
     h: int                       # meses a proyectar
-    procedimiento: tuple = ()    # modelos a combinar (pesos iguales); vacio = torneo por serie
     trimestral: bool = False     # estacionalidad por mes del trimestre (p.ej. RCONT)
     dominio: tuple = (None, None)  # cotas actuariales (min, max) de la serie proyectada
     moneda: str = ""             # moneda en que se modela (montos)
@@ -422,36 +306,47 @@ class Resultado:
     pronostico: list[float]
     li: list[float]
     ls: list[float]
-    regla: str
+    regla: str                                       # regla de datos que resolvio la serie (si aplica)
+    modelo: str = ""                                 # modelo usado
     transformacion: str = ""
     n_obs: int = 0
-    modelos: dict = field(default_factory=dict)     # nombre -> MASE backtest de la serie
-    pesos: dict = field(default_factory=dict)        # nombre -> peso en la combinacion final
-    mase_ensamble: float = math.nan                  # MASE backtest de la combinacion final
+    parametros: dict = field(default_factory=dict)   # alpha, beta, phi, gamma estimados
+    tendencia_mensual: float = math.nan              # pendiente al final de la historia (log: % mensual)
+    n_cortes: int = 0                                # cortes del backtest
+    error_modelo: float = math.nan                   # error % (WAPE) del modelo en el backtest
+    error_ultimo_valor: float = math.nan             # idem, repitiendo el ultimo valor
+    error_ses: float = math.nan                      # idem, SES
     alertas: list = field(default_factory=list)
-    n_cortes: int = 0
     moneda: str = ""
     historia_periodos: list = field(default_factory=list)
     historia_valores: list = field(default_factory=list)
 
 
-def _ajustar(nombre, z, h, mes0, orden_arima):
-    f = CATALOGO[nombre][0]
-    if nombre == "ARIMA":
-        return np.asarray(f(z, h, orden_arima), dtype=float)
-    if nombre == "Regresion log-lineal":
-        return np.asarray(f(z, h, mes0), dtype=float)
-    return np.asarray(f(z, h), dtype=float)
+def ajustar_ets(z, modelo: str, h: int):
+    """Ajusta el modelo a z (en la escala del modelo) y devuelve pronostico, intervalo y parametros."""
+    kw = MODELOS[modelo]
+    if not kw.get("trend"):
+        cotas = None                                    # SES: alpha libre
+    else:
+        cotas = dict(COTAS_ESTACIONAL if kw.get("seasonal") else COTAS_SUAVIZAMIENTO)
+    m = ETSModel(pd.Series(np.asarray(z, dtype=float)), error="add", bounds=cotas, **kw).fit(disp=False, maxiter=500)
+    pred = m.get_prediction(start=len(z), end=len(z) + h - 1).summary_frame(alpha=1 - NIVEL_INTERVALO)
+    nombres = {"smoothing_level": "alpha", "smoothing_trend": "beta", "damping_trend": "phi",
+               "smoothing_seasonal": "gamma"}
+    params = {nombres[k]: float(v) for k, v in zip(m.param_names, np.asarray(m.params, dtype=float))
+              if k in nombres}
+    pendiente = float(m.states["trend"].iloc[-1]) if kw.get("trend") else 0.0
+    return pred["mean"].to_numpy(), pred["pi_lower"].to_numpy(), pred["pi_upper"].to_numpy(), params, pendiente
 
 
-def _origenes_cv(n: int, minimo: int) -> list[int]:
-    """Cortes del backtest (longitud del entrenamiento). Se combinan cortes con ventana de prueba
-    completa de H_CV meses (miden el error a 16 meses con varias repeticiones) y cortes recientes
-    (horizontes cortos con la informacion mas nueva). Todos los modelos se evaluan en los mismos."""
-    fin_completo = n - H_CV
-    completos = range(fin_completo - CV_PASO * (CV_ORIGENES - 1), fin_completo + 1, CV_PASO)
-    recientes = range(fin_completo + CV_PASO, n, CV_PASO)
-    return [o for o in sorted(set(completos) | set(recientes)) if o >= minimo]
+def elegir_modelo(tipo: str, n: int, trimestral: bool) -> str:
+    if n < MIN_OBS_SES:
+        return ULTIMO_VALOR
+    if n < MIN_OBS_HOLT:
+        return "SES"
+    if trimestral and n >= MIN_OBS_TRIMESTRAL:
+        return "Holt-Winters amortiguado (trimestral)"
+    return MODELO_POR_TIPO[tipo]
 
 
 def preparar(serie: Serie):
@@ -533,8 +428,8 @@ def preparar(serie: Serie):
 
 
 def pronosticar(serie: Serie) -> Resultado:
-    """Proyecta una serie mensual aplicando reglas de calidad de datos, backtest por serie y el
-    procedimiento validado para su tipo (o el torneo por serie si no se indica procedimiento)."""
+    """Proyecta una serie mensual: reglas de calidad de datos, modelo segun el tipo de serie, backtest y
+    cotas actuariales."""
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         return _pronosticar(serie)
@@ -543,40 +438,19 @@ def pronosticar(serie: Serie) -> Resultado:
 def _pronosticar(serie: Serie) -> Resultado:
     res, prep = preparar(serie)
     if prep is None:
-        return _aplicar_dominio(res, serie.dominio)
+        return _post_proceso(res, None, serie.tipo, serie.dominio)
     tipo, h = serie.tipo, serie.h
     y, per, brecha = prep["y"], prep["per"], prep["brecha"]
     n = len(y)
     hh = h + brecha                       # si el ultimo dato es anterior al ultimo mes real
 
-    def _salida(pron, li=None, ls=None):
-        pron = np.asarray(pron, dtype=float)[brecha:]
-        li = pron if li is None else np.asarray(li, dtype=float)[brecha:]
-        ls = pron if ls is None else np.asarray(ls, dtype=float)[brecha:]
-        return pron, li, ls
-
     usar_log = tipo in ("nivel", "indice") and np.all(y > 0)
     res.transformacion = "log" if usar_log else "ninguna"
     res.moneda = serie.moneda
     z = np.log(y) if usar_log else y.copy()
-    mes0 = per[0] % 100 - 1
-    zq = _cuantil_normal()
-    trimestral = serie.trimestral and n >= 12
-    if trimestral:
-        res.transformacion += " + factores por mes del trimestre"
 
     def inv(v):
         return np.exp(v) if usar_log else v
-
-    def pred(m, z_tr, hz, orden):
-        """Pronostico en escala original desde el entrenamiento z_tr (con estacionalidad trimestral
-        estimada solo con z_tr, para no usar informacion futura)."""
-        if trimestral:
-            f = _factores_trimestrales(z_tr, mes0)
-            q = (mes0 + np.arange(len(z_tr) + hz)) % 12 % 3
-            s = f[q]
-            return inv(_ajustar(m, z_tr - s[:len(z_tr)], hz, mes0, orden) + s[len(z_tr):])
-        return inv(_ajustar(m, z_tr, hz, mes0, orden))
 
     # alerta de atipico en el ultimo mes (salto > 3 desviaciones de los cambios mensuales)
     if tipo in ("nivel", "indice") and n >= 13:
@@ -586,398 +460,98 @@ def _pronosticar(serie: Serie) -> Resultado:
             res.alertas.append(f"Salto atipico en el ultimo mes ({(y[-1] / y[-2] - 1):+.1%}); revisar si es un "
                                "evento puntual que se liberara")
 
-    # series cortas: SES
-    if n < MIN_OBS_TORNEO:
-        try:
-            pron = pred("SES", z, hh, None) if n >= 6 else inv(_m_ingenuo(z, hh))
-            res.regla = "Serie corta: SES" if n >= 6 else "Serie corta: ultimo valor"
-        except Exception:  # noqa: BLE001
-            pron = inv(_m_ingenuo(z, hh))
-            res.regla = "Serie corta: ultimo valor"
-        sd = (np.std(np.diff(z), ddof=1) if n > 2 else 0.0) * np.sqrt(np.arange(1, hh + 1))
-        li, ls = (pron * np.exp(-zq * sd), pron * np.exp(zq * sd)) if usar_log else (pron - zq * sd,
-                                                                                     pron + zq * sd)
-        p, li, ls = _salida(pron, li, ls)
-        res.pronostico, res.li, res.ls = list(p), list(li), list(ls)
+    modelo = elegir_modelo(tipo, n, serie.trimestral)
+    if n < MIN_OBS_HOLT:
         res.alertas.append(f"Solo {n} observaciones: proyeccion de baja confiabilidad")
-        return _post_proceso(res, y, tipo, serie.dominio)
-
-    # ---------------- backtest rolling-origin por serie (mismos cortes para todos los modelos)
-    procedimiento = [m for m in serie.procedimiento if n >= CATALOGO[m][1] + 2]
-    candidatos = [m for m in MODELOS_POR_TIPO[tipo] if n >= CATALOGO[m][1] + 2]
-    candidatos += [m for m in procedimiento if m not in candidatos]
-    while True:
-        minimo = max([MIN_ENTRENAMIENTO] + [CATALOGO[m][1] for m in candidatos])
-        origenes = _origenes_cv(n, minimo)
-        exigentes = [m for m in candidatos if CATALOGO[m][1] == minimo and CATALOGO[m][1] > MIN_ENTRENAMIENTO
-                     and m not in procedimiento]
-        if len(origenes) >= MIN_CORTES_CV or not exigentes:
-            break
-        candidatos = [m for m in candidatos if m not in exigentes]
-    # orden ARIMA: en el backtest se elige solo con la historia hasta el primer corte (sin fuga de
-    # informacion); para la proyeccion final, con toda la historia
-    orden_cv = orden_final = None
-    if "ARIMA" in candidatos and origenes:
-        orden_cv = seleccionar_arima(z[:min(origenes)])
-        orden_final = seleccionar_arima(z)
-        if orden_cv is None or orden_final is None:
-            candidatos.remove("ARIMA")
-    escala = np.mean(np.abs(np.diff(y)))
-    if not np.isfinite(escala) or escala <= 0:
-        escala = max(np.mean(np.abs(y)), 1e-12)
-
-    h_cv = min(hh, H_CV)
-    errores = {m: [[] for _ in range(h_cv)] for m in candidatos}
-    pred_cv = {m: {} for m in candidatos}
-    for o in origenes:
-        hz = min(h_cv, n - o)
-        for m in candidatos:
-            try:
-                pr = pred(m, z[:o], hz, orden_cv)
-                if not np.all(np.isfinite(pr)):
-                    continue
-                pred_cv[m][o] = pr
-                for k in range(hz):
-                    errores[m][k].append(abs(pr[k] - y[o + k]))
-            except Exception:  # noqa: BLE001
-                continue
-    puntajes = {}
-    for m in candidatos:
-        por_h = [np.mean(e) for e in errores[m] if len(e) > 0]
-        if len(pred_cv[m]) >= 0.8 * len(origenes) and por_h:      # debe ajustar en >= 80% de los cortes
-            puntajes[m] = float(np.mean(por_h) / escala)
-    res.n_cortes = len(origenes)
-    res.modelos = {m: round(v, 4) for m, v in sorted(puntajes.items(), key=lambda kv: kv[1])}
-
-    # ---------------- modelos de la proyeccion final
-    mase_proc = _mase_combinacion(procedimiento, pred_cv, origenes, y, h_cv, escala) if procedimiento else math.nan
-    respaldo = (procedimiento and "Ingenuo" in puntajes and np.isfinite(mase_proc)
-                and len(origenes) >= MIN_CORTES_CV and mase_proc > FACTOR_RESPALDO_SERIE * puntajes["Ingenuo"])
-    if respaldo:
-        res.alertas.append(
-            f"Red de seguridad: en el backtest de esta serie el procedimiento validado ({' + '.join(procedimiento)}, "
-            f"MASE {mase_proc:.2f}) fue > {FACTOR_RESPALDO_SERIE}x peor que el ultimo valor (MASE "
-            f"{puntajes['Ingenuo']:.2f}); se usa el ensamble propio de la serie")
-    if procedimiento and not respaldo:
-        pesos = {m: 1.0 / len(procedimiento) for m in procedimiento}
-        res.regla = "Procedimiento validado: " + " + ".join(procedimiento)
-    elif puntajes:
-        orden = sorted(puntajes, key=puntajes.get)
-        mejor = puntajes[orden[0]]
-        elegidos = [m for m in orden if puntajes[m] <= TOLERANCIA_ENSAMBLE * max(mejor, 1e-12)]
-        elegidos = elegidos[:MAX_MODELOS_ENSAMBLE]
-        inv_err = {m: 1.0 / max(puntajes[m], 1e-12) for m in elegidos}
-        pesos = {m: inv_err[m] / sum(inv_err.values()) for m in elegidos}
-        res.regla = "Red de seguridad: ensamble propio de la serie" if respaldo else "Torneo por serie + ensamble"
-    else:
-        pesos = {"Ingenuo": 1.0}
-        res.regla = "Sin backtest valido: ultimo valor"
-
-    finales = {}
-    for m in pesos:
+    pron = li = ls = None
+    while modelo != ULTIMO_VALOR:
         try:
-            pr = pred(m, z, hh, orden_final)
-            if np.all(np.isfinite(pr)):
-                finales[m] = pr
-        except Exception:  # noqa: BLE001
-            res.alertas.append(f"No se pudo ajustar {m}; se omite de la combinacion")
-    if not finales:
-        finales = {"Ingenuo": inv(_m_ingenuo(z, hh))}
-        res.alertas.append("Ningun modelo ajusto; se usa el ultimo valor")
-    total = sum(pesos.get(m, 0) for m in finales) or 1.0
-    pesos = {m: pesos.get(m, 0) / total for m in finales} if any(pesos.get(m) for m in finales) \
-        else {m: 1.0 / len(finales) for m in finales}
-    pron = sum(pesos[m] * finales[m] for m in finales)
-    res.pesos = {m: round(w, 4) for m, w in pesos.items()}
-
-    # ---------------- errores de la combinacion final en el backtest -> MASE e intervalos
-    resid = [[] for _ in range(h_cv)]
-    abs_ens = [[] for _ in range(h_cv)]
-    for o in origenes:
-        if not all(o in pred_cv.get(m, {}) for m in pesos):
-            continue
-        ens = sum(pesos[m] * pred_cv[m][o] for m in pesos)
-        for k in range(len(ens)):
-            real, est = y[o + k], ens[k]
-            abs_ens[k].append(abs(est - real))
-            if usar_log:
-                if est > 0 and real > 0:
-                    resid[k].append(math.log(real) - math.log(est))
-            else:
-                resid[k].append(real - est)
-    por_h = [np.mean(e) for e in abs_ens if e]
-    res.mase_ensamble = float(np.mean(por_h) / escala) if por_h else math.nan
-    sd = _sd_por_horizonte(resid, hh)
-    s_hist = s_proy = None
-    if trimestral:
-        f_q = _factores_trimestrales(z, mes0)
-        s_todo = f_q[(mes0 + np.arange(n + hh)) % 12 % 3]
-        s_hist, s_proy = s_todo[:n], s_todo[n:]
-    if len(origenes) < CORTES_PISO_INTERVALO:
-        # pocos cortes de backtest (series cortas): piso de caminata aleatoria con la volatilidad observada
-        z_ds = z - s_hist if trimestral else z
-        sd = np.maximum(sd, np.std(np.diff(z_ds), ddof=1) * np.sqrt(np.arange(1, hh + 1)))
-    if usar_log:
-        li, ls = pron * np.exp(-zq * sd), pron * np.exp(zq * sd)
-    else:
-        li, ls = pron - zq * sd, pron + zq * sd
-    p, li, ls = _salida(pron, li, ls)
-    res.pronostico, res.li, res.ls = list(p), list(li), list(ls)
-    if "Ingenuo" in puntajes and np.isfinite(res.mase_ensamble) and res.mase_ensamble > puntajes["Ingenuo"] * 1.10:
-        res.alertas.append("En el backtest de esta serie la proyeccion no supera al ultimo valor (ingenuo)")
-    ajuste = None
-    if trimestral and usar_log:
-        ajuste = (np.exp(s_hist), np.exp(s_proy[brecha:]))
-    return _post_proceso(res, y, tipo, serie.dominio, ajuste)
-
-
-def _mase_combinacion(modelos, pred_cv, origenes, y, h_cv, escala):
-    """MASE del backtest de una combinacion de pesos iguales (misma definicion que los puntajes)."""
-    errores = [[] for _ in range(h_cv)]
-    for o in origenes:
-        if not all(o in pred_cv.get(m, {}) for m in modelos):
-            continue
-        ens = np.mean([pred_cv[m][o] for m in modelos], axis=0)
-        for k in range(len(ens)):
-            errores[k].append(abs(ens[k] - y[o + k]))
-    por_h = [np.mean(e) for e in errores if e]
-    return float(np.mean(por_h) / escala) if por_h else math.nan
-
-
-# =============================================================================
-# VALIDACION FUERA DE MUESTRA DEL METODO (seleccion del procedimiento por tipo)
-# =============================================================================
-def _trabajo_validacion(args):
-    """Pronosticos de los modelos base desde un corte historico (para la validacion del metodo)."""
-    clave, tipo, y, o, h = args
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
-        usar_log = tipo in ("nivel", "indice") and np.all(y > 0)
-        z = np.log(y[:o]) if usar_log else np.asarray(y[:o], dtype=float)
-        salida = {}
-        for m in MODELOS_BASE_VALIDACION:
-            try:
-                pz = _ajustar(m, z, h, 0, None)
-                if np.all(np.isfinite(pz)):
-                    salida[m] = np.exp(pz) if usar_log else pz
-            except Exception:  # noqa: BLE001
-                continue
-        return clave, tipo, o, salida
-
-
-def validar_procedimientos(series: list[Serie]):
-    """Backtest del metodo completo: para cada serie con historia suficiente se simula haber proyectado
-    desde varios cortes pasados (ventanas completas de H_CV meses) con cada procedimiento candidato, y se
-    compara contra lo real. Criterio de seleccion por tipo de serie:
-      * montos (nivel): WAPE = suma de errores absolutos / suma de montos reales (pondera por USD); entre
-        los procedimientos a menos de TOLERANCIA_WAPE del mejor, el de menor sesgo agregado a 13-16 meses.
-      * indices, razones y LAGs (adimensionales): AvgRelMAE = media geometrica entre series del error
-        relativo al ingenuo. Si su IC bootstrap al 90% incluye 1 (no mejora significativamente al ingenuo),
-        se elige el mejor procedimiento SIN tendencia (principio de parsimonia)."""
-    trabajos, reales = [], {}
-    for s in series:
-        res, prep = preparar(s)
-        if prep is None or prep["brecha"] > 0 or prep["n_interp"] > MAX_INTERPOLADOS_VALIDACION:
-            continue            # la validacion solo usa series con datos genuinos
-        y = prep["y"]
-        n = len(y)
-        if s.tipo in ("nivel", "indice") and np.min(y) <= 0:
-            continue
-        origenes = [o for o in range(n - H_CV - CV_PASO * (CV_ORIGENES - 1), n - H_CV + 1, CV_PASO)
-                    if o >= MIN_OBS_ESTACIONAL]
-        if len(origenes) < 3:
-            continue
-        reales[s.clave] = (y, s.tipo, prep["per"])
-        trabajos += [(s.clave, s.tipo, y, o, H_CV) for o in origenes]
-    print(f"   Validacion del metodo: {len(reales)} series, {len(trabajos)} pronosticos fuera de muestra",
-          flush=True)
-    salidas = _mapear(_trabajo_validacion, trabajos)
-
-    # errores por procedimiento, solo en cortes donde el procedimiento Y el ingenuo tienen pronostico
-    filas = []                     # (tipo, procedimiento, clave, periodo_corte, h, pronostico, real)
-    for clave, tipo, o, sal in salidas:
-        y, _, per = reales[clave]
-        if "Ingenuo" not in sal:
-            continue
-        for nombre, comp in PROCEDIMIENTOS_CANDIDATOS.items():
-            if not all(m in sal for m in comp):
-                continue
-            f = np.mean([sal[m] for m in comp], axis=0)
-            for k in range(H_CV):
-                filas.append((tipo, nombre, clave, per[o - 1], k + 1, float(f[k]), float(y[o + k])))
-    rng = np.random.default_rng(12345)
-    tabla, seleccion = [], {}
-    for tipo in ("nivel", "indice", "razon", "lag"):
-        ft = [f for f in filas if f[0] == tipo]
-        if not ft:
-            continue
-        cortes_ok = {}             # (clave, corte) disponibles por procedimiento
-        for _, nombre, clave, corte, _, _, _ in ft:
-            cortes_ok.setdefault(nombre, set()).add((clave, corte))
-        resumen = []
-        for nombre in PROCEDIMIENTOS_CANDIDATOS:
-            fp = [f for f in ft if f[1] == nombre]
-            if not fp:
-                continue
-            comunes = cortes_ok[nombre] & cortes_ok.get("Ingenuo", set())
-            fp = [f for f in fp if (f[2], f[3]) in comunes]
-            fb = [f for f in ft if f[1] == "Ingenuo" and (f[2], f[3]) in comunes]
-            e_proc, e_base = {}, {}
-            for f in fp:
-                e_proc[f[2]] = e_proc.get(f[2], 0.0) + abs(f[5] - f[6])
-            for f in fb:
-                e_base[f[2]] = e_base.get(f[2], 0.0) + abs(f[5] - f[6])
-            claves = [c for c in e_proc if e_base.get(c, 0) > 0 and e_proc[c] > 0]
-            if not claves:
-                continue
-            logrel = np.log(np.array([e_proc[c] / e_base[c] for c in claves]))
-            boot = [np.exp(np.mean(rng.choice(logrel, size=len(logrel)))) for _ in range(N_BOOTSTRAP)]
-            # WAPE y sesgo agregado por libro (cada libro en su propia moneda) y promedio entre libros
-            wape_libro, sesgo_libro = [], []
-            for libro in sorted({f[2][0] for f in fp}):
-                fl = [f for f in fp if f[2][0] == libro]
-                suma_real = sum(abs(f[6]) for f in fl)
-                if suma_real:
-                    wape_libro.append(sum(abs(f[5] - f[6]) for f in fl) / suma_real * 100)
-                agregado = {}
-                for f in fl:
-                    if f[4] >= 13:
-                        a = agregado.setdefault((f[3], f[4]), [0.0, 0.0])
-                        a[0] += f[5]
-                        a[1] += f[6]
-                if agregado:
-                    sesgo_libro.append(float(np.mean([(F - A) / abs(A) for F, A in agregado.values() if A])) * 100)
-            sesgo_agr = float(np.mean(sesgo_libro)) if sesgo_libro else math.nan
-            ape = lambda h1, h2: float(np.nanmean(  # noqa: E731
-                [abs(f[5] - f[6]) / abs(f[6]) for f in fp if h1 <= f[4] <= h2 and f[6]]) * 100)
-            resumen.append({
-                "Tipo": tipo, "Procedimiento": nombre,
-                "WAPE %": float(np.mean(wape_libro)) if wape_libro else math.nan,
-                "AvgRelMAE": float(np.exp(np.mean(logrel))),
-                "IC90 inf": float(np.quantile(boot, 0.05)), "IC90 sup": float(np.quantile(boot, 0.95)),
-                "% series mejor que ingenuo": float(np.mean(logrel < 0)), "Series": len(claves),
-                "MAPE 1-6": ape(1, 6), "MAPE 7-12": ape(7, 12), "MAPE 13-16": ape(13, 16),
-                "Sesgo agregado % 13-16": sesgo_agr,
-                "Tendencia": "no" if nombre in PROCEDIMIENTOS_SIN_TENDENCIA else "si",
-            })
-        if not resumen:
-            continue
-        elegido, motivo = None, ""
-        if tipo == "nivel":
-            mejor = min(d["WAPE %"] for d in resumen)
-            cerca = [d for d in resumen if d["WAPE %"] <= mejor * (1 + TOLERANCIA_WAPE)]
-            elegido = min(cerca, key=lambda d: abs(d["Sesgo agregado % 13-16"]))
-            motivo = (f"menor WAPE (error ponderado por monto); entre los {len(cerca)} a menos de "
-                      f"{TOLERANCIA_WAPE:.0%} del mejor, el de menor sesgo agregado")
-        else:
-            orden = sorted(resumen, key=lambda d: d["AvgRelMAE"])
-            elegido = orden[0]
-            motivo = "menor AvgRelMAE"
-            if elegido["IC90 sup"] >= 1 and elegido["Tendencia"] == "si":
-                sin_tend = [d for d in orden if d["Tendencia"] == "no"]
-                if sin_tend:
-                    elegido = sin_tend[0]
-                    motivo = ("la mejora del mejor procedimiento no es significativa (IC90 incluye 1): se usa el "
-                              "mejor procedimiento sin tendencia")
-        if elegido["Series"] >= MIN_SERIES_VALIDACION:
-            seleccion[tipo] = elegido["Procedimiento"]
-        orden_tabla = sorted(resumen, key=lambda d: d["WAPE %"] if tipo == "nivel" else d["AvgRelMAE"])
-        for d in orden_tabla:
-            d["Seleccionado"] = ("SI: " + motivo) if seleccion.get(tipo) == d["Procedimiento"] else ""
-        tabla += orden_tabla
-    return tabla, seleccion
-
-
-def _mapear(funcion, trabajos):
-    """map en paralelo por procesos (con respaldo secuencial)."""
-    n_proc = N_PROCESOS or max(1, (os.cpu_count() or 2) - 1)
-    if n_proc > 1 and len(trabajos) > 1:
-        try:
-            with ProcessPoolExecutor(max_workers=n_proc) as ex:
-                return list(ex.map(funcion, trabajos, chunksize=4))
+            f, lo, hi, params, pendiente = ajustar_ets(z, modelo, hh)
+            if np.all(np.isfinite(f)):
+                pron, li, ls = inv(f), inv(lo), inv(hi)
+                res.parametros = params
+                res.tendencia_mensual = (math.exp(pendiente) - 1) if usar_log else pendiente
+                break
         except Exception as e:  # noqa: BLE001
-            print(f"   Paralelismo no disponible ({e!r}); se continua en un solo proceso", flush=True)
-    return [funcion(t) for t in trabajos]
+            res.alertas.append(f"No se pudo ajustar {modelo} ({type(e).__name__})")
+        modelo = "SES" if modelo != "SES" else ULTIMO_VALOR     # respaldo: SES, y si tampoco, ultimo valor
+        res.alertas.append(f"Se usa {modelo}")
+    if pron is None:
+        pron = np.repeat(y[-1], hh)
+        sd = (np.std(np.diff(z), ddof=1) if n > 2 else 0.0) * np.sqrt(np.arange(1, hh + 1)) * _cuantil_normal()
+        li, ls = inv(z[-1] - sd), inv(z[-1] + sd)
+    res.modelo = modelo
+    res.regla = modelo if not res.regla else res.regla
+
+    # backtest: se re-proyecta desde cortes pasados con el mismo modelo y se compara contra lo real
+    res.error_modelo, res.error_ultimo_valor, res.error_ses, res.n_cortes = backtest(z, y, modelo, inv)
+    if (res.n_cortes and np.isfinite(res.error_modelo) and np.isfinite(res.error_ultimo_valor)
+            and res.error_modelo > res.error_ultimo_valor * 1.10 + 0.5):
+        res.alertas.append(f"En el backtest de esta serie el modelo ({res.error_modelo:.1f}%) no supera a repetir "
+                           f"el ultimo valor ({res.error_ultimo_valor:.1f}%)")
+
+    res.pronostico, res.li, res.ls = list(pron[brecha:]), list(li[brecha:]), list(ls[brecha:])
+    return _post_proceso(res, y, tipo, serie.dominio)
+
+
+def backtest(z, y, modelo: str, inv):
+    """Error % (WAPE = suma |error| / suma |real|) del modelo, del ultimo valor y de SES, re-proyectando desde
+    CORTES_BACKTEST meses antes del final (horizontes de 1 a 16 meses)."""
+    n = len(y)
+    errores = {"modelo": [0.0, 0.0], "ultimo": [0.0, 0.0], "ses": [0.0, 0.0]}
+    cortes = 0
+    for c in CORTES_BACKTEST:
+        o = n - c
+        if o < MIN_ENTRENAMIENTO:
+            continue
+        hz = min(16, n - o)
+        real = y[o:o + hz]
+        preds = {"ultimo": np.repeat(inv(z[o - 1]), hz)}
+        for nombre, mod in (("modelo", modelo), ("ses", "SES")):
+            try:
+                preds[nombre] = inv(ajustar_ets(z[:o], mod, hz)[0]) if mod != ULTIMO_VALOR else preds["ultimo"]
+            except Exception:  # noqa: BLE001
+                preds[nombre] = None
+        if any(p is None or not np.all(np.isfinite(p)) for p in preds.values()):
+            continue
+        cortes += 1
+        for nombre, p in preds.items():
+            errores[nombre][0] += float(np.sum(np.abs(p - real)))
+            errores[nombre][1] += float(np.sum(np.abs(real)))
+
+    def wape(e):
+        return (e[0] / e[1] * 100) if cortes and e[1] > 0 else math.nan
+
+    return wape(errores["modelo"]), wape(errores["ultimo"]), wape(errores["ses"]), cortes
 
 
 def _cuantil_normal():
     return float(_normal.ppf(0.5 + NIVEL_INTERVALO / 2))
 
 
-def _sd_por_horizonte(resid, hh):
-    """Desviacion estandar del error por horizonte (RMSE del backtest); los horizontes sin
-    observaciones se extrapolan con raiz(h) y se fuerza que no decrezca."""
-    sd = np.full(hh, np.nan)
-    for k, r in enumerate(resid[:hh]):
-        if len(r) >= 2:
-            sd[k] = math.sqrt(np.mean(np.square(r)))
-    ult = np.where(~np.isnan(sd))[0]
-    if len(ult) == 0:
-        return np.zeros(hh)
-    k0 = ult[-1]
-    for k in range(hh):
-        if np.isnan(sd[k]):
-            ref = ult[ult <= k][-1] if np.any(ult <= k) else ult[0]
-            sd[k] = sd[ref] * math.sqrt((k + 1) / (ref + 1))
-    return np.maximum.accumulate(sd) if k0 >= 0 else sd
-
-
-def _factores_trimestrales(z, mes0):
-    """Factores (escala log) por mes del trimestre: promedio de la desviacion contra la media movil
-    centrada de 3 meses, normalizados a suma cero."""
-    q = (mes0 + np.arange(len(z))) % 12 % 3
-    dev = [[] for _ in range(3)]
-    for t in range(1, len(z) - 1):
-        dev[q[t]].append(z[t] - np.mean(z[t - 1:t + 2]))
-    f = np.array([np.mean(d) if d else 0.0 for d in dev])
-    return f - f.mean()
-
-
-def _recortar_dominio(res: Resultado, p, li, ls, dominio):
-    lo_d, hi_d = dominio
-    if lo_d is None and hi_d is None:
-        return p, li, ls
-    lo_d = -np.inf if lo_d is None else lo_d
-    hi_d = np.inf if hi_d is None else hi_d
-    if np.any(p < lo_d - 1e-12) or np.any(p > hi_d + 1e-12):
-        res.alertas.append(f"Proyeccion fuera del dominio actuarial [{lo_d}, {hi_d}]: se acota "
-                           "(la historia reciente ya estaba fuera; revisar el dato)")
-    return np.clip(p, lo_d, hi_d), np.clip(li, lo_d, hi_d), np.clip(ls, lo_d, hi_d)
-
-
-def _aplicar_dominio(res: Resultado, dominio) -> Resultado:
-    """Dominio actuarial para las series resueltas por una regla (constante, escalon, etc.)."""
+def _post_proceso(res: Resultado, y, tipo, dominio=(None, None)):
+    """Cotas actuariales (dominio) y alerta de cambios mayores a los observados en la historia."""
     p = np.array(res.pronostico, dtype=float)
     if np.all(np.isnan(p)):
         return res
-    p, li, ls = _recortar_dominio(res, p, np.array(res.li, dtype=float), np.array(res.ls, dtype=float), dominio)
-    res.pronostico, res.li, res.ls = [float(v) for v in p], [float(v) for v in li], [float(v) for v in ls]
-    return res
-
-
-def _post_proceso(res: Resultado, y, tipo, dominio=(None, None), ajuste=None):
-    p = np.array(res.pronostico, dtype=float)
     li = np.array(res.li, dtype=float)
     ls = np.array(res.ls, dtype=float)
-
-    if tipo in ("razon", "lag"):
-        lo, hi = float(np.nanmin(y)), float(np.nanmax(y))
-        if np.any(p < lo - 1e-12) or np.any(p > hi + 1e-12):
-            res.alertas.append(f"Proyeccion acotada al rango historico [{lo:.4f}, {hi:.4f}]")
-        p, li, ls = np.clip(p, lo, hi), np.clip(li, lo, hi), np.clip(ls, lo, hi)
-    # dominio actuarial (despues del rango historico, para que siempre prevalezca)
-    p, li, ls = _recortar_dominio(res, p, li, ls, dominio)
+    lo_d, hi_d = dominio
+    lo_d = -np.inf if lo_d is None else lo_d
+    hi_d = np.inf if hi_d is None else hi_d
     if tipo == "nivel":
-        p, li, ls = np.maximum(p, 0), np.maximum(li, 0), np.maximum(ls, 0)
-    if tipo in ("nivel", "indice") and len(y) > len(p) and np.all(y > 0):
+        lo_d = max(lo_d, 0.0)
+    if np.any(p < lo_d - 1e-12) or np.any(p > hi_d + 1e-12):
+        res.alertas.append(f"Proyeccion fuera del dominio actuarial [{lo_d}, {hi_d}]: se acota")
+    p, li, ls = np.clip(p, lo_d, hi_d), np.clip(li, lo_d, hi_d), np.clip(ls, lo_d, hi_d)
+    if y is not None and tipo in ("nivel", "indice") and len(y) > len(p) and np.all(y > 0) and "trimestral" not in res.modelo:
         k = len(p)
-        yy, pp = (y, p) if ajuste is None else (y / ajuste[0], p / ajuste[1])   # sin estacionalidad trimestral
-        cambios = np.abs(np.log(yy[k:] / yy[:-k]))
-        if len(cambios) and pp[-1] > 0:
-            cambio = abs(math.log(pp[-1] / yy[-1]))
-            if cambio > np.max(cambios) * 1.0 + 1e-12:
+        cambios = np.abs(np.log(y[k:] / y[:-k]))
+        if len(cambios) and p[-1] > 0:
+            cambio = abs(math.log(p[-1] / y[-1]))
+            if cambio > np.max(cambios) + 1e-12:
                 res.alertas.append(
-                    f"Cambio proyectado a {k} meses ({(pp[-1] / yy[-1] - 1):+.1%}) mayor al maximo historico "
+                    f"Cambio proyectado a {k} meses ({(p[-1] / y[-1] - 1):+.1%}) mayor al maximo historico "
                     f"a {k} meses ({(math.exp(np.max(cambios)) - 1):.1%})")
     res.pronostico, res.li, res.ls = [float(v) for v in p], [float(v) for v in li], [float(v) for v in ls]
     return res
@@ -992,7 +566,7 @@ def correr_series(series: list[Serie]) -> dict:
             with ProcessPoolExecutor(max_workers=n_proc) as ex:
                 for i, r in enumerate(ex.map(pronosticar, series, chunksize=2), start=1):
                     resultados[r.clave] = r
-                    if i % 25 == 0 or i == len(series):
+                    if i % 50 == 0 or i == len(series):
                         print(f"   {i}/{len(series)} series ({time.time() - t0:,.0f} s)", flush=True)
             return resultados
         except Exception as e:  # noqa: BLE001
@@ -1001,9 +575,32 @@ def correr_series(series: list[Serie]) -> dict:
     for i, s in enumerate(series, start=1):
         r = pronosticar(s)
         resultados[r.clave] = r
-        if i % 25 == 0 or i == len(series):
+        if i % 50 == 0 or i == len(series):
             print(f"   {i}/{len(series)} series ({time.time() - t0:,.0f} s)", flush=True)
     return resultados
+
+
+def resumen_backtest(resultados: dict) -> list[dict]:
+    """Una fila por tipo de serie: error % mediano del modelo, del ultimo valor y de SES en el backtest."""
+    filas = []
+    for tipo in ("nivel", "indice", "razon", "lag"):
+        rs = [r for r in resultados.values() if r.tipo == tipo and r.n_cortes and np.isfinite(r.error_modelo)
+              and np.isfinite(r.error_ultimo_valor)]
+        modelos = sorted({r.modelo for r in resultados.values() if r.tipo == tipo and r.modelo})
+        if not rs:
+            filas.append({"Tipo": tipo, "Modelo": ", ".join(modelos), "Series con backtest": 0})
+            continue
+        em = np.array([r.error_modelo for r in rs])
+        eu = np.array([r.error_ultimo_valor for r in rs])
+        es = np.array([r.error_ses for r in rs])
+        filas.append({
+            "Tipo": tipo, "Modelo": ", ".join(modelos), "Series con backtest": len(rs),
+            "Error % modelo (mediana)": float(np.median(em)),
+            "Error % ultimo valor (mediana)": float(np.median(eu)),
+            "Error % SES (mediana)": float(np.nanmedian(es)) if np.any(np.isfinite(es)) else None,
+            "% series en que el modelo mejora al ultimo valor": float(np.mean(em < eu)),
+        })
+    return filas
 
 
 # =============================================================================
@@ -1342,7 +939,7 @@ def series_hparametros(hp: HParam, h: int, ultimo: int) -> list[Serie]:
                 valores = [hist.get(p, math.nan) for p in periodos]
             tipo = "indice" if nombre in INDICES else "lag"
             series.append(Serie(("HPARAM", HOJA_PARAMETROS, nombre, clave_ramo), tipo, periodos, valores,
-                                ultimo, h))
+                                ultimo, h, dominio=DOMINIO_LAG if tipo == "lag" else (None, None)))
     return series
 
 
@@ -1409,7 +1006,7 @@ def escribir_hparametros(hp: HParam, resultados: dict, periodos_proy: list[int])
 # DIAGNOSTICO Y GRAFICAS
 # =============================================================================
 def escribir_diagnostico(resultados: dict, periodos_proy: list[int], alertas_generales: list, derivados: dict,
-                         resumen: dict, tabla_validacion: list | None = None):
+                         resumen: dict):
     wb = openpyxl.Workbook()
     negrita = Font(bold=True)
     encab = PatternFill("solid", fgColor="D9E1F2")
@@ -1427,114 +1024,102 @@ def escribir_diagnostico(resultados: dict, periodos_proy: list[int], alertas_gen
         ("METODOLOGIA", ""),
         ("1. Coherencia contable", "Se proyectan drivers (BEL / BRUTO y razones) y se derivan las demas lineas: "
                                    "RRC: BRUTO = BEL+GTO+MR, IRR = %ces*BRUTO, NETO = BRUTO-IRR; SONR: BRUTO = BEL+MR; "
-                                   "RFV: NETO = BRUTO-IRR; RCONT: total con factores por mes del trimestre, repartido "
-                                   "por ramo con la mezcla de los ultimos 8 meses."),
-        ("2. Moneda", "Montos modelados en USD: en backtest, modelar en MXN y convertir con el TC real fue menos "
-                      "preciso (Danos WAPE 22.5% vs 19.8%; Fianzas 7.4% vs 6.0%). Libros en MXN (MODELAR_EN_MXN): "
-                      + (", ".join(k for k, v in MODELAR_EN_MXN.items() if v) or "ninguno") + "."),
-        ("3. Modelos evaluados", "Ingenuo, Ingenuo estacional, Media 12m, SES, Holt amortiguado, Holt-Winters "
-                                 "amortiguado, Theta, ARIMA (AICc), Regresion log-lineal con estacionalidad."),
-        ("4. Seleccion", "Validacion fuera de muestra del metodo completo (hoja Validacion_Metodo): se simula haber "
-                         f"proyectado desde {CV_ORIGENES} cortes historicos a 1-16 meses. Montos: menor WAPE (error "
-                         "ponderado por USD) con desempate por sesgo agregado. Indices, razones y LAGs: menor "
-                         "AvgRelMAE; si la mejora vs el ingenuo no es significativa (IC90), procedimiento sin tendencia. "
-                         "En cada serie hay ademas un backtest con todos los modelos (MASE en Series_Modelos) que da "
-                         "los intervalos y la red de seguridad (si el procedimiento es > 1.5x peor que el ingenuo en la "
-                         "propia serie, se usa el ensamble propio)."
-                         + ("" if MODO_SELECCION == "validado" else " MODO TORNEO: cada serie usa su propio ensamble.")),
-        ("5. Transformaciones", "Montos e indices en logaritmos (la proyeccion es la mediana); razones y LAGs en "
-                                "escala original, acotadas al rango historico y al dominio actuarial (cesion en [0,1], "
-                                "%GTO y %MR >= 0)."),
-        ("6. Intervalos", f"{NIVEL_INTERVALO:.0%} a partir del error de la proyeccion en el backtest por horizonte "
-                          "(con piso de caminata aleatoria si hay pocos cortes)."),
-        ("7. Reglas", "Series en cero -> 0; parametros en escalon -> ultimo valor; series cortas -> SES; "
-                      "99.5% >= media si siempre lo fue; limpieza de textos y LAG=0 marcadores; alerta de saltos "
-                      "atipicos en el ultimo mes."),
-        ("8. Tipo de cambio", "Columna TC = supuesto de Inversiones (TC_Real_Esti.xlsx, hoja TC: FCST 2026 y "
+                                   "RFV: NETO = BRUTO-IRR; RCONT: total repartido por ramo con la mezcla de los "
+                                   "ultimos 8 meses."),
+        ("2. Modelo", "Suavizamiento exponencial (familia Holt-Winters). Montos e indices: Holt con tendencia "
+                      "amortiguada en logaritmos. LAGs: Holt con tendencia amortiguada, no negativos. Razones "
+                      "(%GTO, %MR, %cedido): SES (nivel sin tendencia). RCONT: Holt-Winters amortiguado con "
+                      "estacionalidad por mes del trimestre. Series cortas: SES (< 12 obs) o ultimo valor (< 4)."),
+        ("3. Parametros", "alpha (nivel), beta (tendencia), phi (amortiguacion) y gamma (estacionalidad) se estiman "
+                          "por maxima verosimilitud en cada serie, dentro de las cotas "
+                          + ", ".join(f"{k} en [{a}, {b}]" for k, (a, b) in COTAS_SUAVIZAMIENTO.items())
+                          + " (RCONT: alpha en [0.2, 0.99]). alpha ~ 1 hace que la proyeccion arranque del ultimo "
+                          "dato real; beta <= 0.15 hace que la tendencia sea la de los ultimos anos y no la del "
+                          "ultimo mes. La columna 'Tendencia mensual' de Series_Modelos es la pendiente al final de "
+                          "la historia (en % mensual para montos e indices); hacia adelante se amortigua con phi."),
+        ("4. Backtest", "Cada serie se vuelve a proyectar desde 16, 12 y 8 meses antes del final (horizontes de 1 a "
+                        "16 meses) y se mide el error % (suma de errores absolutos / suma de valores reales) del "
+                        "modelo, de repetir el ultimo valor y de SES. Hoja Backtest: resumen por tipo; "
+                        "Series_Modelos: por serie. Sirve para juzgar la confiabilidad; no cambia el modelo."),
+        ("5. Intervalos", f"{NIVEL_INTERVALO:.0%}, calculados por el propio modelo (en logaritmos para montos e "
+                          "indices, por lo que son asimetricos)."),
+        ("6. Reglas", "Series en cero -> 0; parametros en escalon -> ultimo valor; dominio actuarial (cesion en "
+                      "[0,1], %GTO y %MR >= 0, LAGs >= 0); 99.5% >= media si siempre lo fue; limpieza de textos "
+                      "y LAG=0 marcadores; alertas de saltos atipicos y de cambios mayores a los historicos."),
+        ("7. Tipo de cambio", "Columna TC = supuesto de Inversiones (TC_Real_Esti.xlsx, hoja TC: FCST 2026 y "
                               "FCST 2027), en tipo_cambio.py; 202601-202608 = TC real de SAP. Los montos se "
                               "modelan en USD, por lo que el TC no altera las cifras proyectadas."),
-        ("9. Sesgo conocido", "En la validacion (2023-2026, periodo de fuerte crecimiento) las proyecciones de montos a "
-                              "13-16 meses quedaron en promedio por debajo de lo real (ver 'Sesgo agregado' del "
-                              "procedimiento elegido). Los modelos amortiguan la tendencia: si el plan de negocio "
-                              "prevé un crecimiento sostenido, conviene contrastarlo."),
         ("Versiones", resumen.get("versiones", "")),
-        ("", ""),
-        ("Interpretacion MASE", "Error absoluto medio del backtest promediado en horizontes de 1 a 16 meses, "
-                                "dividido entre la variacion mensual tipica de la serie. Al ser multi-horizonte, "
-                                "valores > 1 son normales; lo relevante es compararlo contra 'MASE Ingenuo' "
-                                "(caminata aleatoria): menor = mejor."),
     ]
     for i, (a, b) in enumerate(lineas, start=1):
         ws.cell(i, 1, a).font = negrita if a and b == "" or a in ("METODOLOGIA",) else Font()
         ws.cell(i, 2, b).alignment = Alignment(wrap_text=True, vertical="top")
     ws.column_dimensions["A"].width = 28
     ws.column_dimensions["B"].width = 120
+    fila = ws.max_row + 2
+    ws.cell(fila, 1, "MODELO POR TIPO DE SERIE").font = negrita
+    for i, (tipo, nombre) in enumerate(MODELO_POR_TIPO.items(), start=1):
+        ws.cell(fila + i, 1, tipo)
+        ws.cell(fila + i, 2, nombre)
 
-    if resumen.get("seleccion"):
-        fila = ws.max_row + 2
-        ws.cell(fila, 1, "PROCEDIMIENTO SELECCIONADO POR TIPO").font = negrita
-        for i, (tipo, nombre) in enumerate(sorted(resumen["seleccion"].items()), start=1):
-            ws.cell(fila + i, 1, tipo)
-            ws.cell(fila + i, 2, f"{nombre}  (combinacion de pesos iguales; ver hoja Validacion_Metodo)")
-
-    # Validacion fuera de muestra del metodo
-    if tabla_validacion:
-        ws = wb.create_sheet("Validacion_Metodo")
-        cols = ["Tipo", "Procedimiento", "Seleccionado", "WAPE %", "AvgRelMAE", "IC90 inf", "IC90 sup",
-                "% series mejor que ingenuo", "Series", "MAPE 1-6", "MAPE 7-12", "MAPE 13-16",
-                "Sesgo agregado % 13-16", "Tendencia"]
-        ws.append(cols)
-        for d in tabla_validacion:
-            ws.append([d.get(c) for c in cols])
-        _formato_tabla(ws, negrita, encab)
-        for fila in ws.iter_rows(min_row=2):
-            for c in fila:
-                encabezado = ws.cell(1, c.column).value
-                if encabezado in ("AvgRelMAE", "IC90 inf", "IC90 sup"):
-                    c.number_format = "0.000"
-                elif encabezado == "% series mejor que ingenuo":
-                    c.number_format = "0%"
-                elif encabezado in ("WAPE %", "MAPE 1-6", "MAPE 7-12", "MAPE 13-16", "Sesgo agregado % 13-16"):
-                    c.number_format = "0.0"
-        nota = ws.max_row + 2
-        notas = [
-            "Pronosticos fuera de muestra desde 8 cortes historicos, horizontes 1-16 meses (backtest del metodo "
-            "completo). Solo series con datos genuinos (<= 3 meses interpolados).",
-            "WAPE % = suma de errores absolutos / suma de valores reales (pondera por monto). Criterio para montos: "
-            "menor WAPE; entre los que estan a <= 2% del mejor, el de menor |sesgo agregado|.",
-            "AvgRelMAE = media geometrica entre series del error del procedimiento / error del ingenuo (< 1 = mejor "
-            "que repetir el ultimo valor), con IC bootstrap al 90%. Criterio para indices, razones y LAGs: menor "
-            "AvgRelMAE; si su IC incluye 1, el mejor procedimiento sin tendencia (parsimonia).",
-            "Sesgo agregado % 13-16 = (suma proyectada - suma real) / suma real por corte y horizonte, promedio a "
-            "13-16 meses. Negativo = la proyeccion quedo por debajo de lo real (en 2023-2026 hubo fuerte "
-            "crecimiento).",
-        ]
-        for i, texto in enumerate(notas):
-            ws.cell(nota + i, 1, texto)
+    # Backtest por tipo
+    ws = wb.create_sheet("Backtest")
+    tabla = resumen_backtest(resultados)
+    cols = ["Tipo", "Modelo", "Series con backtest", "Error % modelo (mediana)", "Error % ultimo valor (mediana)",
+            "Error % SES (mediana)", "% series en que el modelo mejora al ultimo valor"]
+    ws.append(cols)
+    for d in tabla:
+        ws.append([d.get(c) for c in cols])
+    _formato_tabla(ws, negrita, encab)
+    for fila_ in ws.iter_rows(min_row=2):
+        for c in fila_:
+            enc_ = ws.cell(1, c.column).value
+            if enc_.startswith("Error %"):
+                c.number_format = "0.0"
+            elif enc_.startswith("% series"):
+                c.number_format = "0%"
+    nota = ws.max_row + 2
+    for i, texto in enumerate([
+        "Error % = suma de errores absolutos / suma de valores reales, re-proyectando desde 16, 12 y 8 meses antes "
+        "del final (horizontes 1-16). Mediana entre series del tipo.",
+        "El modelo elegido continua la tendencia observada (amortiguada). En indices y LAGs eso cuesta algo de "
+        "error frente a repetir el ultimo valor; en montos lo mejora.",
+    ]):
+        ws.cell(nota + i, 1, texto)
 
     # Series y modelos
     ws = wb.create_sheet("Series_Modelos")
-    todos_modelos = list(CATALOGO)
-    cab = (["Libro", "Grupo", "Serie", "Ramo", "Tipo", "Moneda modelo", "Transformacion", "Obs", "Cortes backtest",
-            "Desde", "Regla",
-            "Modelos proyeccion (peso)", "MASE proyeccion"] + [f"MASE {m}" for m in todos_modelos]
-           + ["Ultimo real", f"Proy {periodos_proy[0]}", f"Proy {periodos_proy[-1]}", "Var % vs ultimo real",
-              "Alertas"])
+    cab = ["Libro", "Grupo", "Serie", "Ramo", "Tipo", "Moneda modelo", "Transformacion", "Obs", "Desde", "Regla",
+           "Modelo", "alpha", "beta", "phi", "gamma", "Tendencia mensual", "Cortes backtest", "Error % modelo",
+           "Error % ultimo valor", "Error % SES", "Ultimo real", f"Proy {periodos_proy[0]}",
+           f"Proy {periodos_proy[-1]}", "Var % vs ultimo real", "Alertas"]
     ws.append(cab)
+
+    def num(v):
+        return None if v is None or (isinstance(v, float) and math.isnan(v)) else v
+
     for k, r in sorted(resultados.items(), key=lambda kv: tuple(str(x) for x in kv[0])):
         ult = r.historia_valores[-1] if r.historia_valores else math.nan
         fin = r.pronostico[-1] if r.pronostico else math.nan
         var = (fin / ult - 1) if (ult and not math.isnan(ult) and not math.isnan(fin) and ult != 0) else None
-        fila = [k[0], k[1], k[2], k[3], r.tipo, r.moneda, r.transformacion, r.n_obs, r.n_cortes or None,
-                r.historia_periodos[0] if r.historia_periodos else None, r.regla,
-                ", ".join(f"{m} ({w:.0%})" for m, w in r.pesos.items()),
-                None if math.isnan(r.mase_ensamble) else r.mase_ensamble]
-        fila += [r.modelos.get(m) for m in todos_modelos]
-        fila += [None if math.isnan(ult) else ult,
+        fila_ = [k[0], k[1], k[2], k[3], r.tipo, r.moneda, r.transformacion, r.n_obs,
+                 r.historia_periodos[0] if r.historia_periodos else None, r.regla, r.modelo or None,
+                 num(r.parametros.get("alpha")), num(r.parametros.get("beta")), num(r.parametros.get("phi")),
+                 num(r.parametros.get("gamma")), num(r.tendencia_mensual), r.n_cortes or None,
+                 num(r.error_modelo), num(r.error_ultimo_valor), num(r.error_ses), num(ult),
                  None if not r.pronostico or math.isnan(r.pronostico[0]) else r.pronostico[0],
-                 None if math.isnan(fin) else fin, var, " | ".join(r.alertas)]
-        ws.append(fila)
+                 num(fin), var, " | ".join(r.alertas)]
+        ws.append(fila_)
     _formato_tabla(ws, negrita, encab)
+    for fila_ in ws.iter_rows(min_row=2):
+        for c in fila_:
+            enc_ = ws.cell(1, c.column).value
+            if enc_ == "Tendencia mensual" and isinstance(c.value, float):
+                c.number_format = "0.00%" if fila_[6].value == "log" else "0.0000"
+            elif enc_ in ("alpha", "beta", "phi", "gamma") and isinstance(c.value, float):
+                c.number_format = "0.000"
+            elif enc_ and enc_.startswith("Error %") and isinstance(c.value, float):
+                c.number_format = "0.0"
 
     # Pronosticos (drivers con intervalos)
     ws = wb.create_sheet("Pronosticos_Drivers")
@@ -1630,7 +1215,7 @@ def graficar(resultados: dict, derivados: dict, historia_montos: dict, periodos_
                 if np.any(~np.isnan(pr)):
                     ax.plot(fechas(periodos_proy), pr, color="#c55a11", lw=1.5, ls="--")
                     ax.fill_between(fechas(periodos_proy), r.li, r.ls, color="#f4b183", alpha=0.35, lw=0)
-                ax.set_title(f"{r.clave[3]}: {', '.join(r.pesos) or r.regla}"[:60], fontsize=7)
+                ax.set_title(f"{r.clave[3]}: {r.modelo or r.regla}"[:60], fontsize=7)
                 ax.tick_params(labelsize=6)
             for ax in list(ejes.flat)[len(lista):]:
                 ax.axis("off")
@@ -1770,18 +1355,8 @@ def main():
     series = (series_montos(bd_danos, "DANOS", ESTRUCTURA["DANOS"], ultimo, h, tc_hist.get("DANOS"))
               + series_montos(bd_rfv, "FIANZAS", ESTRUCTURA["FIANZAS"], ultimo, h, tc_hist.get("FIANZAS"))
               + series_hparametros(hp, h, ultimo))
-    tabla_validacion, seleccion = [], {}
-    if MODO_SELECCION == "validado":
-        print("Validando procedimientos fuera de muestra (backtest del metodo completo) ...", flush=True)
-        tabla_validacion, seleccion = validar_procedimientos(series)
-        for tipo, nombre in PROCEDIMIENTO_RESPALDO.items():
-            if tipo not in seleccion:
-                seleccion[tipo] = nombre
-                alertas.append(("METODO", tipo, f"Sin series suficientes para validar; se usa {nombre}"))
-        for s in series:
-            s.procedimiento = tuple(PROCEDIMIENTOS_CANDIDATOS[seleccion[s.tipo]])
-        for tipo, nombre in seleccion.items():
-            print(f"   {tipo:<7} -> {nombre}", flush=True)
+    for tipo, nombre in MODELO_POR_TIPO.items():
+        print(f"   {tipo:<7} -> {nombre}", flush=True)
     print(f"   {len(series)} series a proyectar (con backtest por serie) ...", flush=True)
     resultados = correr_series(series)
     ajustar_orden_indices(hp, resultados, alertas)
@@ -1805,9 +1380,7 @@ def main():
     }
     segundos = time.time() - t0
     escribir_diagnostico(resultados, periodos_proy, alertas, {"DANOS": proy_danos, "FIANZAS": proy_rfv},
-                         {"ultimo": ultimo, "segundos": segundos, "seleccion": seleccion,
-                          "versiones": _versiones()},
-                         tabla_validacion)
+                         {"ultimo": ultimo, "segundos": segundos, "versiones": _versiones()})
     graficas_ok = False
     if GENERAR_GRAFICAS:
         print("Generando graficas ...", flush=True)

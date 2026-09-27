@@ -5,7 +5,7 @@ Dos scripts de Python pensados para correr desde VSCode (F5 o *Run Python File*)
 | Script | Qué hace |
 |---|---|
 | `llenar_bd_rfv.py` | Llena **BD_ RFV** (ramos de Fianzas 130–170) desde `Res_Rvas_2025` y `Res_Rvas_2026`, con el mismo criterio con el que se llenó a mano la BD de Daños. |
-| `proyeccion_reservas.py` | Proyecta de **202609 a 202712** `HParametros_2026` (índices y LAGs “Real”), `BD_Montos_RRC_SONR` (Daños) y `BD_ RFV` (Fianzas), con el mismo formato de los archivos originales. |
+| `proyeccion_reservas.py` | Proyecta de **202609 a 202712** `HParametros_2026` (índices y LAGs “Real”), `BD_Montos_RRC_SONR` (Daños) y `BD_ RFV` (Fianzas), con el mismo formato de los archivos originales, usando suavizamiento exponencial (Holt / Holt-Winters / SES). |
 | `dashboard.py` | Arma los **dashboards de Excel** de índices y reservas (real y proyectado) a partir de las salidas. Lo llama `proyeccion_reservas.py` al final; también se puede correr solo (ver sección 5). |
 | `excel_fiel.py` | Módulo auxiliar que usan los dos scripts para guardar los libros sin perder formato (ver sección 4). |
 | `tipo_cambio.py` | Supuesto de tipo de cambio de Inversiones (`TC_Real_Esti.xlsx`, hoja TC: **FCST** 2026 y **FCST 2027**) que se escribe en la columna TC. Actualízalo cuando haya un nuevo pronóstico. |
@@ -13,7 +13,7 @@ Dos scripts de Python pensados para correr desde VSCode (F5 o *Run Python File*)
 ## Cómo correrlo
 
 1. Copia los cuatro archivos a `proyeccion_indices/entradas/`: `BD_ BEL - IRR - MR.xlsx`, `BD_ RFV.xlsx`, `Res_Rvas_2025.xlsx` y `Res_Rvas_2026.xlsx`.
-2. Ejecuta `proyeccion_reservas.py`. Tarda unos 2–3 minutos; en cada corrida vuelve a llenar la BD de Fianzas desde los Res_Rvas (`REGENERAR_BD_RFV`). Genera:
+2. Ejecuta `proyeccion_reservas.py`. Tarda alrededor de un minuto; en cada corrida vuelve a llenar la BD de Fianzas desde los Res_Rvas (`REGENERAR_BD_RFV`). Genera:
    - `salidas/BD_ RFV.xlsx`: la BD de Fianzas llena, sin proyección.
    - `salidas/BD_ BEL - IRR - MR_Proyeccion.xlsx`
    - `salidas/BD_ RFV_Proyeccion.xlsx`
@@ -68,47 +68,49 @@ El criterio se obtuvo reconstruyendo celda por celda la hoja de referencia de Da
 | SONR | BEL, %MR/BEL, %IRR/BRUTO | MR, BRUTO = BEL+MR, IRR, NETO |
 | RFV | BRUTO, %IRR/BRUTO, RCONT total | IRR, NETO; RCONT por ramo con la mezcla de los últimos 8 meses |
 
-**b) Modelos.** Ingenuo, Ingenuo estacional, Media 12m, SES, Holt amortiguado, Holt-Winters amortiguado, Theta, ARIMA (orden por AICc) y Regresión log-lineal con estacionalidad. Montos e índices se modelan en logaritmos; razones y LAGs, en escala original.
+**b) Un solo tipo de modelo: suavizamiento exponencial (familia Holt-Winters).** Todos son el mismo modelo de nivel + tendencia amortiguada + estacionalidad, en la variante que corresponde a cada tipo de serie (`MODELO_POR_TIPO`):
 
-**c) Selección validada fuera de muestra (backtest del método completo).** En cada corrida se simula haber proyectado desde 8 cortes históricos a 1–16 meses con cada procedimiento candidato (modelos solos y combinaciones de pesos iguales):
-
-- **Montos**: se elige el menor **WAPE** (error absoluto / monto real, que pondera por USD). Entre los que están a ≤ 2% del mejor, gana el de menor sesgo agregado.
-- **Índices, razones y LAGs**: se elige el menor **AvgRelMAE** (error relativo al ingenuo, media geométrica entre series), con IC bootstrap al 90%. Si la mejora frente al ingenuo no es significativa, se usa el mejor procedimiento **sin tendencia** (parsimonia).
-
-Resultados con historia a 202608 (159 series, 1,256 pronósticos fuera de muestra):
-
-| Tipo de serie | Procedimiento elegido | Evidencia |
+| Tipo de serie | Modelo | Escala |
 |---|---|---|
-| Montos (BEL / BRUTO / RCONT) | **Theta + Holt amortiguado** | WAPE 19.7% (ingenuo 24.0%); sesgo agregado a 13–16 m −14% (ingenuo ≈ −30%) |
-| Índices (Ind Sin …) | **Ingenuo + Media 12m** | AvgRelMAE 0.942, IC90 [0.906, 0.981]; mejora en 82% de las series |
-| Razones (%GTO, %MR, %cesión) | **Ingenuo + SES** | AvgRelMAE 0.991 (no es significativamente mejor que el ingenuo, pero tampoco supone tendencia: suaviza el último dato) |
-| LAGs | **Ingenuo** (sin deriva) | El mejor, Ingenuo + Theta, supone tendencia y no mejora significativamente al último valor |
+| Montos (BEL, BRUTO) | **Holt con tendencia amortiguada** | logaritmos (crecimiento porcentual, siempre positivo) |
+| Índices (Ind Sin RRC, 99.5%, SONR) | **Holt con tendencia amortiguada** | logaritmos |
+| LAGs (patrón de desarrollo) | **Holt con tendencia amortiguada** | original, no negativo |
+| Razones (%GTO, %MR, %cedido) | **SES** (nivel suavizado, sin tendencia) | original, acotado al dominio |
+| RCONT | **Holt-Winters amortiguado** con estacionalidad por mes del trimestre | logaritmos |
 
-- La validación de montos usa las 21 series BEL de Daños con historia suficiente; Fianzas (20 meses) no alcanza para validar y se le aplica el mismo procedimiento por extensión.
-- Regla de parsimonia: si el intervalo de confianza del mejor procedimiento incluye 1 **y** el procedimiento supone tendencia, se usa el mejor procedimiento sin tendencia. Los procedimientos sin tendencia se consideran igual de parsimoniosos.
-- Elegir el modelo serie por serie (“torneo”) fue menos preciso. Queda como modo alternativo: `MODO_SELECCION = "torneo"`.
-- **Moneda**: los montos se modelan en USD. En backtest, modelar en MXN y convertir con el TC real fue menos preciso en Daños (WAPE 22.5% vs 19.8%) y en Fianzas (7.4% vs 6.0%). Se puede cambiar con `MODELAR_EN_MXN`.
-- **Sesgo conocido**: en 2023–2026 hubo un crecimiento muy fuerte. Los modelos amortiguan la tendencia y a 13–16 meses quedaron en promedio 14% por debajo de lo real. Si el plan de negocio prevé un crecimiento sostenido, conviene contrastarlo.
+- Los parámetros de cada serie (α nivel, β tendencia, φ amortiguación, γ estacionalidad) se estiman por máxima verosimilitud con `statsmodels` (`ETSModel`), y los intervalos al 80% salen del propio modelo. Quedan en la hoja `Series_Modelos` del diagnóstico, junto con la **tendencia mensual** al final de la historia.
+- **Cómo se estima** (`COTAS_SUAVIZAMIENTO`): los parámetros de cada serie se estiman por máxima verosimilitud dentro de cotas con sentido actuarial:
+  - α ≈ 1 (nivel): la proyección **arranca del último dato real**, sin escalón entre lo real y lo proyectado. Sin esta cota, en varias series el modelo suavizaba el nivel y el primer mes proyectado caía o subía de golpe (hasta −4% en el total de RRC).
+  - β ≤ 0.15 (tendencia): la tendencia es el promedio suavizado de los cambios de los últimos años, **no la del último mes**; así un salto puntual no se convierte en tendencia.
+  - φ entre 0.80 y 0.95 (amortiguación): la tendencia se reduce entre 5% y 20% cada mes hacia adelante, así continúa lo observado sin extrapolar linealmente 16 meses.
+  - En RCONT (Holt-Winters trimestral) el nivel sí se suaviza (α ≥ 0.2) para separar la estacionalidad.
+  - Sin cotas, en series cortas o ruidosas la estimación caía en casos degenerados (α = 0: el modelo ignora el nivel actual y proyecta la recta de toda la historia; φ = 0.98: extrapolación casi lineal) con errores de backtest mayores (índices 26% contra 21–22% con cotas).
+- Las razones usan SES porque dependen de los contratos de reaseguro y de la estructura de gastos, no de una tendencia; en el backtest la tendencia no las mejoró y en algunas series producía cesiones fuera de [0, 1].
+- La estacionalidad mensual (Holt-Winters de periodo 12) se probó en montos e índices y empeoró el backtest, así que solo se usa la trimestral de RCONT (acumula en los meses 1–2 del trimestre y libera en el 3), donde el error del backtest baja de 7–10% a 5%.
+- Series cortas: SES con menos de 12 observaciones; último valor con menos de 4.
 
-**d) Backtest por serie**, con todos los modelos y los mismos cortes (sin fuga de información):
+**c) Backtest por serie.** Cada serie se vuelve a proyectar desde 16, 12 y 8 meses antes del final (horizontes de 1 a 16 meses) con el mismo modelo, y se mide el error % (suma de errores absolutos / suma de valores reales) del modelo, de repetir el último valor y de SES. Está por serie en `Series_Modelos` y resumido por tipo en la hoja `Backtest`. Sirve para juzgar la confiabilidad y para las alertas; no cambia el modelo. Con la historia a 202608 (mediana entre series):
 
-- Da el MASE de cada modelo en cada serie (hoja `Series_Modelos`) y los intervalos al 80%, con piso de caminata aleatoria en series cortas.
-- Incluye una **red de seguridad**: si en la propia serie el procedimiento validado fue más de 1.5 veces peor que el ingenuo (por ejemplo, un cambio de régimen como el ramo 37), se usa el ensamble propio de esa serie.
+| Tipo | Modelo | Error % modelo | Error % último valor | Series en que el modelo mejora al último valor |
+|---|---|---|---|---|
+| Montos | Holt amortiguado, Holt-Winters amortiguado (trimestral) | 18.9% | 22.3% | 61% (23 series) |
+| Índices | Holt amortiguado | 13.3% | 13.1% | 29% (38 series) |
+| Razones | SES | 15.2% | 15.2% | 60% (55 series) |
+| LAGs | Holt amortiguado | 2.3% | 2.1% | 41% (74 series) |
 
-**e) Reglas actuariales y de calidad de datos** (todas reportadas en la hoja `Alertas`):
+En montos la tendencia mejora la precisión; en índices y LAGs cuesta uno o dos puntos de error frente a la línea plana, a cambio de reflejar la tendencia observada, que es lo que se necesita para planeación.
 
-- **Dominio actuarial**: cesión (IRR/BRUTO) en [0, 1] y %GTO, %MR ≥ 0. Razones y LAGs se acotan además al rango histórico.
-- **RCONT**: se proyecta con factores por mes del trimestre (acumula en los meses 1–2 y libera en el 3). En un backtest con 7 cortes (12 a 18 meses de entrenamiento), el MAPE con Theta + Holt bajó de 8.6% a 6.2%. Con tan poca historia la cifra es indicativa.
-- **Series especiales**:
-  - Las series en cero en los últimos 6 meses se proyectan en cero.
-  - Los parámetros “en escalón” conservan el último valor.
-  - Las series cortas usan SES.
+**d) Reglas actuariales y de calidad de datos** (todas reportadas en la hoja `Alertas`):
+
+- **Dominio actuarial**: cesión (IRR/BRUTO) en [0, 1]; %GTO y %MR ≥ 0; LAGs ≥ 0 (no se acotan a 1: en el ramo 31 el patrón acumulado real supera 1); montos ≥ 0.
+- **Series especiales**: las series en cero en los últimos 6 meses se proyectan en cero; los parámetros “en escalón” (≥ 50% de meses sin cambio) conservan el último valor.
 - **Índice 99.5%**: se mantiene ≥ la media cuando así ha sido siempre en la historia del ramo.
 - **Limpieza de datos**:
   - Números guardados como texto (P de 202506 con `\xa0`).
-  - Huecos de hasta 6 meses se interpolan; con huecos mayores se usa solo la historia posterior (TEV e Hidro).
+  - Huecos de hasta 6 meses se interpolan (en HParametros falta 202501 en varios ramos); con huecos mayores se usa solo la historia posterior (TEV e Hidro).
   - Un LAG en 0 después de que el patrón acumulado superó 50% se trata como faltante (ramo 35).
-- **Alerta de salto atípico en el último mes** (por ejemplo, RFV 150 en 202608, +27.6%).
+- **Alertas**: salto atípico en el último mes (por ejemplo, RFV 150 en 202608, +27.6%; Ind Sin RRC 35, +43.7%), cambio proyectado a 16 meses mayor al máximo observado en la historia, y series en que el modelo no supera al último valor en su propio backtest.
+- **Moneda**: los montos se modelan en USD. En backtest, modelar en MXN y convertir con el TC real fue menos preciso. Se puede cambiar con `MODELAR_EN_MXN`.
 
 ## 3. Salidas y formato
 

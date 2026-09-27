@@ -222,18 +222,15 @@ def leer_montos(ultimo: int):
 
 
 def leer_metodo() -> list:
+    """Filas de la hoja Backtest del diagnostico (modelo y error por tipo de serie)."""
     if not ARCHIVO_DIAGNOSTICO.exists():
         return []
     wb = openpyxl.load_workbook(ARCHIVO_DIAGNOSTICO, read_only=True, data_only=True)
-    if "Validacion_Metodo" not in wb.sheetnames:
+    if "Backtest" not in wb.sheetnames:
         return []
-    filas = wb["Validacion_Metodo"].iter_rows(values_only=True)
+    filas = wb["Backtest"].iter_rows(values_only=True)
     enc = [str(h) for h in next(filas)]
-    out = []
-    for f in filas:
-        d = dict(zip(enc, f))
-        if d.get("Seleccionado"):
-            out.append(d)
+    out = [dict(zip(enc, f)) for f in filas if f and f[0] in ("nivel", "indice", "razon", "lag")]
     wb.close()
     return out
 
@@ -346,7 +343,7 @@ def generar(ruta_salida: Path = SALIDA_DASHBOARD) -> Path:
     intervalos = leer_intervalos()
     registros_m, tc, ramos_m = leer_montos(ultimo)
     metodo = leer_metodo()
-    proc = {d.get("Tipo"): d.get("Procedimiento") or "n/d" for d in metodo}
+    proc = {d.get("Tipo"): d.get("Modelo") or "n/d" for d in metodo}
     fin = max(r[3] for r in registros_i)
     fin_m = max(r[4] for r in registros_m)
     p_dic_actual = (ultimo // 100) * 100 + 12
@@ -477,7 +474,7 @@ def generar(ruta_salida: Path = SALIDA_DASHBOARD) -> Path:
     notas = [f"Real hasta {etiqueta(ultimo)}", f"Proyección {etiqueta(mover(ultimo, 1))} a {etiqueta(fin)}",
              "", "Cambia los selectores (listas", "desplegables) y las gráficas", "se actualizan solas.", "",
              f"Índices: {proc.get('indice', 'n/d')}", f"LAGs: {proc.get('lag', 'n/d')}",
-             "(métodos validados fuera de muestra)"]
+             "(tendencia amortiguada)"]
     for k, t in enumerate(notas):
         ws.cell(21 + k, 2, t).font = fuente(9, k < 2, TEXTO_2, k >= 3)
 
@@ -925,11 +922,12 @@ def construir_analisis(ws, registros_i, ramos_i, registros_m, ultimo, p_dic, fin
                            mid_color="F0EFEC", end_type="num", end_value=0.5, end_color="E66767"))
 
     fila += 3
-    ws.cell(fila, 2, "3. Método de proyección (validación fuera de muestra)").font = fuente(12, True)
+    ws.cell(fila, 2, "3. Modelo por tipo de serie y error del backtest").font = fuente(12, True)
     fila += 1
-    # columnas: B tipo | C:D procedimiento | E WAPE | F AvgRelMAE | G sesgo | H:M criterio
-    posiciones = [(2, 2), (3, 4), (5, 5), (6, 6), (7, 7), (8, 13)]
-    cab = ["Tipo de serie", "Procedimiento", "WAPE %", "AvgRelMAE", "Sesgo agregado % 13-16", "Criterio"]
+    # columnas: B tipo | C:D modelo | E series | F error modelo | G error ultimo valor | H:I % series mejor
+    posiciones = [(2, 2), (3, 4), (5, 5), (6, 6), (7, 7), (8, 9)]
+    cab = ["Tipo de serie", "Modelo", "Series con backtest", "Error % modelo (mediana)",
+           "Error % último valor (mediana)", "% series en que el modelo mejora al último valor"]
     for (c1_, c2_), t in zip(posiciones, cab):
         ws.merge_cells(start_row=fila, start_column=c1_, end_row=fila, end_column=c2_)
         c = ws.cell(fila, c1_, t)
@@ -941,14 +939,15 @@ def construir_analisis(ws, registros_i, ramos_i, registros_m, ultimo, p_dic, fin
     nombres = {"nivel": "Montos", "indice": "Índices", "razon": "Razones", "lag": "LAGs"}
     for d in metodo:
         fila += 1
-        vals = [nombres.get(d.get("Tipo"), d.get("Tipo")), d.get("Procedimiento"), d.get("WAPE %"), d.get("AvgRelMAE"),
-                d.get("Sesgo agregado % 13-16"), str(d.get("Seleccionado", "")).replace("SI: ", "")]
+        vals = [nombres.get(d.get("Tipo"), d.get("Tipo")), d.get("Modelo"), d.get("Series con backtest"),
+                d.get("Error % modelo (mediana)"), d.get("Error % ultimo valor (mediana)"),
+                d.get("% series en que el modelo mejora al ultimo valor")]
         for j, ((c1_, c2_), v) in enumerate(zip(posiciones, vals)):
             ws.merge_cells(start_row=fila, start_column=c1_, end_row=fila, end_column=c2_)
             c = ws.cell(fila, c1_, v)
             c.font = fuente(10, j == 1)
-            c.number_format = "0.000" if j == 3 else ("0.0" if j in (2, 4) else "General")
-            c.alignment = Alignment(wrap_text=j in (1, 5), vertical="center")
+            c.number_format = "0%" if j == 5 else ("0.0" if j in (3, 4) else "General")
+            c.alignment = Alignment(wrap_text=j == 1, vertical="center")
             for k in range(c1_, c2_ + 1):
                 ws.cell(fila, k).fill = relleno(PANEL)
         ws.row_dimensions[fila].height = 30
