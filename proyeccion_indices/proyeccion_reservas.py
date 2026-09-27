@@ -11,7 +11,7 @@ Proyecta, con exactamente el mismo formato de los archivos actuales:
                               de los renglones "Real" (el mismo filtro de la hoja).
        * BD_Montos_RRC_SONR -> RRC (NETO, BRUTO, BEL, GTO, IRR, MR) y SONR (NETO,
                               BRUTO, BEL, IRR, MR) por ramo.
-  2. "BD_ RFV.xlsx" (Fianzas, generado con llenar_bd_rfv.py)
+  2. "BD_ RFV.xlsx" (Fianzas, ya llena por el usuario)
        * BD_Montos_RRC_SONR -> RFV NETO, RFV BRUTO, RFV IRR y RCONT por ramo.
 
 METODOLOGIA (resumen; el detalle queda en salidas/Diagnostico_Proyeccion.xlsx)
@@ -138,7 +138,7 @@ ENTRADAS = CARPETA / "entradas"
 SALIDAS = CARPETA / "salidas"
 
 ARCHIVO_BD_DANOS = ENTRADAS / "BD_ BEL - IRR - MR.xlsx"
-ARCHIVO_BD_RFV = SALIDAS / "BD_ RFV.xlsx"        # lo genera llenar_bd_rfv.py (se corre solo si falta)
+ARCHIVO_BD_RFV = ENTRADAS / "BD_ RFV.xlsx"       # BD de Fianzas ya llena (se lee tal cual, no se regenera)
 
 SALIDA_BD_DANOS = SALIDAS / "BD_ BEL - IRR - MR_Proyeccion.xlsx"
 SALIDA_BD_RFV = SALIDAS / "BD_ RFV_Proyeccion.xlsx"
@@ -170,8 +170,6 @@ ACTUALIZAR_TC_EXISTENTES = True
 
 RESALTAR_PROYECCION = False      # True = relleno azul claro en celdas proyectadas
 SOBRESCRIBIR_PERIODOS_CON_DATOS = False  # False = se detiene si algun mes a proyectar ya trae cifras
-REGENERAR_BD_RFV = True          # True = vuelve a llenar BD_ RFV en cada corrida (tarda ~20 s); False = solo si
-                                 # no existe o alguna entrada tiene fecha mas reciente
 COLOR_RESALTADO = "DDEBF7"
 GENERAR_GRAFICAS = True
 GENERAR_DASHBOARD = True         # dashboards de indices y reservas (real vs proyeccion): Excel y HTML
@@ -1272,15 +1270,6 @@ def _versiones() -> str:
     return ", ".join(partes)
 
 
-def _bd_rfv_desactualizada() -> bool:
-    """La BD_ RFV llena se regenera siempre (REGENERAR_BD_RFV) o si no existe o alguna entrada es mas reciente."""
-    if REGENERAR_BD_RFV or not ARCHIVO_BD_RFV.exists():
-        return True
-    entradas = list(ENTRADAS.glob("Res_Rvas_*.xlsx")) + [ENTRADAS / "BD_ RFV.xlsx"]
-    t_salida = ARCHIVO_BD_RFV.stat().st_mtime
-    return any(p.exists() and p.stat().st_mtime > t_salida for p in entradas)
-
-
 UMBRAL_CIFRA = 1.0   # USD; debajo es ruido de redondeo de SAP (p.ej. 3e-12) y cuenta como cero
 
 
@@ -1318,18 +1307,14 @@ def main():
     ultimo = indice_a_periodo(periodo_a_indice(PERIODO_INICIO) - 1)
     h = len(periodos_proy)
     print(f"Proyeccion {periodos_proy[0]} - {periodos_proy[-1]} ({h} meses). Historia hasta {ultimo}.", flush=True)
-    regenerar_rfv = _bd_rfv_desactualizada()
+    for ruta in (ARCHIVO_BD_DANOS, ARCHIVO_BD_RFV):
+        if not ruta.exists():
+            raise SystemExit(f"Falta {ruta}: copia la BD (Fianzas ya llena) a la carpeta entradas/.")
     salidas = ([SALIDA_BD_DANOS, SALIDA_BD_RFV, SALIDA_DIAGNOSTICO] + ([SALIDA_GRAFICAS] if GENERAR_GRAFICAS else [])
-               + ([SALIDA_DASHBOARD, SALIDA_DASHBOARD_HTML] if GENERAR_DASHBOARD else [])
-               + ([ARCHIVO_BD_RFV] if regenerar_rfv else []))
+               + ([SALIDA_DASHBOARD, SALIDA_DASHBOARD_HTML] if GENERAR_DASHBOARD else []))
     verificar_escritura(salidas)
-
-    if regenerar_rfv:
-        print("Llenando BD_ RFV desde los Res_Rvas (llenar_bd_rfv.py) ...", flush=True)
-        import llenar_bd_rfv  # noqa: WPS433
-        llenar_bd_rfv.llenar()
-    print(f"   BD_ RFV usada: {ARCHIVO_BD_RFV.name} "
-          f"({datetime.fromtimestamp(ARCHIVO_BD_RFV.stat().st_mtime):%Y-%m-%d %H:%M})", flush=True)
+    for ruta in (ARCHIVO_BD_DANOS, ARCHIVO_BD_RFV):
+        print(f"   Entrada: {ruta.name} ({datetime.fromtimestamp(ruta.stat().st_mtime):%Y-%m-%d %H:%M})", flush=True)
 
     alertas = []
     print("Leyendo archivos ...", flush=True)
@@ -1390,7 +1375,7 @@ def main():
     n_hp = escribir_hparametros(hp, resultados, periodos_proy)
     guardar_libro(bd_danos.wb, SALIDA_BD_DANOS, original=ARCHIVO_BD_DANOS)
     info_rfv = escribir_bd_montos(bd_rfv, proy_rfv, periodos_proy, SALIDA_BD_RFV)
-    guardar_libro(bd_rfv.wb, SALIDA_BD_RFV, original=ENTRADAS / "BD_ RFV.xlsx")
+    guardar_libro(bd_rfv.wb, SALIDA_BD_RFV, original=ARCHIVO_BD_RFV)
 
     historia = {
         "DANOS": {k: v for k, v in bd_danos.valores.items() if k[1] <= ultimo},

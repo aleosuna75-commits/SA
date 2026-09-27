@@ -4,7 +4,7 @@ Dos scripts de Python pensados para correr desde VSCode (F5 o *Run Python File*)
 
 | Script | Qué hace |
 |---|---|
-| `llenar_bd_rfv.py` | Llena **BD_ RFV** (ramos de Fianzas 130–170) desde `Res_Rvas_2025` y `Res_Rvas_2026`, con el mismo criterio con el que se llenó a mano la BD de Daños. |
+| `llenar_bd_rfv.py` | Herramienta **opcional, fuera del proceso**: llena una BD_ RFV vacía desde `Res_Rvas_2025` y `Res_Rvas_2026` con el criterio de la BD de Daños. La proyección ya no la ejecuta; lee la BD de Fianzas que tú llenas. |
 | `proyeccion_reservas.py` | Proyecta de **202609 a 202712** `HParametros_2026` (índices y LAGs “Real”), `BD_Montos_RRC_SONR` (Daños) y `BD_ RFV` (Fianzas), con el mismo formato de los archivos originales, usando suavizamiento exponencial (Holt / Holt-Winters / SES). |
 | `dashboard.py` | Arma el **dashboard de Excel** de índices y reservas (real y proyectado) a partir de las salidas. Lo llama `proyeccion_reservas.py` al final; también se puede correr solo (ver sección 5). |
 | `dashboard_html.py` | Arma el mismo dashboard en **HTML** (un solo archivo, sin internet), con tooltips, vista de tabla y modo oscuro. |
@@ -13,9 +13,8 @@ Dos scripts de Python pensados para correr desde VSCode (F5 o *Run Python File*)
 
 ## Cómo correrlo
 
-1. Copia los cuatro archivos a `proyeccion_indices/entradas/`: `BD_ BEL - IRR - MR.xlsx`, `BD_ RFV.xlsx`, `Res_Rvas_2025.xlsx` y `Res_Rvas_2026.xlsx`.
-2. Ejecuta `proyeccion_reservas.py`. Tarda alrededor de un minuto; en cada corrida vuelve a llenar la BD de Fianzas desde los Res_Rvas (`REGENERAR_BD_RFV`). Genera:
-   - `salidas/BD_ RFV.xlsx`: la BD de Fianzas llena, sin proyección.
+1. Copia las dos BD a `proyeccion_indices/entradas/`: `BD_ BEL - IRR - MR.xlsx` (Daños) y `BD_ RFV.xlsx` (Fianzas, **ya llena** con la historia real hasta el último mes). Los archivos de entrada no se modifican.
+2. Ejecuta `proyeccion_reservas.py`. Tarda alrededor de un minuto. Genera:
    - `salidas/BD_ BEL - IRR - MR_Proyeccion.xlsx`
    - `salidas/BD_ RFV_Proyeccion.xlsx`
    - `salidas/Diagnostico_Proyeccion.xlsx`: metodología, validación, modelos por serie, intervalos y alertas.
@@ -32,7 +31,9 @@ Protecciones incluidas:
 
 > Las carpetas `entradas/` y `salidas/` y cualquier `.xlsx` están excluidas de git (el repositorio es público y los datos son confidenciales).
 
-## 1. Llenado de BD_ RFV (Fianzas)
+## 1. Herramienta opcional: `llenar_bd_rfv.py` (ya no es parte del proceso)
+
+La proyección lee la `BD_ RFV.xlsx` que tú llenas. Este script queda solo por si algún día hace falta llenar una BD de Fianzas vacía desde los Res_Rvas (se corre solo: lee `entradas/Res_Rvas_2025.xlsx`, `Res_Rvas_2026.xlsx` y la plantilla `entradas/BD_ RFV.xlsx`, y escribe `salidas/BD_ RFV.xlsx`). Lo que sigue documenta su criterio.
 
 El criterio se obtuvo reconstruyendo celda por celda la hoja de referencia de Daños: RRC coincide en 312 de 312 celdas y SONR en 288 de 288. Dos verificadores independientes recalcularon las 480 celdas de Fianzas sin diferencias.
 
