@@ -79,30 +79,32 @@ El criterio se obtuvo reconstruyendo celda por celda la hoja de referencia de Da
 | RCONT | **Holt-Winters amortiguado** con estacionalidad por mes del trimestre | logaritmos |
 
 - Los parámetros de cada serie (α nivel, β tendencia, φ amortiguación, γ estacionalidad) se estiman por máxima verosimilitud con `statsmodels` (`ETSModel`), y los intervalos al 80% salen del propio modelo. Quedan en la hoja `Series_Modelos` del diagnóstico, junto con la **tendencia mensual** al final de la historia.
-- **Cómo se estima** (`COTAS_SUAVIZAMIENTO`): los parámetros de cada serie se estiman por máxima verosimilitud dentro de cotas con sentido actuarial:
-  - α ≈ 1 (nivel): la proyección **arranca del último dato real**, sin escalón entre lo real y lo proyectado. Sin esta cota, en varias series el modelo suavizaba el nivel y el primer mes proyectado caía o subía de golpe (hasta −4% en el total de RRC).
+- **Amortiguación fija** (`AMORTIGUACION_TENDENCIA = 0.95`): cada mes hacia adelante la tendencia conserva 95% de su valor; a 16 meses conserva 44% y el cambio acumulado equivale a 10.7 meses de la tendencia mensual. Es el mismo φ para todas las series, y es el parámetro que conviene tocar si se quiere más o menos tendencia: con 0.98 la proyección es casi lineal (72% a 16 meses) y con 0.90 se apaga pronto (19%). Se fijó porque, al dejar que la máxima verosimilitud lo estime, en la mitad de las series se iba al mínimo permitido y la tendencia se apagaba en 2027, que era justo la queja original.
+- **Cotas de los demás parámetros** (`COTAS_SUAVIZAMIENTO`), estimados por máxima verosimilitud en cada serie:
+  - α ≈ 1 (nivel, en Holt): la proyección **arranca del último dato real**, sin escalón entre lo real y lo proyectado. Sin esta cota, en varias series el modelo suavizaba el nivel y el primer mes proyectado caía o subía de golpe (hasta −4% en el total de RRC).
   - β ≤ 0.15 (tendencia): la tendencia es el promedio suavizado de los cambios de los últimos años, **no la del último mes**; así un salto puntual no se convierte en tendencia.
-  - φ entre 0.80 y 0.95 (amortiguación): la tendencia se reduce entre 5% y 20% cada mes hacia adelante, así continúa lo observado sin extrapolar linealmente 16 meses.
-  - En RCONT (Holt-Winters trimestral) el nivel sí se suaviza (α ≥ 0.2) para separar la estacionalidad.
-  - Sin cotas, en series cortas o ruidosas la estimación caía en casos degenerados (α = 0: el modelo ignora el nivel actual y proyecta la recta de toda la historia; φ = 0.98: extrapolación casi lineal) con errores de backtest mayores (índices 26% contra 21–22% con cotas).
+  - En RCONT (Holt-Winters) el nivel sí se suaviza (α ≥ 0.2) para separar la estacionalidad. En las razones (SES) α se estima libre: si la razón cambió de nivel, α ≈ 1 y sigue al último dato (por ejemplo la cesión del ramo 10 de RRC, que subió de 0.40 a 0.63 en seis meses); si solo tiene ruido, usa el promedio reciente. Ponerle una cota inferior hacía que el optimizador se quedara pegado a ella y sí producía escalones en NETO.
+  - Sin cotas, en series cortas o ruidosas la estimación caía en casos degenerados: α = 0 (el modelo ignora el nivel actual y proyecta el promedio o la recta de toda la historia) y β alto (un salto de un mes se vuelve tendencia), con proyecciones de +65% o −49% a 16 meses en índices y LAGs.
 - Las razones usan SES porque dependen de los contratos de reaseguro y de la estructura de gastos, no de una tendencia; en el backtest la tendencia no las mejoró y en algunas series producía cesiones fuera de [0, 1].
-- La estacionalidad mensual (Holt-Winters de periodo 12) se probó en montos e índices y empeoró el backtest, así que solo se usa la trimestral de RCONT (acumula en los meses 1–2 del trimestre y libera en el 3), donde el error del backtest baja de 7–10% a 5%.
+- La estacionalidad mensual (Holt-Winters de periodo 12) se probó en montos e índices y empeoró el backtest, así que solo se usa la trimestral de RCONT (acumula en los meses 1–2 del trimestre y libera en el 3), que reproduce el diente de sierra de la historia.
 - Series cortas: SES con menos de 12 observaciones; último valor con menos de 4.
 
-**c) Backtest por serie.** Cada serie se vuelve a proyectar desde 16, 12 y 8 meses antes del final (horizontes de 1 a 16 meses) con el mismo modelo, y se mide el error % (suma de errores absolutos / suma de valores reales) del modelo, de repetir el último valor y de SES. Está por serie en `Series_Modelos` y resumido por tipo en la hoja `Backtest`. Sirve para juzgar la confiabilidad y para las alertas; no cambia el modelo. Con la historia a 202608 (mediana entre series):
+**c) Backtest por serie.** Cada serie se vuelve a proyectar desde 16, 12 y 8 meses antes del final (horizontes de 1 a 16 meses, con al menos 12 meses de entrenamiento) con el mismo modelo, y se mide el error % (suma de errores absolutos / suma de valores reales) del modelo, de repetir el último valor y de SES. Está por serie en `Series_Modelos` y resumido por tipo en la hoja `Backtest`. Fianzas tiene 20 meses de historia, así que solo alcanza el corte a 8 meses y su cifra es indicativa. Sirve para juzgar la confiabilidad y para las alertas; no cambia el modelo. Con la historia a 202608 (mediana entre series):
 
-| Tipo | Modelo | Error % modelo | Error % último valor | Series en que el modelo mejora al último valor |
-|---|---|---|---|---|
-| Montos | Holt amortiguado, Holt-Winters amortiguado (trimestral) | 18.9% | 22.3% | 61% (23 series) |
-| Índices | Holt amortiguado | 13.3% | 13.1% | 29% (38 series) |
-| Razones | SES | 15.2% | 15.2% | 60% (55 series) |
-| LAGs | Holt amortiguado | 2.3% | 2.1% | 41% (74 series) |
+| Tipo | Libro | Modelo | Error % modelo | Error % último valor | Series en que el modelo mejora al último valor |
+|---|---|---|---|---|---|
+| Montos | Daños | Holt amortiguado | 21.5% | 22.3% | 57% (23 series, 3 cortes) |
+| Montos | Fianzas | Holt amortiguado, Holt-Winters amortiguado (trimestral) | 8.2% | 13.3% | 80% (5 series, 1 corte) |
+| Índices | HParametros | Holt amortiguado | 13.9% | 13.7% | 16% (38 series, 3 cortes) |
+| Razones | Daños | SES | 15.2% | 15.2% | 60% (55 series, 3 cortes) |
+| Razones | Fianzas | SES | 12.0% | 6.5% | 25% (4 series, 1 corte) |
+| LAGs | HParametros | Holt amortiguado | 2.5% | 2.1% | 36% (74 series, 3 cortes) |
 
-En montos la tendencia mejora la precisión; en índices y LAGs cuesta uno o dos puntos de error frente a la línea plana, a cambio de reflejar la tendencia observada, que es lo que se necesita para planeación.
+En montos la tendencia mejora la precisión (Daños: mejor que el último valor en 57% de las series; Fianzas: en 80%, con un solo corte). En índices y LAGs **no**: el error mediano es algo mayor que el de la línea plana y el modelo solo gana en 16% de los índices y 36% de los LAGs, porque los índices son ruidosos y los LAGs casi no se mueven. Se conserva la tendencia porque es lo que se necesita para planeación, pero el costo queda a la vista; si se prefiere precisión sobre pendiente en índices, basta cambiar `MODELO_POR_TIPO["indice"]` a `"SES"`. Las series en que el modelo no supera al último valor en su propio backtest llevan alerta.
 
 **d) Reglas actuariales y de calidad de datos** (todas reportadas en la hoja `Alertas`):
 
-- **Dominio actuarial**: cesión (IRR/BRUTO) en [0, 1]; %GTO y %MR ≥ 0; LAGs ≥ 0 (no se acotan a 1: en el ramo 31 el patrón acumulado real supera 1); montos ≥ 0.
+- **Dominio actuarial**: cesión (IRR/BRUTO) en [0, 1]; %GTO y %MR ≥ 0; LAGs ≥ 0 (no se acotan a 1: en la historia el patrón acumulado supera 1 en 10 de los 13 ramos, hasta 1.21 en el 40); montos ≥ 0.
 - **Series especiales**: las series en cero en los últimos 6 meses se proyectan en cero; los parámetros “en escalón” (≥ 50% de meses sin cambio) conservan el último valor.
 - **Índice 99.5%**: se mantiene ≥ la media cuando así ha sido siempre en la historia del ramo.
 - **Limpieza de datos**:
@@ -144,7 +146,7 @@ Con el estilo del ejemplo: panel de navegación con selectores a la izquierda, b
 |---|---|
 | **Dashboard Índices** | Selectores: ramo, índice o LAG y periodo. Indicadores: último real, promedio real de 12 meses, proyección a dic-26 y dic-27, variación. Gráficas: evolución mensual 2021–2027 con banda al 80%, comparativo por ramo (el ramo elegido resaltado), patrón de desarrollo LAG 1–10 (ago-24, ago-25, ago-26 y dic-27 proyectado). Tabla resumen de los índices del ramo. |
 | **Dashboard Reservas** | Selectores: reserva (RRC, SONR, RFV), concepto, ramo (o “Todos”) y moneda (USD, o MXN con el TC de cada mes). Indicadores: real ago-26, proyección dic-26 y dic-27, crecimiento anual proyectado, crecimiento real de 12 meses y % cedido. Gráficas: mensual 2025–2027, histórico 2022–2027, por ramo y por concepto. |
-| **Análisis** | Tablas fijas con mapa de calor: índices por ramo (real contra dic-27), totales de reservas por concepto (dic-24 a dic-27) y el método elegido en la validación. |
+| **Análisis** | Tablas fijas con mapa de calor: índices por ramo (real contra dic-27), totales de reservas por concepto (dic-24 a dic-27) y el modelo por tipo de serie con su error de backtest. |
 | **BD_Indices**, **BD_Reservas** | Las bases que alimentan los dashboards, como tablas de Excel con filtros. |
 
 - Se regenera en cada corrida de la proyección (`GENERAR_DASHBOARD`). Para rehacerlo sin volver a proyectar, corre `dashboard.py`.

@@ -35,10 +35,11 @@ b) Un solo tipo de modelo: suavizamiento exponencial (familia Holt-Winters), en 
          contratos y en el backtest la tendencia no ayudo);
        - RCONT -> Holt-Winters amortiguado con estacionalidad por mes del trimestre (acumula en
          los meses 1-2 y libera en el 3).
-   Los parametros se estiman por maxima verosimilitud dentro de cotas (COTAS_SUAVIZAMIENTO):
-   alpha ~ 1 (la proyeccion arranca del ultimo dato real), beta <= 0.15 (la tendencia es la de los
-   ultimos anos, no la del ultimo mes) y phi entre 0.80 y 0.95 (se amortigua hacia adelante). Los
-   intervalos al 80% salen del propio modelo.
+   La amortiguacion de la tendencia es fija (AMORTIGUACION_TENDENCIA = 0.95: cada mes conserva 95%
+   de la tendencia; a 16 meses, 44%). Los demas parametros se estiman por maxima verosimilitud
+   dentro de cotas (COTAS_SUAVIZAMIENTO): alpha ~ 1 (la proyeccion arranca del ultimo dato real) y
+   beta <= 0.15 (la tendencia es la de los ultimos anos, no la del ultimo mes). Los intervalos al
+   80% salen del propio modelo.
 c) Backtest por serie: se vuelve a proyectar desde 16, 12 y 8 meses antes del final y se mide el
    error contra lo real, del modelo y de las alternativas simples (ultimo valor y SES). Se
    reporta por serie (Series_Modelos) y por tipo (Backtest); no cambia el modelo.
@@ -183,23 +184,31 @@ MODELO_POR_TIPO = {
     "razon": "SES",                  # %GTO, %MR y %cedido: dependen de los contratos -> nivel suavizado sin tendencia
 }
 # RCONT (ESTACIONALIDAD_TRIMESTRAL) usa Holt-Winters amortiguado con estacionalidad por mes del trimestre.
-# Cotas de los parametros (se estiman por maxima verosimilitud dentro de ellas):
-#   * alpha (nivel) ~ 1: la proyeccion arranca del ultimo dato real, sin escalon entre lo real y lo proyectado
-#     (statsmodels no admite alpha = 1 exacto; 0.99 es equivalente en la practica);
+# Amortiguacion de la tendencia (phi), fija e igual para todas las series: cada mes hacia adelante la tendencia
+# conserva phi de su valor. Con 0.95 a 16 meses conserva 44% y el cambio acumulado equivale a 10.7 meses de la
+# tendencia mensual; con 0.98 conserva 72% (casi lineal, 13.5 meses); con 0.90, 19% (7.6 meses). Si se deja que
+# la maxima verosimilitud lo estime, en la mitad de las series se va al minimo y la tendencia se apaga en 2027.
+AMORTIGUACION_TENDENCIA = 0.95
+# Cotas de los demas parametros (se estiman por maxima verosimilitud dentro de ellas):
+#   * alpha (nivel) ~ 1 en Holt: la proyeccion arranca del ultimo dato real, sin escalon entre lo real y lo
+#     proyectado (statsmodels no admite alpha = 1 exacto; 0.99 es equivalente en la practica);
 #   * beta (tendencia) entre 0.02 y 0.15: la tendencia es el promedio suavizado de los cambios de los ultimos
 #     anos, no la del ultimo mes;
-#   * phi (amortiguacion) entre 0.80 y 0.95: la tendencia se reduce entre 5% y 20% cada mes hacia adelante.
-#   En RCONT (Holt-Winters trimestral) el nivel si se suaviza (alpha >= 0.2) para separar la estacionalidad.
-# Sin cotas, en series cortas o ruidosas la estimacion cae en casos degenerados (alpha = 0 ignora el nivel
-# actual; beta alto convierte un salto de un mes en tendencia; phi = 0.98 extrapola casi lineal) que en el
-# backtest fueron peores.
-COTAS_SUAVIZAMIENTO = {"smoothing_level": (0.90, 0.99), "smoothing_trend": (0.02, 0.15), "damping_trend": (0.80, 0.95)}
+#   * en RCONT (Holt-Winters trimestral) el nivel si se suaviza (alpha >= 0.2) para separar la estacionalidad;
+#   * en SES (razones) alpha se estima libre: si la razon cambia de nivel, alpha ~ 1 y sigue al ultimo dato; si
+#     solo tiene ruido, alpha bajo y usa el promedio reciente. (Con una cota inferior el optimizador de
+#     statsmodels se queda pegado a ella en series que libres dan alpha = 1, y eso si producia escalones.)
+# Sin cotas en Holt, en series cortas o ruidosas la estimacion cae en casos degenerados (alpha = 0 ignora el
+# nivel actual y proyecta la recta de toda la historia; beta alto convierte un salto de un mes en tendencia).
+COTAS_SUAVIZAMIENTO = {"smoothing_level": (0.90, 0.99), "smoothing_trend": (0.02, 0.15),
+                       "damping_trend": (AMORTIGUACION_TENDENCIA, AMORTIGUACION_TENDENCIA)}
 COTAS_ESTACIONAL = {**COTAS_SUAVIZAMIENTO, "smoothing_level": (0.20, 0.99)}
 MIN_OBS_HOLT = 12                # con menos observaciones se usa SES
 MIN_OBS_SES = 4                  # con menos observaciones se mantiene el ultimo valor
 MIN_OBS_TRIMESTRAL = 12          # observaciones minimas para estimar la estacionalidad trimestral
 CORTES_BACKTEST = (16, 12, 8)    # meses antes del final desde los que se re-proyecta para medir el error
-MIN_ENTRENAMIENTO = 18           # observaciones minimas para un corte del backtest
+MIN_ENTRENAMIENTO = 12           # observaciones minimas para un corte del backtest (Fianzas, con 20 meses, solo
+                                 # alcanza el corte a 8 meses: su backtest es indicativo)
 MAX_HUECO_INTERPOLABLE = 6       # huecos mas largos cortan la historia
 UMBRAL_CERO_MONTOS = 1.0         # |monto| < 1 USD se considera 0
 MESES_CERO_EXTINTA = 6           # ultimos N meses en cero -> serie extinta
@@ -472,6 +481,7 @@ def _pronosticar(serie: Serie) -> Resultado:
                 res.parametros = params
                 res.tendencia_mensual = (math.exp(pendiente) - 1) if usar_log else pendiente
                 break
+            res.alertas.append(f"No se pudo ajustar {modelo} (pronostico no finito)")
         except Exception as e:  # noqa: BLE001
             res.alertas.append(f"No se pudo ajustar {modelo} ({type(e).__name__})")
         modelo = "SES" if modelo != "SES" else ULTIMO_VALOR     # respaldo: SES, y si tampoco, ultimo valor
@@ -481,7 +491,6 @@ def _pronosticar(serie: Serie) -> Resultado:
         sd = (np.std(np.diff(z), ddof=1) if n > 2 else 0.0) * np.sqrt(np.arange(1, hh + 1)) * _cuantil_normal()
         li, ls = inv(z[-1] - sd), inv(z[-1] + sd)
     res.modelo = modelo
-    res.regla = modelo if not res.regla else res.regla
 
     # backtest: se re-proyecta desde cortes pasados con el mismo modelo y se compara contra lo real
     res.error_modelo, res.error_ultimo_valor, res.error_ses, res.n_cortes = backtest(z, y, modelo, inv)
@@ -581,25 +590,27 @@ def correr_series(series: list[Serie]) -> dict:
 
 
 def resumen_backtest(resultados: dict) -> list[dict]:
-    """Una fila por tipo de serie: error % mediano del modelo, del ultimo valor y de SES en el backtest."""
+    """Una fila por tipo de serie y libro: error % mediano del modelo, del ultimo valor y de SES en el backtest."""
     filas = []
-    for tipo in ("nivel", "indice", "razon", "lag"):
-        rs = [r for r in resultados.values() if r.tipo == tipo and r.n_cortes and np.isfinite(r.error_modelo)
-              and np.isfinite(r.error_ultimo_valor)]
-        modelos = sorted({r.modelo for r in resultados.values() if r.tipo == tipo and r.modelo})
-        if not rs:
-            filas.append({"Tipo": tipo, "Modelo": ", ".join(modelos), "Series con backtest": 0})
-            continue
-        em = np.array([r.error_modelo for r in rs])
-        eu = np.array([r.error_ultimo_valor for r in rs])
-        es = np.array([r.error_ses for r in rs])
-        filas.append({
-            "Tipo": tipo, "Modelo": ", ".join(modelos), "Series con backtest": len(rs),
-            "Error % modelo (mediana)": float(np.median(em)),
-            "Error % ultimo valor (mediana)": float(np.median(eu)),
-            "Error % SES (mediana)": float(np.nanmedian(es)) if np.any(np.isfinite(es)) else None,
-            "% series en que el modelo mejora al ultimo valor": float(np.mean(em < eu)),
-        })
+    grupos = sorted({(r.tipo, r.clave[0]) for r in resultados.values()},
+                    key=lambda g: (["nivel", "indice", "razon", "lag"].index(g[0]), g[1]))
+    for tipo, libro in grupos:
+        todos = [r for r in resultados.values() if r.tipo == tipo and r.clave[0] == libro]
+        rs = [r for r in todos if r.n_cortes and np.isfinite(r.error_modelo) and np.isfinite(r.error_ultimo_valor)]
+        modelos = ", ".join(sorted({r.modelo for r in todos if r.modelo}))
+        fila = {"Tipo": tipo, "Libro": libro, "Modelo": modelos, "Series con backtest": len(rs)}
+        if rs:
+            em = np.array([r.error_modelo for r in rs])
+            eu = np.array([r.error_ultimo_valor for r in rs])
+            es = np.array([r.error_ses for r in rs])
+            fila.update({
+                "Cortes por serie (mediana)": float(np.median([r.n_cortes for r in rs])),
+                "Error % modelo (mediana)": float(np.median(em)),
+                "Error % ultimo valor (mediana)": float(np.median(eu)),
+                "Error % SES (mediana)": float(np.nanmedian(es)) if np.any(np.isfinite(es)) else None,
+                "% series en que el modelo mejora al ultimo valor": float(np.mean(em < eu)),
+            })
+        filas.append(fila)
     return filas
 
 
@@ -1030,17 +1041,21 @@ def escribir_diagnostico(resultados: dict, periodos_proy: list[int], alertas_gen
                       "amortiguada en logaritmos. LAGs: Holt con tendencia amortiguada, no negativos. Razones "
                       "(%GTO, %MR, %cedido): SES (nivel sin tendencia). RCONT: Holt-Winters amortiguado con "
                       "estacionalidad por mes del trimestre. Series cortas: SES (< 12 obs) o ultimo valor (< 4)."),
-        ("3. Parametros", "alpha (nivel), beta (tendencia), phi (amortiguacion) y gamma (estacionalidad) se estiman "
-                          "por maxima verosimilitud en cada serie, dentro de las cotas "
-                          + ", ".join(f"{k} en [{a}, {b}]" for k, (a, b) in COTAS_SUAVIZAMIENTO.items())
-                          + " (RCONT: alpha en [0.2, 0.99]). alpha ~ 1 hace que la proyeccion arranque del ultimo "
-                          "dato real; beta <= 0.15 hace que la tendencia sea la de los ultimos anos y no la del "
-                          "ultimo mes. La columna 'Tendencia mensual' de Series_Modelos es la pendiente al final de "
-                          "la historia (en % mensual para montos e indices); hacia adelante se amortigua con phi."),
+        ("3. Parametros", f"La amortiguacion phi es fija: {AMORTIGUACION_TENDENCIA} (cada mes hacia adelante la "
+                          f"tendencia conserva {AMORTIGUACION_TENDENCIA:.0%}; a 16 meses, "
+                          f"{AMORTIGUACION_TENDENCIA ** 16:.0%}). alpha (nivel), beta (tendencia) y gamma "
+                          "(estacionalidad) se estiman por maxima verosimilitud en cada serie dentro de cotas: Holt "
+                          f"alpha en {list(COTAS_SUAVIZAMIENTO['smoothing_level'])} (la proyeccion arranca del ultimo "
+                          f"dato real), beta en {list(COTAS_SUAVIZAMIENTO['smoothing_trend'])} (la tendencia es la de "
+                          "los ultimos anos, no la del ultimo mes); RCONT alpha >= 0.2; SES alpha libre. La columna 'Tendencia "
+                          "mensual' de Series_Modelos es la pendiente al final de la historia (en % mensual para "
+                          "montos e indices)."),
         ("4. Backtest", "Cada serie se vuelve a proyectar desde 16, 12 y 8 meses antes del final (horizontes de 1 a "
-                        "16 meses) y se mide el error % (suma de errores absolutos / suma de valores reales) del "
-                        "modelo, de repetir el ultimo valor y de SES. Hoja Backtest: resumen por tipo; "
-                        "Series_Modelos: por serie. Sirve para juzgar la confiabilidad; no cambia el modelo."),
+                        "16 meses, con al menos 12 meses de entrenamiento) y se mide el error % (suma de errores "
+                        "absolutos / suma de valores reales) del modelo, de repetir el ultimo valor y de SES. Hoja "
+                        "Backtest: resumen por tipo; Series_Modelos: por serie. Fianzas (20 meses de historia) solo "
+                        "alcanza el corte a 8 meses: indicativo. Sirve para juzgar la confiabilidad; no cambia el "
+                        "modelo."),
         ("5. Intervalos", f"{NIVEL_INTERVALO:.0%}, calculados por el propio modelo (en logaritmos para montos e "
                           "indices, por lo que son asimetricos)."),
         ("6. Reglas", "Series en cero -> 0; parametros en escalon -> ultimo valor; dominio actuarial (cesion en "
@@ -1065,8 +1080,8 @@ def escribir_diagnostico(resultados: dict, periodos_proy: list[int], alertas_gen
     # Backtest por tipo
     ws = wb.create_sheet("Backtest")
     tabla = resumen_backtest(resultados)
-    cols = ["Tipo", "Modelo", "Series con backtest", "Error % modelo (mediana)", "Error % ultimo valor (mediana)",
-            "Error % SES (mediana)", "% series en que el modelo mejora al ultimo valor"]
+    cols = ["Tipo", "Libro", "Modelo", "Series con backtest", "Cortes por serie (mediana)", "Error % modelo (mediana)",
+            "Error % ultimo valor (mediana)", "Error % SES (mediana)", "% series en que el modelo mejora al ultimo valor"]
     ws.append(cols)
     for d in tabla:
         ws.append([d.get(c) for c in cols])
@@ -1081,7 +1096,8 @@ def escribir_diagnostico(resultados: dict, periodos_proy: list[int], alertas_gen
     nota = ws.max_row + 2
     for i, texto in enumerate([
         "Error % = suma de errores absolutos / suma de valores reales, re-proyectando desde 16, 12 y 8 meses antes "
-        "del final (horizontes 1-16). Mediana entre series del tipo.",
+        "del final (horizontes 1-16, minimo 12 meses de entrenamiento). Mediana entre series del tipo y libro. "
+        "FIANZAS tiene 20 meses de historia: un solo corte (a 8 meses), indicativo.",
         "El modelo elegido continua la tendencia observada (amortiguada). En indices y LAGs eso cuesta algo de "
         "error frente a repetir el ultimo valor; en montos lo mejora.",
     ]):

@@ -925,7 +925,7 @@ def construir_analisis(ws, registros_i, ramos_i, registros_m, ultimo, p_dic, fin
     ws.cell(fila, 2, "3. Modelo por tipo de serie y error del backtest").font = fuente(12, True)
     fila += 1
     # columnas: B tipo | C:D modelo | E series | F error modelo | G error ultimo valor | H:I % series mejor
-    posiciones = [(2, 2), (3, 4), (5, 5), (6, 6), (7, 7), (8, 9)]
+    posiciones = [(2, 3), (4, 5), (6, 6), (7, 7), (8, 8), (9, 10)]
     cab = ["Tipo de serie", "Modelo", "Series con backtest", "Error % modelo (mediana)",
            "Error % último valor (mediana)", "% series en que el modelo mejora al último valor"]
     for (c1_, c2_), t in zip(posiciones, cab):
@@ -939,7 +939,11 @@ def construir_analisis(ws, registros_i, ramos_i, registros_m, ultimo, p_dic, fin
     nombres = {"nivel": "Montos", "indice": "Índices", "razon": "Razones", "lag": "LAGs"}
     for d in metodo:
         fila += 1
-        vals = [nombres.get(d.get("Tipo"), d.get("Tipo")), d.get("Modelo"), d.get("Series con backtest"),
+        libros = {"DANOS": "Daños", "FIANZAS": "Fianzas", "HPARAM": "HParametros"}
+        etiqueta_tipo = nombres.get(d.get("Tipo"), d.get("Tipo"))
+        if d.get("Libro"):
+            etiqueta_tipo += f" · {libros.get(d['Libro'], d['Libro'])}"
+        vals = [etiqueta_tipo, d.get("Modelo"), d.get("Series con backtest"),
                 d.get("Error % modelo (mediana)"), d.get("Error % ultimo valor (mediana)"),
                 d.get("% series en que el modelo mejora al ultimo valor")]
         for j, ((c1_, c2_), v) in enumerate(zip(posiciones, vals)):
@@ -947,7 +951,7 @@ def construir_analisis(ws, registros_i, ramos_i, registros_m, ultimo, p_dic, fin
             c = ws.cell(fila, c1_, v)
             c.font = fuente(10, j == 1)
             c.number_format = "0%" if j == 5 else ("0.0" if j in (3, 4) else "General")
-            c.alignment = Alignment(wrap_text=j == 1, vertical="center")
+            c.alignment = Alignment(wrap_text=j in (0, 1), vertical="center")
             for k in range(c1_, c2_ + 1):
                 ws.cell(fila, k).fill = relleno(PANEL)
         ws.row_dimensions[fila].height = 30
