@@ -126,6 +126,12 @@ import pandas as pd  # noqa: E402
 from scipy.stats import norm as _normal  # noqa: E402
 from statsmodels.tsa.exponential_smoothing.ets import ETSModel  # noqa: E402
 
+# Los scripts se apoyan unos en otros: deben estar todos en la misma carpeta (tal como vienen en el zip).
+_FALTAN = [n for n in ("excel_fiel.py", "tipo_cambio.py", "dashboard.py", "dashboard_html.py")
+           if not (Path(__file__).resolve().parent / n).exists()]
+if _FALTAN:
+    raise SystemExit(f"Faltan en la carpeta {Path(__file__).resolve().parent}: {', '.join(_FALTAN)}. "
+                     "Copia todos los archivos del zip a esa misma carpeta y vuelve a correr.")
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from excel_fiel import guardar_libro, verificar_escritura  # noqa: E402
 from tipo_cambio import TC_FCST  # noqa: E402

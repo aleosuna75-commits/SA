@@ -24,7 +24,14 @@ from datetime import datetime
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-import dashboard as dx  # noqa: E402  (lectores de las salidas, paleta y utilerias)
+try:
+    import dashboard as dx  # noqa: E402  (lectores de las salidas, paleta y utilerias)
+except ModuleNotFoundError as _e:
+    if _e.name == "dashboard":
+        raise SystemExit("Falta dashboard.py en la misma carpeta que dashboard_html.py. Los archivos del zip "
+                         "(proyeccion_reservas.py, dashboard.py, dashboard_html.py, excel_fiel.py, tipo_cambio.py) "
+                         "deben estar juntos en una sola carpeta.") from _e
+    raise
 
 SALIDA_HTML = dx.SALIDAS / "Dashboard_Indices_Reservas.html"
 PRIMER_PERIODO_MENSUAL = dx.PRIMER_PERIODO_MENSUAL

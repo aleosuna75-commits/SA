@@ -64,7 +64,13 @@ from openpyxl.worksheet.hyperlink import Hyperlink  # noqa: E402
 from openpyxl.worksheet.table import Table, TableStyleInfo  # noqa: E402
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from excel_fiel import guardar_libro  # noqa: E402
+try:
+    from excel_fiel import guardar_libro  # noqa: E402
+except ModuleNotFoundError as _e:
+    if _e.name == "excel_fiel":
+        raise SystemExit("Falta excel_fiel.py en la misma carpeta que dashboard.py. Los archivos del zip deben estar "
+                         "juntos en una sola carpeta.") from _e
+    raise
 
 # =============================================================================
 # CONFIGURACION
