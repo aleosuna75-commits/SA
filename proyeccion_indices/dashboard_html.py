@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
 """
 DASHBOARD EN HTML (un solo archivo, sin conexion a internet): indices (HParametros) y reservas (RRC / SONR / RFV),
-real y proyectado. Se abre en cualquier navegador (doble clic) y se ve bien en pantalla, celular e impresion.
+real y proyectado. Se abre con doble clic en cualquier navegador actual (Chrome, Edge, Firefox o Safari de 2021 en
+adelante) y se ve bien en pantalla, celular e impresion.
 
 Genera salidas/Dashboard_Indices_Reservas.html a partir de las mismas salidas que dashboard.py (la version Excel):
   * pestaña "Indices"   : filtros (ramo, indice o LAG, periodo); indicadores; evolucion mensual real vs proyeccion
@@ -9,7 +10,8 @@ Genera salidas/Dashboard_Indices_Reservas.html a partir de las mismas salidas qu
   * pestaña "Reservas"  : filtros (reserva, concepto, ramo, moneda); indicadores; mensual 2025-2027; por ramo;
                           historico 2022-2027; por concepto.
   * pestaña "Analisis"  : tablas con mapa de calor (indices por ramo, totales por concepto) y modelo por tipo.
-Cada grafica tiene tooltip (o cursor con flechas del teclado) y una vista de tabla equivalente.
+Cada grafica tiene tooltip (en las de lineas tambien con las flechas del teclado; en barras, con Tab) y una vista
+de tabla equivalente.
 
 Uso: lo llama proyeccion_reservas.py al final (GENERAR_DASHBOARD) o se ejecuta directo (F5 en VSCode).
 """
@@ -51,11 +53,11 @@ def preparar_datos() -> dict:
     for tipo, ramo, serie, per, v in registros_i:
         if per not in pos_i:
             continue
-        ind.setdefault(ramo, {}).setdefault(serie, [None] * len(periodos_i))[pos_i[per]] = _redondear(v, 6)
+        ind.setdefault(ramo, {}).setdefault(serie, [None] * len(periodos_i))[pos_i[per]] = _redondear(v, 8)
         if tipo == "Proyección":
             a, b = intervalos.get((serie, ramo, per), (None, None))
-            li.setdefault(ramo, {}).setdefault(serie, [None] * len(periodos_i))[pos_i[per]] = _redondear(a, 6)
-            ls.setdefault(ramo, {}).setdefault(serie, [None] * len(periodos_i))[pos_i[per]] = _redondear(b, 6)
+            li.setdefault(ramo, {}).setdefault(serie, [None] * len(periodos_i))[pos_i[per]] = _redondear(a, 8)
+            ls.setdefault(ramo, {}).setdefault(serie, [None] * len(periodos_i))[pos_i[per]] = _redondear(b, 8)
 
     mon = {}
     for libro, reserva, conc, ramo, per, tipo, v in registros_m:
@@ -73,11 +75,14 @@ def preparar_datos() -> dict:
             "series": d.get("Series con backtest"), "cortes": d.get("Cortes por serie (mediana)"),
             "err_modelo": _redondear(d.get("Error % modelo (mediana)"), 1),
             "err_ultimo": _redondear(d.get("Error % ultimo valor (mediana)"), 1),
-            "mejora": _redondear(d.get("% series en que el modelo mejora al ultimo valor"), 3),
+            "mejora": _redondear(d.get("% series en que el modelo mejora al ultimo valor"), 6),
         })
     modelo_por_tipo = {}
     for d in filas_metodo:
         modelo_por_tipo.setdefault(d["tipo"], d["modelo"])
+    sin_tc = [p for p in periodos_m if not tc.get(p)]
+    if sin_tc:
+        print(f"   Aviso: sin tipo de cambio en la BD para {sin_tc}; en MXN esos meses se muestran como s/d")
     return {
         "ultimo": ultimo, "fin": fin, "fin_m": fin_m,
         "p_dic": (ultimo // 100) * 100 + 12, "p_12": dx.mover(ultimo, -12), "primer_mensual": PRIMER_PERIODO_MENSUAL,
@@ -119,7 +124,7 @@ PLANTILLA = r"""<!DOCTYPE html>
 :root {
   color-scheme: light;
   --page: #f9f9f7; --surface: #fcfcfb; --surface-2: #f3f3f0;
-  --ink: #0b0b0b; --ink-2: #52514e; --muted: #898781;
+  --ink: #0b0b0b; --ink-2: #52514e; --muted: #6f6e69;
   --grid: #e1e0d9; --axis: #c3c2b7; --border: rgba(11,11,11,0.10);
   --real: #2a78d6; --proy: #eb6834; --deemph: #c3c8d4; --deemph-ink: #898781;
   --ord-1: #86b6ef; --ord-2: #3987e5; --ord-3: #184f95;
@@ -201,6 +206,7 @@ main { max-width: 1320px; margin: 0 auto; }
 .plot { display: block; width: 100%; height: auto; overflow: visible; }
 .plot text { font-family: inherit; }
 .tick { fill: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; }
+.cat { fill: var(--ink-2); font-size: 11px; font-variant-numeric: tabular-nums; }
 .grid { stroke: var(--grid); stroke-width: 1; shape-rendering: crispEdges; }
 .base { stroke: var(--axis); stroke-width: 1; shape-rendering: crispEdges; }
 .linea { fill: none; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
@@ -209,7 +215,8 @@ main { max-width: 1320px; margin: 0 auto; }
 .etq.fuerte { fill: var(--ink); font-weight: 600; }
 .cruz { stroke: var(--muted); stroke-width: 1; shape-rendering: crispEdges; pointer-events: none; }
 .barra { transition: filter .1s; }
-.barra:hover, .barra.activa { filter: brightness(1.12); }
+.barra:hover, .barra.activa, .barra:focus-visible { filter: brightness(1.12); }
+.barra:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
 .hit { fill: transparent; }
 .leyenda { display: flex; flex-wrap: wrap; gap: 6px 16px; margin-top: 8px; color: var(--ink-2); font-size: 12.5px; }
 .leyenda .item { display: inline-flex; align-items: center; gap: 7px; }
@@ -225,10 +232,13 @@ main { max-width: 1320px; margin: 0 auto; }
 .tooltip .tt-fila b { font-weight: 600; font-variant-numeric: tabular-nums; }
 .tooltip .tt-fila span { color: var(--ink-2); }
 table.datos { width: 100%; border-collapse: collapse; font-size: 12.5px; font-variant-numeric: tabular-nums; }
-table.datos th, table.datos td { padding: 5px 8px; border-bottom: 1px solid var(--grid); text-align: right;
+table.datos th, table.datos td { padding: 5px 7px; border-bottom: 1px solid var(--grid); text-align: right;
   white-space: nowrap; }
-table.datos th:first-child, table.datos td:first-child { text-align: left; }
-table.datos thead th { color: var(--ink-2); font-weight: 600; position: sticky; top: 0; background: var(--surface); }
+table.datos th:first-child, table.datos td:first-child, table.datos .txt { text-align: left; }
+table.datos thead th { color: var(--ink-2); font-weight: 600; position: sticky; top: 0; background: var(--surface);
+  white-space: normal; vertical-align: bottom; z-index: 1; }
+table.datos th:first-child, table.datos td:first-child { position: sticky; left: 0; background: var(--surface); }
+table.datos thead th:first-child { z-index: 2; }
 table.datos tbody tr:hover { background: var(--surface-2); }
 .tabla-envoltura { max-height: 360px; overflow: auto; border: 1px solid var(--grid); border-radius: 8px; }
 .analisis h2 { font-size: 16px; margin: 20px 0 8px; }
@@ -239,6 +249,8 @@ table.datos tbody tr:hover { background: var(--surface-2); }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
 @media (max-width: 600px) {
   .kpi .val { font-size: 24px; }
+  table.datos { font-size: 12px; }
+  table.datos th, table.datos td { padding: 4px 6px; }
   .encabezado h1 { font-size: 19px; }
   .filtro select { min-width: 130px; }
 }
@@ -246,6 +258,18 @@ table.datos tbody tr:hover { background: var(--surface-2); }
   body { background: #fff; padding: 0; }
   .acciones, .tarjeta .btn, .filtros .nota { display: none; }
   .tarjeta, .kpi { break-inside: avoid; box-shadow: none; }
+}
+/* al imprimir siempre la paleta clara (va al final para ganar a las reglas del tema oscuro) */
+@media print {
+  :root, :root[data-theme="dark"], :root:where(:not([data-theme="light"])) {
+    color-scheme: light;
+    --page: #ffffff; --surface: #ffffff; --surface-2: #f3f3f0;
+    --ink: #0b0b0b; --ink-2: #52514e; --muted: #6f6e69;
+    --grid: #e1e0d9; --axis: #c3c2b7; --border: rgba(11,11,11,0.10);
+    --real: #2a78d6; --proy: #eb6834; --deemph: #c3c8d4; --deemph-ink: #898781;
+    --ord-1: #86b6ef; --ord-2: #3987e5; --ord-3: #184f95;
+    --div-neg: #2a78d6; --div-mid: #f0efec; --div-pos: #e34948; --shadow: none;
+  }
 }
 </style>
 </head>
@@ -302,7 +326,9 @@ const eti = p => `${MESES[p % 100 - 1]}-${String(p).slice(2, 4)}`;
 const etiLarga = p => `${MESES[p % 100 - 1]} ${Math.floor(p / 100)}`;
 const NF = {};
 const nf = d => (NF[d] ||= new Intl.NumberFormat('es-MX', { minimumFractionDigits: d, maximumFractionDigits: d }));
-const fmt = (v, d) => (v == null || !isFinite(v)) ? 's/d' : nf(d).format(v);
+const fmt = (v, d) => { if (v == null || !isFinite(v)) return 's/d'; if (Math.abs(v) < Math.pow(10, -d) / 2) v = 0; return nf(d).format(v); };
+const varPct = (base, v) => (base > 0 && v != null && isFinite(v)) ? v / base - 1 : null;   // variacion solo con base positiva
+const decimalesPaso = (ts, minimo) => { const paso = ts.length > 1 ? Math.abs(ts[1] - ts[0]) : 1; return Math.max(minimo || 0, Math.min(6, Math.ceil(-Math.log10(paso) - 1e-9))); };
 const fmtPct = v => (v == null || !isFinite(v)) ? 's/d' : (v > 0 ? '+' : v < 0 ? '−' : '') + nf(1).format(Math.abs(v) * 100) + ' %';
 const cssVar = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
 const el = (tag, attrs = {}, ...hijos) => {
@@ -360,9 +386,11 @@ function dominio(vals, incluirCero) {
   return [Math.min(lo, t[0]), Math.max(hi, t[t.length - 1])];
 }
 function pathBarra(x, y, w, h, lado) {
-  // barra con extremo de dato redondeado (4px) y base recta
+  // barra con el extremo del dato redondeado (4px) y la base (el cero) recta
   const r = Math.min(4, Math.abs(w) / 2, Math.abs(h) / 2);
   if (lado === 'arriba') return `M${x},${y + h} V${y + r} Q${x},${y} ${x + r},${y} H${x + w - r} Q${x + w},${y} ${x + w},${y + r} V${y + h} Z`;
+  if (lado === 'abajo') return `M${x},${y} V${y + h - r} Q${x},${y + h} ${x + r},${y + h} H${x + w - r} Q${x + w},${y + h} ${x + w},${y + h - r} V${y} Z`;
+  if (lado === 'izquierda') return `M${x + w},${y} H${x + r} Q${x},${y} ${x},${y + r} V${y + h - r} Q${x},${y + h} ${x + r},${y + h} H${x + w} Z`;
   return `M${x},${y} H${x + w - r} Q${x + w},${y} ${x + w},${y + r} V${y + h - r} Q${x + w},${y + h} ${x + w - r},${y + h} H${x} Z`;
 }
 
@@ -417,7 +445,7 @@ function leyenda(items) {
   const l = el('div', { class: 'leyenda' });
   for (const it of items) {
     const s = svg('svg', { viewBox: '0 0 22 12', 'aria-hidden': 'true' });
-    if (it.caja) s.append(svg('rect', { x: 0, y: 1, width: 22, height: 10, rx: 2, fill: it.color }));
+    if (it.caja) s.append(svg('rect', { x: 0, y: 1, width: 22, height: 10, rx: 2, fill: it.color, 'fill-opacity': it.opacidad ?? 1 }));
     else s.append(svg('line', { x1: 0, y1: 6, x2: 22, y2: 6, stroke: it.color, 'stroke-width': 2, 'stroke-dasharray': it.dash ? '5 3' : null, 'stroke-linecap': 'round' }));
     if (it.marcador) s.append(svg('circle', { cx: 11, cy: 6, r: 3.5, fill: it.color }));
     l.append(el('span', { class: 'item' }, s, el('span', { text: it.nombre })));
@@ -428,18 +456,22 @@ function leyenda(items) {
 // ---------------------------------------------------------------- grafica de lineas (con banda, cruz y tooltip)
 function graficaLineas(cuerpo, W, o) {
   // o = {labels, series:[{nombre, valores, color, dash, marcadores, banda:{lo,hi}}], fmt, cadaX, etiquetasFin, incluirCero}
-  const m = { l: 52, r: 18, t: 14, b: 30 }, H = o.alto || 250;
-  const s = svg('svg', { class: 'plot', viewBox: `0 0 ${W} ${H}`, width: W, height: H, tabindex: 0, role: 'img', 'aria-label': o.aria || '' });
+  const anchoTexto = t => 8 + 6.6 * String(t).length;
+  let margenFin = 18;
+  if (o.etiquetasFin) for (const se of o.series) if (se.etiquetaFin) { const i = ultimoFinito(se.valores); if (i >= 0) margenFin = Math.max(margenFin, anchoTexto(o.fmt(se.valores[i])) + 4); }
+  const m = { l: 52, r: margenFin, t: 14, b: 30 }, H = o.alto || 250;
+  const s = svg('svg', { class: 'plot', viewBox: `0 0 ${W} ${H}`, width: W, height: H, tabindex: 0, role: 'group', 'aria-roledescription': 'gráfica', 'aria-label': o.aria || '' });
   const n = o.labels.length, x0 = m.l, x1 = W - m.r, y0 = H - m.b, y1 = m.t;
   const X = i => n > 1 ? x0 + (x1 - x0) * i / (n - 1) : (x0 + x1) / 2;
   const todos = [];
   for (const se of o.series) { todos.push(...se.valores); if (se.banda) { todos.push(...se.banda.lo, ...se.banda.hi); } }
   const [lo, hi] = dominio(todos, o.incluirCero);
   const Y = v => y0 - (y0 - y1) * (v - lo) / (hi - lo);
-  for (const t of ticks(lo, hi, 5)) {
+  const ts = ticks(lo, hi, 5), decT = decimalesPaso(ts, o.decTick || 0);
+  for (const t of ts) {
     if (t < lo || t > hi) continue;
     s.append(svg('line', { class: 'grid', x1: x0, x2: x1, y1: Y(t), y2: Y(t) }));
-    const tx = svg('text', { class: 'tick', x: x0 - 8, y: Y(t) + 4, 'text-anchor': 'end' }); tx.textContent = o.fmt(t); s.append(tx);
+    const tx = svg('text', { class: 'tick', x: x0 - 8, y: Y(t) + 4, 'text-anchor': 'end' }); tx.textContent = fmt(t, decT); s.append(tx);
   }
   s.append(svg('line', { class: 'base', x1: x0, x2: x1, y1: y0, y2: y0 }));
   const auto = Math.max(1, Math.ceil(n / Math.max(2, Math.floor((x1 - x0) / 62))));
@@ -474,10 +506,12 @@ function graficaLineas(cuerpo, W, o) {
     for (const se of o.series) {
       if (!se.etiquetaFin) continue;
       const i = ultimoFinito(se.valores); if (i < 0) continue;
-      let y = Y(se.valores[i]);
-      for (const p of puestas) if (Math.abs(p - y) < 12) y = p + (y >= p ? 12 : -12);
-      puestas.push(y);
-      const tx = svg('text', { class: 'etq fuerte', x: X(i) + 6, y: y + 4, 'text-anchor': 'start' }); tx.textContent = o.fmt(se.valores[i]); s.append(tx);
+      const texto = o.fmt(se.valores[i]), ancho = anchoTexto(texto);
+      let x = X(i) + 6, y = Y(se.valores[i]), ancla = 'start';
+      if (x + ancho > W) { x = X(i); y -= 9; ancla = 'middle'; }         // sin lugar a la derecha: encima del punto
+      for (const p of puestas) if (Math.abs(p.x - x) < ancho && Math.abs(p.y - y) < 12) y = p.y + (y >= p.y ? 12 : -12);
+      puestas.push({ x, y });
+      const tx = svg('text', { class: 'etq fuerte', x, y: y + 4, 'text-anchor': ancla }); tx.textContent = texto; s.append(tx);
     }
   }
   // capa de interaccion: cruz + tooltip con todas las series
@@ -486,10 +520,13 @@ function graficaLineas(cuerpo, W, o) {
   const hit = svg('rect', { class: 'hit', x: x0, y: y1, width: x1 - x0, height: y0 - y1 }); s.append(hit);
   const tt = crearTooltip(cuerpo);
   let iSel = -1;
-  const tieneDato = i => o.series.some(se => se.valores[i] != null);
+  const tieneDato = i => i >= 0 && i < n && o.series.some(se => se.valores[i] != null);
+  const primerIndiceConDato = () => { for (const se of o.series) { const i = ultimoFinito(se.valores); if (i >= 0) return i; } return -1; };
   const mostrar = i0 => {
+    if (i0 < 0 || i0 >= n) return ocultar();
     let i = i0;                                   // si el mes no tiene dato, el mas cercano que si (hasta 6 meses)
-    for (let d = 1; !tieneDato(i) && d <= 6; d++) { if (i0 - d >= 0 && tieneDato(i0 - d)) i = i0 - d; else if (i0 + d < n && tieneDato(i0 + d)) i = i0 + d; }
+    for (let d = 1; !tieneDato(i) && d <= 6; d++) { if (tieneDato(i0 - d)) i = i0 - d; else if (tieneDato(i0 + d)) i = i0 + d; }
+    if (!tieneDato(i)) return ocultar();
     iSel = i; cruz.setAttribute('x1', X(i)); cruz.setAttribute('x2', X(i)); cruz.setAttribute('visibility', 'visible');
     puntos.replaceChildren();
     const filas = [];
@@ -514,13 +551,17 @@ function graficaLineas(cuerpo, W, o) {
   hit.addEventListener('pointermove', desdePuntero); hit.addEventListener('pointerdown', desdePuntero);
   hit.addEventListener('pointerleave', ocultar);
   s.addEventListener('keydown', ev => {
-    if (ev.key === 'ArrowRight' || ev.key === 'ArrowLeft') { ev.preventDefault(); mostrar(Math.max(0, Math.min(n - 1, (iSel < 0 ? ultimoFinito(o.series[0].valores) : iSel) + (ev.key === 'ArrowRight' ? 1 : -1)))); }
+    if (ev.key === 'ArrowRight' || ev.key === 'ArrowLeft') { ev.preventDefault(); const base = iSel < 0 ? primerIndiceConDato() : iSel; if (base >= 0) mostrar(Math.max(0, Math.min(n - 1, base + (ev.key === 'ArrowRight' ? 1 : -1)))); }
     else if (ev.key === 'Escape') ocultar();
   });
-  s.addEventListener('focus', () => { if (iSel < 0) mostrar(ultimoFinito(o.series[0].valores)); });
+  s.addEventListener('focus', () => { if (iSel < 0) mostrar(primerIndiceConDato()); });
   s.addEventListener('blur', ocultar);
   cuerpo.append(s);
-  if (o.series.length > 1) cuerpo.append(leyenda(o.series.map(se => ({ nombre: se.nombre, color: se.color, dash: se.dash, marcador: se.marcadores }))));
+  if (o.series.length > 1) {
+    const items = o.series.map(se => ({ nombre: se.nombre, color: se.color, dash: se.dash, marcador: se.marcadores }));
+    if (o.series.some(se => se.banda)) items.push({ nombre: 'Intervalo al 80 %', color: cssVar('--proy'), caja: true, opacidad: 0.3 });
+    cuerpo.append(leyenda(items));
+  }
 }
 
 // ---------------------------------------------------------------- barras horizontales (agrupadas; con resaltado)
@@ -528,39 +569,41 @@ function graficaBarrasH(cuerpo, W, o) {
   // o = {categorias, series:[{nombre, valores, color | colores[]}], fmt, etiquetar: i => bool, leyendaItems}
   const k = o.series.length, grosor = Math.min(24, k > 1 ? 11 : 16), gap = 2, filaH = k * grosor + (k - 1) * gap + 10;
   const m = { l: 56, r: 56, t: 20, b: 8 }, n = o.categorias.length, H = m.t + m.b + n * filaH;
-  const s = svg('svg', { class: 'plot', viewBox: `0 0 ${W} ${H}`, width: W, height: H, role: 'img', 'aria-label': o.aria || '' });
+  const s = svg('svg', { class: 'plot', viewBox: `0 0 ${W} ${H}`, width: W, height: H, role: 'group', 'aria-roledescription': 'gráfica', 'aria-label': o.aria || '' });
   const x0 = m.l, x1 = W - m.r;
   const todos = o.series.flatMap(se => se.valores);
   const [lo, hi] = dominio(todos, true);
   const X = v => x0 + (x1 - x0) * (v - lo) / (hi - lo);
-  for (const t of ticks(lo, hi, 4)) {
+  const ts = ticks(lo, hi, 4), decT = decimalesPaso(ts, 0);
+  for (const t of ts) {
     if (t < lo || t > hi) continue;
     s.append(svg('line', { class: 'grid', y1: m.t - 6, y2: H - m.b, x1: X(t), x2: X(t) }));
-    const tx = svg('text', { class: 'tick', x: X(t), y: m.t - 9, 'text-anchor': 'middle' }); tx.textContent = o.fmt(t); s.append(tx);
+    const tx = svg('text', { class: 'tick', x: X(t), y: m.t - 9, 'text-anchor': 'middle' }); tx.textContent = fmt(t, decT); s.append(tx);
   }
   s.append(svg('line', { class: 'base', x1: X(0), x2: X(0), y1: m.t - 6, y2: H - m.b }));
-  const tt = crearTooltip(cuerpo);
+  const tt = crearTooltip(cuerpo), etiquetas = svg('g');
   o.categorias.forEach((cat, i) => {
     const yFila = m.t + i * filaH + 5;
-    const tx = svg('text', { class: 'tick', x: x0 - 8, y: yFila + (filaH - 10) / 2 + 4, 'text-anchor': 'end' }); tx.textContent = cat; s.append(tx);
+    const tx = svg('text', { class: 'cat', x: x0 - 8, y: yFila + (filaH - 10) / 2 + 4, 'text-anchor': 'end' }); tx.textContent = cat; s.append(tx);
     o.series.forEach((se, j) => {
       const v = se.valores[i]; if (v == null) return;
-      const y = yFila + j * (grosor + gap), color = se.colores ? se.colores[i] : se.color;
-      const xa = X(Math.min(0, v)), xb = X(Math.max(0, v));
-      const p = svg('path', { class: 'barra', d: pathBarra(xa, y, Math.max(xb - xa, 0.5), grosor, 'derecha'), fill: color });
+      const y = yFila + j * (grosor + gap), color = se.colores ? se.colores[i] : se.color, neg = v < 0;
+      const xa = X(Math.min(0, v)), xb = X(Math.max(0, v)), xDato = neg ? xa : xb;
+      const p = svg('path', { class: 'barra', d: pathBarra(xa, y, Math.max(xb - xa, 0.5), grosor, neg ? 'izquierda' : 'derecha'), fill: color });
       p.setAttribute('tabindex', 0); p.setAttribute('role', 'img'); p.setAttribute('aria-label', `${cat}, ${se.nombre}: ${o.fmt(v)}`);
       const mostrar = () => {
         const rect = s.getBoundingClientRect(), esc = rect.width / W;
-        tt.mostrar(xb * esc, (y + grosor / 2) * esc, cat, [{ valor: o.fmt(v), nombre: se.nombre, color, caja: true }]);
+        tt.mostrar(xDato * esc, (y + grosor / 2) * esc, cat, [{ valor: o.fmt(v), nombre: se.nombre, color, caja: true }]);
       };
       p.addEventListener('pointermove', mostrar); p.addEventListener('focus', mostrar);
       p.addEventListener('pointerleave', tt.ocultar); p.addEventListener('blur', tt.ocultar);
       s.append(p);
       if (o.etiquetar && o.etiquetar(i, j)) {
-        const e = svg('text', { class: 'etq fuerte', x: xb + 6, y: y + grosor / 2 + 4, 'text-anchor': 'start' }); e.textContent = o.fmt(v); s.append(e);
+        const e = svg('text', { class: 'etq fuerte', x: xDato + (neg ? -6 : 6), y: y + grosor / 2 + 4, 'text-anchor': neg ? 'end' : 'start' }); e.textContent = o.fmt(v); etiquetas.append(e);
       }
     });
   });
+  s.append(etiquetas);                     // las etiquetas van encima de todas las barras
   cuerpo.append(s);
   if (o.leyendaItems) cuerpo.append(leyenda(o.leyendaItems));
 }
@@ -569,7 +612,7 @@ function graficaBarrasH(cuerpo, W, o) {
 function graficaColumnas(cuerpo, W, o) {
   // o = {categorias, series:[{nombre, valores, color}], fmt, compartido (una sola columna por categoria), cadaX}
   const m = { l: 52, r: 12, t: 14, b: 30 }, H = o.alto || 250, n = o.categorias.length;
-  const s = svg('svg', { class: 'plot', viewBox: `0 0 ${W} ${H}`, width: W, height: H, role: 'img', 'aria-label': o.aria || '' });
+  const s = svg('svg', { class: 'plot', viewBox: `0 0 ${W} ${H}`, width: W, height: H, role: 'group', 'aria-roledescription': 'gráfica', 'aria-label': o.aria || '' });
   const x0 = m.l, x1 = W - m.r, y0 = H - m.b, y1 = m.t;
   const carril = (x1 - x0) / n, k = o.compartido ? 1 : o.series.length, gap = 2;
   const grosor = Math.min(24, Math.max(3, (carril * 0.72 - (k - 1) * gap) / k));
@@ -577,10 +620,11 @@ function graficaColumnas(cuerpo, W, o) {
   const todos = o.series.flatMap(se => se.valores);
   const [lo, hi] = dominio(todos, true);
   const Y = v => y0 - (y0 - y1) * (v - lo) / (hi - lo);
-  for (const t of ticks(lo, hi, 5)) {
+  const ts = ticks(lo, hi, 5), decT = decimalesPaso(ts, 0);
+  for (const t of ts) {
     if (t < lo || t > hi) continue;
     s.append(svg('line', { class: 'grid', x1: x0, x2: x1, y1: Y(t), y2: Y(t) }));
-    const tx = svg('text', { class: 'tick', x: x0 - 8, y: Y(t) + 4, 'text-anchor': 'end' }); tx.textContent = o.fmt(t); s.append(tx);
+    const tx = svg('text', { class: 'tick', x: x0 - 8, y: Y(t) + 4, 'text-anchor': 'end' }); tx.textContent = fmt(t, decT); s.append(tx);
   }
   s.append(svg('line', { class: 'base', x1: x0, x2: x1, y1: Y(0), y2: Y(0) }));
   const auto = Math.max(1, Math.ceil(n / Math.max(2, Math.floor((x1 - x0) / 60))));
@@ -588,27 +632,31 @@ function graficaColumnas(cuerpo, W, o) {
   for (let i = 0; i < n; i += cada) {
     const tx = svg('text', { class: 'tick', x: x0 + carril * (i + 0.5), y: y0 + 18, 'text-anchor': 'middle' }); tx.textContent = o.categorias[i]; s.append(tx);
   }
-  const tt = crearTooltip(cuerpo);
+  const tt = crearTooltip(cuerpo), etiquetas = svg('g');
   o.categorias.forEach((cat, i) => {
     const xg = x0 + carril * (i + 0.5) - anchoGrupo / 2;
+    const etiquetables = o.series.map((se, j) => se.valores[i] != null && o.etiquetar && o.etiquetar(i, j) ? j : -1).filter(j => j >= 0);
+    // con columnas angostas y dos etiquetas en el mismo grupo, solo se etiqueta la ultima serie (la tabla trae el resto)
+    const jEtiqueta = grosor < 30 && etiquetables.length > 1 ? etiquetables[etiquetables.length - 1] : null;
     o.series.forEach((se, j) => {
       const v = se.valores[i]; if (v == null) return;
-      const x = xg + (o.compartido ? 0 : j * (grosor + gap));
-      const ya = Y(Math.max(0, v)), yb = Y(Math.min(0, v));
-      const p = svg('path', { class: 'barra', d: pathBarra(x, ya, grosor, Math.max(yb - ya, 0.5), 'arriba'), fill: se.color });
+      const x = xg + (o.compartido ? 0 : j * (grosor + gap)), neg = v < 0;
+      const ya = Y(Math.max(0, v)), yb = Y(Math.min(0, v)), yDato = neg ? yb : ya;
+      const p = svg('path', { class: 'barra', d: pathBarra(x, ya, grosor, Math.max(yb - ya, 0.5), neg ? 'abajo' : 'arriba'), fill: se.color });
       p.setAttribute('tabindex', 0); p.setAttribute('role', 'img'); p.setAttribute('aria-label', `${o.tituloX ? o.tituloX(i) : cat}, ${se.nombre}: ${o.fmt(v)}`);
       const mostrar = () => {
         const rect = s.getBoundingClientRect(), esc = rect.width / W;
-        tt.mostrar((x + grosor / 2) * esc, ya * esc, o.tituloX ? o.tituloX(i) : cat, [{ valor: o.fmt(v), nombre: se.nombre, color: se.color, caja: true }]);
+        tt.mostrar((x + grosor / 2) * esc, yDato * esc, o.tituloX ? o.tituloX(i) : cat, [{ valor: o.fmt(v), nombre: se.nombre, color: se.color, caja: true }]);
       };
       p.addEventListener('pointermove', mostrar); p.addEventListener('focus', mostrar);
       p.addEventListener('pointerleave', tt.ocultar); p.addEventListener('blur', tt.ocultar);
       s.append(p);
-      if (o.etiquetar && o.etiquetar(i, j)) {
-        const e = svg('text', { class: 'etq fuerte', x: x + grosor / 2, y: ya - 6, 'text-anchor': 'middle' }); e.textContent = o.fmt(v); s.append(e);
+      if (etiquetables.includes(j) && (jEtiqueta == null || j === jEtiqueta)) {
+        const e = svg('text', { class: 'etq fuerte', x: x + grosor / 2, y: neg ? yDato + 13 : yDato - 6, 'text-anchor': 'middle' }); e.textContent = o.fmt(v); etiquetas.append(e);
       }
     });
   });
+  s.append(etiquetas);
   cuerpo.append(s);
   if (o.series.length > 1) cuerpo.append(leyenda(o.series.map(se => ({ nombre: se.nombre, color: se.color, caja: true }))));
 }
@@ -632,7 +680,10 @@ const E = {
   reserva: 'RRC', concepto: 'NETO', ramoRes: 'Todos', moneda: 'USD', vista: 'indices',
 };
 const tarjetasVivas = [];
-function redibujarTodo() { for (const c of tarjetasVivas) if (c.isConnected && c._pintar) c._pintar(); }
+function redibujarTodo() {
+  for (const c of tarjetasVivas) if (c.isConnected && c._pintar) c._pintar();
+  if (E.vista === 'analisis') pintarAnalisis();          // los colores del mapa de calor dependen del tema
+}
 let redim; window.addEventListener('resize', () => { clearTimeout(redim); redim = setTimeout(redibujarTodo, 120); });
 
 function llenarSelect(sel, opciones, valor) {
@@ -661,9 +712,9 @@ function pintarIndices() {
   document.getElementById('kpis-ind').replaceChildren(
     kpi(`Último real (${eti(D.ultimo)})`, f4(ult)),
     kpi('Promedio real 12 meses', f4(prom), `${eti(P_I[i12 + 1])} a ${eti(D.ultimo)}`),
-    kpi(`Proyección ${eti(D.p_dic)}`, f4(pDic), ult ? fmtPct(pDic / ult - 1) + ' vs último real' : null),
-    kpi(`Proyección ${eti(D.fin)}`, f4(pFin), ult ? fmtPct(pFin / ult - 1) + ' vs último real' : null),
-    kpi(`Variación ${eti(D.fin)} vs ${eti(D.ultimo)}`, ult && pFin != null ? fmtPct(pFin / ult - 1) : 's/d', 'tendencia amortiguada'),
+    kpi(`Proyección ${eti(D.p_dic)}`, f4(pDic), varPct(ult, pDic) == null ? null : fmtPct(varPct(ult, pDic)) + ' vs último real'),
+    kpi(`Proyección ${eti(D.fin)}`, f4(pFin), varPct(ult, pFin) == null ? null : fmtPct(varPct(ult, pFin)) + ' vs último real'),
+    kpi(`Variación ${eti(D.fin)} vs ${eti(D.ultimo)}`, fmtPct(varPct(ult, pFin)), 'tendencia amortiguada'),
   );
   const real = vals.map((v, i) => i <= iUlt ? v : null);
   const proy = vals.map((v, i) => i >= iUlt ? v : null);
@@ -692,6 +743,7 @@ function pintarIndices() {
       leyendaItems: [{ nombre: 'Ramo seleccionado', color: cssVar('--real'), caja: true }, { nombre: 'Otros ramos', color: cssVar('--deemph'), caja: true }],
     }),
     () => tablaDatos(['Ramo', `${serie} ${etiLarga(E.periodo)}`], D.ramos_i.map((r, i) => [r, fmt(valoresRamo[i], 4)])));
+  c2.querySelector('.cuerpo').style.minHeight = '0';
 
   const cortes = [[D.p_12 - 100, 'real'], [D.p_12, 'real'], [D.ultimo, 'real'], [D.fin, 'proyección']].filter(([p]) => idx(P_I, p) >= 0);
   const ordinales = [cssVar('--ord-1'), cssVar('--ord-2'), cssVar('--ord-3')];
@@ -705,7 +757,7 @@ function pintarIndices() {
 
   const filasRes = [...D.indices, ...D.lags.slice(0, 3)].map(se => {
     const v = serieInd(ramo, se); const u = v[iUlt], pf = v[iFin];
-    return { se, u, prom: promedio12(v), pd: v[iDic], pf, var: u && pf != null ? pf / u - 1 : null };
+    return { se, u, prom: promedio12(v), pd: v[iDic], pf, var: varPct(u, pf) };
   });
   const c4 = tarjeta(`Resumen de índices · ramo ${ramo}`, 'Últimos reales y proyección, con la variación a dic-27',
     (cuerpo) => {
@@ -736,7 +788,8 @@ function montoSerie(reserva, concepto, ramo) {
     let s = null;
     for (const r of ramos) { const v = (porRamo[r] || [])[i]; if (v != null) s = (s || 0) + v; }
     if (s == null) return null;
-    const f = E.moneda === 'MXN' ? (tcDe(p) || 0) : 1;
+    const f = E.moneda === 'MXN' ? tcDe(p) : 1;
+    if (f == null) return null;                 // sin TC en la BD: mejor s/d que una cifra falsa
     return s * f / 1e6;
   });
 }
@@ -750,13 +803,13 @@ function pintarReservas() {
   const f1 = v => fmt(v, 1);
   document.getElementById('kpis-res').replaceChildren(
     kpi(`Real ${eti(D.ultimo)} (M ${moneda})`, f1(u)),
-    kpi(`Proyección ${eti(D.p_dic)} (M ${moneda})`, f1(pd), u ? fmtPct(pd / u - 1) + ' vs último real' : null),
-    kpi(`Proyección ${eti(D.fin_m)} (M ${moneda})`, f1(pf), u ? fmtPct(pf / u - 1) + ' vs último real' : null),
+    kpi(`Proyección ${eti(D.p_dic)} (M ${moneda})`, f1(pd), varPct(u, pd) == null ? null : fmtPct(varPct(u, pd)) + ' vs último real'),
+    kpi(`Proyección ${eti(D.fin_m)} (M ${moneda})`, f1(pf), varPct(u, pf) == null ? null : fmtPct(varPct(u, pf)) + ' vs último real'),
     kpi('Crecimiento anual proyectado', u > 0 && pf > 0 ? fmtPct(Math.pow(pf / u, 12 / meses) - 1) : 's/d', `${eti(D.ultimo)} a ${eti(D.fin_m)}, anualizado`),
-    kpi('Crecimiento real 12 meses', v12 ? fmtPct(u / v12 - 1) : 's/d', `${eti(D.p_12)} a ${eti(D.ultimo)}`),
+    kpi('Crecimiento real 12 meses', fmtPct(varPct(v12, u)), `${eti(D.p_12)} a ${eti(D.ultimo)}`),
   );
   const irr = montoSerie(reserva, 'IRR', ramoRes), bruto = montoSerie(reserva, 'BRUTO', ramoRes);
-  const ced = i => bruto[i] ? irr[i] / bruto[i] : null;
+  const ced = i => bruto[i] > 0 && irr[i] != null ? irr[i] / bruto[i] : null;
   document.getElementById('cedido').textContent = conceptos.includes('IRR') && conceptos.includes('BRUTO')
     ? `% cedido (IRR / BRUTO) · ${eti(D.ultimo)}: ${ced(jUlt) == null ? 's/d' : nf(1).format(ced(jUlt) * 100) + ' %'} · ${eti(D.fin_m)}: ${ced(jFin) == null ? 's/d' : nf(1).format(ced(jFin) * 100) + ' %'}` : '';
   const rejilla = document.getElementById('rejilla-res'); rejilla.replaceChildren(); tarjetasVivas.length = 0;
@@ -781,7 +834,7 @@ function pintarReservas() {
       etiquetar: (i, j) => ramoRes !== 'Todos' && ramos[i] === ramoRes,
       leyendaItems: [{ nombre: `${eti(D.ultimo)} (real)`, color: cssVar('--real'), caja: true }, { nombre: `${eti(D.fin_m)} (proyección)`, color: cssVar('--proy'), caja: true }],
     }),
-    () => tablaDatos(['Ramo', `${eti(D.ultimo)} real`, `${eti(D.fin_m)} proyección`, 'Variación'], ramos.map((r, i) => [r, fmt(porRamoU[i], 2), fmt(porRamoF[i], 2), fmtPct(porRamoU[i] ? porRamoF[i] / porRamoU[i] - 1 : null)])));
+    () => tablaDatos(['Ramo', `${eti(D.ultimo)} real`, `${eti(D.fin_m)} proyección`, 'Variación'], ramos.map((r, i) => [r, fmt(porRamoU[i], 2), fmt(porRamoF[i], 2), fmtPct(varPct(porRamoU[i], porRamoF[i]))])));
 
   const c3 = tarjeta(`${reserva} ${concepto} histórico y proyección · ${etiqRamo}`, `${eti(P_M[0])} a ${eti(D.fin_m)}, millones de ${moneda}`,
     (cuerpo, W) => graficaLineas(cuerpo, W, {
@@ -798,7 +851,7 @@ function pintarReservas() {
       series: [{ nombre: `${eti(D.ultimo)} (real)`, valores: porConcU, color: cssVar('--real') }, { nombre: `${eti(D.fin_m)} (proyección)`, valores: porConcF, color: cssVar('--proy') }],
       etiquetar: (i) => conceptos[i] === concepto,
     }),
-    () => tablaDatos(['Concepto', `${eti(D.ultimo)} real`, `${eti(D.fin_m)} proyección`, 'Variación'], conceptos.map((c, i) => [c, fmt(porConcU[i], 2), fmt(porConcF[i], 2), fmtPct(porConcU[i] ? porConcF[i] / porConcU[i] - 1 : null)])));
+    () => tablaDatos(['Concepto', `${eti(D.ultimo)} real`, `${eti(D.fin_m)} proyección`, 'Variación'], conceptos.map((c, i) => [c, fmt(porConcU[i], 2), fmt(porConcF[i], 2), fmtPct(varPct(porConcU[i], porConcF[i]))])));
   for (const c of [c1, c2, c3, c4]) { rejilla.append(c); tarjetasVivas.push(c); }
   redibujarTodo();
 }
@@ -813,7 +866,7 @@ function pintarAnalisis() {
   for (const r of D.ramos_i) {
     const tr = el('tr', {}, el('th', { scope: 'row', text: r }));
     for (const s of D.indices) {
-      const a = valorInd(r, s, iUlt), b = valorInd(r, s, iFin), va = a && b != null ? b / a - 1 : null;
+      const a = valorInd(r, s, iUlt), b = valorInd(r, s, iFin), va = varPct(a, b);
       const cv = el('td', { text: fmtPct(va) }); const bg = colorDivergente(va, 0.3); if (bg) cv.style.background = bg;
       tr.append(el('td', { text: fmt(a, 4) }), el('td', { text: fmt(b, 4) }), cv);
     }
@@ -828,9 +881,9 @@ function pintarAnalisis() {
   const tb2 = el('tbody'); const monedaGuardada = E.moneda; E.moneda = 'USD';
   for (const res of Object.keys(D.conceptos)) for (const c of D.conceptos[res]) {
     const s = montoSerie(res, c, 'Todos'); const u = s[jUlt], f = s[jFin], v12 = s[j12];
-    const tr = el('tr', {}, el('th', { scope: 'row', text: res }), el('td', { text: c, style: 'text-align:left' }));
+    const tr = el('tr', {}, el('th', { scope: 'row', text: res }), el('td', { class: 'txt', text: c }));
     for (const p of cortes) tr.append(el('td', { text: fmt(s[idx(P_M, p)], 1) }));
-    const g12 = v12 ? u / v12 - 1 : null, gp = u > 0 && f > 0 ? Math.pow(f / u, 12 / (jFin - jUlt)) - 1 : null;
+    const g12 = varPct(v12, u), gp = u > 0 && f > 0 ? Math.pow(f / u, 12 / (jFin - jUlt)) - 1 : null;
     for (const g of [g12, gp]) { const cv = el('td', { text: fmtPct(g) }); const bg = colorDivergente(g, 0.5); if (bg) cv.style.background = bg; tr.append(cv); }
     tb2.append(tr);
   }
@@ -841,8 +894,10 @@ function pintarAnalisis() {
   v.append(el('p', { text: 'Suavizamiento exponencial (familia Holt-Winters). Error % = suma de errores absolutos / suma de valores reales, re-proyectando desde 16, 12 y 8 meses antes del final; mediana entre las series de cada tipo. Fianzas tiene 20 meses de historia y solo alcanza un corte.' }));
   const nombres = { nivel: 'Montos', indice: 'Índices', razon: 'Razones', lag: 'LAGs' }, libros = { DANOS: 'Daños', FIANZAS: 'Fianzas', HPARAM: 'HParametros' };
   const t3 = tablaDatos(['Tipo de serie', 'Modelo', 'Series con backtest', 'Cortes', 'Error % modelo', 'Error % último valor', 'Series en que el modelo mejora al último valor'],
-    D.metodo.map(d => [`${nombres[d.tipo] || d.tipo} · ${libros[d.libro] || d.libro}`, d.modelo || '', d.series ?? '', d.cortes ?? '', fmt(d.err_modelo, 1), fmt(d.err_ultimo, 1), d.mejora == null ? 's/d' : nf(0).format(d.mejora * 100) + ' %']));
+    D.metodo.map(d => [`${nombres[d.tipo] || d.tipo} · ${libros[d.libro] || d.libro}`, d.modelo || '', d.series ?? '', d.cortes ?? '', fmt(d.err_modelo, 1), fmt(d.err_ultimo, 1), d.mejora == null ? 's/d' : nf(0).format(Math.round(d.mejora * 100)) + ' %']));
+  for (const tr of t3.querySelectorAll('tbody tr')) tr.children[1].classList.add('txt');
   v.append(el('div', { class: 'tabla-envoltura', style: 'max-height:none' }, t3));
+  v.append(el('p', { text: 'Nota: un LAG en 0 después de que el patrón acumulado ya superó 50 % es un marcador de dato faltante en la BD y se muestra como s/d, igual que en la proyección.' }));
 }
 
 // ---------------------------------------------------------------- filtros y pestañas
@@ -878,6 +933,13 @@ function iniciar() {
     try { localStorage.setItem('vista', nombre); } catch (e) { /* sin almacenamiento */ }
   };
   for (const t of tabs) t.addEventListener('click', () => mostrarVista(t.id.replace('tab-', '')));
+  const lista = [...tabs];
+  for (const t of lista) t.addEventListener('keydown', ev => {
+    if (ev.key !== 'ArrowRight' && ev.key !== 'ArrowLeft') return;
+    ev.preventDefault();
+    const k = (lista.indexOf(t) + (ev.key === 'ArrowRight' ? 1 : lista.length - 1)) % lista.length;
+    lista[k].focus(); mostrarVista(lista[k].id.replace('tab-', ''));
+  });
   let vistaInicial = 'indices';
   try { vistaInicial = localStorage.getItem('vista') || 'indices'; } catch (e) { /* sin almacenamiento */ }
   if (!['indices', 'reservas', 'analisis'].includes(vistaInicial)) vistaInicial = 'indices';
