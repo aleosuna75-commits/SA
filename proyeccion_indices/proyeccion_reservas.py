@@ -29,8 +29,11 @@ b) Modelo (MODELO_POR_TIPO):
        - montos (BEL, BRUTO), indices de HParametros y LAGs -> linea de TENDENCIA HISTORICA: regresion
          lineal (en logaritmos cuando la serie es positiva, es decir crecimiento % constante) sobre los
          ultimos MESES_TENDENCIA meses (36), continuada desde el ultimo dato real sin amortiguar
-         (AMORTIGUACION_TENDENCIA = 1). Es la linea de tendencia de Excel: la proyeccion sale paralela
-         a ella y arranca del ultimo real;
+         (AMORTIGUACION_TENDENCIA = 1), MAS LA ESTACIONALIDAD MENSUAL: el patron por mes del ano
+         (promedio, por mes, de la serie menos su media movil de 12 meses) ponderado por su
+         credibilidad (R2 ajustado del mes del ano: 1 = el patron se repite igual cada ano, 0 = ruido).
+         Es la linea de tendencia de Excel con los picos y valles del ano: la proyeccion sale paralela
+         a ella, arranca del ultimo real y repite el patron en la medida en que se ha repetido;
        - razones (%GTO, %MR, %cedido) -> SES (nivel suavizado, sin tendencia: dependen de los contratos);
        - RCONT -> Holt-Winters amortiguado con estacionalidad por mes del trimestre (acumula en los
          meses 1-2 y libera en el 3) si hay al menos 12 meses; con menos, SES (nivel).
@@ -119,7 +122,7 @@ from openpyxl.formula.translate import Translator  # noqa: E402
 from openpyxl.styles import Alignment, Font, PatternFill  # noqa: E402
 from openpyxl.utils import get_column_letter  # noqa: E402
 import pandas as pd  # noqa: E402
-from scipy.stats import norm as _normal  # noqa: E402
+from scipy.stats import f_oneway as _f_oneway, norm as _normal  # noqa: E402
 from statsmodels.tsa.exponential_smoothing.ets import ETSModel  # noqa: E402
 
 # Los scripts se apoyan unos en otros: deben estar todos en la misma carpeta (tal como vienen en el zip).
@@ -182,8 +185,9 @@ N_PROCESOS = None                # None = automatico (nucleos-1); 1 = sin parale
 #       los ultimos MESES_TENDENCIA meses, que se continua desde el ultimo dato real. Es la misma linea de
 #       tendencia de Excel; la proyeccion sale paralela a ella y arranca del ultimo real.
 #   "SES": nivel suavizado sin tendencia (razones: %GTO, %MR y %cedido dependen de los contratos).
-#   Tambien estan disponibles "Holt amortiguado" y "Holt-Winters amortiguado (trimestral)" (suavizamiento
-#   exponencial); RCONT usa el trimestral por su estacionalidad (acumula meses 1-2, libera en el 3).
+#   Tambien estan disponibles "Holt amortiguado", "Holt-Winters amortiguado (mensual)" y "Holt-Winters amortiguado
+#   (trimestral)" (suavizamiento exponencial); RCONT usa el trimestral por su estacionalidad (acumula meses 1-2,
+#   libera en el 3).
 MODELO_POR_TIPO = {
     "nivel": "Tendencia historica",   # montos (BEL, BRUTO), en logaritmos: crecimiento % mensual constante
     "indice": "Tendencia historica",  # indices de HParametros, en logaritmos
@@ -196,6 +200,21 @@ MESES_TENDENCIA = 36             # ventana de la tendencia historica (None = tod
 AMORTIGUACION_TENDENCIA = 1.0    # 1.0 = la tendencia continua constante (sin amortiguar). Con 0.95, cada mes conserva
                                  # 95% (a 16 meses, 44%); con 0.98, 72%.
 MIN_OBS_TENDENCIA = 6            # observaciones minimas para estimar la tendencia; con menos se usa SES
+# Estacionalidad mensual (los picos que se repiten cada ano): patron por mes del ano alrededor de la tendencia,
+# estimado por descomposicion clasica (la serie menos su media movil centrada de 12 meses, promediada por mes del
+# ano). Se suma a la recta de tendencia en las series que se proyectan con "Tendencia historica".
+ESTACIONALIDAD_MENSUAL = True    # False = solo la recta de tendencia
+MESES_ESTACIONALIDAD = None      # historia para estimar el patron (None = toda la disponible)
+MIN_OBS_ESTACIONALIDAD = 36      # tres anos: cada mes del ano aparece al menos dos veces en la serie sin tendencia
+CREDIBILIDAD_ESTACIONAL = "ajustada"  # cuanto del patron observado se aplica (1 = se repite igual todos los anos;
+                                 #   0 = puro ruido, no se aplica):
+                                 #   "ajustada": R2 ajustado del mes del ano sobre la serie sin tendencia. Es la mas
+                                 #       conservadora y la que mejor backtest da (el patron se debilito en 2025-2026).
+                                 #   "buhlmann": credibilidad de Buhlmann Z = n/(n+K), K = varianza dentro del mes /
+                                 #       varianza entre meses (la teorica si el patron fuera estable; picos mas altos).
+                                 #   "completa": 100 % del patron cuando la prueba F lo detecta (p < P_ESTACIONALIDAD)
+                                 #       y nada en caso contrario.
+P_ESTACIONALIDAD = 0.10          # umbral de la prueba F para la opcion "completa"
 # Cotas de los modelos de suavizamiento exponencial (si se eligen), estimadas por maxima verosimilitud dentro de
 # ellas: alpha ~ 1 (arranca del ultimo dato real), beta <= 0.15 (tendencia de los ultimos anos, no del ultimo mes),
 # phi entre 0.80 y 0.98. RCONT (Holt-Winters trimestral) suaviza el nivel (alpha >= 0.2) para separar la
@@ -203,6 +222,7 @@ MIN_OBS_TENDENCIA = 6            # observaciones minimas para estimar la tendenc
 COTAS_SUAVIZAMIENTO = {"smoothing_level": (0.90, 0.99), "smoothing_trend": (0.02, 0.15), "damping_trend": (0.80, 0.98)}
 COTAS_ESTACIONAL = {**COTAS_SUAVIZAMIENTO, "smoothing_level": (0.20, 0.99)}
 MIN_OBS_HOLT = 12                # con menos observaciones los modelos Holt caen a SES
+MIN_OBS_HW_MENSUAL = 24          # Holt-Winters mensual necesita dos anos completos; con menos cae a SES
 MIN_OBS_SES = 4                  # con menos observaciones se mantiene el ultimo valor
 MIN_OBS_TRIMESTRAL = 12          # observaciones minimas para estimar la estacionalidad trimestral
 CORTES_BACKTEST = (16, 12, 8)    # meses antes del final desde los que se re-proyecta para medir el error
@@ -288,6 +308,7 @@ TENDENCIA = "Tendencia historica"
 MODELOS = {
     "SES": dict(),
     "Holt amortiguado": dict(trend="add", damped_trend=True),
+    "Holt-Winters amortiguado (mensual)": dict(trend="add", damped_trend=True, seasonal="add", seasonal_periods=12),
     "Holt-Winters amortiguado (trimestral)": dict(trend="add", damped_trend=True, seasonal="add",
                                                   seasonal_periods=3),
 }
@@ -347,12 +368,70 @@ def ajustar_ets(z, modelo: str, h: int):
     return pred["mean"].to_numpy(), pred["pi_lower"].to_numpy(), pred["pi_upper"].to_numpy(), params, pendiente
 
 
-def ajustar_tendencia(z, h: int):
-    """Linea de tendencia: regresion lineal sobre los ultimos MESES_TENDENCIA valores de z (escala del modelo),
-    continuada desde el ultimo dato real con amortiguacion AMORTIGUACION_TENDENCIA. Intervalo: la variabilidad
-    mensual alrededor de la tendencia, que crece con la raiz del horizonte."""
+def factores_estacionales(z, meses):
+    """Patron por mes del ano alrededor de la tendencia (descomposicion clasica): a z se le resta su media movil
+    centrada de 12 meses (2x12) y lo que queda se promedia por mes del ano. Devuelve None si no hay historia
+    suficiente; si no, un dict con "factores" (12 valores centrados en cero, ya ponderados por la credibilidad, en
+    la escala del modelo), "credibilidad", "p" (prueba F del mes del ano), "r2", "obs" y "amplitud"."""
     z = np.asarray(z, dtype=float)
-    w = z if MESES_TENDENCIA is None or len(z) <= MESES_TENDENCIA else z[-MESES_TENDENCIA:]
+    meses = np.asarray(meses, dtype=int)
+    if MESES_ESTACIONALIDAD is not None and len(z) > MESES_ESTACIONALIDAD:
+        z, meses = z[-MESES_ESTACIONALIDAD:], meses[-MESES_ESTACIONALIDAD:]
+    n = len(z)
+    if n < MIN_OBS_ESTACIONALIDAD:
+        return None
+    pesos = np.r_[0.5, np.ones(11), 0.5] / 12.0                    # media movil 2x12, centrada exactamente en t
+    det = z[6:n - 6] - np.convolve(z, pesos, mode="valid")          # serie sin tendencia (t = 6 .. n-7)
+    mm = meses[6:n - 6]
+    grupos = [det[mm == m] for m in range(1, 13)]
+    s = np.array([g.mean() if len(g) else 0.0 for g in grupos])
+    s -= s.mean()
+    n_det, k = len(det), sum(1 for g in grupos if len(g))
+    var_det = float(np.var(det))
+    r2 = max(0.0, 1 - float(np.var(det - s[mm - 1])) / var_det) if var_det > 0 else 0.0
+    r2_ajustado = max(0.0, 1 - (1 - r2) * (n_det - 1) / max(1, n_det - k))   # 0 cuando el mes no explica nada
+    try:
+        p = float(_f_oneway(*[g for g in grupos if len(g) >= 2]).pvalue)
+    except Exception:  # noqa: BLE001
+        p = math.nan
+    if CREDIBILIDAD_ESTACIONAL == "completa":
+        credibilidad = 1.0 if p < P_ESTACIONALIDAD else 0.0
+    elif CREDIBILIDAD_ESTACIONAL == "buhlmann":
+        # componentes de varianza (ANOVA de un factor): sigma2 dentro del mes, tau2 entre meses; Z = n/(n+K)
+        n_m = np.array([len(g) for g in grupos], dtype=float)
+        gl = float(np.sum(np.maximum(n_m - 1, 0)))
+        sigma2 = sum(float(np.sum((g - g.mean()) ** 2)) for g in grupos if len(g) > 1) / gl if gl > 0 else 0.0
+        medias = np.array([g.mean() if len(g) else det.mean() for g in grupos])
+        denom = n_det - float(np.sum(n_m ** 2)) / n_det
+        tau2 = max(0.0, (float(np.sum(n_m * (medias - det.mean()) ** 2)) - (k - 1) * sigma2) / denom) if denom > 0 else 0.0
+        z_mes = n_m / (n_m + sigma2 / tau2) if tau2 > 0 else np.zeros(12)
+        s = s * z_mes
+        s -= s.mean()
+        credibilidad = float(np.mean(z_mes[n_m > 0])) if k else 0.0
+    else:
+        credibilidad = r2_ajustado
+    if CREDIBILIDAD_ESTACIONAL != "buhlmann":
+        s = s * credibilidad
+    return {"factores": s, "credibilidad": float(credibilidad), "p": p, "r2": float(r2), "obs": int(n_det),
+            "amplitud": float(s.max() - s.min())}
+
+
+def ajustar_tendencia(z, h: int, meses=None):
+    """Linea de tendencia (regresion lineal sobre los ultimos MESES_TENDENCIA valores de z, en la escala del modelo)
+    mas, si ESTACIONALIDAD_MENSUAL y se conocen los meses, el patron por mes del ano; continuada desde el ultimo
+    dato real con amortiguacion AMORTIGUACION_TENDENCIA. Intervalo: la variabilidad mensual alrededor de la
+    tendencia (ya sin el patron estacional), que crece con la raiz del horizonte."""
+    z = np.asarray(z, dtype=float)
+    est = factores_estacionales(z, meses) if (ESTACIONALIDAD_MENSUAL and meses is not None) else None
+    if est is not None:
+        meses = np.asarray(meses, dtype=int)
+        s = est["factores"]
+        d = z - s[meses - 1]                                          # serie sin el patron estacional
+        m_fut = (meses[-1] - 1 + np.arange(1, h + 1)) % 12            # mes del ano (0-11) de cada mes proyectado
+        estacional_fut = s[m_fut]
+    else:
+        d, estacional_fut = z, 0.0
+    w = d if MESES_TENDENCIA is None or len(d) <= MESES_TENDENCIA else d[-MESES_TENDENCIA:]
     t = np.arange(len(w), dtype=float)
     pendiente, ordenada = np.polyfit(t, w, 1)
     ajuste = ordenada + pendiente * t
@@ -360,17 +439,22 @@ def ajustar_tendencia(z, h: int):
     r2 = 1 - ss_res / ss_tot if ss_tot > 0 else math.nan
     phi = AMORTIGUACION_TENDENCIA
     pasos = np.cumsum(phi ** np.arange(1, h + 1))
-    pron = z[-1] + pendiente * pasos
+    pron = d[-1] + pendiente * pasos + estacional_fut                  # arranca del ultimo real y repite el patron
     sd = float(np.std(np.diff(w) - pendiente, ddof=1)) if len(w) > 2 else 0.0
     ancho = _cuantil_normal() * sd * np.sqrt(np.arange(1, h + 1))
     params = {"pendiente": float(pendiente), "ventana": int(len(w)), "r2": float(r2),
-              "ajuste_ultimo": float(ordenada + pendiente * (len(w) - 1))}   # valor de la recta en el ultimo mes
+              "ajuste_ultimo": float(ordenada + pendiente * (len(w) - 1))}   # recta (sin estacionalidad) en el ultimo mes
+    if est is not None:
+        params.update({"estacional": [float(v) for v in est["factores"]], "credibilidad_estacional": est["credibilidad"],
+                       "p_estacional": est["p"], "r2_estacional": est["r2"], "obs_estacional": est["obs"],
+                       "amplitud_estacional": est["amplitud"]})
     return pron, pron - ancho, pron + ancho, params, float(pendiente)
 
 
-def ajustar(z, modelo: str, h: int):
-    """Pronostico en la escala del modelo: (pronostico, li, ls, parametros, pendiente final)."""
-    return ajustar_tendencia(z, h) if modelo == TENDENCIA else ajustar_ets(z, modelo, h)
+def ajustar(z, modelo: str, h: int, meses=None):
+    """Pronostico en la escala del modelo: (pronostico, li, ls, parametros, pendiente final). meses = mes del ano
+    (1-12) de cada observacion, para la estacionalidad de la tendencia historica."""
+    return ajustar_tendencia(z, h, meses) if modelo == TENDENCIA else ajustar_ets(z, modelo, h)
 
 
 def elegir_modelo(tipo: str, n: int, trimestral: bool) -> str:
@@ -380,7 +464,7 @@ def elegir_modelo(tipo: str, n: int, trimestral: bool) -> str:
         # con menos de MIN_OBS_TRIMESTRAL meses no se puede separar la estacionalidad: nivel suavizado
         return "Holt-Winters amortiguado (trimestral)" if n >= MIN_OBS_TRIMESTRAL else "SES"
     modelo = MODELO_POR_TIPO[tipo]
-    minimo = MIN_OBS_TENDENCIA if modelo == TENDENCIA else MIN_OBS_HOLT
+    minimo = {TENDENCIA: MIN_OBS_TENDENCIA, "Holt-Winters amortiguado (mensual)": MIN_OBS_HW_MENSUAL}.get(modelo, MIN_OBS_HOLT)
     if modelo != "SES" and n < minimo:
         return "SES"
     return modelo
@@ -485,6 +569,7 @@ def _pronosticar(serie: Serie) -> Resultado:
     usar_log = tipo in ("nivel", "indice", "lag") and np.all(y > 0)   # LAGs positivos: tendencia en % (no cruzan 0)
     res.transformacion = "log" if usar_log else "ninguna"
     z = np.log(y) if usar_log else y.copy()
+    meses = np.array([p % 100 for p in per], dtype=int)               # mes del ano de cada observacion
 
     def inv(v):
         return np.exp(v) if usar_log else v
@@ -506,7 +591,7 @@ def _pronosticar(serie: Serie) -> Resultado:
     pron = li = ls = None
     while modelo != ULTIMO_VALOR:
         try:
-            f, lo, hi, params, pendiente = ajustar(z, modelo, hh)
+            f, lo, hi, params, pendiente = ajustar(z, modelo, hh, meses)
             if np.all(np.isfinite(f)):
                 pron, li, ls = inv(f), inv(lo), inv(hi)
                 res.parametros = params
@@ -535,7 +620,7 @@ def _pronosticar(serie: Serie) -> Resultado:
                                    f"({cambio12:+.0%})")
 
     # backtest: se re-proyecta desde cortes pasados con el mismo modelo y se compara contra lo real
-    res.error_modelo, res.error_ultimo_valor, res.error_ses, res.n_cortes = backtest(z, y, modelo, inv)
+    res.error_modelo, res.error_ultimo_valor, res.error_ses, res.n_cortes = backtest(z, y, modelo, inv, meses)
     if (res.n_cortes and np.isfinite(res.error_modelo) and np.isfinite(res.error_ultimo_valor)
             and res.error_modelo > res.error_ultimo_valor * 1.10 + 0.5):
         res.alertas.append(f"En el backtest de esta serie el modelo ({res.error_modelo:.1f}%) no supera a repetir "
@@ -545,9 +630,10 @@ def _pronosticar(serie: Serie) -> Resultado:
     return _post_proceso(res, y, tipo, serie.dominio)
 
 
-def backtest(z, y, modelo: str, inv):
+def backtest(z, y, modelo: str, inv, meses=None):
     """Error % (WAPE = suma |error| / suma |real|) del modelo, del ultimo valor y de SES, re-proyectando desde
-    CORTES_BACKTEST meses antes del final (horizontes de 1 a 16 meses)."""
+    CORTES_BACKTEST meses antes del final (horizontes de 1 a 16 meses). La estacionalidad se re-estima en cada
+    corte solo con la historia anterior al corte."""
     n = len(y)
     errores = {"modelo": [0.0, 0.0], "ultimo": [0.0, 0.0], "ses": [0.0, 0.0]}
     cortes = 0
@@ -560,7 +646,8 @@ def backtest(z, y, modelo: str, inv):
         preds = {"ultimo": np.repeat(inv(z[o - 1]), hz)}
         for nombre, mod in (("modelo", modelo), ("ses", "SES")):
             try:
-                preds[nombre] = inv(ajustar(z[:o], mod, hz)[0]) if mod != ULTIMO_VALOR else preds["ultimo"]
+                preds[nombre] = (inv(ajustar(z[:o], mod, hz, None if meses is None else meses[:o])[0])
+                                 if mod != ULTIMO_VALOR else preds["ultimo"])
             except Exception:  # noqa: BLE001
                 preds[nombre] = None
         if any(p is None or not np.all(np.isfinite(p)) for p in preds.values()):
@@ -1074,6 +1161,9 @@ def escribir_diagnostico(resultados: dict, periodos_proy: list[int], alertas_gen
         ("Series modeladas", str(len(resultados))),
         ("Ventana de tendencia (meses)", str(MESES_TENDENCIA) if MESES_TENDENCIA else "toda la historia"),
         ("Amortiguacion de la tendencia (phi)", str(AMORTIGUACION_TENDENCIA)),
+        ("Estacionalidad mensual", (f"si: patron por mes del ano con credibilidad {CREDIBILIDAD_ESTACIONAL}, estimado "
+                                    f"sobre {'toda la historia' if MESES_ESTACIONALIDAD is None else str(MESES_ESTACIONALIDAD) + ' meses'} "
+                                    f"(minimo {MIN_OBS_ESTACIONALIDAD} meses)") if ESTACIONALIDAD_MENSUAL else "no"),
         ("Tiempo de ejecucion (s)", f"{resumen.get('segundos', 0):,.0f}"),
         ("", ""),
         ("METODOLOGIA", ""),
@@ -1082,16 +1172,23 @@ def escribir_diagnostico(resultados: dict, periodos_proy: list[int], alertas_gen
                                    "RFV: NETO = BRUTO-IRR; RCONT: total repartido por ramo con la mezcla de los "
                                    "ultimos 8 meses."),
         ("2. Modelo", "Montos, indices y LAGs: linea de tendencia historica (regresion lineal, en logaritmos cuando "
-                      f"la serie es positiva) sobre los ultimos {MESES_TENDENCIA or 'N/A'} meses, continuada desde "
-                      "el ultimo dato real (la proyeccion sale paralela a la linea de tendencia de Excel y arranca "
-                      "del ultimo real). Razones (%GTO, %MR, %cedido): SES (nivel sin tendencia). RCONT: "
+                      f"la serie es positiva) sobre los ultimos {MESES_TENDENCIA or 'N/A'} meses, mas el patron por "
+                      "mes del ano (estacionalidad mensual: promedio, por mes del ano, de la serie menos su media "
+                      "movil de 12 meses, ponderado por su credibilidad = R2 ajustado del mes del ano; con menos de "
+                      f"{MIN_OBS_ESTACIONALIDAD} meses no se estima), continuada desde el ultimo dato real (la "
+                      "proyeccion sale paralela a la linea de tendencia de Excel, arranca del ultimo real y repite "
+                      "los picos y valles del ano en la medida en que se han repetido). Razones (%GTO, %MR, "
+                      "%cedido): SES (nivel sin tendencia). RCONT: "
                       "Holt-Winters amortiguado con estacionalidad por mes del trimestre si hay al menos 12 meses; "
                       "con menos, SES (nivel). Series cortas: SES (< 6 obs para la tendencia) o ultimo valor (< 4). "
                       "Los conceptos derivados (NETO, BRUTO de Danos, IRR, GTO, MR) y los totales por ramo no siguen "
                       "una recta propia: salen de las identidades y de la suma de ramos."),
         ("3. Parametros", f"Tendencia: pendiente de la regresion (columna 'Tendencia mensual' de Series_Modelos, en "
                           f"% mensual cuando la serie va en logaritmos), ventana usada y R2. Amortiguacion phi = "
-                          f"{AMORTIGUACION_TENDENCIA} (1 = constante; con 0.95 cada mes conserva 95%). Modelos de "
+                          f"{AMORTIGUACION_TENDENCIA} (1 = constante; con 0.95 cada mes conserva 95%). Estacionalidad: "
+                          "hoja Estacionalidad (factor aplicado por mes del ano, credibilidad, R2 del mes del ano y p de "
+                          "la prueba F; columnas 'Credibilidad estacional' y 'Amplitud estacional' de Series_Modelos). "
+                          "Modelos de "
                           "suavizamiento (SES, Holt, Holt-Winters): alpha, beta, phi y gamma por maxima verosimilitud "
                           + f"dentro de {COTAS_SUAVIZAMIENTO} (RCONT alpha >= 0.2; SES alpha libre)."),
         ("4. Backtest", "Cada serie se vuelve a proyectar desde 16, 12 y 8 meses antes del final (horizontes de 1 a "
@@ -1150,7 +1247,8 @@ def escribir_diagnostico(resultados: dict, periodos_proy: list[int], alertas_gen
     # Series y modelos
     ws = wb.create_sheet("Series_Modelos")
     cab = ["Libro", "Grupo", "Serie", "Ramo", "Tipo", "Moneda modelo", "Transformacion", "Obs", "Desde", "Regla",
-           "Modelo", "Ventana (meses)", "R2 tendencia", "Ajuste tendencia ultimo mes", "alpha", "beta", "phi", "gamma",
+           "Modelo", "Ventana (meses)", "R2 tendencia", "Ajuste tendencia ultimo mes", "Credibilidad estacional",
+           "Amplitud estacional", "alpha", "beta", "phi", "gamma",
            "Tendencia mensual",
            "Cortes backtest", "Error % modelo",
            "Error % ultimo valor", "Error % SES", "Ultimo real", f"Proy {periodos_proy[0]}",
@@ -1160,6 +1258,12 @@ def escribir_diagnostico(resultados: dict, periodos_proy: list[int], alertas_gen
     def num(v):
         return None if v is None or (isinstance(v, float) and math.isnan(v)) else v
 
+    def _amplitud(r):
+        a = r.parametros.get("amplitud_estacional")
+        if a is None:
+            return None
+        return math.expm1(a) if r.transformacion == "log" else a
+
     for k, r in sorted(resultados.items(), key=lambda kv: tuple(str(x) for x in kv[0])):
         ult = r.historia_valores[-1] if r.historia_valores else math.nan
         fin = r.pronostico[-1] if r.pronostico else math.nan
@@ -1167,6 +1271,7 @@ def escribir_diagnostico(resultados: dict, periodos_proy: list[int], alertas_gen
         fila_ = [k[0], k[1], k[2], k[3], r.tipo, r.moneda, r.transformacion, r.n_obs,
                  r.historia_periodos[0] if r.historia_periodos else None, r.regla, r.modelo or None,
                  r.parametros.get("ventana"), num(r.parametros.get("r2")), num(r.parametros.get("ajuste_ultimo")),
+                 num(r.parametros.get("credibilidad_estacional")), _amplitud(r),
                  num(r.parametros.get("alpha")), num(r.parametros.get("beta")), num(r.parametros.get("phi")),
                  num(r.parametros.get("gamma")), num(r.tendencia_mensual), r.n_cortes or None,
                  num(r.error_modelo), num(r.error_ultimo_valor), num(r.error_ses), num(ult),
@@ -1179,10 +1284,39 @@ def escribir_diagnostico(resultados: dict, periodos_proy: list[int], alertas_gen
             enc_ = ws.cell(1, c.column).value
             if enc_ == "Tendencia mensual" and isinstance(c.value, float):
                 c.number_format = "0.00%" if fila_[6].value == "log" else "0.0000"
-            elif enc_ in ("alpha", "beta", "phi", "gamma", "R2 tendencia") and isinstance(c.value, float):
+            elif enc_ in ("alpha", "beta", "phi", "gamma", "R2 tendencia", "Credibilidad estacional") and isinstance(c.value, float):
                 c.number_format = "0.000"
+            elif enc_ == "Amplitud estacional" and isinstance(c.value, float):
+                c.number_format = "0.0%" if fila_[6].value == "log" else "0.0000"
             elif enc_ and enc_.startswith("Error %") and isinstance(c.value, float):
                 c.number_format = "0.0"
+
+    # Estacionalidad: patron por mes del ano aplicado a cada serie (en % si la serie va en logaritmos)
+    ws = wb.create_sheet("Estacionalidad")
+    meses_nombre = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"]
+    ws.append(["Libro", "Grupo", "Serie", "Ramo", "Transformacion", "Obs sin tendencia", "p (prueba F del mes del ano)",
+               "R2 del mes del ano", "Credibilidad aplicada", "Amplitud aplicada"] + meses_nombre)
+    for k, r in sorted(resultados.items(), key=lambda kv: tuple(str(x) for x in kv[0])):
+        pe = r.parametros
+        if "estacional" not in pe:
+            continue
+        log_ = r.transformacion == "log"
+        conv = (lambda v: math.expm1(v)) if log_ else (lambda v: v)
+        ws.append([k[0], k[1], k[2], k[3], r.transformacion, pe.get("obs_estacional"), num(pe.get("p_estacional")),
+                   num(pe.get("r2_estacional")), num(pe.get("credibilidad_estacional")), _amplitud(r)]
+                  + [conv(v) for v in pe["estacional"]])
+    _formato_tabla(ws, negrita, encab)
+    for fila_ in ws.iter_rows(min_row=2):
+        log_ = fila_[4].value == "log"
+        for c in fila_[6:]:
+            if isinstance(c.value, float):
+                enc_ = ws.cell(1, c.column).value
+                c.number_format = "0.000" if enc_ in ("p (prueba F del mes del ano)", "R2 del mes del ano", "Credibilidad aplicada") \
+                    else ("0.0%" if log_ else "0.0000")
+    ws.cell(ws.max_row + 2, 1, "Factor aplicado = promedio por mes del ano de la serie sin tendencia (media movil centrada "
+            "de 12 meses), centrado en cero y multiplicado por la credibilidad (R2 ajustado del mes del ano; 0 = el mes "
+            "no explica nada y no se aplica patron). En % cuando la serie se modela en logaritmos. La proyeccion = "
+            "recta de tendencia + este factor del mes correspondiente.")
 
     # Pronosticos (drivers con intervalos)
     ws = wb.create_sheet("Pronosticos_Drivers")
@@ -1480,6 +1614,11 @@ def main():
             print(f"      {r.clave[0]} {r.clave[1]} {r.clave[2]} ramo {r.clave[3]}: {cambio:+.0%} "
                   f"(tendencia {r.tendencia_mensual:+.1%} mensual"
                   + (f", regresion sobre {ventana} de {r.n_obs} meses)" if ventana else f", {r.modelo})"))
+    con_est = [r.parametros["credibilidad_estacional"] for r in resultados.values()
+               if r.parametros.get("credibilidad_estacional")]
+    if ESTACIONALIDAD_MENSUAL:
+        print(f"   Estacionalidad mensual aplicada en {len(con_est)} series (credibilidad mediana "
+              f"{np.median(con_est) if con_est else 0:.2f}); patron por mes en la hoja 'Estacionalidad'")
     n_alertas = len(alertas) + sum(len(r.alertas) for r in resultados.values())
     print(f"   Alertas a revisar: {n_alertas} (hoja 'Alertas' del diagnostico)")
     print(f"   Tiempo total: {time.time() - t0:,.0f} s")

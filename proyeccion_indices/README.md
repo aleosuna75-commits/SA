@@ -5,7 +5,7 @@ Dos scripts de Python pensados para correr desde VSCode (F5 o *Run Python File*)
 | Script | Qué hace |
 |---|---|
 | `llenar_bd_rfv.py` | Herramienta **opcional, fuera del proceso**: llena una BD_ RFV vacía desde `Res_Rvas_2025` y `Res_Rvas_2026` con el criterio de la BD de Daños. La proyección ya no la ejecuta; lee la BD de Fianzas que tú llenas. |
-| `proyeccion_reservas.py` | Proyecta de **202609 a 202712** `HParametros_2026` (índices y LAGs “Real”), `BD_Montos_RRC_SONR` (Daños) y `BD_ RFV` (Fianzas), con el mismo formato de los archivos originales, continuando la línea de tendencia histórica de los últimos 36 meses (montos, índices y LAGs) y con SES para las razones. |
+| `proyeccion_reservas.py` | Proyecta de **202609 a 202712** `HParametros_2026` (índices y LAGs “Real”), `BD_Montos_RRC_SONR` (Daños) y `BD_ RFV` (Fianzas), con el mismo formato de los archivos originales, continuando la línea de tendencia histórica de los últimos 36 meses más el patrón estacional del año (montos, índices y LAGs), y con SES para las razones. |
 | `dashboard.py` | Arma el **dashboard de Excel** de índices y reservas (real y proyectado) a partir de las salidas. Lo llama `proyeccion_reservas.py` al final; también se puede correr solo (ver sección 5). |
 | `dashboard_html.py` | Arma el mismo dashboard en **HTML** (un solo archivo, sin internet), con tooltips, vista de tabla y modo oscuro. |
 | `excel_fiel.py` | Módulo auxiliar que usan los dos scripts para guardar los libros sin perder formato (ver sección 4). |
@@ -70,36 +70,48 @@ El criterio se obtuvo reconstruyendo celda por celda la hoja de referencia de Da
 | SONR | BEL, %MR/BEL, %IRR/BRUTO | MR, BRUTO = BEL+MR, IRR, NETO |
 | RFV | BRUTO, %IRR/BRUTO, RCONT total | IRR, NETO; RCONT por ramo con la mezcla de los últimos 8 meses |
 
-**b) Modelo: la línea de tendencia histórica.** Para montos, índices y LAGs se ajusta una regresión lineal (en logaritmos cuando la serie es positiva, es decir, un crecimiento porcentual constante) sobre los últimos **36 meses** (`MESES_TENDENCIA`; `None` = toda la historia) y se continúa **desde el último dato real**, sin amortiguar (`AMORTIGUACION_TENDENCIA = 1.0`). Es la misma línea de tendencia que se obtiene en Excel: la proyección sale paralela a ella y arranca del último real, así que no hay escalón entre lo real y lo proyectado. El dashboard HTML dibuja la línea de tendencia en gris para que se vea de dónde sale la pendiente. Solo llevan recta propia las series que se proyectan directo (índices, LAGs y BEL/BRUTO por ramo en USD); los conceptos derivados (NETO, BRUTO de Daños, IRR, GTO, MR) y los totales por ramo salen de las identidades contables y de la suma de ramos, por lo que un total puede crecer distinto de su propia tendencia si los ramos grandes son los de mayor pendiente (efecto mezcla: RRC BEL total +54 % sumando ramos contra +41 % de la recta del total).
+**b) Modelo: la línea de tendencia histórica más el patrón estacional del año.** Para montos, índices y LAGs se ajusta una regresión lineal (en logaritmos cuando la serie es positiva, es decir, un crecimiento porcentual constante) sobre los últimos **36 meses** (`MESES_TENDENCIA`; `None` = toda la historia) y se continúa **desde el último dato real**, sin amortiguar (`AMORTIGUACION_TENDENCIA = 1.0`). Es la misma línea de tendencia que se obtiene en Excel: la proyección sale paralela a ella y arranca del último real, así que no hay escalón entre lo real y lo proyectado.
+
+Sobre esa recta se repite la **estacionalidad mensual** (los picos y valles que se ven cada año en la historia, por ejemplo el índice del ramo 10 sube de mayo a agosto y baja en noviembre-diciembre): se resta a la serie su media móvil centrada de 12 meses, lo que queda se promedia por mes del año (descomposición clásica) y ese patrón se suma a la recta en el mes que corresponde. El patrón entra **ponderado por su credibilidad** = R² ajustado del mes del año sobre la serie sin tendencia: 1 cuando el patrón se repite igual todos los años, 0 cuando el mes no explica nada (puro ruido), y entonces no se aplica. Se necesitan al menos 36 meses de historia (`MIN_OBS_ESTACIONALIDAD`); Fianzas, con 20, se proyecta solo con la recta. Ajustes: `ESTACIONALIDAD_MENSUAL = False` quita el patrón; `CREDIBILIDAD_ESTACIONAL` elige cuánto del patrón se aplica: `"ajustada"` (R² ajustado, la de fábrica), `"buhlmann"` (credibilidad de Bühlmann Z = n / (n + K), la teórica si el patrón fuera estable; picos más altos) o `"completa"` (100 % del patrón donde la prueba F lo detecta, p < 0.10, y nada en las demás). La hoja `Estacionalidad` del diagnóstico trae el factor aplicado por mes, la credibilidad, el R² y la p de cada serie. El dashboard HTML dibuja en gris la curva del modelo (recta + patrón) para que se vea de dónde salen la pendiente y los picos. Solo llevan recta propia las series que se proyectan directo (índices, LAGs y BEL/BRUTO por ramo en USD); los conceptos derivados (NETO, BRUTO de Daños, IRR, GTO, MR) y los totales por ramo salen de las identidades contables y de la suma de ramos, por lo que un total puede crecer distinto de su propia tendencia si los ramos grandes son los de mayor pendiente (efecto mezcla: RRC BEL total +54 % sumando ramos contra +41 % de la recta del total).
 
 | Tipo de serie | Modelo | Escala |
 |---|---|---|
-| Montos (BEL, BRUTO) | **Tendencia histórica** (36 meses) | logaritmos: crecimiento % mensual constante |
-| Índices (Ind Sin RRC, 99.5%, SONR) | **Tendencia histórica** (36 meses) | logaritmos |
-| LAGs (patrón de desarrollo) | **Tendencia histórica** (36 meses) | logaritmos si son positivos (así no cruzan cero) |
+| Montos (BEL, BRUTO) | **Tendencia histórica** (36 meses) **+ estacionalidad mensual** con credibilidad | logaritmos: crecimiento % mensual constante |
+| Índices (Ind Sin RRC, 99.5%, SONR) | **Tendencia histórica** (36 meses) **+ estacionalidad mensual** con credibilidad | logaritmos |
+| LAGs (patrón de desarrollo) | **Tendencia histórica** (36 meses) **+ estacionalidad mensual** con credibilidad | logaritmos si son positivos (así no cruzan cero) |
 | Razones (%GTO, %MR, %cedido) | **SES** (nivel suavizado, sin tendencia) | original, acotado al dominio |
 | RCONT | **Holt-Winters amortiguado** con estacionalidad trimestral si hay ≥ 12 meses; con menos, **SES** del nivel | logaritmos |
 
 - **Por qué 36 meses y no toda la historia**: con toda la historia entran arranques desde cero y cambios de régimen (el índice SONR del ramo 80 pasó de 0.10 en 2021 a 1.44; Hidro cayó de 4.0 a 0.14) que disparan la pendiente (+109 % o −64 % a 16 meses). Tres años es la tendencia reciente que sí describe el negocio actual. Si la serie tiene menos de 36 meses, se usa lo que hay (mínimo 6; con menos, SES; con menos de 4, último valor).
 - **Por qué sin amortiguar**: fue la decisión del área: si la tendencia ha sido constante, lo más probable es que siga así el próximo año. Con `AMORTIGUACION_TENDENCIA = 0.95` cada mes conserva 95 % de la tendencia (a 16 meses, 44 %) y las proyecciones bajan alrededor de un tercio.
 - **Qué implica en los totales** (con la historia a ago-26): RRC BEL +54 % a dic-27 (+38 % anualizado, cuando en los últimos 12 meses reales creció 27 %), SONR BEL +72 % (+50 % anualizado; real +54 %). Son las tendencias de tres años continuadas; conviene contrastarlas con el plan de negocio.
-- **Costo en precisión**: en el backtest la línea de tendencia es peor que repetir el último valor en los tres tipos (montos 26.7 % contra 22.3 %; índices 20.2 % contra 13.7 %; LAGs 2.6 % contra 2.1 %). Los modelos de suavizamiento (`"Holt amortiguado"`, con α ≈ 1 y β ≤ 0.15) siguen disponibles en `MODELO_POR_TIPO` para quien prefiera precisión sobre pendiente.
+- **Costo en precisión**: en el backtest la línea de tendencia (con el patrón estacional) es peor que repetir el último valor en los tres tipos (montos 26.5 % contra 22.3 %; índices 21.0 % contra 13.7 %; LAGs 2.6 % contra 2.1 %). Los modelos de suavizamiento (`"Holt amortiguado"`, con α ≈ 1 y β ≤ 0.15) siguen disponibles en `MODELO_POR_TIPO` para quien prefiera precisión sobre pendiente.
 - Las razones usan SES porque dependen de los contratos de reaseguro y de la estructura de gastos, no de una tendencia; en el backtest la tendencia no las mejoró y en algunas series producía cesiones fuera de [0, 1].
-- La estacionalidad mensual se probó y empeoró el backtest; solo se usa la trimestral de RCONT, que reproduce el diente de sierra de la historia. Necesita al menos 12 meses de RCONT; si la BD trae RCONT solo desde 2026 (8 meses), se proyecta el nivel suavizado (SES) y se avisa en `Alertas`.
-- Los intervalos al 80 % salen de la variabilidad mensual alrededor de la tendencia (crece con la raíz del horizonte) o del propio modelo de suavizamiento.
+- **Por qué la estacionalidad va con credibilidad y no completa**: la mitad de los índices tiene un patrón anual significativo (prueba F, p < 0.05), pero en varias series se debilitó en 2025-2026 (el ramo 10 casi no tuvo pico en 2026). Por eso, cuanto más del patrón se aplica, peor el backtest de los últimos 16 meses. Error % mediano de los 38 índices (montos y LAGs son casi insensibles):
+
+  | Opción | A 1-16 meses | A 1-6 meses |
+  |---|---|---|
+  | Solo la recta | 20.2 % | 14.3 % |
+  | Patrón con credibilidad R² ajustado (`"ajustada"`) | 21.0 % | 15.1 % |
+  | Patrón con credibilidad de Bühlmann (`"buhlmann"`) | 21.9 % | 16.2 % |
+  | Patrón completo donde es significativo (`"completa"`) | 24.3 % | 18.3 % |
+
+  Es el mismo principio de credibilidad de tarificación: se usa del patrón la parte que se ha repetido de forma consistente. Si el área prefiere ver el patrón completo, es un cambio de una línea y el costo queda documentado aquí.
+- RCONT usa la estacionalidad trimestral de Holt-Winters, que reproduce el diente de sierra de la historia. Necesita al menos 12 meses de RCONT; si la BD trae RCONT solo desde 2026 (8 meses), se proyecta el nivel suavizado (SES) y se avisa en `Alertas`.
+- Los intervalos al 80 % salen de la variabilidad mensual alrededor de la tendencia, ya sin el patrón estacional (crece con la raíz del horizonte), o del propio modelo de suavizamiento.
 
 **c) Backtest por serie.** Cada serie se vuelve a proyectar desde 16, 12 y 8 meses antes del final (horizontes de 1 a 16 meses, con al menos 12 meses de entrenamiento) con el mismo modelo, y se mide el error % (suma de errores absolutos / suma de valores reales) del modelo, de repetir el último valor y de SES. Está por serie en `Series_Modelos` y resumido por tipo en la hoja `Backtest`. Fianzas tiene 20 meses de historia, así que solo alcanza el corte a 8 meses y su cifra es indicativa. Sirve para juzgar la confiabilidad y para las alertas; no cambia el modelo. Con la historia a 202608 (mediana entre series):
 
 | Tipo | Libro | Modelo | Error % modelo | Error % último valor | Series en que el modelo mejora al último valor |
 |---|---|---|---|---|---|
-| Montos | Daños | Tendencia historica | 26.7% | 22.3% | 43% (23 series, 3 cortes) |
+| Montos | Daños | Tendencia historica | 26.5% | 22.3% | 48% (23 series, 3 cortes) |
 | Montos | Fianzas | Tendencia historica | 5.3% | 13.3% | 50% (4 series, 1 corte) |
-| Índices | HParametros | Tendencia historica | 20.2% | 13.7% | 16% (38 series, 3 cortes) |
+| Índices | HParametros | Tendencia historica | 21.0% | 13.7% | 16% (38 series, 3 cortes) |
 | Razones | Daños | SES | 15.2% | 15.2% | 60% (55 series, 3 cortes) |
 | Razones | Fianzas | SES | 12.0% | 6.5% | 25% (4 series, 1 corte) |
 | LAGs | HParametros | Tendencia historica | 2.6% | 2.1% | 35% (74 series, 3 cortes) |
 
-En Daños y HParametros la línea de tendencia pierde contra la línea plana (gana en 43 % de los montos, 16 % de los índices y 35 % de los LAGs); en los montos de Fianzas gana (5.3 % contra 13.3 %), aunque con un solo corte de 8 meses es indicativo. Continuar una tendencia tres años hacia adelante cuesta precisión a 16 meses, sobre todo en índices ruidosos. Se conserva porque es lo que se necesita para planeación, pero el costo queda a la vista; para precisión sobre pendiente, `MODELO_POR_TIPO` admite `"Holt amortiguado"` o `"SES"` por tipo. Las series en que el modelo no supera al último valor en su propio backtest llevan alerta.
+En Daños y HParametros la línea de tendencia pierde contra la línea plana (gana en 48% de los montos, 16% de los índices y 35% de los LAGs); en los montos de Fianzas gana (5.3 % contra 13.3 %), aunque con un solo corte de 8 meses es indicativo. Continuar una tendencia tres años hacia adelante cuesta precisión a 16 meses, sobre todo en índices ruidosos. Se conserva porque es lo que se necesita para planeación, pero el costo queda a la vista; para precisión sobre pendiente, `MODELO_POR_TIPO` admite `"Holt amortiguado"` o `"SES"` por tipo. Las series en que el modelo no supera al último valor en su propio backtest llevan alerta.
 
 **d) Reglas actuariales y de calidad de datos** (todas reportadas en la hoja `Alertas`):
 

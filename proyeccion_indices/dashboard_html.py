@@ -59,13 +59,33 @@ def leer_resumen() -> dict:
     return out
 
 
+MESES_CORTOS = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"]
+
+
+def _clave_serie(r: dict) -> str:
+    return f"{r['Libro']}|{r['Serie']}|{r['Ramo']}" if r["Libro"] == "HPARAM" else f"{r['Grupo']}|{r['Serie']}|{r['Ramo']}"
+
+
 def leer_tendencias() -> dict:
-    """Recta de tendencia por serie modelada con 'Tendencia historica' (hoja Series_Modelos):
-    {clave: [pendiente en la escala del modelo, ventana, log (1/0), valor de la recta en el ultimo mes]}."""
+    """Modelo por serie proyectada con 'Tendencia historica' (hojas Series_Modelos y Estacionalidad del diagnostico):
+    {clave: [pendiente en la escala del modelo, ventana, log (1/0), valor de la recta en el ultimo mes,
+             factores estacionales ene..dic en la escala del modelo o None]}."""
     if not dx.ARCHIVO_DIAGNOSTICO.exists():
         return {}
     wb = openpyxl.load_workbook(dx.ARCHIVO_DIAGNOSTICO, read_only=True, data_only=True)
-    out = {}
+    out, estacional = {}, {}
+    if "Estacionalidad" in wb.sheetnames:
+        filas = wb["Estacionalidad"].iter_rows(values_only=True)
+        enc = [str(h) for h in next(filas)]
+        for f in filas:
+            r = dict(zip(enc, f))
+            if r.get("Libro") is None or r.get("Credibilidad aplicada") in (None, 0):
+                continue
+            log = r.get("Transformacion") == "log"
+            factores = [r.get(m) for m in MESES_CORTOS]
+            if any(v is None for v in factores):
+                continue
+            estacional[_clave_serie(r)] = [_redondear(math.log1p(v) if log else v, 8) for v in factores]
     if "Series_Modelos" in wb.sheetnames:
         filas = wb["Series_Modelos"].iter_rows(values_only=True)
         enc = [str(h) for h in next(filas)]
@@ -75,8 +95,9 @@ def leer_tendencias() -> dict:
                 continue
             log = r.get("Transformacion") == "log"
             pend = math.log1p(r["Tendencia mensual"]) if log else r["Tendencia mensual"]
-            clave = f"{r['Libro']}|{r['Serie']}|{r['Ramo']}" if r["Libro"] == "HPARAM" else f"{r['Grupo']}|{r['Serie']}|{r['Ramo']}"
-            out[clave] = [pend, r.get("Ventana (meses)"), 1 if log else 0, r.get("Ajuste tendencia ultimo mes")]
+            clave = _clave_serie(r)
+            out[clave] = [pend, r.get("Ventana (meses)"), 1 if log else 0, r.get("Ajuste tendencia ultimo mes"),
+                          estacional.get(clave)]
     wb.close()
     return out
 
@@ -368,7 +389,7 @@ table.datos tbody tr:hover { background: var(--surface-2); }
 </main>
 <footer class="pie">
   <span>__PIE__</span>
-  <span>Generado el __GENERADO__ por proyeccion_reservas.py · azul = real, naranja punteado = proyección, gris fino = recta de tendencia del modelo (solo en las series que se proyectan directo: índices, LAGs y BEL/BRUTO por ramo en USD) · banda = intervalo al 80%</span>
+  <span>Generado el __GENERADO__ por proyeccion_reservas.py · azul = real, naranja punteado = proyección, gris fino = modelo: recta de tendencia más el patrón por mes del año cuando la serie lo tiene (solo en las series que se proyectan directo: índices, LAGs y BEL/BRUTO por ramo en USD) · banda = intervalo al 80%</span>
 </footer>
 <script>
 'use strict';
@@ -398,16 +419,23 @@ const svg = (tag, attrs = {}) => {
   return e;
 };
 const idx = (arr, v) => arr.indexOf(v);
-// Recta de tendencia del modelo (pendiente, ventana y ajuste del diagnostico), anclada en el ultimo dato real
-// de la serie dibujada y extendida al horizonte; escala = factor para pasar a las unidades de la grafica.
-function rectaModelo(clave, vals, total, escala) {
+// Curva del modelo (recta de tendencia del diagnostico mas el patron por mes del ano, si la serie lo tiene),
+// anclada en el ultimo dato real de la serie dibujada y extendida al horizonte; escala = factor para pasar a las
+// unidades de la grafica. periodos = AAAAMM de cada posicion (para saber el mes del ano).
+function rectaModelo(clave, vals, periodos, escala) {
   const p = D.tend[clave]; if (!p) return null;
-  const [pend, ventana, log, ajuste] = p;
+  const [pend, ventana, log, ajuste, est] = p;
   const iAncla = ultimoFinito(vals); if (iAncla < 0 || ajuste == null) return null;
-  const out = new Array(total).fill(null);
-  for (let i = Math.max(0, iAncla - ventana + 1); i < total; i++) { const v = ajuste + pend * (i - iAncla); out[i] = (log ? Math.exp(v) : v) * escala; }
+  const out = new Array(periodos.length).fill(null);
+  for (let i = Math.max(0, iAncla - ventana + 1); i < periodos.length; i++) {
+    const v = ajuste + pend * (i - iAncla) + (est ? est[(periodos[i] % 100) - 1] : 0);
+    out[i] = (log ? Math.exp(v) : v) * escala;
+  }
   return out;
 }
+const tieneEstacionalidad = clave => !!(D.tend[clave] && D.tend[clave][4]);
+const nombreModelo = clave => tieneEstacionalidad(clave) ? `Modelo (tendencia ${D.ventana_tendencia ? D.ventana_tendencia + ' m' : 'toda la historia'} + estacionalidad)`
+  : (D.ventana_tendencia ? `Tendencia (últimos ${D.ventana_tendencia} meses)` : 'Tendencia (toda la historia)');
 const ultimoFinito = arr => { for (let i = arr.length - 1; i >= 0; i--) if (arr[i] != null) return i; return -1; };
 
 // ---------------------------------------------------------------- tema
@@ -785,9 +813,10 @@ function pintarIndices() {
   const banda = { lo: P_I.map((_, i) => i === iUlt ? vals[i] : (lo[i] ?? null)), hi: P_I.map((_, i) => i === iUlt ? vals[i] : (hi[i] ?? null)) };
   const rejilla = document.getElementById('rejilla-ind'); rejilla.replaceChildren(); tarjetasVivas.length = 0;
 
-  const nombreTend = D.ventana_tendencia ? `Tendencia (últimos ${D.ventana_tendencia} meses)` : 'Tendencia (toda la historia)';
-  const tendI = rectaModelo(`HPARAM|${serie}|${ramo}`, real, P_I.length, 1);
-  const c1 = tarjeta(`Evolución mensual · ${serie} · ramo ${ramo}`, 'Real, línea de tendencia y proyección con banda al 80 %',
+  const nombreTend = nombreModelo(`HPARAM|${serie}|${ramo}`);
+  const tendI = rectaModelo(`HPARAM|${serie}|${ramo}`, real, P_I, 1);
+  const c1 = tarjeta(`Evolución mensual · ${serie} · ramo ${ramo}`, tieneEstacionalidad(`HPARAM|${serie}|${ramo}`)
+    ? 'Real, modelo (tendencia + patrón del año) y proyección con banda al 80 %' : 'Real, línea de tendencia y proyección con banda al 80 %',
     (cuerpo, W) => graficaLineas(cuerpo, W, {
       labels: P_I.map(eti), tituloX: i => etiLarga(P_I[i]), fmt: v => fmt(v, decInd(serie)), cadaX: 6, etiquetasFin: true,
       aria: `Evolución mensual de ${serie} del ramo ${ramo}`,
@@ -902,9 +931,9 @@ function pintarReservas() {
     }),
     () => tablaDatos(['Ramo', `${eti(D.ultimo)} real`, `${eti(D.fin_m)} proyección`, 'Variación'], ramos.map((r, i) => [r, fmt(porRamoU[i], 2), fmt(porRamoF[i], 2), fmtPct(varPct(porRamoU[i], porRamoF[i]))])));
 
-  const nombreTendR = D.ventana_tendencia ? `Tendencia (últimos ${D.ventana_tendencia} meses)` : 'Tendencia (toda la historia)';
-  // la recta solo existe para las series que se modelan directo: BEL (RRC, SONR) o BRUTO (RFV) por ramo, en USD
-  const tendR = (moneda === 'USD' && ramoRes !== 'Todos') ? rectaModelo(`${reserva}|${concepto}|${ramoRes}`, real, P_M.length, 1e-6) : null;
+  const nombreTendR = nombreModelo(`${reserva}|${concepto}|${ramoRes}`);
+  // la curva del modelo solo existe para las series que se modelan directo: BEL (RRC, SONR) o BRUTO (RFV) por ramo, en USD
+  const tendR = (moneda === 'USD' && ramoRes !== 'Todos') ? rectaModelo(`${reserva}|${concepto}|${ramoRes}`, real, P_M, 1e-6) : null;
   const c3 = tarjeta(`${reserva} ${concepto} histórico y proyección · ${etiqRamo}`, `${eti(P_M[0])} a ${eti(D.fin_m)}, millones de ${moneda}`,
     (cuerpo, W) => graficaLineas(cuerpo, W, {
       labels: P_M.map(eti), tituloX: i => etiLarga(P_M[i]), fmt: v => fmt(v, 0), cadaX: 6, etiquetasFin: true, incluirCero: true,
