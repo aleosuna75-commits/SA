@@ -889,10 +889,14 @@ def tc_para_periodo(bd: BDMontos, p: int) -> float:
     return bd.tc[max(bd.tc)]
 
 
-def leer_tc_real(bd: BDMontos, ultimo: int) -> dict:
-    """TC real con que la fuente SAP convirtio cada mes a USD (fila 7 de BacktestingRRC, columnas SAP, de
-    los Res_Rvas en entradas/). Se usa para regresar la historia a MXN; donde no hay dato se usa la BD."""
+def leer_tc_real(bd: BDMontos, ultimo: int, libro: str = "", alertas: list | None = None) -> dict:
+    """TC real con que la fuente SAP convirtio cada mes a USD. Se usa para regresar la historia a MXN. Prioridad:
+    1) Res_Rvas en entradas/ (fila 7 de BacktestingRRC, columnas SAP), si estan; 2) los meses reales de
+    TC_PROYECCION (tipo_cambio.py: 202601 en adelante hasta el ultimo real = TC de SAP); 3) la columna TC de la BD.
+    Si la columna TC de la BD difiere del TC real en algun mes de la historia, se avisa: la historia se regresa a
+    pesos con el real, que es con el que se convirtieron los montos."""
     tc = {p: v for p, v in bd.tc.items() if p <= ultimo}
+    tc.update({p: v for p, v in TC_PROYECCION.items() if p <= ultimo})
     for ruta in sorted(ENTRADAS.glob("Res_Rvas_*.xlsx")):
         try:
             wb = openpyxl.load_workbook(ruta, read_only=True, data_only=True)
@@ -907,6 +911,14 @@ def leer_tc_real(bd: BDMontos, ultimo: int) -> dict:
             if norm(escenario) == "SAP" and isinstance(per, (int, float)) and isinstance(v, (int, float)) \
                     and int(per) <= ultimo:
                 tc[int(per)] = float(v)
+    if alertas is not None:
+        difieren = [p for p, v in sorted(tc.items()) if p in bd.tc and bd.tc[p] and abs(bd.tc[p] / v - 1) > 0.005]
+        if difieren:
+            detalle = ", ".join(f"{p}: BD {bd.tc[p]:.4f} vs real {tc[p]:.4f}" for p in difieren)
+            texto = (f"La columna TC de la BD no es el TC real de SAP en {len(difieren)} meses de la historia ({detalle}). "
+                     "Para regresar la historia a pesos se usa el real (con el que se convirtieron los montos).")
+            alertas.append((libro, "TC de la historia", texto))
+            print(f"   AVISO {libro}: {texto}", flush=True)
     return tc
 
 
@@ -1800,7 +1812,7 @@ def main():
     tc_hist = {}
     for libro, bd in (("DANOS", bd_danos), ("FIANZAS", bd_rfv)):
         if MODELAR_EN_MXN.get(libro):
-            tc_hist[libro] = leer_tc_real(bd, ultimo)
+            tc_hist[libro] = leer_tc_real(bd, ultimo, libro, alertas)
             alertas.append(("METODO", f"Moneda {libro}", "Montos modelados en MXN (historia USD x TC real de SAP) y "
                                                          "convertidos a USD con el TC de cada mes proyectado de la BD"))
 
