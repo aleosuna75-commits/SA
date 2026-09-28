@@ -123,6 +123,61 @@ python3 aplicar_cat.py        # FCST_2027_Cesion.xlsb
 python3 verificar4.py
 ```
 
+## `05_FCST_2027.xlsx`: llenado desde las vistas y su validación
+
+El reporte `05_FCST_2027.xlsx` (seis hojas `Ppto…_Red`, en MXN) se llena recorriendo un año:
+
+| Donde estaba | Ahora va | De dónde sale |
+|---|---|---|
+| 2026 | **2027** | Vistas `ER_ln`, `ER_ram`, `ER_reg`, `ER_tre` evaluadas por miembro, y `ER` para el total mensual |
+| 2025 | **2026** | El presupuesto 2026 que ya traía el mismo archivo, recorrido una posición |
+| 2024 | **2025** | El real 2025 que ya traía el archivo (es la columna D de cada vista) |
+
+**Moneda.** 2027 va en pesos: cada flujo mensual × `'Parámetros'!F3:Q3` y acumulado, que es lo
+que dan las vistas con `xMonEEFF = "MXN"`. El libro se guarda en USD, así que las cifras se
+calculan fuera y la validación convierte con fórmulas.
+
+**Bloques.** Cada bloque del 05 se asigna a uno o más miembros de la vista. Los casos
+compuestos son:
+
+- Daños Facultativos Sur y Agropecuario = `LN04008` (reservas) + `LN04008-Agro` (`CtaMens`);
+- Crédito = `Crédito` (reservas) + `Credito` (`CtaMens`).
+
+Así ningún miembro queda fuera y los bloques suman `ER`. El mapeo se comprobó con el 2025: el
+real que traía el 05 es igual, celda por celda, a la columna D de la vista para esos miembros, y
+el 2024 a la columna C.
+
+**Lo que quedó vacío o con criterio:**
+
+- **`'2027 CA'`** (PptoxLN_Red) se deja vacía. En el archivo anterior `'2026 CA'` era el mismo
+  total con otro reparto entre LN, y el libro no trae esa clasificación para 2027.
+- **Filas financieras de 2027** en PptoxMes_Red: quedan vacías las que dependen de `ER!Q62`,
+  `Q63` y `Q67`, que tienen `=$Q63/12+P63` (referencia circular, sin cálculo iterativo). Con
+  ellas quedan vacíos el RIF, los impuestos y la utilidad.
+- **Columnas T/U/V:** T y U se recorren; V se calcula con la regla de cada renglón. Las filas de
+  variación de reserva (11 y 12) quedan vacías en V porque su razón no sale de la hoja.
+- **Mayo de 2026:** traía `'|'` en lugar de cifra. Se puso Prima Tomada − Prima Devengada, que es
+  como sale en los demás meses.
+
+**Hojas que se agregan al libro de Cesión** (mismo formato que las `Val_*`, todo en fórmulas
+salvo las cifras del 05, que van capturadas):
+
+| Hoja | Contenido |
+|---|---|
+| `Val05_Resumen` | Los 20 renglones a diciembre por hoja del 05 contra su referencia, y el conteo de celdas que cuadran. Incluye el 2025 recorrido y las observaciones |
+| `Val05_Mensual` | PptoxMes_Red contra ER en MXN, mes a mes; W (2025) contra `ER!E` |
+| `Val05_LN`, `Val05_Ramo`, `Val05_Region`, `Val05_TRea` | Cada bloque del 05 contra la vista en MXN, que sale de `Val_x` × `'Parámetros'!F3:Q3` ÷ `ER_x!E6:P6`. Traen la suma de bloques contra ER y el 2025 contra la columna D de la vista. `Val05_LN` trae además PptoxLN_Red |
+
+La conversión divide entre el factor vigente de la vista, así que la comparación vale con
+`xMonEEFF` en USD o en MXN.
+
+```bash
+python3 cargar_v3.py          # CtaMens y celdas del libro de Cesión (en cesion/)
+python3 datos05.py            # 2027 por miembro en USD y MXN; se cruza contra Val_* y ER
+python3 llenar05.py           # escribe 05_FCST_2027.xlsx editando el XML (solo valores)
+python3 construir05.py        # agrega las hojas Val05_* al libro de Cesión
+```
+
 ## Cómo se escribe el `.xlsb`
 
 LibreOffice no abre este libro y `pyxlsb` es solo lectura. `xlsbw.py` genera los
@@ -146,6 +201,7 @@ originales conservan sus bytes comprimidos.
 | `render.py`, `render2.py` | Vista previa HTML de las hojas con los estilos reales del libro |
 | `load_int.py`, `flujo.py` | Carga completa de `CtaMens` y lectura parcial de hojas grandes |
 | `cat_reparto.py`, `aplicar_cat.py`, `evaluador2.py`, `verificar4.py` | Reparto de CAT y Gastos en `CtaMens`, hoja `Val_CAT` y su auditoría |
+| `cargar_v3.py`, `datos05.py`, `llenar05.py`, `construir05.py` | Llenado de `05_FCST_2027.xlsx` desde las vistas y hojas `Val05_*` |
 | `analisis.py`, `comparar.py`, `construir.py`, `verificar.py`, `empaquetar.py`, `load_ctamens.py` | Versión anterior (ValDim vs recálculo), se conserva por referencia |
 
 ## Cómo correrlo
