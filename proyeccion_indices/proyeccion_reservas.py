@@ -33,7 +33,7 @@ b) Modelo (MODELO_POR_TIPO):
          a ella y arranca del ultimo real;
        - razones (%GTO, %MR, %cedido) -> SES (nivel suavizado, sin tendencia: dependen de los contratos);
        - RCONT -> Holt-Winters amortiguado con estacionalidad por mes del trimestre (acumula en los
-         meses 1-2 y libera en el 3).
+         meses 1-2 y libera en el 3) si hay al menos 12 meses; con menos, SES (nivel).
    Los intervalos al 80% salen de la variabilidad mensual alrededor de la tendencia (crece con la raiz
    del horizonte) o del propio modelo de suavizamiento.
 c) Backtest por serie: se vuelve a proyectar desde 16, 12 y 8 meses antes del final y se mide el
@@ -43,7 +43,7 @@ d) Reglas actuariales / de calidad de datos (todas reportadas en la hoja "Alerta
        - series en cero en los ultimos 6 meses -> se proyectan en cero;
        - parametros "en escalon" (se actualizan esporadicamente, >=50% de meses sin
          cambio) -> se mantiene el ultimo valor;
-       - series cortas (<12 obs) -> SES; (<4 obs) -> ultimo valor;
+       - series cortas (< 6 obs) -> SES; (< 4 obs) -> ultimo valor;
        - dominio actuarial: cesion en [0, 1], %GTO y %MR >= 0, LAGs >= 0, montos >= 0;
        - alerta de saltos atipicos en el ultimo mes y de cambios proyectados mayores a los
          observados en la historia;
@@ -363,7 +363,8 @@ def ajustar_tendencia(z, h: int):
     pron = z[-1] + pendiente * pasos
     sd = float(np.std(np.diff(w) - pendiente, ddof=1)) if len(w) > 2 else 0.0
     ancho = _cuantil_normal() * sd * np.sqrt(np.arange(1, h + 1))
-    params = {"pendiente": float(pendiente), "ventana": int(len(w)), "r2": float(r2)}
+    params = {"pendiente": float(pendiente), "ventana": int(len(w)), "r2": float(r2),
+              "ajuste_ultimo": float(ordenada + pendiente * (len(w) - 1))}   # valor de la recta en el ultimo mes
     return pron, pron - ancho, pron + ancho, params, float(pendiente)
 
 
@@ -375,8 +376,9 @@ def ajustar(z, modelo: str, h: int):
 def elegir_modelo(tipo: str, n: int, trimestral: bool) -> str:
     if n < MIN_OBS_SES:
         return ULTIMO_VALOR
-    if trimestral and n >= MIN_OBS_TRIMESTRAL:
-        return "Holt-Winters amortiguado (trimestral)"
+    if trimestral:
+        # con menos de MIN_OBS_TRIMESTRAL meses no se puede separar la estacionalidad: nivel suavizado
+        return "Holt-Winters amortiguado (trimestral)" if n >= MIN_OBS_TRIMESTRAL else "SES"
     modelo = MODELO_POR_TIPO[tipo]
     minimo = MIN_OBS_TENDENCIA if modelo == TENDENCIA else MIN_OBS_HOLT
     if modelo != "SES" and n < minimo:
@@ -498,6 +500,9 @@ def _pronosticar(serie: Serie) -> Resultado:
     modelo = elegir_modelo(tipo, n, serie.trimestral)
     if n < MIN_OBS_HOLT:
         res.alertas.append(f"Solo {n} observaciones: proyeccion de baja confiabilidad")
+    if serie.trimestral and modelo == "SES":
+        res.alertas.append(f"Serie trimestral con {n} meses (< {MIN_OBS_TRIMESTRAL}): no se estima estacionalidad ni "
+                           "tendencia; se proyecta el nivel suavizado (completa la historia para usar Holt-Winters)")
     pron = li = ls = None
     while modelo != ULTIMO_VALOR:
         try:
@@ -517,6 +522,17 @@ def _pronosticar(serie: Serie) -> Resultado:
         sd = (np.std(np.diff(z), ddof=1) if n > 2 else 0.0) * np.sqrt(np.arange(1, hh + 1)) * _cuantil_normal()
         li, ls = inv(z[-1] - sd), inv(z[-1] + sd)
     res.modelo = modelo
+    if modelo == TENDENCIA and res.parametros:
+        r2 = res.parametros.get("r2", math.nan)
+        if np.isfinite(r2) and r2 < 0.3:
+            res.alertas.append(f"R2 de la tendencia {r2:.2f}: la recta explica poco de los ultimos "
+                               f"{res.parametros['ventana']} meses; revisar antes de usar la pendiente")
+        if n >= 13 and y[-13] > 0 and y[-1] > 0:
+            cambio12 = y[-1] / y[-13] - 1
+            if abs(cambio12) > 0.05 and np.sign(res.tendencia_mensual) != np.sign(cambio12):
+                res.alertas.append(f"La tendencia de {res.parametros['ventana']} meses ({res.tendencia_mensual:+.1%} "
+                                   f"mensual) va en sentido contrario al cambio real de los ultimos 12 meses "
+                                   f"({cambio12:+.0%})")
 
     # backtest: se re-proyecta desde cortes pasados con el mismo modelo y se compara contra lo real
     res.error_modelo, res.error_ultimo_valor, res.error_ses, res.n_cortes = backtest(z, y, modelo, inv)
@@ -623,7 +639,7 @@ def resumen_backtest(resultados: dict) -> list[dict]:
     for tipo, libro in grupos:
         todos = [r for r in resultados.values() if r.tipo == tipo and r.clave[0] == libro]
         rs = [r for r in todos if r.n_cortes and np.isfinite(r.error_modelo) and np.isfinite(r.error_ultimo_valor)]
-        modelos = ", ".join(sorted({r.modelo for r in todos if r.modelo}))
+        modelos = ", ".join(sorted({r.modelo for r in (rs or todos) if r.modelo}))  # solo los modelos de las series con backtest
         fila = {"Tipo": tipo, "Libro": libro, "Modelo": modelos, "Series con backtest": len(rs)}
         if rs:
             em = np.array([r.error_modelo for r in rs])
@@ -1069,8 +1085,10 @@ def escribir_diagnostico(resultados: dict, periodos_proy: list[int], alertas_gen
                       f"la serie es positiva) sobre los ultimos {MESES_TENDENCIA or 'N/A'} meses, continuada desde "
                       "el ultimo dato real (la proyeccion sale paralela a la linea de tendencia de Excel y arranca "
                       "del ultimo real). Razones (%GTO, %MR, %cedido): SES (nivel sin tendencia). RCONT: "
-                      "Holt-Winters amortiguado con estacionalidad por mes del trimestre. Series cortas: SES "
-                      "(< 6 obs para la tendencia) o ultimo valor (< 4)."),
+                      "Holt-Winters amortiguado con estacionalidad por mes del trimestre si hay al menos 12 meses; "
+                      "con menos, SES (nivel). Series cortas: SES (< 6 obs para la tendencia) o ultimo valor (< 4). "
+                      "Los conceptos derivados (NETO, BRUTO de Danos, IRR, GTO, MR) y los totales por ramo no siguen "
+                      "una recta propia: salen de las identidades y de la suma de ramos."),
         ("3. Parametros", f"Tendencia: pendiente de la regresion (columna 'Tendencia mensual' de Series_Modelos, en "
                           f"% mensual cuando la serie va en logaritmos), ventana usada y R2. Amortiguacion phi = "
                           f"{AMORTIGUACION_TENDENCIA} (1 = constante; con 0.95 cada mes conserva 95%). Modelos de "
@@ -1124,15 +1142,16 @@ def escribir_diagnostico(resultados: dict, periodos_proy: list[int], alertas_gen
         "Error % = suma de errores absolutos / suma de valores reales, re-proyectando desde 16, 12 y 8 meses antes "
         "del final (horizontes 1-16, minimo 12 meses de entrenamiento). Mediana entre series del tipo y libro. "
         "FIANZAS tiene 20 meses de historia: un solo corte (a 8 meses), indicativo.",
-        "El modelo elegido continua la tendencia observada (amortiguada). En indices y LAGs eso cuesta algo de "
-        "error frente a repetir el ultimo valor; en montos lo mejora.",
+        "El modelo elegido continua la tendencia observada" + (" (amortiguada)" if AMORTIGUACION_TENDENCIA < 1 else "")
+        + ". Continuar una recta 16 meses cuesta precision frente a repetir el ultimo valor; el costo queda aqui a la vista.",
     ]):
         ws.cell(nota + i, 1, texto)
 
     # Series y modelos
     ws = wb.create_sheet("Series_Modelos")
     cab = ["Libro", "Grupo", "Serie", "Ramo", "Tipo", "Moneda modelo", "Transformacion", "Obs", "Desde", "Regla",
-           "Modelo", "Ventana (meses)", "R2 tendencia", "alpha", "beta", "phi", "gamma", "Tendencia mensual",
+           "Modelo", "Ventana (meses)", "R2 tendencia", "Ajuste tendencia ultimo mes", "alpha", "beta", "phi", "gamma",
+           "Tendencia mensual",
            "Cortes backtest", "Error % modelo",
            "Error % ultimo valor", "Error % SES", "Ultimo real", f"Proy {periodos_proy[0]}",
            f"Proy {periodos_proy[-1]}", "Var % vs ultimo real", "Alertas"]
@@ -1147,7 +1166,8 @@ def escribir_diagnostico(resultados: dict, periodos_proy: list[int], alertas_gen
         var = (fin / ult - 1) if (ult and not math.isnan(ult) and not math.isnan(fin) and ult != 0) else None
         fila_ = [k[0], k[1], k[2], k[3], r.tipo, r.moneda, r.transformacion, r.n_obs,
                  r.historia_periodos[0] if r.historia_periodos else None, r.regla, r.modelo or None,
-                 r.parametros.get("ventana"), num(r.parametros.get("r2")), num(r.parametros.get("alpha")), num(r.parametros.get("beta")), num(r.parametros.get("phi")),
+                 r.parametros.get("ventana"), num(r.parametros.get("r2")), num(r.parametros.get("ajuste_ultimo")),
+                 num(r.parametros.get("alpha")), num(r.parametros.get("beta")), num(r.parametros.get("phi")),
                  num(r.parametros.get("gamma")), num(r.tendencia_mensual), r.n_cortes or None,
                  num(r.error_modelo), num(r.error_ultimo_valor), num(r.error_ses), num(ult),
                  None if not r.pronostico or math.isnan(r.pronostico[0]) else r.pronostico[0],
@@ -1456,8 +1476,10 @@ def main():
     if mayores:
         print(f"   Mayores cambios proyectados a {periodos_proy[-1]} (revisalos contra el plan de negocio):")
         for cambio, r in mayores:
+            ventana = r.parametros.get("ventana")
             print(f"      {r.clave[0]} {r.clave[1]} {r.clave[2]} ramo {r.clave[3]}: {cambio:+.0%} "
-                  f"(tendencia {r.tendencia_mensual:+.1%} mensual, {r.n_obs} obs)")
+                  f"(tendencia {r.tendencia_mensual:+.1%} mensual"
+                  + (f", regresion sobre {ventana} de {r.n_obs} meses)" if ventana else f", {r.modelo})"))
     n_alertas = len(alertas) + sum(len(r.alertas) for r in resultados.values())
     print(f"   Alertas a revisar: {n_alertas} (hoja 'Alertas' del diagnostico)")
     print(f"   Tiempo total: {time.time() - t0:,.0f} s")

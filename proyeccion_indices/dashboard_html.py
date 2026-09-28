@@ -59,6 +59,28 @@ def leer_resumen() -> dict:
     return out
 
 
+def leer_tendencias() -> dict:
+    """Recta de tendencia por serie modelada con 'Tendencia historica' (hoja Series_Modelos):
+    {clave: [pendiente en la escala del modelo, ventana, log (1/0), valor de la recta en el ultimo mes]}."""
+    if not dx.ARCHIVO_DIAGNOSTICO.exists():
+        return {}
+    wb = openpyxl.load_workbook(dx.ARCHIVO_DIAGNOSTICO, read_only=True, data_only=True)
+    out = {}
+    if "Series_Modelos" in wb.sheetnames:
+        filas = wb["Series_Modelos"].iter_rows(values_only=True)
+        enc = [str(h) for h in next(filas)]
+        for f in filas:
+            r = dict(zip(enc, f))
+            if r.get("Modelo") != "Tendencia historica" or r.get("Tendencia mensual") is None:
+                continue
+            log = r.get("Transformacion") == "log"
+            pend = math.log1p(r["Tendencia mensual"]) if log else r["Tendencia mensual"]
+            clave = f"{r['Libro']}|{r['Serie']}|{r['Ramo']}" if r["Libro"] == "HPARAM" else f"{r['Grupo']}|{r['Serie']}|{r['Ramo']}"
+            out[clave] = [pend, r.get("Ventana (meses)"), 1 if log else 0, r.get("Ajuste tendencia ultimo mes")]
+    wb.close()
+    return out
+
+
 def preparar_datos() -> dict:
     """Lee las salidas de la proyeccion y arma el diccionario que se incrusta en el HTML."""
     registros_i, ramos_i, ultimo = dx.leer_indices()
@@ -121,6 +143,7 @@ def preparar_datos() -> dict:
         "ramos_m": {k: ramos_m.get(k, []) for k in conceptos}, "conceptos": conceptos, "mon": mon,
         "tc": {str(p): _redondear(t, 6) for p, t in tc.items()},
         "metodo": filas_metodo, "modelo_por_tipo": modelo_por_tipo, "ventana_tendencia": ventana,
+        "tend": leer_tendencias(),
         "generado": datetime.now().strftime("%Y-%m-%d %H:%M"),
     }
 
@@ -345,7 +368,7 @@ table.datos tbody tr:hover { background: var(--surface-2); }
 </main>
 <footer class="pie">
   <span>__PIE__</span>
-  <span>Generado el __GENERADO__ por proyeccion_reservas.py · azul = real, naranja punteado = proyección, gris fino = línea de tendencia histórica · banda = intervalo al 80%</span>
+  <span>Generado el __GENERADO__ por proyeccion_reservas.py · azul = real, naranja punteado = proyección, gris fino = recta de tendencia del modelo (solo en las series que se proyectan directo: índices, LAGs y BEL/BRUTO por ramo en USD) · banda = intervalo al 80%</span>
 </footer>
 <script>
 'use strict';
@@ -375,21 +398,14 @@ const svg = (tag, attrs = {}) => {
   return e;
 };
 const idx = (arr, v) => arr.indexOf(v);
-// Linea de tendencia (regresion lineal, en logaritmos si todo es positivo) sobre los ultimos `ventana` datos reales
-// hasta iUlt; devuelve la recta desde el inicio de la ventana hasta el final del eje (misma que usa la proyeccion).
-function lineaTendencia(vals, iUlt, ventana, total) {
-  const ini = ventana ? Math.max(0, iUlt - ventana + 1) : 0;
-  const pts = [];
-  for (let i = ini; i <= iUlt; i++) if (vals[i] != null) pts.push([i, vals[i]]);
-  if (pts.length < 6) return null;
-  const log = pts.every(p => p[1] > 0);
-  const xs = pts.map(p => p[0]), ys = pts.map(p => log ? Math.log(p[1]) : p[1]);
-  const mx = xs.reduce((a, b) => a + b, 0) / xs.length, my = ys.reduce((a, b) => a + b, 0) / ys.length;
-  let sxy = 0, sxx = 0;
-  for (let k = 0; k < xs.length; k++) { sxy += (xs[k] - mx) * (ys[k] - my); sxx += (xs[k] - mx) ** 2; }
-  const b = sxx ? sxy / sxx : 0, a = my - b * mx;
+// Recta de tendencia del modelo (pendiente, ventana y ajuste del diagnostico), anclada en el ultimo dato real
+// de la serie dibujada y extendida al horizonte; escala = factor para pasar a las unidades de la grafica.
+function rectaModelo(clave, vals, total, escala) {
+  const p = D.tend[clave]; if (!p) return null;
+  const [pend, ventana, log, ajuste] = p;
+  const iAncla = ultimoFinito(vals); if (iAncla < 0 || ajuste == null) return null;
   const out = new Array(total).fill(null);
-  for (let i = pts[0][0]; i < total; i++) { const v = a + b * i; out[i] = log ? Math.exp(v) : v; }
+  for (let i = Math.max(0, iAncla - ventana + 1); i < total; i++) { const v = ajuste + pend * (i - iAncla); out[i] = (log ? Math.exp(v) : v) * escala; }
   return out;
 }
 const ultimoFinito = arr => { for (let i = arr.length - 1; i >= 0; i--) if (arr[i] != null) return i; return -1; };
@@ -770,7 +786,7 @@ function pintarIndices() {
   const rejilla = document.getElementById('rejilla-ind'); rejilla.replaceChildren(); tarjetasVivas.length = 0;
 
   const nombreTend = D.ventana_tendencia ? `Tendencia (últimos ${D.ventana_tendencia} meses)` : 'Tendencia (toda la historia)';
-  const tendI = lineaTendencia(real, iUlt, D.ventana_tendencia, P_I.length);
+  const tendI = rectaModelo(`HPARAM|${serie}|${ramo}`, real, P_I.length, 1);
   const c1 = tarjeta(`Evolución mensual · ${serie} · ramo ${ramo}`, 'Real, línea de tendencia y proyección con banda al 80 %',
     (cuerpo, W) => graficaLineas(cuerpo, W, {
       labels: P_I.map(eti), tituloX: i => etiLarga(P_I[i]), fmt: v => fmt(v, decInd(serie)), cadaX: 6, etiquetasFin: true,
@@ -887,7 +903,8 @@ function pintarReservas() {
     () => tablaDatos(['Ramo', `${eti(D.ultimo)} real`, `${eti(D.fin_m)} proyección`, 'Variación'], ramos.map((r, i) => [r, fmt(porRamoU[i], 2), fmt(porRamoF[i], 2), fmtPct(varPct(porRamoU[i], porRamoF[i]))])));
 
   const nombreTendR = D.ventana_tendencia ? `Tendencia (últimos ${D.ventana_tendencia} meses)` : 'Tendencia (toda la historia)';
-  const tendR = concepto === 'RCONT' ? null : lineaTendencia(real, jUlt, D.ventana_tendencia, P_M.length);
+  // la recta solo existe para las series que se modelan directo: BEL (RRC, SONR) o BRUTO (RFV) por ramo, en USD
+  const tendR = (moneda === 'USD' && ramoRes !== 'Todos') ? rectaModelo(`${reserva}|${concepto}|${ramoRes}`, real, P_M.length, 1e-6) : null;
   const c3 = tarjeta(`${reserva} ${concepto} histórico y proyección · ${etiqRamo}`, `${eti(P_M[0])} a ${eti(D.fin_m)}, millones de ${moneda}`,
     (cuerpo, W) => graficaLineas(cuerpo, W, {
       labels: P_M.map(eti), tituloX: i => etiLarga(P_M[i]), fmt: v => fmt(v, 0), cadaX: 6, etiquetasFin: true, incluirCero: true,
@@ -895,7 +912,7 @@ function pintarReservas() {
       series: [...(tendR ? [{ nombre: nombreTendR, valores: tendR, color: cssVar('--deemph-ink'), fino: true }] : []),
         { nombre: 'Real', valores: real, color: cssVar('--real'), etiquetaFin: true }, { nombre: 'Proyección', valores: proyLinea, color: cssVar('--proy'), dash: true, etiquetaFin: true }],
     }),
-    () => tablaDatos(['Mes', 'Tipo', `M ${moneda}`, nombreTendR], P_M.map((p, i) => [etiLarga(p), i <= jUlt ? 'Real' : 'Proyección', fmt(vals[i], 2), fmt(tendR ? tendR[i] : null, 2)])));
+    () => { const dec = Math.max(...vals.filter(v => v != null)) < 10 ? 4 : 2; return tablaDatos(['Mes', 'Tipo', `M ${moneda}`, nombreTendR], P_M.map((p, i) => [etiLarga(p), i <= jUlt ? 'Real' : 'Proyección', fmt(vals[i], dec), fmt(tendR ? tendR[i] : null, dec)])); });
 
   const porConcU = conceptos.map(c => montoSerie(reserva, c, ramoRes)[jUlt]), porConcF = conceptos.map(c => montoSerie(reserva, c, ramoRes)[jFin]);
   const c4 = tarjeta(`${reserva} por concepto · ${etiqRamo}`, `${eti(D.ultimo)} real y ${eti(D.fin_m)} proyectado, millones de ${moneda}`,
