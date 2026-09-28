@@ -396,7 +396,7 @@ table.datos tbody tr:hover { background: var(--surface-2); }
 </main>
 <footer class="pie">
   <span>__PIE__</span>
-  <span>Generado el __GENERADO__ por proyeccion_reservas.py · azul = real, naranja punteado = proyección, gris fino = modelo ajustado sobre la historia: recta de tendencia más el patrón por mes del año cuando la serie lo tiene; la proyección arranca del último real y, en los índices, su desviación respecto al modelo se desvanece hacia el nivel del último año (solo en las series que se proyectan directo: índices, LAGs y BEL/BRUTO por ramo en USD) · banda = intervalo al 80%</span>
+  <span>Generado el __GENERADO__ por proyeccion_reservas.py · azul = real, naranja punteado = proyección, gris fino = modelo ajustado sobre la historia: recta de tendencia más el patrón por mes del año cuando la serie lo tiene; la proyección arranca del último real y, en los índices, su desviación respecto al modelo se desvanece hacia el nivel del último año y la pendiente entra ponderada por su credibilidad (solo en las series que se proyectan directo: índices, LAGs y BEL/BRUTO por ramo en USD) · banda = intervalo al 80%</span>
 </footer>
 <script>
 'use strict';
@@ -829,7 +829,7 @@ function pintarIndices() {
   const tendI = rectaModelo(`HPARAM|${serie}|${ramo}`, real, P_I, 1);
   const c1 = tarjeta(`Evolución mensual · ${serie} · ramo ${ramo}`, (!tendI ? 'Real y proyección con banda al 80 %' : conPatron
     ? 'Real, modelo ajustado (tendencia + patrón del año) y proyección con banda al 80 %' : 'Real, línea de tendencia y proyección con banda al 80 %')
-    + (!esLag && D.persistencia_indices != null && D.persistencia_indices < 1 ? ` · la desviación del último mes se desvanece hacia el nivel del último año (persistencia ${D.persistencia_indices})` : ''),
+    + (!esLag && D.persistencia_indices != null && D.persistencia_indices < 1 ? ` · la desviación del último mes se desvanece hacia el nivel del último año (persistencia ${D.persistencia_indices}) y la pendiente entra ponderada por lo que explica la recta` : ''),
     (cuerpo, W) => graficaLineas(cuerpo, W, {
       labels: P_I.map(eti), tituloX: i => etiLarga(P_I[i]), fmt: v => fmt(v, decInd(serie)), cadaX: 6, etiquetasFin: true,
       aria: `Evolución mensual de ${serie} del ramo ${ramo}`,

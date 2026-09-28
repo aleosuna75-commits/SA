@@ -34,8 +34,10 @@ b) Modelo (MODELO_POR_TIPO):
          mismos 36 meses) ponderado por su credibilidad (Buhlmann, Z = n/(n+K): 1 = el patron se
          repite igual cada ano, 0 = ruido). Los LAGs (patron de desarrollo) van solo con la recta.
          En los indices (razones que se mueven en una banda y rebotan) la desviacion del ultimo mes
-         respecto al modelo se desvanece hacia el nivel del ultimo ano (PERSISTENCIA_DESVIACION 0.8);
-         en montos y LAGs se conserva (la proyeccion arranca del ultimo real).
+         respecto al modelo se desvanece hacia el nivel del ultimo ano (PERSISTENCIA_DESVIACION 0.8) y
+         la pendiente se proyecta ponderada por su credibilidad (R2 ajustado de la recta,
+         CREDIBILIDAD_PENDIENTE); en montos y LAGs la desviacion se conserva (la proyeccion arranca
+         del ultimo real) y la pendiente se proyecta completa.
          Es la linea de tendencia de Excel con los picos y valles del ano: la proyeccion sale paralela
          a ella, arranca del ultimo real y repite el patron en la medida en que se ha repetido;
        - razones (%GTO, %MR, %cedido) -> SES (nivel suavizado, sin tendencia: dependen de los contratos);
@@ -239,6 +241,16 @@ DESCRIPCION_CREDIBILIDAD = {
 #       8.5 % contra 9.5 % en la prueba anidada) y evita que un mes bajo arrastre todo el horizonte.
 PERSISTENCIA_DESVIACION = {"nivel": 1.0, "indice": 0.8, "lag": 1.0}
 MESES_NIVEL_LOCAL = 12           # meses del nivel promedio (respecto a la recta) al que converge la desviacion
+ANCLAR_SERIES = set()            # series (Serie, Ramo) de indices que se dejan ancladas al ultimo real (phi = 1) a
+                                 # criterio del area, p. ej. {("Ind sin RRC 99.5%", "31")} si la caida reciente es un
+                                 # cambio de nivel y no una desviacion que rebota
+# Cuanto de la pendiente de la recta se proyecta:
+#   montos y LAGs: completa (1.0): la tendencia de los ultimos tres anos se continua tal cual (decision del area).
+#   indices: ponderada por su credibilidad = R2 ajustado de la recta ("r2"). Son razones: extrapolar 16 meses una
+#       pendiente que la recta explica poco (ramo 31: +1.3 % mensual con R2 0.16) proyecta subidas o bajadas que la
+#       serie nunca sostuvo. Backtest de indices (error % mediano a 1-16 / 1-6 meses): pendiente completa 18.3 / 14.0;
+#       ponderada por R2 16.3 / 13.5; sin pendiente 13.9 / 12.6. Un numero entre 0 y 1 fija la proporcion.
+CREDIBILIDAD_PENDIENTE = {"nivel": 1.0, "indice": "r2", "lag": 1.0}
 # Cotas de los modelos de suavizamiento exponencial (si se eligen), estimadas por maxima verosimilitud dentro de
 # ellas: alpha ~ 1 (arranca del ultimo dato real), beta <= 0.15 (tendencia de los ultimos anos, no del ultimo mes),
 # phi entre 0.80 y 0.98. RCONT (Holt-Winters trimestral) suaviza el nivel (alpha >= 0.2) para separar la
@@ -442,14 +454,15 @@ def factores_estacionales(z, meses):
             "amplitud": float(s.max() - s.min())}
 
 
-def ajustar_tendencia(z, h: int, meses=None, phi_desv: float = 1.0):
+def ajustar_tendencia(z, h: int, meses=None, phi_desv: float = 1.0, cred_pend=1.0):
     """Linea de tendencia (regresion lineal sobre los ultimos MESES_TENDENCIA valores de z, en la escala del modelo)
     mas, si ESTACIONALIDAD_MENSUAL y se conocen los meses, el patron por mes del ano; continuada desde el ultimo
     dato real con amortiguacion AMORTIGUACION_TENDENCIA. La desviacion del ultimo mes respecto al modelo se
     conserva (phi_desv = 1) o se desvanece con persistencia phi_desv hacia el nivel promedio de los ultimos
     MESES_NIVEL_LOCAL meses (indices). Intervalo: con phi_desv = 1, la variabilidad mensual alrededor de la
     tendencia (sin el patron), que crece con la raiz del horizonte; con phi_desv < 1, la banda estacionaria de los
-    residuos mas la incertidumbre de la pendiente."""
+    residuos mas la incertidumbre de la pendiente. cred_pend: proporcion de la pendiente que se proyecta (1 = toda;
+    "r2" = el R2 ajustado de la recta, para indices)."""
     z = np.asarray(z, dtype=float)
     est = factores_estacionales(z, meses) if (ESTACIONALIDAD_MENSUAL and meses is not None) else None
     if est is not None:
@@ -469,6 +482,9 @@ def ajustar_tendencia(z, h: int, meses=None, phi_desv: float = 1.0):
     phi = AMORTIGUACION_TENDENCIA
     pasos = np.cumsum(phi ** np.arange(1, h + 1))
     hh = np.arange(1, h + 1)
+    r2_ajustado = max(0.0, 1 - (1 - r2) * (len(w) - 1) / max(1, len(w) - 2)) if np.isfinite(r2) else 0.0
+    credibilidad_pend = r2_ajustado if cred_pend == "r2" else float(cred_pend)
+    pendiente_aplicada = float(pendiente) * credibilidad_pend           # pendiente que se proyecta
     ajuste_ultimo = float(ordenada + pendiente * (len(w) - 1))         # recta (sin estacionalidad) en el ultimo mes
     e = w - ajuste                                                     # residuos alrededor de la recta
     e_ultimo = float(d[-1] - ajuste_ultimo)                            # desviacion del ultimo mes (= e[-1])
@@ -486,8 +502,9 @@ def ajustar_tendencia(z, h: int, meses=None, phi_desv: float = 1.0):
         desviacion = e_ultimo                                          # se conserva: arranca del ultimo real
         sd = float(np.std(np.diff(w) - pendiente, ddof=1)) if len(w) > 2 else 0.0
         ancho = _cuantil_normal() * sd * np.sqrt(hh)
-    pron = ajuste_ultimo + pendiente * pasos + desviacion + estacional_fut   # con phi_d = 1: d[-1] + pendiente*pasos + s
+    pron = ajuste_ultimo + pendiente_aplicada * pasos + desviacion + estacional_fut   # con phi_d = 1 y cred 1: d[-1] + pendiente*pasos + s
     params = {"pendiente": float(pendiente), "ventana": int(len(w)), "r2": float(r2), "ajuste_ultimo": ajuste_ultimo,
+              "credibilidad_pendiente": float(credibilidad_pend), "pendiente_aplicada": pendiente_aplicada,
               "phi_desviacion": phi_d, "desviacion_ultimo": e_ultimo, "nivel_local": float(objetivo),
               "sd_residual": float(np.std(e, ddof=1)) if len(e) > 2 else 0.0}
     if est is not None:
@@ -497,11 +514,11 @@ def ajustar_tendencia(z, h: int, meses=None, phi_desv: float = 1.0):
     return pron, pron - ancho, pron + ancho, params, float(pendiente)
 
 
-def ajustar(z, modelo: str, h: int, meses=None, phi_desv: float = 1.0):
+def ajustar(z, modelo: str, h: int, meses=None, phi_desv: float = 1.0, cred_pend=1.0):
     """Pronostico en la escala del modelo: (pronostico, li, ls, parametros, pendiente final). meses = mes del ano
     (1-12) de cada observacion, para la estacionalidad de la tendencia historica; phi_desv = persistencia de la
-    desviacion del ultimo mes (1 = se conserva)."""
-    return ajustar_tendencia(z, h, meses, phi_desv) if modelo == TENDENCIA else ajustar_ets(z, modelo, h)
+    desviacion del ultimo mes (1 = se conserva); cred_pend = proporcion de la pendiente que se proyecta."""
+    return ajustar_tendencia(z, h, meses, phi_desv, cred_pend) if modelo == TENDENCIA else ajustar_ets(z, modelo, h)
 
 
 def elegir_modelo(tipo: str, n: int, trimestral: bool) -> str:
@@ -619,6 +636,10 @@ def _pronosticar(serie: Serie) -> Resultado:
     meses = (np.array([p % 100 for p in per], dtype=int)              # mes del ano de cada observacion
              if tipo in TIPOS_CON_ESTACIONALIDAD else None)          # (solo montos e indices llevan patron)
     phi_desv = float(PERSISTENCIA_DESVIACION.get(tipo, 1.0))          # indices: la desviacion se desvanece
+    if (serie.clave[2], str(serie.clave[3])) in ANCLAR_SERIES:
+        phi_desv = 1.0
+        res.alertas.append("Serie anclada al ultimo real por decision del area (ANCLAR_SERIES)")
+    cred_pend = CREDIBILIDAD_PENDIENTE.get(tipo, 1.0)                  # indices: pendiente ponderada por su R2
 
     def inv(v):
         return np.exp(v) if usar_log else v
@@ -640,7 +661,7 @@ def _pronosticar(serie: Serie) -> Resultado:
     pron = li = ls = None
     while modelo != ULTIMO_VALOR:
         try:
-            f, lo, hi, params, pendiente = ajustar(z, modelo, hh, meses, phi_desv)
+            f, lo, hi, params, pendiente = ajustar(z, modelo, hh, meses, phi_desv, cred_pend)
             if np.all(np.isfinite(f)):
                 pron, li, ls = inv(f), inv(lo), inv(hi)
                 res.parametros = params
@@ -676,7 +697,7 @@ def _pronosticar(serie: Serie) -> Resultado:
                                    f"({cambio12:+.0%})")
 
     # backtest: se re-proyecta desde cortes pasados con el mismo modelo y se compara contra lo real
-    res.error_modelo, res.error_ultimo_valor, res.error_ses, res.n_cortes = backtest(z, y, modelo, inv, meses, phi_desv)
+    res.error_modelo, res.error_ultimo_valor, res.error_ses, res.n_cortes = backtest(z, y, modelo, inv, meses, phi_desv, cred_pend)
     if (res.n_cortes and np.isfinite(res.error_modelo) and np.isfinite(res.error_ultimo_valor)
             and res.error_modelo > res.error_ultimo_valor * 1.10 + 0.5):
         res.alertas.append(f"En el backtest de esta serie el modelo ({res.error_modelo:.1f}%) no supera a repetir "
@@ -686,7 +707,7 @@ def _pronosticar(serie: Serie) -> Resultado:
     return _post_proceso(res, y, tipo, serie.dominio)
 
 
-def backtest(z, y, modelo: str, inv, meses=None, phi_desv: float = 1.0):
+def backtest(z, y, modelo: str, inv, meses=None, phi_desv: float = 1.0, cred_pend=1.0):
     """Error % (WAPE = suma |error| / suma |real|) del modelo, del ultimo valor y de SES, re-proyectando desde
     CORTES_BACKTEST meses antes del final (horizontes de 1 a 16 meses). La estacionalidad se re-estima en cada
     corte solo con la historia anterior al corte."""
@@ -702,7 +723,7 @@ def backtest(z, y, modelo: str, inv, meses=None, phi_desv: float = 1.0):
         preds = {"ultimo": np.repeat(inv(z[o - 1]), hz)}
         for nombre, mod in (("modelo", modelo), ("ses", "SES")):
             try:
-                preds[nombre] = (inv(ajustar(z[:o], mod, hz, None if meses is None else meses[:o], phi_desv)[0])
+                preds[nombre] = (inv(ajustar(z[:o], mod, hz, None if meses is None else meses[:o], phi_desv, cred_pend)[0])
                                  if mod != ULTIMO_VALOR else preds["ultimo"])
             except Exception:  # noqa: BLE001
                 preds[nombre] = None
@@ -1221,6 +1242,9 @@ def escribir_diagnostico(resultados: dict, periodos_proy: list[int], alertas_gen
                                     f"'{CREDIBILIDAD_ESTACIONAL}' ({DESCRIPCION_CREDIBILIDAD[CREDIBILIDAD_ESTACIONAL]}), "
                                     f"estimado sobre {'toda la historia' if MESES_ESTACIONALIDAD is None else 'los ultimos ' + str(MESES_ESTACIONALIDAD) + ' meses'} "
                                     f"(minimo {MIN_OBS_ESTACIONALIDAD} meses)") if ESTACIONALIDAD_MENSUAL else "no"),
+        ("Pendiente proyectada", "montos y LAGs: la pendiente completa de la recta; indices: ponderada por su credibilidad "
+                                 "(R2 ajustado de la recta)" if CREDIBILIDAD_PENDIENTE.get("indice") == "r2"
+                                 else f"proporcion de la pendiente por tipo: {CREDIBILIDAD_PENDIENTE}"),
         ("Desviacion del ultimo mes", f"indices: se desvanece hacia el nivel promedio de los ultimos {MESES_NIVEL_LOCAL} meses con "
                                        f"persistencia {PERSISTENCIA_DESVIACION.get('indice', 1.0)}; montos y LAGs: se conserva "
                                        f"(persistencia {PERSISTENCIA_DESVIACION.get('nivel', 1.0)} / {PERSISTENCIA_DESVIACION.get('lag', 1.0)})"),
@@ -1242,8 +1266,10 @@ def escribir_diagnostico(resultados: dict, periodos_proy: list[int], alertas_gen
                       "pendiente x meses + factor del mes proyectado, asi que repite los picos y valles del ano en la "
                       "medida en que se han repetido. En los indices (razones que se mueven en una banda y rebotan) la "
                       "desviacion del ultimo mes respecto a la recta no se conserva: converge al nivel promedio del "
-                      f"ultimo ano con persistencia {PERSISTENCIA_DESVIACION.get('indice', 1.0)} por mes; en montos y "
-                      "LAGs se conserva (arrancan del ultimo real). Razones (%GTO, %MR, %cedido): SES (nivel sin "
+                      f"ultimo ano con persistencia {PERSISTENCIA_DESVIACION.get('indice', 1.0)} por mes, y la pendiente "
+                      "se proyecta ponderada por su credibilidad (R2 ajustado de la recta: una pendiente que la recta "
+                      "explica poco casi no se extrapola); en montos y LAGs la desviacion se conserva (arrancan del "
+                      "ultimo real) y la pendiente se proyecta completa. Razones (%GTO, %MR, %cedido): SES (nivel sin "
                       "tendencia). RCONT: "
                       "Holt-Winters amortiguado con estacionalidad por mes del trimestre si hay al menos 12 meses; "
                       "con menos, SES (nivel). Series cortas: SES (< 6 obs para la tendencia) o ultimo valor (< 4). "
@@ -1316,7 +1342,7 @@ def escribir_diagnostico(resultados: dict, periodos_proy: list[int], alertas_gen
     cab = ["Libro", "Grupo", "Serie", "Ramo", "Tipo", "Moneda modelo", "Transformacion", "Obs", "Desde", "Regla",
            "Modelo", "Ventana (meses)", "R2 tendencia", "Ajuste tendencia ultimo mes", "Credibilidad estacional",
            "Amplitud estacional", "Persistencia desviacion", "Desviacion ultimo mes vs recta", "Nivel ultimo ano vs recta",
-           "alpha", "beta", "phi", "gamma",
+           "Credibilidad pendiente", "Pendiente aplicada", "alpha", "beta", "phi", "gamma",
            "Tendencia mensual",
            "Cortes backtest", "Error % modelo",
            "Error % ultimo valor", "Error % SES", "Ultimo real", f"Proy {periodos_proy[0]}",
@@ -1348,6 +1374,7 @@ def escribir_diagnostico(resultados: dict, periodos_proy: list[int], alertas_gen
                  r.parametros.get("ventana"), num(r.parametros.get("r2")), num(r.parametros.get("ajuste_ultimo")),
                  num(r.parametros.get("credibilidad_estacional")), _amplitud(r),
                  num(r.parametros.get("phi_desviacion")), _en_escala(r, "desviacion_ultimo"), _en_escala(r, "nivel_local"),
+                 num(r.parametros.get("credibilidad_pendiente")), _en_escala(r, "pendiente_aplicada"),
                  num(r.parametros.get("alpha")), num(r.parametros.get("beta")), num(r.parametros.get("phi")),
                  num(r.parametros.get("gamma")), num(r.tendencia_mensual), r.n_cortes or None,
                  num(r.error_modelo), num(r.error_ultimo_valor), num(r.error_ses), num(ult),
@@ -1358,13 +1385,13 @@ def escribir_diagnostico(resultados: dict, periodos_proy: list[int], alertas_gen
     for fila_ in ws.iter_rows(min_row=2):
         for c in fila_:
             enc_ = ws.cell(1, c.column).value
-            if enc_ == "Tendencia mensual" and isinstance(c.value, float):
+            if enc_ in ("Tendencia mensual", "Pendiente aplicada") and isinstance(c.value, float):
                 c.number_format = "0.00%" if fila_[6].value == "log" else "0.0000"
             elif enc_ in ("alpha", "beta", "phi", "gamma", "R2 tendencia", "Credibilidad estacional") and isinstance(c.value, float):
                 c.number_format = "0.000"
             elif enc_ in ("Amplitud estacional", "Desviacion ultimo mes vs recta", "Nivel ultimo ano vs recta") and isinstance(c.value, float):
                 c.number_format = "0.0%" if fila_[6].value == "log" else "0.0000"
-            elif enc_ == "Persistencia desviacion" and isinstance(c.value, float):
+            elif enc_ in ("Persistencia desviacion", "Credibilidad pendiente") and isinstance(c.value, float):
                 c.number_format = "0.00"
             elif enc_ and enc_.startswith("Error %") and isinstance(c.value, float):
                 c.number_format = "0.0"
@@ -1693,8 +1720,12 @@ def main():
         print(f"   Mayores cambios proyectados a {periodos_proy[-1]} (revisalos contra el plan de negocio):")
         for cambio, r in mayores:
             ventana = r.parametros.get("ventana")
+            pa = r.parametros.get("pendiente_aplicada")
+            aplicada = ""
+            if pa is not None and abs(pa - math.log1p(r.tendencia_mensual) if r.transformacion == "log" else pa - r.tendencia_mensual) > 1e-9:
+                aplicada = f", se proyecta {(math.expm1(pa) if r.transformacion == 'log' else pa):+.1%} por credibilidad {r.parametros.get('credibilidad_pendiente', 1):.2f}"
             print(f"      {r.clave[0]} {r.clave[1]} {r.clave[2]} ramo {r.clave[3]}: {cambio:+.0%} "
-                  f"(tendencia {r.tendencia_mensual:+.1%} mensual"
+                  f"(tendencia {r.tendencia_mensual:+.1%} mensual{aplicada}"
                   + (f", regresion sobre {ventana} de {r.n_obs} meses)" if ventana else f", {r.modelo})"))
     con_est = [r.parametros["credibilidad_estacional"] for r in resultados.values()
                if r.parametros.get("credibilidad_estacional")]
