@@ -70,39 +70,36 @@ El criterio se obtuvo reconstruyendo celda por celda la hoja de referencia de Da
 | SONR | BEL, %MR/BEL, %IRR/BRUTO | MR, BRUTO = BEL+MR, IRR, NETO |
 | RFV | BRUTO, %IRR/BRUTO, RCONT total | IRR, NETO; RCONT por ramo con la mezcla de los últimos 8 meses |
 
-**b) Un solo tipo de modelo: suavizamiento exponencial (familia Holt-Winters).** Todos son el mismo modelo de nivel + tendencia amortiguada + estacionalidad, en la variante que corresponde a cada tipo de serie (`MODELO_POR_TIPO`):
+**b) Modelo: la línea de tendencia histórica.** Para montos, índices y LAGs se ajusta una regresión lineal (en logaritmos cuando la serie es positiva, es decir, un crecimiento porcentual constante) sobre los últimos **36 meses** (`MESES_TENDENCIA`; `None` = toda la historia) y se continúa **desde el último dato real**, sin amortiguar (`AMORTIGUACION_TENDENCIA = 1.0`). Es la misma línea de tendencia que se obtiene en Excel: la proyección sale paralela a ella y arranca del último real, así que no hay escalón entre lo real y lo proyectado. El dashboard HTML dibuja la línea de tendencia en gris para que se vea de dónde sale la pendiente.
 
 | Tipo de serie | Modelo | Escala |
 |---|---|---|
-| Montos (BEL, BRUTO) | **Holt con tendencia amortiguada** | logaritmos (crecimiento porcentual, siempre positivo) |
-| Índices (Ind Sin RRC, 99.5%, SONR) | **Holt con tendencia amortiguada** | logaritmos |
-| LAGs (patrón de desarrollo) | **Holt con tendencia amortiguada** | original, no negativo |
+| Montos (BEL, BRUTO) | **Tendencia histórica** (36 meses) | logaritmos: crecimiento % mensual constante |
+| Índices (Ind Sin RRC, 99.5%, SONR) | **Tendencia histórica** (36 meses) | logaritmos |
+| LAGs (patrón de desarrollo) | **Tendencia histórica** (36 meses) | logaritmos si son positivos (así no cruzan cero) |
 | Razones (%GTO, %MR, %cedido) | **SES** (nivel suavizado, sin tendencia) | original, acotado al dominio |
-| RCONT | **Holt-Winters amortiguado** con estacionalidad por mes del trimestre | logaritmos |
+| RCONT | **Holt-Winters amortiguado** con estacionalidad trimestral | logaritmos |
 
-- Los parámetros de cada serie (α nivel, β tendencia, φ amortiguación, γ estacionalidad) se estiman por máxima verosimilitud con `statsmodels` (`ETSModel`), y los intervalos al 80% salen del propio modelo. Quedan en la hoja `Series_Modelos` del diagnóstico, junto con la **tendencia mensual** al final de la historia.
-- **Amortiguación fija** (`AMORTIGUACION_TENDENCIA = 0.95`): cada mes hacia adelante la tendencia conserva 95% de su valor; a 16 meses conserva 44% y el cambio acumulado equivale a 10.7 meses de la tendencia mensual. Es el mismo φ para todas las series, y es el parámetro que conviene tocar si se quiere más o menos tendencia: con 0.98 la proyección es casi lineal (72% a 16 meses) y con 0.90 se apaga pronto (19%). Se fijó porque, al dejar que la máxima verosimilitud lo estime, en la mitad de las series se iba al mínimo permitido y la tendencia se apagaba en 2027, que era justo la queja original.
-- **Cotas de los demás parámetros** (`COTAS_SUAVIZAMIENTO`), estimados por máxima verosimilitud en cada serie:
-  - α ≈ 1 (nivel, en Holt): la proyección **arranca del último dato real**, sin escalón entre lo real y lo proyectado. Sin esta cota, en varias series el modelo suavizaba el nivel y el primer mes proyectado caía o subía de golpe (hasta −4% en el total de RRC).
-  - β ≤ 0.15 (tendencia): la tendencia es el promedio suavizado de los cambios de los últimos años, **no la del último mes**; así un salto puntual no se convierte en tendencia.
-  - En RCONT (Holt-Winters) el nivel sí se suaviza (α ≥ 0.2) para separar la estacionalidad. En las razones (SES) α se estima libre: si la razón cambió de nivel, α ≈ 1 y sigue al último dato (por ejemplo la cesión del ramo 10 de RRC, que subió de 0.40 a 0.63 en seis meses); si solo tiene ruido, usa el promedio reciente. Ponerle una cota inferior hacía que el optimizador se quedara pegado a ella y sí producía escalones en NETO.
-  - Sin cotas, en series cortas o ruidosas la estimación caía en casos degenerados: α = 0 (el modelo ignora el nivel actual y proyecta el promedio o la recta de toda la historia) y β alto (un salto de un mes se vuelve tendencia), con proyecciones de +65% o −49% a 16 meses en índices y LAGs.
+- **Por qué 36 meses y no toda la historia**: con toda la historia entran arranques desde cero y cambios de régimen (el índice SONR del ramo 80 pasó de 0.10 en 2021 a 1.44; Hidro cayó de 4.0 a 0.14) que disparan la pendiente (+109 % o −64 % a 16 meses). Tres años es la tendencia reciente que sí describe el negocio actual. Si la serie tiene menos de 36 meses, se usa lo que hay (mínimo 6; con menos, SES).
+- **Por qué sin amortiguar**: fue la decisión del área: si la tendencia ha sido constante, lo más probable es que siga así el próximo año. Con `AMORTIGUACION_TENDENCIA = 0.95` cada mes conserva 95 % de la tendencia (a 16 meses, 44 %) y las proyecciones bajan alrededor de un tercio.
+- **Qué implica en los totales** (con la historia a ago-26): RRC BEL +54 % a dic-27 (+38 % anualizado, cuando en los últimos 12 meses reales creció 27 %), SONR BEL +72 % (+50 % anualizado; real +54 %). Son las tendencias de tres años continuadas; conviene contrastarlas con el plan de negocio.
+- **Costo en precisión**: en el backtest la línea de tendencia es peor que repetir el último valor en los tres tipos (montos 26.7 % contra 22.3 %; índices 20.2 % contra 13.7 %; LAGs 2.6 % contra 2.1 %). Los modelos de suavizamiento (`"Holt amortiguado"`, con α ≈ 1 y β ≤ 0.15) siguen disponibles en `MODELO_POR_TIPO` para quien prefiera precisión sobre pendiente.
 - Las razones usan SES porque dependen de los contratos de reaseguro y de la estructura de gastos, no de una tendencia; en el backtest la tendencia no las mejoró y en algunas series producía cesiones fuera de [0, 1].
-- La estacionalidad mensual (Holt-Winters de periodo 12) se probó en montos e índices y empeoró el backtest, así que solo se usa la trimestral de RCONT (acumula en los meses 1–2 del trimestre y libera en el 3), que reproduce el diente de sierra de la historia.
-- Series cortas: SES con menos de 12 observaciones; último valor con menos de 4.
+- La estacionalidad mensual se probó y empeoró el backtest; solo se usa la trimestral de RCONT, que reproduce el diente de sierra de la historia.
+- Los intervalos al 80 % salen de la variabilidad mensual alrededor de la tendencia (crece con la raíz del horizonte) o del propio modelo de suavizamiento.
 
 **c) Backtest por serie.** Cada serie se vuelve a proyectar desde 16, 12 y 8 meses antes del final (horizontes de 1 a 16 meses, con al menos 12 meses de entrenamiento) con el mismo modelo, y se mide el error % (suma de errores absolutos / suma de valores reales) del modelo, de repetir el último valor y de SES. Está por serie en `Series_Modelos` y resumido por tipo en la hoja `Backtest`. Fianzas tiene 20 meses de historia, así que solo alcanza el corte a 8 meses y su cifra es indicativa. Sirve para juzgar la confiabilidad y para las alertas; no cambia el modelo. Con la historia a 202608 (mediana entre series):
 
 | Tipo | Libro | Modelo | Error % modelo | Error % último valor | Series en que el modelo mejora al último valor |
 |---|---|---|---|---|---|
-| Montos | Daños | Holt amortiguado | 21.5% | 22.3% | 57% (23 series, 3 cortes) |
-| Montos | Fianzas | Holt amortiguado, Holt-Winters amortiguado (trimestral) | 8.2% | 13.3% | 80% (5 series, 1 corte) |
-| Índices | HParametros | Holt amortiguado | 13.9% | 13.7% | 16% (38 series, 3 cortes) |
+| Montos | Daños | Tendencia historica | 26.7% | 22.3% | 43% (23 series, 3 cortes) |
+| Montos | Fianzas | Tendencia historica | 1507.1% | 1460.8% | 25% (4 series, 1 corte) |
+| Índices | HParametros | Tendencia historica | 20.2% | 13.7% | 16% (38 series, 3 cortes) |
 | Razones | Daños | SES | 15.2% | 15.2% | 60% (55 series, 3 cortes) |
 | Razones | Fianzas | SES | 12.0% | 6.5% | 25% (4 series, 1 corte) |
-| LAGs | HParametros | Holt amortiguado | 2.5% | 2.1% | 36% (74 series, 3 cortes) |
+| LAGs | HParametros | Tendencia historica | 2.6% | 2.1% | 35% (74 series, 3 cortes) |
 
-En montos la tendencia mejora la precisión (Daños: mejor que el último valor en 57% de las series; Fianzas: en 80%, con un solo corte). En índices y LAGs **no**: el error mediano es algo mayor que el de la línea plana y el modelo solo gana en 16% de los índices y 36% de los LAGs, porque los índices son ruidosos y los LAGs casi no se mueven. Se conserva la tendencia porque es lo que se necesita para planeación, pero el costo queda a la vista; si se prefiere precisión sobre pendiente en índices, basta cambiar `MODELO_POR_TIPO["indice"]` a `"SES"`. Las series en que el modelo no supera al último valor en su propio backtest llevan alerta.
+La línea de tendencia pierde contra la línea plana en los tres tipos (gana en 43 % de los montos, 16 % de los índices y 35 % de los LAGs): continuar una tendencia tres años hacia adelante cuesta precisión a 16 meses, sobre todo en índices ruidosos. Se conserva porque es lo que se necesita para planeación, pero el costo queda a la vista; para precisión sobre pendiente, `MODELO_POR_TIPO` admite `"Holt amortiguado"` o `"SES"` por tipo. Las series en que el modelo no supera al último valor en su propio backtest llevan alerta.
 
 **d) Reglas actuariales y de calidad de datos** (todas reportadas en la hoja `Alertas`):
 

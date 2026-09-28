@@ -25,21 +25,17 @@ a) Coherencia contable. No se proyectan todas las lineas por separado: se proyec
               MR = m*BEL ; BRUTO = BEL+MR ; IRR = c*BRUTO ; NETO = BRUTO-IRR
        RFV :  BRUTO (nivel), c = IRR/BRUTO ; IRR = c*BRUTO ; NETO = BRUTO-IRR
               RCONT: se proyecta el total y se reparte por ramo con la mezcla de los ultimos 8 meses.
-b) Un solo tipo de modelo: suavizamiento exponencial (familia Holt-Winters), en la variante
-   que corresponde a cada tipo de serie (MODELO_POR_TIPO):
-       - montos (BEL, BRUTO) e indices de HParametros -> Holt con tendencia amortiguada, en
-         logaritmos (crecimiento porcentual, siempre positivo);
-       - LAGs (patron de desarrollo) -> Holt con tendencia amortiguada, no negativos (en algunos
-         ramos el patron acumulado supera 1, asi que no se acota por arriba);
-       - razones (%GTO, %MR, %cedido) -> SES (nivel suavizado, sin tendencia: dependen de los
-         contratos y en el backtest la tendencia no ayudo);
-       - RCONT -> Holt-Winters amortiguado con estacionalidad por mes del trimestre (acumula en
-         los meses 1-2 y libera en el 3).
-   La amortiguacion de la tendencia es fija (AMORTIGUACION_TENDENCIA = 0.95: cada mes conserva 95%
-   de la tendencia; a 16 meses, 44%). Los demas parametros se estiman por maxima verosimilitud
-   dentro de cotas (COTAS_SUAVIZAMIENTO): alpha ~ 1 (la proyeccion arranca del ultimo dato real) y
-   beta <= 0.15 (la tendencia es la de los ultimos anos, no la del ultimo mes). Los intervalos al
-   80% salen del propio modelo.
+b) Modelo (MODELO_POR_TIPO):
+       - montos (BEL, BRUTO), indices de HParametros y LAGs -> linea de TENDENCIA HISTORICA: regresion
+         lineal (en logaritmos cuando la serie es positiva, es decir crecimiento % constante) sobre los
+         ultimos MESES_TENDENCIA meses (36), continuada desde el ultimo dato real sin amortiguar
+         (AMORTIGUACION_TENDENCIA = 1). Es la linea de tendencia de Excel: la proyeccion sale paralela
+         a ella y arranca del ultimo real;
+       - razones (%GTO, %MR, %cedido) -> SES (nivel suavizado, sin tendencia: dependen de los contratos);
+       - RCONT -> Holt-Winters amortiguado con estacionalidad por mes del trimestre (acumula en los
+         meses 1-2 y libera en el 3).
+   Los intervalos al 80% salen de la variabilidad mensual alrededor de la tendencia (crece con la raiz
+   del horizonte) o del propio modelo de suavizamiento.
 c) Backtest por serie: se vuelve a proyectar desde 16, 12 y 8 meses antes del final y se mide el
    error contra lo real, del modelo y de las alternativas simples (ultimo valor y SES). Se
    reporta por serie (Series_Modelos) y por tipo (Backtest); no cambia el modelo.
@@ -181,34 +177,32 @@ GENERAR_GRAFICAS = True
 GENERAR_DASHBOARD = True         # dashboards de indices y reservas (real vs proyeccion): Excel y HTML
 N_PROCESOS = None                # None = automatico (nucleos-1); 1 = sin paralelismo
 
-# Modelo de proyeccion por tipo de serie (todos de la familia de suavizamiento exponencial de Holt-Winters)
+# Modelo de proyeccion por tipo de serie
+#   "Tendencia historica": linea de tendencia (regresion lineal, en logaritmos cuando la serie es positiva) sobre
+#       los ultimos MESES_TENDENCIA meses, que se continua desde el ultimo dato real. Es la misma linea de
+#       tendencia de Excel; la proyeccion sale paralela a ella y arranca del ultimo real.
+#   "SES": nivel suavizado sin tendencia (razones: %GTO, %MR y %cedido dependen de los contratos).
+#   Tambien estan disponibles "Holt amortiguado" y "Holt-Winters amortiguado (trimestral)" (suavizamiento
+#   exponencial); RCONT usa el trimestral por su estacionalidad (acumula meses 1-2, libera en el 3).
 MODELO_POR_TIPO = {
-    "nivel": "Holt amortiguado",     # montos (BEL, BRUTO): nivel + tendencia amortiguada, en logaritmos
-    "indice": "Holt amortiguado",    # indices de HParametros, en logaritmos
-    "lag": "Holt amortiguado",       # patron de desarrollo (LAG 1-10), escala original, no negativo
-    "razon": "SES",                  # %GTO, %MR y %cedido: dependen de los contratos -> nivel suavizado sin tendencia
+    "nivel": "Tendencia historica",   # montos (BEL, BRUTO), en logaritmos: crecimiento % mensual constante
+    "indice": "Tendencia historica",  # indices de HParametros, en logaritmos
+    "lag": "Tendencia historica",     # patron de desarrollo (LAG 1-10); en logaritmos si es positivo
+    "razon": "SES",
 }
-# RCONT (ESTACIONALIDAD_TRIMESTRAL) usa Holt-Winters amortiguado con estacionalidad por mes del trimestre.
-# Amortiguacion de la tendencia (phi), fija e igual para todas las series: cada mes hacia adelante la tendencia
-# conserva phi de su valor. Con 0.95 a 16 meses conserva 44% y el cambio acumulado equivale a 10.7 meses de la
-# tendencia mensual; con 0.98 conserva 72% (casi lineal, 13.5 meses); con 0.90, 19% (7.6 meses). Si se deja que
-# la maxima verosimilitud lo estime, en la mitad de las series se va al minimo y la tendencia se apaga en 2027.
-AMORTIGUACION_TENDENCIA = 0.95
-# Cotas de los demas parametros (se estiman por maxima verosimilitud dentro de ellas):
-#   * alpha (nivel) ~ 1 en Holt: la proyeccion arranca del ultimo dato real, sin escalon entre lo real y lo
-#     proyectado (statsmodels no admite alpha = 1 exacto; 0.99 es equivalente en la practica);
-#   * beta (tendencia) entre 0.02 y 0.15: la tendencia es el promedio suavizado de los cambios de los ultimos
-#     anos, no la del ultimo mes;
-#   * en RCONT (Holt-Winters trimestral) el nivel si se suaviza (alpha >= 0.2) para separar la estacionalidad;
-#   * en SES (razones) alpha se estima libre: si la razon cambia de nivel, alpha ~ 1 y sigue al ultimo dato; si
-#     solo tiene ruido, alpha bajo y usa el promedio reciente. (Con una cota inferior el optimizador de
-#     statsmodels se queda pegado a ella en series que libres dan alpha = 1, y eso si producia escalones.)
-# Sin cotas en Holt, en series cortas o ruidosas la estimacion cae en casos degenerados (alpha = 0 ignora el
-# nivel actual y proyecta la recta de toda la historia; beta alto convierte un salto de un mes en tendencia).
-COTAS_SUAVIZAMIENTO = {"smoothing_level": (0.90, 0.99), "smoothing_trend": (0.02, 0.15),
-                       "damping_trend": (AMORTIGUACION_TENDENCIA, AMORTIGUACION_TENDENCIA)}
+MESES_TENDENCIA = 36             # ventana de la tendencia historica (None = toda la historia). Con toda la historia
+                                 # entran arranques desde cero y cambios de regimen (ramo 80 SONR, Hidro) que
+                                 # disparan la pendiente; 36 meses = la tendencia de los ultimos tres anos.
+AMORTIGUACION_TENDENCIA = 1.0    # 1.0 = la tendencia continua constante (sin amortiguar). Con 0.95, cada mes conserva
+                                 # 95% (a 16 meses, 44%); con 0.98, 72%.
+MIN_OBS_TENDENCIA = 6            # observaciones minimas para estimar la tendencia; con menos se usa SES
+# Cotas de los modelos de suavizamiento exponencial (si se eligen), estimadas por maxima verosimilitud dentro de
+# ellas: alpha ~ 1 (arranca del ultimo dato real), beta <= 0.15 (tendencia de los ultimos anos, no del ultimo mes),
+# phi entre 0.80 y 0.98. RCONT (Holt-Winters trimestral) suaviza el nivel (alpha >= 0.2) para separar la
+# estacionalidad. SES estima alpha libre.
+COTAS_SUAVIZAMIENTO = {"smoothing_level": (0.90, 0.99), "smoothing_trend": (0.02, 0.15), "damping_trend": (0.80, 0.98)}
 COTAS_ESTACIONAL = {**COTAS_SUAVIZAMIENTO, "smoothing_level": (0.20, 0.99)}
-MIN_OBS_HOLT = 12                # con menos observaciones se usa SES
+MIN_OBS_HOLT = 12                # con menos observaciones los modelos Holt caen a SES
 MIN_OBS_SES = 4                  # con menos observaciones se mantiene el ultimo valor
 MIN_OBS_TRIMESTRAL = 12          # observaciones minimas para estimar la estacionalidad trimestral
 CORTES_BACKTEST = (16, 12, 8)    # meses antes del final desde los que se re-proyecta para medir el error
@@ -285,12 +279,12 @@ def norm(t) -> str:
 
 
 # =============================================================================
-# MODELOS: suavizamiento exponencial (familia Holt-Winters)
+# MODELOS
 # =============================================================================
-# Todos son casos de un mismo modelo: nivel + tendencia amortiguada + estacionalidad.
-#   SES                = solo nivel (la serie no tiene tendencia)
-#   Holt amortiguado   = nivel + tendencia que se va amortiguando (phi) hacia adelante
-#   Holt-Winters       = ademas, estacionalidad (aqui solo la trimestral de RCONT)
+#   Tendencia historica = linea de tendencia (regresion) sobre la ventana, continuada desde el ultimo real.
+#   Los demas son casos de suavizamiento exponencial (familia Holt-Winters): SES = solo nivel; Holt amortiguado =
+#   nivel + tendencia amortiguada; Holt-Winters = ademas estacionalidad (aqui la trimestral de RCONT).
+TENDENCIA = "Tendencia historica"
 MODELOS = {
     "SES": dict(),
     "Holt amortiguado": dict(trend="add", damped_trend=True),
@@ -353,14 +347,41 @@ def ajustar_ets(z, modelo: str, h: int):
     return pred["mean"].to_numpy(), pred["pi_lower"].to_numpy(), pred["pi_upper"].to_numpy(), params, pendiente
 
 
+def ajustar_tendencia(z, h: int):
+    """Linea de tendencia: regresion lineal sobre los ultimos MESES_TENDENCIA valores de z (escala del modelo),
+    continuada desde el ultimo dato real con amortiguacion AMORTIGUACION_TENDENCIA. Intervalo: la variabilidad
+    mensual alrededor de la tendencia, que crece con la raiz del horizonte."""
+    z = np.asarray(z, dtype=float)
+    w = z if MESES_TENDENCIA is None or len(z) <= MESES_TENDENCIA else z[-MESES_TENDENCIA:]
+    t = np.arange(len(w), dtype=float)
+    pendiente, ordenada = np.polyfit(t, w, 1)
+    ajuste = ordenada + pendiente * t
+    ss_res, ss_tot = float(np.sum((w - ajuste) ** 2)), float(np.sum((w - w.mean()) ** 2))
+    r2 = 1 - ss_res / ss_tot if ss_tot > 0 else math.nan
+    phi = AMORTIGUACION_TENDENCIA
+    pasos = np.cumsum(phi ** np.arange(1, h + 1))
+    pron = z[-1] + pendiente * pasos
+    sd = float(np.std(np.diff(w) - pendiente, ddof=1)) if len(w) > 2 else 0.0
+    ancho = _cuantil_normal() * sd * np.sqrt(np.arange(1, h + 1))
+    params = {"pendiente": float(pendiente), "ventana": int(len(w)), "r2": float(r2)}
+    return pron, pron - ancho, pron + ancho, params, float(pendiente)
+
+
+def ajustar(z, modelo: str, h: int):
+    """Pronostico en la escala del modelo: (pronostico, li, ls, parametros, pendiente final)."""
+    return ajustar_tendencia(z, h) if modelo == TENDENCIA else ajustar_ets(z, modelo, h)
+
+
 def elegir_modelo(tipo: str, n: int, trimestral: bool) -> str:
     if n < MIN_OBS_SES:
         return ULTIMO_VALOR
-    if n < MIN_OBS_HOLT:
-        return "SES"
     if trimestral and n >= MIN_OBS_TRIMESTRAL:
         return "Holt-Winters amortiguado (trimestral)"
-    return MODELO_POR_TIPO[tipo]
+    modelo = MODELO_POR_TIPO[tipo]
+    minimo = MIN_OBS_TENDENCIA if modelo == TENDENCIA else MIN_OBS_HOLT
+    if modelo != "SES" and n < minimo:
+        return "SES"
+    return modelo
 
 
 def preparar(serie: Serie):
@@ -458,9 +479,9 @@ def _pronosticar(serie: Serie) -> Resultado:
     n = len(y)
     hh = h + brecha                       # si el ultimo dato es anterior al ultimo mes real
 
-    usar_log = tipo in ("nivel", "indice") and np.all(y > 0)
-    res.transformacion = "log" if usar_log else "ninguna"
     res.moneda = serie.moneda
+    usar_log = tipo in ("nivel", "indice", "lag") and np.all(y > 0)   # LAGs positivos: tendencia en % (no cruzan 0)
+    res.transformacion = "log" if usar_log else "ninguna"
     z = np.log(y) if usar_log else y.copy()
 
     def inv(v):
@@ -480,7 +501,7 @@ def _pronosticar(serie: Serie) -> Resultado:
     pron = li = ls = None
     while modelo != ULTIMO_VALOR:
         try:
-            f, lo, hi, params, pendiente = ajustar_ets(z, modelo, hh)
+            f, lo, hi, params, pendiente = ajustar(z, modelo, hh)
             if np.all(np.isfinite(f)):
                 pron, li, ls = inv(f), inv(lo), inv(hi)
                 res.parametros = params
@@ -523,7 +544,7 @@ def backtest(z, y, modelo: str, inv):
         preds = {"ultimo": np.repeat(inv(z[o - 1]), hz)}
         for nombre, mod in (("modelo", modelo), ("ses", "SES")):
             try:
-                preds[nombre] = inv(ajustar_ets(z[:o], mod, hz)[0]) if mod != ULTIMO_VALOR else preds["ultimo"]
+                preds[nombre] = inv(ajustar(z[:o], mod, hz)[0]) if mod != ULTIMO_VALOR else preds["ultimo"]
             except Exception:  # noqa: BLE001
                 preds[nombre] = None
         if any(p is None or not np.all(np.isfinite(p)) for p in preds.values()):
@@ -1035,6 +1056,8 @@ def escribir_diagnostico(resultados: dict, periodos_proy: list[int], alertas_gen
         ("Periodos proyectados", f"{periodos_proy[0]} - {periodos_proy[-1]} ({len(periodos_proy)} meses)"),
         ("Ultimo mes real usado", str(resumen.get("ultimo"))),
         ("Series modeladas", str(len(resultados))),
+        ("Ventana de tendencia (meses)", str(MESES_TENDENCIA) if MESES_TENDENCIA else "toda la historia"),
+        ("Amortiguacion de la tendencia (phi)", str(AMORTIGUACION_TENDENCIA)),
         ("Tiempo de ejecucion (s)", f"{resumen.get('segundos', 0):,.0f}"),
         ("", ""),
         ("METODOLOGIA", ""),
@@ -1042,19 +1065,17 @@ def escribir_diagnostico(resultados: dict, periodos_proy: list[int], alertas_gen
                                    "RRC: BRUTO = BEL+GTO+MR, IRR = %ces*BRUTO, NETO = BRUTO-IRR; SONR: BRUTO = BEL+MR; "
                                    "RFV: NETO = BRUTO-IRR; RCONT: total repartido por ramo con la mezcla de los "
                                    "ultimos 8 meses."),
-        ("2. Modelo", "Suavizamiento exponencial (familia Holt-Winters). Montos e indices: Holt con tendencia "
-                      "amortiguada en logaritmos. LAGs: Holt con tendencia amortiguada, no negativos. Razones "
-                      "(%GTO, %MR, %cedido): SES (nivel sin tendencia). RCONT: Holt-Winters amortiguado con "
-                      "estacionalidad por mes del trimestre. Series cortas: SES (< 12 obs) o ultimo valor (< 4)."),
-        ("3. Parametros", f"La amortiguacion phi es fija: {AMORTIGUACION_TENDENCIA} (cada mes hacia adelante la "
-                          f"tendencia conserva {AMORTIGUACION_TENDENCIA:.0%}; a 16 meses, "
-                          f"{AMORTIGUACION_TENDENCIA ** 16:.0%}). alpha (nivel), beta (tendencia) y gamma "
-                          "(estacionalidad) se estiman por maxima verosimilitud en cada serie dentro de cotas: Holt "
-                          f"alpha en {list(COTAS_SUAVIZAMIENTO['smoothing_level'])} (la proyeccion arranca del ultimo "
-                          f"dato real), beta en {list(COTAS_SUAVIZAMIENTO['smoothing_trend'])} (la tendencia es la de "
-                          "los ultimos anos, no la del ultimo mes); RCONT alpha >= 0.2; SES alpha libre. La columna 'Tendencia "
-                          "mensual' de Series_Modelos es la pendiente al final de la historia (en % mensual para "
-                          "montos e indices)."),
+        ("2. Modelo", "Montos, indices y LAGs: linea de tendencia historica (regresion lineal, en logaritmos cuando "
+                      f"la serie es positiva) sobre los ultimos {MESES_TENDENCIA or 'N/A'} meses, continuada desde "
+                      "el ultimo dato real (la proyeccion sale paralela a la linea de tendencia de Excel y arranca "
+                      "del ultimo real). Razones (%GTO, %MR, %cedido): SES (nivel sin tendencia). RCONT: "
+                      "Holt-Winters amortiguado con estacionalidad por mes del trimestre. Series cortas: SES "
+                      "(< 6 obs para la tendencia) o ultimo valor (< 4)."),
+        ("3. Parametros", f"Tendencia: pendiente de la regresion (columna 'Tendencia mensual' de Series_Modelos, en "
+                          f"% mensual cuando la serie va en logaritmos), ventana usada y R2. Amortiguacion phi = "
+                          f"{AMORTIGUACION_TENDENCIA} (1 = constante; con 0.95 cada mes conserva 95%). Modelos de "
+                          "suavizamiento (SES, Holt, Holt-Winters): alpha, beta, phi y gamma por maxima verosimilitud "
+                          + f"dentro de {COTAS_SUAVIZAMIENTO} (RCONT alpha >= 0.2; SES alpha libre)."),
         ("4. Backtest", "Cada serie se vuelve a proyectar desde 16, 12 y 8 meses antes del final (horizontes de 1 a "
                         "16 meses, con al menos 12 meses de entrenamiento) y se mide el error % (suma de errores "
                         "absolutos / suma de valores reales) del modelo, de repetir el ultimo valor y de SES. Hoja "
@@ -1111,7 +1132,8 @@ def escribir_diagnostico(resultados: dict, periodos_proy: list[int], alertas_gen
     # Series y modelos
     ws = wb.create_sheet("Series_Modelos")
     cab = ["Libro", "Grupo", "Serie", "Ramo", "Tipo", "Moneda modelo", "Transformacion", "Obs", "Desde", "Regla",
-           "Modelo", "alpha", "beta", "phi", "gamma", "Tendencia mensual", "Cortes backtest", "Error % modelo",
+           "Modelo", "Ventana (meses)", "R2 tendencia", "alpha", "beta", "phi", "gamma", "Tendencia mensual",
+           "Cortes backtest", "Error % modelo",
            "Error % ultimo valor", "Error % SES", "Ultimo real", f"Proy {periodos_proy[0]}",
            f"Proy {periodos_proy[-1]}", "Var % vs ultimo real", "Alertas"]
     ws.append(cab)
@@ -1125,7 +1147,7 @@ def escribir_diagnostico(resultados: dict, periodos_proy: list[int], alertas_gen
         var = (fin / ult - 1) if (ult and not math.isnan(ult) and not math.isnan(fin) and ult != 0) else None
         fila_ = [k[0], k[1], k[2], k[3], r.tipo, r.moneda, r.transformacion, r.n_obs,
                  r.historia_periodos[0] if r.historia_periodos else None, r.regla, r.modelo or None,
-                 num(r.parametros.get("alpha")), num(r.parametros.get("beta")), num(r.parametros.get("phi")),
+                 r.parametros.get("ventana"), num(r.parametros.get("r2")), num(r.parametros.get("alpha")), num(r.parametros.get("beta")), num(r.parametros.get("phi")),
                  num(r.parametros.get("gamma")), num(r.tendencia_mensual), r.n_cortes or None,
                  num(r.error_modelo), num(r.error_ultimo_valor), num(r.error_ses), num(ult),
                  None if not r.pronostico or math.isnan(r.pronostico[0]) else r.pronostico[0],
@@ -1137,7 +1159,7 @@ def escribir_diagnostico(resultados: dict, periodos_proy: list[int], alertas_gen
             enc_ = ws.cell(1, c.column).value
             if enc_ == "Tendencia mensual" and isinstance(c.value, float):
                 c.number_format = "0.00%" if fila_[6].value == "log" else "0.0000"
-            elif enc_ in ("alpha", "beta", "phi", "gamma") and isinstance(c.value, float):
+            elif enc_ in ("alpha", "beta", "phi", "gamma", "R2 tendencia") and isinstance(c.value, float):
                 c.number_format = "0.000"
             elif enc_ and enc_.startswith("Error %") and isinstance(c.value, float):
                 c.number_format = "0.0"
@@ -1428,6 +1450,14 @@ def main():
               else "   Dashboard Excel: NO se actualizo (ver mensaje arriba)")
         print(f"   Dashboard HTML: {SALIDA_DASHBOARD_HTML.name}" if html_ok
               else "   Dashboard HTML: NO se actualizo (ver mensaje arriba)")
+    mayores = sorted(((r.pronostico[-1] / r.historia_valores[-1] - 1, r) for r in resultados.values()
+                      if r.tipo in ("nivel", "indice") and r.historia_valores and r.historia_valores[-1] > 0
+                      and r.pronostico and not math.isnan(r.pronostico[-1])), key=lambda t: -abs(t[0]))[:6]
+    if mayores:
+        print(f"   Mayores cambios proyectados a {periodos_proy[-1]} (revisalos contra el plan de negocio):")
+        for cambio, r in mayores:
+            print(f"      {r.clave[0]} {r.clave[1]} {r.clave[2]} ramo {r.clave[3]}: {cambio:+.0%} "
+                  f"(tendencia {r.tendencia_mensual:+.1%} mensual, {r.n_obs} obs)")
     n_alertas = len(alertas) + sum(len(r.alertas) for r in resultados.values())
     print(f"   Alertas a revisar: {n_alertas} (hoja 'Alertas' del diagnostico)")
     print(f"   Tiempo total: {time.time() - t0:,.0f} s")

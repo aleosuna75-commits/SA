@@ -20,6 +20,8 @@ from __future__ import annotations
 import json
 import math
 import sys
+
+import openpyxl
 from datetime import datetime
 from pathlib import Path
 
@@ -41,6 +43,20 @@ def _redondear(v, dec):
     if v is None or (isinstance(v, float) and not math.isfinite(v)):
         return None
     return round(float(v), dec)
+
+
+def leer_resumen() -> dict:
+    """Pares (etiqueta, valor) de la hoja Resumen del diagnostico."""
+    if not dx.ARCHIVO_DIAGNOSTICO.exists():
+        return {}
+    wb = openpyxl.load_workbook(dx.ARCHIVO_DIAGNOSTICO, read_only=True, data_only=True)
+    out = {}
+    if "Resumen" in wb.sheetnames:
+        for a, b, *_ in wb["Resumen"].iter_rows(values_only=True):
+            if a:
+                out[str(a).strip()] = b
+    wb.close()
+    return out
 
 
 def preparar_datos() -> dict:
@@ -87,6 +103,12 @@ def preparar_datos() -> dict:
     modelo_por_tipo = {}
     for d in filas_metodo:
         modelo_por_tipo.setdefault(d["tipo"], d["modelo"])
+    resumen = leer_resumen()
+    ventana = resumen.get("Ventana de tendencia (meses)")
+    try:
+        ventana = int(float(ventana))
+    except (TypeError, ValueError):
+        ventana = None                                   # toda la historia
     sin_tc = [p for p in periodos_m if not tc.get(p)]
     if sin_tc:
         print(f"   Aviso: sin tipo de cambio en la BD para {sin_tc}; en MXN esos meses se muestran como s/d")
@@ -98,7 +120,7 @@ def preparar_datos() -> dict:
         "ind": ind, "li": li, "ls": ls,
         "ramos_m": {k: ramos_m.get(k, []) for k in conceptos}, "conceptos": conceptos, "mon": mon,
         "tc": {str(p): _redondear(t, 6) for p, t in tc.items()},
-        "metodo": filas_metodo, "modelo_por_tipo": modelo_por_tipo,
+        "metodo": filas_metodo, "modelo_por_tipo": modelo_por_tipo, "ventana_tendencia": ventana,
         "generado": datetime.now().strftime("%Y-%m-%d %H:%M"),
     }
 
@@ -323,7 +345,7 @@ table.datos tbody tr:hover { background: var(--surface-2); }
 </main>
 <footer class="pie">
   <span>__PIE__</span>
-  <span>Generado el __GENERADO__ por proyeccion_reservas.py · azul = real, naranja punteado = proyección · banda = intervalo al 80%</span>
+  <span>Generado el __GENERADO__ por proyeccion_reservas.py · azul = real, naranja punteado = proyección, gris fino = línea de tendencia histórica · banda = intervalo al 80%</span>
 </footer>
 <script>
 'use strict';
@@ -353,6 +375,23 @@ const svg = (tag, attrs = {}) => {
   return e;
 };
 const idx = (arr, v) => arr.indexOf(v);
+// Linea de tendencia (regresion lineal, en logaritmos si todo es positivo) sobre los ultimos `ventana` datos reales
+// hasta iUlt; devuelve la recta desde el inicio de la ventana hasta el final del eje (misma que usa la proyeccion).
+function lineaTendencia(vals, iUlt, ventana, total) {
+  const ini = ventana ? Math.max(0, iUlt - ventana + 1) : 0;
+  const pts = [];
+  for (let i = ini; i <= iUlt; i++) if (vals[i] != null) pts.push([i, vals[i]]);
+  if (pts.length < 6) return null;
+  const log = pts.every(p => p[1] > 0);
+  const xs = pts.map(p => p[0]), ys = pts.map(p => log ? Math.log(p[1]) : p[1]);
+  const mx = xs.reduce((a, b) => a + b, 0) / xs.length, my = ys.reduce((a, b) => a + b, 0) / ys.length;
+  let sxy = 0, sxx = 0;
+  for (let k = 0; k < xs.length; k++) { sxy += (xs[k] - mx) * (ys[k] - my); sxx += (xs[k] - mx) ** 2; }
+  const b = sxx ? sxy / sxx : 0, a = my - b * mx;
+  const out = new Array(total).fill(null);
+  for (let i = pts[0][0]; i < total; i++) { const v = a + b * i; out[i] = log ? Math.exp(v) : v; }
+  return out;
+}
 const ultimoFinito = arr => { for (let i = arr.length - 1; i >= 0; i--) if (arr[i] != null) return i; return -1; };
 
 // ---------------------------------------------------------------- tema
@@ -454,7 +493,7 @@ function leyenda(items) {
   for (const it of items) {
     const s = svg('svg', { viewBox: '0 0 22 12', 'aria-hidden': 'true' });
     if (it.caja) s.append(svg('rect', { x: 0, y: 1, width: 22, height: 10, rx: 2, fill: it.color, 'fill-opacity': it.opacidad ?? 1 }));
-    else s.append(svg('line', { x1: 0, y1: 6, x2: 22, y2: 6, stroke: it.color, 'stroke-width': 2, 'stroke-dasharray': it.dash ? '5 3' : null, 'stroke-linecap': 'round' }));
+    else s.append(svg('line', { x1: 0, y1: 6, x2: 22, y2: 6, stroke: it.color, 'stroke-width': it.fino ? 1.25 : 2, 'stroke-dasharray': it.dash ? '5 3' : null, 'stroke-linecap': 'round' }));
     if (it.marcador) s.append(svg('circle', { cx: 11, cy: 6, r: 3.5, fill: it.color }));
     l.append(el('span', { class: 'item' }, s, el('span', { text: it.nombre })));
   }
@@ -505,7 +544,7 @@ function graficaLineas(cuerpo, W, o) {
       if (v == null) { abierto = false; continue; }
       d += (abierto ? 'L' : 'M') + X(i) + ',' + Y(v) + ' '; abierto = true;
     }
-    if (d) s.append(svg('path', { class: 'linea', d, stroke: se.color, 'stroke-dasharray': se.dash ? '6 4' : null }));
+    if (d) s.append(svg('path', { class: 'linea', d, stroke: se.color, 'stroke-width': se.fino ? 1.25 : null, 'stroke-dasharray': se.dash ? '6 4' : null }));
     if (se.marcadores) for (let i = 0; i < n; i++) if (se.valores[i] != null)
       s.append(svg('circle', { class: 'marcador', cx: X(i), cy: Y(se.valores[i]), r: 4, fill: se.color }));
   }
@@ -566,7 +605,7 @@ function graficaLineas(cuerpo, W, o) {
   s.addEventListener('blur', ocultar);
   cuerpo.append(s);
   if (o.series.length > 1) {
-    const items = o.series.map(se => ({ nombre: se.nombre, color: se.color, dash: se.dash, marcador: se.marcadores }));
+    const items = o.series.map(se => ({ nombre: se.nombre, color: se.color, dash: se.dash, marcador: se.marcadores, fino: se.fino }));
     if (o.series.some(se => se.banda)) items.push({ nombre: 'Intervalo al 80 %', color: cssVar('--proy'), caja: true, opacidad: 0.3 });
     cuerpo.append(leyenda(items));
   }
@@ -722,7 +761,7 @@ function pintarIndices() {
     kpi('Promedio real 12 meses', f4(prom), `${eti(P_I[i12 + 1])} a ${eti(D.ultimo)}`),
     kpi(`Proyección ${eti(D.p_dic)}`, f4(pDic), varPct(ult, pDic) == null ? null : fmtPct(varPct(ult, pDic)) + ' vs último real'),
     kpi(`Proyección ${eti(D.fin)}`, f4(pFin), varPct(ult, pFin) == null ? null : fmtPct(varPct(ult, pFin)) + ' vs último real'),
-    kpi(`Variación ${eti(D.fin)} vs ${eti(D.ultimo)}`, fmtPct(varPct(ult, pFin)), 'tendencia amortiguada'),
+    kpi(`Variación ${eti(D.fin)} vs ${eti(D.ultimo)}`, fmtPct(varPct(ult, pFin)), D.modelo_por_tipo[esLag ? 'lag' : 'indice'] || ''),
   );
   const real = vals.map((v, i) => i <= iUlt ? v : null);
   const proy = vals.map((v, i) => i >= iUlt ? v : null);
@@ -730,17 +769,20 @@ function pintarIndices() {
   const banda = { lo: P_I.map((_, i) => i === iUlt ? vals[i] : (lo[i] ?? null)), hi: P_I.map((_, i) => i === iUlt ? vals[i] : (hi[i] ?? null)) };
   const rejilla = document.getElementById('rejilla-ind'); rejilla.replaceChildren(); tarjetasVivas.length = 0;
 
-  const c1 = tarjeta(`Evolución mensual · ${serie} · ramo ${ramo}`, 'Real y proyección con banda al 80 %',
+  const nombreTend = D.ventana_tendencia ? `Tendencia (últimos ${D.ventana_tendencia} meses)` : 'Tendencia (toda la historia)';
+  const tendI = lineaTendencia(real, iUlt, D.ventana_tendencia, P_I.length);
+  const c1 = tarjeta(`Evolución mensual · ${serie} · ramo ${ramo}`, 'Real, línea de tendencia y proyección con banda al 80 %',
     (cuerpo, W) => graficaLineas(cuerpo, W, {
       labels: P_I.map(eti), tituloX: i => etiLarga(P_I[i]), fmt: v => fmt(v, decInd(serie)), cadaX: 6, etiquetasFin: true,
       aria: `Evolución mensual de ${serie} del ramo ${ramo}`,
       series: [
+        ...(tendI ? [{ nombre: nombreTend, valores: tendI, color: cssVar('--deemph-ink'), fino: true }] : []),
         { nombre: 'Real', valores: real, color: cssVar('--real'), etiquetaFin: true },
         { nombre: 'Proyección', valores: proy, color: cssVar('--proy'), dash: true, banda, etiquetaFin: true },
       ],
     }),
-    () => tablaDatos(['Mes', 'Real', 'Proyección', 'Banda inferior', 'Banda superior'],
-      P_I.map((p, i) => [etiLarga(p), fmt(real[i], 4), fmt(i > iUlt ? proy[i] : null, 4), fmt(i > iUlt ? lo[i] : null, 4), fmt(i > iUlt ? hi[i] : null, 4)])));
+    () => tablaDatos(['Mes', 'Real', 'Proyección', 'Banda inferior', 'Banda superior', nombreTend],
+      P_I.map((p, i) => [etiLarga(p), fmt(real[i], 4), fmt(i > iUlt ? proy[i] : null, 4), fmt(i > iUlt ? lo[i] : null, 4), fmt(i > iUlt ? hi[i] : null, 4), fmt(tendI ? tendI[i] : null, 4)])));
 
   const valoresRamo = D.ramos_i.map(r => valorInd(r, serie, iPer));
   const c2 = tarjeta(`${serie} por ramo · ${etiLarga(E.periodo)}${iPer > iUlt ? ' (proyección)' : ' (real)'}`, 'El ramo seleccionado se resalta en azul',
@@ -844,13 +886,16 @@ function pintarReservas() {
     }),
     () => tablaDatos(['Ramo', `${eti(D.ultimo)} real`, `${eti(D.fin_m)} proyección`, 'Variación'], ramos.map((r, i) => [r, fmt(porRamoU[i], 2), fmt(porRamoF[i], 2), fmtPct(varPct(porRamoU[i], porRamoF[i]))])));
 
+  const nombreTendR = D.ventana_tendencia ? `Tendencia (últimos ${D.ventana_tendencia} meses)` : 'Tendencia (toda la historia)';
+  const tendR = concepto === 'RCONT' ? null : lineaTendencia(real, jUlt, D.ventana_tendencia, P_M.length);
   const c3 = tarjeta(`${reserva} ${concepto} histórico y proyección · ${etiqRamo}`, `${eti(P_M[0])} a ${eti(D.fin_m)}, millones de ${moneda}`,
     (cuerpo, W) => graficaLineas(cuerpo, W, {
       labels: P_M.map(eti), tituloX: i => etiLarga(P_M[i]), fmt: v => fmt(v, 0), cadaX: 6, etiquetasFin: true, incluirCero: true,
       aria: `${reserva} ${concepto} histórico y proyección`,
-      series: [{ nombre: 'Real', valores: real, color: cssVar('--real'), etiquetaFin: true }, { nombre: 'Proyección', valores: proyLinea, color: cssVar('--proy'), dash: true, etiquetaFin: true }],
+      series: [...(tendR ? [{ nombre: nombreTendR, valores: tendR, color: cssVar('--deemph-ink'), fino: true }] : []),
+        { nombre: 'Real', valores: real, color: cssVar('--real'), etiquetaFin: true }, { nombre: 'Proyección', valores: proyLinea, color: cssVar('--proy'), dash: true, etiquetaFin: true }],
     }),
-    () => tablaDatos(['Mes', 'Tipo', `M ${moneda}`], P_M.map((p, i) => [etiLarga(p), i <= jUlt ? 'Real' : 'Proyección', fmt(vals[i], 2)])));
+    () => tablaDatos(['Mes', 'Tipo', `M ${moneda}`, nombreTendR], P_M.map((p, i) => [etiLarga(p), i <= jUlt ? 'Real' : 'Proyección', fmt(vals[i], 2), fmt(tendR ? tendR[i] : null, 2)])));
 
   const porConcU = conceptos.map(c => montoSerie(reserva, c, ramoRes)[jUlt]), porConcF = conceptos.map(c => montoSerie(reserva, c, ramoRes)[jFin]);
   const c4 = tarjeta(`${reserva} por concepto · ${etiqRamo}`, `${eti(D.ultimo)} real y ${eti(D.fin_m)} proyectado, millones de ${moneda}`,
