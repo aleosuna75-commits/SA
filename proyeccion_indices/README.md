@@ -124,13 +124,13 @@ En los índices con cambio de nivel reciente (ramos 40, 31, 110, Hidro y TEV) co
 | Tipo | Libro | Modelo | Error % modelo | Error % último valor | Series en que el modelo mejora al último valor |
 |---|---|---|---|---|---|
 | Montos | Daños | Tendencia historica | 27.0% | 22.3% | 43% (23 series, 3 cortes) |
-| Montos | Fianzas | Tendencia historica | 5.3% | 13.3% | 50% (4 series, 1 corte) |
+| Montos | Fianzas | Tendencia historica | 7.6% | 10.3% | 50% (4 series, 1 corte) |
 | Índices | HParametros | Tendencia historica | 16.3% | 13.7% | 50% (38 series, 3 cortes) |
 | Razones | Daños | SES | 15.2% | 15.2% | 60% (55 series, 3 cortes) |
 | Razones | Fianzas | SES | 12.0% | 6.5% | 25% (4 series, 1 corte) |
 | LAGs | HParametros | Tendencia historica | 2.6% | 2.1% | 35% (74 series, 3 cortes) |
 
-En Daños y HParametros la línea de tendencia pierde contra la línea plana (gana en 43% de los montos, 50% de los índices y 35% de los LAGs); en los montos de Fianzas gana (5.3 % contra 13.3 %), aunque con un solo corte de 8 meses es indicativo. Continuar una tendencia tres años hacia adelante cuesta precisión a 16 meses, sobre todo en índices ruidosos. Se conserva porque es lo que se necesita para planeación, pero el costo queda a la vista; para precisión sobre pendiente, `MODELO_POR_TIPO` admite `"Holt amortiguado"` o `"SES"` por tipo. Las series en que el modelo no supera al último valor en su propio backtest llevan alerta.
+En Daños y HParametros la línea de tendencia pierde contra la línea plana (gana en 43% de los montos, 50% de los índices y 35% de los LAGs); en los montos de Fianzas (modelados en pesos) el error es 7.6 % contra 10.3 %, con un solo corte de 8 meses: indicativo. Continuar una tendencia tres años hacia adelante cuesta precisión a 16 meses, sobre todo en índices ruidosos. Se conserva porque es lo que se necesita para planeación, pero el costo queda a la vista; para precisión sobre pendiente, `MODELO_POR_TIPO` admite `"Holt amortiguado"` o `"SES"` por tipo. Las series en que el modelo no supera al último valor en su propio backtest llevan alerta.
 
 **e) Reglas actuariales y de calidad de datos** (todas reportadas en la hoja `Alertas`):
 
@@ -142,7 +142,9 @@ En Daños y HParametros la línea de tendencia pierde contra la línea plana (ga
   - Huecos de hasta 6 meses se interpolan (en HParametros falta 202501 en varios ramos); con huecos mayores se usa solo la historia posterior (TEV e Hidro).
   - Un LAG en 0 después de que el patrón acumulado superó 50% se trata como faltante (ramo 35).
 - **Alertas**: salto atípico en el último mes (por ejemplo, RFV 150 en 202608, +27.6%; Ind Sin RRC 35, +43.7%), cambio proyectado a 16 meses mayor al máximo observado en la historia, series en que el modelo no supera al último valor en su propio backtest, R² de la tendencia menor a 0.3 (la recta explica poco de la variación de la ventana), tendencia de 36 meses en sentido contrario al cambio de los últimos 12 meses, y series trimestrales (RCONT) con menos de 12 meses.
-- **Moneda**: los montos se modelan en USD. En backtest, modelar en MXN y convertir con el TC real fue menos preciso. Se puede cambiar con `MODELAR_EN_MXN`.
+- **Moneda del modelo** (`MODELAR_EN_MXN`): Daños se modela en USD (en backtest, modelar en MXN fue menos preciso: 22.5 % contra 19.8 %). **Fianzas se modela en MXN** y se convierte a USD con el TC de Inversiones de cada mes proyectado. La RFV es una reserva en pesos: de ene-25 a ago-26 la RFV NETO creció 27 % en pesos pero 55 % en dólares, porque el peso pasó de 20.7 a 17.0. Modelar en USD extrapolaba esa apreciación (RFV NETO 134 M USD a dic-27) cuando Inversiones pronostica 18.5 a dic-27; en MXN con ese TC da 105. El único corte de backtest de Fianzas (8 meses de 2026, con el peso aún apreciándose) favorecía USD (6.0 % contra 7.4 %) justamente por eso.
+- **Monedas mezcladas en la historia** (`CORREGIR_MONEDA_MEZCLADA`): si un tramo de la BD viene en pesos y otro en dólares, el salto entre dos meses seguidos es del tamaño del TC (RFV BRUTO: 1,754 M en dic-25 y 104 M en ene-26) y la tendencia lo leía como una caída de 94 %: la RFV terminaba en 4-5 M USD. El script lo detecta recorriendo la historia hacia atrás desde el último mes (que se toma como USD), convierte esos meses a USD con el TC de cada mes de la propia BD, en memoria y en la BD de salida (con un comentario en cada celda corregida), y lo avisa en consola y en `Alertas`. La BD de entrada no se modifica; conviene corregirla en origen.
+- **Rango esperado** (`RANGO_ESPERADO`): criterio del área para el total de un concepto en USD. Hoy: RFV NETO total entre 80 y 100 M USD. Si la proyección del modelo sale del rango, se reduce en la misma proporción el crecimiento proyectado de todos los ramos (desde su último real) hasta que el total quede dentro en todos los meses; si el último real ya estuviera fuera, se lleva al límite. BRUTO, IRR y NETO de cada ramo se escalan juntos, así que las identidades se cumplen y la mezcla por ramo se conserva. Con la historia a ago-26 el modelo en pesos daba 104.8 a dic-27; se conserva el 68 % del crecimiento y queda de 90.9 a 100.0. La cifra sin ajuste queda en `Alertas` y en la hoja `Resumen`.
 
 ## 3. Salidas y formato
 

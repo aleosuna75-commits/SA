@@ -18,6 +18,7 @@ Uso: lo llama proyeccion_reservas.py al final (GENERAR_DASHBOARD) o se ejecuta d
 from __future__ import annotations
 
 import json
+import re
 import math
 import sys
 
@@ -152,6 +153,13 @@ def preparar_datos() -> dict:
         ventana = int(float(ventana))
     except (TypeError, ValueError):
         ventana = None                                   # toda la historia
+    nota_rangos = None                               # rango esperado por el area (hoja Resumen del diagnostico)
+    ajuste = str(resumen.get("Ajuste por rango esperado") or "")
+    if resumen.get("Rango esperado") and resumen.get("Rango esperado") != "sin rangos":
+        m = re.search(r"se conservo el (\d+)% del crecimiento", ajuste)
+        m2 = re.search(r"proyectaba .*? de [\d.,]+ a ([\d.,]+) M USD", ajuste)
+        nota_rangos = (f"Rango esperado del área: {resumen['Rango esperado']}"
+                       + (f"; el modelo daba {m2.group(1)} al final y se conservó el {m.group(1)} % del crecimiento" if m and m2 else ""))
     persistencia = None
     try:                                             # "indices: ... con persistencia 0.8; montos y LAGs: ..."
         texto = str(resumen.get("Desviacion del ultimo mes", ""))
@@ -171,6 +179,7 @@ def preparar_datos() -> dict:
         "tc": {str(p): _redondear(t, 6) for p, t in tc.items()},
         "metodo": filas_metodo, "modelo_por_tipo": modelo_por_tipo, "ventana_tendencia": ventana,
         "persistencia_indices": persistencia,
+        "nota_rangos": nota_rangos,
         "tend": leer_tendencias(),
         "generado": datetime.now().strftime("%Y-%m-%d %H:%M"),
     }
@@ -905,7 +914,7 @@ function pintarReservas() {
   const { reserva, concepto, moneda } = E; const ramoRes = E.ramoRes;
   const conceptos = D.conceptos[reserva] || [], ramos = D.ramos_m[reserva] || [];
   const aviso = document.getElementById('nota-res');
-  aviso.textContent = `Cifras en millones de ${moneda}${moneda === 'MXN' ? ' (USD × TC del mes)' : ''} · real hasta ${eti(D.ultimo)} · montos: ${D.modelo_por_tipo.nivel || 'n/d'}; razones: ${D.modelo_por_tipo.razon || 'n/d'}`;
+  aviso.textContent = `Cifras en millones de ${moneda}${moneda === 'MXN' ? ' (USD × TC del mes)' : ''} · real hasta ${eti(D.ultimo)} · montos: ${D.modelo_por_tipo.nivel || 'n/d'}; razones: ${D.modelo_por_tipo.razon || 'n/d'}${reserva === 'RFV' ? ' · Fianzas se modela en pesos y se convierte con el TC de Inversiones' + (D.nota_rangos ? ' · ' + D.nota_rangos : '') : ''}`;
   const vals = montoSerie(reserva, concepto, ramoRes);
   const u = vals[jUlt], pd = vals[jDic], pf = vals[jFin], v12 = vals[j12], p12 = vals[jUlt + 12];
   const f1 = v => fmt(v, 1);

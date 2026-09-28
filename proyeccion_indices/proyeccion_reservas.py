@@ -282,11 +282,27 @@ ESTRUCTURA = {
     },
 }
 MESES_MEZCLA = 8                 # meses recientes para repartir por ramo los totales (RCONT)
-# Moneda en que se modelan los montos. En USD por evidencia: en backtest, modelar en MXN (historia USD x
-# TC real) y convertir con el TC real futuro fue MENOS preciso que modelar directo en USD, tanto en Danos
-# (WAPE 22.5% vs 19.8%, 21 series) como en Fianzas (RFV BRUTO 7.4% vs 6.0%): las reservas se comportan como
-# montos en dolares. True = modelar en MXN y convertir con el TC de cada mes proyectado de la BD.
-MODELAR_EN_MXN = {"DANOS": False, "FIANZAS": False}
+# Moneda en que se modelan los montos. True = modelar en MXN (historia USD x TC real) y convertir a USD con el TC de
+# cada mes proyectado (el supuesto de Inversiones, TC_FCST).
+#   Danos: USD. En backtest, modelar en MXN fue menos preciso (WAPE 22.5 % contra 19.8 %, 21 series).
+#   Fianzas: MXN. La RFV es una reserva en pesos: de ene-25 a ago-26 la RFV NETO crecio 27 % en pesos pero 55 % en
+#       dolares, porque el peso paso de 20.7 a 17.0. Modelar en USD extrapolaba esa apreciacion (dic-27: 134 M USD)
+#       cuando Inversiones pronostica 18.5 a dic-27; en MXN con ese TC da 105 M USD. El unico corte de backtest de
+#       Fianzas (8 meses de 2026, con el peso aun apreciandose) favorecia USD (6.0 % contra 7.4 %) justamente por eso.
+MODELAR_EN_MXN = {"DANOS": False, "FIANZAS": True}
+# Monedas mezcladas en la historia: si un tramo de la BD viene en MXN y otro en USD, el salto entre dos meses seguidos
+# es del tamano del TC (p. ej. RFV BRUTO 1,754 M en dic-25 y 104 M en ene-26) y la tendencia lo lee como una caida de
+# 94 %. True = se detecta (recorriendo la historia hacia atras desde el ultimo mes, que se toma como USD), los meses en
+# MXN se convierten a USD con el TC de cada mes de la propia BD, en memoria y en la BD de salida (con comentario en cada
+# celda corregida), y se avisa en consola y en Alertas. El archivo de entrada no se modifica.
+CORREGIR_MONEDA_MEZCLADA = True
+TOLERANCIA_SALTO_TC = 0.25       # un salto entre dos meses se atribuye al TC si difiere de el en menos de 25 %
+# Rango esperado por el area para el total de un concepto en USD (suma de ramos), por libro. Si la proyeccion del
+# modelo sale del rango, se reduce en la misma proporcion el crecimiento proyectado de todos los ramos (desde su ultimo
+# real) hasta que el total quede dentro en todos los meses; si el ultimo real ya estaba fuera, se lleva al limite mas
+# cercano. BRUTO, IRR y NETO de cada ramo se escalan juntos, asi que las identidades se conservan. Es un ajuste de
+# criterio experto: la cifra del modelo sin ajuste queda en Alertas. {} = sin rangos.
+RANGO_ESPERADO = {("FIANZAS", "RFV NETO"): (80e6, 100e6)}   # RFV NETO total: 80 a 100 M USD (ago-26 real: 90.6)
 ESTACIONALIDAD_TRIMESTRAL = ("RCONT",)   # acumula en meses 1-2 del trimestre y libera en el 3
 DOMINIO_CESION = (0.0, 1.0)      # IRR/BRUTO entre 0 y 100%
 DOMINIO_RAZON_BEL = (0.0, None)  # GTO/BEL y MR/BEL no negativos
@@ -958,6 +974,137 @@ def periodo_ultimo_real(periodos_proy: list[int]) -> int:
     return indice_a_periodo(periodo_a_indice(periodos_proy[0]) - 1)
 
 
+def detectar_moneda_mezclada(bd: BDMontos, ultimo: int) -> dict:
+    """Meses de la historia que vienen en MXN dentro de una BD en USD: {periodo: TC de la BD}. Se recorre la historia
+    hacia atras desde el ultimo mes (que se toma como USD); un salto entre dos meses seguidos del tamano del TC
+    (dentro de TOLERANCIA_SALTO_TC) marca un cambio de moneda. Se usa el total de todos los conceptos y ramos."""
+    totales = {}
+    for (_, p, _), v in bd.valores.items():
+        if p <= ultimo and isinstance(v, (int, float)) and not math.isnan(v):
+            totales[p] = totales.get(p, 0.0) + abs(v)
+    periodos = [p for p in sorted(totales) if totales[p] > 0]
+    tolerancia = math.log(1 + TOLERANCIA_SALTO_TC)
+    en_mxn, unidad = {}, "USD"
+    for i in range(len(periodos) - 1, 0, -1):
+        a, b = periodos[i - 1], periodos[i]          # a = mes anterior, b = mes siguiente
+        razon = totales[a] / totales[b]
+        tc_a, tc_b = bd.tc.get(a), bd.tc.get(b)
+        if unidad == "USD" and tc_a and tc_a > 3 and abs(math.log(razon / tc_a)) < tolerancia:
+            unidad = "MXN"                           # el mes anterior es ~TC veces mayor: viene en pesos
+        elif unidad == "MXN" and tc_b and tc_b > 3 and abs(math.log(1 / razon / tc_b)) < tolerancia:
+            unidad = "USD"                           # regreso a dolares
+        if unidad == "MXN" and tc_a:
+            en_mxn[a] = tc_a
+    return en_mxn
+
+
+def corregir_moneda_mezclada(bd: BDMontos, libro: str, ultimo: int, alertas: list) -> list:
+    """Convierte a USD (en memoria) los meses que la BD trae en MXN. Regresa las celdas corregidas
+    [(concepto, periodo, ramo, valor original, valor en USD, tc)] para escribirlas tambien en la BD de salida."""
+    en_mxn = detectar_moneda_mezclada(bd, ultimo)
+    if not en_mxn:
+        return []
+    cambios = []
+    for (c, p, r), v in list(bd.valores.items()):
+        if p in en_mxn and v:
+            bd.valores[(c, p, r)] = v / en_mxn[p]
+            cambios.append((c, p, r, v, v / en_mxn[p], en_mxn[p]))
+    meses = sorted(en_mxn)
+    texto = (f"{len(meses)} meses ({meses[0]} a {meses[-1]}) venian en pesos (el salto contra el mes siguiente es del "
+             f"tamano del TC); se convirtieron a USD con el TC de cada mes de la BD ({len(cambios)} celdas). Sin esto la "
+             "tendencia leia el cambio de moneda como una caida de ~94 %. Revisa la BD de entrada.")
+    alertas.append((libro, "Moneda mezclada en la historia", texto))
+    print(f"   AVISO {libro}: {texto}", flush=True)
+    return cambios
+
+
+def escribir_correccion_moneda(bd: BDMontos, cambios: list):
+    """Escribe en la BD de salida los valores historicos convertidos a USD, con un comentario en cada celda."""
+    from openpyxl.comments import Comment
+    for c, p, r, original, nuevo, tc in cambios:
+        fila, col = bd.filas.get((c, p)), bd.cols_ramo.get(r)
+        if fila is None or col is None:
+            continue
+        celda = bd.ws.cell(fila, col)
+        celda.value = nuevo
+        celda.comment = Comment(f"Venia en MXN ({original:,.2f}); convertido a USD con TC {tc} "
+                                "(proyeccion_reservas.py, CORREGIR_MONEDA_MEZCLADA)", "Proyeccion")
+
+
+def aplicar_rango_esperado(proy: dict, bd: BDMontos, libro: str, reservas: dict, resultados: dict,
+                           periodos_proy: list[int], ultimo: int, alertas: list) -> list:
+    """Mantiene el total (suma de ramos, USD) de los conceptos de RANGO_ESPERADO dentro de su rango. Si la proyeccion
+    sale, el crecimiento de cada ramo respecto a su ultimo real se eleva a una potencia k en [0, 1] (la misma para
+    todos los ramos), la mayor que deja todos los meses dentro; BRUTO, IRR, NETO y demas conceptos de la reserva de
+    cada ramo se escalan con el mismo factor, y tambien el driver (pronostico e intervalo) del diagnostico. Si ni con
+    k = 0 (nivel del ultimo real) queda dentro, cada mes se lleva al limite. Regresa lineas de resumen."""
+    resumen = []
+    for (lib, concepto), (inf, sup) in RANGO_ESPERADO.items():
+        if lib != libro:
+            continue
+        pref = concepto.split()[0]
+        est = reservas.get(pref)
+        if not est:
+            continue
+        driver = f"{pref} {est['nivel']}"
+        ramos = list(bd.cols_ramo)
+        n = len(periodos_proy)
+        # crecimiento del driver (en USD) respecto al ultimo real, por ramo y mes
+        crec = {}
+        for r in ramos:
+            base = bd.valores.get((norm(driver), ultimo, r), 0.0)
+            proy_r = np.array([proy.get((norm(driver), p, r), 0.0) for p in periodos_proy])
+            crec[r] = proy_r / base if base > 0 and np.all(proy_r > 0) else np.ones(n)
+        objetivo = {r: np.array([proy.get((norm(concepto), p, r), 0.0) for p in periodos_proy]) for r in ramos}
+
+        def total(k):
+            return sum(objetivo[r] * crec[r] ** (k - 1) for r in ramos)      # factor = crec**k / crec
+
+        def fuera(k):
+            tt = total(k)
+            return float(np.max(np.maximum(tt - sup, inf - tt)))
+
+        sin_ajuste = total(1.0)
+        if fuera(1.0) <= 0:
+            resumen.append(f"{libro} {concepto}: dentro del rango {inf/1e6:,.0f}-{sup/1e6:,.0f} M USD sin ajuste "
+                           f"(dic: {sin_ajuste[-1]/1e6:,.1f})")
+            continue
+        if fuera(0.0) <= 0:
+            lo, hi = 0.0, 1.0
+            for _ in range(60):
+                mid = (lo + hi) / 2
+                lo, hi = (mid, hi) if fuera(mid) <= 0 else (lo, mid)
+            k = lo
+            factores = {r: crec[r] ** (k - 1) for r in ramos}
+            nota = f"se conservo el {k:.0%} del crecimiento proyectado"
+        else:
+            k = 0.0
+            nivel = total(0.0)
+            recorte = np.clip(nivel, inf, sup) / nivel
+            factores = {r: crec[r] ** -1 * recorte for r in ramos}
+            nota = "el ultimo real ya estaba fuera del rango: se llevo cada mes al limite"
+        for r in ramos:
+            f = factores[r]
+            for (c, p, rr) in list(proy):
+                if rr == r and c.startswith(pref + " ") and p in periodos_proy:
+                    proy[(c, p, rr)] *= float(f[periodos_proy.index(p)])
+            res = resultados.get((libro, pref, est["nivel"], r))
+            if res is not None:
+                res.pronostico = [v * float(fi) for v, fi in zip(res.pronostico, f)]
+                res.li = [v * float(fi) for v, fi in zip(res.li, f)]
+                res.ls = [v * float(fi) for v, fi in zip(res.ls, f)]
+                res.alertas.append(f"Rango esperado de {concepto} total ({inf/1e6:,.0f}-{sup/1e6:,.0f} M USD): {nota}")
+                res.parametros["factor_rango_esperado"] = float(k)
+        con_ajuste = sum(np.array([proy.get((norm(concepto), p, r), 0.0) for p in periodos_proy]) for r in ramos)
+        texto = (f"El modelo proyectaba {concepto} total de {sin_ajuste[0]/1e6:,.1f} a {sin_ajuste[-1]/1e6:,.1f} M USD "
+                 f"({periodos_proy[0]} a {periodos_proy[-1]}), fuera del rango esperado {inf/1e6:,.0f}-{sup/1e6:,.0f}; "
+                 f"{nota}: queda de {con_ajuste[0]/1e6:,.1f} a {con_ajuste[-1]/1e6:,.1f} (RANGO_ESPERADO).")
+        alertas.append((libro, f"Rango esperado {concepto}", texto))
+        resumen.append(texto)
+        print(f"   {libro}: {texto}", flush=True)
+    return resumen
+
+
 def derivar_montos(bd: BDMontos, libro: str, reservas: dict, resultados: dict, periodos_proy: list[int],
                    en_mxn: bool = False):
     """Aplica las identidades contables y regresa {(concepto, periodo, ramo): valor en USD}. Si los montos
@@ -1242,6 +1389,14 @@ def escribir_diagnostico(resultados: dict, periodos_proy: list[int], alertas_gen
                                     f"'{CREDIBILIDAD_ESTACIONAL}' ({DESCRIPCION_CREDIBILIDAD[CREDIBILIDAD_ESTACIONAL]}), "
                                     f"estimado sobre {'toda la historia' if MESES_ESTACIONALIDAD is None else 'los ultimos ' + str(MESES_ESTACIONALIDAD) + ' meses'} "
                                     f"(minimo {MIN_OBS_ESTACIONALIDAD} meses)") if ESTACIONALIDAD_MENSUAL else "no"),
+        ("Moneda del modelo", ", ".join(f"{lib}: {'MXN (convertido con el TC de Inversiones)' if v else 'USD'}"
+                                         for lib, v in MODELAR_EN_MXN.items())),
+        ("Rango esperado", "; ".join(f"{lib} {c}: {a/1e6:,.0f} - {b/1e6:,.0f} M USD (total de ramos)"
+                                     for (lib, c), (a, b) in RANGO_ESPERADO.items()) or "sin rangos"),
+        ("Ajuste por rango esperado", " | ".join(resumen.get("rangos") or []) or "no aplico"),
+        ("Moneda mezclada corregida", ", ".join(f"{k}: {v} celdas convertidas de MXN a USD"
+                                                for k, v in (resumen.get("moneda_corregida") or {}).items())
+                                      or "no se detecto"),
         ("Pendiente proyectada", "montos y LAGs: la pendiente completa de la recta; indices: ponderada por su credibilidad "
                                  "(R2 ajustado de la recta)" if CREDIBILIDAD_PENDIENTE.get("indice") == "r2"
                                  else f"proporcion de la pendiente por tipo: {CREDIBILIDAD_PENDIENTE}"),
@@ -1611,6 +1766,10 @@ def main():
     print("Leyendo archivos ...", flush=True)
     bd_danos = leer_bd_montos(ARCHIVO_BD_DANOS)
     bd_rfv = leer_bd_montos(ARCHIVO_BD_RFV)
+    correcciones = {"DANOS": [], "FIANZAS": []}
+    if CORREGIR_MONEDA_MEZCLADA:
+        correcciones = {"DANOS": corregir_moneda_mezclada(bd_danos, "DANOS", ultimo, alertas),
+                        "FIANZAS": corregir_moneda_mezclada(bd_rfv, "FIANZAS", ultimo, alertas)}
     revisar_periodos(bd_danos, "BD Daños", ultimo, periodos_proy, alertas)
     revisar_periodos(bd_rfv, "BD RFV", ultimo, periodos_proy, alertas)
     hp = leer_hparametros(bd_danos.wb)
@@ -1660,12 +1819,18 @@ def main():
                                 en_mxn="DANOS" in tc_hist)
     proy_rfv = derivar_montos(bd_rfv, "FIANZAS", ESTRUCTURA["FIANZAS"], resultados, periodos_proy,
                               en_mxn="FIANZAS" in tc_hist)
+    resumen_rangos = (aplicar_rango_esperado(proy_danos, bd_danos, "DANOS", ESTRUCTURA["DANOS"], resultados,
+                                             periodos_proy, ultimo, alertas)
+                      + aplicar_rango_esperado(proy_rfv, bd_rfv, "FIANZAS", ESTRUCTURA["FIANZAS"], resultados,
+                                               periodos_proy, ultimo, alertas))
     validar(proy_danos, proy_rfv)
 
     info_danos = escribir_bd_montos(bd_danos, proy_danos, periodos_proy, SALIDA_BD_DANOS)
+    escribir_correccion_moneda(bd_danos, correcciones["DANOS"])
     n_hp = escribir_hparametros(hp, resultados, periodos_proy)
     guardar_libro(bd_danos.wb, SALIDA_BD_DANOS, original=ARCHIVO_BD_DANOS)
     info_rfv = escribir_bd_montos(bd_rfv, proy_rfv, periodos_proy, SALIDA_BD_RFV)
+    escribir_correccion_moneda(bd_rfv, correcciones["FIANZAS"])
     guardar_libro(bd_rfv.wb, SALIDA_BD_RFV, original=ARCHIVO_BD_RFV)
 
     historia = {
@@ -1674,7 +1839,9 @@ def main():
     }
     segundos = time.time() - t0
     escribir_diagnostico(resultados, periodos_proy, alertas, {"DANOS": proy_danos, "FIANZAS": proy_rfv},
-                         {"ultimo": ultimo, "segundos": segundos, "versiones": _versiones()})
+                         {"ultimo": ultimo, "segundos": segundos, "versiones": _versiones(),
+                          "rangos": resumen_rangos,
+                          "moneda_corregida": {k: len(v) for k, v in correcciones.items() if v}})
     graficas_ok = False
     if GENERAR_GRAFICAS:
         print("Generando graficas ...", flush=True)
