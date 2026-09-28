@@ -389,7 +389,7 @@ table.datos tbody tr:hover { background: var(--surface-2); }
 </main>
 <footer class="pie">
   <span>__PIE__</span>
-  <span>Generado el __GENERADO__ por proyeccion_reservas.py · azul = real, naranja punteado = proyección, gris fino = modelo: recta de tendencia más el patrón por mes del año cuando la serie lo tiene (solo en las series que se proyectan directo: índices, LAGs y BEL/BRUTO por ramo en USD) · banda = intervalo al 80%</span>
+  <span>Generado el __GENERADO__ por proyeccion_reservas.py · azul = real, naranja punteado = proyección, gris fino = modelo ajustado sobre la historia: recta de tendencia más el patrón por mes del año cuando la serie lo tiene; la proyección es ese modelo trasladado al último real (solo en las series que se proyectan directo: índices, LAGs y BEL/BRUTO por ramo en USD) · banda = intervalo al 80%</span>
 </footer>
 <script>
 'use strict';
@@ -419,23 +419,28 @@ const svg = (tag, attrs = {}) => {
   return e;
 };
 const idx = (arr, v) => arr.indexOf(v);
-// Curva del modelo (recta de tendencia del diagnostico mas el patron por mes del ano, si la serie lo tiene),
-// anclada en el ultimo dato real de la serie dibujada y extendida al horizonte; escala = factor para pasar a las
-// unidades de la grafica. periodos = AAAAMM de cada posicion (para saber el mes del ano).
+// Curva del modelo ajustado sobre la historia: recta de tendencia del diagnostico (valor en el ultimo mes y
+// pendiente) mas el patron por mes del ano, si la serie lo tiene, dibujada sobre la ventana de la regresion y hasta
+// el ultimo dato real de la serie. La proyeccion es esa misma curva trasladada al ultimo real (anclaje), por eso no
+// se prolonga al horizonte. escala = factor para pasar a las unidades de la grafica; periodos = AAAAMM de cada
+// posicion (para saber el mes del ano).
 function rectaModelo(clave, vals, periodos, escala) {
   const p = D.tend[clave]; if (!p) return null;
   const [pend, ventana, log, ajuste, est] = p;
   const iAncla = ultimoFinito(vals); if (iAncla < 0 || ajuste == null) return null;
   const out = new Array(periodos.length).fill(null);
-  for (let i = Math.max(0, iAncla - ventana + 1); i < periodos.length; i++) {
+  for (let i = Math.max(0, iAncla - ventana + 1); i <= iAncla; i++) {
     const v = ajuste + pend * (i - iAncla) + (est ? est[(periodos[i] % 100) - 1] : 0);
     out[i] = (log ? Math.exp(v) : v) * escala;
   }
   return out;
 }
 const tieneEstacionalidad = clave => !!(D.tend[clave] && D.tend[clave][4]);
-const nombreModelo = clave => tieneEstacionalidad(clave) ? `Modelo (tendencia ${D.ventana_tendencia ? D.ventana_tendencia + ' m' : 'toda la historia'} + estacionalidad)`
-  : (D.ventana_tendencia ? `Tendencia (últimos ${D.ventana_tendencia} meses)` : 'Tendencia (toda la historia)');
+const nombreModelo = clave => {
+  const v = D.tend[clave] ? D.tend[clave][1] : D.ventana_tendencia;       // ventana propia de la serie (20, 32, 36...)
+  return tieneEstacionalidad(clave) ? `Modelo ajustado (tendencia y patrón del año, ${v ? v + ' meses' : 'toda la historia'})`
+    : (v ? `Tendencia (últimos ${v} meses)` : 'Tendencia (toda la historia)');
+};
 const ultimoFinito = arr => { for (let i = arr.length - 1; i >= 0; i--) if (arr[i] != null) return i; return -1; };
 
 // ---------------------------------------------------------------- tema
@@ -799,13 +804,13 @@ function pintarIndices() {
   const vals = serieInd(ramo, serie), esLag = D.lags.includes(serie);
   document.getElementById('nota-ind').textContent = `Real hasta ${eti(D.ultimo)} · proyección ${eti(P_I[iUlt + 1])} a ${eti(D.fin)} · ${esLag ? 'LAGs' : 'Índices'}: ${D.modelo_por_tipo[esLag ? 'lag' : 'indice'] || 'n/d'}`;
   const ult = vals[iUlt], pDic = vals[iDic], pFin = vals[iFin], prom = promedio12(vals);
-  const f4 = v => fmt(v, 4);
+  const f4 = v => fmt(v, 4), conPatron = tieneEstacionalidad(`HPARAM|${serie}|${ramo}`);
   document.getElementById('kpis-ind').replaceChildren(
     kpi(`Último real (${eti(D.ultimo)})`, f4(ult)),
     kpi('Promedio real 12 meses', f4(prom), `${eti(P_I[i12 + 1])} a ${eti(D.ultimo)}`),
-    kpi(`Proyección ${eti(D.p_dic)}`, f4(pDic), varPct(ult, pDic) == null ? null : fmtPct(varPct(ult, pDic)) + ' vs último real'),
-    kpi(`Proyección ${eti(D.fin)}`, f4(pFin), varPct(ult, pFin) == null ? null : fmtPct(varPct(ult, pFin)) + ' vs último real'),
-    kpi(`Variación ${eti(D.fin)} vs ${eti(D.ultimo)}`, fmtPct(varPct(ult, pFin)), D.modelo_por_tipo[esLag ? 'lag' : 'indice'] || ''),
+    kpi(`Proyección ${eti(D.p_dic)}`, f4(pDic), varPct(ult, pDic) == null ? null : fmtPct(varPct(ult, pDic)) + ' vs último real' + (conPatron ? ' (incluye el mes del año)' : '')),
+    kpi(`Proyección ${eti(D.fin)}`, f4(pFin), varPct(ult, pFin) == null ? null : fmtPct(varPct(ult, pFin)) + ' vs último real' + (conPatron ? ' (incluye el mes del año)' : '')),
+    kpi(`Variación a 12 meses (${eti(P_I[iUlt + 12])} vs ${eti(D.ultimo)})`, fmtPct(varPct(ult, vals[iUlt + 12])), conPatron ? 'mismo mes: solo la tendencia, sin el efecto del mes del año' : 'mismo mes del año siguiente'),
   );
   const real = vals.map((v, i) => i <= iUlt ? v : null);
   const proy = vals.map((v, i) => i >= iUlt ? v : null);
@@ -815,8 +820,8 @@ function pintarIndices() {
 
   const nombreTend = nombreModelo(`HPARAM|${serie}|${ramo}`);
   const tendI = rectaModelo(`HPARAM|${serie}|${ramo}`, real, P_I, 1);
-  const c1 = tarjeta(`Evolución mensual · ${serie} · ramo ${ramo}`, tieneEstacionalidad(`HPARAM|${serie}|${ramo}`)
-    ? 'Real, modelo (tendencia + patrón del año) y proyección con banda al 80 %' : 'Real, línea de tendencia y proyección con banda al 80 %',
+  const c1 = tarjeta(`Evolución mensual · ${serie} · ramo ${ramo}`, !tendI ? 'Real y proyección con banda al 80 %' : conPatron
+    ? 'Real, modelo ajustado (tendencia + patrón del año) y proyección con banda al 80 %' : 'Real, línea de tendencia y proyección con banda al 80 %',
     (cuerpo, W) => graficaLineas(cuerpo, W, {
       labels: P_I.map(eti), tituloX: i => etiLarga(P_I[i]), fmt: v => fmt(v, decInd(serie)), cadaX: 6, etiquetasFin: true,
       aria: `Evolución mensual de ${serie} del ramo ${ramo}`,
@@ -826,8 +831,8 @@ function pintarIndices() {
         { nombre: 'Proyección', valores: proy, color: cssVar('--proy'), dash: true, banda, etiquetaFin: true },
       ],
     }),
-    () => tablaDatos(['Mes', 'Real', 'Proyección', 'Banda inferior', 'Banda superior', nombreTend],
-      P_I.map((p, i) => [etiLarga(p), fmt(real[i], 4), fmt(i > iUlt ? proy[i] : null, 4), fmt(i > iUlt ? lo[i] : null, 4), fmt(i > iUlt ? hi[i] : null, 4), fmt(tendI ? tendI[i] : null, 4)])));
+    () => tablaDatos(['Mes', 'Real', 'Proyección', 'Banda inferior', 'Banda superior', ...(tendI ? [nombreTend] : [])],
+      P_I.map((p, i) => [etiLarga(p), fmt(real[i], 4), fmt(i > iUlt ? proy[i] : null, 4), fmt(i > iUlt ? lo[i] : null, 4), fmt(i > iUlt ? hi[i] : null, 4), ...(tendI ? [fmt(tendI[i], 4)] : [])])));
 
   const valoresRamo = D.ramos_i.map(r => valorInd(r, serie, iPer));
   const c2 = tarjeta(`${serie} por ramo · ${etiLarga(E.periodo)}${iPer > iUlt ? ' (proyección)' : ' (real)'}`, 'El ramo seleccionado se resalta en azul',
@@ -854,7 +859,7 @@ function pintarIndices() {
     const v = serieInd(ramo, se); const u = v[iUlt], pf = v[iFin];
     return { se, u, prom: promedio12(v), pd: v[iDic], pf, var: varPct(u, pf) };
   });
-  const c4 = tarjeta(`Resumen de índices · ramo ${ramo}`, 'Últimos reales y proyección, con la variación a dic-27',
+  const c4 = tarjeta(`Resumen de índices · ramo ${ramo}`, `Últimos reales y proyección, con la variación a ${eti(D.fin)} (en las series con patrón incluye el mes del año)`,
     (cuerpo) => {
       const t = el('table', { class: 'datos' });
       t.append(el('thead', {}, el('tr', {}, ...['Índice', `Real ${eti(D.ultimo)}`, 'Prom. 12 m', `Proy. ${eti(D.p_dic)}`, `Proy. ${eti(D.fin)}`, 'Var. vs real'].map(h => el('th', { scope: 'col', text: h })))));
@@ -894,13 +899,13 @@ function pintarReservas() {
   const aviso = document.getElementById('nota-res');
   aviso.textContent = `Cifras en millones de ${moneda}${moneda === 'MXN' ? ' (USD × TC del mes)' : ''} · real hasta ${eti(D.ultimo)} · montos: ${D.modelo_por_tipo.nivel || 'n/d'}; razones: ${D.modelo_por_tipo.razon || 'n/d'}`;
   const vals = montoSerie(reserva, concepto, ramoRes);
-  const u = vals[jUlt], pd = vals[jDic], pf = vals[jFin], v12 = vals[j12], meses = jFin - jUlt;
+  const u = vals[jUlt], pd = vals[jDic], pf = vals[jFin], v12 = vals[j12], p12 = vals[jUlt + 12];
   const f1 = v => fmt(v, 1);
   document.getElementById('kpis-res').replaceChildren(
     kpi(`Real ${eti(D.ultimo)} (M ${moneda})`, f1(u)),
     kpi(`Proyección ${eti(D.p_dic)} (M ${moneda})`, f1(pd), varPct(u, pd) == null ? null : fmtPct(varPct(u, pd)) + ' vs último real'),
     kpi(`Proyección ${eti(D.fin_m)} (M ${moneda})`, f1(pf), varPct(u, pf) == null ? null : fmtPct(varPct(u, pf)) + ' vs último real'),
-    kpi('Crecimiento anual proyectado', u > 0 && pf > 0 ? fmtPct(Math.pow(pf / u, 12 / meses) - 1) : 's/d', `${eti(D.ultimo)} a ${eti(D.fin_m)}, anualizado`),
+    kpi('Crecimiento proyectado 12 meses', fmtPct(varPct(u, p12)), `${eti(D.ultimo)} a ${eti(P_M[jUlt + 12])}, mismo mes`),
     kpi('Crecimiento real 12 meses', fmtPct(varPct(v12, u)), `${eti(D.p_12)} a ${eti(D.ultimo)}`),
   );
   const irr = montoSerie(reserva, 'IRR', ramoRes), bruto = montoSerie(reserva, 'BRUTO', ramoRes);
@@ -911,10 +916,13 @@ function pintarReservas() {
   const etiqRamo = ramoRes === 'Todos' ? 'todos los ramos' : `ramo ${ramoRes}`;
   const real = vals.map((v, i) => i <= jUlt ? v : null), proy = vals.map((v, i) => i > jUlt ? v : null);
   const proyLinea = vals.map((v, i) => i >= jUlt ? v : null);
+  // decimales de etiquetas y tooltip segun la magnitud de la serie (ramos chicos: menos de 1 M USD)
+  const decGraf = arr => { const m = Math.max(0, ...arr.filter(v => v != null).map(Math.abs)); return m < 1 ? 3 : m < 10 ? 2 : m < 100 ? 1 : 0; };
+  const decV = decGraf(vals);
 
   const c1 = tarjeta(`${reserva} ${concepto} mensual · ${etiqRamo}`, `${eti(P_M[jMen])} a ${eti(D.fin_m)}, millones de ${moneda}`,
     (cuerpo, W) => graficaColumnas(cuerpo, W, {
-      categorias: P_M.slice(jMen).map(eti), tituloX: i => etiLarga(P_M[jMen + i]), fmt: v => fmt(v, 0), compartido: true, cadaX: 3,
+      categorias: P_M.slice(jMen).map(eti), tituloX: i => etiLarga(P_M[jMen + i]), fmt: v => fmt(v, decV), compartido: true, cadaX: 3,
       aria: `${reserva} ${concepto} mensual`,
       series: [{ nombre: 'Real', valores: real.slice(jMen), color: cssVar('--real') }, { nombre: 'Proyección', valores: proy.slice(jMen), color: cssVar('--proy') }],
       etiquetar: (i) => jMen + i === jUlt || jMen + i === jFin,
@@ -936,17 +944,17 @@ function pintarReservas() {
   const tendR = (moneda === 'USD' && ramoRes !== 'Todos') ? rectaModelo(`${reserva}|${concepto}|${ramoRes}`, real, P_M, 1e-6) : null;
   const c3 = tarjeta(`${reserva} ${concepto} histórico y proyección · ${etiqRamo}`, `${eti(P_M[0])} a ${eti(D.fin_m)}, millones de ${moneda}`,
     (cuerpo, W) => graficaLineas(cuerpo, W, {
-      labels: P_M.map(eti), tituloX: i => etiLarga(P_M[i]), fmt: v => fmt(v, 0), cadaX: 6, etiquetasFin: true, incluirCero: true,
+      labels: P_M.map(eti), tituloX: i => etiLarga(P_M[i]), fmt: v => fmt(v, decV), cadaX: 6, etiquetasFin: true, incluirCero: true,
       aria: `${reserva} ${concepto} histórico y proyección`,
       series: [...(tendR ? [{ nombre: nombreTendR, valores: tendR, color: cssVar('--deemph-ink'), fino: true }] : []),
         { nombre: 'Real', valores: real, color: cssVar('--real'), etiquetaFin: true }, { nombre: 'Proyección', valores: proyLinea, color: cssVar('--proy'), dash: true, etiquetaFin: true }],
     }),
-    () => { const dec = Math.max(...vals.filter(v => v != null)) < 10 ? 4 : 2; return tablaDatos(['Mes', 'Tipo', `M ${moneda}`, nombreTendR], P_M.map((p, i) => [etiLarga(p), i <= jUlt ? 'Real' : 'Proyección', fmt(vals[i], dec), fmt(tendR ? tendR[i] : null, dec)])); });
+    () => { const dec = Math.max(...vals.filter(v => v != null)) < 10 ? 4 : 2; return tablaDatos(['Mes', 'Tipo', `M ${moneda}`, ...(tendR ? [nombreTendR] : [])], P_M.map((p, i) => [etiLarga(p), i <= jUlt ? 'Real' : 'Proyección', fmt(vals[i], dec), ...(tendR ? [fmt(tendR[i], dec)] : [])])); });
 
   const porConcU = conceptos.map(c => montoSerie(reserva, c, ramoRes)[jUlt]), porConcF = conceptos.map(c => montoSerie(reserva, c, ramoRes)[jFin]);
   const c4 = tarjeta(`${reserva} por concepto · ${etiqRamo}`, `${eti(D.ultimo)} real y ${eti(D.fin_m)} proyectado, millones de ${moneda}`,
     (cuerpo, W) => graficaColumnas(cuerpo, W, {
-      categorias: conceptos, fmt: v => fmt(v, 0), cadaX: 1, aria: `${reserva} por concepto`,
+      categorias: conceptos, fmt: v => fmt(v, decGraf([...porConcU, ...porConcF])), cadaX: 1, aria: `${reserva} por concepto`,
       series: [{ nombre: `${eti(D.ultimo)} (real)`, valores: porConcU, color: cssVar('--real') }, { nombre: `${eti(D.fin_m)} (proyección)`, valores: porConcF, color: cssVar('--proy') }],
       etiquetar: (i) => conceptos[i] === concepto,
     }),
@@ -958,7 +966,7 @@ function pintarReservas() {
 // ---------------------------------------------------------------- vista: analisis
 function pintarAnalisis() {
   const v = document.getElementById('vista-analisis'); v.replaceChildren();
-  v.append(el('h2', { text: `1. Índices por ramo: real ${eti(D.ultimo)} contra proyección ${eti(D.fin)}` }));
+  v.append(el('h2', { text: `1. Índices por ramo: real ${eti(D.ultimo)} contra proyección ${eti(D.fin)} (en las series con patrón la variación incluye el mes del año)` }));
   const enc1 = ['Ramo']; for (const s of D.indices) enc1.push(`${s} real`, `${s} proy.`, 'Var.');
   const t1 = el('table', { class: 'datos' }); t1.append(el('thead', {}, el('tr', {}, ...enc1.map(h => el('th', { scope: 'col', text: h })))));
   const tb1 = el('tbody');

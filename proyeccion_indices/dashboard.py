@@ -227,6 +227,19 @@ def leer_montos(ultimo: int):
     return registros, tc, ramos
 
 
+def nota_modelo() -> str:
+    """Nota corta sobre el modelo de tendencia (ventana y estacionalidad), leida de la hoja Resumen del diagnostico."""
+    if not ARCHIVO_DIAGNOSTICO.exists():
+        return ""
+    wb = openpyxl.load_workbook(ARCHIVO_DIAGNOSTICO, read_only=True, data_only=True)
+    filas = {str(a).strip(): b for a, b, *_ in wb["Resumen"].iter_rows(values_only=True) if a} if "Resumen" in wb.sheetnames else {}
+    wb.close()
+    ventana = filas.get("Ventana de tendencia (meses)")
+    estacional = str(filas.get("Estacionalidad mensual", "")).lower().startswith("si")
+    recta = f"recta de {ventana} meses" if ventana and str(ventana).isdigit() else "recta de toda la historia"
+    return f"({recta}" + (" + patrón del año en índices)" if estacional else ")")
+
+
 def leer_metodo() -> list:
     """Filas de la hoja Backtest del diagnostico (modelo y error por tipo de serie)."""
     if not ARCHIVO_DIAGNOSTICO.exists():
@@ -480,7 +493,7 @@ def generar(ruta_salida: Path = SALIDA_DASHBOARD) -> Path:
     notas = [f"Real hasta {etiqueta(ultimo)}", f"Proyección {etiqueta(mover(ultimo, 1))} a {etiqueta(fin)}",
              "", "Cambia los selectores (listas", "desplegables) y las gráficas", "se actualizan solas.", "",
              f"Índices: {proc.get('indice', 'n/d')}", f"LAGs: {proc.get('lag', 'n/d')}",
-             "(tendencia amortiguada)"]
+             nota_modelo()]
     for k, t in enumerate(notas):
         ws.cell(21 + k, 2, t).font = fuente(9, k < 2, TEXTO_2, k >= 3)
 
