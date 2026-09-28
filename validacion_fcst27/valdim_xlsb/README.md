@@ -151,11 +151,16 @@ el 2024 a la columna C.
 
 - **`'2027 CA'`** (PptoxLN_Red) se deja vacía. En el archivo anterior `'2026 CA'` era el mismo
   total con otro reparto entre LN, y el libro no trae esa clasificación para 2027.
-- **Filas financieras de 2027** en PptoxMes_Red: quedan vacías las que dependen de `ER!Q62`,
-  `Q63` y `Q67`, que tienen `=$Q63/12+P63` (referencia circular, sin cálculo iterativo). Con
-  ellas quedan vacíos el RIF, los impuestos y la utilidad.
-- **Columnas T/U/V:** T y U se recorren; V se calcula con la regla de cada renglón. Las filas de
-  variación de reserva (11 y 12) quedan vacías en V porque su razón no sale de la hoja.
+- **Filas financieras de 2027** en PptoxMes_Red: `ER!Q62`, `Q63` y `Q67` tienen `=$Q63/12+P63`
+  (referencia circular, sin cálculo iterativo) y enero a noviembre dependen de ese Q. Se usa el
+  anual del bloque *ESTACIONALIDAD ACUMULADA MXN* de RIF (`P233`, `P234`, `P237`) ÷ 12 acumulado,
+  como ya hace la fila 60 (`ER!Y60 = RIF!P231`). Eso reproduce lo que ER tiene guardado de enero a
+  noviembre. RIF, impuestos y utilidad salen con las fórmulas de ER (filas 70 a 81).
+- **Dividendos:** se dejan como los calcula ER, con diciembre en 0, porque `ER!Q64 = RIF!F22`
+  está en blanco. Se anota como observación.
+- **Columnas T/U/V:** T y U se recorren; V se calcula con la regla de cada renglón. En las filas
+  de variación de reserva, V = variación ÷ (aumento de la prima contra 2026), igual que el 05
+  anterior: `V11 = R11/(R8−F8)` y `V12 = R12/(R10−F10)`.
 - **Mayo de 2026:** traía `'|'` en lugar de cifra. Se puso Prima Tomada − Prima Devengada, que es
   como sale en los demás meses.
 
@@ -165,11 +170,16 @@ salvo las cifras del 05, que van capturadas):
 | Hoja | Contenido |
 |---|---|
 | `Val05_Resumen` | Los 20 renglones a diciembre por hoja del 05 contra su referencia, y el conteo de celdas que cuadran. Incluye el 2025 recorrido y las observaciones |
-| `Val05_Mensual` | PptoxMes_Red contra ER en MXN, mes a mes; W (2025) contra `ER!E` |
+| `Val05_Mensual` | PptoxMes_Red contra ER en MXN, mes a mes (filas financieras con el anual de RIF y las fórmulas de ER); W (2025) contra `ER!E` |
 | `Val05_LN`, `Val05_Ramo`, `Val05_Region`, `Val05_TRea` | Cada bloque del 05 contra la vista en MXN, que sale de `Val_x` × `'Parámetros'!F3:Q3` ÷ `ER_x!E6:P6`. Traen la suma de bloques contra ER y el 2025 contra la columna D de la vista. `Val05_LN` trae además PptoxLN_Red |
 
 La conversión divide entre el factor vigente de la vista, así que la comparación vale con
 `xMonEEFF` en USD o en MXN.
+
+**Paréntesis en las fórmulas.** Excel arma el texto de la fórmula desde los tokens y solo pone
+paréntesis donde hay `PtgParen`. Por eso `construir05.py` guarda la precedencia de cada expresión
+y agrega `PtgParen` donde hace falta: el texto que se ve en la barra de fórmulas es el que se
+calcula. Las cadenas nuevas reusan las que ya existían en la tabla compartida.
 
 ```bash
 python3 cargar_v3.py          # CtaMens y celdas del libro de Cesión (en cesion/)

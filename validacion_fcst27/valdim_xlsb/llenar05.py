@@ -135,6 +135,11 @@ for hoja, (dim, mapa) in MAPA.items():
             R = nuevo.get((f, 'R')); Fv = nuevo.get((f, 'F'))
             if f == 8:
                 v = (R/Fv - 1) if (R is not None and Fv) else None; how = 'crecimiento 2027 vs 2026'
+            elif f in (11, 12):                   # variacion de reserva / aumento de prima (como en el 05 anterior)
+                b = 8 if f == 11 else 10
+                Rb, Fb = nuevo.get((b, 'R')), nuevo.get((b, 'F'))
+                v = (R/(Rb - Fb)) if (R is not None and Rb is not None and Fb is not None and Rb != Fb) else None
+                how = f'dic 2027 / (fila {b} dic 2027 − fila {b} 2026)'
             elif f in BASE:
                 b = nuevo.get((BASE[f], 'R'))
                 v = ((R or 0.0)/b) if b else None; how = f'dic 2027 / fila {BASE[f]}'
@@ -222,8 +227,9 @@ for r in range(8, 69):
     if r in ER_FILA:
         for j, c in enumerate(IZQ):
             v = er_mxn(r, j)
-            put(H, f'{c}{r}', v, f'ER fila(s) {ER_FILA[r]} mes {j+1} MXN' if v is not None
-                else f'ER fila {ER_FILA[r]}: depende de la referencia circular de ER!Q62/Q63/Q67 → vacía')
+            sup = r in (46, 47, 50, 53, 55, 58, 59, 60, 61, 62, 64, 68)
+            put(H, f'{c}{r}', v, f'ER fila(s) {ER_FILA[r]} mes {j+1} MXN'
+                + (' (anual de RIF!P233/P234/P237 en lugar de ER!Q62/Q63/Q67, circulares)' if sup else ''))
             nuevo[(c, r)] = v
 
 def g(c, r):

@@ -20,6 +20,8 @@ import openpyxl
 import xlsbw as W
 from biff import records, sheet_map, colrow
 from reparar import records_raw
+from biff import rd_xlwstr
+def W_rd(pl): return rd_xlwstr(pl, 1)[0]
 
 SRC, DST, F05 = 'cesion/FCST.xlsb', os.environ.get('DST_XLSB', 'FCST_2027_Cesion.xlsb'), '05_FCST_2027.xlsx'
 CEL = pickle.load(open('cesion/celdas_v3.pkl', 'rb'))
@@ -44,13 +46,19 @@ TOL = 0.005
 
 # ============================================================ expresiones (rgce + valor)
 class X:
-    __slots__ = ('g', 'v')
-    def __init__(s, g, v): s.g = g; s.v = v
+    """rgce + valor + precedencia del operador raiz (9 atomo, 3 * /, 2 + -, 1 comparacion).
+    Excel arma el texto de la formula desde los tokens y solo pone parentesis donde hay PtgParen,
+    asi que se agregan donde la precedencia lo exige para que el texto diga lo mismo que se calcula."""
+    __slots__ = ('g', 'v', 'p')
+    def __init__(s, g, v, p=9): s.g = g; s.v = v; s.p = p
 def lift(o): return o if isinstance(o, X) else X(W.num(o), float(o))
+PREC = {W.ADD: 2, W.SUB: 2, W.MUL: 3, W.DIV: 3}
 def _op(a, b, tok, fn):
-    a, b = lift(a), lift(b)
+    a, b = lift(a), lift(b); p = PREC[tok]
+    ga = a.g + (W.PAREN if a.p < p else b'')
+    gb = b.g + (W.PAREN if (b.p < p or (b.p == p and tok != W.ADD)) else b'')
     v = None if (a.v is None or b.v is None) else fn(a.v, b.v)
-    return X(a.g + b.g + tok, v)
+    return X(ga + gb + tok, v, p)
 def add(a, b): return _op(a, b, W.ADD, lambda x, y: x + y)
 def sub(a, b): return _op(a, b, W.SUB, lambda x, y: x - y)
 def mul(a, b): return _op(a, b, W.MUL, lambda x, y: x * y)
@@ -91,8 +99,8 @@ class Hoja:
         vals = [s.val.get((r, c)) or 0.0 for c in range(c1, c2 + 1)]
         a = W.area(r, r, c1, c2)
         g = a + W.funcvar(1, 7) + W.func_fix(24) + a + W.funcvar(1, 6) + W.func_fix(24) + W.ADD + W.num(TOL) + W.LT
-        return X(g, abs(max(vals)) + abs(min(vals)) < TOL)
-    def abs_lt(s, x): return X(x.g + W.func_fix(24) + W.num(TOL) + W.LT, abs(x.v) < TOL)
+        return X(g, abs(max(vals)) + abs(min(vals)) < TOL, 1)
+    def abs_lt(s, x): return X(x.g + W.func_fix(24) + W.num(TOL) + W.LT, abs(x.v) < TOL, 1)
     def suma_col(s, r1, r2, c):
         vals = [s.val.get((r, c)) or 0.0 for r in range(r1, r2 + 1)]
         return X(W.area(r1, r2, c, c) + W.funcvar(1, W.IF_SUM), sum(vals))
@@ -114,6 +122,31 @@ P = None
 # ============================================================ Val05_Mensual
 ER_FILA = LL['ER_FILA']
 DIRECTAS = {60, 61, 64, 65, 66, 68}          # filas de ER que no pasan por el tipo de cambio
+HOJA_IX['RIF'] = 'RIF'; IX['RIF'] = 10
+RIF_ANUAL = {62: 232, 63: 233, 67: 236}      # ER!Q62/Q63/Q67 circulares -> anual de RIF!P233, P234, P237
+def _m(h, f05, j): return h.L(MROW[f05], C2 + j)
+def _max0(x): return X(x.g + W.num(0) + W.funcvar(2, 7), max(x.v, 0.0))
+def _base(h, j): return _max0(sub(_m(h, 55, j), _m(h, 50, j)))
+CALC_05 = {    # mismas formulas que ER (filas 70-81) sobre las cifras en MXN de esta hoja
+    70: lambda h, j: X(W.area(MROW[44], MROW[52], C2 + j, C2 + j) + W.funcvar(1, W.IF_SUM),
+                       sum(h.val.get((rr, C2 + j)) or 0.0 for rr in range(MROW[44], MROW[52] + 1))),
+    71: lambda h, j: add(_m(h, 41, j), _m(h, 53, j)),
+    73: lambda h, j: mul(_base(h, j), 0.3),
+    74: lambda h, j: (lambda b, t: X(b.g + W.num(0.1) + W.MUL + t.g + W.funcvar(2, 6), min(b.v*0.1, t.v)))(_base(h, j), R3('Parámetros', 13, 16)),
+    75: lambda h, j: mul(_m(h, 50, j), 0.28),
+    76: lambda h, j: mul(_m(h, 50, j), 0.02),
+    77: lambda h, j: X(W.area(MROW[58], MROW[61], C2 + j, C2 + j) + W.funcvar(1, W.IF_SUM),
+                       sum(h.val.get((rr, C2 + j)) or 0.0 for rr in range(MROW[58], MROW[61] + 1))),
+    78: lambda h, j: sub(_m(h, 55, j), _m(h, 62, j)),
+    81: lambda h, j: add(_m(h, 64, j), _m(h, 66, j)),
+}
+DESC_SUP = {62: "ER fila 62 · anual de RIF!P233 ÷ 12 acumulado (ER!Q62 es circular)",
+            63: "ER fila 63 · anual de RIF!P234 ÷ 12 acumulado (ER!Q63 es circular)",
+            67: "ER fila 67 · anual de RIF!P237 ÷ 12 acumulado (ER!Q67 es circular)",
+            70: "ER fila 70 · SUM de las filas 44 a 52 de esta hoja", 71: "ER fila 71 · fila 41 + fila 53",
+            73: "ER fila 73 · MAX(fila 55 − fila 50; 0) × 0.3", 74: "ER fila 74 · MIN(MAX(fila 55 − fila 50; 0) × 0.1; 'Parámetros'!Q14)",
+            75: "ER fila 75 · fila 50 × 0.28", 76: "ER fila 76 · fila 50 × 0.02", 77: "ER fila 77 · SUM de las filas 58 a 61",
+            78: "ER fila 78 · fila 55 − fila 62", 81: "ER fila 81 · fila 64 + fila 66 (ER fila 80 vacía)"}
 MROW = {}
 
 def hoja_mensual():
@@ -122,7 +155,7 @@ def hoja_mensual():
     h.t(1, 0, "Cada cifra del 05 (capturada tal como quedó en el archivo) contra el renglón equivalente de ER convertido a pesos: "
               "importe del mes en ER × 'Parámetros'!F3:Q3 ÷ ER!F3:Q3, acumulado. Es lo que da ER con xMonEEFF = \"MXN\".", 'SUB')
     h.t(2, 0, "Las filas financieras que en ER no pasan por el tipo de cambio (intereses sobre depósitos, dividendos, cambios, etc.) se toman tal cual. "
-              "Las que dependen de la referencia circular de ER!Q62, Q63 y Q67 no se llenaron en el 05 y aquí se señalan.", 'SUB')
+              "ER!Q62, Q63 y Q67 son circulares: esas filas usan el anual de RIF!P233/P234/P237 ÷ 12 y las de abajo (RIF, impuestos, utilidad) las fórmulas de ER sobre esta hoja.", 'SUB')
     h.t(3, 0, "Mes (CALMONTH)", 'TXT_B')
     for j in range(NM):
         for c0 in (C1, C2, C3): h.n(3, c0 + j, MESES[j], 'MES')
@@ -147,7 +180,7 @@ def hoja_mensual():
         MROW[f] = r
         etq = ws.cell(f, 4).value or ws.cell(f, 3).value
         h.t(r, 0, f"fila {f} · {str(etq).strip()}", 'TXT')
-        h.t(r, 1, ' − '.join(f"ER fila {abs(x)}" for x in filas), 'OBS')
+        h.t(r, 1, DESC_SUP.get(filas[0]) or ' − '.join(f"ER fila {abs(x)}" for x in filas), 'OBS')
         v05 = [num05(ws, f, 6 + j) for j in range(NM)]
         definida = all(DAT['ER_MXN'].get(abs(x)) is not None for x in filas)
         for j in range(NM): h.n(r, C1 + j, v05[j], 'NUM')
@@ -155,7 +188,12 @@ def hoja_mensual():
             for j in range(NM):
                 er_j = sumar([R3('ER', abs(x) - 1, 5 + j) if x > 0 else mul(R3('ER', abs(x) - 1, 5 + j), -1) for x in filas]) \
                     if len(filas) == 1 else sub(R3('ER', abs(filas[0]) - 1, 5 + j), R3('ER', abs(filas[1]) - 1, 5 + j))
-                if filas[0] in DIRECTAS:
+                if filas[0] in RIF_ANUAL:                               # anual de RIF / 12, acumulado
+                    paso = div(R3('RIF', RIF_ANUAL[filas[0]], 15), 12)
+                    x = paso if j == 0 else add(h.L(r, C2 + j - 1), paso)
+                elif filas[0] in CALC_05:
+                    x = CALC_05[filas[0]](h, j)
+                elif filas[0] in DIRECTAS:
                     x = er_j
                 elif filas[0] == 79:                                   # = prima retenida en MXN × 'Parámetros'!F11:Q11
                     x = mul(h.L(MROW[10], C2 + j), R3('Parámetros', 10, 5 + j))
@@ -254,7 +292,9 @@ def formula_d(dim, texto, k, mbs, h, LAY, V25):
     def factor():
         t = take()
         if t == '+': return factor()
-        if t == '-': x = factor(); return None if x is None else X(x.g + W.UMINUS, -x.v)
+        if t == '-':
+            x = factor()
+            return None if x is None else X(x.g + (W.PAREN if x.p < 9 else b'') + W.UMINUS, -x.v)
         if t == '(':
             x = expr(); take(); return None if x is None else X(x.g + W.PAREN, x.v)
         if t.startswith('HLOOKUP'): return hlook(t)
@@ -377,7 +417,8 @@ def hoja_dim(dim):
             h.f(r, C1 + j, X(W.ref3d(IX['Val05_Mensual'], mr, C2 + j), MENS.val[(mr, C2 + j)]), 'NUM_G')
         h.f(r, Y1, X(W.ref3d(IX['Val05_Mensual'], mr, Y2), MENS.val[(mr, Y2)]), 'NUM_G')
         r = DIFR[f]
-        h.t(r, 0, "Diferencia (suma del 05 − ER)", 'LBL_Y'); h.t(r, 1, "Cero: los bloques del 05 suman el total de ER.", 'LBL_Y')
+        h.t(r, 0, "Diferencia (suma del 05 − ER)", 'LBL_Y')
+        h.t(r, 1, "2027 (AC:AO): cero, los bloques del 05 suman el total de ER. 2025 (AS:AT): ver Val05_Resumen, sección 2025.", 'LBL_Y')
         for j in range(NM): h.f(r, C3 + j, sub(h.L(SUMR[f], C1 + j), h.L(ERR[f], C1 + j)), 'NUM_Y')
         h.fb(r, QC, h.cuadra(r, C3, C3 + NM - 1), 'BOOL')
         h.f(r, Y3, sub(h.L(SUMR[f], Y1), h.L(ERR[f], Y1)), 'NUM_Y'); h.fb(r, Y4, h.abs_lt(h.L(r, Y3)), 'BOOL')
@@ -418,7 +459,7 @@ def seccion_anual_ln(h, r):
         h.fb(r, T0 + 3, X(c1.g + c2.g + W.funcvar(2, 36), bool(c1.v and c2.v)), 'BOOL')
         r += 1
     assert not malos, malos[:4]
-    h.t(r + 1, 0, "La columna '2027 CA' se dejó vacía: en el 05 anterior '2026 CA' sumaba lo mismo que 2026 con otro reparto entre LN, y el libro de Cesión no trae esa segunda clasificación para 2027.", 'NOTA')
+    h.t(r + 1, 0, "La columna '2027 CA' se dejó vacía: en el 05 anterior '2026 CA' coincidía con 2026 en primas, siniestros, costos y gastos (otro reparto entre LN) pero no en reservas, IBNR ni resultados, y el libro de Cesión no trae esa versión para 2027.", 'NOTA')
     ANCLA['LN']['anual'] = (r_ini, r - 1, T0 + 3)
     return r + 2, T0 + 3
 
@@ -463,7 +504,7 @@ def hoja_resumen():
     r += 1
     # ---- totales por hoja
     h.barra(r, "¿CUADRAN TODAS LAS CELDAS?", 7); r += 1
-    h.t(r, 0, "Hoja del 05", 'HDR'); h.t(r, 1, "Qué se compara", 'HDR'); h.t(r, 2, "Celdas", 'HDR_C'); h.t(r, 3, "¿Todas cuadran?", 'HDR_C')
+    h.t(r, 0, "Hoja del 05", 'HDR'); h.t(r, 1, "Qué se compara", 'HDR'); h.t(r, 2, "Celdas del 05", 'HDR_C'); h.t(r, 3, "¿Todas cuadran?", 'HDR_C')
     h.t(r, 4, "Hoja de detalle", 'HDR'); r += 1
     conteo = {}
     def fila_total(etq, que, celdas, x, det):
@@ -497,8 +538,8 @@ def hoja_resumen():
     x = AND_areas([(area, vals)])
     h.t(r, 0, "PptoxMes_Red (W)", 'TXT'); h.t(r, 1, "Columna W (2025) contra ER!E (Dic 2025)", 'OBS'); h.b(r, 2, 'BOOL'); h.fb(r, 3, x, 'BOOL')
     h.t(r, 4, "", 'OBS'); r += 1
-    NOTA25 = {'RAMO': "ER_ram!D toma ER1225_Real!D5:Q60, cuyos valores guardados son de febrero de 2025 (primas 3,188 M contra 20,691 M del año): "
-                      "el 2025 por ramo del 05 anterior ya venía así. Coincide con la vista pero no con ER!E.",
+    NOTA25 = {'RAMO': "ER_ram!D toma ER1225_Real, vínculo a ER_RPAT_Ramos_202512.xlsx cuyo valor guardado es el acumulado a febrero de 2025 (primas 3,188 M contra 20,691 M del año); "
+                      "el 05 anterior ya venía así. Coincide con la vista pero no con ER!E. Si se actualizan los vínculos habría que volver a llenar esa columna.",
               'LN': 'Los bloques coinciden con la vista. La suma contra ER!E solo difiere en: IBNR y resultados técnicos por 1.85 y 1.29 pesos (redondeo entre Anexo2_1225 y ER!E), y Gastos Generales, Contribución y Resultado de Operación, porque el real 2025 por dimensión (Anexo2_1225) no trae gastos (703.49 M en ER!E).', 'REGION': 'Los bloques coinciden con la vista. La suma contra ER!E solo difiere en: IBNR y resultados técnicos por 1.85 y 1.29 pesos (redondeo entre Anexo2_1225 y ER!E), y Gastos Generales, Contribución y Resultado de Operación, porque el real 2025 por dimensión (Anexo2_1225) no trae gastos (703.49 M en ER!E).', 'TREA': 'Los bloques coinciden con la vista. La suma contra ER!E solo difiere en: IBNR y resultados técnicos por 1.85 y 1.29 pesos (redondeo entre Anexo2_1225 y ER!E), y Gastos Generales, Contribución y Resultado de Operación, porque el real 2025 por dimensión (Anexo2_1225) no trae gastos (703.49 M en ER!E).'}
     for dim in ['LN', 'RAMO', 'REGION', 'TREA']:
         A = ANCLA[dim]; hd = DIMH[dim]; ix = IX[DIMINFO[dim]['hoja']]
@@ -522,19 +563,28 @@ def hoja_resumen():
     return h, W.sheet_bin(h.rows, g0 + 20, cols=cols, freeze=(2, 6)), conteo
 
 NOTAS = [
-    "1) Filas financieras de PptoxMes_Red en 2027: Productos de Inmuebles, Intereses y Variación en Valuación de Inversiones quedaron vacías. En ER, Q62, Q63 y Q67 "
-    "tienen =$Q62/12+P62 (se refieren a sí mismas) y el libro no calcula iterativo; también quedaron vacíos RIF, Resultado antes de impuestos, impuestos y Utilidad, que dependen de ellas. "
-    "El diseño parece ser anual/12 acumulado, con el anual en la columna Q; los anuales están en RIF!E21 (Intereses, 1,113.48 M) y RIF!E23 (Valuación, 411.55 M), iguales al presupuesto 2026.",
-    "1b) Dividendos (ER fila 64): J64 = RIF!E22 × RIF!K23 (41.35 M) y se arrastra a O64; P64 = RIF!E22 (65.50 M) y Q64 = RIF!F22, que está vacía, así que diciembre da 0. "
-    "El 05 trae lo que calcula ER; parece un corrimiento de una columna (Q64 debería apuntar a RIF!E22).",
-    "2) Gastos Generales 2027 = Gastos!C12:N12 = Gastos!C6:N6 ÷ tipo de cambio, y la fila 6 rotula los meses 202601 a 202612: en pesos da exactamente el presupuesto 2026 (697.16 M).",
-    "3) Daños Ultramar Londres (LN04009): en CtaMens 2027 no hay renglones de esa LN; la prima de Ultramar (R05) viene en LN04006, Daños Líneas Especiales. "
-    "Por eso el bloque de Londres 2027 solo trae las reservas de 2_Reservas y da prima 0 y resultado negativo.",
-    "4) Daños Facultativos Sur y Agropecuario = LN04008 (reservas) + LN04008-Agro (CtaMens). Crédito = 'Crédito' (reservas) + 'Credito' (CtaMens). Así cada miembro de la vista cae en un bloque y los bloques suman ER.",
-    "5) PptoxLN_Red: la columna '2027 CA' se dejó vacía (en el 05 anterior '2026 CA' era el mismo total con otro reparto entre LN y aquí no hay esa clasificación).",
-    "6) Columnas T/U/V de las hojas por dimensión: T y U se recorrieron (eran U y V); V se calculó para 2027 con la regla de cada renglón. Las filas de variación de reserva (11 y 12) quedaron vacías en V: su cifra venía capturada y no corresponde a ninguna razón de la hoja.",
-    "7) PptoxMes_Red, mayo 2026 (AB11): el 05 anterior traía '|' en lugar de la cifra; se puso Prima Tomada − Prima Devengada del mes, que es como sale en los demás meses.",
-    "8) El 2026 del 05 es el presupuesto 2026 que ya traía el archivo (Integración2026_Dim_9), no el reforecast 9+3 de ER!D.",
+    "1) Filas financieras 2027 de PptoxMes_Red: ER!Q62, Q63 y Q67 tienen =$Q62/12+P62 (se refieren a sí mismas, el libro no calcula iterativo) y de enero a noviembre también dependen de ese Q. "
+    "Se usó el anual del bloque 'ESTACIONALIDAD ACUMULADA MXN' de RIF, como ya hace la fila 60 (ER!Y60 = RIF!P231): RIF!P233 = 18.00 M (Productos de Inmuebles), P234 = 1,113.48 M (Intereses) y P237 = 411.55 M (Valuación), ÷ 12 acumulado. "
+    "Con eso enero a noviembre coinciden con lo que ER tiene guardado; son los montos del presupuesto 2026. RIF, impuestos y utilidad salen con las fórmulas de ER (filas 70 a 81). "
+    "Para corregir ER: Y62 = RIF!P233, Y63 = RIF!P234, Y67 = RIF!P237 y en F:Q usar $Y en lugar de $Q.",
+    "2) Dividendos (ER fila 64): J64 = RIF!E22 × RIF!K23 (41.35 M) y se arrastra hasta O64; P64 = RIF!E22 (65.50 M) y Q64 = RIF!F22, que está en blanco (columna del año 2025 de RIF), así que diciembre da 0 y el RIF anual no los incluye. "
+    "El 05 trae lo que calcula ER; parece un corrimiento de una columna (Q64 debería ser RIF!E22).",
+    "3) Costos Protecciones XL 2027 = 0 en todo el 05: ER (filas 29 y 43) y las vistas (fila 27) toman CtaMens!AA, que viene en 0 en los 201,231 renglones de 2027 (AB también); la hoja CostosXL solo llega a 202612 y CtaAnual también trae 0. "
+    "En el presupuesto 2026 eran 1,561.79 M y en el real 2025 1,598.72 M. Por eso el Resultado Técnico a Retención 2027 (3,710.72 M) y el de Operación (3,223.88 M) no traen ese costo: hay que cargar el XL 2027.",
+    "4) Prima 2027 que CtaMens no trae: no hay renglones de LN04009 (Daños Ultramar Londres), de LN04008 (Facultativos Sur sin Agro) ni del ramo GMM, y Salud solo trae prima en diciembre. Ninguna otra LN la recoge (Líneas Especiales baja de 7,147.7 M a 6,649.7 M). "
+    "CtaAnual del mismo libro sí trae prima 2027 para ellas (en USD: LN04009 195.07 M, LN04008 31.85 M, GMM 3.00 M, Salud 31.69 M). Por eso esos bloques traen las reservas de 2_Reservas sin prima: "
+    "Londres da prima 0 y resultado −509.7 M, Fac. Sur y Agropecuario queda con 403.8 M de prima (solo Agro, contra 963.0 M en 2026) y GMM da resultado −3.7 M.",
+    "5) Gastos Generales y Gasto GAEF 2027 salen de la hoja Gastos, cuyos meses (Gastos!C5:N5) son 202601 a 202612: ER fila 46 = Gastos!C12:N12 = C6:N6 ÷ 'Parámetros'!F7:Q7 (N12 lleva +0.35) y ER fila 69 = −Gastos!C13:N13 = −C7:N7 ÷ F7:Q7. "
+    "En pesos repiten el presupuesto 2026: Gastos Generales 697.16 M y GAEF −123.02 M.",
+    "6) Daños Facultativos Sur y Agropecuario = LN04008 (reservas) + LN04008-Agro (CtaMens). Crédito = 'Crédito' (reservas) + 'Credito' (CtaMens). Así cada miembro de la vista cae en un bloque y los bloques suman ER.",
+    "7) PptoxLN_Red: '2027 CA' se dejó vacía. En el 05 anterior '2026 CA' coincidía con 2026 en primas, siniestros, costos, XL y gastos (con otro reparto entre LN), pero no en reservas, IBNR ni resultados (columna A 'RESREVAS'); el libro de Cesión no trae esa segunda versión para 2027.",
+    "8) Columnas T/U/V de las hojas por dimensión: T y U se recorrieron (eran U y V) y V se calculó para 2027 con la regla de cada renglón. En las filas de variación de reserva, V = variación ÷ (aumento de la prima tomada o retenida contra 2026), igual que el 05 anterior. Quedan vacías donde el denominador es 0 (Londres, GMM).",
+    "9) Filas 37/38 (% combinado) de 2025 y 2026 se recalcularon con las cifras recorridas y la fórmula de la vista. En 32 celdas difieren de lo que imprimía el 05 anterior, que no cuadraba con sus propias cifras (Ramo 2025 de Resp. Civil a Fianzas y Región 2026). "
+    "En 2027 la fila 38 queda vacía donde la prima es 0 (Londres, GMM y Salud de enero a noviembre).",
+    "10) PptoxMes_Red, mayo 2026 (AB11): el 05 anterior traía '|' en lugar de la cifra; se puso Prima Tomada − Prima Devengada del mes, que es como sale en los demás meses.",
+    "11) El 2026 del 05 es el presupuesto 2026 que ya traía el archivo (Integración2026_Dim_9), no el reforecast 9+3 de ER!D.",
+    "12) El libro está en cálculo manual. Los valores guardados de ER_ln, ER_ram, ER_reg y ER_tre en las filas de CAT y gastos (17, 20, 24, 28, 31, 33 y 35) son anteriores al reparto de CAT: antes de comparar una vista contra el 05, recalcular con Ctrl+Alt+F9. Las hojas Val_* y Val05_* ya están calculadas.",
+    "13) En ER_ram el nombre xEvCat tiene una definición local que apunta al libro externo Integración2025_2030 (hoy vale 0), y la fila 24 de las vistas resta las recuperaciones AB × xEvCat con signo contrario a ER. Con xEvCat = 0 no hay efecto; si se cambia el escenario, conviene corregirlo.",
 ]
 
 # ============================================================ empaquetado
@@ -549,6 +599,13 @@ def empaquetar(src, dst, partes):
 if __name__ == '__main__':
     import empaquetar2 as E2
     P = W.Cadenas(E2.leer_sst(SRC))
+    _i = 0
+    for _rid, _pl in records(zipfile.ZipFile(SRC).read('xl/sharedStrings.bin')):
+        if _rid == 19:
+            if _pl[0] == 0:                                   # solo cadenas simples (sin formato ni fonetica)
+                _s = W_rd(_pl)
+                P.idx.setdefault(_s, _i)
+            _i += 1
     MENS, b_mens = hoja_mensual()
     DIMH = {}; BIN = {}
     for dim in ['LN', 'RAMO', 'REGION', 'TREA']:

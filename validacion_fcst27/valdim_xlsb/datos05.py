@@ -204,6 +204,24 @@ def er_eval(fx):
     e[66] = [78644000.0*(TCC[1+j] - TCC[0]) for j in range(NM)]
     e[69] = X([-v for v in GS(13)])
     e[79] = [a*t for a, t in zip(e[7], TASA_RO)]
+    # ER!Q62, Q63 y Q67 = $Q/12 + P se refieren a si mismas (circular, sin calculo iterativo), y de enero a
+    # noviembre dependen de ese Q. El diseño es anual/12 acumulado, como la fila 60 (ER!Y60 = RIF!P231):
+    # se toma el anual del mismo bloque de RIF (P233, P234, P237), que reproduce los valores guardados de
+    # enero a noviembre de ER. Sin tipo de cambio, como el resto de las filas financieras.
+    for f, r_rif in ((62, 232), (63, 233), (67, 236)):
+        e[f] = acum([val('RIF', r_rif, 15)/12]*NM)
+    e[80] = [0.0]*NM
+    e[70] = [sum(e[k][j] for k in range(60, 70)) for j in range(NM)]
+    e[71] = [a+b for a, b in zip(e[58], e[70])]
+    base = [max(a-b, 0.0) for a, b in zip(e[71], e[67])]
+    e[73] = [x*0.3 for x in base]
+    q14 = val('Parámetros', 13, 16)                                          # tope PTU, en MXN
+    tope = [q14 if fx is TC else q14/val('Parámetros', 6, 5+j) for j in range(NM)]
+    e[74] = [min(x*0.1, t) for x, t in zip(base, tope)]
+    e[75] = [x*0.28 for x in e[67]]; e[76] = [x*0.02 for x in e[67]]
+    e[77] = [a+b+c+d_ for a, b, c, d_ in zip(e[73], e[74], e[75], e[76])]
+    e[78] = [a-b for a, b in zip(e[71], e[77])]
+    e[81] = [a+b-c for a, b, c in zip(e[78], e[79], e[80])]
     return e
 
 ER_USD = er_eval(UNO); ER_MXN = er_eval(TC)
