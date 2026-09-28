@@ -152,6 +152,12 @@ def preparar_datos() -> dict:
         ventana = int(float(ventana))
     except (TypeError, ValueError):
         ventana = None                                   # toda la historia
+    persistencia = None
+    try:                                             # "indices: ... con persistencia 0.8; montos y LAGs: ..."
+        texto = str(resumen.get("Desviacion del ultimo mes", ""))
+        persistencia = float(texto.split("persistencia")[1].split(";")[0].strip()) if "persistencia" in texto else None
+    except (IndexError, ValueError):
+        persistencia = None
     sin_tc = [p for p in periodos_m if not tc.get(p)]
     if sin_tc:
         print(f"   Aviso: sin tipo de cambio en la BD para {sin_tc}; en MXN esos meses se muestran como s/d")
@@ -164,6 +170,7 @@ def preparar_datos() -> dict:
         "ramos_m": {k: ramos_m.get(k, []) for k in conceptos}, "conceptos": conceptos, "mon": mon,
         "tc": {str(p): _redondear(t, 6) for p, t in tc.items()},
         "metodo": filas_metodo, "modelo_por_tipo": modelo_por_tipo, "ventana_tendencia": ventana,
+        "persistencia_indices": persistencia,
         "tend": leer_tendencias(),
         "generado": datetime.now().strftime("%Y-%m-%d %H:%M"),
     }
@@ -389,7 +396,7 @@ table.datos tbody tr:hover { background: var(--surface-2); }
 </main>
 <footer class="pie">
   <span>__PIE__</span>
-  <span>Generado el __GENERADO__ por proyeccion_reservas.py · azul = real, naranja punteado = proyección, gris fino = modelo ajustado sobre la historia: recta de tendencia más el patrón por mes del año cuando la serie lo tiene; la proyección es ese modelo trasladado al último real (solo en las series que se proyectan directo: índices, LAGs y BEL/BRUTO por ramo en USD) · banda = intervalo al 80%</span>
+  <span>Generado el __GENERADO__ por proyeccion_reservas.py · azul = real, naranja punteado = proyección, gris fino = modelo ajustado sobre la historia: recta de tendencia más el patrón por mes del año cuando la serie lo tiene; la proyección arranca del último real y, en los índices, su desviación respecto al modelo se desvanece hacia el nivel del último año (solo en las series que se proyectan directo: índices, LAGs y BEL/BRUTO por ramo en USD) · banda = intervalo al 80%</span>
 </footer>
 <script>
 'use strict';
@@ -810,7 +817,7 @@ function pintarIndices() {
     kpi('Promedio real 12 meses', f4(prom), `${eti(P_I[i12 + 1])} a ${eti(D.ultimo)}`),
     kpi(`Proyección ${eti(D.p_dic)}`, f4(pDic), varPct(ult, pDic) == null ? null : fmtPct(varPct(ult, pDic)) + ' vs último real' + (conPatron ? ' (incluye el mes del año)' : '')),
     kpi(`Proyección ${eti(D.fin)}`, f4(pFin), varPct(ult, pFin) == null ? null : fmtPct(varPct(ult, pFin)) + ' vs último real' + (conPatron ? ' (incluye el mes del año)' : '')),
-    kpi(`Variación a 12 meses (${eti(P_I[iUlt + 12])} vs ${eti(D.ultimo)})`, fmtPct(varPct(ult, vals[iUlt + 12])), conPatron ? 'mismo mes: solo la tendencia, sin el efecto del mes del año' : 'mismo mes del año siguiente'),
+    kpi(`Variación a 12 meses (${eti(P_I[iUlt + 12])} vs ${eti(D.ultimo)})`, fmtPct(varPct(ult, vals[iUlt + 12])), conPatron ? 'mismo mes del año: sin el efecto estacional' : 'mismo mes del año siguiente'),
   );
   const real = vals.map((v, i) => i <= iUlt ? v : null);
   const proy = vals.map((v, i) => i >= iUlt ? v : null);
@@ -820,8 +827,9 @@ function pintarIndices() {
 
   const nombreTend = nombreModelo(`HPARAM|${serie}|${ramo}`);
   const tendI = rectaModelo(`HPARAM|${serie}|${ramo}`, real, P_I, 1);
-  const c1 = tarjeta(`Evolución mensual · ${serie} · ramo ${ramo}`, !tendI ? 'Real y proyección con banda al 80 %' : conPatron
-    ? 'Real, modelo ajustado (tendencia + patrón del año) y proyección con banda al 80 %' : 'Real, línea de tendencia y proyección con banda al 80 %',
+  const c1 = tarjeta(`Evolución mensual · ${serie} · ramo ${ramo}`, (!tendI ? 'Real y proyección con banda al 80 %' : conPatron
+    ? 'Real, modelo ajustado (tendencia + patrón del año) y proyección con banda al 80 %' : 'Real, línea de tendencia y proyección con banda al 80 %')
+    + (!esLag && D.persistencia_indices != null && D.persistencia_indices < 1 ? ` · la desviación del último mes se desvanece hacia el nivel del último año (persistencia ${D.persistencia_indices})` : ''),
     (cuerpo, W) => graficaLineas(cuerpo, W, {
       labels: P_I.map(eti), tituloX: i => etiLarga(P_I[i]), fmt: v => fmt(v, decInd(serie)), cadaX: 6, etiquetasFin: true,
       aria: `Evolución mensual de ${serie} del ramo ${ramo}`,
