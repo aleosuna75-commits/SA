@@ -143,7 +143,7 @@ CALC_05 = {    # mismas formulas que ER (filas 70-81) sobre las cifras en MXN de
 DESC_SUP = {62: "ER fila 62 · anual de RIF!P233 ÷ 12 acumulado (ER!Q62 es circular)",
             63: "ER fila 63 · anual de RIF!P234 ÷ 12 acumulado (ER!Q63 es circular)",
             67: "ER fila 67 · anual de RIF!P237 ÷ 12 acumulado (ER!Q67 es circular)",
-            70: "ER fila 70 · SUM de las filas 44 a 52 de esta hoja", 71: "ER fila 71 · fila 41 + fila 53",
+            70: "ER fila 70 · SUM de las filas 44 a 52 del 05 (filas de arriba en esta hoja; ER suma F60:F69, con la fila 65 Recargos = 0)", 71: "ER fila 71 · fila 41 + fila 53",
             73: "ER fila 73 · MAX(fila 55 − fila 50; 0) × 0.3", 74: "ER fila 74 · MIN(MAX(fila 55 − fila 50; 0) × 0.1; 'Parámetros'!Q14)",
             75: "ER fila 75 · fila 50 × 0.28", 76: "ER fila 76 · fila 50 × 0.02", 77: "ER fila 77 · SUM de las filas 58 a 61",
             78: "ER fila 78 · fila 55 − fila 62", 81: "ER fila 81 · fila 64 + fila 66 (ER fila 80 vacía)"}
@@ -459,7 +459,7 @@ def seccion_anual_ln(h, r):
         h.fb(r, T0 + 3, X(c1.g + c2.g + W.funcvar(2, 36), bool(c1.v and c2.v)), 'BOOL')
         r += 1
     assert not malos, malos[:4]
-    h.t(r + 1, 0, "La columna '2027 CA' se dejó vacía: en el 05 anterior '2026 CA' coincidía con 2026 en primas, siniestros, costos y gastos (otro reparto entre LN) pero no en reservas, IBNR ni resultados, y el libro de Cesión no trae esa versión para 2027.", 'NOTA')
+    h.t(r + 1, 0, "La columna '2027 CA' se dejó vacía: en el 05 anterior '2026 CA' coincidía con 2026 en primas, siniestros, costos, XL y gastos (otro reparto entre LN) pero no en reservas, IBNR ni resultados, y el libro de Cesión no trae esa versión para 2027.", 'NOTA')
     ANCLA['LN']['anual'] = (r_ini, r - 1, T0 + 3)
     return r + 2, T0 + 3
 
@@ -540,7 +540,7 @@ def hoja_resumen():
     h.t(r, 4, "", 'OBS'); r += 1
     NOTA25 = {'RAMO': "ER_ram!D toma ER1225_Real, vínculo a ER_RPAT_Ramos_202512.xlsx cuyo valor guardado es el acumulado a febrero de 2025 (primas 3,188 M contra 20,691 M del año); "
                       "el 05 anterior ya venía así. Coincide con la vista pero no con ER!E. Si se actualizan los vínculos habría que volver a llenar esa columna.",
-              'LN': 'Los bloques coinciden con la vista. La suma contra ER!E solo difiere en: IBNR y resultados técnicos por 1.85 y 1.29 pesos (redondeo entre Anexo2_1225 y ER!E), y Gastos Generales, Contribución y Resultado de Operación, porque el real 2025 por dimensión (Anexo2_1225) no trae gastos (703.49 M en ER!E).', 'REGION': 'Los bloques coinciden con la vista. La suma contra ER!E solo difiere en: IBNR y resultados técnicos por 1.85 y 1.29 pesos (redondeo entre Anexo2_1225 y ER!E), y Gastos Generales, Contribución y Resultado de Operación, porque el real 2025 por dimensión (Anexo2_1225) no trae gastos (703.49 M en ER!E).', 'TREA': 'Los bloques coinciden con la vista. La suma contra ER!E solo difiere en: IBNR y resultados técnicos por 1.85 y 1.29 pesos (redondeo entre Anexo2_1225 y ER!E), y Gastos Generales, Contribución y Resultado de Operación, porque el real 2025 por dimensión (Anexo2_1225) no trae gastos (703.49 M en ER!E).'}
+              'LN': 'Los bloques coinciden con la vista. La suma contra ER!E solo difiere en: IBNR y resultados técnicos por 1.85 y 1.29 pesos (redondeo entre Anexo2_1225 y ER!E), y Gastos Generales (703.49 M), Contribución (321.70 M), Total Costos de Operación (381.79 M) y Resultado de Operación, porque el real 2025 por dimensión (Anexo2_1225) no trae gastos. Por eso las filas por bloque de esos tres renglones no tienen ¿Cuadra? 2025 (AQ:AT en blanco) y el VERDADERO de la columna C no las cubre.', 'REGION': 'Los bloques coinciden con la vista. La suma contra ER!E solo difiere en: IBNR y resultados técnicos por 1.85 y 1.29 pesos (redondeo entre Anexo2_1225 y ER!E), y Gastos Generales (703.49 M), Contribución (321.70 M), Total Costos de Operación (381.79 M) y Resultado de Operación, porque el real 2025 por dimensión (Anexo2_1225) no trae gastos. Por eso las filas por bloque de esos tres renglones no tienen ¿Cuadra? 2025 (AQ:AT en blanco) y el VERDADERO de la columna C no las cubre.', 'TREA': 'Los bloques coinciden con la vista. La suma contra ER!E solo difiere en: IBNR y resultados técnicos por 1.85 y 1.29 pesos (redondeo entre Anexo2_1225 y ER!E), y Gastos Generales (703.49 M), Contribución (321.70 M), Total Costos de Operación (381.79 M) y Resultado de Operación, porque el real 2025 por dimensión (Anexo2_1225) no trae gastos. Por eso las filas por bloque de esos tres renglones no tienen ¿Cuadra? 2025 (AQ:AT en blanco) y el VERDADERO de la columna C no las cubre.'}
     for dim in ['LN', 'RAMO', 'REGION', 'TREA']:
         A = ANCLA[dim]; hd = DIMH[dim]; ix = IX[DIMINFO[dim]['hoja']]
         areas_b, areas_s = [], []
@@ -567,24 +567,32 @@ NOTAS = [
     "Se usó el anual del bloque 'ESTACIONALIDAD ACUMULADA MXN' de RIF, como ya hace la fila 60 (ER!Y60 = RIF!P231): RIF!P233 = 18.00 M (Productos de Inmuebles), P234 = 1,113.48 M (Intereses) y P237 = 411.55 M (Valuación), ÷ 12 acumulado. "
     "Con eso enero a noviembre coinciden con lo que ER tiene guardado; son los montos del presupuesto 2026. RIF, impuestos y utilidad salen con las fórmulas de ER (filas 70 a 81). "
     "Para corregir ER: Y62 = RIF!P233, Y63 = RIF!P234, Y67 = RIF!P237 y en F:Q usar $Y en lugar de $Q.",
-    "2) Dividendos (ER fila 64): J64 = RIF!E22 × RIF!K23 (41.35 M) y se arrastra hasta O64; P64 = RIF!E22 (65.50 M) y Q64 = RIF!F22, que está en blanco (columna del año 2025 de RIF), así que diciembre da 0 y el RIF anual no los incluye. "
-    "El 05 trae lo que calcula ER; parece un corrimiento de una columna (Q64 debería ser RIF!E22).",
+    "2) Dividendos (ER fila 64): J64 = RIF!E22 × RIF!K23 (41.35 M) y se arrastra hasta O64; P64 = RIF!E22 (65.50 M) y Q64 = RIF!F22, que está en blanco (columna del año 2025 de RIF), así que diciembre da 0. "
+    "El Resultado Integral de Financiamiento de diciembre (fila 53 del 05, 1,470.40 M) no los incluye, aunque la hoja RIF sí los trae (RIF!E22 y RIF!P235 = 65.50 M). "
+    "El 05 trae lo que calcula ER; parece un corrimiento de una columna (Q64 debería ser RIF!E22; en el presupuesto 2026 diciembre traía 65.50 M).",
     "3) Costos Protecciones XL 2027 = 0 en todo el 05: ER (filas 29 y 43) y las vistas (fila 27) toman CtaMens!AA, que viene en 0 en los 201,231 renglones de 2027 (AB también); la hoja CostosXL solo llega a 202612 y CtaAnual también trae 0. "
     "En el presupuesto 2026 eran 1,561.79 M y en el real 2025 1,598.72 M. Por eso el Resultado Técnico a Retención 2027 (3,710.72 M) y el de Operación (3,223.88 M) no traen ese costo: hay que cargar el XL 2027.",
     "4) Prima 2027 que CtaMens no trae: no hay renglones de LN04009 (Daños Ultramar Londres), de LN04008 (Facultativos Sur sin Agro) ni del ramo GMM, y Salud solo trae prima en diciembre. Ninguna otra LN la recoge (Líneas Especiales baja de 7,147.7 M a 6,649.7 M). "
     "CtaAnual del mismo libro sí trae prima 2027 para ellas (en USD: LN04009 195.07 M, LN04008 31.85 M, GMM 3.00 M, Salud 31.69 M). Por eso esos bloques traen las reservas de 2_Reservas sin prima: "
-    "Londres da prima 0 y resultado −509.7 M, Fac. Sur y Agropecuario queda con 403.8 M de prima (solo Agro, contra 963.0 M en 2026) y GMM da resultado −3.7 M.",
+    "Londres da prima 0 y resultado técnico a retención y de operación de −509.7 M, Fac. Sur y Agropecuario queda con 403.8 M de prima (solo Agro, contra 963.0 M en 2026) "
+    "y GMM da resultado técnico a retención y de operación de −3.7 M.",
     "5) Gastos Generales y Gasto GAEF 2027 salen de la hoja Gastos, cuyos meses (Gastos!C5:N5) son 202601 a 202612: ER fila 46 = Gastos!C12:N12 = C6:N6 ÷ 'Parámetros'!F7:Q7 (N12 lleva +0.35) y ER fila 69 = −Gastos!C13:N13 = −C7:N7 ÷ F7:Q7. "
     "En pesos repiten el presupuesto 2026: Gastos Generales 697.16 M y GAEF −123.02 M.",
     "6) Daños Facultativos Sur y Agropecuario = LN04008 (reservas) + LN04008-Agro (CtaMens). Crédito = 'Crédito' (reservas) + 'Credito' (CtaMens). Así cada miembro de la vista cae en un bloque y los bloques suman ER.",
     "7) PptoxLN_Red: '2027 CA' se dejó vacía. En el 05 anterior '2026 CA' coincidía con 2026 en primas, siniestros, costos, XL y gastos (con otro reparto entre LN), pero no en reservas, IBNR ni resultados (columna A 'RESREVAS'); el libro de Cesión no trae esa segunda versión para 2027.",
-    "8) Columnas T/U/V de las hojas por dimensión: T y U se recorrieron (eran U y V) y V se calculó para 2027 con la regla de cada renglón. En las filas de variación de reserva, V = variación ÷ (aumento de la prima tomada o retenida contra 2026), igual que el 05 anterior. Quedan vacías donde el denominador es 0 (Londres, GMM).",
+    "8) Columnas T/U/V de las hojas por dimensión: T y U se recorrieron (eran U y V) y V se calculó para 2027 con la regla de cada renglón. En las filas de variación de reserva (11 y 12), "
+    "V = variación ÷ (aumento de la prima tomada o retenida contra 2026), igual que el 05 anterior, y tienen cifra en todos los bloques. Quedan vacías las demás V cuyo denominador es la prima 2027 = 0 "
+    "(Londres y GMM, filas 9, 10, 15, 18, 22, 25, 26, 30, 31 y 32 del bloque).",
     "9) Filas 37/38 (% combinado) de 2025 y 2026 se recalcularon con las cifras recorridas y la fórmula de la vista. En 32 celdas difieren de lo que imprimía el 05 anterior, que no cuadraba con sus propias cifras (Ramo 2025 de Resp. Civil a Fianzas y Región 2026). "
     "En 2027 la fila 38 queda vacía donde la prima es 0 (Londres, GMM y Salud de enero a noviembre).",
     "10) PptoxMes_Red, mayo 2026 (AB11): el 05 anterior traía '|' en lugar de la cifra; se puso Prima Tomada − Prima Devengada del mes, que es como sale en los demás meses.",
     "11) El 2026 del 05 es el presupuesto 2026 que ya traía el archivo (Integración2026_Dim_9), no el reforecast 9+3 de ER!D.",
-    "12) El libro está en cálculo manual. Los valores guardados de ER_ln, ER_ram, ER_reg y ER_tre en las filas de CAT y gastos (17, 20, 24, 28, 31, 33 y 35) son anteriores al reparto de CAT: antes de comparar una vista contra el 05, recalcular con Ctrl+Alt+F9. Las hojas Val_* y Val05_* ya están calculadas.",
-    "13) En ER_ram el nombre xEvCat tiene una definición local que apunta al libro externo Integración2025_2030 (hoy vale 0), y la fila 24 de las vistas resta las recuperaciones AB × xEvCat con signo contrario a ER. Con xEvCat = 0 no hay efecto; si se cambia el escenario, conviene corregirlo.",
+    "12) El libro está en cálculo manual. Los valores guardados de ER_ln, ER_ram, ER_reg y ER_tre en las filas de CAT y gastos (17, 20, 24, 28, 31, 33 y 35) son anteriores al reparto de CAT: antes de comparar una vista contra el 05, recalcular con Ctrl+Alt+F9. Las hojas Val_* y Val05_* ya están calculadas. "
+    "El libro trae además la marca de recálculo completo al abrir; todo recálculo completo muestra el aviso de referencia circular de ER!Q62, Q63 y Q67 (nota 1).",
+    "13) En ER_ram el nombre xEvCat tiene una definición local que apunta a Inicio!C13 del libro externo Integración2025_2030 - Base_9+3_Esc1 (valor guardado 0), no al de este libro; ahí multiplica los eventos CAT (CtaMens!AC, 45 M USD en 2027) en las filas 17 y 24. "
+    "Además la fila 24 de las cuatro vistas resta las recuperaciones AB × xEvCat con signo contrario a ER. Hoy no hay efecto (xEvCat = 0 y AB = 0); con los escenarios con eventos CAT, ER_ram dejaría fuera lo que sí toman ER y las otras vistas.",
+    "14) ER!F70:Q81 guarda valores de un cálculo anterior (F70 = 1,379.76 M, igual a E70) y #REF! en G73:Q74, G77:Q78 y G81:Q81. Val05_Mensual no los usa: rehace RIF, impuestos y utilidad con las fórmulas de ER sobre su propia hoja. "
+    "Se limpian al aplicar la corrección de la nota 1 y recalcular.",
 ]
 
 # ============================================================ empaquetado
