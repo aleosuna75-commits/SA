@@ -311,8 +311,9 @@ TOLERANCIA_SALTO_TC = 0.25       # un salto entre dos meses se atribuye al TC si
 # modelo sale del rango, se reduce en la misma proporcion el crecimiento proyectado de todos los ramos (desde su ultimo
 # real) hasta que el total quede dentro en todos los meses; si el ultimo real ya estaba fuera, se lleva al limite mas
 # cercano. BRUTO, IRR y NETO de cada ramo se escalan juntos, asi que las identidades se conservan. Es un ajuste de
-# criterio experto: la cifra del modelo sin ajuste queda en Alertas. {} = sin rangos.
-RANGO_ESPERADO = {("FIANZAS", "RFV NETO"): (80e6, 100e6)}   # RFV NETO total: 80 a 100 M USD (ago-26 real: 90.6)
+# criterio experto: la cifra del modelo sin ajuste queda en Alertas. None en un limite = sin limite de ese lado.
+# {} = sin rangos.
+RANGO_ESPERADO = {("FIANZAS", "RFV NETO"): (80e6, None)}    # RFV NETO total: minimo 80 M USD, sin tope (ago-26 real: 90.6)
 # Contraste con el presupuesto (opcional). Si en entradas/ esta el dashboard HTML del presupuesto tecnico ("Validacion
 # FCST", con primas, siniestros y comisiones por linea de negocio: real del ano anterior, reestimado del ano en curso y
 # presupuesto del siguiente), el diagnostico compara el crecimiento de cada reserva con el de su referencia: RRC con
@@ -1089,6 +1090,17 @@ def escribir_correccion_moneda(bd: BDMontos, cambios: list):
         bd.ws.cell(fila, col).value = nuevo
 
 
+def texto_rango(inf: float | None, sup: float | None) -> str:
+    """Rango esperado para textos: "80-100 M USD", "minimo 80 M USD, sin tope" o "maximo 100 M USD, sin piso"."""
+    if inf is not None and sup is not None:
+        return f"{inf/1e6:,.0f}-{sup/1e6:,.0f} M USD"
+    if inf is not None:
+        return f"minimo {inf/1e6:,.0f} M USD, sin tope"
+    if sup is not None:
+        return f"maximo {sup/1e6:,.0f} M USD, sin piso"
+    return "sin limites"
+
+
 def aplicar_rango_esperado(proy: dict, bd: BDMontos, libro: str, reservas: dict, resultados: dict,
                            periodos_proy: list[int], ultimo: int, alertas: list) -> list:
     """Mantiene el total (suma de ramos, USD) de los conceptos de RANGO_ESPERADO dentro de su rango. Si la proyeccion
@@ -1097,9 +1109,12 @@ def aplicar_rango_esperado(proy: dict, bd: BDMontos, libro: str, reservas: dict,
     cada ramo se escalan con el mismo factor, y tambien el driver (pronostico e intervalo) del diagnostico. Si ni con
     k = 0 (nivel del ultimo real) queda dentro, cada mes se lleva al limite. Regresa lineas de resumen."""
     resumen = []
-    for (lib, concepto), (inf, sup) in RANGO_ESPERADO.items():
+    for (lib, concepto), (inf_cfg, sup_cfg) in RANGO_ESPERADO.items():
         if lib != libro:
             continue
+        inf = -np.inf if inf_cfg is None else inf_cfg
+        sup = np.inf if sup_cfg is None else sup_cfg
+        rango = texto_rango(inf_cfg, sup_cfg)
         pref = concepto.split()[0]
         est = reservas.get(pref)
         if not est:
@@ -1124,8 +1139,8 @@ def aplicar_rango_esperado(proy: dict, bd: BDMontos, libro: str, reservas: dict,
 
         sin_ajuste = total(1.0)
         if fuera(1.0) <= 0:
-            resumen.append(f"{libro} {concepto}: dentro del rango {inf/1e6:,.0f}-{sup/1e6:,.0f} M USD sin ajuste "
-                           f"(dic: {sin_ajuste[-1]/1e6:,.1f})")
+            resumen.append(f"{libro} {concepto}: dentro del rango ({rango}) sin ajuste "
+                           f"({periodos_proy[0]}: {sin_ajuste[0]/1e6:,.1f}; {periodos_proy[-1]}: {sin_ajuste[-1]/1e6:,.1f})")
             continue
         if fuera(0.0) <= 0:
             lo, hi = 0.0, 1.0
@@ -1151,11 +1166,11 @@ def aplicar_rango_esperado(proy: dict, bd: BDMontos, libro: str, reservas: dict,
                 res.pronostico = [v * float(fi) for v, fi in zip(res.pronostico, f)]
                 res.li = [v * float(fi) for v, fi in zip(res.li, f)]
                 res.ls = [v * float(fi) for v, fi in zip(res.ls, f)]
-                res.alertas.append(f"Rango esperado de {concepto} total ({inf/1e6:,.0f}-{sup/1e6:,.0f} M USD): {nota}")
+                res.alertas.append(f"Rango esperado de {concepto} total ({rango}): {nota}")
                 res.parametros["factor_rango_esperado"] = float(k)
         con_ajuste = sum(np.array([proy.get((norm(concepto), p, r), 0.0) for p in periodos_proy]) for r in ramos)
         texto = (f"El modelo proyectaba {concepto} total de {sin_ajuste[0]/1e6:,.1f} a {sin_ajuste[-1]/1e6:,.1f} M USD "
-                 f"({periodos_proy[0]} a {periodos_proy[-1]}), fuera del rango esperado {inf/1e6:,.0f}-{sup/1e6:,.0f}; "
+                 f"({periodos_proy[0]} a {periodos_proy[-1]}), fuera del rango esperado ({rango}); "
                  f"{nota}: queda de {con_ajuste[0]/1e6:,.1f} a {con_ajuste[-1]/1e6:,.1f} (RANGO_ESPERADO).")
         alertas.append((libro, f"Rango esperado {concepto}", texto))
         resumen.append(texto)
@@ -1539,7 +1554,7 @@ def escribir_diagnostico(resultados: dict, periodos_proy: list[int], alertas_gen
                                     f"(minimo {MIN_OBS_ESTACIONALIDAD} meses)") if ESTACIONALIDAD_MENSUAL else "no"),
         ("Moneda del modelo", ", ".join(f"{lib}: {'MXN (convertido con el TC de Inversiones)' if v else 'USD'}"
                                          for lib, v in MODELAR_EN_MXN.items())),
-        ("Rango esperado", "; ".join(f"{lib} {c}: {a/1e6:,.0f} - {b/1e6:,.0f} M USD (total de ramos)"
+        ("Rango esperado", "; ".join(f"{lib} {c} (total de ramos): {texto_rango(a, b)}"
                                      for (lib, c), (a, b) in RANGO_ESPERADO.items()) or "sin rangos"),
         ("Ajuste por rango esperado", " | ".join(resumen.get("rangos") or []) or "no aplico"),
         ("Moneda mezclada corregida", ", ".join(f"{k}: {v} celdas convertidas de MXN a USD"

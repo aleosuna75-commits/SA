@@ -177,7 +177,7 @@ def preparar_datos() -> dict:
     if resumen.get("Rango esperado") and resumen.get("Rango esperado") != "sin rangos":
         m = re.search(r"se conservo el (\d+)% del crecimiento", ajuste)
         m2 = re.search(r"proyectaba .*? de [\d.,]+ a ([\d.,]+) M USD", ajuste)
-        nota_rangos = (f"Rango esperado del área: {resumen['Rango esperado']}"
+        nota_rangos = (f"Rango esperado del área: {str(resumen['Rango esperado']).replace('minimo', 'mínimo').replace('maximo', 'máximo')}"
                        + (f"; el modelo daba {m2.group(1)} al final y se conservó el {m.group(1)} % del crecimiento" if m and m2 else ""))
     persistencia = None
     try:                                             # "indices: ... con persistencia 0.8; montos y LAGs: ..."
