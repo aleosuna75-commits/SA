@@ -222,7 +222,9 @@ def leer_montos(ultimo: int):
             tipo = "Real" if per <= ultimo else "Proyección"
             for ramo, k in c_ramos.items():
                 v = numero(f[k])
-                registros.append((libro, reserva, conc, ramo, per, tipo, v if v is not None else 0.0))
+                if v is None:                    # celda vacia (p. ej. RCONT de 2025): sin dato, no un cero real
+                    continue
+                registros.append((libro, reserva, conc, ramo, per, tipo, v))
         wb.close()
     return registros, tc, ramos
 
