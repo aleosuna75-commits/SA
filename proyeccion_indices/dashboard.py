@@ -512,10 +512,12 @@ def generar(ruta_salida: Path = SALIDA_DASHBOARD) -> Path:
     kpis = [
         (f"Último real ({etiqueta(ultimo)})", "=" + valor_indice(ultimo), "0.0000"),
         ("Promedio real 12 meses",
-         f'=IFERROR(AVERAGEIFS(I_Val,I_Tipo,"Real",{crit},I_Per,">"&{p_12}),NA())', "0.0000"),
+         f'=IF(COUNTIFS(I_Tipo,"Real",{crit},I_Per,">"&{p_12})<12,NA(),'
+         f'AVERAGEIFS(I_Val,I_Tipo,"Real",{crit},I_Per,">"&{p_12}))', "0.0000"),
         (f"Proyección {etiqueta(p_dic_actual)}", "=" + valor_indice(p_dic_actual), "0.0000"),
         (f"Proyección {etiqueta(fin)}", "=" + valor_indice(fin), "0.0000"),
-        ("Var. promedio 12 meses (proy. vs real)", "", "+0.0%;-0.0%;0.0%"),
+        (f"Var. prom. 12 m ({etiqueta(mover(ultimo, 1))}–{etiqueta(mover(ultimo, 12))} vs "
+         f"{etiqueta(mover(ultimo, -11))}–{etiqueta(ultimo)})", "", "+0.0%;-0.0%;0.0%"),
     ]
     pintar(ws, f"D5:{ultima_col}8", BANDA_KPI)
     for k, (tit, form, fmt) in enumerate(kpis):
@@ -530,8 +532,9 @@ def generar(ruta_salida: Path = SALIDA_DASHBOARD) -> Path:
         c.alignment = Alignment(horizontal="left", vertical="center", indent=1)
     # promedio de los proximos 12 meses proyectados contra el de los ultimos 12 reales (J7): ano contra ano, sin el
     # efecto del mes del ano
-    ws.cell(7, 28).value = (f'=IFERROR(AVERAGEIFS(I_Val,{crit},I_Per,">"&{ultimo},I_Per,"<="&{mover(ultimo, 12)})'
-                            f'/J7-1,"s/d")')
+    ws.cell(7, 28).value = (f'=IF(COUNTIFS({crit},I_Per,">"&{ultimo},I_Per,"<="&{mover(ultimo, 12)})<12,"s/d",'
+                            f'IFERROR(ROUND(AVERAGEIFS(I_Val,{crit},I_Per,">"&{ultimo},I_Per,"<="&{mover(ultimo, 12)})'
+                            f'/J7-1,4),"s/d"))')
 
     # paneles
     caja(ws, "D10:S27")
@@ -637,8 +640,11 @@ def generar(ruta_salida: Path = SALIDA_DASHBOARD) -> Path:
         forms = [serie] + [f"=IFERROR(SUMIFS(I_Val,{base},I_Per,{p})/(COUNTIFS({base},I_Per,{p})>0),NA())"
                            for p in (ultimo, p_dic_actual, fin)]
         # promedio de los proximos 12 meses proyectados contra el de los ultimos 12 reales
-        forms.append(f'=IFERROR(AVERAGEIFS(I_Val,{base},I_Per,">"&{ultimo},I_Per,"<="&{mover(ultimo, 12)})'
-                     f'/AVERAGEIFS(I_Val,{base},I_Per,">"&{mover(ultimo, -12)},I_Per,"<="&{ultimo})-1,NA())')
+        # exige los 12 meses de cada lado (las series con meses faltantes quedan en #N/D, igual que en Analisis)
+        forms.append(f'=IF(OR(COUNTIFS({base},I_Per,">"&{mover(ultimo, -12)},I_Per,"<="&{ultimo})<12,'
+                     f'COUNTIFS({base},I_Per,">"&{ultimo},I_Per,"<="&{mover(ultimo, 12)})<12),NA(),'
+                     f'IFERROR(ROUND(AVERAGEIFS(I_Val,{base},I_Per,">"&{ultimo},I_Per,"<="&{mover(ultimo, 12)})'
+                     f'/AVERAGEIFS(I_Val,{base},I_Per,">"&{mover(ultimo, -12)},I_Per,"<="&{ultimo})-1,4),NA()))')
         for (_, c1_, c2_), form in zip(cab, forms):
             ws.merge_cells(start_row=f_, start_column=c1_, end_row=f_ + 1, end_column=c2_)
             cel = ws.cell(f_, c1_, form)

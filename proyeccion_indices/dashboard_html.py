@@ -438,7 +438,7 @@ const nf = d => (NF[d] ||= new Intl.NumberFormat('es-MX', { minimumFractionDigit
 const fmt = (v, d) => { if (v == null || !isFinite(v)) return 's/d'; if (Math.abs(v) < Math.pow(10, -d) / 2) v = 0; return nf(d).format(v); };
 const varPct = (base, v) => (base > 0 && v != null && isFinite(v)) ? v / base - 1 : null;   // variacion solo con base positiva
 const decimalesPaso = (ts, minimo) => { const paso = ts.length > 1 ? Math.abs(ts[1] - ts[0]) : 1; return Math.max(minimo || 0, Math.min(6, Math.ceil(-Math.log10(paso) - 1e-9))); };
-const fmtPct = v => (v == null || !isFinite(v)) ? 's/d' : (v > 0 ? '+' : v < 0 ? '−' : '') + nf(1).format(Math.abs(v) * 100) + ' %';
+const fmtPct = v => { if (v == null || !isFinite(v)) return 's/d'; const r = Math.round(v * 1000) / 1000; return (r > 0 ? '+' : r < 0 ? '−' : '') + nf(1).format(Math.abs(r) * 100) + ' %'; };
 const cssVar = n => `var(${n})`;                    // las marcas usan la variable: siguen al tema y a la impresion
 const cssHex = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
 const el = (tag, attrs = {}, ...hijos) => {
@@ -832,7 +832,8 @@ function kpi(lbl, val, dlt) { return el('div', { class: 'kpi' }, el('div', { cla
 const P_I = D.periodos_i, iUlt = idx(P_I, D.ultimo), iDic = idx(P_I, D.p_dic), iFin = idx(P_I, D.fin), i12 = idx(P_I, D.p_12);
 const valorInd = (ramo, serie, i) => ((D.ind[ramo] || {})[serie] || [])[i] ?? null;
 const serieInd = (ramo, serie) => (D.ind[ramo] || {})[serie] || new Array(P_I.length).fill(null);
-const promedio12 = arr => { const v = arr.slice(i12 + 1, iUlt + 1).filter(x => x != null); return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null; };
+// promedio de los ultimos 12 meses reales: exige los 12 (las series con meses faltantes muestran s/d, igual que en Excel)
+const promedio12 = arr => { const v = arr.slice(i12 + 1, iUlt + 1).filter(x => x != null); return v.length === 12 ? v.reduce((a, b) => a + b, 0) / 12 : null; };
 // promedio de los proximos 12 meses proyectados (sep a ago): se compara contra promedio12, ano completo contra ano completo,
 // asi la variacion no depende del mes del ano ni de un solo mes atipico
 const promedioProx12 = arr => { const v = arr.slice(iUlt + 1, iUlt + 13).filter(x => x != null); return v.length === 12 ? v.reduce((a, b) => a + b, 0) / 12 : null; };
@@ -1048,7 +1049,7 @@ function pintarAnalisis() {
 
   if (D.ppto) {
     v.append(el('h2', { text: '4. Reservas contra el presupuesto' }));
-    v.append(el('p', { text: 'Crecimiento de diciembre contra diciembre de cada reserva NETO (total de ramos) frente a su referencia en el presupuesto técnico (vista tomado): RRC contra primas y SONR contra siniestros de Daños; RFV contra las primas de las líneas de Fianzas. Si la razón reserva / referencia se mantiene, la reserva crece en proporción al negocio. Las líneas de negocio cambiaron de clasificación entre el año anterior y el actual (hay líneas nuevas y reclasificadas), así que el crecimiento de la referencia del año en curso no es comparable; el contraste útil es el del último año. Cifras en millones de USD.' }));
+    v.append(el('p', { text: 'Crecimiento de diciembre contra diciembre de cada reserva NETO (total de ramos) frente a su referencia en el presupuesto técnico (vista tomado): RRC contra primas y SONR contra siniestros de Daños; RFV contra las primas de las líneas de Fianzas. Si la razón reserva / referencia se mantiene, la reserva crece en proporción al negocio. La referencia de Daños excluye las líneas nuevas sin base en el año en curso, porque la reserva proyectada por tendencia no puede traer ese negocio; la columna «con líneas nuevas» muestra el crecimiento si se incluyen. Las líneas cambiaron de clasificación entre el año anterior y el actual, así que el crecimiento de la referencia del año en curso no es comparable; el contraste útil es el del último año. Cifras en millones de USD.' }));
     const enc = D.ppto.enc;
     const fmtCol = (h, x) => {
       if (x == null || x === '') return 's/d';
@@ -1059,7 +1060,8 @@ function pintarAnalisis() {
       return fmt(x / 1e6, 1);
     };
     const t4 = el('table', { class: 'datos' });
-    t4.append(el('thead', {}, el('tr', {}, ...enc.map(h => el('th', { scope: 'col', text: h })))));
+    const etiqEnc = h => h.replace(/\b(20\d{2})(\d{2})\b/g, (m, a, b) => eti(+(a + b)));   // Reserva 202512 -> Reserva dic-25
+    t4.append(el('thead', {}, el('tr', {}, ...enc.map(h => el('th', { scope: 'col', text: etiqEnc(h) })))));
     const tb4 = el('tbody');
     for (const f of D.ppto.filas) {
       const tr = el('tr');

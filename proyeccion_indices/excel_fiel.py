@@ -139,6 +139,9 @@ def restaurar_vinculos_externos(original: Path | None, salida: Path) -> list:
                 rels = f"xl/externalLinks/_rels/{m.group(1)}.xml.rels" if m else None
                 if m and rels in nombres:
                     rel_xml = zo.read(rels).decode("utf-8")
+                    ids_o = {_atributo(e, "Id") for e in _PATRON_REL.findall(rel_xml)}
+                    if any(r not in ids_o for r in _PATRON_RID.findall(zo.read(n).decode("utf-8"))):
+                        continue      # el original ya viene roto (p. ej. guardado con openpyxl): lo repara la validacion
                     for destino in _destinos(rel_xml):
                         originales[destino] = (zo.read(n), zo.read(rels))
     ajustes, reemplazos = [], {}
@@ -162,6 +165,8 @@ def restaurar_vinculos_externos(original: Path | None, salida: Path) -> list:
             if faltan and len(ids) == 1:
                 reemplazos[n] = _PATRON_RID.sub(f'r:id="{ids[0]}"', xml).encode("utf-8")
                 ajustes.append(f"{m.group(1)}: r:id {faltan} -> {ids[0]}")
+            elif faltan:
+                ajustes.append(f"{m.group(1)}: r:id {faltan} sin relacion; Excel podria abrir el libro como reparado")
         if not reemplazos:
             return ajustes
         fd, tmp = tempfile.mkstemp(suffix=".xlsx", dir=str(salida.parent))
@@ -226,7 +231,9 @@ def guardar_libro(wb, ruta: Path, original: Path | None = None) -> None:
             except Exception as e:  # noqa: BLE001
                 print(f"   Aviso: no se pudo restaurar el encabezado/pie de pagina original de {ruta.name}: {e!r}")
         try:
-            restaurar_vinculos_externos(original, Path(tmp))
+            for ajuste in restaurar_vinculos_externos(original, Path(tmp)):
+                if "restaurado del original" not in ajuste:
+                    print(f"   Aviso {ruta.name}: vinculo externo {ajuste}")
         except Exception as e:  # noqa: BLE001
             print(f"   Aviso: no se pudieron revisar los vinculos externos de {ruta.name}: {e!r}")
         _permisos_normales(tmp)
