@@ -108,6 +108,72 @@ def restaurar_encabezados(original: Path, salida: Path) -> int:
     return len(reemplazos)
 
 
+_PATRON_LINK = re.compile(r"^xl/externalLinks/(externalLink\d+)\.xml$")
+_PATRON_RID = re.compile(r'r:id="([^"]+)"')
+_PATRON_REL = re.compile(r'<Relationship\b[^>]*>')
+
+
+def _atributo(etiqueta: str, nombre: str) -> str | None:
+    m = re.search(rf'\b{nombre}="([^"]*)"', etiqueta)
+    return m.group(1) if m else None
+
+
+def _destinos(rels_xml: str) -> set:
+    """Nombres de archivo (sin ruta) a los que apuntan las relaciones de un vinculo externo."""
+    return {Path((_atributo(e, "Target") or "").replace("\\", "/")).name.lower() for e in _PATRON_REL.findall(rels_xml)}
+
+
+def restaurar_vinculos_externos(original: Path | None, salida: Path) -> list:
+    """openpyxl conserva los vinculos externos (p. ej. a los Res_Rvas) pero, cuando el original trae rutas alternas
+    (extension "extlinks2021" de Excel), escribe el <externalBook r:id="rId1"> con una sola relacion cuyo Id es otro:
+    Excel lo detecta al abrir y "repara" el archivo quitando el vinculo. Aqui se vuelven a poner, tal cual vienen en el
+    original, la parte y las relaciones de cada vinculo (se emparejan por el archivo al que apuntan) y despues se
+    valida que cada r:id de los vinculos exista en sus relaciones. Regresa la lista de ajustes hechos."""
+    salida = Path(salida)
+    originales = {}
+    if original is not None and Path(original).exists():
+        with zipfile.ZipFile(original) as zo:
+            nombres = set(zo.namelist())
+            for n in nombres:
+                m = _PATRON_LINK.match(n)
+                rels = f"xl/externalLinks/_rels/{m.group(1)}.xml.rels" if m else None
+                if m and rels in nombres:
+                    rel_xml = zo.read(rels).decode("utf-8")
+                    for destino in _destinos(rel_xml):
+                        originales[destino] = (zo.read(n), zo.read(rels))
+    ajustes, reemplazos = [], {}
+    with zipfile.ZipFile(salida) as zs:
+        nombres = set(zs.namelist())
+        for n in sorted(nombres):
+            m = _PATRON_LINK.match(n)
+            if not m:
+                continue
+            rels = f"xl/externalLinks/_rels/{m.group(1)}.xml.rels"
+            rel_xml = zs.read(rels).decode("utf-8") if rels in nombres else ""
+            par = next((originales[d] for d in _destinos(rel_xml) if d in originales), None)
+            if par is not None:
+                reemplazos[n], reemplazos[rels] = par
+                ajustes.append(f"{m.group(1)}: restaurado del original")
+                continue
+            # sin original: al menos que cada r:id apunte a una relacion existente
+            xml = zs.read(n).decode("utf-8")
+            ids = [_atributo(e, "Id") for e in _PATRON_REL.findall(rel_xml)]
+            faltan = [r for r in _PATRON_RID.findall(xml) if r not in ids]
+            if faltan and len(ids) == 1:
+                reemplazos[n] = _PATRON_RID.sub(f'r:id="{ids[0]}"', xml).encode("utf-8")
+                ajustes.append(f"{m.group(1)}: r:id {faltan} -> {ids[0]}")
+        if not reemplazos:
+            return ajustes
+        fd, tmp = tempfile.mkstemp(suffix=".xlsx", dir=str(salida.parent))
+        os.close(fd)
+        with zipfile.ZipFile(tmp, "w", zipfile.ZIP_DEFLATED) as zt:
+            for item in zs.infolist():
+                zt.writestr(item, reemplazos.get(item.filename, zs.read(item.filename)))
+    _permisos_normales(tmp)
+    os.replace(tmp, salida)
+    return ajustes
+
+
 def verificar_escritura(rutas) -> None:
     """Falla de inmediato (antes del calculo) si alguna salida esta abierta en Excel o en otro programa, o si
     no se puede escribir en su carpeta."""
@@ -159,6 +225,10 @@ def guardar_libro(wb, ruta: Path, original: Path | None = None) -> None:
                 restaurar_encabezados(original, Path(tmp))
             except Exception as e:  # noqa: BLE001
                 print(f"   Aviso: no se pudo restaurar el encabezado/pie de pagina original de {ruta.name}: {e!r}")
+        try:
+            restaurar_vinculos_externos(original, Path(tmp))
+        except Exception as e:  # noqa: BLE001
+            print(f"   Aviso: no se pudieron revisar los vinculos externos de {ruta.name}: {e!r}")
         _permisos_normales(tmp)
         try:
             os.replace(tmp, ruta)

@@ -103,6 +103,25 @@ def leer_tendencias() -> dict:
     return out
 
 
+def leer_contraste_presupuesto() -> dict | None:
+    """Hoja Contraste_Presupuesto del diagnostico (si se leyo el presupuesto): {"enc": [...], "filas": [[...]]}."""
+    if not dx.ARCHIVO_DIAGNOSTICO.exists():
+        return None
+    wb = openpyxl.load_workbook(dx.ARCHIVO_DIAGNOSTICO, read_only=True, data_only=True)
+    try:
+        if "Contraste_Presupuesto" not in wb.sheetnames:
+            return None
+        filas = list(wb["Contraste_Presupuesto"].iter_rows(values_only=True))
+    finally:
+        wb.close()
+    if not filas:
+        return None
+    enc = [str(h) for h in filas[0] if h is not None]
+    datos = [[(_redondear(v, 6) if isinstance(v, float) else v) for v in f[:len(enc)]]
+             for f in filas[1:] if f and f[0] and str(f[0]).strip() and len(str(f[0])) < 40]
+    return {"enc": enc, "filas": datos} if datos else None
+
+
 def preparar_datos() -> dict:
     """Lee las salidas de la proyeccion y arma el diccionario que se incrusta en el HTML."""
     registros_i, ramos_i, ultimo = dx.leer_indices()
@@ -180,6 +199,7 @@ def preparar_datos() -> dict:
         "metodo": filas_metodo, "modelo_por_tipo": modelo_por_tipo, "ventana_tendencia": ventana,
         "persistencia_indices": persistencia,
         "nota_rangos": nota_rangos,
+        "ppto": leer_contraste_presupuesto(),
         "tend": leer_tendencias(),
         "generado": datetime.now().strftime("%Y-%m-%d %H:%M"),
     }
@@ -813,6 +833,9 @@ const P_I = D.periodos_i, iUlt = idx(P_I, D.ultimo), iDic = idx(P_I, D.p_dic), i
 const valorInd = (ramo, serie, i) => ((D.ind[ramo] || {})[serie] || [])[i] ?? null;
 const serieInd = (ramo, serie) => (D.ind[ramo] || {})[serie] || new Array(P_I.length).fill(null);
 const promedio12 = arr => { const v = arr.slice(i12 + 1, iUlt + 1).filter(x => x != null); return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null; };
+// promedio de los proximos 12 meses proyectados (sep a ago): se compara contra promedio12, ano completo contra ano completo,
+// asi la variacion no depende del mes del ano ni de un solo mes atipico
+const promedioProx12 = arr => { const v = arr.slice(iUlt + 1, iUlt + 13).filter(x => x != null); return v.length === 12 ? v.reduce((a, b) => a + b, 0) / 12 : null; };
 const decInd = serie => 4;
 
 function pintarIndices() {
@@ -826,7 +849,7 @@ function pintarIndices() {
     kpi('Promedio real 12 meses', f4(prom), `${eti(P_I[i12 + 1])} a ${eti(D.ultimo)}`),
     kpi(`Proyección ${eti(D.p_dic)}`, f4(pDic), varPct(ult, pDic) == null ? null : fmtPct(varPct(ult, pDic)) + ' vs último real' + (conPatron ? ' (incluye el mes del año)' : '')),
     kpi(`Proyección ${eti(D.fin)}`, f4(pFin), varPct(ult, pFin) == null ? null : fmtPct(varPct(ult, pFin)) + ' vs último real' + (conPatron ? ' (incluye el mes del año)' : '')),
-    kpi(`Variación a 12 meses (${eti(P_I[iUlt + 12])} vs ${eti(D.ultimo)})`, fmtPct(varPct(ult, vals[iUlt + 12])), conPatron ? 'mismo mes del año: sin el efecto estacional' : 'mismo mes del año siguiente'),
+    kpi('Variación promedio 12 meses', fmtPct(varPct(prom, promedioProx12(vals))), `${eti(P_I[iUlt + 1])}–${eti(P_I[iUlt + 12])} (proy.) contra ${eti(P_I[i12 + 1])}–${eti(D.ultimo)} (real)`),
   );
   const real = vals.map((v, i) => i <= iUlt ? v : null);
   const proy = vals.map((v, i) => i >= iUlt ? v : null);
@@ -873,22 +896,22 @@ function pintarIndices() {
     () => tablaDatos(['LAG', ...seriesLag.map(s => s.nombre)], D.lags.map((l, i) => [l, ...seriesLag.map(s => fmt(s.valores[i], 4))])));
 
   const filasRes = [...D.indices, ...D.lags.slice(0, 3)].map(se => {
-    const v = serieInd(ramo, se); const u = v[iUlt], pf = v[iFin];
-    return { se, u, prom: promedio12(v), pd: v[iDic], pf, var: varPct(u, pf) };
+    const v = serieInd(ramo, se); const u = v[iUlt], pf = v[iFin], prom = promedio12(v), prox = promedioProx12(v);
+    return { se, u, prom, prox, pd: v[iDic], pf, var: varPct(prom, prox) };
   });
-  const c4 = tarjeta(`Resumen de índices · ramo ${ramo}`, `Últimos reales y proyección, con la variación a ${eti(D.fin)} (en las series con patrón incluye el mes del año)`,
+  const encRes = ['Índice', `Real ${eti(D.ultimo)}`, 'Prom. 12 m real', 'Prom. 12 m proy.', 'Var. prom. 12 m', `Proy. ${eti(D.p_dic)}`, `Proy. ${eti(D.fin)}`];
+  const c4 = tarjeta(`Resumen de índices · ramo ${ramo}`, `Variación = promedio de los próximos 12 meses proyectados (${eti(P_I[iUlt + 1])} a ${eti(P_I[iUlt + 12])}) contra los últimos 12 reales: año completo contra año completo, sin el efecto del mes`,
     (cuerpo) => {
       const t = el('table', { class: 'datos' });
-      t.append(el('thead', {}, el('tr', {}, ...['Índice', `Real ${eti(D.ultimo)}`, 'Prom. 12 m', `Proy. ${eti(D.p_dic)}`, `Proy. ${eti(D.fin)}`, 'Var. vs real'].map(h => el('th', { scope: 'col', text: h })))));
+      t.append(el('thead', {}, el('tr', {}, ...encRes.map(h => el('th', { scope: 'col', text: h })))));
       const tb = el('tbody');
       for (const f of filasRes) {
         const cv = el('td', { text: fmtPct(f.var) }); const bg = colorDivergente(f.var, 0.3); if (bg) { cv.style.background = bg; cv.className = 'celda-calor'; }
-        tb.append(el('tr', {}, el('th', { scope: 'row', text: f.se }), el('td', { text: fmt(f.u, 4) }), el('td', { text: fmt(f.prom, 4) }), el('td', { text: fmt(f.pd, 4) }), el('td', { text: fmt(f.pf, 4) }), cv));
+        tb.append(el('tr', {}, el('th', { scope: 'row', text: f.se }), el('td', { text: fmt(f.u, 4) }), el('td', { text: fmt(f.prom, 4) }), el('td', { text: fmt(f.prox, 4) }), cv, el('td', { text: fmt(f.pd, 4) }), el('td', { text: fmt(f.pf, 4) })));
       }
       t.append(tb); cuerpo.append(el('div', { class: 'tabla-envoltura', style: 'max-height:none;border:0' }, t));
     },
-    () => tablaDatos(['Índice', `Real ${eti(D.ultimo)}`, 'Prom. 12 m', `Proy. ${eti(D.p_dic)}`, `Proy. ${eti(D.fin)}`, 'Var. vs real'],
-      filasRes.map(f => [f.se, fmt(f.u, 4), fmt(f.prom, 4), fmt(f.pd, 4), fmt(f.pf, 4), fmtPct(f.var)])));
+    () => tablaDatos(encRes, filasRes.map(f => [f.se, fmt(f.u, 4), fmt(f.prom, 4), fmt(f.prox, 4), fmtPct(f.var), fmt(f.pd, 4), fmt(f.pf, 4)])));
   c4.querySelector('.btn').remove();
   for (const c of [c1, c2, c3, c4]) { rejilla.append(c); tarjetasVivas.push(c); }
   redibujarTodo();
@@ -983,14 +1006,14 @@ function pintarReservas() {
 // ---------------------------------------------------------------- vista: analisis
 function pintarAnalisis() {
   const v = document.getElementById('vista-analisis'); v.replaceChildren();
-  v.append(el('h2', { text: `1. Índices por ramo: real ${eti(D.ultimo)} contra proyección ${eti(D.fin)} (en las series con patrón la variación incluye el mes del año)` }));
-  const enc1 = ['Ramo']; for (const s of D.indices) enc1.push(`${s} real`, `${s} proy.`, 'Var.');
+  v.append(el('h2', { text: `1. Índices por ramo: promedio de los últimos 12 meses reales contra los próximos 12 proyectados (${eti(P_I[iUlt + 1])} a ${eti(P_I[iUlt + 12])})` }));
+  const enc1 = ['Ramo']; for (const s of D.indices) enc1.push(`${s} real 12 m`, `${s} proy. 12 m`, 'Var.');
   const t1 = el('table', { class: 'datos' }); t1.append(el('thead', {}, el('tr', {}, ...enc1.map(h => el('th', { scope: 'col', text: h })))));
   const tb1 = el('tbody');
   for (const r of D.ramos_i) {
     const tr = el('tr', {}, el('th', { scope: 'row', text: r }));
     for (const s of D.indices) {
-      const a = valorInd(r, s, iUlt), b = valorInd(r, s, iFin), va = varPct(a, b);
+      const serie_ = serieInd(r, s), a = promedio12(serie_), b = promedioProx12(serie_), va = varPct(a, b);
       const cv = el('td', { text: fmtPct(va) }); const bg = colorDivergente(va, 0.3); if (bg) cv.style.background = bg;
       tr.append(el('td', { text: fmt(a, 4) }), el('td', { text: fmt(b, 4) }), cv);
     }
@@ -1015,13 +1038,42 @@ function pintarAnalisis() {
   t2.append(tb2); v.append(el('div', { class: 'tabla-envoltura', style: 'max-height:none' }, t2));
 
   v.append(el('h2', { text: '3. Modelo por tipo de serie y error del backtest' }));
-  v.append(el('p', { text: 'Suavizamiento exponencial (familia Holt-Winters). Error % = suma de errores absolutos / suma de valores reales, re-proyectando desde 16, 12 y 8 meses antes del final; mediana entre las series de cada tipo. Fianzas tiene 20 meses de historia y solo alcanza un corte.' }));
+  v.append(el('p', { text: 'Montos, índices y LAGs: línea de tendencia de los últimos 36 meses (en índices y montos con el patrón del año); razones: suavizamiento exponencial simple. Error % = suma de errores absolutos / suma de valores reales, re-proyectando desde 16, 12 y 8 meses antes del final; mediana entre las series de cada tipo. Fianzas tiene 20 meses de historia y solo alcanza un corte.' }));
   const nombres = { nivel: 'Montos', indice: 'Índices', razon: 'Razones', lag: 'LAGs' }, libros = { DANOS: 'Daños', FIANZAS: 'Fianzas', HPARAM: 'HParametros' };
   const t3 = tablaDatos(['Tipo de serie', 'Modelo', 'Series con backtest', 'Cortes', 'Error % modelo', 'Error % último valor', 'Series en que el modelo mejora al último valor'],
     D.metodo.map(d => [`${nombres[d.tipo] || d.tipo} · ${libros[d.libro] || d.libro}`, d.modelo || '', d.series ?? '', d.cortes ?? '', fmt(d.err_modelo, 1), fmt(d.err_ultimo, 1), d.mejora == null ? 's/d' : nf(0).format(Math.round(d.mejora * 100)) + ' %']));
   for (const tr of t3.querySelectorAll('tbody tr')) tr.children[1].classList.add('txt');
   v.append(el('div', { class: 'tabla-envoltura', style: 'max-height:none' }, t3));
   v.append(el('p', { text: 'Nota: un LAG en 0 después de que el patrón acumulado ya superó 50 % es un marcador de dato faltante en la BD y se muestra como s/d, igual que en la proyección.' }));
+
+  if (D.ppto) {
+    v.append(el('h2', { text: '4. Reservas contra el presupuesto' }));
+    v.append(el('p', { text: 'Crecimiento de diciembre contra diciembre de cada reserva NETO (total de ramos) frente a su referencia en el presupuesto técnico (vista tomado): RRC contra primas y SONR contra siniestros de Daños; RFV contra las primas de las líneas de Fianzas. Si la razón reserva / referencia se mantiene, la reserva crece en proporción al negocio. Las líneas de negocio cambiaron de clasificación entre el año anterior y el actual (hay líneas nuevas y reclasificadas), así que el crecimiento de la referencia del año en curso no es comparable; el contraste útil es el del último año. Cifras en millones de USD.' }));
+    const enc = D.ppto.enc;
+    const fmtCol = (h, x) => {
+      if (x == null || x === '') return 's/d';
+      if (typeof x !== 'number') return String(x);
+      if (h.startsWith('Crec.')) return fmtPct(x);
+      if (h.startsWith('Diferencia')) return (x > 0 ? '+' : x < 0 ? '−' : '') + fmt(Math.abs(x), 1) + ' pts';
+      if (h.startsWith('Reserva / referencia')) return fmt(x, 2);
+      return fmt(x / 1e6, 1);
+    };
+    const t4 = el('table', { class: 'datos' });
+    t4.append(el('thead', {}, el('tr', {}, ...enc.map(h => el('th', { scope: 'col', text: h })))));
+    const tb4 = el('tbody');
+    for (const f of D.ppto.filas) {
+      const tr = el('tr');
+      f.forEach((x, k) => {
+        const h = enc[k];
+        if (k === 0) { tr.append(el('th', { scope: 'row', text: String(x) })); return; }
+        const td = el('td', { class: typeof x === 'number' ? '' : 'txt', text: fmtCol(h, x) });
+        if (h.startsWith('Diferencia') && typeof x === 'number') { const bg = colorDivergente(x / 100, 0.3); if (bg) td.style.background = bg; }
+        tr.append(td);
+      });
+      tb4.append(tr);
+    }
+    t4.append(tb4); v.append(el('div', { class: 'tabla-envoltura', style: 'max-height:none' }, t4));
+  }
 }
 
 // ---------------------------------------------------------------- filtros y pestañas

@@ -113,6 +113,7 @@ _asegurar_paquetes({
 
 import math  # noqa: E402
 
+import json  # noqa: E402
 import re  # noqa: E402
 import time  # noqa: E402
 import warnings  # noqa: E402
@@ -241,6 +242,11 @@ DESCRIPCION_CREDIBILIDAD = {
 #       8.5 % contra 9.5 % en la prueba anidada) y evita que un mes bajo arrastre todo el horizonte.
 PERSISTENCIA_DESVIACION = {"nivel": 1.0, "indice": 0.8, "lag": 1.0}
 MESES_NIVEL_LOCAL = 12           # meses del nivel promedio (respecto a la recta) al que converge la desviacion
+MEDIA_ARITMETICA_INDICES = False # los indices se modelan en logaritmos: el nivel al que convergen es el promedio
+                                 # geometrico del ultimo ano, que queda por debajo del promedio aritmetico (el que se ve en
+                                 # la historia) tanto mas cuanto mas volatil es la serie (mediana 0.4 %, hasta 6 % en los
+                                 # 99.5 % de los ramos 31 y 35). True = se converge al promedio aritmetico (estimador de
+                                 # "smearing" de Duan: log del promedio de exp(residuo) de los ultimos 12 meses).
 ANCLAR_SERIES = set()            # series (Serie, Ramo) de indices que se dejan ancladas al ultimo real (phi = 1) a
                                  # criterio del area, p. ej. {("Ind sin RRC 99.5%", "31")} si la caida reciente es un
                                  # cambio de nivel y no una desviacion que rebota
@@ -303,6 +309,14 @@ TOLERANCIA_SALTO_TC = 0.25       # un salto entre dos meses se atribuye al TC si
 # cercano. BRUTO, IRR y NETO de cada ramo se escalan juntos, asi que las identidades se conservan. Es un ajuste de
 # criterio experto: la cifra del modelo sin ajuste queda en Alertas. {} = sin rangos.
 RANGO_ESPERADO = {("FIANZAS", "RFV NETO"): (80e6, 100e6)}   # RFV NETO total: 80 a 100 M USD (ago-26 real: 90.6)
+# Contraste con el presupuesto (opcional). Si en entradas/ esta el dashboard HTML del presupuesto tecnico ("Validacion
+# FCST", con primas, siniestros y comisiones por linea de negocio: real del ano anterior, reestimado del ano en curso y
+# presupuesto del siguiente), el diagnostico compara el crecimiento de cada reserva con el de su referencia: RRC con
+# las primas tomadas, SONR con los siniestros tomados (Danos = total menos las lineas de Fianzas) y RFV con las primas
+# de las lineas de Fianzas. No cambia la proyeccion: sirve para ver si las reservas crecen en proporcion al negocio.
+PATRON_PRESUPUESTO = "Dashboard_FCST*.html"
+LINEAS_FIANZAS_PPTO = ("4003",)  # lineas de negocio del presupuesto donde estan las afianzadoras
+TOLERANCIA_PRESUPUESTO = 0.10    # alerta si el crecimiento de la reserva difiere del de su referencia en mas de 10 pts
 ESTACIONALIDAD_TRIMESTRAL = ("RCONT",)   # acumula en meses 1-2 del trimestre y libera en el 3
 DOMINIO_CESION = (0.0, 1.0)      # IRR/BRUTO entre 0 y 100%
 DOMINIO_RAZON_BEL = (0.0, None)  # GTO/BEL y MR/BEL no negativos
@@ -470,7 +484,7 @@ def factores_estacionales(z, meses):
             "amplitud": float(s.max() - s.min())}
 
 
-def ajustar_tendencia(z, h: int, meses=None, phi_desv: float = 1.0, cred_pend=1.0):
+def ajustar_tendencia(z, h: int, meses=None, phi_desv: float = 1.0, cred_pend=1.0, media_aritmetica: bool = False):
     """Linea de tendencia (regresion lineal sobre los ultimos MESES_TENDENCIA valores de z, en la escala del modelo)
     mas, si ESTACIONALIDAD_MENSUAL y se conocen los meses, el patron por mes del ano; continuada desde el ultimo
     dato real con amortiguacion AMORTIGUACION_TENDENCIA. La desviacion del ultimo mes respecto al modelo se
@@ -507,7 +521,10 @@ def ajustar_tendencia(z, h: int, meses=None, phi_desv: float = 1.0, cred_pend=1.
     phi_d = float(phi_desv)
     if phi_d < 1:
         # la desviacion converge al nivel promedio del ultimo ano: desv_h = objetivo + phi^h (e_ultimo - objetivo)
-        objetivo = float(np.mean(e[-MESES_NIVEL_LOCAL:]))
+        e_local = e[-MESES_NIVEL_LOCAL:]
+        # nivel del ultimo ano respecto a la recta: promedio de los residuos (geometrico) o, en logaritmos, log del
+        # promedio de exp(residuo) (aritmetico, sin el sesgo de retransformar desde logaritmos)
+        objetivo = float(np.log(np.mean(np.exp(e_local)))) if media_aritmetica else float(np.mean(e_local))
         desviacion = objetivo + phi_d ** hh * (e_ultimo - objetivo)
         sd_e = float(np.std(e, ddof=1)) if len(e) > 2 else 0.0        # banda estacionaria de los residuos
         se_pend = (math.sqrt(ss_res / (len(w) - 2) / float(np.sum((t - t.mean()) ** 2)))
@@ -530,11 +547,12 @@ def ajustar_tendencia(z, h: int, meses=None, phi_desv: float = 1.0, cred_pend=1.
     return pron, pron - ancho, pron + ancho, params, float(pendiente)
 
 
-def ajustar(z, modelo: str, h: int, meses=None, phi_desv: float = 1.0, cred_pend=1.0):
+def ajustar(z, modelo: str, h: int, meses=None, phi_desv: float = 1.0, cred_pend=1.0, media_aritmetica: bool = False):
     """Pronostico en la escala del modelo: (pronostico, li, ls, parametros, pendiente final). meses = mes del ano
     (1-12) de cada observacion, para la estacionalidad de la tendencia historica; phi_desv = persistencia de la
     desviacion del ultimo mes (1 = se conserva); cred_pend = proporcion de la pendiente que se proyecta."""
-    return ajustar_tendencia(z, h, meses, phi_desv, cred_pend) if modelo == TENDENCIA else ajustar_ets(z, modelo, h)
+    return (ajustar_tendencia(z, h, meses, phi_desv, cred_pend, media_aritmetica) if modelo == TENDENCIA
+            else ajustar_ets(z, modelo, h))
 
 
 def elegir_modelo(tipo: str, n: int, trimestral: bool) -> str:
@@ -656,6 +674,7 @@ def _pronosticar(serie: Serie) -> Resultado:
         phi_desv = 1.0
         res.alertas.append("Serie anclada al ultimo real por decision del area (ANCLAR_SERIES)")
     cred_pend = CREDIBILIDAD_PENDIENTE.get(tipo, 1.0)                  # indices: pendiente ponderada por su R2
+    media_arit = bool(MEDIA_ARITMETICA_INDICES and usar_log and phi_desv < 1)   # converger al promedio aritmetico
 
     def inv(v):
         return np.exp(v) if usar_log else v
@@ -677,7 +696,7 @@ def _pronosticar(serie: Serie) -> Resultado:
     pron = li = ls = None
     while modelo != ULTIMO_VALOR:
         try:
-            f, lo, hi, params, pendiente = ajustar(z, modelo, hh, meses, phi_desv, cred_pend)
+            f, lo, hi, params, pendiente = ajustar(z, modelo, hh, meses, phi_desv, cred_pend, media_arit)
             if np.all(np.isfinite(f)):
                 pron, li, ls = inv(f), inv(lo), inv(hi)
                 res.parametros = params
@@ -713,7 +732,8 @@ def _pronosticar(serie: Serie) -> Resultado:
                                    f"({cambio12:+.0%})")
 
     # backtest: se re-proyecta desde cortes pasados con el mismo modelo y se compara contra lo real
-    res.error_modelo, res.error_ultimo_valor, res.error_ses, res.n_cortes = backtest(z, y, modelo, inv, meses, phi_desv, cred_pend)
+    res.error_modelo, res.error_ultimo_valor, res.error_ses, res.n_cortes = backtest(z, y, modelo, inv, meses, phi_desv,
+                                                                                  cred_pend, media_arit)
     if (res.n_cortes and np.isfinite(res.error_modelo) and np.isfinite(res.error_ultimo_valor)
             and res.error_modelo > res.error_ultimo_valor * 1.10 + 0.5):
         res.alertas.append(f"En el backtest de esta serie el modelo ({res.error_modelo:.1f}%) no supera a repetir "
@@ -723,7 +743,7 @@ def _pronosticar(serie: Serie) -> Resultado:
     return _post_proceso(res, y, tipo, serie.dominio)
 
 
-def backtest(z, y, modelo: str, inv, meses=None, phi_desv: float = 1.0, cred_pend=1.0):
+def backtest(z, y, modelo: str, inv, meses=None, phi_desv: float = 1.0, cred_pend=1.0, media_arit: bool = False):
     """Error % (WAPE = suma |error| / suma |real|) del modelo, del ultimo valor y de SES, re-proyectando desde
     CORTES_BACKTEST meses antes del final (horizontes de 1 a 16 meses). La estacionalidad se re-estima en cada
     corte solo con la historia anterior al corte."""
@@ -739,7 +759,8 @@ def backtest(z, y, modelo: str, inv, meses=None, phi_desv: float = 1.0, cred_pen
         preds = {"ultimo": np.repeat(inv(z[o - 1]), hz)}
         for nombre, mod in (("modelo", modelo), ("ses", "SES")):
             try:
-                preds[nombre] = (inv(ajustar(z[:o], mod, hz, None if meses is None else meses[:o], phi_desv, cred_pend)[0])
+                preds[nombre] = (inv(ajustar(z[:o], mod, hz, None if meses is None else meses[:o], phi_desv, cred_pend,
+                                             media_arit)[0])
                                  if mod != ULTIMO_VALOR else preds["ultimo"])
             except Exception:  # noqa: BLE001
                 preds[nombre] = None
@@ -1025,22 +1046,20 @@ def corregir_moneda_mezclada(bd: BDMontos, libro: str, ultimo: int, alertas: lis
     texto = (f"{len(meses)} meses ({meses[0]} a {meses[-1]}) venian en pesos (el salto contra el mes siguiente es del "
              f"tamano del TC); se convirtieron a USD con el TC de cada mes de la BD ({len(cambios)} celdas). Sin esto la "
              "tendencia leia el cambio de moneda como una caida de ~94 %. Revisa la BD de entrada.")
-    alertas.append((libro, "Moneda mezclada en la historia", texto))
+    alertas.append((libro, "Moneda mezclada en la historia", texto + " Detalle por celda: hoja Moneda_corregida."))
     print(f"   AVISO {libro}: {texto}", flush=True)
     return cambios
 
 
 def escribir_correccion_moneda(bd: BDMontos, cambios: list):
-    """Escribe en la BD de salida los valores historicos convertidos a USD, con un comentario en cada celda."""
-    from openpyxl.comments import Comment
+    """Escribe en la BD de salida los valores historicos convertidos a USD. No agrega comentarios ni otras partes al
+    libro (la BD de salida conserva la estructura de la de entrada); el detalle celda por celda queda en la hoja
+    Moneda_corregida del diagnostico."""
     for c, p, r, original, nuevo, tc in cambios:
         fila, col = bd.filas.get((c, p)), bd.cols_ramo.get(r)
         if fila is None or col is None:
             continue
-        celda = bd.ws.cell(fila, col)
-        celda.value = nuevo
-        celda.comment = Comment(f"Venia en MXN ({original:,.2f}); convertido a USD con TC {tc} "
-                                "(proyeccion_reservas.py, CORREGIR_MONEDA_MEZCLADA)", "Proyeccion")
+        bd.ws.cell(fila, col).value = nuevo
 
 
 def aplicar_rango_esperado(proy: dict, bd: BDMontos, libro: str, reservas: dict, resultados: dict,
@@ -1115,6 +1134,80 @@ def aplicar_rango_esperado(proy: dict, bd: BDMontos, libro: str, reservas: dict,
         resumen.append(texto)
         print(f"   {libro}: {texto}", flush=True)
     return resumen
+
+
+def leer_presupuesto() -> dict | None:
+    """Lee el dashboard HTML del presupuesto tecnico (objeto DATA incrustado). Regresa {"archivo", "anio", "P", "S"},
+    con P y S = {"total": {...}, "fianzas": {...}} y cada uno {"real_ant", "ppto_curso", "reest_curso", "ppto"}
+    (real del ano anterior, presupuesto original y reestimado del ano en curso, presupuesto del ano siguiente)."""
+    archivos = sorted(ENTRADAS.glob(PATRON_PRESUPUESTO), key=lambda f: f.stat().st_mtime)
+    if not archivos:
+        return None
+    ruta = archivos[-1]
+    try:
+        texto = ruta.read_text(encoding="utf-8", errors="replace")
+        i = texto.index("const DATA = ") + len("const DATA = ")
+        datos, _ = json.JSONDecoder().raw_decode(texto[i:])
+        kpi = datos["vistas"]["T"]["lnKpi"]                       # vista "tomado"
+        anio = int(datos.get("cfg", {}).get("anio") or 0)
+    except Exception as e:  # noqa: BLE001
+        print(f"   Aviso: no se pudo leer el presupuesto {ruta.name}: {e!r}", flush=True)
+        return None
+    campos = {"real_ant": "r25", "ppto_curso": "p", "reest_curso": "r", "ppto": "f"}
+    salida = {"archivo": ruta.name, "anio": anio}
+    for medida in ("P", "S"):
+        total = {k: float((kpi.get("_tot", {}).get(medida, {}) or {}).get(c) or 0.0) for k, c in campos.items()}
+        fianzas = {k: sum(float((kpi.get(ln, {}).get(medida, {}) or {}).get(c) or 0.0) for ln in LINEAS_FIANZAS_PPTO)
+                   for k, c in campos.items()}
+        salida[medida] = {"total": total, "fianzas": fianzas,
+                          "danos": {k: total[k] - fianzas[k] for k in campos}}
+    return salida
+
+
+def contraste_presupuesto(ppto: dict, bds: dict, proys: dict, alertas: list) -> list:
+    """Filas del contraste reservas contra presupuesto: total NETO de cada reserva a diciembre de los tres anos del
+    presupuesto (real si ya paso, proyectado si no) contra su referencia (primas o siniestros tomados)."""
+    anio = ppto["anio"]
+    if not anio:
+        return []
+    cortes = [(anio - 2) * 100 + 12, (anio - 1) * 100 + 12, anio * 100 + 12]
+    referencias = [("DANOS", "RRC NETO", "P", "danos", "Primas tomadas (Daños)"),
+                   ("DANOS", "SONR NETO", "S", "danos", "Siniestros tomados (Daños)"),
+                   ("FIANZAS", "RFV NETO", "P", "fianzas", f"Primas lineas {', '.join(LINEAS_FIANZAS_PPTO)} (Fianzas)")]
+    filas = []
+    for libro, concepto, medida, grupo, nombre_ref in referencias:
+        bd, proy = bds[libro], proys[libro]
+
+        def total(p):
+            if any((concepto, p, r) in proy for r in bd.cols_ramo):          # mes proyectado
+                return sum(proy.get((concepto, p, r), 0.0) for r in bd.cols_ramo) or None
+            return sum(bd.valores.get((concepto, p, r), 0.0) for r in bd.cols_ramo) or None   # mes real
+        res = [total(p) for p in cortes]
+        ref = ppto[medida][grupo]
+        refs = [ref["real_ant"], ref["reest_curso"], ref["ppto"]]
+
+        def crec(a, b):
+            return (b / a - 1) if a and b else None
+        fila = {"Reserva": concepto, "Referencia": nombre_ref}
+        for p, v in zip(cortes, res):
+            fila[f"Reserva {p}"] = v
+        fila.update({f"Referencia {anio - 2} real": refs[0], f"Referencia {anio - 1} reestimado": refs[1],
+                     f"Referencia {anio} presupuesto": refs[2],
+                     f"Crec. reserva {anio - 1}": crec(res[0], res[1]), f"Crec. referencia {anio - 1}": crec(refs[0], refs[1]),
+                     f"Crec. reserva {anio}": crec(res[1], res[2]), f"Crec. referencia {anio}": crec(refs[1], refs[2])})
+        for k, (v, rf) in enumerate(zip(res, refs)):
+            fila[f"Reserva / referencia {anio - 2 + k}"] = (v / rf) if v and rf else None
+        dif = (fila[f"Crec. reserva {anio}"] - fila[f"Crec. referencia {anio}"]
+               if fila[f"Crec. reserva {anio}"] is not None and fila[f"Crec. referencia {anio}"] is not None else None)
+        fila[f"Diferencia {anio} (pts)"] = dif * 100 if dif is not None else None   # puntos porcentuales
+        if dif is not None and abs(dif) > TOLERANCIA_PRESUPUESTO:
+            texto = (f"{concepto} crece {fila[f'Crec. reserva {anio}']:+.1%} en {anio} (dic contra dic) y su referencia en el "
+                     f"presupuesto, {nombre_ref.lower()}, {fila[f'Crec. referencia {anio}']:+.1%}: diferencia de "
+                     f"{dif * 100:+.0f} pts. La razon reserva / referencia pasa de {fila[f'Reserva / referencia {anio - 1}'] or 0:.2f} "
+                     f"a {fila[f'Reserva / referencia {anio}'] or 0:.2f}. Revisa si el crecimiento proyectado es coherente con el negocio.")
+            alertas.append((libro, f"Presupuesto {concepto}", texto))
+        filas.append(fila)
+    return filas
 
 
 def derivar_montos(bd: BDMontos, libro: str, reservas: dict, resultados: dict, periodos_proy: list[int],
@@ -1594,6 +1687,51 @@ def escribir_diagnostico(resultados: dict, periodos_proy: list[int], alertas_gen
             "factor del mes + pendiente de la tendencia x meses + factor del mes proyectado (paralela a la recta de "
             "tendencia, anclada al ultimo real).")
 
+    # Contraste con el presupuesto (si se leyo)
+    filas_ppto = resumen.get("presupuesto") or []
+    if filas_ppto:
+        ws = wb.create_sheet("Contraste_Presupuesto")
+        cab_p = list(filas_ppto[0])
+        ws.append(cab_p)
+        for f in filas_ppto:
+            ws.append([f.get(c) for c in cab_p])
+        _formato_tabla(ws, negrita, encab)
+        for fila_ in ws.iter_rows(min_row=2):
+            for c in fila_:
+                enc_ = str(ws.cell(1, c.column).value)
+                if enc_.startswith("Crec.") and isinstance(c.value, float):
+                    c.number_format = "+0.0%;-0.0%;0.0%"
+                elif enc_.startswith("Diferencia") and isinstance(c.value, float):
+                    c.number_format = "+0.0;-0.0;0.0"
+                elif enc_.startswith("Reserva / referencia") and isinstance(c.value, float):
+                    c.number_format = "0.00"
+                elif isinstance(c.value, float):
+                    c.number_format = "#,##0"
+        nota = ws.max_row + 2
+        for i, texto in enumerate([
+            f"Fuente del presupuesto: {resumen.get('archivo_presupuesto', '')} (vista tomado, USD). Reservas: total NETO de "
+            "todos los ramos a diciembre (real si ya paso, proyectado si no).",
+            "Referencia: RRC contra primas tomadas y SONR contra siniestros tomados de Danos (total menos las lineas de "
+            f"Fianzas {', '.join(LINEAS_FIANZAS_PPTO)}); RFV contra las primas de esas lineas. Las lineas de negocio cambiaron "
+            "de clasificacion entre anos (hay lineas nuevas), asi que el contraste mas util es el del ultimo ano.",
+            "Si la razon reserva / referencia se mantiene estable, la reserva crece en proporcion al negocio. No cambia la "
+            f"proyeccion; la diferencia mayor a {TOLERANCIA_PRESUPUESTO:.0%} queda en Alertas.",
+        ]):
+            ws.cell(nota + i, 1, texto)
+
+    # Celdas de la historia convertidas de MXN a USD (monedas mezcladas)
+    celdas = resumen.get("celdas_moneda") or {}
+    if any(celdas.values()):
+        ws = wb.create_sheet("Moneda_corregida")
+        ws.append(["Libro", "Concepto", "Periodo", "Ramo", "Valor en la BD (MXN)", "TC", "Valor usado (USD)"])
+        for libro, lista in celdas.items():
+            for c, p, r, original, nuevo, tc in lista:
+                ws.append([libro, c, p, r, original, tc, nuevo])
+        _formato_tabla(ws, negrita, encab)
+        for fila_ in ws.iter_rows(min_row=2):
+            fila_[4].number_format = "#,##0.00"
+            fila_[6].number_format = "#,##0.00"
+
     # Pronosticos (drivers con intervalos)
     ws = wb.create_sheet("Pronosticos_Drivers")
     ws.append(["Libro", "Grupo", "Serie", "Ramo", "Moneda", "Periodo", "Pronostico", f"LI {NIVEL_INTERVALO:.0%}",
@@ -1850,10 +1988,15 @@ def main():
         "FIANZAS": {k: v for k, v in bd_rfv.valores.items() if k[1] <= ultimo},
     }
     segundos = time.time() - t0
+    ppto = leer_presupuesto()
+    filas_ppto = contraste_presupuesto(ppto, {"DANOS": bd_danos, "FIANZAS": bd_rfv},
+                                       {"DANOS": proy_danos, "FIANZAS": proy_rfv}, alertas) if ppto else []
     escribir_diagnostico(resultados, periodos_proy, alertas, {"DANOS": proy_danos, "FIANZAS": proy_rfv},
                          {"ultimo": ultimo, "segundos": segundos, "versiones": _versiones(),
                           "rangos": resumen_rangos,
-                          "moneda_corregida": {k: len(v) for k, v in correcciones.items() if v}})
+                          "moneda_corregida": {k: len(v) for k, v in correcciones.items() if v},
+                          "celdas_moneda": correcciones,
+                          "presupuesto": filas_ppto, "archivo_presupuesto": ppto["archivo"] if ppto else ""})
     graficas_ok = False
     if GENERAR_GRAFICAS:
         print("Generando graficas ...", flush=True)
@@ -1911,6 +2054,15 @@ def main():
     if ESTACIONALIDAD_MENSUAL:
         print(f"   Estacionalidad mensual aplicada en {len(con_est)} series (credibilidad mediana "
               f"{np.median(con_est) if con_est else 0:.2f}); patron por mes en la hoja 'Estacionalidad'")
+    if filas_ppto:
+        anio = ppto["anio"]
+        print(f"   Contraste con el presupuesto ({ppto['archivo']}), crecimiento dic {anio} contra dic {anio - 1}:")
+        for f in filas_ppto:
+            cr, rf = f.get(f"Crec. reserva {anio}"), f.get(f"Crec. referencia {anio}")
+            if cr is not None and rf is not None:
+                print(f"      {f['Reserva']:<10} {cr:+6.1%}  contra {f['Referencia'].lower()} {rf:+6.1%}")
+    elif GENERAR_DASHBOARD:
+        print(f"   (Sin contraste con presupuesto: no hay {PATRON_PRESUPUESTO} en entradas/)")
     n_alertas = len(alertas) + sum(len(r.alertas) for r in resultados.values())
     print(f"   Alertas a revisar: {n_alertas} (hoja 'Alertas' del diagnostico)")
     print(f"   Tiempo total: {time.time() - t0:,.0f} s")

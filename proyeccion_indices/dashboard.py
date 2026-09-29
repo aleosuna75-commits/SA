@@ -515,7 +515,7 @@ def generar(ruta_salida: Path = SALIDA_DASHBOARD) -> Path:
          f'=IFERROR(AVERAGEIFS(I_Val,I_Tipo,"Real",{crit},I_Per,">"&{p_12}),NA())', "0.0000"),
         (f"Proyección {etiqueta(p_dic_actual)}", "=" + valor_indice(p_dic_actual), "0.0000"),
         (f"Proyección {etiqueta(fin)}", "=" + valor_indice(fin), "0.0000"),
-        (f"Var. {etiqueta(fin)} vs {etiqueta(ultimo)}", "", "+0.0%;-0.0%;0.0%"),
+        ("Var. promedio 12 meses (proy. vs real)", "", "+0.0%;-0.0%;0.0%"),
     ]
     pintar(ws, f"D5:{ultima_col}8", BANDA_KPI)
     for k, (tit, form, fmt) in enumerate(kpis):
@@ -528,7 +528,10 @@ def generar(ruta_salida: Path = SALIDA_DASHBOARD) -> Path:
         c.number_format = fmt
         c.font = fuente(20, True)
         c.alignment = Alignment(horizontal="left", vertical="center", indent=1)
-    ws.cell(7, 28).value = '=IFERROR(V7/D7-1,"s/d")'      # proyeccion al cierre (V7) contra ultimo real (D7)
+    # promedio de los proximos 12 meses proyectados contra el de los ultimos 12 reales (J7): ano contra ano, sin el
+    # efecto del mes del ano
+    ws.cell(7, 28).value = (f'=IFERROR(AVERAGEIFS(I_Val,{crit},I_Per,">"&{ultimo},I_Per,"<="&{mover(ultimo, 12)})'
+                            f'/J7-1,"s/d")')
 
     # paneles
     caja(ws, "D10:S27")
@@ -617,7 +620,7 @@ def generar(ruta_salida: Path = SALIDA_DASHBOARD) -> Path:
 
     # Tabla resumen del ramo (formulas); cada dato ocupa 2 columnas x 2 filas de la rejilla
     cab = [("Índice", 21, 24), (f"Real\n{etiqueta(ultimo)}", 25, 26), (f"Proy.\n{etiqueta(p_dic_actual)}", 27, 28),
-           (f"Proy.\n{etiqueta(fin)}", 29, 30), ("Var. vs\nreal", 31, 32)]
+           (f"Proy.\n{etiqueta(fin)}", 29, 30), ("Var. prom.\n12 m", 31, 32)]
     linea_fina = Border(bottom=Side(style="thin", color=BORDE))
     for t, c1_, c2_ in cab:
         ws.merge_cells(start_row=31, start_column=c1_, end_row=31, end_column=c2_)
@@ -633,7 +636,9 @@ def generar(ruta_salida: Path = SALIDA_DASHBOARD) -> Path:
         base = f'I_Ramo,SelRamoInd,I_Serie,"{serie}"'
         forms = [serie] + [f"=IFERROR(SUMIFS(I_Val,{base},I_Per,{p})/(COUNTIFS({base},I_Per,{p})>0),NA())"
                            for p in (ultimo, p_dic_actual, fin)]
-        forms.append(f"=IFERROR({get_column_letter(29)}{f_}/{get_column_letter(25)}{f_}-1,NA())")
+        # promedio de los proximos 12 meses proyectados contra el de los ultimos 12 reales
+        forms.append(f'=IFERROR(AVERAGEIFS(I_Val,{base},I_Per,">"&{ultimo},I_Per,"<="&{mover(ultimo, 12)})'
+                     f'/AVERAGEIFS(I_Val,{base},I_Per,">"&{mover(ultimo, -12)},I_Per,"<="&{ultimo})-1,NA())')
         for (_, c1_, c2_), form in zip(cab, forms):
             ws.merge_cells(start_row=f_, start_column=c1_, end_row=f_ + 1, end_column=c2_)
             cel = ws.cell(f_, c1_, form)
@@ -864,11 +869,12 @@ def construir_analisis(ws, registros_i, ramos_i, registros_m, ultimo, p_dic, fin
 
     val_i = {(r[1], r[2], r[3]): r[4] for r in registros_i}
     fila = 6
-    ws.cell(fila, 2, f"1. Índices por ramo: real {etiqueta(ultimo)} vs proyección {etiqueta(fin)}").font = fuente(12, True)
+    ws.cell(fila, 2, f"1. Índices por ramo: promedio de los últimos 12 meses reales contra los próximos 12 proyectados "
+                     f"({etiqueta(mover(ultimo, 1))} a {etiqueta(mover(ultimo, 12))})").font = fuente(12, True)
     fila += 1
     cab = ["Ramo"]
     for serie in INDICES:
-        cab += [f"{serie}\nreal {etiqueta(ultimo)}", f"{serie}\nproy. {etiqueta(fin)}", "Var. %"]
+        cab += [f"{serie}\nreal 12 m", f"{serie}\nproy. 12 m", "Var. %"]
     for j, t in enumerate(cab):
         c = ws.cell(fila, 2 + j, t)
         c.font = fuente(9, True, TEXTO_2)
@@ -881,7 +887,10 @@ def construir_analisis(ws, registros_i, ramos_i, registros_m, ultimo, p_dic, fin
         ws.cell(fila, 2, ramo).font = fuente(10, True)
         ws.cell(fila, 2).fill = relleno(PANEL)
         for k, serie in enumerate(INDICES):
-            a, b = val_i.get((ramo, serie, ultimo)), val_i.get((ramo, serie, fin))
+            reales = [val_i.get((ramo, serie, mover(ultimo, -k))) for k in range(12)]
+            proys = [val_i.get((ramo, serie, mover(ultimo, k))) for k in range(1, 13)]
+            a = sum(reales) / 12 if all(x is not None for x in reales) else None
+            b = sum(proys) / 12 if all(x is not None for x in proys) else None
             for j, v in enumerate([a, b, (b / a - 1) if a and b is not None else None]):
                 c = ws.cell(fila, 3 + k * 3 + j, v)
                 c.number_format = "+0.0%;-0.0%;0.0%" if j == 2 else "0.0000"
