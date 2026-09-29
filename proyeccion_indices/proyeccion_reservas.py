@@ -61,7 +61,8 @@ d) Reglas actuariales / de calidad de datos (todas reportadas en la hoja "Alerta
          dos niveles con razon mayor a SALTO_NIVEL_HUECO (entonces se usa solo la historia posterior)
          y con huecos mayores solo se usa la historia posterior;
        - LAG en 0 despues de que el patron acumulado ya supero 50% se trata como faltante.
-   Los montos se modelan en USD (modelar en MXN y convertir con el TC fue menos preciso).
+   Los montos de Danos se modelan en USD; los de Fianzas en MXN y se convierten con el TC de Inversiones
+   (MODELAR_EN_MXN).
 
 USO: abrir en VSCode y ejecutar (F5 o "Run Python File"). Los paquetes que falten se
 instalan automaticamente en el interprete activo. Parametros en la seccion CONFIGURACION.
@@ -177,7 +178,8 @@ PARES_MEDIA_995 = [("Ind Sin RRC", "Ind sin RRC 99.5%"), ("Ind Sin SONR Media", 
 # TC_Real_Esti.xlsx hoja TC: FCST para 2026 y FCST 2027 para 2027). Se aplica a los renglones nuevos y,
 # si ACTUALIZAR_TC_EXISTENTES, tambien a los renglones que ya existen de esos meses (p.ej. 202606-202612,
 # que en la BD traian una interpolacion). Meses sin dato toman el ultimo TC de la BD.
-# Los montos se modelan en USD, asi que el TC no cambia las cifras proyectadas (salvo con MODELAR_EN_MXN).
+# Danos se modela en USD, asi que el TC no cambia sus cifras proyectadas; Fianzas se modela en MXN (MODELAR_EN_MXN)
+# y el TC de cada mes proyectado si mueve sus cifras en USD.
 TC_PROYECCION: dict[int, float] = dict(TC_FCST)
 ACTUALIZAR_TC_EXISTENTES = True
 
@@ -195,7 +197,8 @@ N_PROCESOS = None                # None = automatico (nucleos-1); 1 = sin parale
 #   "SES": nivel suavizado sin tendencia (razones: %GTO, %MR y %cedido dependen de los contratos).
 #   Tambien estan disponibles "Holt amortiguado", "Holt-Winters amortiguado (mensual)" y "Holt-Winters amortiguado
 #   (trimestral)" (suavizamiento exponencial); RCONT usa el trimestral por su estacionalidad (acumula meses 1-2,
-#   libera en el 3).
+#   libera en el 3) si tiene al menos MIN_OBS_TRIMESTRAL meses; con menos se proyecta con SES (hoy: 8 meses, 2025
+#   viene vacio).
 MODELO_POR_TIPO = {
     "nivel": "Tendencia historica",   # montos (BEL, BRUTO), en logaritmos: crecimiento % mensual constante
     "indice": "Tendencia historica",  # indices de HParametros, en logaritmos
@@ -210,18 +213,22 @@ AMORTIGUACION_TENDENCIA = 1.0    # 1.0 = la tendencia continua constante (sin am
 MIN_OBS_TENDENCIA = 6            # observaciones minimas para estimar la tendencia; con menos se usa SES
 # Estacionalidad mensual (los picos que se repiten cada ano): patron por mes del ano alrededor de la tendencia,
 # estimado por descomposicion clasica (la serie menos su media movil centrada de 12 meses, promediada por mes del
-# ano). Se suma a la recta de tendencia en las series que se proyectan con "Tendencia historica".
+# ano). Se suma a la recta de tendencia en las series de TIPOS_CON_ESTACIONALIDAD (montos e indices); los LAGs, que
+# tambien van con "Tendencia historica", llevan solo la recta.
 ESTACIONALIDAD_MENSUAL = True    # False = solo la recta de tendencia
 MESES_ESTACIONALIDAD = 36        # historia para estimar el patron: la misma ventana que la tendencia. Con toda la
                                  # historia los picos de anos distintos caen en meses distintos, el promedio sale mas
                                  # plano y el backtest empeora; con 36 meses mejora (indices 18.9 % contra 20.2 % de la
-                                 # recta sola). None = toda la historia.
+                                 # recta sola, medido antes de desvanecer la desviacion, ponderar la pendiente y corregir
+                                 # el ancla y los huecos con salto de nivel de los indices). None = toda la historia.
 MIN_OBS_ESTACIONALIDAD = 36      # tres anos: quedan 24 meses sin tendencia, dos por cada mes del ano (minimo exigido)
 CREDIBILIDAD_ESTACIONAL = "buhlmann"  # cuanto del patron observado se aplica (1 = se repite igual todos los anos;
                                  #   0 = puro ruido, no se aplica):
                                  #   "buhlmann": credibilidad de Buhlmann Z = n/(n+K), K = varianza dentro del mes /
                                  #       varianza entre meses (la estandar actuarial; backtest de indices 18.9 % / 14.1 %
-                                 #       a 1-16 / 1-6 meses).
+                                 #       a 1-16 / 1-6 meses; las cifras de las tres opciones son de antes de
+                                 #       desvanecer la desviacion y ponderar la pendiente de los indices; hoy
+                                 #       "buhlmann" da 13.6 % a 1-16 meses).
                                  #   "ajustada": R2 ajustado del mes del ano sobre la serie sin tendencia (mas
                                  #       conservadora, picos mas bajos; 18.7 % / 14.4 %).
                                  #   "completa": 100 % del patron cuando la prueba F lo detecta (p < P_ESTACIONALIDAD)
@@ -240,12 +247,13 @@ DESCRIPCION_CREDIBILIDAD = {
 #   indices: son razones que se mueven en una banda y rebotan (tocan el minimo y vuelven al maximo), asi que la
 #       desviacion se desvanece con persistencia phi hacia el nivel promedio del ultimo ano (phi = 0.8: cada mes
 #       conserva 80 %, a los 3 meses la mitad). En backtest mejora a los indices (18.3 % contra 18.9 % a 1-16 meses,
-#       8.5 % contra 9.5 % en la prueba anidada) y evita que un mes bajo arrastre todo el horizonte.
+#       8.5 % contra 9.5 % en la prueba anidada, medido con la pendiente completa) y evita que un mes bajo arrastre
+#       todo el horizonte.
 PERSISTENCIA_DESVIACION = {"nivel": 1.0, "indice": 0.8, "lag": 1.0}
 MESES_NIVEL_LOCAL = 12           # meses del nivel promedio (respecto a la recta) al que converge la desviacion
 MEDIA_ARITMETICA_INDICES = False # los indices se modelan en logaritmos: el nivel al que convergen es el promedio
                                  # geometrico del ultimo ano, que queda por debajo del promedio aritmetico (el que se ve en
-                                 # la historia) tanto mas cuanto mas volatil es la serie (mediana 0.4 %, hasta 6 % en los
+                                 # la historia) tanto mas cuanto mas volatil es la serie (mediana 0.3 %, hasta 6 % en los
                                  # 99.5 % de los ramos 31 y 35). True = se converge al promedio aritmetico (estimador de
                                  # "smearing" de Duan: log del promedio de exp(residuo) de los ultimos 12 meses).
 ANCLAR_SERIES = set()            # series (Serie, Ramo) de indices que se dejan ancladas al ultimo real (phi = 1) a
@@ -255,8 +263,8 @@ ANCLAR_SERIES = set()            # series (Serie, Ramo) de indices que se dejan 
 #   montos y LAGs: completa (1.0): la tendencia de los ultimos tres anos se continua tal cual (decision del area).
 #   indices: ponderada por su credibilidad = R2 ajustado de la recta ("r2"). Son razones: extrapolar 16 meses una
 #       pendiente que la recta explica poco (ramo 31: +1.3 % mensual con R2 0.16) proyecta subidas o bajadas que la
-#       serie nunca sostuvo. Backtest de indices (error % mediano a 1-16 / 1-6 meses): pendiente completa 18.3 / 14.0;
-#       ponderada por R2 16.3 / 13.5; sin pendiente 13.9 / 12.6. Un numero entre 0 y 1 fija la proporcion.
+#       serie nunca sostuvo. Backtest de indices (error % mediano a 1-16 / 1-6 meses): pendiente completa 16.5 / 12.6;
+#       ponderada por R2 13.6 / 12.5; sin pendiente 13.4 / 11.6. Un numero entre 0 y 1 fija la proporcion.
 CREDIBILIDAD_PENDIENTE = {"nivel": 1.0, "indice": "r2", "lag": 1.0}
 # Cotas de los modelos de suavizamiento exponencial (si se eligen), estimadas por maxima verosimilitud dentro de
 # ellas: alpha ~ 1 (arranca del ultimo dato real), beta <= 0.15 (tendencia de los ultimos anos, no del ultimo mes),
@@ -294,17 +302,18 @@ ESTRUCTURA = {
 MESES_MEZCLA = 8                 # meses recientes para repartir por ramo los totales (RCONT)
 # Moneda en que se modelan los montos. True = modelar en MXN (historia USD x TC real) y convertir a USD con el TC de
 # cada mes proyectado (el supuesto de Inversiones, TC_FCST).
-#   Danos: USD. En backtest, modelar en MXN fue menos preciso (WAPE 22.5 % contra 19.8 %, 21 series).
+#   Danos: USD. En backtest, modelar en MXN fue menos preciso (WAPE 30.8 % contra 27.0 %, 23 series).
 #   Fianzas: MXN. La RFV es una reserva en pesos: de ene-25 a ago-26 la RFV NETO crecio 27 % en pesos pero 55 % en
 #       dolares, porque el peso paso de 20.7 a 17.0. Modelar en USD extrapolaba esa apreciacion (dic-27: 134 M USD)
 #       cuando Inversiones pronostica 18.5 a dic-27; en MXN con ese TC da 105 M USD. El unico corte de backtest de
-#       Fianzas (8 meses de 2026, con el peso aun apreciandose) favorecia USD (6.0 % contra 7.4 %) justamente por eso.
+#       Fianzas (8 meses de 2026, con el peso aun apreciandose) favorecia USD (5.3 % contra 7.6 %) justamente por eso.
 MODELAR_EN_MXN = {"DANOS": False, "FIANZAS": True}
 # Monedas mezcladas en la historia: si un tramo de la BD viene en MXN y otro en USD, el salto entre dos meses seguidos
 # es del tamano del TC (p. ej. RFV BRUTO 1,754 M en dic-25 y 104 M en ene-26) y la tendencia lo lee como una caida de
 # 94 %. True = se detecta (recorriendo la historia hacia atras desde el ultimo mes, que se toma como USD), los meses en
-# MXN se convierten a USD con el TC de cada mes de la propia BD, en memoria y en la BD de salida (con comentario en cada
-# celda corregida), y se avisa en consola y en Alertas. El archivo de entrada no se modifica.
+# MXN se convierten a USD con el TC de cada mes de la propia BD, en memoria y en la BD de salida (sin comentarios;
+# el detalle queda en la hoja Moneda_corregida), y se avisa en consola y en Alertas. El archivo de entrada no se
+# modifica.
 CORREGIR_MONEDA_MEZCLADA = True
 TOLERANCIA_SALTO_TC = 0.25       # un salto entre dos meses se atribuye al TC si difiere de el en menos de 25 %
 # Rango esperado por el area para el total de un concepto en USD (suma de ramos), por libro. Si la proyeccion del
@@ -317,8 +326,9 @@ RANGO_ESPERADO = {("FIANZAS", "RFV NETO"): (80e6, None)}    # RFV NETO total: mi
 # Contraste con el presupuesto (opcional). Si en entradas/ esta el dashboard HTML del presupuesto tecnico ("Validacion
 # FCST", con primas, siniestros y comisiones por linea de negocio: real del ano anterior, reestimado del ano en curso y
 # presupuesto del siguiente), el diagnostico compara el crecimiento de cada reserva con el de su referencia: RRC con
-# las primas tomadas, SONR con los siniestros tomados (Danos = total menos las lineas de Fianzas) y RFV con las primas
-# de las lineas de Fianzas. No cambia la proyeccion: sirve para ver si las reservas crecen en proporcion al negocio.
+# las primas tomadas, SONR con los siniestros tomados (Danos = total menos las lineas de Fianzas y menos las lineas
+# nuevas: sin primas en el ano en curso pero con presupuesto del siguiente) y RFV con las primas de las lineas de
+# Fianzas. No cambia la proyeccion: sirve para ver si las reservas crecen en proporcion al negocio.
 PATRON_PRESUPUESTO = "Dashboard_FCST*.html"
 LINEAS_FIANZAS_PPTO = ("4003",)  # lineas de negocio del presupuesto donde estan las afianzadoras (aproximacion: la 4003
                                  # mezcla fianzas de Mexico con caucion y credito de otros paises)

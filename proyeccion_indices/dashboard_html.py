@@ -70,7 +70,7 @@ def _clave_serie(r: dict) -> str:
 def leer_tendencias() -> dict:
     """Modelo por serie proyectada con 'Tendencia historica' (hojas Series_Modelos y Estacionalidad del diagnostico):
     {clave: [pendiente en la escala del modelo, ventana, log (1/0), valor de la recta en el ultimo mes,
-             factores estacionales ene..dic en la escala del modelo o None]}."""
+             factores estacionales ene..dic en la escala del modelo o None, modelo en MXN (1/0)]}."""
     if not dx.ARCHIVO_DIAGNOSTICO.exists():
         return {}
     wb = openpyxl.load_workbook(dx.ARCHIVO_DIAGNOSTICO, read_only=True, data_only=True)
@@ -98,7 +98,7 @@ def leer_tendencias() -> dict:
             pend = math.log1p(r["Tendencia mensual"]) if log else r["Tendencia mensual"]
             clave = _clave_serie(r)
             out[clave] = [pend, r.get("Ventana (meses)"), 1 if log else 0, r.get("Ajuste tendencia ultimo mes"),
-                          estacional.get(clave)]
+                          estacional.get(clave), 1 if r.get("Moneda modelo") == "MXN" else 0]
     wb.close()
     return out
 
@@ -425,7 +425,7 @@ table.datos tbody tr:hover { background: var(--surface-2); }
 </main>
 <footer class="pie">
   <span>__PIE__</span>
-  <span>Generado el __GENERADO__ por proyeccion_reservas.py · azul = real, naranja punteado = proyección, gris fino = modelo ajustado sobre la historia: recta de tendencia más el patrón por mes del año cuando la serie lo tiene; la proyección arranca del último real y, en los índices, su desviación respecto al modelo se desvanece hacia el nivel del último año y la pendiente entra ponderada por su credibilidad (solo en las series que se proyectan directo: índices, LAGs y BEL/BRUTO por ramo en USD) · banda = intervalo al 80%</span>
+  <span>Generado el __GENERADO__ por proyeccion_reservas.py · azul = real, naranja punteado = proyección, gris fino = modelo ajustado sobre la historia: recta de tendencia más el patrón por mes del año cuando la serie lo tiene; la proyección arranca del último real y, en los índices, su desviación respecto al modelo se desvanece hacia el nivel del último año y la pendiente entra ponderada por su credibilidad (solo en las series que se proyectan directo: índices, LAGs y BEL/BRUTO por ramo; la RFV se modela en pesos) · banda = intervalo al 80%</span>
 </footer>
 <script>
 'use strict';
@@ -459,15 +459,21 @@ const idx = (arr, v) => arr.indexOf(v);
 // pendiente) mas el patron por mes del ano, si la serie lo tiene, dibujada sobre la ventana de la regresion y hasta
 // el ultimo dato real de la serie. La proyeccion es esa misma curva trasladada al ultimo real (anclaje), por eso no
 // se prolonga al horizonte. escala = factor para pasar a las unidades de la grafica; periodos = AAAAMM de cada
-// posicion (para saber el mes del ano).
-function rectaModelo(clave, vals, periodos, escala) {
+// posicion (para saber el mes del ano); moneda = moneda de la grafica en montos ('USD' o 'MXN'): la curva esta en la
+// moneda del modelo (USD, o MXN si el libro se modela en pesos) y se convierte con el TC de cada mes.
+function rectaModelo(clave, vals, periodos, escala, moneda) {
   const p = D.tend[clave]; if (!p) return null;
-  const [pend, ventana, log, ajuste, est] = p;
+  const [pend, ventana, log, ajuste, est, enMxn] = p;
   const iAncla = ultimoFinito(vals); if (iAncla < 0 || ajuste == null) return null;
   const out = new Array(periodos.length).fill(null);
   for (let i = Math.max(0, iAncla - ventana + 1); i <= iAncla; i++) {
     const v = ajuste + pend * (i - iAncla) + (est ? est[(periodos[i] % 100) - 1] : 0);
-    out[i] = (log ? Math.exp(v) : v) * escala;
+    let f = escala;
+    if (moneda && !!enMxn !== (moneda === 'MXN')) {       // modelo en otra moneda que la grafica
+      const t = tcDe(periodos[i]); if (t == null) continue;
+      f = enMxn ? escala / t : escala * t;
+    }
+    out[i] = (log ? Math.exp(v) : v) * f;
   }
   return out;
 }
@@ -981,8 +987,9 @@ function pintarReservas() {
     () => tablaDatos(['Ramo', `${eti(D.ultimo)} real`, `${eti(D.fin_m)} proyección`, 'Variación'], ramos.map((r, i) => [r, fmt(porRamoU[i], 2), fmt(porRamoF[i], 2), fmtPct(varPct(porRamoU[i], porRamoF[i]))])));
 
   const nombreTendR = nombreModelo(`${reserva}|${concepto}|${ramoRes}`);
-  // la curva del modelo solo existe para las series que se modelan directo: BEL (RRC, SONR) o BRUTO (RFV) por ramo, en USD
-  const tendR = (moneda === 'USD' && ramoRes !== 'Todos') ? rectaModelo(`${reserva}|${concepto}|${ramoRes}`, real, P_M, 1e-6) : null;
+  // la curva del modelo solo existe para las series que se modelan directo: BEL (RRC, SONR, en USD) o BRUTO (RFV, en
+  // pesos) por ramo; se pasa a la moneda de la grafica con el TC de cada mes
+  const tendR = ramoRes !== 'Todos' ? rectaModelo(`${reserva}|${concepto}|${ramoRes}`, real, P_M, 1e-6, moneda) : null;
   const c3 = tarjeta(`${reserva} ${concepto} histórico y proyección · ${etiqRamo}`, `${eti(P_M[0])} a ${eti(D.fin_m)}, millones de ${moneda}`,
     (cuerpo, W) => graficaLineas(cuerpo, W, {
       labels: P_M.map(eti), tituloX: i => etiLarga(P_M[i]), fmt: v => fmt(v, decV), cadaX: 6, etiquetasFin: true, incluirCero: true,
