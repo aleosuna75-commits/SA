@@ -403,7 +403,8 @@ BD_CON_ESCENARIO_PND = None      # None: la BD principal no cambia y cada escena
 INDICE_BASE_PND = {"RRC": ("Ind Sin RRC", "PND"), "SONR": ("Ind Sin SONR Media", "PD")}   # indice y nombre de la base
 PERSISTENCIAS_PND = (1.0, "estimada")   # desviacion del FA: se conserva (1) o se desvanece con su rho
 RANGO_FA = (0.001, 20.0)         # FA (base / prima anualizada) sano al ultimo mes
-INDICES_PND_EN_BD = True         # columnas a la derecha de BD_Montos_RRC_SONR con los indicadores de toda la reserva
+INDICES_PND_EN_BD = True         # columnas a la derecha de BD_Montos_RRC_SONR con los indicadores por ramo: un bloque
+                                 # por indicador, con una columna por ramo ("PND/PD 10", "FA 10", ...)
 COLUMNAS_INDICES_PND = {"PND/PD": "#,##0", "FA": "0.0000", "FACTOR GTO": "0.00%", "FACTOR MR": "0.00%"}
 ESTACIONALIDAD_TRIMESTRAL = ("RCONT",)   # acumula en meses 1-2 del trimestre y libera en el 3
 DOMINIO_CESION = (0.0, 1.0)      # IRR/BRUTO entre 0 y 100%
@@ -1987,82 +1988,85 @@ def _indice_al_corte(hp, ramo, nombre: str, pc: int, h: int):
 
 
 def indices_pnd_bd(diag: dict, resultados: dict, proy: dict, periodos_proy: list[int], meses_pe: int | None) -> dict:
-    """Indicadores de toda la reserva (suma de los ramos con indice) por mes, para las columnas de la BD:
-    {(reserva, periodo): {"PND/PD": suma de la base BEL / indice, "FA": base / prima de los grupos de esos ramos (ultimos
-    meses_pe meses, anualizada), "FACTOR GTO": GTO / PND (RRC), "FACTOR MR": MR / base}}. La historia sale del real y la
-    proyeccion de proy (la base proyectada es el BEL escrito entre el indice proyectado de HParametros)."""
+    """Indicadores por ramo y mes para las columnas de la BD: {(reserva, periodo, ramo): {"PND/PD": BEL / indice,
+    "FA": base / prima anualizada del grupo del ramo (ultimos meses_pe meses), "FACTOR GTO": GTO / PND (RRC),
+    "FACTOR MR": MR / base}}. La historia sale del real y la proyeccion de proy (la base proyectada es el BEL escrito
+    entre el indice proyectado de HParametros)."""
     hist, pe_tab = diag.get("_hist") or {}, diag.get("_pe") or {}
     esc = next((e for e, m in ESCENARIOS_PND.items() if m == meses_pe), None)
     h = len(periodos_proy)
     out = {}
-    for pref, (nombre_is, _) in INDICE_BASE_PND.items():
-        acum = {}
-        for (pf, ramo), d in hist.items():
-            if pf != pref:
-                continue
-            grupo = d.get("grupo")
-            for i, p in enumerate(d["per"]):
-                b = d["base"][i]
-                if np.isfinite(b) and b > 0:
-                    a = acum.setdefault(p, [0.0, 0.0, 0.0, set()])
-                    a[0] += b
-                    a[1] += float(np.nan_to_num(d["gto"][i]))
-                    a[2] += float(np.nan_to_num(d["mr"][i]))
-                    a[3].add(grupo)
-            r_is = resultados.get(("HPARAM", HOJA_PARAMETROS, nombre_is, MAPA_RAMO_LAG.get(str(ramo))))
-            is_f = np.asarray(r_is.pronostico, dtype=float) if r_is is not None else None
-            if is_f is None or len(is_f) != h:
-                continue
-            for j, p in enumerate(periodos_proy):
-                bel = proy.get((norm(f"{pref} BEL"), p, ramo), math.nan)
-                if not (np.isfinite(bel) and bel > 0 and np.isfinite(is_f[j]) and is_f[j] > 0):
-                    continue
-                a = acum.setdefault(p, [0.0, 0.0, 0.0, set()])
-                a[0] += bel / is_f[j]
-                a[1] += proy.get((norm("RRC GTO"), p, ramo), 0.0) if pref == "RRC" else 0.0
-                a[2] += proy.get((norm(f"{pref} MR"), p, ramo), 0.0)
-                a[3].add(grupo)
-        for p, (b, g, m, grupos) in acum.items():
-            fila = {"PND/PD": b, "FACTOR MR": m / b if b > 0 else None}
+    for (pref, ramo), d in hist.items():
+        pe = pe_tab.get((esc, d.get("grupo"))) if esc is not None else None
+
+        def fila(p, b, gto, mr):
+            f = {"PND/PD": b, "FACTOR MR": mr / b}
             if pref == "RRC":
-                fila["FACTOR GTO"] = g / b if b > 0 else None
-            if esc is not None and pe_tab and None not in grupos:
-                pe = [float(pe_tab[(esc, gr)].get(p, math.nan)) for gr in grupos if (esc, gr) in pe_tab]
-                tot = sum(pe) if pe and all(np.isfinite(pe)) else math.nan
-                fila["FA"] = b / tot if np.isfinite(tot) and tot > 0 else None
-            out[(pref, p)] = fila
+                f["FACTOR GTO"] = gto / b
+            if pe is not None:
+                v = float(pe.get(p, math.nan))
+                f["FA"] = b / v if np.isfinite(v) and v > 0 else None
+            out[(pref, p, ramo)] = f
+
+        for i, p in enumerate(d["per"]):
+            b = d["base"][i]
+            if np.isfinite(b) and b > 0:
+                fila(p, b, float(np.nan_to_num(d["gto"][i])), float(np.nan_to_num(d["mr"][i])))
+        r_is = resultados.get(("HPARAM", HOJA_PARAMETROS, d["nombre_is"], MAPA_RAMO_LAG.get(str(ramo))))
+        is_f = np.asarray(r_is.pronostico, dtype=float) if r_is is not None else None
+        if is_f is None or len(is_f) != h:
+            continue
+        for j, p in enumerate(periodos_proy):
+            bel = proy.get((norm(f"{pref} BEL"), p, ramo), math.nan)
+            if np.isfinite(bel) and bel > 0 and np.isfinite(is_f[j]) and is_f[j] > 0:
+                fila(p, bel / is_f[j], proy.get((norm("RRC GTO"), p, ramo), 0.0) if pref == "RRC" else 0.0,
+                     proy.get((norm(f"{pref} MR"), p, ramo), 0.0))
     return out
 
 
 def escribir_indices_pnd(bd: BDMontos, indices: dict):
-    """Escribe los indicadores en columnas a la derecha de la hoja de montos (encabezados de COLUMNAS_INDICES_PND en
-    el renglon 3: si ya estan, se usan esas columnas; si no, se agregan despues de la ultima). Van en todos los
-    renglones de RRC y SONR (historia y proyeccion); sin dato, la celda queda vacia."""
+    """Escribe los indicadores por ramo a la derecha de la hoja de montos: un bloque por indicador de
+    COLUMNAS_INDICES_PND con una columna por ramo (encabezado "<indicador> <ramo>" en el renglon 3, que no empieza con
+    RAM_ para no confundirse con los montos, y el nombre del bloque en el renglon 2). Si la BD ya trae esas columnas se
+    usan; si trae los encabezados de toda la reserva ("PND/PD", "FA", ...) al final, el bloque empieza ahi; si no, despues
+    de la ultima columna. Van en todos los renglones de RRC y SONR (historia y proyeccion); sin dato, la celda queda
+    vacia."""
     ws = bd.ws
     enc = {norm(ws.cell(3, c).value): c for c in range(1, ws.max_column + 1) if ws.cell(3, c).value}
-    ultima = max(enc.values())
+    ramos = list(bd.cols_ramo)
+    nombres = [(ind, r, f"{ind} {r}") for ind in COLUMNAS_INDICES_PND for r in ramos]
+    viejas = [enc[norm(ind)] for ind in COLUMNAS_INDICES_PND if norm(ind) in enc]
+    fijas = [c for n, c in enc.items() if n not in {norm(x[2]) for x in nombres} | {norm(i) for i in COLUMNAS_INDICES_PND}]
+    siguiente = (min(viejas) if viejas and min(viejas) > max(fijas) else max(fijas) + 1)
+    col_estilo = max(fijas)
+    col_ramo = next(iter(bd.cols_ramo.values()))
+    ancho = ws.column_dimensions[get_column_letter(col_ramo)].width
     cols = {}
-    for nombre in COLUMNAS_INDICES_PND:
+    for ind, r, nombre in nombres:
         c = enc.get(norm(nombre))
         if c is None:
-            ultima += 1
-            c = ultima
-            _copiar_estilo(ws.cell(3, max(enc.values())), ws.cell(3, c))
-            ws.cell(3, c).value = nombre
-            ancho = ws.column_dimensions[get_column_letter(max(enc.values()))].width
-            if ancho:
-                ws.column_dimensions[get_column_letter(c)].width = ancho
-        cols[nombre] = c
-    for (conc, p), r in bd.filas.items():
+            while siguiente in fijas:
+                siguiente += 1
+            c = siguiente
+            siguiente += 1
+        cols[(ind, r)] = c
+        _copiar_estilo(ws.cell(3, col_estilo), ws.cell(3, c))
+        ws.cell(3, c).value = nombre
+        if ancho:
+            ws.column_dimensions[get_column_letter(c)].width = ancho
+    for ind in COLUMNAS_INDICES_PND:                      # nombre del bloque arriba de su primera columna
+        c0 = min(c for (i, _), c in cols.items() if i == ind)
+        ws.cell(2, c0).value = ind
+        ws.cell(2, c0).font = Font(bold=True)
+    for (conc, p), fila in bd.filas.items():
         pref = conc.split()[0]
         if pref not in INDICE_BASE_PND:
             continue
-        vals = indices.get((pref, p), {})
-        for nombre, c in cols.items():
-            v = vals.get(nombre)
-            celda = ws.cell(r, c)
+        for (ind, r), c in cols.items():
+            v = indices.get((pref, p, r), {}).get(ind)
+            celda = ws.cell(fila, c)
             celda.value = float(v) if v is not None and np.isfinite(v) else None
-            celda.number_format = COLUMNAS_INDICES_PND[nombre]
+            celda.number_format = COLUMNAS_INDICES_PND[ind]
     if ws.auto_filter and ws.auto_filter.ref:          # el filtro de la hoja llega a las columnas nuevas
         ini, fin = ws.auto_filter.ref.split(":")
         fila_fin = re.match(r"[A-Z]+(\d+)", fin).group(1)
