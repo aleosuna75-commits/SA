@@ -387,6 +387,22 @@ UMBRAL_RESERVA_FACTOR = 1e6      # reserva minima (USD) para usar el factor
 RANGO_FACTOR = (0.01, 10.0)      # factor (reserva / exposicion) sano al ultimo mes
 MAX_MESES_PRIMA_ESTIMADA = 2     # meses maximos entre el ultimo real de primas y el de reservas
 SENSIBILIDAD_PRIMA = (0.9, 1.1)  # escenarios de prima del ano siguiente para la sensibilidad
+# Escenarios PND / PD (Danos RRC y SONR): la reserva se escribe sobre la prima no devengada (RRC) o devengada (SONR)
+# implicita en la valuacion. BEL RRC = PND x IS RRC y BEL SONR = PD x IS SONR media, asi que con el BEL y el indice
+# reales de cada mes se despeja PND = BEL / "Ind Sin RRC" y PD = BEL SONR / "Ind Sin SONR Media". Esa base se liga a
+# la prima tomada con FA = PND / PE (PE = prima de los ultimos 12 o 18 meses, anualizada) y los gastos y el margen se
+# expresan sobre ella: FG = GTO / PND y FM = MR / PND (MR SONR / PD). Proyeccion: FA sin pendiente (su nivel con el
+# patron del mes; la desviacion se conserva o se desvanece, lo decide el backtest), PE con la prima real, el reforecast
+# y el presupuesto, IS con la proyeccion de HParametros, FG el ultimo valor (es un % anual, el mismo en casi todos los
+# ramos) y FM con SES como las demas razones. PND = FA x PE; BEL = PND x IS; GTO = FG x PND; MR = FM x PND.
+USAR_ESCENARIOS_PND = True
+ESCENARIOS_PND = {"PE12": 12, "PE18": 18}   # escenario -> meses de prima tomada en la base del factor (FA)
+BD_CON_ESCENARIO_PND = None      # None: la BD principal no cambia y cada escenario va en su propio archivo
+                                 # (..._Proyeccion_PE12.xlsx, ..._PE18.xlsx); "PE12" o "PE18": la BD principal usa ese
+                                 # escenario en las series donde aplica
+INDICE_BASE_PND = {"RRC": ("Ind Sin RRC", "PND"), "SONR": ("Ind Sin SONR Media", "PD")}   # indice y nombre de la base
+PERSISTENCIAS_PND = (1.0, "estimada")   # desviacion del FA: se conserva (1) o se desvanece con su rho
+RANGO_FA = (0.001, 20.0)         # FA (base / prima anualizada) sano al ultimo mes
 ESTACIONALIDAD_TRIMESTRAL = ("RCONT",)   # acumula en meses 1-2 del trimestre y libera en el 3
 DOMINIO_CESION = (0.0, 1.0)      # IRR/BRUTO entre 0 y 100%
 DOMINIO_RAZON_BEL = (0.0, None)  # GTO/BEL y MR/BEL no negativos
@@ -1901,6 +1917,367 @@ def _mas_meses(periodo: int, meses: int) -> int:
     return indice_a_periodo(periodo_a_indice(periodo) + meses)
 
 
+# =============================================================================
+# ESCENARIOS PND / PD (Danos RRC y SONR): reserva = base implicita x indice de siniestralidad
+# =============================================================================
+def ruta_escenario_pnd(esc: str) -> Path:
+    """Archivo de la BD de Danos con el escenario esc (junto a la BD principal)."""
+    return SALIDA_BD_DANOS.with_name(f"{SALIDA_BD_DANOS.stem}_{esc}{SALIDA_BD_DANOS.suffix}")
+
+
+def _indice_mensual(hp, ramo, nombre: str) -> dict:
+    """{periodo: indice} de HParametros para el ramo de reserva (via MAPA_RAMO_LAG). Los huecos de hasta
+    MAX_HUECO_INTERPOLABLE meses se interpolan en linea recta; los mas largos se dejan vacios."""
+    r_hp = MAPA_RAMO_LAG.get(str(ramo))
+    h = hp.historia.get((r_hp, nombre), {}) if (hp is not None and r_hp) else {}
+    fechas = sorted(p for p, v in h.items() if v is not None and not math.isnan(v))
+    if not fechas:
+        return {}
+    per = rango_periodos(fechas[0], fechas[-1])
+    x = np.array([h.get(p, math.nan) for p in per], dtype=float)
+    ok = np.isfinite(x)
+    i = 0
+    while i < len(x):
+        if ok[i]:
+            i += 1
+            continue
+        j = i
+        while j < len(x) and not ok[j]:
+            j += 1
+        if j - i <= MAX_HUECO_INTERPOLABLE and i > 0 and j < len(x):
+            x[i:j] = np.interp(np.arange(i, j), [i - 1, j], [x[i - 1], x[j]])
+        i = j
+    return {int(p): float(v) for p, v in zip(per, x) if np.isfinite(v)}
+
+
+def _pe(pr, grupo: str, meses: int) -> pd.Series:
+    """Prima tomada del grupo de los ultimos `meses` meses, anualizada (x 12 / meses)."""
+    p = pr.mensual[grupo].astype(float)
+    return p.rolling(meses, min_periods=meses).sum() * (12.0 / meses)
+
+
+def _razon_ses(clave: tuple, per: list, valores, pc: int, h: int):
+    """Proyeccion de una razon con el mismo tratamiento que las demas razones del modelo (SES y sus reglas)."""
+    res = pronosticar(Serie(clave, "razon", list(per), [float(v) for v in valores], pc, h, dominio=DOMINIO_RAZON_BEL))
+    f = np.asarray(res.pronostico, dtype=float)
+    return np.nan_to_num(f, nan=0.0) if len(f) == h else None
+
+
+def _indice_al_corte(hp, ramo, nombre: str, pc: int, h: int):
+    """Indice de HParametros proyectado desde el corte pc con el mismo metodo de los indices (para el backtest)."""
+    r_hp = MAPA_RAMO_LAG.get(str(ramo))
+    hist = hp.historia.get((r_hp, nombre), {}) if r_hp else {}
+    fechas = [f for f, v in hist.items() if f <= pc and not math.isnan(v)]
+    if not fechas:
+        return None
+    periodos = rango_periodos(min(fechas), pc)
+    res = pronosticar(Serie(("HPARAM", HOJA_PARAMETROS, nombre, r_hp), "indice", periodos,
+                            [hist.get(p, math.nan) for p in periodos], pc, h))
+    f = np.asarray(res.pronostico, dtype=float)
+    return f if len(f) == h and np.all(np.isfinite(f)) and np.all(f > 0) else None
+
+
+def escenarios_pnd(bd: BDMontos, hp, resultados: dict, pr, proy_base: dict, periodos_proy: list[int], ultimo: int,
+                   alertas: list) -> dict:
+    """Escenarios PND / PD de Danos (ver ESCENARIOS_PND). Regresa el diagnostico y, por escenario, el diccionario de
+    montos derivados (el de proy_base con RRC y SONR reemplazados donde el escenario aplica)."""
+    diag = {"estado": "", "resumen": [], "mensual": [], "decision": [], "backtest": [], "totales": [], "proy": {},
+            "config": {}}
+    h = len(periodos_proy)
+    pos = {p: i for i, p in enumerate(periodos_proy)}
+    dics = [p for p in periodos_proy if p % 100 == 12]
+    # 1) historia (aunque no haya prima): base implicita, gastos y margen sobre la base
+    hist = {}
+    for pref, (nombre_is, base) in INDICE_BASE_PND.items():
+        for ramo in bd.cols_ramo:
+            res = resultados.get(("DANOS", pref, "BEL", ramo))
+            if res is None or not res.historia_periodos:
+                continue
+            ind = _indice_mensual(hp, ramo, nombre_is)
+            per = list(res.historia_periodos)
+            bel = np.asarray(res.historia_valores, dtype=float)
+            iv = np.array([ind.get(p, math.nan) for p in per], dtype=float)
+            with np.errstate(divide="ignore", invalid="ignore"):
+                b = np.where(np.isfinite(iv) & (iv > 0) & np.isfinite(bel), bel / iv, np.nan)
+            gto = np.array([bd.valores.get((f"{pref} GTO", p, ramo), math.nan) for p in per], dtype=float) \
+                if pref == "RRC" else np.full(len(per), np.nan)
+            mr = np.array([bd.valores.get((f"{pref} MR", p, ramo), math.nan) for p in per], dtype=float)
+            with np.errstate(divide="ignore", invalid="ignore"):
+                fg = np.where(b > 0, gto / b, np.nan)
+                fm = np.where(b > 0, mr / b, np.nan)
+            hist[(pref, ramo)] = {"per": per, "bel": bel, "is": iv, "base": b, "gto": gto, "mr": mr, "fg": fg,
+                                  "fm": fm, "nombre_is": nombre_is, "base_nombre": base}
+    if not USAR_ESCENARIOS_PND:
+        diag["estado"] = "apagado (USAR_ESCENARIOS_PND = False)"
+    elif pr is None:
+        diag["estado"] = "sin archivos de prima real en entradas/: solo se reporta la base implicita (sin escenarios)"
+    elif not pr.tiene_siguiente:
+        diag["estado"] = ("sin prima del ano siguiente (presupuesto completo): solo se reporta la base implicita "
+                          "(sin escenarios)")
+    elif periodo_a_indice(ultimo) - periodo_a_indice(pr.ultimo_real) > MAX_MESES_PRIMA_ESTIMADA:
+        diag["estado"] = (f"la prima real llega a {pr.ultimo_real} y las reservas a {ultimo}: actualiza el real de "
+                          "primas; solo se reporta la base implicita (sin escenarios)")
+    pe_tab = {}
+    if not diag["estado"]:
+        for esc, meses in ESCENARIOS_PND.items():
+            for g in pr.mensual.columns:
+                pe_tab[(esc, g)] = _pe(pr, g, meses)
+
+    # 2) elegibilidad, ajuste del FA por configuracion y backtest (por escenario y reserva)
+    ajustes, motivos, bts = {}, {}, {}
+    cache_bt = {}
+    for (pref, ramo), d in hist.items():
+        grupo = primas.GRUPO_DE_RAMO_RESERVA.get(str(ramo)) if primas is not None else None
+        d["grupo"] = grupo
+        motivo = ""
+        if diag["estado"]:
+            motivo = diag["estado"]
+        elif resultados[("DANOS", pref, "BEL", ramo)].regla or d["per"][-1] != ultimo:
+            motivo = "BEL resuelto por regla o sin dato al ultimo mes"
+        elif not (np.isfinite(d["base"][-1]) and d["base"][-1] > 0):
+            motivo = f"sin {d['nombre_is']} o sin BEL positivo al ultimo mes"
+        elif grupo is None or pr.cobertura.get(grupo) is None or pr.cobertura[grupo] < primas.MIN_COBERTURA_HISTORIA:
+            motivo = f"cobertura de prima insuficiente en el grupo {grupo}"
+        is_f = None
+        if not motivo:
+            r_is = resultados.get(("HPARAM", HOJA_PARAMETROS, d["nombre_is"], MAPA_RAMO_LAG.get(str(ramo))))
+            is_f = np.asarray(r_is.pronostico, dtype=float) if r_is is not None else None
+            if is_f is None or len(is_f) != h or not np.all(np.isfinite(is_f)) or not np.all(is_f > 0):
+                motivo = f"sin proyeccion de {d['nombre_is']} para el ramo"
+        d["is_f"] = is_f
+        for esc in ESCENARIOS_PND:
+            if motivo:
+                motivos[(esc, pref, ramo)] = motivo
+                continue
+            PE = pe_tab[(esc, grupo)]
+            for persist in PERSISTENCIAS_PND:
+                cfg = (esc, 0.0, persist)
+                a = ajustar_factor(d["per"], d["base"], PE, periodos_proy, cfg, "DANOS")
+                if a is None or not (RANGO_FA[0] <= a["kappa_hist"][-1] <= RANGO_FA[1]):
+                    continue
+                ajustes[(esc, pref, ramo, persist)] = a
+                # backtest en los cortes estandar (prima real despues del corte; indice proyectado desde el corte)
+                filas = []
+                for c in CORTES_BACKTEST:
+                    o = len(d["per"]) - c
+                    if o < MIN_ENTRENAMIENTO:
+                        continue
+                    hz = min(16, len(d["per"]) - o)
+                    pc, per_h = d["per"][o - 1], d["per"][o:o + hz]
+                    b = ajustar_factor(d["per"][:o], d["base"][:o], PE, per_h, cfg, "DANOS")
+                    if b is None:
+                        continue
+                    k_c = (pref, ramo, c)
+                    if k_c not in cache_bt:        # lo que no depende del escenario: indice, FG, FM y la recta
+                        is_c = _indice_al_corte(hp, ramo, d["nombre_is"], pc, hz)
+                        fg_ok = [x for x in d["fg"][:o] if np.isfinite(x)]
+                        fm_c = _razon_ses(("DANOS", pref, f"MR/{d['base_nombre']}", ramo), d["per"][:o],
+                                          d["fm"][:o], pc, hz)
+                        try:
+                            bel_a = (_recta(d["bel"][:o], d["per"][:o], hz)
+                                     if np.all(np.isfinite(d["bel"][:o]) & (d["bel"][:o] > 0)) else None)
+                        except Exception:  # noqa: BLE001
+                            bel_a = None
+                        with np.errstate(divide="ignore", invalid="ignore"):
+                            rg = np.where(d["bel"][:o] > 0, d["gto"][:o] / d["bel"][:o], np.nan)
+                            rm = np.where(d["bel"][:o] > 0, d["mr"][:o] / d["bel"][:o], np.nan)
+                        ga = (_razon_ses(("DANOS", pref, "GTO/BEL", ramo), d["per"][:o], rg, pc, hz)
+                              if pref == "RRC" else np.zeros(hz))
+                        ma = _razon_ses(("DANOS", pref, "MR/BEL", ramo), d["per"][:o], rm, pc, hz)
+                        cache_bt[k_c] = {"is": is_c, "fg": fg_ok[-1] if fg_ok else (0.0 if pref == "SONR" else None),
+                                         "fm": fm_c, "bel_a": bel_a, "ga": ga, "ma": ma}
+                    cb = cache_bt[k_c]
+                    if cb["is"] is None or cb["fm"] is None or cb["fg"] is None or cb["bel_a"] is None \
+                            or cb["ma"] is None or cb["ga"] is None or not np.all(np.isfinite(cb["bel_a"])):
+                        continue
+                    base_b = b["pron"]
+                    is_real = d["is"][o:o + hz]
+                    real = {"BEL": d["bel"][o:o + hz], "GTO": np.nan_to_num(d["gto"][o:o + hz]),
+                            "MR": np.nan_to_num(d["mr"][o:o + hz])}
+                    esc_f = {"BEL": base_b * cb["is"], "GTO": cb["fg"] * base_b, "MR": cb["fm"] * base_b}
+                    rec_f = {"BEL": cb["bel_a"], "GTO": cb["ga"] * cb["bel_a"], "MR": cb["ma"] * cb["bel_a"]}
+                    ora = base_b * is_real if np.all(np.isfinite(is_real)) else None
+                    filas.append({"corte": pc, "meses": hz, "real": real, "esc": esc_f, "recta": rec_f,
+                                  "bel_is_real": ora})
+                bts[(esc, pref, ramo, persist)] = filas
+            if not any(k[:3] == (esc, pref, ramo) for k in ajustes):
+                motivos[(esc, pref, ramo)] = (f"{d['base_nombre']} / prima con menos de {MIN_MESES_FACTOR['DANOS']} "
+                                              "meses validos o FA fuera de rango")
+
+    def _err(filas, modelo, concepto):
+        num = sum(float(np.sum(np.abs(f[modelo][concepto] - f["real"][concepto]))) for f in filas)
+        den = sum(float(np.sum(np.abs(f["real"][concepto]))) for f in filas)
+        return num / den * 100 if den > 0 else math.nan
+
+    def _err_bruto(filas, modelo):
+        num = den = 0.0
+        for f in filas:
+            tot_f = f[modelo]["BEL"] + f[modelo]["GTO"] + f[modelo]["MR"]
+            tot_r = f["real"]["BEL"] + f["real"]["GTO"] + f["real"]["MR"]
+            num += float(np.sum(np.abs(tot_f - tot_r)))
+            den += float(np.sum(np.abs(tot_r)))
+        return num / den * 100 if den > 0 else math.nan
+
+    # 3) persistencia del FA por escenario y reserva: la de fabrica (1) salvo que la estimada baje el error del BEL
+    #    agrupado MARGEN_PREFERENCIA_FACTOR puntos o mas (mismos casos)
+    for esc in ESCENARIOS_PND:
+        for pref in INDICE_BASE_PND:
+            ramos = sorted({k[2] for k in ajustes if k[:2] == (esc, pref)}, key=str)
+            comunes = [(r, f["corte"]) for r in ramos
+                       for f in bts.get((esc, pref, r, PERSISTENCIAS_PND[0]), [])
+                       if all(any(g["corte"] == f["corte"] for g in bts.get((esc, pref, r, ps), []))
+                              for ps in PERSISTENCIAS_PND)]
+            errs = {}
+            for ps in PERSISTENCIAS_PND:
+                filas = [f for r in ramos for f in bts.get((esc, pref, r, ps), []) if (r, f["corte"]) in comunes]
+                errs[ps] = _err(filas, "esc", "BEL") if filas else math.nan
+            elegida = PERSISTENCIAS_PND[0]
+            mejor = min((ps for ps in PERSISTENCIAS_PND if np.isfinite(errs[ps])), key=lambda ps: errs[ps],
+                        default=elegida)
+            if np.isfinite(errs.get(elegida, math.nan)) and errs[mejor] <= errs[elegida] - MARGEN_PREFERENCIA_FACTOR:
+                elegida = mejor
+            diag["config"][(esc, pref)] = elegida
+            filas = [f for r in ramos for f in bts.get((esc, pref, r, elegida), [])]
+            fila = {"Escenario": esc, "Reserva": pref, "Base": INDICE_BASE_PND[pref][1],
+                    "Indice": INDICE_BASE_PND[pref][0], "Persistencia del FA": str(elegida),
+                    "Series": len({r for r in ramos if bts.get((esc, pref, r, elegida))}), "Cortes (serie x corte)": len(filas)}
+            for ps in PERSISTENCIAS_PND:
+                fila[f"Error % BEL (persistencia {ps})"] = errs[ps]
+            for conc in ("BEL", "GTO", "MR") if pref == "RRC" else ("BEL", "MR"):
+                fila[f"Error % {conc} recta"] = _err(filas, "recta", conc) if filas else math.nan
+                fila[f"Error % {conc} escenario"] = _err(filas, "esc", conc) if filas else math.nan
+            fila["Error % BRUTO recta"] = _err_bruto(filas, "recta") if filas else math.nan
+            fila["Error % BRUTO escenario"] = _err_bruto(filas, "esc") if filas else math.nan
+            ora = [f for f in filas if f["bel_is_real"] is not None]
+            if ora:
+                num = sum(float(np.sum(np.abs(f["bel_is_real"] - f["real"]["BEL"]))) for f in ora)
+                den = sum(float(np.sum(np.abs(f["real"]["BEL"]))) for f in ora)
+                fila["Error % BEL escenario con el indice real"] = num / den * 100 if den else math.nan
+            diag["decision"].append(fila)
+            for r in ramos:
+                for f in bts.get((esc, pref, r, elegida), []):
+                    diag["backtest"].append({
+                        "Escenario": esc, "Reserva": pref, "Ramo": r, "Corte": f["corte"], "Meses": f["meses"],
+                        **{f"{conc} recta": _err([f], "recta", conc) for conc in ("BEL", "GTO", "MR")},
+                        **{f"{conc} escenario": _err([f], "esc", conc) for conc in ("BEL", "GTO", "MR")},
+                        "BRUTO recta": _err_bruto([f], "recta"), "BRUTO escenario": _err_bruto([f], "esc")})
+
+    # 4) proyeccion por escenario y montos derivados (IRR con la misma razon de cesion del modelo)
+    finales = {}
+    for esc in ESCENARIOS_PND:
+        proy = dict(proy_base)
+        aplicadas = 0
+        for (pref, ramo), d in hist.items():
+            cfg_p = diag["config"].get((esc, pref), PERSISTENCIAS_PND[0])
+            a = ajustes.get((esc, pref, ramo, cfg_p)) or next(
+                (ajustes[k] for k in ajustes if k[:3] == (esc, pref, ramo)), None)
+            if a is None:
+                continue
+            base_f = np.asarray(a["pron"], dtype=float)
+            bel_f = base_f * d["is_f"]
+            fg_ok = [x for x in d["fg"] if np.isfinite(x)]
+            fg = fg_ok[-1] if (pref == "RRC" and fg_ok) else 0.0
+            fm_f = _razon_ses(("DANOS", pref, f"MR/{d['base_nombre']}", ramo), d["per"], d["fm"], ultimo, h)
+            if fm_f is None:
+                motivos[(esc, pref, ramo)] = f"no se pudo proyectar MR / {d['base_nombre']}"
+                continue
+            gto_f, mr_f = fg * base_f, fm_f * base_f
+            ces = resultados.get(("DANOS", pref, "IRR/BRUTO", ramo))
+            c = np.nan_to_num(np.asarray(ces.pronostico, dtype=float), nan=0.0) if ces is not None else np.zeros(h)
+            bruto = bel_f + gto_f + mr_f
+            irr = c * bruto
+            valores = {f"{pref} BEL": bel_f, f"{pref} MR": mr_f, f"{pref} BRUTO": bruto, f"{pref} IRR": irr,
+                       f"{pref} NETO": bruto - irr}
+            if pref == "RRC":
+                valores["RRC GTO"] = gto_f
+            for conc, arr in valores.items():
+                for i, p in enumerate(periodos_proy):
+                    proy[(norm(conc), p, ramo)] = float(arr[i])
+            aplicadas += 1
+            finales[(esc, pref, ramo)] = {"a": a, "cfg": cfg_p, "base": base_f, "bel": bel_f, "gto": gto_f, "mr": mr_f,
+                                          "fg": fg, "fm": fm_f, "neto": bruto - irr}
+        if aplicadas:
+            diag["proy"][esc] = proy
+
+    # 5) tablas del diagnostico
+    def _v(proy, conc, p, ramo):
+        return proy.get((norm(conc), p, ramo), math.nan)
+
+    for (pref, ramo), d in hist.items():
+        per, base = d["per"], d["base_nombre"]
+        for i, p in enumerate(per):
+            if not np.isfinite(d["base"][i]):
+                continue
+            fila = {"Reserva": pref, "Ramo": ramo, "Periodo": p, "Tipo": "Real", d["nombre_is"]: d["is"][i],
+                    f"{base} (BEL / indice)": d["base"][i], "BEL": d["bel"][i], "MR": d["mr"][i],
+                    f"MR / {base} (FM)": d["fm"][i]}
+            if pref == "RRC":
+                fila.update({"GTO": d["gto"][i], f"GTO / {base} (FG)": d["fg"][i]})
+            for esc in ESCENARIOS_PND:
+                pe = pe_tab.get((esc, d.get("grupo")))
+                v = float(pe.get(p, math.nan)) if pe is not None else math.nan
+                fila[f"Prima {esc} (anualizada)"] = v
+                fila[f"FA {esc}"] = d["base"][i] / v if v and np.isfinite(v) and v > 0 else math.nan
+            diag["mensual"].append(fila)
+        if not any((esc, pref, ramo) in finales for esc in ESCENARIOS_PND):
+            continue
+        for j, p in enumerate(periodos_proy):
+            fila = {"Reserva": pref, "Ramo": ramo, "Periodo": p, "Tipo": "Proyeccion",
+                    d["nombre_is"]: d["is_f"][j] if d.get("is_f") is not None else math.nan,
+                    "BEL modelo actual": _v(proy_base, f"{pref} BEL", p, ramo)}
+            for esc in ESCENARIOS_PND:
+                fz = finales.get((esc, pref, ramo))
+                if fz is None:
+                    continue
+                pe = pe_tab[(esc, d["grupo"])]
+                fila.update({f"Prima {esc} (anualizada)": float(pe.get(p, math.nan)), f"FA {esc}": fz["a"]["kappa_fut"][j],
+                             f"{base} {esc}": fz["base"][j], f"BEL {esc}": fz["bel"][j], f"MR {esc}": fz["mr"][j],
+                             f"MR / {base} (FM) {esc}": fz["fm"][j]})
+                if pref == "RRC":
+                    fila.update({f"GTO {esc}": fz["gto"][j], f"GTO / {base} (FG) {esc}": fz["fg"]})
+            diag["mensual"].append(fila)
+    for esc in ESCENARIOS_PND:
+        for (pref, ramo), d in hist.items():
+            fz = finales.get((esc, pref, ramo))
+            fila = {"Escenario": esc, "Reserva": pref, "Ramo": ramo, "Grupo de prima": d.get("grupo"),
+                    "Aplica": fz is not None, "Motivo": "" if fz is not None else motivos.get((esc, pref, ramo), "")}
+            if fz is not None:
+                a = fz["a"]
+                fila.update({"Persistencia del FA": str(fz["cfg"]), "Rho del FA (AR1)": a["rho"],
+                             f"FA {ultimo}": a["kappa_hist"][-1], f"FA {periodos_proy[-1]}": a["kappa_fut"][-1],
+                             f"{d['nombre_is']} {ultimo}": d["is"][-1], f"{d['nombre_is']} {periodos_proy[-1]}": d["is_f"][-1]})
+                if pref == "RRC":
+                    fila["FG (ultimo)"] = fz["fg"]
+                fila[f"FM {periodos_proy[-1]}"] = fz["fm"][-1]
+                for conc in (("BEL", "GTO", "MR", "NETO") if pref == "RRC" else ("BEL", "MR", "NETO")):
+                    fila[f"{conc} real {ultimo}"] = bd.valores.get((f"{pref} {conc}", ultimo, ramo), math.nan)
+                    for p in dics:
+                        fila[f"{conc} actual {p}"] = _v(proy_base, f"{pref} {conc}", p, ramo)
+                        fila[f"{conc} {esc} {p}"] = _v(diag["proy"][esc], f"{pref} {conc}", p, ramo)
+            diag["resumen"].append(fila)
+    # totales por reserva (todos los ramos)
+    for pref in INDICE_BASE_PND:
+        for conc in (("BEL", "GTO", "MR", "BRUTO", "NETO") if pref == "RRC" else ("BEL", "MR", "BRUTO", "NETO")):
+            reales = [bd.valores.get((f"{pref} {conc}", ultimo, r), math.nan) for r in bd.cols_ramo]
+            fila = {"Reserva": f"{pref} {conc}", f"Real {ultimo}": float(sum(v for v in reales if np.isfinite(v)))}
+            for nombre, proy in [("Modelo actual", proy_base)] + [(e, diag["proy"][e]) for e in diag["proy"]]:
+                for p in dics:
+                    fila[f"{nombre} {p}"] = sum(_v(proy, f"{pref} {conc}", p, r) for r in bd.cols_ramo
+                                                if np.isfinite(_v(proy, f"{pref} {conc}", p, r)))
+            diag["totales"].append(fila)
+    if not diag["estado"]:
+        n = {esc: sum(1 for k in finales if k[0] == esc) for esc in ESCENARIOS_PND}
+        diag["estado"] = "; ".join(f"{esc}: {v} series (reserva x ramo) con el escenario" for esc, v in n.items())
+        for f in diag["decision"]:
+            alertas.append(("PND", f"Escenario {f['Escenario']} {f['Reserva']}",
+                            f"Error % backtest BEL: recta {f.get('Error % BEL recta', math.nan):.1f}, escenario "
+                            f"{f.get('Error % BEL escenario', math.nan):.1f}; BRUTO: recta "
+                            f"{f.get('Error % BRUTO recta', math.nan):.1f}, escenario "
+                            f"{f.get('Error % BRUTO escenario', math.nan):.1f} (persistencia del FA "
+                            f"{f['Persistencia del FA']})"))
+    return diag
+
+
 def derivar_montos(bd: BDMontos, libro: str, reservas: dict, resultados: dict, periodos_proy: list[int],
                    en_mxn: bool = False):
     """Aplica las identidades contables y regresa {(concepto, periodo, ramo): valor en USD}. Si los montos
@@ -2476,6 +2853,7 @@ def escribir_diagnostico(resultados: dict, periodos_proy: list[int], alertas_gen
     _formato_tabla(ws, negrita, encab)
 
     _hojas_primas(wb, resumen, negrita, encab)
+    _hojas_pnd(wb, resumen.get("pnd") or {}, negrita, encab)
 
     ws = wb.create_sheet("Alertas")
     ws.append(["Libro", "Serie / Elemento", "Detalle"])
@@ -2614,6 +2992,49 @@ def _hojas_primas(wb, resumen: dict, negrita, encab):
                     {"Valor": "#,##0", "Reserva": "#,##0", "Factor": "0.0000", "%": "0.0%"})
         _hoja_filas(wb, "Backtest_Primas", diag.get("backtest") or [], negrita, encab,
                     {"Recta": "0.0", "Factor": "0.0", "Combinacion": "0.0"})
+
+
+def _hojas_pnd(wb, diag: dict, negrita, encab):
+    """Hojas de los escenarios PND / PD: resumen (estado, backtest por escenario, totales y detalle por serie), la base
+    implicita y los factores mes a mes (historia y proyeccion) y el backtest por serie y corte."""
+    if not diag or not (diag.get("mensual") or diag.get("resumen")):
+        return
+    ws = wb.create_sheet("PND_Resumen")
+    fila = 1
+    bloques = [("Estado", [{"Escenarios PND / PD": diag.get("estado", "")}]),
+               ("Backtest agrupado por escenario y reserva (error %: recta del modelo actual contra el escenario; "
+                "prima real despues del corte, indice proyectado desde el corte)", diag.get("decision")),
+               ("Totales de todos los ramos (USD)", diag.get("totales")),
+               ("Detalle por serie", diag.get("resumen"))]
+    for titulo, filas in bloques:
+        ws.cell(fila, 1, titulo).font = negrita
+        fila += 1
+        if not filas:
+            ws.cell(fila, 1, "(sin datos)")
+            fila += 2
+            continue
+        cab = []
+        for f in filas:
+            cab += [c for c in f if c not in cab]
+        for j, c in enumerate(cab, start=1):
+            ws.cell(fila, j, c).font = negrita
+            ws.cell(fila, j).fill = encab
+            ws.cell(fila, j).alignment = Alignment(wrap_text=True, vertical="center")
+        enc_fila = fila
+        for f in filas:
+            fila += 1
+            for j, c in enumerate(cab, start=1):
+                ws.cell(fila, j, _celda(f.get(c)))
+        _formatear(ws, enc_fila, {"Error": "0.0", "FA": "0.0000", "FG": "0.0000", "FM": "0.0000", "Rho": "0.00",
+                                  "Ind": "0.0000", "BEL": "#,##0", "GTO": "#,##0", "MR": "#,##0", "NETO": "#,##0",
+                                  "Real": "#,##0", "Modelo": "#,##0", "PE": "#,##0"}, fila)
+        fila += 2
+    ws.column_dimensions["A"].width = 26
+    _hoja_filas(wb, "PND_Mensual", diag.get("mensual") or [], negrita, encab,
+                {"GTO /": "0.0000", "MR /": "0.0000", "Ind": "0.0000", "PND": "#,##0", "PD": "#,##0", "BEL": "#,##0",
+                 "GTO": "#,##0", "MR": "#,##0", "Prima": "#,##0", "FA": "0.0000"})
+    _hoja_filas(wb, "PND_Backtest", diag.get("backtest") or [], negrita, encab,
+                {"BEL": "0.0", "GTO": "0.0", "MR": "0.0", "BRUTO": "0.0"})
 
 
 def _formato_tabla(ws, negrita, encab):
@@ -2760,7 +3181,8 @@ def main():
         if not ruta.exists():
             raise SystemExit(f"Falta {ruta}: copia la BD (Fianzas ya llena) a la carpeta entradas/.")
     salidas = ([SALIDA_BD_DANOS, SALIDA_BD_RFV, SALIDA_DIAGNOSTICO] + ([SALIDA_GRAFICAS] if GENERAR_GRAFICAS else [])
-               + ([SALIDA_DASHBOARD, SALIDA_DASHBOARD_HTML] if GENERAR_DASHBOARD else []))
+               + ([SALIDA_DASHBOARD, SALIDA_DASHBOARD_HTML] if GENERAR_DASHBOARD else [])
+               + ([ruta_escenario_pnd(e) for e in ESCENARIOS_PND] if USAR_ESCENARIOS_PND else []))
     verificar_escritura(salidas)
     for ruta in (ARCHIVO_BD_DANOS, ARCHIVO_BD_RFV):
         print(f"   Entrada: {ruta.name} ({datetime.fromtimestamp(ruta.stat().st_mtime):%Y-%m-%d %H:%M})", flush=True)
@@ -2867,6 +3289,27 @@ def main():
                       + aplicar_rango_esperado(proy_rfv, bd_rfv, "FIANZAS", ESTRUCTURA["FIANZAS"], resultados,
                                                periodos_proy, ultimo, alertas))
     validar(proy_danos, proy_rfv)
+    # escenarios PND / PD (Danos): cada uno en su archivo; la BD principal solo cambia con BD_CON_ESCENARIO_PND
+    diag_pnd = {"estado": "apagado (USAR_ESCENARIOS_PND = False)"}
+    if USAR_ESCENARIOS_PND:
+        print("Escenarios PND / PD (Danos) ...", flush=True)
+        n0 = len(alertas)
+        try:
+            diag_pnd = escenarios_pnd(bd_danos, hp, resultados, pr, proy_danos, periodos_proy, ultimo, alertas)
+        except Exception as e:  # noqa: BLE001
+            del alertas[n0:]
+            diag_pnd = {"estado": f"error en los escenarios PND ({type(e).__name__}: {e}); no se generan"}
+            alertas.append(("PND", "Escenarios PND", diag_pnd["estado"]))
+        print(f"   {diag_pnd['estado']}", flush=True)
+        if BD_CON_ESCENARIO_PND:
+            if BD_CON_ESCENARIO_PND in (diag_pnd.get("proy") or {}):
+                proy_danos = diag_pnd["proy"][BD_CON_ESCENARIO_PND]
+                alertas.append(("PND", "BD principal", f"La BD de Danos usa el escenario {BD_CON_ESCENARIO_PND} "
+                                                       "(BD_CON_ESCENARIO_PND) en las series donde aplica"))
+            else:
+                alertas.append(("PND", "BD principal", f"BD_CON_ESCENARIO_PND = {BD_CON_ESCENARIO_PND} pero el escenario "
+                                                       "no se pudo calcular: la BD de Danos queda con el modelo actual"))
+        validar(proy_danos, proy_rfv)
     comparativo = comparar_factor(resultados, diag_factor, pr, tc_primas, {"DANOS": bd_danos, "FIANZAS": bd_rfv},
                                   {"DANOS": proy_danos, "FIANZAS": proy_rfv}, periodos_proy, tc_hist, ultimo, sin_rango)
     actualizar_finales_factor(diag_factor, resultados, periodos_proy)
@@ -2878,6 +3321,15 @@ def main():
     info_rfv = escribir_bd_montos(bd_rfv, proy_rfv, periodos_proy, SALIDA_BD_RFV)
     escribir_correccion_moneda(bd_rfv, correcciones["FIANZAS"])
     guardar_libro(bd_rfv.wb, SALIDA_BD_RFV, original=ARCHIVO_BD_RFV)
+    # una BD de Danos por escenario (mismo libro, con HParametros ya proyectado; solo cambian RRC y SONR)
+    archivos_pnd = []
+    for esc, proy_esc in (diag_pnd.get("proy") or {}).items():
+        ruta = ruta_escenario_pnd(esc)
+        escribir_bd_montos(bd_danos, proy_esc, periodos_proy, ruta)
+        guardar_libro(bd_danos.wb, ruta, original=ARCHIVO_BD_DANOS)
+        archivos_pnd.append(ruta.name)
+    viejos = [ruta_escenario_pnd(e).name for e in ESCENARIOS_PND
+              if ruta_escenario_pnd(e).exists() and ruta_escenario_pnd(e).name not in archivos_pnd]
 
     historia = {
         "DANOS": {k: v for k, v in bd_danos.valores.items() if k[1] <= ultimo},
@@ -2893,7 +3345,7 @@ def main():
                           "celdas_moneda": correcciones,
                           "presupuesto": filas_ppto, "archivo_presupuesto": ppto["archivo"] if ppto else "",
                           "lineas_nuevas_presupuesto": (ppto or {}).get("lineas_nuevas") or [],
-                          "primas": pr, "factor": diag_factor, "comparativo": comparativo})
+                          "primas": pr, "factor": diag_factor, "comparativo": comparativo, "pnd": diag_pnd})
     graficas_ok = False
     if GENERAR_GRAFICAS:
         print("Generando graficas ...", flush=True)
@@ -2986,6 +3438,23 @@ def main():
                 print(f"      {f['Reserva']:<10} {f['Escenario']:<27} "
                       + " / ".join(f"{(f.get(k) or 0) / 1e6:,.1f}" for k in dics)
                       + (f"  (crec. {crec:+.1%})" if crec is not None else ""))
+    if USAR_ESCENARIOS_PND:
+        print(f"   Escenarios PND / PD (Danos): {diag_pnd.get('estado')}")
+        for f in diag_pnd.get("decision") or []:
+            conc = ("BEL", "GTO", "MR", "BRUTO") if f["Reserva"] == "RRC" else ("BEL", "MR", "BRUTO")
+            print(f"      {f['Escenario']} {f['Reserva']:<5} error backtest recta / escenario: "
+                  + ", ".join(f"{c} {f.get(f'Error % {c} recta', math.nan):.1f} / {f.get(f'Error % {c} escenario', math.nan):.1f}"
+                              for c in conc) + f" ({f['Cortes (serie x corte)']} casos)")
+        tot = [f for f in diag_pnd.get("totales") or [] if f["Reserva"].endswith("NETO")]
+        if tot and diag_pnd.get("proy"):
+            cols = [k for k in tot[0] if k != "Reserva"]
+            print(f"      Totales NETO (M USD): " + " | ".join(cols))
+            for f in tot:
+                print(f"      {f['Reserva']:<10} " + " | ".join(f"{(f.get(k) or 0) / 1e6:,.1f}" for k in cols))
+        if archivos_pnd:
+            print(f"      Archivos: {', '.join(archivos_pnd)}")
+        if viejos:
+            print(f"      OJO: {', '.join(viejos)} son de una corrida anterior (esta vez no se generaron)")
     n_alertas = len(alertas) + sum(len(r.alertas) for r in resultados.values())
     print(f"   Alertas a revisar: {n_alertas} (hoja 'Alertas' del diagnostico)")
     print(f"   Tiempo total: {time.time() - t0:,.0f} s")
