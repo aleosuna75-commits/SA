@@ -197,6 +197,11 @@ def leer_intervalos() -> dict:
     return out
 
 
+# Montos que calcula el script de proyeccion para las celdas de la BD que van como formula (BEL por FND y sus
+# derivados): la BD se guarda sin recalcular, asi que esas celdas no traen valor. {(libro, concepto, periodo, ramo): v}
+MONTOS_CALCULADOS: dict = {}
+
+
 def leer_montos(ultimo: int):
     registros, tc = [], {}
     ramos = {}
@@ -222,6 +227,8 @@ def leer_montos(ultimo: int):
             tipo = "Real" if per <= ultimo else "Proyección"
             for ramo, k in c_ramos.items():
                 v = numero(f[k])
+                if v is None:                    # formula sin valor guardado: el monto que calculo la proyeccion
+                    v = MONTOS_CALCULADOS.get((libro, concepto, per, ramo))
                 if v is None:                    # celda vacia (mes sin captura): sin dato, no un cero real
                     continue
                 registros.append((libro, reserva, conc, ramo, per, tipo, v))
