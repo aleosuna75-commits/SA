@@ -1,6 +1,7 @@
 # Datos confidenciales: nunca se versionan (el repositorio es publico)
 *.xlsx
 *.xlsm
+*.xlsb
 *.xls
 *.csv
 entradas/
