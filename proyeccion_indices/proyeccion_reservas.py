@@ -411,16 +411,16 @@ INDICES_PND_EN_BD = True         # columnas a la derecha de BD_Montos_RRC_SONR c
                                  # por indicador, con una columna por ramo ("PND/PD 10", "FA 10", ...)
 COLUMNAS_INDICES_PND = {"PND/PD": "#,##0", "FA": "0.0000", "FACTOR GTO": "0.00%", "FACTOR MR": "0.00%",
                         "IS (RL)": "0.00%", "LAG (RL)": "0.00%", "PE FCST": "#,##0", "PRIMA N AÑOS": "#,##0",
-                        "PEACUMULADA": "#,##0", "FD/FND": "0.0000", "FD/FND (MEC)": "0.0000"}
-INDICES_PND_SOLO_BEL = ("IS (RL)", "LAG (RL)", "PE FCST", "PRIMA N AÑOS", "PEACUMULADA", "FD/FND",
-                        "FD/FND (MEC)")  # bloques que solo van en el renglon BEL de cada mes (los demas, en toda la reserva)
-INDICES_PND_RETIRADOS = ("PD/PND CORREGIDA", "BEL", "BEL (MEC)")   # bloques de versiones anteriores: se limpian
+                        "PEACUMULADA": "#,##0", "FD/FND": "0.0000"}
+INDICES_PND_SOLO_BEL = ("IS (RL)", "LAG (RL)", "PE FCST", "PRIMA N AÑOS", "PEACUMULADA", "FD/FND")
+                                 # bloques que solo van en el renglon BEL de cada mes (los demas, en toda la reserva)
+INDICES_PND_RETIRADOS = ("PD/PND CORREGIDA", "BEL", "BEL (MEC)", "FD/FND (MEC)")   # bloques de versiones anteriores: se limpian
 AGRUPAR_BLOQUES = True           # agrupa (esquema de Excel) las columnas de cada bloque con varios ramos, incluidas las
                                  # RAM_: queda visible la primera (ramo 10) y el boton +/- junto a ella
-INDICES_PND_CAPTURA = {"PE FCST": ("RRC", "SONR"), "FD/FND (MEC)": ("RRC",)}   # datos de captura: PE FCST sale de la
-                                 # hoja HOJA_PE_RAMO (PExRamo y FCST) en los meses que traen; en los demas meses, y
-                                 # FD/FND (MEC) de RRC siempre, la celda queda vacia para llenarse a mano y, si la BD de
-                                 # entrada ya trae un numero o una formula en esa columna "<indicador> <ramo>", se conserva
+INDICES_PND_CAPTURA = {"PE FCST": ("RRC", "SONR")}   # datos de captura: PE FCST sale de la hoja HOJA_PE_RAMO (PExRamo,
+                                 # reforecast y FCST) en los meses que traen; en los demas meses la celda queda vacia para
+                                 # llenarse a mano y, si la BD de entrada ya trae un numero o una formula en esa columna
+                                 # "<indicador> <ramo>", se conserva
 INDICES_PND_FORMULAS = True      # True: los indicadores van como formulas de Excel (celdas del indice y del LAG 1 en
                                  # HParametros, BEL / indice, base / PE de la hoja Primas_PE, GTO / PND, MR / base, ...);
                                  # False: como valores
@@ -2705,7 +2705,6 @@ def escribir_indices_pnd(bd: BDMontos, ctx: dict, avisos: list | None = None) ->
             gto, mr = monto(pref, "GTO", p, r) if pref == "RRC" else math.nan, monto(pref, "MR", p, r)
             vals = {"PND/PD": pnd, "IS (RL)": is_, "LAG (RL)": lag1, "PE FCST": pe_v, "PRIMA N AÑOS": p12_v,
                     "PEACUMULADA": peac, "FD/FND": fnd_v,
-                    "FD/FND (MEC)": fnd_v if pref not in INDICES_PND_CAPTURA.get("FD/FND (MEC)", ()) else None,
                     "FA": pnd / pe_g if ok(pnd) and ok(pe_g) and pe_g > 0 else math.nan,
                     "FACTOR GTO": gto / pnd if ok(gto) and ok(pnd) and pnd != 0 else math.nan,
                     "FACTOR MR": mr / pnd if ok(mr) and ok(pnd) and pnd != 0 else math.nan}
@@ -2760,8 +2759,6 @@ def escribir_indices_pnd(bd: BDMontos, ctx: dict, avisos: list | None = None) ->
                         celda.value = ("=" + "+".join(terminos)) if terminos else float(v)
                 elif ind == "FD/FND":
                     celda.value = f"={pnd_c}/{L('PEACUMULADA', r)}{fila}"
-                elif ind == "FD/FND (MEC)":
-                    celda.value = f"={L('FD/FND', r)}{fila}"
                 elif ind == "FA":
                     if not primas_pe or meses_pe is None or (meses_pe, g) not in primas_pe["col"] \
                             or p not in primas_pe["fila"]:
