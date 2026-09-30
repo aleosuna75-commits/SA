@@ -388,26 +388,37 @@ RANGO_FACTOR = (0.01, 10.0)      # factor (reserva / exposicion) sano al ultimo 
 MAX_MESES_PRIMA_ESTIMADA = 2     # meses maximos entre el ultimo real de primas y el de reservas
 SENSIBILIDAD_PRIMA = (0.9, 1.1)  # escenarios de prima del ano siguiente para la sensibilidad
 # Escenarios PND / PD (Danos RRC y SONR): la reserva se escribe sobre la prima no devengada (RRC) o devengada (SONR)
-# implicita en la valuacion. BEL RRC = PND x IS RRC y BEL SONR = PD x IS SONR media, asi que con el BEL y el indice
-# reales de cada mes se despeja PND = BEL / "Ind Sin RRC" y PD = BEL SONR / "Ind Sin SONR Media". Esa base se liga a
-# la prima tomada con FA = PND / PE (PE = prima de los ultimos 12 o 18 meses, anualizada) y los gastos y el margen se
-# expresan sobre ella: FG = GTO / PND y FM = MR / PND (MR SONR / PD). Proyeccion: FA sin pendiente (su nivel con el
-# patron del mes; la desviacion se conserva o se desvanece, lo decide el backtest), PE con la prima real, el reforecast
-# y el presupuesto, IS con la proyeccion de HParametros, FG el ultimo valor (es un % anual, el mismo en casi todos los
-# ramos) y FM con SES como las demas razones. PND = FA x PE; BEL = PND x IS; GTO = FG x PND; MR = FM x PND.
+# implicita en la valuacion. BEL RRC = PND x IS RRC y BEL SONR (IBNR) = PD x IS SONR media x (1 - LAG 1), asi que con
+# el BEL, el indice y el LAG 1 reales de cada mes (renglon Real de HParametros) se despeja PND = BEL / "Ind Sin RRC" y
+# PD = BEL SONR / ("Ind Sin SONR Media" x (1 - "LAG 1")). Esa base se liga a la prima tomada con FA = PND / PE (PE =
+# prima de los ultimos 12 o 18 meses, anualizada) y los gastos y el margen se expresan sobre ella: FG = GTO / PND y
+# FM = MR / PND (MR SONR / PD). Proyeccion: FA sin pendiente (su nivel con el patron del mes; la desviacion se conserva
+# o se desvanece, lo decide el backtest), PE con la prima real, el reforecast y el presupuesto, IS y LAG 1 con su
+# proyeccion de HParametros, FG el ultimo valor (es un % anual, el mismo en casi todos los ramos) y FM con SES como las
+# demas razones. PND = FA x PE; BEL = PND x IS (x (1 - LAG 1) en SONR); GTO = FG x PND; MR = FM x PND.
 USAR_ESCENARIOS_PND = True
 ESCENARIOS_PND = {"PE12": 12, "PE18": 18}   # escenario -> meses de prima tomada en la base del factor (FA)
 BD_CON_ESCENARIO_PND = None      # None: la BD principal no cambia y cada escenario va en su propio archivo
                                  # (..._Proyeccion_PE12.xlsx, ..._PE18.xlsx); "PE12" o "PE18": la BD principal usa ese
                                  # escenario en las series donde aplica
 INDICE_BASE_PND = {"RRC": ("Ind Sin RRC", "PND"), "SONR": ("Ind Sin SONR Media", "PD")}   # indice y nombre de la base
+LAG_BASE_PND = {"SONR": "LAG 1"}   # la base se despeja con el indice x (1 - este LAG): en el IBNR solo queda pendiente
+                                   # lo que no se ha reportado
 PERSISTENCIAS_PND = (1.0, "estimada")   # desviacion del FA: se conserva (1) o se desvanece con su rho
 RANGO_FA = (0.001, 20.0)         # FA (base / prima anualizada) sano al ultimo mes
 INDICES_PND_EN_BD = True         # columnas a la derecha de BD_Montos_RRC_SONR con los indicadores por ramo: un bloque
                                  # por indicador, con una columna por ramo ("PND/PD 10", "FA 10", ...)
-COLUMNAS_INDICES_PND = {"PND/PD": "#,##0", "FA": "0.0000", "FACTOR GTO": "0.00%", "FACTOR MR": "0.00%"}
-INDICES_PND_FORMULAS = True      # True: los indicadores van como formulas de Excel (BEL / celda del indice en HParametros,
-                                 # base / PE de la hoja Primas_PE, GTO / PND y MR / base); False: como valores
+COLUMNAS_INDICES_PND = {"PND/PD": "#,##0", "FA": "0.0000", "FACTOR GTO": "0.00%", "FACTOR MR": "0.00%",
+                        "IS (RL)": "0.00%", "LAG (RL)": "0.00%", "PD/PND CORREGIDA": "#,##0", "PE FCST": "#,##0",
+                        "FD/FND": "0.0000", "FD/FND (MEC)": "0.0000", "BEL": "#,##0", "BEL (MEC)": "#,##0"}
+INDICES_PND_SOLO_BEL = ("IS (RL)", "LAG (RL)", "PD/PND CORREGIDA", "PE FCST", "FD/FND", "FD/FND (MEC)", "BEL",
+                        "BEL (MEC)")     # bloques que solo van en el renglon BEL de cada mes (los demas, en toda la reserva)
+INDICES_PND_CAPTURA = {"PE FCST": ("RRC", "SONR"), "FD/FND (MEC)": ("RRC",)}   # datos de captura (no salen de las
+                                 # bases): la celda queda vacia para llenarse a mano y, si la BD de entrada ya trae un
+                                 # numero en ella, se conserva; las formulas que dependen de ellos quedan vacias sin dato
+INDICES_PND_FORMULAS = True      # True: los indicadores van como formulas de Excel (celdas del indice y del LAG 1 en
+                                 # HParametros, BEL / indice, base / PE de la hoja Primas_PE, GTO / PND, MR / base, ...);
+                                 # False: como valores
 HOJA_PRIMAS_PE = "Primas_PE"     # hoja que se agrega a la BD de Danos con la prima mensual por grupo y su PE (formulas)
 ESTACIONALIDAD_TRIMESTRAL = ("RCONT",)   # acumula en meses 1-2 del trimestre y libera en el 3
 DOMINIO_CESION = (0.0, 1.0)      # IRR/BRUTO entre 0 y 100%
@@ -1977,24 +1988,60 @@ def _razon_ses(clave: tuple, per: list, valores, pc: int, h: int):
 
 
 def _indice_al_corte(hp, ramo, nombre: str, pc: int, h: int):
-    """Indice de HParametros proyectado desde el corte pc con el mismo metodo de los indices (para el backtest)."""
+    """Indice (o LAG) de HParametros proyectado desde el corte pc con el mismo metodo de la hoja (para el backtest)."""
     r_hp = MAPA_RAMO_LAG.get(str(ramo))
     hist = hp.historia.get((r_hp, nombre), {}) if r_hp else {}
     fechas = [f for f, v in hist.items() if f <= pc and not math.isnan(v)]
     if not fechas:
         return None
     periodos = rango_periodos(min(fechas), pc)
-    res = pronosticar(Serie(("HPARAM", HOJA_PARAMETROS, nombre, r_hp), "indice", periodos,
-                            [hist.get(p, math.nan) for p in periodos], pc, h))
+    tipo = "lag" if nombre in LAGS else "indice"
+    res = pronosticar(Serie(("HPARAM", HOJA_PARAMETROS, nombre, r_hp), tipo, periodos,
+                            [hist.get(p, math.nan) for p in periodos], pc, h,
+                            dominio=DOMINIO_LAG if tipo == "lag" else (None, None)))
     f = np.asarray(res.pronostico, dtype=float)
-    return f if len(f) == h and np.all(np.isfinite(f)) and np.all(f > 0) else None
+    return f if len(f) == h and np.all(np.isfinite(f)) and (tipo == "lag" or np.all(f > 0)) else None
+
+
+def _lag_pnd(pref: str) -> str:
+    """LAG que se reporta junto al indice de la reserva (el de LAG_BASE_PND, o el LAG 1 si la base no lo usa)."""
+    return LAG_BASE_PND.get(pref) or LAGS[0]
+
+
+def _divisor_base(hp, ramo, pref: str, per: list, hasta: int | None = None):
+    """Indice, LAG y divisor de la base por mes de per: BEL = base x divisor, con divisor = IS (RRC) o
+    IS x (1 - LAG 1) (SONR, ver LAG_BASE_PND). Los tres como arreglos; el divisor, solo donde es positivo."""
+    ind = _indice_mensual(hp, ramo, INDICE_BASE_PND[pref][0], hasta)
+    lag = _indice_mensual(hp, ramo, _lag_pnd(pref), hasta)
+    iv = np.array([ind.get(p, math.nan) for p in per], dtype=float)
+    lv = np.array([lag.get(p, math.nan) for p in per], dtype=float)
+    dv = iv * (1.0 - lv) if pref in LAG_BASE_PND else iv.copy()
+    return iv, lv, np.where(np.isfinite(dv) & (dv > 0), dv, np.nan)
+
+
+def _divisor_proyectado(resultados: dict, ramo, pref: str, h: int):
+    """(indice, LAG, divisor) proyectados de HParametros para el ramo (los que se escriben en sus renglones de
+    Proyeccion); None en lo que no se pudo proyectar."""
+    r_hp = MAPA_RAMO_LAG.get(str(ramo))
+
+    def pron(nombre):
+        r = resultados.get(("HPARAM", HOJA_PARAMETROS, nombre, r_hp))
+        f = np.asarray(r.pronostico, dtype=float) if r is not None else None
+        return f if f is not None and len(f) == h else None
+    is_f, lag_f = pron(INDICE_BASE_PND[pref][0]), pron(_lag_pnd(pref))
+    if is_f is None:
+        return None, lag_f, None
+    if pref in LAG_BASE_PND:
+        return is_f, lag_f, (is_f * (1.0 - lag_f) if lag_f is not None else None)
+    return is_f, lag_f, is_f.copy()
 
 
 def indices_pnd_bd(diag: dict, resultados: dict, proy: dict, periodos_proy: list[int], meses_pe: int | None) -> dict:
-    """Indicadores por ramo y mes para las columnas de la BD: {(reserva, periodo, ramo): {"PND/PD": BEL / indice,
-    "FA": base / prima anualizada del grupo del ramo (ultimos meses_pe meses), "FACTOR GTO": GTO / PND (RRC),
-    "FACTOR MR": MR / base}}. La historia sale del real y la proyeccion de proy (la base proyectada es el BEL escrito
-    entre el indice proyectado de HParametros)."""
+    """Indicadores por ramo y mes para las columnas de la BD: {(reserva, periodo, ramo): {"PND/PD": base (BEL / IS, o
+    BEL / (IS x (1 - LAG 1)) en SONR), "FA": base / prima anualizada del grupo del ramo (ultimos meses_pe meses),
+    "FACTOR GTO": GTO / PND (RRC), "FACTOR MR": MR / base, "IS (RL)", "LAG (RL)", "PD/PND CORREGIDA": la base}}. Los
+    que dependen de un dato de captura (INDICES_PND_CAPTURA) no van. La historia sale del real y la proyeccion de proy
+    (la base proyectada es el BEL escrito entre el indice (y el LAG) proyectados de HParametros)."""
     hist, pe_tab = diag.get("_hist") or {}, diag.get("_pe") or {}
     esc = next((e for e, m in ESCENARIOS_PND.items() if m == meses_pe), None)
     h = len(periodos_proy)
@@ -2002,28 +2049,30 @@ def indices_pnd_bd(diag: dict, resultados: dict, proy: dict, periodos_proy: list
     for (pref, ramo), d in hist.items():
         pe = pe_tab.get((esc, d.get("grupo"))) if esc is not None else None
 
-        def fila(p, b, gto, mr):
-            f = {"PND/PD": b, "FACTOR MR": mr / b}
+        def fila(p, b, gto, mr, iv, lv):
+            f = {"IS (RL)": iv if np.isfinite(iv) else None, "LAG (RL)": lv if np.isfinite(lv) else None}
+            out[(pref, p, ramo)] = f
+            if not (np.isfinite(b) and b > 0):             # sin base (BEL no positivo o sin indice): solo IS y LAG
+                return
+            f.update({"PND/PD": b, "PD/PND CORREGIDA": b, "FACTOR MR": mr / b})
             if pref == "RRC":
                 f["FACTOR GTO"] = gto / b
             if pe is not None:
                 v = float(pe.get(p, math.nan))
                 f["FA"] = b / v if np.isfinite(v) and v > 0 else None
-            out[(pref, p, ramo)] = f
 
         for i, p in enumerate(d["per"]):
-            b = d["base"][i]
-            if np.isfinite(b) and b > 0:
-                fila(p, b, float(np.nan_to_num(d["gto"][i])), float(np.nan_to_num(d["mr"][i])))
-        r_is = resultados.get(("HPARAM", HOJA_PARAMETROS, d["nombre_is"], MAPA_RAMO_LAG.get(str(ramo))))
-        is_f = np.asarray(r_is.pronostico, dtype=float) if r_is is not None else None
-        if is_f is None or len(is_f) != h:
+            fila(p, d["base"][i], float(np.nan_to_num(d["gto"][i])), float(np.nan_to_num(d["mr"][i])), d["is"][i],
+                 d["lag"][i])
+        is_f, lag_f, dv_f = _divisor_proyectado(resultados, ramo, pref, h)
+        if is_f is None:
             continue
         for j, p in enumerate(periodos_proy):
             bel = proy.get((norm(f"{pref} BEL"), p, ramo), math.nan)
-            if np.isfinite(bel) and bel > 0 and np.isfinite(is_f[j]) and is_f[j] > 0:
-                fila(p, bel / is_f[j], proy.get((norm("RRC GTO"), p, ramo), 0.0) if pref == "RRC" else 0.0,
-                     proy.get((norm(f"{pref} MR"), p, ramo), 0.0))
+            b = bel / dv_f[j] if (dv_f is not None and np.isfinite(bel) and bel > 0 and np.isfinite(dv_f[j])
+                                  and dv_f[j] > 0) else math.nan
+            fila(p, b, proy.get((norm("RRC GTO"), p, ramo), 0.0) if pref == "RRC" else 0.0,
+                 proy.get((norm(f"{pref} MR"), p, ramo), 0.0), is_f[j], lag_f[j] if lag_f is not None else math.nan)
     return out
 
 
@@ -2077,27 +2126,32 @@ def escribir_indices_pnd(bd: BDMontos, indices: dict, hp=None, pe: dict | None =
     """Escribe los indicadores por ramo a la derecha de la hoja de montos: un bloque por indicador de
     COLUMNAS_INDICES_PND con una columna por ramo (encabezado "<indicador> <ramo>" en el renglon 3, que no empieza con
     RAM_ para no confundirse con los montos, y el nombre del bloque en el renglon 2). Si la BD ya trae esas columnas se
-    usan; si trae los encabezados de toda la reserva ("PND/PD", "FA", ...) al final, el bloque empieza ahi; si no, despues
-    de la ultima columna. Van en todos los renglones de RRC y SONR (historia y proyeccion); sin dato, la celda queda
-    vacia."""
+    usan; si trae los encabezados sin ramo ("PND/PD", "FA", "IS (RL)", ...) al final, los bloques empiezan ahi; si no,
+    despues de la ultima columna. PND/PD, FA y los factores van en todos los renglones de RRC y SONR (historia y
+    proyeccion); los de INDICES_PND_SOLO_BEL, solo en el renglon BEL. Sin dato, la celda queda vacia. Los datos de
+    captura (INDICES_PND_CAPTURA) quedan vacios, salvo que la BD de entrada ya traiga un numero en esa columna."""
     ws = bd.ws
     enc = {norm(ws.cell(3, c).value): c for c in range(1, ws.max_column + 1) if ws.cell(3, c).value}
     ramos = list(bd.cols_ramo)
     nombres = [(ind, r, f"{ind} {r}") for ind in COLUMNAS_INDICES_PND for r in ramos]
     viejas = [enc[norm(ind)] for ind in COLUMNAS_INDICES_PND if norm(ind) in enc]
     fijas = [c for n, c in enc.items() if n not in {norm(x[2]) for x in nombres} | {norm(i) for i in COLUMNAS_INDICES_PND}]
-    siguiente = (min(viejas) if viejas and min(viejas) > max(fijas) else max(fijas) + 1)
+    ocupadas = {enc[norm(x[2])] for x in nombres if norm(x[2]) in enc}   # bloques que la BD ya trae
+    ultima = max(fijas + list(ocupadas))
+    siguiente = (min(viejas) if viejas and min(viejas) > ultima else ultima + 1)
     col_estilo = max(fijas)
     col_ramo = next(iter(bd.cols_ramo.values()))
     ancho = ws.column_dimensions[get_column_letter(col_ramo)].width
-    cols = {}
+    cols, existentes = {}, set()
     for ind, r, nombre in nombres:
         c = enc.get(norm(nombre))
         if c is None:
-            while siguiente in fijas:
+            while siguiente in fijas or siguiente in ocupadas:
                 siguiente += 1
             c = siguiente
             siguiente += 1
+        else:
+            existentes.add((ind, r))
         cols[(ind, r)] = c
         _copiar_estilo(ws.cell(3, col_estilo), ws.cell(3, c))
         ws.cell(3, c).value = nombre
@@ -2105,7 +2159,9 @@ def escribir_indices_pnd(bd: BDMontos, indices: dict, hp=None, pe: dict | None =
             ws.column_dimensions[get_column_letter(c)].width = ancho
     for ind in COLUMNAS_INDICES_PND:                      # nombre del bloque arriba de su primera columna
         c0 = min(c for (i, _), c in cols.items() if i == ind)
-        ws.cell(2, c0).value = ind
+        cap = INDICES_PND_CAPTURA.get(ind)
+        ws.cell(2, c0).value = ind + ("" if not cap else " (dato de captura" + (
+            "" if set(cap) >= set(INDICE_BASE_PND) else " en " + " y ".join(cap)) + ")")
         ws.cell(2, c0).font = Font(bold=True)
     formulas = INDICES_PND_FORMULAS and hp is not None and getattr(hp, "filas", None)
     hoja_hp = f"'{HOJA_PARAMETROS}'"
@@ -2121,15 +2177,17 @@ def escribir_indices_pnd(bd: BDMontos, indices: dict, hp=None, pe: dict | None =
         return ref
 
     def expr_indice(r_hp, nombre, periodo):
-        """Indice del mes como formula: la celda de HParametros (Real o Proyeccion); en un hueco de hasta
+        """Indice (o LAG) del mes como formula: la celda de HParametros (Real o Proyeccion); en un hueco de hasta
         MAX_HUECO_INTERPOLABLE meses sin cambio de nivel, la interpolacion lineal entre las celdas de los meses vecinos
         (como la usa el modelo). None si no hay con que calcularlo."""
         hist = hp.historia.get((r_hp, nombre), {})
+        if periodo > hp.ultimo:                           # renglon de Proyeccion: solo si se proyecto un valor (una
+            f = hp.filas.get((r_hp, periodo))             # celda vacia se leeria como 0)
+            v = hp.ws.cell(f, hp.cols[nombre]).value if f is not None else None
+            return celda_indice(r_hp, nombre, periodo) if v not in (None, "") else None
         v = hist.get(periodo, math.nan)
-        if (periodo > hp.ultimo or np.isfinite(v)) and (r_hp, periodo) in hp.filas:
+        if np.isfinite(v) and (r_hp, periodo) in hp.filas:
             return celda_indice(r_hp, nombre, periodo)
-        if periodo > hp.ultimo:
-            return None
         antes = [q for q, x in hist.items() if q < periodo and np.isfinite(x)]
         despues = [q for q, x in hist.items() if q > periodo and np.isfinite(x)]
         if not antes or not despues:
@@ -2144,30 +2202,64 @@ def escribir_indices_pnd(bd: BDMontos, indices: dict, hp=None, pe: dict | None =
             return None
         k = periodo_a_indice(periodo) - periodo_a_indice(pa)
         return f"({ra}+({rb}-{ra})*{k}/{n + 1})"
+
+    def ref(ind, r, fila):
+        return f"{get_column_letter(cols[(ind, r)])}{fila}"
+
+    refs = {}                                             # (reserva, periodo, ramo) -> (indice, LAG) como formula
+
+    def refs_mes(pref, p, r):
+        if (pref, p, r) not in refs:
+            r_hp = MAPA_RAMO_LAG.get(str(r))
+            refs[(pref, p, r)] = ((expr_indice(r_hp, INDICE_BASE_PND[pref][0], p),
+                                   expr_indice(r_hp, _lag_pnd(pref), p)) if r_hp else (None, None))
+        return refs[(pref, p, r)]
+
     for (conc, p), fila in bd.filas.items():
         pref = conc.split()[0]
         if pref not in INDICE_BASE_PND:
             continue
+        f_bel = bd.filas.get((norm(f"{pref} BEL"), p))
+        es_bel = fila == f_bel
+        con_lag = pref in LAG_BASE_PND
         for (ind, r), c in cols.items():
             celda = ws.cell(fila, c)
+            if ind in INDICES_PND_SOLO_BEL and not es_bel:
+                celda.value = None
+                continue
             celda.number_format = COLUMNAS_INDICES_PND[ind]
+            if pref in INDICES_PND_CAPTURA.get(ind, ()):
+                v = celda.value
+                if (ind, r) not in existentes or not isinstance(v, (int, float)) or isinstance(v, bool):
+                    celda.value = None                # dato de captura: se conserva solo si la entrada ya lo traia
+                continue
             if not formulas:
                 v = indices.get((pref, p, r), {}).get(ind)
                 celda.value = float(v) if v is not None and np.isfinite(v) else None
                 continue
-            # formulas: la base se calcula en el renglon BEL del mes; los demas renglones de la reserva la toman de ahi
-            f_bel = bd.filas.get((norm(f"{pref} BEL"), p))
-            is_ref = expr_indice(MAPA_RAMO_LAG.get(str(r)), INDICE_BASE_PND[pref][0], p)
-            ram = get_column_letter(bd.cols_ramo[r])
-            pnd_fila = f"{get_column_letter(cols[('PND/PD', r)])}{fila}"
-            if f_bel is None or is_ref is None:
+            # formulas: la base se calcula en el renglon BEL del mes con el indice y el LAG de ese renglon; los demas
+            # renglones de la reserva toman la PND/PD de ahi
+            is_ref, lag_ref = refs_mes(pref, p, r)
+            if f_bel is None or is_ref is None or (con_lag and lag_ref is None):
                 celda.value = None
+                if ind == "IS (RL)" and is_ref is not None:
+                    celda.value = f"={is_ref}"
+                elif ind == "LAG (RL)" and lag_ref is not None:
+                    celda.value = f"={lag_ref}"
                 continue
-            if ind == "PND/PD":
-                if fila != f_bel:
-                    celda.value = f"={get_column_letter(c)}{f_bel}"
-                    continue
-                celda.value = f'=IFERROR(IF({ram}{f_bel}>0,{ram}{f_bel}/{is_ref},""),"")'
+            ram = get_column_letter(bd.cols_ramo[r])
+            pnd_fila = ref("PND/PD", r, fila)
+            is_c, lag_c, pd_c = ref("IS (RL)", r, f_bel), ref("LAG (RL)", r, f_bel), ref("PD/PND CORREGIDA", r, f_bel)
+            pe_c = ref("PE FCST", r, f_bel)
+            div = f"({is_c}*(1-{lag_c}))" if con_lag else is_c
+            if ind == "IS (RL)":
+                celda.value = f"={is_ref}"
+            elif ind == "LAG (RL)":
+                celda.value = f"={lag_ref}" if lag_ref is not None else None
+            elif ind == "PD/PND CORREGIDA":
+                celda.value = f'=IFERROR(IF({ram}{f_bel}>0,{ram}{f_bel}/{div},""),"")'
+            elif ind == "PND/PD":
+                celda.value = f"={pd_c}" if es_bel else f"={get_column_letter(c)}{f_bel}"
             elif ind == "FA":
                 g = primas.GRUPO_DE_RAMO_RESERVA.get(str(r)) if primas is not None else None
                 if not pe or meses_pe is None or (meses_pe, g) not in pe["col"] or p not in pe["fila"]:
@@ -2177,9 +2269,18 @@ def escribir_indices_pnd(bd: BDMontos, indices: dict, hp=None, pe: dict | None =
             elif ind == "FACTOR GTO":
                 f_g = bd.filas.get((norm("RRC GTO"), p)) if pref == "RRC" else None
                 celda.value = f'=IFERROR({ram}{f_g}/{pnd_fila},"")' if f_g else None
-            else:
+            elif ind == "FACTOR MR":
                 f_m = bd.filas.get((norm(f"{pref} MR"), p))
                 celda.value = f'=IFERROR({ram}{f_m}/{pnd_fila},"")' if f_m else None
+            elif ind in ("FD/FND", "FD/FND (MEC)"):          # (FD/FND (MEC) de RRC es captura)
+                celda.value = f'=IFERROR({pd_c}/{pe_c},"")'
+            elif ind in ("BEL", "BEL (MEC)"):               # PE x FD x IS (x (1 - LAG) en SONR), con el FD de su bloque
+                fd_c = ref("FD/FND" if ind == "BEL" else "FD/FND (MEC)", r, f_bel)
+                args = [pe_c, fd_c, is_c] + ([lag_c] if con_lag else [])
+                celda.value = (f'=IF(COUNT({",".join(args)})={len(args)},{pe_c}*{fd_c}*{is_c}'
+                               + (f"*(1-{lag_c})" if con_lag else "") + ',"")')
+            else:
+                celda.value = None
     if ws.auto_filter and ws.auto_filter.ref:          # el filtro de la hoja llega a las columnas nuevas
         ini, fin = ws.auto_filter.ref.split(":")
         fila_fin = re.match(r"[A-Z]+(\d+)", fin).group(1)
@@ -2203,20 +2304,20 @@ def escenarios_pnd(bd: BDMontos, hp, resultados: dict, pr, proy_base: dict, peri
             res = resultados.get(("DANOS", pref, "BEL", ramo))
             if res is None or not res.historia_periodos:
                 continue
-            ind = _indice_mensual(hp, ramo, nombre_is)
             per = list(res.historia_periodos)             # (los meses de la serie del modelo, en USD de la BD)
             bel = np.array([bd.valores.get((f"{pref} BEL", p, ramo), math.nan) for p in per], dtype=float)
-            iv = np.array([ind.get(p, math.nan) for p in per], dtype=float)
+            iv, lv, dv = _divisor_base(hp, ramo, pref, per)
             with np.errstate(divide="ignore", invalid="ignore"):
-                b = np.where(np.isfinite(iv) & (iv > 0) & np.isfinite(bel), bel / iv, np.nan)
+                b = np.where(np.isfinite(dv) & np.isfinite(bel), bel / dv, np.nan)
             gto = np.array([bd.valores.get((f"{pref} GTO", p, ramo), math.nan) for p in per], dtype=float) \
                 if pref == "RRC" else np.full(len(per), np.nan)
             mr = np.array([bd.valores.get((f"{pref} MR", p, ramo), math.nan) for p in per], dtype=float)
             with np.errstate(divide="ignore", invalid="ignore"):
                 fg = np.where(b > 0, gto / b, np.nan)
                 fm = np.where(b > 0, mr / b, np.nan)
-            hist[(pref, ramo)] = {"per": per, "bel": bel, "is": iv, "base": b, "gto": gto, "mr": mr, "fg": fg,
-                                  "fm": fm, "nombre_is": nombre_is, "base_nombre": base}
+            hist[(pref, ramo)] = {"per": per, "bel": bel, "is": iv, "lag": lv, "div": dv, "base": b, "gto": gto,
+                                  "mr": mr, "fg": fg, "fm": fm, "nombre_is": nombre_is, "base_nombre": base,
+                                  "nombre_lag": _lag_pnd(pref), "con_lag": pref in LAG_BASE_PND}
     if not USAR_ESCENARIOS_PND:
         diag["estado"] = "apagado (USAR_ESCENARIOS_PND = False)"
     elif motivo_sin_prima:
@@ -2250,16 +2351,17 @@ def escenarios_pnd(bd: BDMontos, hp, resultados: dict, pr, proy_base: dict, peri
             motivo = (f"{HOJA_PARAMETROS} llega a {hp.ultimo} y las reservas a {ultimo}: sin el indice real del ultimo "
                       "mes no se puede despejar la base")
         elif not (np.isfinite(d["base"][-1]) and d["base"][-1] > 0):
-            motivo = f"sin {d['nombre_is']} o sin BEL positivo al ultimo mes"
+            motivo = (f"sin {d['nombre_is']}" + (f" o sin {d['nombre_lag']} (con 1 - LAG positivo)" if d["con_lag"]
+                                                 else "") + " o sin BEL positivo al ultimo mes")
         elif grupo is None or pr.cobertura.get(grupo) is None or pr.cobertura[grupo] < primas.MIN_COBERTURA_HISTORIA:
             motivo = f"cobertura de prima insuficiente en el grupo {grupo}"
-        is_f = None
+        is_f = lag_f = dv_f = None
         if not motivo:
-            r_is = resultados.get(("HPARAM", HOJA_PARAMETROS, d["nombre_is"], MAPA_RAMO_LAG.get(str(ramo))))
-            is_f = np.asarray(r_is.pronostico, dtype=float) if r_is is not None else None
-            if is_f is None or len(is_f) != h or not np.all(np.isfinite(is_f)) or not np.all(is_f > 0):
-                motivo = f"sin proyeccion de {d['nombre_is']} para el ramo"
-        d["is_f"] = is_f
+            is_f, lag_f, dv_f = _divisor_proyectado(resultados, ramo, pref, h)
+            if dv_f is None or not np.all(np.isfinite(dv_f)) or not np.all(dv_f > 0):
+                motivo = (f"sin proyeccion de {d['nombre_is']}" + (f" x (1 - {d['nombre_lag']}) positiva"
+                                                                   if d["con_lag"] else "") + " para el ramo")
+        d["is_f"], d["lag_f"], d["div_f"] = is_f, lag_f, dv_f
         for esc in ESCENARIOS_PND:
             if motivo:
                 motivos[(esc, pref, ramo)] = motivo
@@ -2280,11 +2382,10 @@ def escenarios_pnd(bd: BDMontos, hp, resultados: dict, pr, proy_base: dict, peri
                     hz = min(16, len(d["per"]) - o)
                     pc, per_h = d["per"][o - 1], d["per"][o:o + hz]
                     k_b = (pref, ramo, c, "base")
-                    if k_b not in cache_bt:        # base con el indice conocido al corte (sin interpolar hacia adelante)
-                        ind_c = _indice_mensual(hp, ramo, d["nombre_is"], hasta=d["per"][o - 1])
-                        iv_c = np.array([ind_c.get(p, math.nan) for p in d["per"][:o]], dtype=float)
+                    if k_b not in cache_bt:        # base con el indice (y LAG) conocidos al corte (sin interpolar
+                        _, _, dv_c = _divisor_base(hp, ramo, pref, d["per"][:o], hasta=d["per"][o - 1])  # adelante)
                         with np.errstate(divide="ignore", invalid="ignore"):
-                            cache_bt[k_b] = np.where(np.isfinite(iv_c) & (iv_c > 0), d["bel"][:o] / iv_c, np.nan)
+                            cache_bt[k_b] = np.where(np.isfinite(dv_c), d["bel"][:o] / dv_c, np.nan)
                     b = ajustar_factor(d["per"][:o], cache_bt[k_b], PE, per_h, cfg, "DANOS")
                     if b is None:
                         continue
@@ -2295,6 +2396,11 @@ def escenarios_pnd(bd: BDMontos, hp, resultados: dict, pr, proy_base: dict, peri
                     k_c = (pref, ramo, c)
                     if k_c not in cache_bt:        # lo que no depende del escenario: indice, FG, FM y la recta
                         is_c = _indice_al_corte(hp, ramo, d["nombre_is"], pc, hz)
+                        if is_c is not None and d["con_lag"]:
+                            lag_c = _indice_al_corte(hp, ramo, d["nombre_lag"], pc, hz)
+                            is_c = is_c * (1.0 - lag_c) if lag_c is not None else None
+                            if is_c is not None and not np.all(is_c > 0):
+                                is_c = None
                         fg_ok = [x for x in d["fg"][:o] if np.isfinite(x)]
                         fm_c = _razon_ses(("DANOS", pref, f"MR/{d['base_nombre']}", ramo), d["per"][:o],
                                           d["fm"][:o], pc, hz)
@@ -2316,7 +2422,7 @@ def escenarios_pnd(bd: BDMontos, hp, resultados: dict, pr, proy_base: dict, peri
                             or cb["ma"] is None or cb["ga"] is None or not np.all(np.isfinite(cb["bel_a"])):
                         continue
                     base_b = b["pron"]
-                    is_real = d["is"][o:o + hz]
+                    is_real = d["div"][o:o + hz]
                     real = {"BEL": d["bel"][o:o + hz], "GTO": np.nan_to_num(d["gto"][o:o + hz]),
                             "MR": np.nan_to_num(d["mr"][o:o + hz])}
                     esc_f = {"BEL": base_b * cb["is"], "GTO": cb["fg"] * base_b, "MR": cb["fm"] * base_b}
@@ -2411,7 +2517,7 @@ def escenarios_pnd(bd: BDMontos, hp, resultados: dict, pr, proy_base: dict, peri
             if a is None:
                 continue
             base_f = np.asarray(a["pron"], dtype=float)
-            bel_f = base_f * d["is_f"]
+            bel_f = base_f * d["div_f"]
             fg_ok = [x for x in d["fg"] if np.isfinite(x)]
             fg = fg_ok[-1] if (pref == "RRC" and fg_ok) else 0.0
             fm_f = _razon_ses(("DANOS", pref, f"MR/{d['base_nombre']}", ramo), d["per"], d["fm"], ultimo, h)
@@ -2449,12 +2555,14 @@ def escenarios_pnd(bd: BDMontos, hp, resultados: dict, pr, proy_base: dict, peri
 
     for (pref, ramo), d in hist.items():
         per, base = d["per"], d["base_nombre"]
+        lbl = f"{base} (BEL / (indice x (1 - {d['nombre_lag']})))" if d["con_lag"] else f"{base} (BEL / indice)"
         for i, p in enumerate(per):
             if not np.isfinite(d["base"][i]):
                 continue
-            fila = {"Reserva": pref, "Ramo": ramo, "Periodo": p, "Tipo": "Real", d["nombre_is"]: d["is"][i],
-                    f"{base} (BEL / indice)": d["base"][i], "BEL": d["bel"][i], "MR": d["mr"][i],
-                    f"MR / {base} (FM)": d["fm"][i]}
+            fila = {"Reserva": pref, "Ramo": ramo, "Periodo": p, "Tipo": "Real", d["nombre_is"]: d["is"][i]}
+            if d["con_lag"]:
+                fila[d["nombre_lag"]] = d["lag"][i]
+            fila.update({lbl: d["base"][i], "BEL": d["bel"][i], "MR": d["mr"][i], f"MR / {base} (FM)": d["fm"][i]})
             if pref == "RRC":
                 fila.update({"GTO": d["gto"][i], f"GTO / {base} (FG)": d["fg"][i]})
             for esc in ESCENARIOS_PND:
@@ -2467,8 +2575,10 @@ def escenarios_pnd(bd: BDMontos, hp, resultados: dict, pr, proy_base: dict, peri
             continue
         for j, p in enumerate(periodos_proy):
             fila = {"Reserva": pref, "Ramo": ramo, "Periodo": p, "Tipo": "Proyeccion",
-                    d["nombre_is"]: d["is_f"][j] if d.get("is_f") is not None else math.nan,
-                    "BEL BD principal": _v(proy_base, f"{pref} BEL", p, ramo)}
+                    d["nombre_is"]: d["is_f"][j] if d.get("is_f") is not None else math.nan}
+            if d["con_lag"]:
+                fila[d["nombre_lag"]] = d["lag_f"][j] if d.get("lag_f") is not None else math.nan
+            fila["BEL BD principal"] = _v(proy_base, f"{pref} BEL", p, ramo)
             for esc in ESCENARIOS_PND:
                 fz = finales.get((esc, pref, ramo))
                 if fz is None:
@@ -2490,6 +2600,9 @@ def escenarios_pnd(bd: BDMontos, hp, resultados: dict, pr, proy_base: dict, peri
                 fila.update({"Persistencia del FA": str(fz["cfg"]), "Rho del FA (AR1)": a["rho"],
                              f"FA {ultimo}": a["kappa_hist"][-1], f"FA {periodos_proy[-1]}": a["kappa_fut"][-1],
                              f"{d['nombre_is']} {ultimo}": d["is"][-1], f"{d['nombre_is']} {periodos_proy[-1]}": d["is_f"][-1]})
+                if d["con_lag"]:
+                    fila.update({f"{d['nombre_lag']} {ultimo}": d["lag"][-1],
+                                 f"{d['nombre_lag']} {periodos_proy[-1]}": d["lag_f"][-1]})
                 if pref == "RRC":
                     fila["FG (ultimo)"] = fz["fg"]
                 fila[f"FM {periodos_proy[-1]}"] = fz["fm"][-1]
@@ -3276,12 +3389,12 @@ def _hojas_pnd(wb, diag: dict, negrita, encab):
             for j, c in enumerate(cab, start=1):
                 ws.cell(fila, j, _celda(f.get(c)))
         _formatear(ws, enc_fila, {"Error": "0.0", "FA": "0.0000", "FG": "0.0000", "FM": "0.0000", "Rho": "0.00",
-                                  "Ind": "0.0000", "BEL": "#,##0", "GTO": "#,##0", "MR": "#,##0", "NETO": "#,##0",
+                                  "Ind": "0.0000", "LAG": "0.0000", "BEL": "#,##0", "GTO": "#,##0", "MR": "#,##0", "NETO": "#,##0",
                                   "Real": "#,##0", "BD principal": "#,##0", "PE": "#,##0"}, fila)
         fila += 2
     ws.column_dimensions["A"].width = 26
     _hoja_filas(wb, "PND_Mensual", diag.get("mensual") or [], negrita, encab,
-                {"GTO /": "0.0000", "MR /": "0.0000", "Ind": "0.0000", "PND": "#,##0", "PD": "#,##0", "BEL": "#,##0",
+                {"GTO /": "0.0000", "MR /": "0.0000", "Ind": "0.0000", "LAG": "0.0000", "PND": "#,##0", "PD": "#,##0", "BEL": "#,##0",
                  "GTO": "#,##0", "MR": "#,##0", "Prima": "#,##0", "FA": "0.0000"})
     _hoja_filas(wb, "PND_Backtest", diag.get("backtest") or [], negrita, encab,
                 {"BEL": "0.0", "GTO": "0.0", "MR": "0.0", "BRUTO": "0.0"})
