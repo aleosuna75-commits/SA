@@ -430,12 +430,26 @@ HOJA_PRIMAS_PE = "Primas_PE"     # hoja que se agrega a la BD de Danos con la pr
 # CALMONTH = mes; RamoN = ramo)). Se agrega a la BD la hoja HOJA_PE_RAMO (prima del mes en valores y su suma de 12
 # meses como formula) y los bloques "PE FCST <ramo>", "PRIMA N AÑOS <ramo>" y "PEACUMULADA <ramo>" la referencian.
 ARCHIVO_PE_FCST = ENTRADAS / "FCST_2027.xlsb"
-PATRON_PE_RAMO = "PExRamo*"      # base historica de PE por ramo y mes (en entradas/)
+PATRON_PE_RAMO = "PExRamo*"      # base historica de PE por ramo y mes (en entradas/): periodo, Ramo, Sramo, PmaTom
+MONEDA_PE_RAMO = "MXN"           # PExRamo viene en pesos (dividida entre el TC del mes cuadra con la prima real en USD);
+                                 # antes del primer mes con TC en la BD (202201) se usa ese primer TC
+SUBRAMO_A_BD = {"30": {"30": "30", "31": "30", "32": "30", "33": "30", "34": "34", "35": "34", "36": "34",
+                       "37": "37", "38": "37", "39": "37"},
+                "70": {"71": "71", "73": "73", "75": "73", "70": None, "72": None, "74": None}}
+                                 # ramos de PExRamo que se abren por subramo (catalogo de centros de beneficio de
+                                 # primas.py: 31-33 Acc Per., 34-36 GMM, 37-39 Salud, 71 TEV, 73 y 75 Hidro); None = se
+                                 # reparte entre los demas subramos del ramo en proporcion a su prima del mes (el 70, 72
+                                 # y 74 entre TEV e Hidro). Los demas ramos van completos al ramo de la BD con su numero
 HOJA_PE_FCST = "PE_FCST"         # (hoja de versiones anteriores: se quita)
 HOJA_PE_RAMO = "PE_RAMO"
 MESES_PRIMA_N_ANOS = 12          # PRIMA N AÑOS = suma de los ultimos 12 meses de PE FCST; PEACUMULADA de RRC = esa suma
-ANIOS_LAG_PEACUMULADA = {"SONR": 10}   # SONR: PEACUMULADA = LAG 1 x PRIMA N AÑOS del mes + LAG 2 x la del mismo mes del
-                                 # ano anterior + ... (LAG k de HParametros del mes, real o proyectado; 10 anos)
+GRUPOS_CON_MEZCLA = ("30", "70")   # grupos de prima con varios ramos de la BD (30: 30, 34 y 37; 70: 71 y 73): en el
+                                 # reforecast y en el FCST se toma el total del grupo y se reparte con la mezcla de
+                                 # PExRamo de los ultimos 12 meses (el FCST pone casi todo el grupo 30 en Acc Per. y
+                                 # reparte TEV / Hidro distinto que la historia). () = el FCST por ramo tal cual
+ANIOS_LAG_PEACUMULADA = {"SONR": 3}    # SONR: PEACUMULADA = LAG 1 x PRIMA N AÑOS del mes + LAG 2 x la del mismo mes del
+                                 # ano anterior + LAG 3 x la de dos anos antes (LAG k de HParametros del mes, real o
+                                 # proyectado). 3 anos: con PExRamo desde 2019 no alcanzan 10
 # BEL por FND (Danos RRC y SONR): desde el primer mes proyectado BEL = IS x PEACUMULADA x FND, con FND = PND / PEACUMULADA
 # de la historia proyectado con la tendencia (TIPO_MODELO_FND), el IS y los LAG proyectados de HParametros y la PE del
 # FCST. GTO y MR = su razon proyectada sobre el BEL (la del modelo) x el BEL nuevo; BRUTO = BEL + GTO + MR; IRR = BRUTO x
@@ -2208,23 +2222,138 @@ def escribir_primas_pe(wb, pr, grupos: list) -> dict | None:
     return {"fila": filas, "col": col}
 
 
-def leer_pe_ramo(ruta: Path | None = None) -> dict | None:
-    """PE historica por ramo de la BD y mes de la base PExRamo (PATRON_PE_RAMO en entradas/). Regresa {"ruta",
-    "mensual": {(ramo, periodo): prima USD}, "renglones", "usados", "avisos"} o None si no hay archivo."""
+def leer_pe_ramo(tc: dict, ruta: Path | None = None) -> dict | None:
+    """PE historica (prima tomada, PmaTom) por ramo de la BD y mes de la base PExRamo, en USD: MONEDA_PE_RAMO dividida
+    entre el TC del mes (tc; antes del primer mes con TC, el primer TC). Los ramos de SUBRAMO_A_BD se abren por
+    subramo; los subramos sin ramo de la BD (None) se reparten entre los demas del ramo en proporcion a su prima del
+    mes. Regresa {"ruta", "mensual": {(ramo, periodo): USD}, "renglones", "usados", "fuera": {ramo: USD},
+    "repartidos": USD, "meses_tc_inicial": n, "avisos"} o None si no hay archivo."""
     candidatos = [Path(ruta)] if ruta else sorted((c for c in ENTRADAS.glob(PATRON_PE_RAMO) if not c.name.startswith("~$")),
                                                   key=lambda c: c.stat().st_size, reverse=True)
     if not candidatos or not candidatos[0].exists():
         return None
-    raise NotImplementedError(f"{candidatos[0].name}: la lectura de PExRamo se programa al recibir la base")
+    ruta = candidatos[0]
+    wb = openpyxl.load_workbook(ruta, read_only=True, data_only=True)
+    ws = wb.worksheets[0]
+    filas = ws.iter_rows(values_only=True)
+    enc = [norm(x) for x in next(filas)]
+    faltan = [n for n in ("RAMO", "SRAMO", "PMATOM") if n not in enc]
+    if faltan:
+        raise ValueError(f"{ruta.name}: faltan las columnas {faltan} (trae {enc})")
+    j_r, j_s, j_p = enc.index("RAMO"), enc.index("SRAMO"), enc.index("PMATOM")
+    j_per = next((k for k, n in enumerate(enc) if n in ("PERIODO", "EXPR1000", "FECHA", "MES")), 0)
+    if MONEDA_PE_RAMO == "MXN" and not tc:
+        raise ValueError("sin TC para pasar PExRamo de pesos a USD")
+    tc_ini = min(tc) if tc else None
+    bruto, renglones = {}, 0                     # (ramo PExRamo, subramo, periodo) -> monto en la moneda del archivo
+    for f in filas:
+        if f is None or len(f) <= max(j_r, j_s, j_p, j_per):
+            continue
+        per, _ = a_numero(f[j_per])
+        monto, _ = a_numero(f[j_p])
+        if not (np.isfinite(per) and 190001 <= per <= 299912 and np.isfinite(monto)):
+            continue
+        renglones += 1
+        clave = (str(int(a_numero(f[j_r])[0])), str(int(a_numero(f[j_s])[0])), int(per))
+        bruto[clave] = bruto.get(clave, 0.0) + monto
+    ramos_bd = set(MAPA_RAMO_LAG)
+    mensual, fuera, repartidos, usados, meses_tc = {}, {}, 0.0, 0, set()
+
+    def usd(p, v):
+        if MONEDA_PE_RAMO != "MXN":
+            return v
+        if p in tc:
+            return v / tc[p]
+        meses_tc.add(p)                          # sin TC del mes: el primero (antes) o el ultimo anterior (despues)
+        return v / (tc[tc_ini] if p < tc_ini else tc[max(q for q in tc if q < p)])
+    for (r, s, p), v in bruto.items():
+        usados += 1
+        mapa = SUBRAMO_A_BD.get(r)
+        if mapa is None:
+            if r in ramos_bd:
+                mensual[(r, p)] = mensual.get((r, p), 0.0) + usd(p, v)
+            else:
+                fuera[r] = fuera.get(r, 0.0) + usd(p, v)
+            continue
+        destino = mapa.get(s, "sin mapa")
+        if destino == "sin mapa":
+            fuera[f"{r}/{s}"] = fuera.get(f"{r}/{s}", 0.0) + usd(p, v)
+            continue
+        if destino is not None:
+            mensual[(destino, p)] = mensual.get((destino, p), 0.0) + usd(p, v)
+            continue
+        # subramo sin ramo de la BD: se reparte entre los destinos del ramo en proporcion a su prima del mes
+        dest = sorted({d for d in mapa.values() if d})
+        pesos = {d: sum(x for (r2, s2, p2), x in bruto.items() if r2 == r and p2 == p and mapa.get(s2) == d) for d in dest}
+        tot = sum(pesos.values())
+        for d in dest:
+            mensual[(d, p)] = mensual.get((d, p), 0.0) + usd(p, v) * (pesos[d] / tot if tot else 1.0 / len(dest))
+        repartidos += usd(p, v)
+    avisos = []
+    if meses_tc:
+        avisos.append(f"{len(meses_tc)} meses de {min(meses_tc)} a {max(meses_tc)} sin TC en la BD: se usa el TC de "
+                      f"{tc_ini} ({tc[tc_ini]:.4f})")
+    return {"ruta": ruta, "mensual": mensual, "renglones": renglones, "usados": usados, "fuera": fuera,
+            "repartidos": repartidos, "meses_tc_inicial": len(meses_tc), "avisos": avisos,
+            "periodos": sorted({p for _, p in mensual})}
 
 
-def pe_por_mes(pe_ramo: dict | None, pef: dict | None) -> dict:
-    """{(ramo, periodo): (prima del mes USD, fuente)}: PExRamo en su historia y el FCST en los meses que PExRamo no trae."""
+def _mezcla(pe_hist: dict, ramos: list) -> dict:
+    """{ramo: peso} con la PE historica de los ultimos 12 meses (partes iguales si no hay)."""
+    ult = max((p for _, p in pe_hist), default=None)
+    meses = [_mes_menos(ult, j) for j in range(12)] if ult else []
+    pesos = {r: max(sum(pe_hist.get((r, m), 0.0) for m in meses), 0.0) for r in ramos}
+    tot = sum(pesos.values())
+    return {r: (pesos[r] / tot if tot > 0 else 1.0 / len(ramos)) for r in ramos}
+
+
+def repartir_grupos(mensual: dict, pe_hist: dict) -> dict:
+    """PE del FCST con los grupos de GRUPOS_CON_MEZCLA como total del grupo repartido con la mezcla de PExRamo."""
+    if primas is None or not GRUPOS_CON_MEZCLA or not pe_hist:
+        return mensual
+    out = dict(mensual)
+    for g in GRUPOS_CON_MEZCLA:
+        ramos = [r for r in MAPA_RAMO_LAG if primas.GRUPO_DE_RAMO_RESERVA.get(r) == g]
+        w = _mezcla(pe_hist, ramos)
+        for p in sorted({q for (r, q) in mensual if r in ramos}):
+            tot = sum(mensual.get((r, p), 0.0) for r in ramos)
+            for r in ramos:
+                out[(r, p)] = tot * w[r]
+    return out
+
+
+def pe_reforecast(pr, pe_hist: dict, desde: int, hasta: int) -> dict:
+    """PE de los meses entre la historia (PExRamo) y el FCST, del reforecast del ano por grupo que arma primas.py.
+    Los grupos con varios ramos de la BD (30: 30, 34 y 37; 70: 71 y 73) se reparten con la mezcla de la PE historica
+    de los ultimos 12 meses. {(ramo, periodo): USD}."""
+    if pr is None or primas is None or desde > hasta:
+        return {}
     out = {}
-    for fuente in (pef, pe_ramo):                      # (PExRamo, real, manda sobre el FCST en un mes que traigan ambos)
-        if fuente:
-            for (r, p), v in fuente["mensual"].items():
-                out[(r, p)] = (float(v), fuente["ruta"].name)
+    for p in rango_periodos(desde, hasta):
+        if p not in pr.mensual.index:
+            continue
+        for g in pr.mensual.columns:
+            ramos = [r for r in MAPA_RAMO_LAG if primas.GRUPO_DE_RAMO_RESERVA.get(r) == g]
+            if not ramos:
+                continue
+            v = float(pr.mensual.at[p, g])
+            for r, w in _mezcla(pe_hist, ramos).items():
+                out[(r, p)] = v * w
+    return out
+
+
+def pe_por_mes(pe_ramo: dict | None, pef: dict | None, pe_rf: dict | None = None) -> dict:
+    """{(ramo, periodo): (prima del mes USD, fuente)}: PExRamo en su historia, el reforecast entre la historia y el
+    FCST, y el FCST en los meses que no traen los otros (en un mes que traigan varios, manda el real)."""
+    out = {}
+    if pef:
+        for (r, p), v in pef["mensual"].items():
+            out[(r, p)] = (float(v), pef["ruta"].name)
+    for (r, p), v in (pe_rf or {}).items():
+        out[(r, p)] = (float(v), "reforecast")
+    if pe_ramo:
+        for (r, p), v in pe_ramo["mensual"].items():
+            out[(r, p)] = (float(v), pe_ramo["ruta"].name)
     return out
 
 
@@ -3784,6 +3913,7 @@ def _hojas_pnd(wb, diag: dict, negrita, encab):
     fila = 1
     bloques = [("Estado", [{"Escenarios PND / PD": diag.get("estado", ""), "PE FCST (FCST)": diag.get("pe_fcst", ""),
                             "PE historica (PExRamo)": diag.get("pe_ramo", ""),
+                            "PE entre PExRamo y el FCST": diag.get("pe_reforecast", ""),
                             "BEL por FND": (diag.get("bel_fnd") or {}).get("estado", "")}]),
                ("Backtest agrupado por escenario y reserva (error %: la recta, tendencia historica, contra el escenario, "
                 "con el indice proyectado desde cada corte. 'Escenario' usa la prima que si se emitio despues del "
@@ -4128,18 +4258,58 @@ def main():
     elif "pe_fcst" not in diag_pnd:
         diag_pnd["pe_fcst"] = f"sin {ARCHIVO_PE_FCST.name} en entradas/"
     try:
-        pe_ramo = leer_pe_ramo()
+        pe_ramo = leer_pe_ramo(tc_primas)
     except Exception as e:  # noqa: BLE001
         diag_pnd["pe_ramo"] = f"no se pudo leer la base PExRamo ({type(e).__name__}: {e})"
         alertas.append(("PND", "PExRamo", diag_pnd["pe_ramo"]))
-    if pe_ramo is not None:
-        diag_pnd["pe_ramo"] = (f"{pe_ramo['ruta'].name}: {pe_ramo['renglones']:,} renglones, {pe_ramo['usados']:,} "
-                               "usados" + (f"; {'; '.join(pe_ramo['avisos'])}" if pe_ramo.get("avisos") else ""))
+    pe_rf = {}
+    if pe_ramo is not None and pe_ramo["periodos"]:
+        # control: PExRamo en USD contra la prima real por grupo del proyecto, en los meses que comparten
+        control = ""
+        if pr is not None and primas is not None:
+            difs = []
+            for p in pe_ramo["periodos"]:
+                if p not in pr.mensual.index:
+                    continue
+                for g in pr.mensual.columns:
+                    if str(pr.fuente.at[p, g]) != "real" or float(pr.mensual.at[p, g]) <= 1e6:
+                        continue
+                    v = sum(x for (r, q), x in pe_ramo["mensual"].items()
+                            if q == p and primas.GRUPO_DE_RAMO_RESERVA.get(r) == g)
+                    if v:
+                        difs.append(abs(v / float(pr.mensual.at[p, g]) - 1))
+            if difs:
+                control = (f"; contra la prima real por grupo del proyecto ({len(difs)} grupo-mes con mas de 1 M USD): "
+                           f"diferencia mediana {np.median(difs):.1%}, maxima {max(difs):.1%}")
+        diag_pnd["pe_ramo"] = (
+            f"{pe_ramo['ruta'].name}: {pe_ramo['renglones']:,} renglones, meses {pe_ramo['periodos'][0]} a "
+            f"{pe_ramo['periodos'][-1]}, en {MONEDA_PE_RAMO} convertidos a USD con el TC de cada mes"
+            + (f"; {'; '.join(pe_ramo['avisos'])}" if pe_ramo.get("avisos") else "")
+            + f"; subramos repartidos entre TEV e Hidro: {pe_ramo['repartidos'] / 1e6:,.1f} M USD"
+            + "; fuera de la BD de Danos: " + (", ".join(f"{k} ({v / 1e6:,.1f} M USD)"
+                                                         for k, v in sorted(pe_ramo["fuera"].items())) or "nada")
+            + control)
+        for a in pe_ramo.get("avisos") or []:
+            alertas.append(("PND", "PExRamo", a))
+        # meses entre PExRamo y el FCST: reforecast del ano por grupo (primas.py)
+        desde = _mes_menos(pe_ramo["periodos"][-1], -1)
+        hasta = _mes_menos(pef["periodos"][0], 1) if pef else periodos_proy[-1]
+        pe_rf = pe_reforecast(pr, pe_ramo["mensual"], desde, hasta)
+        diag_pnd["pe_reforecast"] = (f"{desde} a {hasta}: reforecast del ano por grupo (primas.py), 30 y 70 repartidos "
+                                     "con la mezcla de PExRamo de los ultimos 12 meses" if pe_rf else
+                                     f"{desde} a {hasta}: sin reforecast (sin bases de primas): la PE de esos meses "
+                                     "queda vacia")
     elif "pe_ramo" not in diag_pnd:
         diag_pnd["pe_ramo"] = f"sin {PATRON_PE_RAMO} en entradas/: la PE historica por ramo queda vacia"
-    pe_mes = pe_por_mes(pe_ramo, pef)
+    if pef is not None and pe_ramo is not None and GRUPOS_CON_MEZCLA:
+        pef = {**pef, "mensual": repartir_grupos(pef["mensual"], pe_ramo["mensual"])}
+        diag_pnd["pe_fcst"] += (f"; grupos {', '.join(GRUPOS_CON_MEZCLA)} del FCST repartidos con la mezcla de PExRamo "
+                                "de los ultimos 12 meses")
+    pe_mes = pe_por_mes(pe_ramo, pef, pe_rf)
     print(f"   PE FCST (FCST): {diag_pnd['pe_fcst']}", flush=True)
     print(f"   PE historica (PExRamo): {diag_pnd['pe_ramo']}", flush=True)
+    if diag_pnd.get("pe_reforecast"):
+        print(f"   PE entre PExRamo y el FCST: {diag_pnd['pe_reforecast']}", flush=True)
     info_fnd = {"estado": "apagado (USAR_BEL_POR_FND = False)", "aplica": set(), "fnd": {}, "series": [], "resumen": []}
     proy_modelo = proy_danos
     if USAR_BEL_POR_FND:
