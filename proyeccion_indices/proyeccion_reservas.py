@@ -121,7 +121,7 @@ import time  # noqa: E402
 import warnings  # noqa: E402
 from concurrent.futures import ProcessPoolExecutor  # noqa: E402
 from copy import copy  # noqa: E402
-from dataclasses import dataclass, field  # noqa: E402
+from dataclasses import dataclass, field, replace  # noqa: E402
 from datetime import datetime  # noqa: E402
 from pathlib import Path  # noqa: E402
 
@@ -143,6 +143,12 @@ if _FALTAN:
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from excel_fiel import guardar_libro, verificar_escritura  # noqa: E402
 from tipo_cambio import TC_FCST  # noqa: E402
+try:                                  # factor de prima (opcional: sin primas.py o si falla, se usa la recta)
+    import primas  # noqa: E402
+    _ERROR_PRIMAS = ""
+except Exception as _e:  # noqa: BLE001
+    primas = None
+    _ERROR_PRIMAS = f"{type(_e).__name__}: {_e}"
 
 # =============================================================================
 # CONFIGURACION
@@ -341,6 +347,41 @@ PATRON_PRESUPUESTO = "Dashboard_FCST*.html"
 LINEAS_FIANZAS_PPTO = ("4003",)  # lineas de negocio del presupuesto donde estan las afianzadoras (aproximacion: la 4003
                                  # mezcla fianzas de Mexico con caucion y credito de otros paises)
 TOLERANCIA_PRESUPUESTO = 0.10    # alerta si el crecimiento de la reserva difiere del de su referencia en mas de 10 pts
+# Factor de prima (primas.py lee la prima real, el reforecast y el presupuesto de entradas/). Las reservas que dependen
+# de la prima (RRC BEL y SONR BEL de Danos por ramo, RFV BRUTO de Fianzas) se escriben como
+#     reserva = factor mensual x exposicion de prima del grupo de ramo
+# y el crecimiento lo pone la prima del plan (reforecast del resto del ano y presupuesto del siguiente). El factor
+# (reserva / exposicion) se proyecta como la recta de 36 meses con su patron del mes (Buhlmann), de fabrica sin
+# pendiente y anclado a su ultimo valor real. Exposicion por reserva (DRIVERS_FACTOR; el primero es el de fabrica):
+#   RRC: PND12 = prima no devengada en 24avos (el riesgo en curso de la prima suscrita en los ultimos 12 meses).
+#   SONR: PDP = prima devengada de cada uno de los ultimos ANIOS_LAG_SONR anos x la parte pendiente de reportar
+#         (1 - LAG del ano en HParametros), como el metodo propio de SONR. Alternativas: P24 y P36 (promedios anuales).
+#   RFV: P12 = prima de los ultimos 12 meses de Fianzas, en pesos (la RFV se modela en MXN).
+# El "factor de error" es el error de ln(factor) como AR(1): su persistencia rho se estima y se reporta siempre, y
+# compite en la rejilla con la de fabrica (1 = anclado). Por tipo de reserva el backtest decide entre A (la recta de
+# siempre), B (factor de prima) y C (combinacion 50/50 en logaritmos): B si su error no pasa de 1.10 x el de la recta +
+# 0.5 pts con la prima real Y con el presupuesto del ano en curso; si no, C con las mismas condiciones; si no, A.
+USAR_FACTOR_PRIMA = True
+MODELO_MONTOS = "auto"           # "auto" (decide el backtest) | "primas" | "combinacion" | "tendencia" (fuerza todo)
+MODELO_MONTOS_SERIE = {}         # {("DANOS", "RRC", "60"): "tendencia" | "primas" | "combinacion"} fuerza una serie
+DRIVERS_FACTOR = {("DANOS", "RRC"): ("PND12", "P12"), ("DANOS", "SONR"): ("PDP", "P24", "P36"),
+                  ("FIANZAS", "RFV"): ("P12", "P24")}
+PENDIENTES_FACTOR = (0.0, "r2")  # pendiente del factor: 0 (de fabrica) o ponderada por su R2 ajustado
+PERSISTENCIAS_FACTOR = (1.0, "estimada")   # desviacion del factor: se conserva (1) o se desvanece con su rho
+PRIOR_PERSISTENCIA_FACTOR = 0.8  # rho cuando hay menos de MIN_MESES_AR1 meses de factor
+MIN_MESES_AR1 = 24
+MARGEN_PREFERENCIA_FACTOR = 1.0  # otra configuracion reemplaza a la de fabrica si baja el error agrupado 1 pt o mas
+TOLERANCIA_FACTOR = (1.10, 0.5)  # el factor "no pierde" si su error <= 1.10 x error de la recta + 0.5 pts
+MIN_MESES_FACTOR = {"DANOS": 24, "FIANZAS": 12}   # meses minimos de factor para ajustarlo (y en cada corte)
+ANIOS_LAG_SONR = 3               # anos de suscripcion en la exposicion de SONR (PDP)
+MAPA_RAMO_LAG = {"10": "10", "30": "31", "34": "35", "37": "39", "40": "40", "50": "50", "60": "60", "71": "TEV",
+                 "73": "Hidro", "80": "80", "90": "90", "100": "100", "110": "110"}   # ramo de reserva -> HParametros
+PENDIENTE_DEFECTO = (0.9, 0.5, 0.2)   # parte pendiente por ano si el ramo no trae LAG en HParametros
+UMBRAL_PRIMA_FACTOR = 5e6        # prima de 12 meses minima del grupo (USD) para usar el factor
+UMBRAL_RESERVA_FACTOR = 1e6      # reserva minima (USD) para usar el factor
+RANGO_FACTOR = (0.01, 10.0)      # factor (reserva / exposicion) sano al ultimo mes
+MAX_MESES_PRIMA_ESTIMADA = 2     # meses maximos entre el ultimo real de primas y el de reservas
+SENSIBILIDAD_PRIMA = (0.9, 1.1)  # escenarios de prima del ano siguiente para la sensibilidad
 ESTACIONALIDAD_TRIMESTRAL = ("RCONT",)   # acumula en meses 1-2 del trimestre y libera en el 3
 DOMINIO_CESION = (0.0, 1.0)      # IRR/BRUTO entre 0 y 100%
 DOMINIO_RAZON_BEL = (0.0, None)  # GTO/BEL y MR/BEL no negativos
@@ -441,6 +482,7 @@ class Resultado:
     moneda: str = ""
     historia_periodos: list = field(default_factory=list)
     historia_valores: list = field(default_factory=list)
+    factor: dict = field(default_factory=dict)       # factor de prima (si aplica): decision, driver, recta alternativa
 
 
 def ajustar_ets(z, modelo: str, h: int):
@@ -1246,7 +1288,8 @@ def leer_presupuesto() -> dict | None:
     # tendencia no puede traerlo, asi que se excluyen de la referencia comparable)
     nuevas = [ln for ln in kpi if ln != "_tot" and ln not in LINEAS_FIANZAS_PPTO
               and val(ln, "P", "r") <= 0 and val(ln, "P", "p") <= 0 and val(ln, "P", "f") > 0]
-    salida = {"archivo": ruta.name, "anio": anio, "lineas_nuevas": nuevas}
+    salida = {"archivo": ruta.name, "anio": anio, "lineas_nuevas": nuevas,
+              "prima_ln_siguiente": {ln: val(ln, "P", "f") for ln in kpi if ln != "_tot"}}
     for medida in ("P", "S"):
         total = {k: val("_tot", medida, c) for k, c in campos.items()}
         fianzas = {k: sum(val(ln, medida, c) for ln in LINEAS_FIANZAS_PPTO) for k, c in campos.items()}
@@ -1306,6 +1349,502 @@ def contraste_presupuesto(ppto: dict, bds: dict, proys: dict, alertas: list) -> 
             alertas.append((libro, f"Presupuesto {concepto}", texto))
         filas.append(fila)
     return filas
+
+
+# =============================================================================
+# FACTOR DE PRIMA (reserva = factor mensual x exposicion de prima del grupo de ramo)
+# =============================================================================
+MODELO_FACTOR = "Factor de prima"
+MODELO_COMBINACION = "Combinacion recta y factor de prima"
+SERIES_FACTOR = {("DANOS", "RRC"): "BEL", ("DANOS", "SONR"): "BEL", ("FIANZAS", "RFV"): "BRUTO"}
+
+
+def persistencia_ar1(z, meses=None) -> tuple[float, float]:
+    """"Factor de error" del factor de prima: el error de ln(factor) alrededor de su recta (sin el patron del mes)
+    como AR(1). rho = sum e_t e_(t-1) / sum e_(t-1)^2 sobre los ultimos MESES_TENDENCIA meses, con la correccion de
+    sesgo de Kendall (rho + (1 + 3 rho) / n), acotado a [0, 1]. Regresa (rho corregido, persistencia a usar): con
+    menos de MIN_MESES_AR1 meses, PRIOR_PERSISTENCIA_FACTOR; con rho >= 0.98, 1 (el error no se desvanece)."""
+    z = np.asarray(z, dtype=float)
+    est = factores_estacionales(z, meses) if (ESTACIONALIDAD_MENSUAL and meses is not None) else None
+    d = z - est["factores"][np.asarray(meses, dtype=int) - 1] if est is not None else z
+    w = d[-MESES_TENDENCIA:] if MESES_TENDENCIA and len(d) > MESES_TENDENCIA else d
+    n = len(w)
+    if n < MIN_MESES_AR1:
+        return math.nan, PRIOR_PERSISTENCIA_FACTOR
+    t = np.arange(n, dtype=float)
+    e = w - np.polyval(np.polyfit(t, w, 1), t)
+    den = float(np.sum(e[:-1] ** 2))
+    rho = float(np.sum(e[1:] * e[:-1]) / den) if den > 0 else 0.0
+    rho_c = float(np.clip(rho + (1 + 3 * rho) / n, 0.0, 1.0))
+    return rho_c, (1.0 if rho_c >= 0.98 else rho_c)
+
+
+def pendientes_sonr(hp, ramo, periodo: int) -> tuple[list, str]:
+    """Parte pendiente de reportar por ano de suscripcion, v_a = 1 - LAG a (a = 1..ANIOS_LAG_SONR), del patron de
+    desarrollo del ramo en HParametros al ultimo mes con dato hasta 'periodo'."""
+    r_hp = MAPA_RAMO_LAG.get(str(ramo))
+    v, notas = [], []
+    for a in range(1, ANIOS_LAG_SONR + 1):
+        h = hp.historia.get((r_hp, f"LAG {a}"), {}) if (hp is not None and r_hp) else {}
+        fechas = [f for f, x in h.items() if f <= periodo and not math.isnan(x)]
+        if fechas:
+            v.append(float(np.clip(1 - h[max(fechas)], 0.0, 1.0)))
+            if periodo_a_indice(periodo) - periodo_a_indice(max(fechas)) > 12:
+                notas.append(f"LAG {a} de {max(fechas)}")
+        else:
+            v.append(PENDIENTE_DEFECTO[a - 1] if a - 1 < len(PENDIENTE_DEFECTO) else 0.0)
+            notas.append(f"LAG {a} por defecto")
+    return v, "; ".join(notas)
+
+
+def _prima_grupo(pr, grupo: str, moneda: str, tc: dict, factor_sig: float = 1.0) -> pd.Series:
+    """Prima mensual del grupo en la moneda del modelo (MXN = USD x TC del mes). factor_sig escala la prima del ano
+    siguiente (sensibilidad)."""
+    p = pr.mensual[grupo].astype(float).copy()
+    if factor_sig != 1.0:
+        p[[x for x in p.index if x // 100 >= pr.anio_sig]] *= factor_sig
+    if moneda == "MXN":
+        p = p * pd.Series([tc.get(int(x), math.nan) for x in p.index], index=p.index)
+    return p
+
+
+def ajustar_factor(y_per: list, y_val, D: pd.Series, per_proy: list, cfg: tuple, libro: str) -> dict | None:
+    """Ajusta ln(factor) = ln(reserva) - ln(driver) con la recta de la tendencia historica (pendiente y persistencia
+    de cfg = (driver, pendiente, persistencia)) y proyecta reserva = factor x driver. None si no hay factor valido
+    suficiente o el driver no esta definido en la proyeccion."""
+    y = np.asarray(y_val, dtype=float)
+    d_hist = np.array([D.get(p, np.nan) for p in y_per], dtype=float)
+    ok = (y > 0) & np.isfinite(d_hist) & (d_hist > 0)
+    if not len(ok) or not ok[-1]:
+        return None
+    ini = len(ok)
+    while ini > 0 and ok[ini - 1]:
+        ini -= 1
+    if len(ok) - ini < MIN_MESES_FACTOR.get(libro, 24):
+        return None
+    d_fut = np.array([D.get(p, np.nan) for p in per_proy], dtype=float)
+    if not np.all(np.isfinite(d_fut) & (d_fut > 0)):
+        return None
+    per_k = list(y_per[ini:])
+    z = np.log(y[ini:]) - np.log(d_hist[ini:])
+    meses = np.array([p % 100 for p in per_k], dtype=int)
+    rho, phi_est = persistencia_ar1(z, meses)
+    phi = 1.0 if cfg[2] == 1.0 else phi_est
+    f, lo, hi, params, _ = ajustar_tendencia(z, len(per_proy), meses, phi, cfg[1])
+    if not np.all(np.isfinite(f)):
+        return None
+    return {"pron": np.exp(f + np.log(d_fut)), "ln_pron": f + np.log(d_fut), "hw": f - lo, "per_kappa": per_k,
+            "kappa_hist": np.exp(z), "kappa_fut": np.exp(f), "d_hist": d_hist[ini:], "d_fut": d_fut,
+            "params": params, "rho": rho, "phi": phi, "n": len(z)}
+
+
+def _recta(y, per, hz: int):
+    """Proyeccion de la recta actual de montos (la misma de _pronosticar para 'nivel') desde y (positiva)."""
+    meses = np.array([p % 100 for p in per], dtype=int)
+    f = ajustar(np.log(np.asarray(y, dtype=float)), TENDENCIA, hz, meses, float(PERSISTENCIA_DESVIACION.get("nivel", 1.0)),
+                CREDIBILIDAD_PENDIENTE.get("nivel", 1.0))[0]
+    return np.exp(f)
+
+
+def _wape(pares) -> float:
+    e = sum(a for a, _ in pares)
+    r = sum(b for _, b in pares)
+    return e / r * 100 if r > 0 else math.nan
+
+
+def _tol(x: float) -> float:
+    return TOLERANCIA_FACTOR[0] * x + TOLERANCIA_FACTOR[1]
+
+
+def aplicar_factor_prima(resultados: dict, pr, hp, tc: dict, bds: dict, periodos_proy: list[int], ultimo: int,
+                         alertas: list) -> dict:
+    """Etapa del factor de prima: elegibilidad por serie, backtest (oraculo, ex ante con el presupuesto del ano en
+    curso y prima plana), configuracion y decision por tipo (A recta, B factor, C combinacion) y aplicacion a
+    res.pronostico de las series con B o C. Regresa el diagnostico."""
+    diag = {"series": [], "rejilla": [], "decision": [], "backtest": [], "mensual": [], "estado": ""}
+    if not USAR_FACTOR_PRIMA:
+        diag["estado"] = "apagado (USAR_FACTOR_PRIMA = False)"
+        return diag
+    if pr is None:
+        diag["estado"] = "sin archivos de prima real en entradas/: se usa la recta"
+        return diag
+    if not pr.tiene_siguiente:
+        diag["estado"] = "sin prima del ano siguiente (presupuesto): se usa la recta"
+        return diag
+    atraso = periodo_a_indice(ultimo) - periodo_a_indice(pr.ultimo_real)
+    if atraso > MAX_MESES_PRIMA_ESTIMADA:
+        diag["estado"] = (f"la prima real llega a {pr.ultimo_real} y las reservas a {ultimo}: actualiza el real de primas "
+                          "del ano; se usa la recta")
+        alertas.append(("PRIMAS", "Factor de prima", diag["estado"]))
+        return diag
+    z90 = _cuantil_normal()
+    h = len(periodos_proy)
+    anio = pr.ultimo_real // 100
+    corte_ppto = (anio - 1) * 100 + 12                 # corte del backtest ex ante (con el presupuesto del ano)
+    cfgs_tipo = {t: [(d, pe, ps) for d in DRIVERS_FACTOR[t] for pe in PENDIENTES_FACTOR for ps in PERSISTENCIAS_FACTOR]
+                 for t in SERIES_FACTOR}
+    por_serie = {}
+
+    for (libro, reserva), nivel in SERIES_FACTOR.items():
+        moneda = "MXN" if MODELAR_EN_MXN.get(libro) else "USD"
+        for ramo in bds[libro].cols_ramo:
+            clave = (libro, reserva, nivel, ramo)
+            res = resultados.get(clave)
+            if res is None:
+                continue
+            grupo = primas.GRUPO_DE_RAMO_RESERVA.get(str(ramo))
+            info = {"libro": libro, "reserva": reserva, "ramo": ramo, "grupo": grupo, "moneda": moneda,
+                    "elegible": False, "motivo": ""}
+            por_serie[clave] = info
+            y, per = np.asarray(res.historia_valores, dtype=float), list(res.historia_periodos)
+            tc_t = tc.get(ultimo, math.nan) if moneda == "MXN" else 1.0
+            p12 = primas.exposicion(pr.mensual[grupo], "P12").get(ultimo, math.nan) if grupo in pr.mensual else math.nan
+            if res.regla or not per or per[-1] != ultimo:
+                info["motivo"] = f"resuelta por regla ({res.regla or 'sin dato al ultimo mes'})"
+            elif grupo is None or pr.cobertura.get(grupo) is None or pr.cobertura[grupo] < primas.MIN_COBERTURA_HISTORIA:
+                c = pr.cobertura.get(grupo) if grupo else None
+                info["motivo"] = f"cobertura de prima insuficiente en el grupo {grupo} ({'s/d' if c is None else f'{c:.0%}'})"
+            elif not np.isfinite(p12) or p12 < UMBRAL_PRIMA_FACTOR:
+                info["motivo"] = f"prima de 12 meses del grupo {grupo} menor a {UMBRAL_PRIMA_FACTOR / 1e6:,.0f} M USD"
+            elif y[-1] / tc_t < UMBRAL_RESERVA_FACTOR:
+                info["motivo"] = f"reserva menor a {UMBRAL_RESERVA_FACTOR / 1e6:,.0f} M USD"
+            elif not np.all(y > 0):
+                info["motivo"] = "reserva con valores no positivos en la historia"
+            if info["motivo"]:
+                continue
+            prima = _prima_grupo(pr, grupo, moneda, tc)
+            ajustes, bts = {}, {}
+            for cfg in cfgs_tipo[(libro, reserva)]:
+                v, nota_v = pendientes_sonr(hp, ramo, ultimo) if cfg[0] == "PDP" else (None, "")
+                D = primas.exposicion(prima, cfg[0], v)
+                a = ajustar_factor(per, y, D, periodos_proy, cfg, libro)
+                if a is None:
+                    continue
+                k_t = a["kappa_hist"][-1]
+                if not (RANGO_FACTOR[0] <= k_t <= RANGO_FACTOR[1]):
+                    continue
+                a["nota_lag"], a["v"] = nota_v, v
+                ajustes[cfg] = a
+                # backtest de esta configuracion
+                cortes = {}
+                for c in CORTES_BACKTEST:
+                    o = len(y) - c
+                    if o < MIN_ENTRENAMIENTO:
+                        continue
+                    hz = min(16, len(y) - o)
+                    real = y[o:o + hz]
+                    pc = per[o - 1]
+                    per_h = per[o:o + hz]
+                    v_c = pendientes_sonr(hp, ramo, pc)[0] if cfg[0] == "PDP" else None
+                    b = ajustar_factor(per[:o], y[:o], primas.exposicion(prima, cfg[0], v_c), per_h, cfg, libro)
+                    if b is None:
+                        continue
+                    try:
+                        ra = _recta(y[:o], per[:o], hz)
+                    except Exception:  # noqa: BLE001
+                        continue
+                    fila = {"A": ra, "B": b["pron"], "C": np.exp(0.5 * (np.log(ra) + b["ln_pron"])), "real": real}
+                    # prima plana: despues del corte, el mismo mes del ano anterior
+                    pl = prima.copy()
+                    for x in pl.index:
+                        if x > pc and _mas_meses(x, -12) in pl.index:
+                            pl[x] = pl[_mas_meses(x, -12)]
+                    bp = ajustar_factor(per[:o], y[:o], primas.exposicion(pl, cfg[0], v_c), per_h, cfg, libro)
+                    if bp is not None:
+                        fila["B plana"] = bp["pron"]
+                    if pc == corte_ppto and pr.ppto_curso is not None and grupo in pr.ppto_curso:
+                        pp = _prima_grupo(pr, grupo, "USD", tc).copy()
+                        for x in pr.ppto_curso.index:
+                            if x in pp.index and x > pc:
+                                pp[x] = pr.ppto_curso.at[x, grupo]
+                        if moneda == "MXN":
+                            pp = pp * pd.Series([tc.get(int(x), math.nan) for x in pp.index], index=pp.index)
+                        bx = ajustar_factor(per[:o], y[:o], primas.exposicion(pp, cfg[0], v_c), per_h, cfg, libro)
+                        if bx is not None:
+                            fila["B ppto"] = bx["pron"]
+                            fila["C ppto"] = np.exp(0.5 * (np.log(ra) + np.log(bx["pron"])))
+                    cortes[pc] = fila
+                bts[cfg] = cortes
+            if not ajustes:
+                info["motivo"] = f"factor fuera de rango o con menos de {MIN_MESES_FACTOR.get(libro)} meses validos"
+                continue
+            info.update({"elegible": True, "ajustes": ajustes, "bts": bts, "prima": prima})
+
+    # configuracion y decision por tipo
+    decision_tipo = {}
+    for tipo, cfgs in cfgs_tipo.items():
+        elegibles = [k for k, i in por_serie.items() if i["elegible"] and (i["libro"], i["reserva"]) == tipo]
+        # (serie, corte) en que todas las configuraciones tienen backtest (se comparan en los mismos casos)
+        comunes = set()
+        for k in elegibles:
+            cortes_cfg = [set(por_serie[k]["bts"].get(cfg, {})) for cfg in cfgs]
+            comunes |= {(k, pc) for pc in (set.intersection(*cortes_cfg) if cortes_cfg else set())}
+        wape_cfg = {}
+        for cfg in cfgs:
+            pares = [(float(np.sum(np.abs(por_serie[k]["bts"][cfg][pc]["B"] - por_serie[k]["bts"][cfg][pc]["real"]))),
+                      float(np.sum(np.abs(por_serie[k]["bts"][cfg][pc]["real"])))) for k, pc in comunes]
+            wape_cfg[cfg] = _wape(pares) if pares else math.nan
+            diag["rejilla"].append({"Tipo": f"{tipo[0]} {tipo[1]}", "Driver": cfg[0], "Pendiente del factor": str(cfg[1]),
+                                    "Persistencia": str(cfg[2]), "Series": len({k for k, _ in comunes}),
+                                    "Cortes (serie x corte)": len(comunes), "Error % (oraculo)": wape_cfg[cfg]})
+        defecto = cfgs[0]
+        elegida = defecto
+        if len({k for k, _ in comunes}) >= 2 and np.isfinite(wape_cfg.get(defecto, math.nan)):
+            mejor = min((c for c in cfgs if np.isfinite(wape_cfg[c])), key=lambda c: wape_cfg[c], default=defecto)
+            if wape_cfg[mejor] <= wape_cfg[defecto] - MARGEN_PREFERENCIA_FACTOR:
+                elegida = mejor
+        # errores agrupados con la configuracion elegida
+        pares = {m: [] for m in ("A", "B", "C", "A ppto", "B ppto", "C ppto", "B plana", "A plana")}
+        n_series = set()
+        for k in elegibles:
+            for pc, f in por_serie[k]["bts"].get(elegida, {}).items():
+                n_series.add(k)
+                den = float(np.sum(np.abs(f["real"])))
+                for m in ("A", "B", "C"):
+                    pares[m].append((float(np.sum(np.abs(f[m] - f["real"]))), den))
+                if "B ppto" in f:
+                    pares["B ppto"].append((float(np.sum(np.abs(f["B ppto"] - f["real"]))), den))
+                    pares["C ppto"].append((float(np.sum(np.abs(f["C ppto"] - f["real"]))), den))
+                    pares["A ppto"].append((float(np.sum(np.abs(f["A"] - f["real"]))), den))
+                if "B plana" in f:
+                    pares["B plana"].append((float(np.sum(np.abs(f["B plana"] - f["real"]))), den))
+                    pares["A plana"].append((float(np.sum(np.abs(f["A"] - f["real"]))), den))
+                diag["backtest"].append({"Tipo": f"{tipo[0]} {tipo[1]}", "Ramo": k[3], "Corte": pc, "Meses": len(f["real"]),
+                                         "Recta (A)": _wape([(float(np.sum(np.abs(f["A"] - f["real"]))), den)]),
+                                         "Factor, prima real (B)": _wape([(float(np.sum(np.abs(f["B"] - f["real"]))), den)]),
+                                         "Factor, presupuesto (B)": _wape([(float(np.sum(np.abs(f["B ppto"] - f["real"]))), den)]) if "B ppto" in f else None,
+                                         "Factor, prima plana (B)": _wape([(float(np.sum(np.abs(f["B plana"] - f["real"]))), den)]) if "B plana" in f else None,
+                                         "Combinacion (C)": _wape([(float(np.sum(np.abs(f["C"] - f["real"]))), den)])})
+        w = {m: _wape(v) if v else math.nan for m, v in pares.items()}
+        n_cortes = len(pares["A"])
+        forzado = MODELO_MONTOS if MODELO_MONTOS in ("primas", "combinacion", "tendencia") else None
+        if forzado:
+            dec, motivo = {"primas": "B", "combinacion": "C", "tendencia": "A"}[forzado], f"forzado (MODELO_MONTOS = {forzado})"
+        elif not n_cortes:
+            dec, motivo = "A", "sin series con backtest del factor"
+        else:
+            hay_ppto = bool(pares["B ppto"])
+
+            def pasa(m):
+                ok_or = np.isfinite(w[m]) and w[m] <= _tol(w["A"])
+                ok_pp = (not hay_ppto) or (np.isfinite(w[f"{m} ppto"]) and w[f"{m} ppto"] <= _tol(w["A ppto"]))
+                return ok_or and ok_pp
+            if pasa("B"):
+                dec, motivo = "B", "el factor no pierde contra la recta (prima real" + (" y presupuesto" if hay_ppto else "") + ")"
+            elif pasa("C"):
+                dec, motivo = "C", "la combinacion no pierde contra la recta; el factor solo, si"
+            else:
+                dec, motivo = "A", "la prima no mejora a la recta en este tipo de reserva"
+            if not hay_ppto:
+                motivo += "; sin presupuesto del ano en curso decide solo la prima real"
+            if len(n_series) < 2 or n_cortes < 3:
+                motivo += f"; indicativo ({len(n_series)} series, {n_cortes} cortes)"
+        decision_tipo[tipo] = (dec, elegida)
+        diag["decision"].append({"Tipo": f"{tipo[0]} {tipo[1]}", "Series elegibles": len(elegibles),
+                                 "Series con backtest": len(n_series), "Cortes (serie x corte)": n_cortes,
+                                 "Configuracion": f"{elegida[0]}, pendiente {elegida[1]}, persistencia {elegida[2]}",
+                                 "Recta (A)": w["A"], "Factor, prima real (B)": w["B"], "Combinacion (C)": w["C"],
+                                 "Recta en el corte ex ante": w["A ppto"], "Factor con presupuesto (B)": w["B ppto"],
+                                 "Combinacion con presupuesto (C)": w["C ppto"], "Factor con prima plana (B)": w["B plana"],
+                                 "Decision": {"A": "recta", "B": "factor de prima", "C": "combinacion"}[dec],
+                                 "Motivo": motivo})
+        if elegibles:
+            alertas.append(("PRIMAS", f"Factor de prima {tipo[0]} {tipo[1]}",
+                            f"Decision: {({'A': 'recta', 'B': 'factor de prima', 'C': 'combinacion'})[dec]} ({motivo}). "
+                            f"Error % backtest: recta {w['A']:.1f}, factor {w['B']:.1f}, combinacion {w['C']:.1f}"
+                            + (f"; con presupuesto: recta {w['A ppto']:.1f}, factor {w['B ppto']:.1f}" if np.isfinite(w['B ppto']) else "")))
+
+    # aplicacion
+    i_dic = next((i for i, p in enumerate(periodos_proy) if p % 100 == 12), None)
+    for clave, info in por_serie.items():
+        res = resultados[clave]
+        tipo = (info["libro"], info["reserva"])
+        dec, cfg = decision_tipo.get(tipo, ("A", None))
+        forzada = MODELO_MONTOS_SERIE.get((info["libro"], info["reserva"], str(info["ramo"])))
+        if forzada in ("primas", "combinacion", "tendencia"):
+            dec = {"primas": "B", "combinacion": "C", "tendencia": "A"}[forzada]
+        fila = {"Libro": info["libro"], "Reserva": info["reserva"], "Ramo": info["ramo"], "Grupo": info["grupo"],
+                "Moneda": info["moneda"], "Elegible": info["elegible"], "Motivo": info["motivo"]}
+        if not info["elegible"]:
+            res.factor = {"decision": "recta", "motivo": info["motivo"]}
+            diag["series"].append(fila)
+            continue
+        cfg = cfg if cfg in info["ajustes"] else next(iter(info["ajustes"]))
+        a = info["ajustes"][cfg]
+        prima = info["prima"]
+        es_est = pd.Series(pr.fuente[info["grupo"]] != "real", index=pr.fuente.index)
+        f_est = primas.fraccion_estimada(prima, es_est, cfg[0], a["v"])
+        f_est_proy = np.array([f_est.get(p, 0.0) for p in periodos_proy])
+        hw_b = np.sqrt(a["hw"] ** 2 + (z90 * f_est_proy * pr.sigma_plan.get(info["grupo"], 0.15)) ** 2)
+        recta = np.array(res.pronostico, dtype=float)
+        li_r, ls_r = np.array(res.li, dtype=float), np.array(res.ls, dtype=float)
+        hw_a = (np.log(np.maximum(ls_r, 1e-12)) - np.log(np.maximum(li_r, 1e-12))) / 2
+        # elasticidad observada (diagnostico): MCO de cambios de 12 meses de ln reserva sobre ln driver
+        lr = np.log(np.asarray(res.historia_valores, dtype=float)[-len(a["kappa_hist"]):])
+        ld = np.log(a["d_hist"])
+        elast = (float(np.polyfit(ld[12:] - ld[:-12], lr[12:] - lr[:-12], 1)[0])
+                 if len(lr) > 14 and np.std(ld[12:] - ld[:-12]) > 0 else math.nan)
+        pe = a["params"]
+        fila.update({"Driver": cfg[0], "Pendiente del factor": str(cfg[1]), "Persistencia": str(cfg[2]),
+                     "Meses del factor": a["n"], "Factor al ultimo mes": a["kappa_hist"][-1],
+                     "Rho del error (AR1)": a["rho"], "Persistencia usada": a["phi"],
+                     "Credibilidad estacional del factor": pe.get("credibilidad_estacional"),
+                     "Pendiente del factor (mensual)": math.expm1(pe.get("pendiente", 0.0)),
+                     "R2 del factor": pe.get("r2"), "Elasticidad observada": elast,
+                     "% del driver estimado a dic": f_est_proy[-1], "Nota LAG": a.get("nota_lag", "")})
+        if np.isfinite(elast) and not (0.3 <= elast <= 2.0):
+            res.alertas.append(f"Elasticidad observada reserva / prima de {elast:.2f} (fuera de 0.3-2): la reserva no se "
+                               "ha movido en proporcion a su driver de prima")
+        wa = _wape([(float(np.sum(np.abs(f["A"] - f["real"]))), float(np.sum(f["real"])))
+                    for f in info["bts"].get(cfg, {}).values()])
+        wb_ = _wape([(float(np.sum(np.abs(f["B"] - f["real"]))), float(np.sum(f["real"])))
+                     for f in info["bts"].get(cfg, {}).values()])
+        wc = _wape([(float(np.sum(np.abs(f["C"] - f["real"]))), float(np.sum(f["real"])))
+                    for f in info["bts"].get(cfg, {}).values()])
+        fila.update({"Error % recta": wa, "Error % factor": wb_, "Error % combinacion": wc})
+        if np.isfinite(wb_) and np.isfinite(wa) and wb_ > 2 * wa + 5:
+            res.alertas.append(f"En el backtest de esta serie el factor de prima ({wb_:.1f}%) queda muy por arriba de "
+                               f"la recta ({wa:.1f}%)")
+        pron_b = a["pron"]
+        if dec == "B":
+            nuevo, hw, modelo = pron_b, hw_b, f"{MODELO_FACTOR} ({cfg[0]})"
+        elif dec == "C":
+            nuevo = np.exp(0.5 * (np.log(recta) + np.log(pron_b)))
+            hw, modelo = 0.5 * (hw_a + hw_b), f"{MODELO_COMBINACION} ({cfg[0]})"
+        else:
+            nuevo, modelo = None, res.modelo
+        decomp = ""
+        if i_dic is not None and i_dic + 12 < len(periodos_proy):
+            j0, j1 = i_dic, i_dic + 12
+            cd = a["d_fut"][j1] / a["d_fut"][j0] - 1
+            ck = a["kappa_fut"][j1] / a["kappa_fut"][j0] - 1
+            decomp = f"prima {cd:+.1%}, factor {ck:+.1%}"
+            fila.update({f"Crec. driver {periodos_proy[j0]}-{periodos_proy[j1]}": cd,
+                         f"Crec. factor {periodos_proy[j0]}-{periodos_proy[j1]}": ck,
+                         f"Crec. recta {periodos_proy[j0]}-{periodos_proy[j1]}": recta[j1] / recta[j0] - 1,
+                         f"Crec. factor de prima {periodos_proy[j0]}-{periodos_proy[j1]}": pron_b[j1] / pron_b[j0] - 1})
+        res.factor = {"decision": {"A": "recta", "B": "factor de prima", "C": "combinacion"}[dec], "driver": cfg[0],
+                      "config": cfg, "pron_recta": list(recta), "li_recta": list(li_r), "ls_recta": list(ls_r),
+                      "error_recta": res.error_modelo, "modelo_recta": res.modelo, "pron_factor": list(pron_b),
+                      "descomposicion": decomp, "grupo": info["grupo"], "kappa_T": float(a["kappa_hist"][-1])}
+        fila["Decision"] = res.factor["decision"]
+        fila[f"Recta {periodos_proy[-1]}"] = recta[-1]
+        fila[f"Factor de prima {periodos_proy[-1]}"] = pron_b[-1]
+        if nuevo is not None:
+            res.pronostico = [float(v) for v in nuevo]
+            res.li = [float(v) for v in np.exp(np.log(nuevo) - hw)]
+            res.ls = [float(v) for v in np.exp(np.log(nuevo) + hw)]
+            res.modelo = modelo
+            res.error_modelo = wb_ if dec == "B" else wc
+            res.alertas = [x for x in res.alertas if not x.startswith("Cambio proyectado a")]
+            _post_proceso(res, np.asarray(res.historia_valores, dtype=float), res.tipo)
+            res.alertas.append(f"Modelo final: {modelo}; recta alternativa a {periodos_proy[-1]}: {recta[-1]:,.0f} "
+                               f"{info['moneda']} (error backtest {wa:.1f}% contra {res.error_modelo:.1f}%)"
+                               + (f"; dic/dic: {decomp}" if decomp else ""))
+        fila[f"Final {periodos_proy[-1]}"] = res.pronostico[-1]
+        diag["series"].append(fila)
+        # factor mensual (historia y proyeccion)
+        for p_, k_, d_ in zip(a["per_kappa"], a["kappa_hist"], a["d_hist"]):
+            diag["mensual"].append({"Libro": info["libro"], "Reserva": info["reserva"], "Ramo": info["ramo"],
+                                    "Grupo": info["grupo"], "Periodo": p_, "Tipo": "Real", "Driver": cfg[0],
+                                    "Valor del driver": d_, "% del driver estimado": float(f_est.get(p_, 0.0)),
+                                    "Factor (reserva / driver)": k_, "Reserva con factor de prima": k_ * d_,
+                                    "Reserva con recta": None, "Reserva final": k_ * d_, "Moneda": info["moneda"]})
+        for i, p_ in enumerate(periodos_proy):
+            diag["mensual"].append({"Libro": info["libro"], "Reserva": info["reserva"], "Ramo": info["ramo"],
+                                    "Grupo": info["grupo"], "Periodo": p_, "Tipo": "Proyeccion", "Driver": cfg[0],
+                                    "Valor del driver": a["d_fut"][i], "% del driver estimado": f_est_proy[i],
+                                    "Factor (reserva / driver)": a["kappa_fut"][i],
+                                    "Reserva con factor de prima": pron_b[i], "Reserva con recta": recta[i],
+                                    "Reserva final": res.pronostico[i], "Moneda": info["moneda"]})
+    usadas = [f for f in diag["series"] if f.get("Decision") in ("factor de prima", "combinacion")]
+    diag["estado"] = (f"{len(usadas)} de {len(diag['series'])} series con factor de prima o combinacion; "
+                      f"{sum(1 for f in diag['series'] if f['Elegible'])} elegibles")
+    diag["_por_serie"] = por_serie
+    diag["_decision_tipo"] = decision_tipo
+    return diag
+
+
+def sensibilidad_factor(resultados: dict, diag: dict, pr, tc: dict, periodos_proy: list[int]) -> dict:
+    """Pronosticos de las series con factor (o combinacion) si la prima del ano siguiente fuera SENSIBILIDAD_PRIMA
+    veces la del presupuesto: {escala: {clave: pronostico}} (el factor no cambia: solo el driver)."""
+    salida = {}
+    for escala in SENSIBILIDAD_PRIMA:
+        mod = {}
+        for clave, info in (diag.get("_por_serie") or {}).items():
+            res = resultados[clave]
+            if not info.get("elegible") or res.factor.get("decision") not in ("factor de prima", "combinacion"):
+                continue
+            cfg = res.factor["config"]
+            a = info["ajustes"][cfg]
+            D = primas.exposicion(_prima_grupo(pr, info["grupo"], info["moneda"], tc, escala), cfg[0], a["v"])
+            d_fut = np.array([D.get(p, np.nan) for p in periodos_proy])
+            pron_b = a["kappa_fut"] * d_fut
+            if res.factor["decision"] == "combinacion":
+                pron_b = np.exp(0.5 * (np.log(np.array(res.factor["pron_recta"])) + np.log(pron_b)))
+            mod[clave] = [float(v) for v in pron_b]
+        salida[escala] = mod
+    return salida
+
+
+def _totales_neto(proy: dict, periodos: list[int]) -> dict:
+    """{reserva: {periodo: total NETO de todos los ramos}} de un diccionario de montos derivados."""
+    out = {}
+    for (c, p, _), v in proy.items():
+        if c.endswith(" NETO") and p in periodos:
+            pref = c.split()[0]
+            out.setdefault(pref, {}).setdefault(p, 0.0)
+            out[pref][p] += v
+    return out
+
+
+def comparar_factor(resultados: dict, diag: dict, pr, tc: dict, bds: dict, proys: dict, periodos_proy: list[int],
+                    tc_hist: dict, ultimo: int) -> dict:
+    """Totales NETO (todos los ramos, USD) de RRC, SONR y RFV con el modelo final, con la recta en todas las series y
+    con la prima del ano siguiente movida SENSIBILIDAD_PRIMA. La recta y la sensibilidad no llevan el ajuste por
+    rango esperado."""
+    por_serie = diag.get("_por_serie") or {}
+    con_factor = [k for k, i in por_serie.items() if i.get("elegible")
+                  and resultados[k].factor.get("decision") in ("factor de prima", "combinacion")]
+    if not con_factor:
+        return {}
+
+    def derivar_con(mods: dict) -> dict:
+        res2 = {k: (replace(r, pronostico=list(mods[k])) if k in mods else r) for k, r in resultados.items()}
+        return {lib: derivar_montos(bds[lib], lib, ESTRUCTURA[lib], res2, periodos_proy, en_mxn=lib in tc_hist)
+                for lib in bds}
+
+    escenarios = {"Modelo final": proys,
+                  "Recta en todas las series": derivar_con({k: resultados[k].factor["pron_recta"] for k in con_factor})}
+    for escala, mods in sensibilidad_factor(resultados, diag, pr, tc, periodos_proy).items():
+        escenarios[f"Prima {pr.anio_sig} x {escala:.2f}"] = derivar_con(mods)
+    dics = [p for p in periodos_proy if p % 100 == 12]
+    reales = {}
+    for lib, bd in bds.items():
+        for (c, p, _), v in bd.valores.items():
+            if p == ultimo and c.endswith(" NETO") and isinstance(v, (int, float)) and not math.isnan(v):
+                reales.setdefault(c.split()[0], 0.0)
+                reales[c.split()[0]] += v
+    filas = []
+    for nombre, proy in escenarios.items():
+        tot = {}
+        for lib in proy:
+            for pref, d in _totales_neto(proy[lib], dics).items():
+                tot[pref] = d
+        for pref in ("RRC", "SONR", "RFV"):
+            if pref not in tot:
+                continue
+            fila = {"Escenario": nombre, "Reserva": f"{pref} NETO", f"Real {ultimo}": reales.get(pref)}
+            for p in dics:
+                fila[f"Proy {p}"] = tot[pref].get(p)
+            if len(dics) >= 2 and tot[pref].get(dics[0]):
+                fila[f"Crec. {dics[0]}-{dics[1]}"] = tot[pref][dics[1]] / tot[pref][dics[0]] - 1
+            filas.append(fila)
+    return {"filas": filas, "series_con_factor": len(con_factor)}
+
+
+def _mas_meses(periodo: int, meses: int) -> int:
+    return indice_a_periodo(periodo_a_indice(periodo) + meses)
 
 
 def derivar_montos(bd: BDMontos, libro: str, reservas: dict, resultados: dict, periodos_proy: list[int],
@@ -1606,6 +2145,15 @@ def escribir_diagnostico(resultados: dict, periodos_proy: list[int], alertas_gen
         ("Desviacion del ultimo mes", f"indices: se desvanece hacia el nivel promedio de los ultimos {MESES_NIVEL_LOCAL} meses con "
                                        f"persistencia {PERSISTENCIA_DESVIACION.get('indice', 1.0)}; montos y LAGs: se conserva "
                                        f"(persistencia {PERSISTENCIA_DESVIACION.get('nivel', 1.0)} / {PERSISTENCIA_DESVIACION.get('lag', 1.0)})"),
+        ("Factor de prima", (resumen.get("factor") or {}).get("estado", "")
+         + (f"; perfil mensual de la prima estimada: {resumen['primas'].perfil['elegido']}"
+            if resumen.get("primas") is not None else "")),
+        ("Factor de prima: decision", " | ".join(f"{d['Tipo']}: {d['Decision']} ({d['Motivo']})"
+                                                 for d in (resumen.get("factor") or {}).get("decision", [])) or "-"),
+        ("Factor de prima: reservas NETO", " | ".join(
+            f"{f['Escenario']} {f['Reserva']}: " + ", ".join(f"{k[5:]} {v / 1e6:,.1f}" for k, v in f.items()
+                                                           if k.startswith("Proy ") and v is not None)
+            for f in (resumen.get("comparativo") or {}).get("filas", [])) or "-"),
         ("Tiempo de ejecucion (s)", f"{resumen.get('segundos', 0):,.0f}"),
         ("", ""),
         ("METODOLOGIA", ""),
@@ -1657,6 +2205,17 @@ def escribir_diagnostico(resultados: dict, periodos_proy: list[int], alertas_gen
                               "FCST 2027), en tipo_cambio.py; los meses reales = TC real de SAP. "
                               + "; ".join(f"{lib}: se modela en {'MXN y se convierte a USD con el TC de cada mes proyectado, asi que el TC si mueve las cifras en USD' if v else 'USD, asi que el TC no altera las cifras proyectadas'}"
                                           for lib, v in MODELAR_EN_MXN.items()) + "."),
+        ("8. Factor de prima", "Si en entradas/ estan las bases de primas (real historico, real del ano, reforecast y "
+                               "presupuesto; primas.py), RRC BEL y SONR BEL de Danos por ramo y RFV BRUTO de Fianzas se "
+                               "escriben como factor mensual x exposicion de prima del grupo de ramo: RRC con la prima no "
+                               "devengada en 24avos (PND12), SONR con la prima devengada de los ultimos anos por la parte "
+                               "pendiente de reportar segun los LAG (PDP), RFV con la prima de 12 meses en pesos. El "
+                               "factor se proyecta con la recta de 36 meses sin pendiente y con su patron del mes, anclado "
+                               "a su ultimo valor; su error como AR(1) (rho) es el 'factor de error'. Por tipo de reserva "
+                               "el backtest decide entre la recta, el factor o la combinacion 50/50 (hoja "
+                               "Factor_Prima_Resumen). La prima del resto del ano sale del reforecast repartido por "
+                               "contrato, cedente y LN, y la del ano siguiente del presupuesto mes a mes; controles en "
+                               "Primas_Controles."),
         ("Versiones", resumen.get("versiones", "")),
     ]
     for i, (a, b) in enumerate(lineas, start=1):
@@ -1705,7 +2264,8 @@ def escribir_diagnostico(resultados: dict, periodos_proy: list[int], alertas_gen
            "Tendencia mensual",
            "Cortes backtest", "Error % modelo",
            "Error % ultimo valor", "Error % SES", "Ultimo real", f"Proy {periodos_proy[0]}",
-           f"Proy {periodos_proy[-1]}", "Var % vs ultimo real", "Alertas"]
+           f"Proy {periodos_proy[-1]}", "Var % vs ultimo real", "Alertas", "Factor de prima (decision)",
+           "Driver de prima", "Recta alternativa (ultimo mes)", "Error % recta (alternativa)"]
     ws.append(cab)
 
     def num(v):
@@ -1738,7 +2298,9 @@ def escribir_diagnostico(resultados: dict, periodos_proy: list[int], alertas_gen
                  num(r.parametros.get("gamma")), num(r.tendencia_mensual), r.n_cortes or None,
                  num(r.error_modelo), num(r.error_ultimo_valor), num(r.error_ses), num(ult),
                  None if not r.pronostico or math.isnan(r.pronostico[0]) else r.pronostico[0],
-                 num(fin), var, " | ".join(r.alertas)]
+                 num(fin), var, " | ".join(r.alertas), r.factor.get("decision"), r.factor.get("driver"),
+                 num(r.factor["pron_recta"][-1]) if r.factor.get("pron_recta") else None,
+                 num(r.factor.get("error_recta")) if r.factor.get("pron_recta") else None]
         ws.append(fila_)
     _formato_tabla(ws, negrita, encab)
     for fila_ in ws.iter_rows(min_row=2):
@@ -1855,6 +2417,8 @@ def escribir_diagnostico(resultados: dict, periodos_proy: list[int], alertas_gen
             ws.append([libro, c, p, ramo, v])
     _formato_tabla(ws, negrita, encab)
 
+    _hojas_primas(wb, resumen, negrita, encab)
+
     ws = wb.create_sheet("Alertas")
     ws.append(["Libro", "Serie / Elemento", "Detalle"])
     for a in alertas_generales:
@@ -1864,6 +2428,132 @@ def escribir_diagnostico(resultados: dict, periodos_proy: list[int], alertas_gen
             ws.append([k[0], f"{k[1]} | {k[2]} | ramo {k[3]}", a])
     _formato_tabla(ws, negrita, encab)
     guardar_libro(wb, SALIDA_DIAGNOSTICO)
+
+
+def _hoja_filas(wb, nombre: str, filas: list, negrita, encab, formatos: dict | None = None):
+    """Hoja con una tabla (lista de dicts); formatos = {prefijo de encabezado: number_format}."""
+    ws = wb.create_sheet(nombre)
+    if not filas:
+        ws.append(["(sin datos)"])
+        return ws
+    cab = []
+    for f in filas:
+        for c in f:
+            if c not in cab:
+                cab.append(c)
+    ws.append(cab)
+    for f in filas:
+        ws.append([_celda(f.get(c)) for c in cab])
+    _formato_tabla(ws, negrita, encab)
+    _formatear(ws, 1, formatos)
+    return ws
+
+
+def _celda(v):
+    if isinstance(v, (np.floating, np.integer)):
+        v = v.item()
+    if isinstance(v, float) and not math.isfinite(v):
+        return None
+    if isinstance(v, (list, tuple, dict, set)):
+        return str(v)
+    return v
+
+
+def _formatear(ws, fila_enc: int, formatos: dict | None, fila_fin: int | None = None):
+    formatos = formatos or {}
+    fin = fila_fin or ws.max_row
+    for c in range(1, ws.max_column + 1):
+        enc_ = str(ws.cell(fila_enc, c).value or "")
+        fmt = next((f for pref, f in formatos.items() if enc_.startswith(pref)), None)
+        if fmt is None:
+            continue
+        for r in range(fila_enc + 1, fin + 1):
+            if isinstance(ws.cell(r, c).value, (int, float)):
+                ws.cell(r, c).number_format = fmt
+
+
+def _hojas_primas(wb, resumen: dict, negrita, encab):
+    """Hojas del factor de prima: controles de las bases de primas, prima mensual por grupo, decision y rejilla por
+    tipo de reserva, detalle por serie, factor mensual y backtest."""
+    pr, diag, comp = resumen.get("primas"), resumen.get("factor") or {}, resumen.get("comparativo") or {}
+    formato_pct = {"Crec.": "+0.0%;-0.0%;0.0%", "Crecimiento": "+0.0%;-0.0%;0.0%", "%": "0.0%", "Cobertura": "0%",
+                   "Diferencia": "+0.0%;-0.0%;0.0%", "Error": "0.0", "Recta (A)": "0.0", "Factor": "0.0",
+                   "Combinacion": "0.0", "Sigma": "0.00", "S/P": "0.0%", "C/P": "0.0%"}
+    if pr is not None:
+        ws = wb.create_sheet("Primas_Controles")
+        fila = 1
+        bloques = [("Controles por archivo", pd.DataFrame(pr.controles))] + list(pr.tablas.items())
+        bloques.append(("Avisos", pd.DataFrame({"Aviso": pr.avisos or ["(ninguno)"]})))
+        for titulo, tabla in bloques:
+            ws.cell(fila, 1, titulo).font = negrita
+            fila += 1
+            if tabla is None or not len(tabla):
+                ws.cell(fila, 1, "(sin datos)")
+                fila += 2
+                continue
+            enc_fila = fila
+            for j, c in enumerate(tabla.columns, start=1):
+                ws.cell(fila, j, str(c)).font = negrita
+                ws.cell(fila, j).fill = encab
+            for reg in tabla.itertuples(index=False):
+                fila += 1
+                for j, v in enumerate(reg, start=1):
+                    ws.cell(fila, j, _celda(v))
+            _formatear(ws, enc_fila, {**formato_pct, "Prima": "#,##0.00", "Real": "#,##0.00", "Presupuesto": "#,##0.00",
+                                      "CSV": "#,##0.00", "Referencia": "#,##0.00", "Ano": "#,##0.00",
+                                      "Historico": "#,##0.00", "Resto": "#,##0.00", "Completado": "#,##0.00",
+                                      "Reforecast": "#,##0.00", "20": "#,##0.00", "1": "#,##0.00", "3": "#,##0.00",
+                                      "4": "#,##0.00", "5": "#,##0.00", "6": "#,##0.00", "7": "#,##0.00",
+                                      "8": "#,##0.00", "9": "#,##0.00"}, fila)
+            fila += 2
+        ws.column_dimensions["A"].width = 30
+        # prima mensual por grupo con sus drivers
+        filas = []
+        for g in pr.mensual.columns:
+            p = pr.mensual[g]
+            drivers = {n: primas.exposicion(p, n) for n in ("P12", "PND12", "P24", "P36", "PD12")}
+            for per, v in p.items():
+                filas.append({"Periodo": int(per), "Grupo": g, "Prima USD": float(v), "Fuente": pr.fuente.at[per, g],
+                              **{f"{n} USD": _celda(float(d.get(per, math.nan))) for n, d in drivers.items()}})
+        _hoja_filas(wb, "Primas_Mensual", filas, negrita, encab, {"Prima": "#,##0", "P": "#,##0"})
+    if diag.get("decision") or diag.get("series"):
+        ws = wb.create_sheet("Factor_Prima_Resumen")
+        fila = 1
+        bloques = [("Estado", [{"Factor de prima": diag.get("estado", "")}]),
+                   ("Decision por tipo de reserva (error % del backtest agrupado)", diag.get("decision")),
+                   ("Rejilla de configuraciones (error % del factor con la prima real, mismos casos)", diag.get("rejilla")),
+                   ("Reservas NETO totales (USD): modelo final contra la recta y sensibilidad a la prima del ano "
+                    "siguiente", comp.get("filas")),
+                   ("Detalle por serie", diag.get("series"))]
+        for titulo, filas in bloques:
+            ws.cell(fila, 1, titulo).font = negrita
+            fila += 1
+            if not filas:
+                ws.cell(fila, 1, "(sin datos)")
+                fila += 2
+                continue
+            cab = []
+            for f in filas:
+                cab += [c for c in f if c not in cab]
+            for j, c in enumerate(cab, start=1):
+                ws.cell(fila, j, c).font = negrita
+                ws.cell(fila, j).fill = encab
+                ws.cell(fila, j).alignment = Alignment(wrap_text=True, vertical="center")
+            enc_fila = fila
+            for f in filas:
+                fila += 1
+                for j, c in enumerate(cab, start=1):
+                    ws.cell(fila, j, _celda(f.get(c)))
+            _formatear(ws, enc_fila, {**formato_pct, "Real": "#,##0", "Proy": "#,##0", "Recta ": "#,##0",
+                                      "Factor de prima 2": "#,##0", "Final": "#,##0", "Factor al": "0.000",
+                                      "Rho": "0.00", "Persistencia usada": "0.00", "R2": "0.00",
+                                      "Elasticidad": "0.00", "Pendiente del factor (": "0.00%"}, fila)
+            fila += 2
+        ws.column_dimensions["A"].width = 26
+        _hoja_filas(wb, "Factor_Mensual", diag.get("mensual") or [], negrita, encab,
+                    {"Valor": "#,##0", "Reserva": "#,##0", "Factor": "0.0000", "%": "0.0%"})
+        _hoja_filas(wb, "Backtest_Primas", diag.get("backtest") or [], negrita, encab,
+                    {"Recta": "0.0", "Factor": "0.0", "Combinacion": "0.0"})
 
 
 def _formato_tabla(ws, negrita, encab):
@@ -2067,6 +2757,41 @@ def main():
     resultados = correr_series(series)
     ajustar_orden_indices(hp, resultados, alertas)
 
+    # factor de prima: las reservas que dependen de la prima se escriben como factor x exposicion de prima
+    ppto = leer_presupuesto()
+    tc_primas = {**bd_danos.tc, **bd_rfv.tc, **(tc_hist.get("FIANZAS") or leer_tc_real(bd_rfv, ultimo))}
+    tc_primas.update({p: tc_para_periodo(bd_rfv, p) for p in periodos_proy})
+    pr, diag_factor = None, {"estado": "apagado (USAR_FACTOR_PRIMA = False)"}
+    if USAR_FACTOR_PRIMA:
+        print("Factor de prima ...", flush=True)
+        if primas is None:
+            diag_factor = {"estado": f"no se pudo cargar primas.py ({_ERROR_PRIMAS}): se usa la recta"}
+        else:
+            error_lectura = ""
+            try:
+                pr = primas.leer_primas(ultimo, periodos_proy[-1], primas.lineas_del_dashboard(ppto), tc_primas)
+            except Exception as e:  # noqa: BLE001
+                pr = None
+                error_lectura = f"no se pudieron leer las primas ({type(e).__name__}: {e}): se usa la recta"
+                alertas.append(("PRIMAS", "Lectura", error_lectura))
+                print(f"   AVISO: {error_lectura}", flush=True)
+            for a in (pr.avisos if pr is not None else []):
+                alertas.append(("PRIMAS", "Primas", a))
+                print(f"   AVISO {a}", flush=True)
+            respaldo = {k: (list(r.pronostico), list(r.li), list(r.ls), r.modelo, list(r.alertas), r.error_modelo)
+                        for k, r in resultados.items() if r.tipo == "nivel"}
+            try:
+                diag_factor = ({"estado": error_lectura} if error_lectura else
+                               aplicar_factor_prima(resultados, pr, hp, tc_primas, {"DANOS": bd_danos, "FIANZAS": bd_rfv},
+                                                    periodos_proy, ultimo, alertas))
+            except Exception as e:  # noqa: BLE001
+                for k, (pn, lo, hi, mo, al, em) in respaldo.items():
+                    r = resultados[k]
+                    r.pronostico, r.li, r.ls, r.modelo, r.alertas, r.error_modelo, r.factor = pn, lo, hi, mo, al, em, {}
+                diag_factor = {"estado": f"error en el factor de prima ({type(e).__name__}: {e}); se usa la recta"}
+                alertas.append(("PRIMAS", "Factor de prima", diag_factor["estado"]))
+        print(f"   {diag_factor.get('estado')}", flush=True)
+
     print("Aplicando identidades contables y escribiendo archivos ...", flush=True)
     proy_danos = derivar_montos(bd_danos, "DANOS", ESTRUCTURA["DANOS"], resultados, periodos_proy,
                                 en_mxn="DANOS" in tc_hist)
@@ -2077,6 +2802,8 @@ def main():
                       + aplicar_rango_esperado(proy_rfv, bd_rfv, "FIANZAS", ESTRUCTURA["FIANZAS"], resultados,
                                                periodos_proy, ultimo, alertas))
     validar(proy_danos, proy_rfv)
+    comparativo = comparar_factor(resultados, diag_factor, pr, tc_primas, {"DANOS": bd_danos, "FIANZAS": bd_rfv},
+                                  {"DANOS": proy_danos, "FIANZAS": proy_rfv}, periodos_proy, tc_hist, ultimo)
 
     info_danos = escribir_bd_montos(bd_danos, proy_danos, periodos_proy, SALIDA_BD_DANOS)
     escribir_correccion_moneda(bd_danos, correcciones["DANOS"])
@@ -2091,7 +2818,6 @@ def main():
         "FIANZAS": {k: v for k, v in bd_rfv.valores.items() if k[1] <= ultimo},
     }
     segundos = time.time() - t0
-    ppto = leer_presupuesto()
     filas_ppto = contraste_presupuesto(ppto, {"DANOS": bd_danos, "FIANZAS": bd_rfv},
                                        {"DANOS": proy_danos, "FIANZAS": proy_rfv}, alertas) if ppto and ppto.get("anio") else []
     escribir_diagnostico(resultados, periodos_proy, alertas, {"DANOS": proy_danos, "FIANZAS": proy_rfv},
@@ -2100,7 +2826,8 @@ def main():
                           "moneda_corregida": {k: len(v) for k, v in correcciones.items() if v},
                           "celdas_moneda": correcciones,
                           "presupuesto": filas_ppto, "archivo_presupuesto": ppto["archivo"] if ppto else "",
-                          "lineas_nuevas_presupuesto": (ppto or {}).get("lineas_nuevas") or []})
+                          "lineas_nuevas_presupuesto": (ppto or {}).get("lineas_nuevas") or [],
+                          "primas": pr, "factor": diag_factor, "comparativo": comparativo})
     graficas_ok = False
     if GENERAR_GRAFICAS:
         print("Generando graficas ...", flush=True)
@@ -2150,6 +2877,11 @@ def main():
             aplicada = ""
             if pa is not None and abs(pa - math.log1p(r.tendencia_mensual) if r.transformacion == "log" else pa - r.tendencia_mensual) > 1e-9:
                 aplicada = f", se proyecta {(math.expm1(pa) if r.transformacion == 'log' else pa):+.1%} por credibilidad {r.parametros.get('credibilidad_pendiente', 1):.2f}"
+            if r.factor.get("decision") in ("factor de prima", "combinacion"):
+                print(f"      {r.clave[0]} {r.clave[1]} {r.clave[2]} ramo {r.clave[3]}: {cambio:+.0%} ({r.modelo}; "
+                      f"dic/dic {r.factor.get('descomposicion') or 's/d'}; la recta daba "
+                      f"{r.factor['pron_recta'][-1] / r.historia_valores[-1] - 1:+.0%})")
+                continue
             print(f"      {r.clave[0]} {r.clave[1]} {r.clave[2]} ramo {r.clave[3]}: {cambio:+.0%} "
                   f"(tendencia {r.tendencia_mensual:+.1%} mensual{aplicada}"
                   + (f", regresion sobre {ventana} de {r.n_obs} meses)" if ventana else f", {r.modelo})"))
@@ -2169,6 +2901,25 @@ def main():
         print(f"   (Sin contraste con presupuesto: no se pudo usar {ppto['archivo']}; ver aviso arriba)")
     else:
         print(f"   (Sin contraste con presupuesto: no hay {PATRON_PRESUPUESTO} en entradas/)")
+    if USAR_FACTOR_PRIMA:
+        def _f(v):
+            return "s/d" if v is None or not np.isfinite(v) else f"{v:.1f}"
+        print(f"   Factor de prima: {diag_factor.get('estado')}"
+              + (f"; perfil mensual de la prima estimada: {pr.perfil['elegido']}" if pr is not None else ""))
+        for d in diag_factor.get("decision", []):
+            if d["Series elegibles"]:
+                print(f"      {d['Tipo']:<13} {d['Decision']:<16} error backtest: recta {_f(d['Recta (A)'])}, factor "
+                      f"{_f(d['Factor, prima real (B)'])}, combinacion {_f(d['Combinacion (C)'])}; con presupuesto: recta "
+                      f"{_f(d['Recta en el corte ex ante'])}, factor {_f(d['Factor con presupuesto (B)'])} ({d['Motivo']})")
+        filas_c = (comparativo or {}).get("filas", [])
+        if filas_c:
+            dics = [k for k in filas_c[0] if k.startswith("Proy ")]
+            print(f"   Reservas NETO totales (M USD) {' / '.join(k[5:] for k in dics)}:")
+            for f in filas_c:
+                crec = next((v for k, v in f.items() if k.startswith("Crec.")), None)
+                print(f"      {f['Reserva']:<10} {f['Escenario']:<27} "
+                      + " / ".join(f"{(f.get(k) or 0) / 1e6:,.1f}" for k in dics)
+                      + (f"  (crec. {crec:+.1%})" if crec is not None else ""))
     n_alertas = len(alertas) + sum(len(r.alertas) for r in resultados.values())
     print(f"   Alertas a revisar: {n_alertas} (hoja 'Alertas' del diagnostico)")
     print(f"   Tiempo total: {time.time() - t0:,.0f} s")
