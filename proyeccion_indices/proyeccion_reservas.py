@@ -1015,6 +1015,7 @@ class BDMontos:
     valores: dict              # (concepto, periodo, ramo) -> float
     tc: dict                   # periodo -> tc
     conceptos: list            # en el orden en que aparecen
+    filas_entrada: set = field(default_factory=set)   # renglones que ya traia la BD de entrada (no los que se agregan)
 
 
 def leer_bd_montos(ruta: Path) -> BDMontos:
@@ -1039,7 +1040,7 @@ def leer_bd_montos(ruta: Path) -> BDMontos:
         if not math.isnan(t):
             tc[periodo] = t
     return BDMontos(ruta, wb, ws, enc["CONCEPTO"], enc["PERIODO"], enc["TC"], cols_ramo, filas, valores, tc,
-                    conceptos)
+                    conceptos, set(filas.values()))
 
 
 def tc_para_periodo(bd: BDMontos, p: int) -> float:
@@ -2097,7 +2098,10 @@ def leer_pe_fcst(ruta: Path | None = None) -> dict | None:
     ruta = Path(ruta or ARCHIVO_PE_FCST)
     if not ruta.exists():
         return None
-    _asegurar_paquetes({"python_calamine": "python-calamine"})      # lee .xlsb (solo si hay archivo de FCST)
+    try:                                               # lee .xlsb (solo si hay archivo de FCST)
+        _asegurar_paquetes({"python_calamine": "python-calamine"})
+    except SystemExit as e:                            # sin pip: la corrida sigue y PE FCST queda como captura
+        raise ImportError(str(e)) from None
     from python_calamine import CalamineWorkbook
     wb = CalamineWorkbook.from_path(str(ruta))
     if "CtaMens" not in wb.sheet_names:
@@ -2134,6 +2138,9 @@ def leer_pe_fcst(ruta: Path | None = None) -> dict | None:
         mensual[(ramo, p)] = mensual.get((ramo, p), 0.0) - monto
         nombres.setdefault(ramo, set()).add(nombre)
     periodos = sorted({p for _, p in mensual})
+    if not periodos:
+        raise ValueError(f"{ruta.name} › CtaMens: {renglones:,} renglones, ninguno con la cuenta {CUENTA_PE_FCST} de "
+                         "ramos de la BD" + (f" (fuera de la BD: {', '.join(sorted(fuera))})" if fuera else ""))
     acumulada = {}
     for ramo in {r for r, _ in mensual}:
         acum, anio = 0.0, None
@@ -2310,6 +2317,10 @@ def escribir_indices_pnd(bd: BDMontos, indices: dict, hp=None, pe: dict | None =
         cap = INDICES_PND_CAPTURA.get(ind)
         ws.cell(2, c0).value = ind + ("" if not cap else " (dato de captura" + (
             "" if set(cap) >= set(INDICE_BASE_PND) else " en " + " y ".join(cap)) + ")")
+        if ind == "PE FCST" and pe_fcst and pe_fcst.get("fila"):
+            m = sorted(pe_fcst["fila"])
+            ws.cell(2, c0).value = (f"PE FCST (hoja {HOJA_PE_FCST} en {m[0]} a {m[-1]}; dato de captura en los "
+                                    "demas meses)")
         ws.cell(2, c0).font = Font(bold=True)
     formulas = INDICES_PND_FORMULAS and hp is not None and getattr(hp, "filas", None)
     hoja_hp = f"'{HOJA_PARAMETROS}'"
@@ -2354,15 +2365,22 @@ def escribir_indices_pnd(bd: BDMontos, indices: dict, hp=None, pe: dict | None =
     def ref(ind, r, fila):
         return f"{get_column_letter(cols[(ind, r)])}{fila}"
 
-    descartados = []
+    descartados, viejas_ref, formulas_val = [], [], []
+    ref_apoyo = re.compile(rf"'?({re.escape(HOJA_PE_FCST)}|{re.escape(HOJA_PRIMAS_PE)})'?!", re.I)
 
     def captura(v, fila, c):
-        """Dato de captura que la BD ya traia: un numero o una formula se conservan; un texto numerico se convierte."""
+        """Dato de captura que la BD de entrada ya traia: un numero o una formula se conservan; un texto numerico se
+        convierte. Una referencia a las hojas de apoyo (de una corrida anterior) no es captura: se limpia."""
         if v is None or isinstance(v, bool):
             return None
         if isinstance(v, (int, float)):
             return v if np.isfinite(v) else None
         if isinstance(v, str) and v.strip().startswith("="):
+            if ref_apoyo.search(v):
+                viejas_ref.append(f"{get_column_letter(c)}{fila}")
+                return None
+            if not formulas:
+                formulas_val.append(f"{get_column_letter(c)}{fila}")
             return v.strip()
         x, _ = a_numero(v)
         if not np.isfinite(x):
@@ -2414,7 +2432,8 @@ def escribir_indices_pnd(bd: BDMontos, indices: dict, hp=None, pe: dict | None =
                                else float(pe_fcst["valor"][(r, p)]))
                 continue
             if pref in INDICES_PND_CAPTURA.get(ind, ()):     # dato de captura: se conserva si la entrada ya lo traia
-                celda.value = captura(celda.value, fila, c) if (ind, r) in existentes else None
+                celda.value = (captura(celda.value, fila, c) if (ind, r) in existentes and fila in bd.filas_entrada
+                               else None)                # (un renglon agregado trae formulas copiadas de su plantilla)
                 continue
             if not formulas:
                 v = indices.get((pref, p, r), {}).get(ind)
@@ -2466,9 +2485,18 @@ def escribir_indices_pnd(bd: BDMontos, indices: dict, hp=None, pe: dict | None =
                                + (f"*(1-{lag_c})" if con_lag else "") + ',"")')
             else:
                 celda.value = None
-    if descartados and avisos is not None:
-        avisos.append(f"{len(descartados)} dato(s) de captura con texto no numerico se dejaron vacios "
-                      f"({', '.join(descartados[:5])}{'...' if len(descartados) > 5 else ''})")
+    def lista(xs):
+        return f"{', '.join(xs[:5])}{'...' if len(xs) > 5 else ''}"
+    if avisos is not None:
+        if descartados:
+            avisos.append(f"{len(descartados)} dato(s) de captura con texto no numerico se dejaron vacios "
+                          f"({lista(descartados)})")
+        if viejas_ref:
+            avisos.append(f"{len(viejas_ref)} celda(s) de captura traian una referencia a {HOJA_PE_FCST} o "
+                          f"{HOJA_PRIMAS_PE} de una corrida anterior; se limpiaron ({lista(viejas_ref)})")
+        if formulas_val:
+            avisos.append(f"{len(formulas_val)} dato(s) de captura son formulas: con INDICES_PND_FORMULAS = False no se "
+                          f"evaluan y FD/FND, BEL y BEL (MEC) de ese renglon quedan vacios ({lista(formulas_val)})")
     if ws.auto_filter and ws.auto_filter.ref:          # el filtro de la hoja llega a las columnas nuevas
         ini, fin = ws.auto_filter.ref.split(":")
         fila_fin = re.match(r"[A-Z]+(\d+)", fin).group(1)
