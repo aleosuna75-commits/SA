@@ -129,7 +129,8 @@ import numpy as np  # noqa: E402
 import openpyxl  # noqa: E402
 from openpyxl.formula.translate import Translator  # noqa: E402
 from openpyxl.styles import Alignment, Font, PatternFill  # noqa: E402
-from openpyxl.utils import column_index_from_string, get_column_letter  # noqa: E402
+from openpyxl.utils import get_column_letter  # noqa: E402
+from openpyxl.worksheet.properties import Outline  # noqa: E402
 import pandas as pd  # noqa: E402
 from scipy.stats import f_oneway as _f_oneway, norm as _normal  # noqa: E402
 from statsmodels.tsa.exponential_smoothing.ets import ETSModel  # noqa: E402
@@ -402,31 +403,47 @@ BD_CON_ESCENARIO_PND = None      # None: la BD principal no cambia y cada escena
                                  # (..._Proyeccion_PE12.xlsx, ..._PE18.xlsx); "PE12" o "PE18": la BD principal usa ese
                                  # escenario en las series donde aplica
 INDICE_BASE_PND = {"RRC": ("Ind Sin RRC", "PND"), "SONR": ("Ind Sin SONR Media", "PD")}   # indice y nombre de la base
-LAG_BASE_PND = {"SONR": "LAG 1"}   # la base se despeja con el indice x (1 - este LAG): en el IBNR solo queda pendiente
-                                   # lo que no se ha reportado
+LAG_BASE_PND = {}                # {"SONR": "LAG 1"}: la base se despeja con el indice x (1 - ese LAG). Por decision
+                                 # del area la PND / PD vuelve a BEL / IS y el LAG entra en la PEACUMULADA de SONR
 PERSISTENCIAS_PND = (1.0, "estimada")   # desviacion del FA: se conserva (1) o se desvanece con su rho
 RANGO_FA = (0.001, 20.0)         # FA (base / prima anualizada) sano al ultimo mes
 INDICES_PND_EN_BD = True         # columnas a la derecha de BD_Montos_RRC_SONR con los indicadores por ramo: un bloque
                                  # por indicador, con una columna por ramo ("PND/PD 10", "FA 10", ...)
 COLUMNAS_INDICES_PND = {"PND/PD": "#,##0", "FA": "0.0000", "FACTOR GTO": "0.00%", "FACTOR MR": "0.00%",
-                        "IS (RL)": "0.00%", "LAG (RL)": "0.00%", "PD/PND CORREGIDA": "#,##0", "PE FCST": "#,##0",
-                        "FD/FND": "0.0000", "FD/FND (MEC)": "0.0000", "BEL": "#,##0", "BEL (MEC)": "#,##0"}
-INDICES_PND_SOLO_BEL = ("IS (RL)", "LAG (RL)", "PD/PND CORREGIDA", "PE FCST", "FD/FND", "FD/FND (MEC)", "BEL",
-                        "BEL (MEC)")     # bloques que solo van en el renglon BEL de cada mes (los demas, en toda la reserva)
-INDICES_PND_CAPTURA = {"PE FCST": ("RRC", "SONR"), "FD/FND (MEC)": ("RRC",)}   # datos de captura: PE FCST sale del
-                                 # FCST (ARCHIVO_PE_FCST) en los meses que trae; en los demas meses, y FD/FND (MEC) de
-                                 # RRC siempre, la celda queda vacia para llenarse a mano y, si la BD de entrada ya trae
-                                 # un numero o una formula en esa columna "<indicador> <ramo>", se conserva; las formulas
-                                 # que dependen de ellos quedan vacias sin dato
+                        "IS (RL)": "0.00%", "LAG (RL)": "0.00%", "PE FCST": "#,##0", "PRIMA N AÑOS": "#,##0",
+                        "PEACUMULADA": "#,##0", "FD/FND": "0.0000", "FD/FND (MEC)": "0.0000"}
+INDICES_PND_SOLO_BEL = ("IS (RL)", "LAG (RL)", "PE FCST", "PRIMA N AÑOS", "PEACUMULADA", "FD/FND",
+                        "FD/FND (MEC)")  # bloques que solo van en el renglon BEL de cada mes (los demas, en toda la reserva)
+INDICES_PND_RETIRADOS = ("PD/PND CORREGIDA", "BEL", "BEL (MEC)")   # bloques de versiones anteriores: se limpian
+AGRUPAR_BLOQUES = True           # agrupa (esquema de Excel) las columnas de cada bloque con varios ramos, incluidas las
+                                 # RAM_: queda visible la primera (ramo 10) y el boton +/- junto a ella
+INDICES_PND_CAPTURA = {"PE FCST": ("RRC", "SONR"), "FD/FND (MEC)": ("RRC",)}   # datos de captura: PE FCST sale de la
+                                 # hoja HOJA_PE_RAMO (PExRamo y FCST) en los meses que traen; en los demas meses, y
+                                 # FD/FND (MEC) de RRC siempre, la celda queda vacia para llenarse a mano y, si la BD de
+                                 # entrada ya trae un numero o una formula en esa columna "<indicador> <ramo>", se conserva
 INDICES_PND_FORMULAS = True      # True: los indicadores van como formulas de Excel (celdas del indice y del LAG 1 en
                                  # HParametros, BEL / indice, base / PE de la hoja Primas_PE, GTO / PND, MR / base, ...);
                                  # False: como valores
 HOJA_PRIMAS_PE = "Primas_PE"     # hoja que se agrega a la BD de Danos con la prima mensual por grupo y su PE (formulas)
-# PE FCST: prima tomada del FCST por ramo, como la arma la hoja ER_ram del archivo de FCST: por mes,
-# -SUMAR.SI.CONJUNTO(CtaMens!AMOUNT; GL_ACCT = 61; CALMONTH = mes; RamoN = ramo) y acumulada en el ano. Se agrega a la
-# BD la hoja HOJA_PE_FCST (prima del mes en valores y su acumulado como formula) y "PE FCST <ramo>" la referencia.
+# PE FCST (prima tomada del mes por ramo): la historia de la base PExRamo (por ramo y mes de ocurrencia) y el ano del
+# FCST como lo arma la hoja ER_ram del archivo de FCST (por mes, -SUMAR.SI.CONJUNTO(CtaMens!AMOUNT; GL_ACCT = 61;
+# CALMONTH = mes; RamoN = ramo)). Se agrega a la BD la hoja HOJA_PE_RAMO (prima del mes en valores y su suma de 12
+# meses como formula) y los bloques "PE FCST <ramo>", "PRIMA N AÑOS <ramo>" y "PEACUMULADA <ramo>" la referencian.
 ARCHIVO_PE_FCST = ENTRADAS / "FCST_2027.xlsb"
-HOJA_PE_FCST = "PE_FCST"
+PATRON_PE_RAMO = "PExRamo*"      # base historica de PE por ramo y mes (en entradas/)
+HOJA_PE_FCST = "PE_FCST"         # (hoja de versiones anteriores: se quita)
+HOJA_PE_RAMO = "PE_RAMO"
+MESES_PRIMA_N_ANOS = 12          # PRIMA N AÑOS = suma de los ultimos 12 meses de PE FCST; PEACUMULADA de RRC = esa suma
+ANIOS_LAG_PEACUMULADA = {"SONR": 10}   # SONR: PEACUMULADA = LAG 1 x PRIMA N AÑOS del mes + LAG 2 x la del mismo mes del
+                                 # ano anterior + ... (LAG k de HParametros del mes, real o proyectado; 10 anos)
+# BEL por FND (Danos RRC y SONR): desde el primer mes proyectado BEL = IS x PEACUMULADA x FND, con FND = PND / PEACUMULADA
+# de la historia proyectado con la tendencia (TIPO_MODELO_FND), el IS y los LAG proyectados de HParametros y la PE del
+# FCST. GTO y MR = su razon proyectada sobre el BEL (la del modelo) x el BEL nuevo; BRUTO = BEL + GTO + MR; IRR = BRUTO x
+# la razon de cesion del modelo; NETO = BRUTO - IRR. En la BD principal van como formulas en las columnas RAM_.
+USAR_BEL_POR_FND = True
+TIPO_MODELO_FND = "indice"       # el FND se proyecta como los indices: recta de los ultimos MESES_TENDENCIA meses con
+                                 # patron del mes y pendiente ponderada por su credibilidad (R2)
+MIN_MESES_FND = 12               # meses minimos de FND real para proyectarlo
 CUENTA_PE_FCST = "61"            # cuenta de prima tomada en CtaMens (la que suma ER_ram)
 RAMO_FCST_A_BD = {"10": "10", "31": "30", "35": "34", "39": "37", "40": "40", "46": "40", "50": "50", "60": "60",
                   "71": "71", "73": "73", "80": "80", "90": "90", "100": "100", "110": "110"}
@@ -2049,46 +2066,6 @@ def _divisor_proyectado(resultados: dict, ramo, pref: str, h: int):
     return is_f, lag_f, is_f.copy()
 
 
-def indices_pnd_bd(diag: dict, resultados: dict, proy: dict, periodos_proy: list[int], meses_pe: int | None) -> dict:
-    """Indicadores por ramo y mes para las columnas de la BD: {(reserva, periodo, ramo): {"PND/PD": base (BEL / IS, o
-    BEL / (IS x (1 - LAG 1)) en SONR), "FA": base / prima anualizada del grupo del ramo (ultimos meses_pe meses),
-    "FACTOR GTO": GTO / PND (RRC), "FACTOR MR": MR / base, "IS (RL)", "LAG (RL)", "PD/PND CORREGIDA": la base}}. Los
-    que dependen de un dato de captura (INDICES_PND_CAPTURA) no van. La historia sale del real y la proyeccion de proy
-    (la base proyectada es el BEL escrito entre el indice (y el LAG) proyectados de HParametros)."""
-    hist, pe_tab = diag.get("_hist") or {}, diag.get("_pe") or {}
-    esc = next((e for e, m in ESCENARIOS_PND.items() if m == meses_pe), None)
-    h = len(periodos_proy)
-    out = {}
-    for (pref, ramo), d in hist.items():
-        pe = pe_tab.get((esc, d.get("grupo"))) if esc is not None else None
-
-        def fila(p, b, gto, mr, iv, lv):
-            f = {"IS (RL)": iv if np.isfinite(iv) else None, "LAG (RL)": lv if np.isfinite(lv) else None}
-            out[(pref, p, ramo)] = f
-            if not (np.isfinite(b) and b > 0):             # sin base (BEL no positivo o sin indice): solo IS y LAG
-                return
-            f.update({"PND/PD": b, "PD/PND CORREGIDA": b, "FACTOR MR": mr / b})
-            if pref == "RRC":
-                f["FACTOR GTO"] = gto / b
-            if pe is not None:
-                v = float(pe.get(p, math.nan))
-                f["FA"] = b / v if np.isfinite(v) and v > 0 else None
-
-        for i, p in enumerate(d["per"]):
-            fila(p, d["base"][i], float(np.nan_to_num(d["gto"][i])), float(np.nan_to_num(d["mr"][i])), d["is"][i],
-                 d["lag"][i])
-        is_f, lag_f, dv_f = _divisor_proyectado(resultados, ramo, pref, h)
-        if is_f is None:
-            continue
-        for j, p in enumerate(periodos_proy):
-            bel = proy.get((norm(f"{pref} BEL"), p, ramo), math.nan)
-            b = bel / dv_f[j] if (dv_f is not None and np.isfinite(bel) and bel > 0 and np.isfinite(dv_f[j])
-                                  and dv_f[j] > 0) else math.nan
-            fila(p, b, proy.get((norm("RRC GTO"), p, ramo), 0.0) if pref == "RRC" else 0.0,
-                 proy.get((norm(f"{pref} MR"), p, ramo), 0.0), is_f[j], lag_f[j] if lag_f is not None else math.nan)
-    return out
-
-
 def leer_pe_fcst(ruta: Path | None = None) -> dict | None:
     """Prima tomada del FCST por ramo de la BD y mes (USD), como la arma la hoja ER_ram del archivo de FCST: por mes,
     -suma de AMOUNT de CtaMens con GL_ACCT = CUENTA_PE_FCST y el ramo (Ramo2 via RAMO_FCST_A_BD). Regresa
@@ -2138,6 +2115,9 @@ def leer_pe_fcst(ruta: Path | None = None) -> dict | None:
         mensual[(ramo, p)] = mensual.get((ramo, p), 0.0) - monto
         nombres.setdefault(ramo, set()).add(nombre)
     periodos = sorted({p for _, p in mensual})
+    for ramo in set(RAMO_FCST_A_BD.values()):          # un ramo o mes sin renglones es prima 0, como en ER_ram
+        for p in periodos:
+            mensual.setdefault((ramo, p), 0.0)
     if not periodos:
         raise ValueError(f"{ruta.name} › CtaMens: {renglones:,} renglones, ninguno con la cuenta {CUENTA_PE_FCST} de "
                          "ramos de la BD" + (f" (fuera de la BD: {', '.join(sorted(fuera))})" if fuera else ""))
@@ -2180,44 +2160,6 @@ def leer_pe_fcst(ruta: Path | None = None) -> dict | None:
     return {"ruta": ruta, "mensual": mensual, "acumulada": acumulada,
             "nombres": {r: ", ".join(sorted(v)) for r, v in nombres.items()}, "periodos": periodos,
             "renglones": renglones, "usados": usados, "fuera": fuera, "control": control, "avisos": avisos}
-
-
-def escribir_pe_fcst(wb, pef: dict | None, ramos: list) -> dict | None:
-    """Hoja HOJA_PE_FCST con la prima tomada del FCST por ramo de la BD: la del mes (valores, de CtaMens como ER_ram)
-    y el acumulado del ano como formula (PE FCST). Regresa {"fila": {periodo: renglon}, "col": {ramo: letra del
-    acumulado}, "valor": {(ramo, periodo): acumulado}} o None sin FCST."""
-    if not pef or not pef["periodos"]:
-        return None
-    if HOJA_PE_FCST in wb.sheetnames:
-        del wb[HOJA_PE_FCST]
-    ws = wb.create_sheet(HOJA_PE_FCST)
-    negrita = Font(bold=True)
-    ramos = [r for r in ramos if any((r, p) in pef["mensual"] for p in pef["periodos"])]
-    ws.cell(1, 1, f"Prima tomada del FCST por ramo (USD): {pef['ruta'].name} › CtaMens, cuenta {CUENTA_PE_FCST}, "
-                  "-suma por mes y ramo, como la hoja ER_ram; PE FCST = acumulado del ano").font = negrita
-    ws.cell(2, 1, "Ramo del FCST: " + "; ".join(f"{r} = {pef['nombres'].get(r, '')}" for r in ramos))
-    cab = ["PERIODO"] + [f"PRIMA MES {r}" for r in ramos] + [f"PE FCST {r}" for r in ramos]
-    for k, h in enumerate(cab, start=1):
-        ws.cell(3, k, h).font = negrita
-    col_m = {r: 2 + i for i, r in enumerate(ramos)}
-    col_a = {r: 2 + len(ramos) + i for i, r in enumerate(ramos)}
-    filas, inicio = {}, {}
-    for i, p in enumerate(pef["periodos"]):
-        fila = 4 + i
-        filas[p] = fila
-        inicio.setdefault(p // 100, fila)
-        ws.cell(fila, 1, p)
-        for r in ramos:
-            c = ws.cell(fila, col_m[r], float(pef["mensual"].get((r, p), 0.0)))
-            c.number_format = "#,##0"
-            m = get_column_letter(col_m[r])
-            c = ws.cell(fila, col_a[r], f"=SUM({m}{inicio[p // 100]}:{m}{fila})")
-            c.number_format = "#,##0"
-    ws.freeze_panes = "B4"
-    for k in range(1, len(cab) + 1):
-        ws.column_dimensions[get_column_letter(k)].width = 15 if k > 1 else 10
-    return {"fila": filas, "col": {r: get_column_letter(c) for r, c in col_a.items()},
-            "valor": {(r, p): pef["acumulada"][(r, p)] for r in ramos for p in pef["periodos"]}}
 
 
 def escribir_primas_pe(wb, pr, grupos: list) -> dict | None:
@@ -2266,107 +2208,317 @@ def escribir_primas_pe(wb, pr, grupos: list) -> dict | None:
     return {"fila": filas, "col": col}
 
 
-def escribir_indices_pnd(bd: BDMontos, indices: dict, hp=None, pe: dict | None = None, meses_pe: int | None = None,
-                         pe_fcst: dict | None = None, avisos: list | None = None):
+def leer_pe_ramo(ruta: Path | None = None) -> dict | None:
+    """PE historica por ramo de la BD y mes de la base PExRamo (PATRON_PE_RAMO en entradas/). Regresa {"ruta",
+    "mensual": {(ramo, periodo): prima USD}, "renglones", "usados", "avisos"} o None si no hay archivo."""
+    candidatos = [Path(ruta)] if ruta else sorted((c for c in ENTRADAS.glob(PATRON_PE_RAMO) if not c.name.startswith("~$")),
+                                                  key=lambda c: c.stat().st_size, reverse=True)
+    if not candidatos or not candidatos[0].exists():
+        return None
+    raise NotImplementedError(f"{candidatos[0].name}: la lectura de PExRamo se programa al recibir la base")
+
+
+def pe_por_mes(pe_ramo: dict | None, pef: dict | None) -> dict:
+    """{(ramo, periodo): (prima del mes USD, fuente)}: PExRamo en su historia y el FCST en los meses que PExRamo no trae."""
+    out = {}
+    for fuente in (pef, pe_ramo):                      # (PExRamo, real, manda sobre el FCST en un mes que traigan ambos)
+        if fuente:
+            for (r, p), v in fuente["mensual"].items():
+                out[(r, p)] = (float(v), fuente["ruta"].name)
+    return out
+
+
+def _suma_12(pe: dict) -> dict:
+    """{(ramo, periodo): suma de la PE de los ultimos MESES_PRIMA_N_ANOS meses} donde estan todos."""
+    out = {}
+    for (r, p) in pe:
+        ms = [indice_a_periodo(periodo_a_indice(p) - j) for j in range(MESES_PRIMA_N_ANOS)]
+        if all((r, m) in pe for m in ms):
+            out[(r, p)] = float(sum(pe[(r, m)][0] if isinstance(pe[(r, m)], tuple) else pe[(r, m)] for m in ms))
+    return out
+
+
+def _mes_menos(p: int, meses: int) -> int:
+    return indice_a_periodo(periodo_a_indice(p) - meses)
+
+
+def _hp_fuente(hp, resultados: dict, r_hp, nombre: str, periodo: int, pos_proy: dict):
+    """Indice o LAG del mes como lo toma la hoja: (valor, ("celda", periodo)) del renglon Real o de Proyeccion;
+    (valor, ("interp", pa, pb, k, n)) en un hueco de hasta MAX_HUECO_INTERPOLABLE meses sin cambio de nivel (como la
+    preparacion de las series); (nan, None) si no hay con que."""
+    if r_hp is None:
+        return math.nan, None
+    if periodo > hp.ultimo:
+        res = resultados.get(("HPARAM", HOJA_PARAMETROS, nombre, r_hp))
+        if res is None or periodo not in pos_proy:
+            return math.nan, None
+        v = float(res.pronostico[pos_proy[periodo]])
+        return (v, ("celda", periodo)) if np.isfinite(v) else (math.nan, None)
+    hist = hp.historia.get((r_hp, nombre), {})
+    v = hist.get(periodo, math.nan)
+    if np.isfinite(v) and (r_hp, periodo) in hp.filas:
+        return float(v), ("celda", periodo)
+    antes = [q for q, x in hist.items() if q < periodo and np.isfinite(x) and (r_hp, q) in hp.filas]
+    despues = [q for q, x in hist.items() if q > periodo and np.isfinite(x) and (r_hp, q) in hp.filas]
+    if not antes or not despues:
+        return math.nan, None
+    pa, pb = max(antes), min(despues)
+    n = periodo_a_indice(pb) - periodo_a_indice(pa) - 1
+    a_, b_ = hist[pa], hist[pb]
+    if n > MAX_HUECO_INTERPOLABLE or (a_ > 0 and b_ > 0 and max(a_, b_) / min(a_, b_) > SALTO_NIVEL_HUECO):
+        return math.nan, None
+    k = periodo_a_indice(periodo) - periodo_a_indice(pa)
+    return float(a_ + (b_ - a_) * k / (n + 1)), ("interp", pa, pb, k, n + 1)
+
+
+def _peacumulada(pref: str, r, p: int, p12: dict, lags: dict):
+    """PEACUMULADA del mes: RRC = PRIMA N AÑOS; SONR = suma de LAG k del mes x PRIMA N AÑOS del mismo mes k - 1 anos
+    antes (ANIOS_LAG_PEACUMULADA). lags = {k: valor}. nan si falta algun termino."""
+    anios = ANIOS_LAG_PEACUMULADA.get(pref)
+    if not anios:
+        return p12.get((r, p), math.nan)
+    tot = 0.0
+    for k in range(1, anios + 1):
+        x, lag = p12.get((r, _mes_menos(p, 12 * (k - 1)))), lags.get(k, math.nan)
+        if x is None or not np.isfinite(lag):
+            return math.nan
+        tot += lag * x
+    return tot
+
+
+def calcular_bel_fnd(bd: BDMontos, hp, resultados: dict, proy: dict, pe: dict, periodos_proy: list[int],
+                     ultimo: int) -> dict:
+    """BEL por FND: FND = PND / PEACUMULADA en la historia (PND = BEL / IS), proyectado con la tendencia desde el primer
+    mes proyectado; BEL = IS x PEACUMULADA x FND y GTO, MR, BRUTO, IRR y NETO con las razones del modelo sobre ese BEL.
+    Regresa {"proy": montos con el BEL nuevo, "aplica": {(reserva, periodo, ramo)}, "fnd": {(reserva, periodo, ramo):
+    FND proyectado}, "razones": {...}, "series": filas para el diagnostico, "resumen", "estado"}."""
+    h = len(periodos_proy)
+    pos = {p: i for i, p in enumerate(periodos_proy)}
+    p12 = _suma_12(pe)
+    out = {"proy": dict(proy), "aplica": set(), "fnd": {}, "razones": {}, "series": [], "resumen": [], "estado": "",
+           "p12": p12}
+    if not pe:
+        out["estado"] = "sin PE por ramo (PExRamo y FCST): el BEL sigue con el modelo"
+        return out
+    per_hist = sorted({p for (_, p) in bd.filas if p <= ultimo})
+    for pref, (nombre_is, _) in INDICE_BASE_PND.items():
+        anios = ANIOS_LAG_PEACUMULADA.get(pref, 0)
+        for r in bd.cols_ramo:
+            r_hp = MAPA_RAMO_LAG.get(str(r))
+
+            def peac(p):
+                lags = {k: _hp_fuente(hp, resultados, r_hp, f"LAG {k}", p, pos)[0] for k in range(1, anios + 1)}
+                return _peacumulada(pref, r, p, p12, lags)
+            fnd_h, per_ok = [], []
+            for p in per_hist:
+                bel = bd.valores.get((f"{pref} BEL", p, r), math.nan)
+                is_ = _hp_fuente(hp, resultados, r_hp, nombre_is, p, pos)[0]
+                pa = peac(p)
+                f = (bel / is_) / pa if np.isfinite(bel) and np.isfinite(is_) and is_ != 0 and np.isfinite(pa) \
+                    and pa != 0 else math.nan
+                fnd_h.append(f)
+                if np.isfinite(f):
+                    per_ok.append(p)
+            fila = {"Reserva": pref, "Ramo": r, "Meses de FND real": len(per_ok),
+                    "Desde": per_ok[0] if per_ok else None, "Hasta": per_ok[-1] if per_ok else None}
+            motivo = ""
+            bel_u = bd.valores.get((f"{pref} BEL", ultimo, r), math.nan)
+            if len(per_ok) < MIN_MESES_FND:
+                motivo = f"menos de {MIN_MESES_FND} meses de FND real (falta PE, IS o LAG)"
+            elif not (np.isfinite(bel_u) and bel_u > 0):
+                motivo = "BEL real no positivo al ultimo mes"
+            fnd_f = None
+            if not motivo:
+                per = rango_periodos(per_ok[0], ultimo)
+                v = [fnd_h[per_hist.index(p)] if p in per_hist else math.nan for p in per]
+                res = pronosticar(Serie(("DANOS", pref, "FND", r), TIPO_MODELO_FND, per, v, ultimo, h,
+                                        dominio=(0.0, None)))
+                fnd_f = np.asarray(res.pronostico, dtype=float)
+                fila.update({"Modelo": res.modelo if hasattr(res, "modelo") else "",
+                             "Error % backtest (modelo)": getattr(res, "error_modelo", math.nan),
+                             "Error % backtest (ultimo valor)": getattr(res, "error_ultimo_valor", math.nan),
+                             f"FND {ultimo}": fnd_h[per_hist.index(ultimo)] if ultimo in per_hist else math.nan,
+                             f"FND {periodos_proy[-1]}": fnd_f[-1] if len(fnd_f) == h else math.nan})
+                if len(fnd_f) != h:
+                    motivo, fnd_f = "no se pudo proyectar el FND", None
+            n_ap = 0
+            for j, p in enumerate(periodos_proy):
+                is_f = _hp_fuente(hp, resultados, r_hp, nombre_is, p, pos)[0]
+                pa = peac(p)
+                fz = fnd_f[j] if fnd_f is not None else math.nan
+                bel_m = proy.get((norm(f"{pref} BEL"), p, r), math.nan)
+                bel_n = is_f * pa * fz if all(np.isfinite(x) for x in (is_f, pa, fz)) else math.nan
+                out["series"].append({"Reserva": pref, "Ramo": r, "Periodo": p, "IS": is_f, "PEACUMULADA": pa,
+                                      "FND": fz, "BEL IS x PEACUMULADA x FND": bel_n, "BEL del modelo": bel_m})
+                if not np.isfinite(bel_n):
+                    continue
+                out["fnd"][(pref, p, r)] = float(fz)
+                g = lambda c: proy.get((norm(f"{pref} {c}"), p, r), math.nan)    # noqa: E731
+                raz = {"GTO": g("GTO") / bel_m if pref == "RRC" and bel_m else 0.0,
+                       "MR": g("MR") / bel_m if bel_m else 0.0,
+                       "IRR": g("IRR") / g("BRUTO") if g("BRUTO") else 0.0}
+                raz = {k: (float(x) if np.isfinite(x) else 0.0) for k, x in raz.items()}
+                gto, mr = raz["GTO"] * bel_n, raz["MR"] * bel_n
+                bruto = bel_n + (gto if pref == "RRC" else 0.0) + mr
+                irr = raz["IRR"] * bruto
+                nuevos = {"BEL": bel_n, "MR": mr, "BRUTO": bruto, "IRR": irr, "NETO": bruto - irr}
+                if pref == "RRC":
+                    nuevos["GTO"] = gto
+                for c, x in nuevos.items():
+                    out["proy"][(norm(f"{pref} {c}"), p, r)] = float(x)
+                out["razones"][(pref, p, r)] = raz
+                out["aplica"].add((pref, p, r))
+                n_ap += 1
+            fila["Meses con BEL por FND"] = n_ap
+            fila["Motivo"] = motivo if motivo else ("" if n_ap == h else
+                                                    f"{h - n_ap} mes(es) sin IS, LAG o PE (quedan con el modelo)")
+            for p in (periodos_proy[3] if len(periodos_proy) > 3 else periodos_proy[-1], periodos_proy[-1]):
+                fila[f"BEL modelo {p}"] = proy.get((norm(f"{pref} BEL"), p, r), math.nan)
+                fila[f"BEL por FND {p}"] = out["proy"].get((norm(f"{pref} BEL"), p, r), math.nan) \
+                    if (pref, p, r) in out["aplica"] else math.nan
+            out["resumen"].append(fila)
+    n = len({(a, c) for a, _, c in out["aplica"]})
+    out["estado"] = (f"{n} series (reserva x ramo) con BEL = IS x PEACUMULADA x FND desde {periodos_proy[0]}; "
+                     f"{len(out['aplica'])} de {2 * len(bd.cols_ramo) * h} meses") if n else \
+        "ninguna serie con PE, IS y LAG suficientes: el BEL sigue con el modelo"
+    return out
+
+
+def escribir_pe_ramo(wb, pe: dict, ramos: list) -> dict | None:
+    """Hoja HOJA_PE_RAMO: PE del mes por ramo (valores, con su fuente) y PRIMA N AÑOS (suma de los ultimos
+    MESES_PRIMA_N_ANOS meses) como formula. Regresa {"fila": {periodo: renglon}, "pe": {ramo: letra},
+    "p12": {ramo: letra}, "tiene": {(ramo, periodo)}, "tiene12": {(ramo, periodo)}} o None sin PE."""
+    for vieja in (HOJA_PE_FCST, HOJA_PE_RAMO):
+        if vieja in wb.sheetnames:
+            del wb[vieja]
+    if not pe:
+        return None
+    ws = wb.create_sheet(HOJA_PE_RAMO)
+    negrita = Font(bold=True)
+    ramos = [r for r in ramos if any(k[0] == r for k in pe)]
+    per = rango_periodos(min(p for _, p in pe), max(p for _, p in pe))
+    fuentes = sorted({f for _, f in pe.values()})
+    ws.cell(1, 1, f"Prima tomada (PE) del mes por ramo (USD) y PRIMA N AÑOS = suma de los ultimos {MESES_PRIMA_N_ANOS} "
+                  f"meses. Fuente: {', '.join(fuentes)}").font = negrita
+    cab = ["PERIODO", "FUENTE"] + [f"PE {r}" for r in ramos] + [f"PRIMA N AÑOS {r}" for r in ramos]
+    for k, t in enumerate(cab, start=1):
+        ws.cell(3, k, t).font = negrita
+    c_pe = {r: 3 + i for i, r in enumerate(ramos)}
+    c_12 = {r: 3 + len(ramos) + i for i, r in enumerate(ramos)}
+    filas, tiene, tiene12 = {}, set(), set()
+    for i, p in enumerate(per):
+        fila = 4 + i
+        filas[p] = fila
+        ws.cell(fila, 1, p)
+        ws.cell(fila, 2, ", ".join(sorted({pe[(r, p)][1] for r in ramos if (r, p) in pe})))
+        for r in ramos:
+            if (r, p) in pe:
+                ws.cell(fila, c_pe[r], pe[(r, p)][0]).number_format = "#,##0"
+                tiene.add((r, p))
+            if i + 1 >= MESES_PRIMA_N_ANOS and all((r, per[i - j]) in pe for j in range(MESES_PRIMA_N_ANOS)):
+                le = get_column_letter(c_pe[r])
+                c = ws.cell(fila, c_12[r], f"=SUM({le}{fila - MESES_PRIMA_N_ANOS + 1}:{le}{fila})")
+                c.number_format = "#,##0"
+                tiene12.add((r, p))
+    ws.freeze_panes = "C4"
+    for k in range(1, len(cab) + 1):
+        ws.column_dimensions[get_column_letter(k)].width = 15 if k > 2 else 12
+    return {"fila": filas, "pe": {r: get_column_letter(c) for r, c in c_pe.items()},
+            "p12": {r: get_column_letter(c) for r, c in c_12.items()}, "tiene": tiene, "tiene12": tiene12}
+
+
+def _ref_hoja(nombre: str) -> str:
+    return nombre if re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", nombre) else f"'{nombre}'"
+
+
+def escribir_indices_pnd(bd: BDMontos, ctx: dict, avisos: list | None = None) -> dict:
     """Escribe los indicadores por ramo a la derecha de la hoja de montos: un bloque por indicador de
     COLUMNAS_INDICES_PND con una columna por ramo (encabezado "<indicador> <ramo>" en el renglon 3, que no empieza con
-    RAM_ para no confundirse con los montos, y el nombre del bloque en el renglon 2). Si la BD ya trae esas columnas se
-    usan; si trae los encabezados sin ramo ("PND/PD", "FA", "IS (RL)", ...) al final, los bloques empiezan ahi; si no,
-    despues de la ultima columna. PND/PD, FA y los factores van en todos los renglones de RRC y SONR (historia y
-    proyeccion); los de INDICES_PND_SOLO_BEL, solo en el renglon BEL. Sin dato, la celda queda vacia. PE FCST
-    referencia la hoja HOJA_PE_FCST (pe_fcst) en los meses que trae el FCST; en los demas meses, y FD/FND (MEC) de RRC,
-    es dato de captura (INDICES_PND_CAPTURA): vacio, salvo que la BD de entrada ya traiga un numero o una formula en
-    esa columna "<indicador> <ramo>". Los avisos (capturas que se pierden) van a la lista avisos."""
+    RAM_, y el nombre del bloque en el renglon 2), despues de las columnas propias de la BD. Si la BD de entrada ya traia
+    bloques (de cualquier version), se limpian y se vuelven a escribir; sus datos de captura se conservan. PND/PD, FA y
+    los factores van en todos los renglones de RRC y SONR (historia y proyeccion); los de INDICES_PND_SOLO_BEL, solo en
+    el renglon BEL. Formulas sencillas (=J33/BZ33) donde el calculo tiene dato; sin dato, la celda queda vacia.
+    ctx: hp, resultados, periodos_proy, ultimo, proy (montos proyectados de este archivo), pe (pe_por_mes), hoja_pe
+    (escribir_pe_ramo), primas_pe (escribir_primas_pe), pe_tab y meses_pe (PE de Primas_PE para el FA), fnd ({(reserva,
+    periodo, ramo): FND proyectado} solo en la BD principal). Regresa {(indicador, ramo): columna}."""
     ws = bd.ws
-    enc = {norm(ws.cell(3, c).value): c for c in range(1, ws.max_column + 1) if ws.cell(3, c).value}
+    hp, resultados, periodos_proy, ultimo = ctx["hp"], ctx["resultados"], ctx["periodos_proy"], ctx["ultimo"]
+    proy, pe, hoja_pe, fnd = ctx["proy"], ctx.get("pe") or {}, ctx.get("hoja_pe"), ctx.get("fnd") or {}
+    primas_pe, pe_tab, meses_pe = ctx.get("primas_pe"), ctx.get("pe_tab") or {}, ctx.get("meses_pe")
+    pos = {p: i for i, p in enumerate(periodos_proy)}
+    formulas = INDICES_PND_FORMULAS and hp is not None and getattr(hp, "filas", None)
+    todos = list(COLUMNAS_INDICES_PND) + list(INDICES_PND_RETIRADOS)
     ramos = list(bd.cols_ramo)
-    nombres = [(ind, r, f"{ind} {r}") for ind in COLUMNAS_INDICES_PND for r in ramos]
-    viejas = [enc[norm(ind)] for ind in COLUMNAS_INDICES_PND if norm(ind) in enc]
-    fijas = [c for n, c in enc.items() if n not in {norm(x[2]) for x in nombres} | {norm(i) for i in COLUMNAS_INDICES_PND}]
-    ocupadas = {enc[norm(x[2])] for x in nombres if norm(x[2]) in enc}   # bloques que la BD ya trae
-    ultima = max(fijas + list(ocupadas))
-    siguiente = (min(viejas) if viejas and min(viejas) > ultima else ultima + 1)
-    for ind in INDICES_PND_CAPTURA:                       # capturas en columnas sin ramo (como el ejemplo del area)
+    enc = {norm(ws.cell(3, c).value): c for c in range(1, ws.max_column + 1) if ws.cell(3, c).value}
+    de_bloque = {norm(f"{i} {r}") for i in todos for r in ramos} | {norm(i) for i in todos}
+    fijas = [c for n, c in enc.items() if n not in de_bloque]
+    viejas = sorted(c for n, c in enc.items() if n in de_bloque)
+    # capturas de la BD de entrada (columnas "<indicador> <ramo>" de los datos de captura), antes de limpiar
+    capturas = {}
+    for ind in INDICES_PND_CAPTURA:
+        for r in ramos:
+            c = enc.get(norm(f"{ind} {r}"))
+            if c is not None:
+                for f in bd.filas_entrada:
+                    v = ws.cell(f, c).value
+                    if v is not None and v != "":
+                        capturas[(ind, r, f)] = v
         c = enc.get(norm(ind))
-        n = 0 if c is None else sum(1 for f in range(4, ws.max_row + 1)
-                                    if isinstance(ws.cell(f, c).value, (int, float))
+        n = 0 if c is None else sum(1 for f in range(4, ws.max_row + 1) if isinstance(ws.cell(f, c).value, (int, float))
                                     and not isinstance(ws.cell(f, c).value, bool))
         if n and avisos is not None:
             avisos.append(f"La columna '{ws.cell(3, c).value}' (sin ramo) traia {n} dato(s) de captura; los bloques por "
                           f"ramo la reemplazan. Captura en la columna del ramo (p. ej. '{ind} 60') de la BD de entrada")
+    for c in viejas:                                   # se limpian los bloques que traia la BD (se escriben de nuevo)
+        for f in range(1, ws.max_row + 1):
+            ws.cell(f, c).value = None
     col_estilo = max(fijas)
     col_ramo = next(iter(bd.cols_ramo.values()))
     ancho = ws.column_dimensions[get_column_letter(col_ramo)].width
-    cols, existentes = {}, set()
-    for ind, r, nombre in nombres:
-        c = enc.get(norm(nombre))
-        if c is None:
-            while siguiente in fijas or siguiente in ocupadas:
-                siguiente += 1
-            c = siguiente
-            siguiente += 1
-        else:
-            existentes.add((ind, r))
-        cols[(ind, r)] = c
-        _copiar_estilo(ws.cell(3, col_estilo), ws.cell(3, c))
-        ws.cell(3, c).value = nombre
-        if ancho:
-            ws.column_dimensions[get_column_letter(c)].width = ancho
-    for ind in COLUMNAS_INDICES_PND:                      # nombre del bloque arriba de su primera columna
-        c0 = min(c for (i, _), c in cols.items() if i == ind)
+    cols, c = {}, max(fijas) + 1
+    for ind in COLUMNAS_INDICES_PND:
+        for r in ramos:
+            cols[(ind, r)] = c
+            _copiar_estilo(ws.cell(3, col_estilo), ws.cell(3, c))
+            ws.cell(3, c).value = f"{ind} {r}"
+            if ancho:
+                ws.column_dimensions[get_column_letter(c)].width = ancho
+            c += 1
+        c0 = cols[(ind, ramos[0])]
         cap = INDICES_PND_CAPTURA.get(ind)
-        ws.cell(2, c0).value = ind + ("" if not cap else " (dato de captura" + (
+        etiqueta = ind + ("" if not cap else " (dato de captura" + (
             "" if set(cap) >= set(INDICE_BASE_PND) else " en " + " y ".join(cap)) + ")")
-        if ind == "PE FCST" and pe_fcst and pe_fcst.get("fila"):
-            m = sorted(pe_fcst["fila"])
-            ws.cell(2, c0).value = (f"PE FCST (hoja {HOJA_PE_FCST} en {m[0]} a {m[-1]}; dato de captura en los "
-                                    "demas meses)")
+        if ind == "PE FCST" and hoja_pe:
+            etiqueta = f"PE FCST (prima del mes, hoja {HOJA_PE_RAMO}; dato de captura en los meses sin PE)"
+        ws.cell(2, c0).value = etiqueta
         ws.cell(2, c0).font = Font(bold=True)
-    formulas = INDICES_PND_FORMULAS and hp is not None and getattr(hp, "filas", None)
-    hoja_hp = f"'{HOJA_PARAMETROS}'"
+    hoja_hp = _ref_hoja(HOJA_PARAMETROS)
 
-    def celda_indice(r_hp, nombre, periodo):
-        """Referencia a la celda del indice en HParametros (limpiando el texto con \xa0 si viene como texto)."""
+    def L(ind, r):
+        return get_column_letter(cols[(ind, r)])
+
+    def ref_hp(r_hp, nombre, periodo):
         f = hp.filas.get((r_hp, periodo))
         if f is None:
             return None
         ref = f"{hoja_hp}!{get_column_letter(hp.cols[nombre])}{f}"
         if isinstance(hp.ws.cell(f, hp.cols[nombre]).value, str):
-            ref = f'VALUE(TRIM(SUBSTITUTE({ref},CHAR(160)," ")))'
+            ref = f'VALUE(SUBSTITUTE({ref},CHAR(160),""))'
         return ref
 
-    def expr_indice(r_hp, nombre, periodo):
-        """Indice (o LAG) del mes como formula: la celda de HParametros (Real o Proyeccion); en un hueco de hasta
-        MAX_HUECO_INTERPOLABLE meses sin cambio de nivel, la interpolacion lineal entre las celdas de los meses vecinos
-        (como la usa el modelo). None si no hay con que calcularlo."""
-        hist = hp.historia.get((r_hp, nombre), {})
-        if periodo > hp.ultimo:                           # renglon de Proyeccion: solo si se proyecto un valor (una
-            f = hp.filas.get((r_hp, periodo))             # celda vacia se leeria como 0)
-            v = hp.ws.cell(f, hp.cols[nombre]).value if f is not None else None
-            return celda_indice(r_hp, nombre, periodo) if v not in (None, "") else None
-        v = hist.get(periodo, math.nan)
-        if np.isfinite(v) and (r_hp, periodo) in hp.filas:
-            return celda_indice(r_hp, nombre, periodo)
-        antes = [q for q, x in hist.items() if q < periodo and np.isfinite(x)]
-        despues = [q for q, x in hist.items() if q > periodo and np.isfinite(x)]
-        if not antes or not despues:
+    def expr_hp(r_hp, nombre, fuente):
+        """Formula del indice o LAG segun su fuente (_hp_fuente); None si no hay celda."""
+        if fuente is None:
             return None
-        pa, pb = max(antes), min(despues)
-        n = periodo_a_indice(pb) - periodo_a_indice(pa) - 1
-        a_, b_ = hist[pa], hist[pb]
-        if n > MAX_HUECO_INTERPOLABLE or (a_ > 0 and b_ > 0 and max(a_, b_) / min(a_, b_) > SALTO_NIVEL_HUECO):
-            return None
-        ra, rb = celda_indice(r_hp, nombre, pa), celda_indice(r_hp, nombre, pb)
-        if ra is None or rb is None:
-            return None
-        k = periodo_a_indice(periodo) - periodo_a_indice(pa)
-        return f"({ra}+({rb}-{ra})*{k}/{n + 1})"
-
-    def ref(ind, r, fila):
-        return f"{get_column_letter(cols[(ind, r)])}{fila}"
+        if fuente[0] == "celda":
+            return ref_hp(r_hp, nombre, fuente[1])
+        _, pa, pb, k, n = fuente
+        ra, rb = ref_hp(r_hp, nombre, pa), ref_hp(r_hp, nombre, pb)
+        return None if ra is None or rb is None else f"{ra}+({rb}-{ra})*{k}/{n}"
 
     descartados, viejas_ref, formulas_val = [], [], []
-    ref_apoyo = re.compile(rf"'?({re.escape(HOJA_PE_FCST)}|{re.escape(HOJA_PRIMAS_PE)})'?!", re.I)
+    ref_apoyo = re.compile(rf"'?({re.escape(HOJA_PE_FCST)}|{re.escape(HOJA_PE_RAMO)}|{re.escape(HOJA_PRIMAS_PE)})'?!",
+                           re.I)
 
     def captura(v, fila, c):
         """Dato de captura que la BD de entrada ya traia: un numero o una formula se conservan; un texto numerico se
@@ -2388,103 +2540,110 @@ def escribir_indices_pnd(bd: BDMontos, indices: dict, hp=None, pe: dict | None =
             return None
         return x
 
-    def num_celda(ind, r, fila):
-        x = ws.cell(fila, cols[(ind, r)]).value
-        return float(x) if isinstance(x, (int, float)) and not isinstance(x, bool) and np.isfinite(x) else None
+    def monto(pref, conc, p, r):
+        if p <= ultimo:
+            return bd.valores.get((f"{pref} {conc}", p, r), math.nan)
+        return proy.get((norm(f"{pref} {conc}"), p, r), math.nan)
 
-    def valor_dependiente(ind, pref, p, r, fila):
-        """Modo valores: FD/FND, FD/FND (MEC) de SONR, BEL y BEL (MEC) con el PE FCST (y el FD (MEC)) ya escritos."""
-        d = indices.get((pref, p, r), {})
-        pd_, is_, lag = d.get("PD/PND CORREGIDA"), d.get("IS (RL)"), d.get("LAG (RL)")
-        pe_ = num_celda("PE FCST", r, fila)
-        if ind in ("FD/FND", "FD/FND (MEC)"):
-            return pd_ / pe_ if pd_ is not None and pe_ else None
-        fd = num_celda("FD/FND" if ind == "BEL" else "FD/FND (MEC)", r, fila)
-        con_lag_ = pref in LAG_BASE_PND
-        if None in (pe_, fd, is_) or (con_lag_ and lag is None):
-            return None
-        return pe_ * fd * is_ * ((1.0 - lag) if con_lag_ else 1.0)
-
-    refs = {}                                             # (reserva, periodo, ramo) -> (indice, LAG) como formula
-
-    def refs_mes(pref, p, r):
-        if (pref, p, r) not in refs:
-            r_hp = MAPA_RAMO_LAG.get(str(r))
-            refs[(pref, p, r)] = ((expr_indice(r_hp, INDICE_BASE_PND[pref][0], p),
-                                   expr_indice(r_hp, _lag_pnd(pref), p)) if r_hp else (None, None))
-        return refs[(pref, p, r)]
-
+    p12 = {k: v for k, v in _suma_12(pe).items()}
+    ok = lambda x: x is not None and np.isfinite(x)               # noqa: E731
     for (conc, p), fila in bd.filas.items():
         pref = conc.split()[0]
         if pref not in INDICE_BASE_PND:
             continue
         f_bel = bd.filas.get((norm(f"{pref} BEL"), p))
         es_bel = fila == f_bel
-        con_lag = pref in LAG_BASE_PND
-        for (ind, r), c in cols.items():
-            celda = ws.cell(fila, c)
-            if ind in INDICES_PND_SOLO_BEL and not es_bel:
-                celda.value = None
-                continue
-            celda.number_format = COLUMNAS_INDICES_PND[ind]
-            if ind == "PE FCST" and pe_fcst and p in pe_fcst["fila"] and r in pe_fcst["col"]:
-                celda.value = (f"='{HOJA_PE_FCST}'!{pe_fcst['col'][r]}{pe_fcst['fila'][p]}" if formulas
-                               else float(pe_fcst["valor"][(r, p)]))
-                continue
-            if pref in INDICES_PND_CAPTURA.get(ind, ()):     # dato de captura: se conserva si la entrada ya lo traia
-                celda.value = (captura(celda.value, fila, c) if (ind, r) in existentes and fila in bd.filas_entrada
-                               else None)                # (un renglon agregado trae formulas copiadas de su plantilla)
-                continue
-            if not formulas:
-                v = indices.get((pref, p, r), {}).get(ind)
-                if es_bel and ind in ("FD/FND", "FD/FND (MEC)", "BEL", "BEL (MEC)"):
-                    v = valor_dependiente(ind, pref, p, r, fila)
-                celda.value = float(v) if v is not None and np.isfinite(v) else None
-                continue
-            # formulas: la base se calcula en el renglon BEL del mes con el indice y el LAG de ese renglon; los demas
-            # renglones de la reserva toman la PND/PD de ahi
-            is_ref, lag_ref = refs_mes(pref, p, r)
-            if f_bel is None or is_ref is None or (con_lag and lag_ref is None):
-                celda.value = None
-                if ind == "IS (RL)" and is_ref is not None:
-                    celda.value = f"={is_ref}"
-                elif ind == "LAG (RL)" and lag_ref is not None:
-                    celda.value = f"={lag_ref}"
-                continue
+        nombre_is = INDICE_BASE_PND[pref][0]
+        anios = ANIOS_LAG_PEACUMULADA.get(pref, 0)
+        for r in ramos:
+            r_hp = MAPA_RAMO_LAG.get(str(r))
             ram = get_column_letter(bd.cols_ramo[r])
-            pnd_fila = ref("PND/PD", r, fila)
-            is_c, lag_c, pd_c = ref("IS (RL)", r, f_bel), ref("LAG (RL)", r, f_bel), ref("PD/PND CORREGIDA", r, f_bel)
-            pe_c = ref("PE FCST", r, f_bel)
-            div = f"({is_c}*(1-{lag_c}))" if con_lag else is_c
-            if ind == "IS (RL)":
-                celda.value = f"={is_ref}"
-            elif ind == "LAG (RL)":
-                celda.value = f"={lag_ref}" if lag_ref is not None else None
-            elif ind == "PD/PND CORREGIDA":
-                celda.value = f'=IFERROR(IF({ram}{f_bel}>0,{ram}{f_bel}/{div},""),"")'
-            elif ind == "PND/PD":
-                celda.value = f"={pd_c}" if es_bel else f"={get_column_letter(c)}{f_bel}"
-            elif ind == "FA":
-                g = primas.GRUPO_DE_RAMO_RESERVA.get(str(r)) if primas is not None else None
-                if not pe or meses_pe is None or (meses_pe, g) not in pe["col"] or p not in pe["fila"]:
+            bel = monto(pref, "BEL", p, r)
+            is_, f_is = _hp_fuente(hp, resultados, r_hp, nombre_is, p, pos)
+            lag1, f_l1 = _hp_fuente(hp, resultados, r_hp, "LAG 1", p, pos)
+            pnd = bel / is_ if ok(bel) and ok(is_) and is_ != 0 else math.nan
+            pe_v = pe.get((r, p), (None, None))[0]
+            p12_v = p12.get((r, p))
+            lags = {k: _hp_fuente(hp, resultados, r_hp, f"LAG {k}", p, pos) for k in range(1, anios + 1)}
+            peac = _peacumulada(pref, r, p, p12, {k: v for k, (v, _) in lags.items()})
+            if p > ultimo and (pref, p, r) in fnd:
+                fnd_v, fnd_proy = fnd[(pref, p, r)], True
+            else:
+                fnd_v, fnd_proy = (pnd / peac if ok(pnd) and ok(peac) and peac != 0 else math.nan), False
+            g = primas.GRUPO_DE_RAMO_RESERVA.get(str(r)) if primas is not None else None
+            pe_g = pe_tab.get(g)
+            pe_g = float(pe_g.get(p, math.nan)) if pe_g is not None else math.nan
+            gto, mr = monto(pref, "GTO", p, r) if pref == "RRC" else math.nan, monto(pref, "MR", p, r)
+            vals = {"PND/PD": pnd, "IS (RL)": is_, "LAG (RL)": lag1, "PE FCST": pe_v, "PRIMA N AÑOS": p12_v,
+                    "PEACUMULADA": peac, "FD/FND": fnd_v,
+                    "FD/FND (MEC)": fnd_v if pref not in INDICES_PND_CAPTURA.get("FD/FND (MEC)", ()) else None,
+                    "FA": pnd / pe_g if ok(pnd) and ok(pe_g) and pe_g > 0 else math.nan,
+                    "FACTOR GTO": gto / pnd if ok(gto) and ok(pnd) and pnd != 0 else math.nan,
+                    "FACTOR MR": mr / pnd if ok(mr) and ok(pnd) and pnd != 0 else math.nan}
+            for ind in COLUMNAS_INDICES_PND:
+                c = cols[(ind, r)]
+                celda = ws.cell(fila, c)
+                if ind in INDICES_PND_SOLO_BEL and not es_bel:
                     celda.value = None
                     continue
-                celda.value = f'=IFERROR({pnd_fila}/{HOJA_PRIMAS_PE}!{pe["col"][(meses_pe, g)]}{pe["fila"][p]},"")'
-            elif ind == "FACTOR GTO":
-                f_g = bd.filas.get((norm("RRC GTO"), p)) if pref == "RRC" else None
-                celda.value = f'=IFERROR({ram}{f_g}/{pnd_fila},"")' if f_g else None
-            elif ind == "FACTOR MR":
-                f_m = bd.filas.get((norm(f"{pref} MR"), p))
-                celda.value = f'=IFERROR({ram}{f_m}/{pnd_fila},"")' if f_m else None
-            elif ind in ("FD/FND", "FD/FND (MEC)"):          # (FD/FND (MEC) de RRC es captura)
-                celda.value = f'=IFERROR({pd_c}/{pe_c},"")'
-            elif ind in ("BEL", "BEL (MEC)"):               # PE x FD x IS (x (1 - LAG) en SONR), con el FD de su bloque
-                fd_c = ref("FD/FND" if ind == "BEL" else "FD/FND (MEC)", r, f_bel)
-                args = [pe_c, fd_c, is_c] + ([lag_c] if con_lag else [])
-                celda.value = (f'=IF(COUNT({",".join(args)})={len(args)},{pe_c}*{fd_c}*{is_c}'
-                               + (f"*(1-{lag_c})" if con_lag else "") + ',"")')
-            else:
-                celda.value = None
+                celda.number_format = COLUMNAS_INDICES_PND[ind]
+                v = vals.get(ind)
+                if ind == "PE FCST" and not ok(v):
+                    celda.value = captura(capturas.get((ind, r, fila)), fila, c) if fila in bd.filas_entrada else None
+                    continue
+                if ind != "PE FCST" and pref in INDICES_PND_CAPTURA.get(ind, ()):
+                    celda.value = captura(capturas.get((ind, r, fila)), fila, c) if fila in bd.filas_entrada else None
+                    continue
+                if not ok(v):
+                    celda.value = None
+                    continue
+                if not formulas or (ind == "FD/FND" and fnd_proy):   # (el FND proyectado va como valor)
+                    celda.value = float(v)
+                    continue
+                pnd_c = f"{L('PND/PD', r)}{fila}"
+                if ind == "PND/PD":
+                    celda.value = f"={ram}{fila}/{L('IS (RL)', r)}{fila}" if es_bel else f"={L('PND/PD', r)}{f_bel}"
+                elif ind == "IS (RL)":
+                    e = expr_hp(r_hp, nombre_is, f_is)
+                    celda.value = f"={e}" if e else None
+                elif ind == "LAG (RL)":
+                    e = expr_hp(r_hp, "LAG 1", f_l1)
+                    celda.value = f"={e}" if e else None
+                elif ind == "PE FCST":
+                    celda.value = (f"={_ref_hoja(HOJA_PE_RAMO)}!{hoja_pe['pe'][r]}{hoja_pe['fila'][p]}"
+                                   if hoja_pe and (r, p) in hoja_pe["tiene"] else float(v))
+                elif ind == "PRIMA N AÑOS":
+                    celda.value = (f"={_ref_hoja(HOJA_PE_RAMO)}!{hoja_pe['p12'][r]}{hoja_pe['fila'][p]}"
+                                   if hoja_pe and (r, p) in hoja_pe["tiene12"] else float(v))
+                elif ind == "PEACUMULADA":
+                    if not anios:
+                        celda.value = f"={L('PRIMA N AÑOS', r)}{fila}"
+                    else:
+                        terminos = []
+                        for k in range(1, anios + 1):
+                            e = expr_hp(r_hp, f"LAG {k}", lags[k][1])
+                            q = _mes_menos(p, 12 * (k - 1))
+                            if e is None or not hoja_pe or (r, q) not in hoja_pe["tiene12"]:
+                                terminos = None
+                                break
+                            e = f"({e})" if lags[k][1][0] == "interp" else e
+                            terminos.append(f"{e}*{_ref_hoja(HOJA_PE_RAMO)}!{hoja_pe['p12'][r]}{hoja_pe['fila'][q]}")
+                        celda.value = ("=" + "+".join(terminos)) if terminos else float(v)
+                elif ind == "FD/FND":
+                    celda.value = f"={pnd_c}/{L('PEACUMULADA', r)}{fila}"
+                elif ind == "FD/FND (MEC)":
+                    celda.value = f"={L('FD/FND', r)}{fila}"
+                elif ind == "FA":
+                    if not primas_pe or meses_pe is None or (meses_pe, g) not in primas_pe["col"] \
+                            or p not in primas_pe["fila"]:
+                        celda.value = None
+                        continue
+                    celda.value = f"={pnd_c}/{_ref_hoja(HOJA_PRIMAS_PE)}!{primas_pe['col'][(meses_pe, g)]}{primas_pe['fila'][p]}"
+                elif ind == "FACTOR GTO":
+                    celda.value = f"={ram}{bd.filas[(norm('RRC GTO'), p)]}/{pnd_c}"
+                elif ind == "FACTOR MR":
+                    celda.value = f"={ram}{bd.filas[(norm(f'{pref} MR'), p)]}/{pnd_c}"
+
     def lista(xs):
         return f"{', '.join(xs[:5])}{'...' if len(xs) > 5 else ''}"
     if avisos is not None:
@@ -2492,16 +2651,55 @@ def escribir_indices_pnd(bd: BDMontos, indices: dict, hp=None, pe: dict | None =
             avisos.append(f"{len(descartados)} dato(s) de captura con texto no numerico se dejaron vacios "
                           f"({lista(descartados)})")
         if viejas_ref:
-            avisos.append(f"{len(viejas_ref)} celda(s) de captura traian una referencia a {HOJA_PE_FCST} o "
-                          f"{HOJA_PRIMAS_PE} de una corrida anterior; se limpiaron ({lista(viejas_ref)})")
+            avisos.append(f"{len(viejas_ref)} celda(s) de captura traian una referencia a una hoja de apoyo de una "
+                          f"corrida anterior; se limpiaron ({lista(viejas_ref)})")
         if formulas_val:
             avisos.append(f"{len(formulas_val)} dato(s) de captura son formulas: con INDICES_PND_FORMULAS = False no se "
-                          f"evaluan y FD/FND, BEL y BEL (MEC) de ese renglon quedan vacios ({lista(formulas_val)})")
+                          f"evaluan ({lista(formulas_val)})")
+    fin = max(cols.values())
     if ws.auto_filter and ws.auto_filter.ref:          # el filtro de la hoja llega a las columnas nuevas
-        ini, fin = ws.auto_filter.ref.split(":")
-        fila_fin = re.match(r"[A-Z]+(\d+)", fin).group(1)
-        if column_index_from_string(re.match(r"[A-Z]+", fin).group()) < max(cols.values()):
-            ws.auto_filter.ref = f"{ini}:{get_column_letter(max(cols.values()))}{fila_fin}"
+        ini, fin_ref = ws.auto_filter.ref.split(":")
+        fila_fin = re.match(r"[A-Z]+(\d+)", fin_ref).group(1)
+        ws.auto_filter.ref = f"{ini}:{get_column_letter(fin)}{fila_fin}"
+    for c in viejas:                                   # columnas viejas que quedaron fuera de los bloques nuevos
+        if c > fin:
+            ws.cell(3, c).value = None
+    if AGRUPAR_BLOQUES:
+        if ws.sheet_properties.outlinePr is None:
+            ws.sheet_properties.outlinePr = Outline()
+        ws.sheet_properties.outlinePr.summaryRight = False
+        grupos = [[bd.cols_ramo[r] for r in ramos]] + [[cols[(ind, r)] for r in ramos] for ind in COLUMNAS_INDICES_PND]
+        for g in grupos:
+            if len(g) > 1:
+                ws.column_dimensions.group(get_column_letter(min(g) + 1), get_column_letter(max(g)), outline_level=1,
+                                           hidden=False)
+    return cols
+
+
+def escribir_bel_fnd(bd: BDMontos, info: dict, cols: dict):
+    """BD principal: en los meses donde aplica el BEL por FND, las celdas RAM_ de RRC y SONR van como formulas:
+    BEL = IS (RL) x PEACUMULADA x FD/FND del renglon; GTO y MR = BEL x su razon del modelo; BRUTO = BEL + GTO + MR;
+    IRR = BRUTO x la razon de cesion del modelo; NETO = BRUTO - IRR."""
+    ws = bd.ws
+    for (pref, p, r) in sorted(info["aplica"]):
+        ram = get_column_letter(bd.cols_ramo[r])
+        f = {c: bd.filas.get((norm(f"{pref} {c}"), p)) for c in ("BEL", "GTO", "MR", "BRUTO", "IRR", "NETO")}
+        if not f["BEL"]:
+            continue
+        L = lambda ind: f"{get_column_letter(cols[(ind, r)])}{f['BEL']}"   # noqa: E731
+        raz = info["razones"][(pref, p, r)]
+        ws[f"{ram}{f['BEL']}"] = f"={L('IS (RL)')}*{L('PEACUMULADA')}*{L('FD/FND')}"
+        if pref == "RRC" and f["GTO"]:
+            ws[f"{ram}{f['GTO']}"] = f"={ram}{f['BEL']}*{raz['GTO']:.10g}"
+        if f["MR"]:
+            ws[f"{ram}{f['MR']}"] = f"={ram}{f['BEL']}*{raz['MR']:.10g}"
+        if f["BRUTO"]:
+            partes = [f"{ram}{f[c]}" for c in (("BEL", "GTO", "MR") if pref == "RRC" else ("BEL", "MR")) if f[c]]
+            ws[f"{ram}{f['BRUTO']}"] = "=" + "+".join(partes)
+        if f["IRR"] and f["BRUTO"]:
+            ws[f"{ram}{f['IRR']}"] = f"={ram}{f['BRUTO']}*{raz['IRR']:.10g}"
+        if f["NETO"] and f["BRUTO"] and f["IRR"]:
+            ws[f"{ram}{f['NETO']}"] = f"={ram}{f['BRUTO']}-{ram}{f['IRR']}"
 
 
 def escenarios_pnd(bd: BDMontos, hp, resultados: dict, pr, proy_base: dict, periodos_proy: list[int], ultimo: int,
@@ -3584,7 +3782,9 @@ def _hojas_pnd(wb, diag: dict, negrita, encab):
         return
     ws = wb.create_sheet("PND_Resumen")
     fila = 1
-    bloques = [("Estado", [{"Escenarios PND / PD": diag.get("estado", ""), "PE FCST": diag.get("pe_fcst", "")}]),
+    bloques = [("Estado", [{"Escenarios PND / PD": diag.get("estado", ""), "PE FCST (FCST)": diag.get("pe_fcst", ""),
+                            "PE historica (PExRamo)": diag.get("pe_ramo", ""),
+                            "BEL por FND": (diag.get("bel_fnd") or {}).get("estado", "")}]),
                ("Backtest agrupado por escenario y reserva (error %: la recta, tendencia historica, contra el escenario, "
                 "con el indice proyectado desde cada corte. 'Escenario' usa la prima que si se emitio despues del "
                 "corte (cota optimista); 'con prima plana' la deja en su valor al corte (cota pesimista))",
@@ -3621,6 +3821,12 @@ def _hojas_pnd(wb, diag: dict, negrita, encab):
                  "GTO": "#,##0", "MR": "#,##0", "Prima": "#,##0", "FA": "0.0000"})
     _hoja_filas(wb, "PND_Backtest", diag.get("backtest") or [], negrita, encab,
                 {"BEL": "0.0", "GTO": "0.0", "MR": "0.0", "BRUTO": "0.0"})
+    fnd = diag.get("bel_fnd") or {}
+    if fnd.get("resumen") or fnd.get("series"):
+        _hoja_filas(wb, "BEL_FND_Resumen", fnd.get("resumen") or [], negrita, encab,
+                    {"FND": "0.0000", "Error": "0.0", "BEL": "#,##0"})
+        _hoja_filas(wb, "BEL_FND_Mensual", fnd.get("series") or [], negrita, encab,
+                    {"IS": "0.0000", "FND": "0.0000", "PEACUMULADA": "#,##0", "BEL": "#,##0"})
 
 
 def _formato_tabla(ws, negrita, encab):
@@ -3904,38 +4110,73 @@ def main():
     comparativo = comparar_factor(resultados, diag_factor, pr, tc_primas, {"DANOS": bd_danos, "FIANZAS": bd_rfv},
                                   {"DANOS": proy_danos, "FIANZAS": proy_rfv}, periodos_proy, tc_hist, ultimo, sin_rango)
     actualizar_finales_factor(diag_factor, resultados, periodos_proy)
+    # PE por ramo y mes (PExRamo y FCST) y BEL por FND (BEL = IS x PEACUMULADA x FND desde el primer mes proyectado)
+    pef = pe_ramo = None
+    try:
+        pef = leer_pe_fcst()
+    except Exception as e:  # noqa: BLE001
+        diag_pnd["pe_fcst"] = f"no se pudo leer {ARCHIVO_PE_FCST.name} ({type(e).__name__}: {e}); sin PE del FCST"
+        alertas.append(("PND", "PE FCST", diag_pnd["pe_fcst"]))
+    if pef is not None:
+        diag_pnd["pe_fcst"] = (
+            f"{pef['ruta'].name} › CtaMens: {pef['renglones']:,} renglones, {pef['usados']:,} con la cuenta "
+            f"{CUENTA_PE_FCST} de ramos de la BD; meses {pef['periodos'][0]} a {pef['periodos'][-1]}; "
+            f"{pef['control']}; fuera de la BD de Danos: "
+            + (", ".join(f"{k} ({v / 1e6:,.1f} M USD)" for k, v in sorted(pef["fuera"].items())) or "nada"))
+        for a in pef["avisos"]:
+            alertas.append(("PND", "PE FCST", a))
+    elif "pe_fcst" not in diag_pnd:
+        diag_pnd["pe_fcst"] = f"sin {ARCHIVO_PE_FCST.name} en entradas/"
+    try:
+        pe_ramo = leer_pe_ramo()
+    except Exception as e:  # noqa: BLE001
+        diag_pnd["pe_ramo"] = f"no se pudo leer la base PExRamo ({type(e).__name__}: {e})"
+        alertas.append(("PND", "PExRamo", diag_pnd["pe_ramo"]))
+    if pe_ramo is not None:
+        diag_pnd["pe_ramo"] = (f"{pe_ramo['ruta'].name}: {pe_ramo['renglones']:,} renglones, {pe_ramo['usados']:,} "
+                               "usados" + (f"; {'; '.join(pe_ramo['avisos'])}" if pe_ramo.get("avisos") else ""))
+    elif "pe_ramo" not in diag_pnd:
+        diag_pnd["pe_ramo"] = f"sin {PATRON_PE_RAMO} en entradas/: la PE historica por ramo queda vacia"
+    pe_mes = pe_por_mes(pe_ramo, pef)
+    print(f"   PE FCST (FCST): {diag_pnd['pe_fcst']}", flush=True)
+    print(f"   PE historica (PExRamo): {diag_pnd['pe_ramo']}", flush=True)
+    info_fnd = {"estado": "apagado (USAR_BEL_POR_FND = False)", "aplica": set(), "fnd": {}, "series": [], "resumen": []}
+    proy_modelo = proy_danos
+    if USAR_BEL_POR_FND:
+        print("BEL por FND (Danos) ...", flush=True)
+        try:
+            info_fnd = calcular_bel_fnd(bd_danos, hp, resultados, proy_danos, pe_mes, periodos_proy, ultimo)
+            proy_danos = info_fnd["proy"]
+        except Exception as e:  # noqa: BLE001
+            info_fnd = {"estado": f"error en el BEL por FND ({type(e).__name__}: {e}); el BEL sigue con el modelo",
+                        "aplica": set(), "fnd": {}, "series": [], "resumen": []}
+            alertas.append(("PND", "BEL por FND", info_fnd["estado"]))
+        print(f"   {info_fnd['estado']}", flush=True)
+        validar(proy_danos, proy_rfv)
+    diag_pnd["bel_fnd"] = info_fnd
+    diag_pnd["proy_modelo"] = proy_modelo
 
     info_danos = escribir_bd_montos(bd_danos, proy_danos, periodos_proy, SALIDA_BD_DANOS)
     escribir_correccion_moneda(bd_danos, correcciones["DANOS"])
     n_hp = escribir_hparametros(hp, resultados, periodos_proy)
     meses_bd = ESCENARIOS_PND.get(BD_CON_ESCENARIO_PND) or next(iter(ESCENARIOS_PND.values()), None)
-    hoja_pe = hoja_fcst = None
+    hoja_pe = hoja_pe_ramo = None
     avisos_ind = []
+
+    def ctx_indices(proy, meses, fnd):
+        esc = next((e for e, m in ESCENARIOS_PND.items() if m == meses), None)
+        return {"hp": hp, "resultados": resultados, "periodos_proy": periodos_proy, "ultimo": ultimo, "proy": proy,
+                "pe": pe_mes, "hoja_pe": hoja_pe_ramo, "primas_pe": hoja_pe, "meses_pe": meses, "fnd": fnd,
+                "pe_tab": {g: x for (e, g), x in (diag_pnd.get("_pe") or {}).items() if e == esc}}
     if INDICES_PND_EN_BD and diag_pnd.get("_hist"):
         if INDICES_PND_FORMULAS and diag_pnd.get("_pe") and primas is not None:   # solo con prima completa y verificada
             grupos_pe = [g for g in pr.mensual.columns
                          if g in {primas.GRUPO_DE_RAMO_RESERVA.get(str(r)) for r in bd_danos.cols_ramo}]
             hoja_pe = escribir_primas_pe(bd_danos.wb, pr, grupos_pe)
-        pef = None
-        try:
-            pef = leer_pe_fcst()
-        except Exception as e:  # noqa: BLE001
-            diag_pnd["pe_fcst"] = f"no se pudo leer {ARCHIVO_PE_FCST.name} ({type(e).__name__}: {e}); PE FCST queda vacio"
-            alertas.append(("PND", "PE FCST", diag_pnd["pe_fcst"]))
-        if pef is not None:
-            hoja_fcst = escribir_pe_fcst(bd_danos.wb, pef, list(bd_danos.cols_ramo))
-            diag_pnd["pe_fcst"] = (
-                f"{pef['ruta'].name} › CtaMens: {pef['renglones']:,} renglones, {pef['usados']:,} con la cuenta "
-                f"{CUENTA_PE_FCST} de ramos de la BD; meses {pef['periodos'][0]} a {pef['periodos'][-1]}; "
-                f"{pef['control']}; fuera de la BD de Danos: "
-                + (", ".join(f"{k} ({v / 1e6:,.1f} M USD)" for k, v in sorted(pef["fuera"].items())) or "nada"))
-            for a in pef["avisos"]:
-                alertas.append(("PND", "PE FCST", a))
-        elif "pe_fcst" not in diag_pnd:
-            diag_pnd["pe_fcst"] = f"sin {ARCHIVO_PE_FCST.name} en entradas/: PE FCST queda como dato de captura"
-        print(f"   PE FCST: {diag_pnd['pe_fcst']}", flush=True)
-        escribir_indices_pnd(bd_danos, indices_pnd_bd(diag_pnd, resultados, proy_danos, periodos_proy, meses_bd),
-                             hp, hoja_pe, meses_bd, hoja_fcst, avisos_ind)
+        hoja_pe_ramo = escribir_pe_ramo(bd_danos.wb, pe_mes, list(bd_danos.cols_ramo))
+        cols_ind = escribir_indices_pnd(bd_danos, ctx_indices(proy_danos, meses_bd, info_fnd.get("fnd")), avisos_ind)
+        if INDICES_PND_FORMULAS and info_fnd.get("aplica"):
+            escribir_bel_fnd(bd_danos, info_fnd, cols_ind)
         for a in avisos_ind:
             alertas.append(("PND", "Indicadores de la BD", a))
             print(f"   AVISO: {a}", flush=True)
@@ -3949,9 +4190,7 @@ def main():
         ruta = ruta_escenario_pnd(esc)
         escribir_bd_montos(bd_danos, proy_esc, periodos_proy, ruta)
         if INDICES_PND_EN_BD and diag_pnd.get("_hist"):
-            escribir_indices_pnd(bd_danos, indices_pnd_bd(diag_pnd, resultados, proy_esc, periodos_proy,
-                                                          ESCENARIOS_PND[esc]), hp, hoja_pe, ESCENARIOS_PND[esc],
-                                 hoja_fcst)
+            escribir_indices_pnd(bd_danos, ctx_indices(proy_esc, ESCENARIOS_PND[esc], None))
         guardar_libro(bd_danos.wb, ruta, original=ARCHIVO_BD_DANOS)
         archivos_pnd.append(ruta.name)
     viejos = [ruta_escenario_pnd(e).name for e in ESCENARIOS_PND
@@ -4086,6 +4325,17 @@ def main():
                 print(f"      {f['Reserva']:<10} " + " | ".join(f"{(f.get(k) or 0) / 1e6:,.1f}" for k in cols))
         if archivos_pnd:
             print(f"      Archivos: {', '.join(archivos_pnd)}")
+    fnd = diag_pnd.get("bel_fnd") or {}
+    if USAR_BEL_POR_FND:
+        print(f"   BEL por FND (Danos): {fnd.get('estado', '')}")
+        if fnd.get("aplica"):
+            pm = diag_pnd.get("proy_modelo") or {}
+            dics = [p for p in periodos_proy if p % 100 == 12]
+            for pref in INDICE_BASE_PND:
+                for conc in ("BEL", "NETO"):
+                    tot = lambda dic, p: sum(dic.get((norm(f"{pref} {conc}"), p, r), 0.0) for r in bd_danos.cols_ramo)  # noqa: E731
+                    print(f"      {pref} {conc:<5} (M USD) modelo / por FND: "
+                          + " | ".join(f"{p}: {tot(pm, p) / 1e6:,.1f} / {tot(proy_danos, p) / 1e6:,.1f}" for p in dics))
     if viejos:
         print(f"   OJO: {', '.join(viejos)} en salidas/ son de una corrida anterior (esta vez no se generaron)")
     n_alertas = len(alertas) + sum(len(r.alertas) for r in resultados.values())
