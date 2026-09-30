@@ -406,6 +406,9 @@ RANGO_FA = (0.001, 20.0)         # FA (base / prima anualizada) sano al ultimo m
 INDICES_PND_EN_BD = True         # columnas a la derecha de BD_Montos_RRC_SONR con los indicadores por ramo: un bloque
                                  # por indicador, con una columna por ramo ("PND/PD 10", "FA 10", ...)
 COLUMNAS_INDICES_PND = {"PND/PD": "#,##0", "FA": "0.0000", "FACTOR GTO": "0.00%", "FACTOR MR": "0.00%"}
+INDICES_PND_FORMULAS = True      # True: los indicadores van como formulas de Excel (BEL / celda del indice en HParametros,
+                                 # base / PE de la hoja Primas_PE, GTO / PND y MR / base); False: como valores
+HOJA_PRIMAS_PE = "Primas_PE"     # hoja que se agrega a la BD de Danos con la prima mensual por grupo y su PE (formulas)
 ESTACIONALIDAD_TRIMESTRAL = ("RCONT",)   # acumula en meses 1-2 del trimestre y libera en el 3
 DOMINIO_CESION = (0.0, 1.0)      # IRR/BRUTO entre 0 y 100%
 DOMINIO_RAZON_BEL = (0.0, None)  # GTO/BEL y MR/BEL no negativos
@@ -2024,7 +2027,53 @@ def indices_pnd_bd(diag: dict, resultados: dict, proy: dict, periodos_proy: list
     return out
 
 
-def escribir_indices_pnd(bd: BDMontos, indices: dict):
+def escribir_primas_pe(wb, pr, grupos: list) -> dict | None:
+    """Hoja HOJA_PRIMAS_PE con la prima tomada mensual (USD) de los grupos de ramo de Danos (real, reforecast y
+    presupuesto, como la arma primas.py) y, como formulas, su PE de cada escenario: suma de los ultimos N meses
+    anualizada (x 12 / N). Regresa {"fila": {periodo: renglon}, "col": {(meses, grupo): letra}} o None sin prima."""
+    if pr is None or not grupos:
+        return None
+    if HOJA_PRIMAS_PE in wb.sheetnames:
+        del wb[HOJA_PRIMAS_PE]
+    ws = wb.create_sheet(HOJA_PRIMAS_PE)
+    negrita = Font(bold=True)
+    ws.cell(1, 1, "Prima tomada mensual por grupo de ramo (USD) y su exposicion PE (suma de los ultimos N meses x 12 / N), "
+                  "como la usan el FA y los escenarios PND / PD").font = negrita
+    cab = ["PERIODO", "FUENTE"] + [f"PRIMA {g}" for g in grupos] + [f"PE{m} {g}" for m in ESCENARIOS_PND.values()
+                                                                    for g in grupos]
+    for j, h in enumerate(cab, start=1):
+        ws.cell(3, j, h).font = negrita
+    per = [int(x) for x in pr.mensual.index]
+    col_p = {g: 3 + i for i, g in enumerate(grupos)}
+    col = {}
+    k = 3 + len(grupos)
+    for m in ESCENARIOS_PND.values():
+        for g in grupos:
+            col[(m, g)] = get_column_letter(k)
+            k += 1
+    filas = {}
+    for i, p in enumerate(per):
+        r = 4 + i
+        filas[p] = r
+        ws.cell(r, 1, p)
+        ws.cell(r, 2, ", ".join(sorted({str(pr.fuente.at[p, g]) for g in grupos if g in pr.fuente.columns})))
+        for g in grupos:
+            c = ws.cell(r, col_p[g], float(pr.mensual.at[p, g]) if g in pr.mensual.columns else None)
+            c.number_format = "#,##0"
+        for m in ESCENARIOS_PND.values():
+            for g in grupos:
+                if i + 1 >= m:
+                    letra = get_column_letter(col_p[g])
+                    c = ws[f"{col[(m, g)]}{r}"]
+                    c.value = f"=SUM({letra}{r - m + 1}:{letra}{r})" + (f"*12/{m}" if m != 12 else "")
+                    c.number_format = "#,##0"
+    ws.freeze_panes = "C4"
+    for j in range(1, len(cab) + 1):
+        ws.column_dimensions[get_column_letter(j)].width = 14 if j > 2 else 12
+    return {"fila": filas, "col": col}
+
+
+def escribir_indices_pnd(bd: BDMontos, indices: dict, hp=None, pe: dict | None = None, meses_pe: int | None = None):
     """Escribe los indicadores por ramo a la derecha de la hoja de montos: un bloque por indicador de
     COLUMNAS_INDICES_PND con una columna por ramo (encabezado "<indicador> <ramo>" en el renglon 3, que no empieza con
     RAM_ para no confundirse con los montos, y el nombre del bloque en el renglon 2). Si la BD ya trae esas columnas se
@@ -2058,15 +2107,79 @@ def escribir_indices_pnd(bd: BDMontos, indices: dict):
         c0 = min(c for (i, _), c in cols.items() if i == ind)
         ws.cell(2, c0).value = ind
         ws.cell(2, c0).font = Font(bold=True)
+    formulas = INDICES_PND_FORMULAS and hp is not None and getattr(hp, "filas", None)
+    hoja_hp = f"'{HOJA_PARAMETROS}'"
+
+    def celda_indice(r_hp, nombre, periodo):
+        """Referencia a la celda del indice en HParametros (limpiando el texto con \xa0 si viene como texto)."""
+        f = hp.filas.get((r_hp, periodo))
+        if f is None:
+            return None
+        ref = f"{hoja_hp}!{get_column_letter(hp.cols[nombre])}{f}"
+        if isinstance(hp.ws.cell(f, hp.cols[nombre]).value, str):
+            ref = f'VALUE(TRIM(SUBSTITUTE({ref},CHAR(160)," ")))'
+        return ref
+
+    def expr_indice(r_hp, nombre, periodo):
+        """Indice del mes como formula: la celda de HParametros (Real o Proyeccion); en un hueco de hasta
+        MAX_HUECO_INTERPOLABLE meses sin cambio de nivel, la interpolacion lineal entre las celdas de los meses vecinos
+        (como la usa el modelo). None si no hay con que calcularlo."""
+        hist = hp.historia.get((r_hp, nombre), {})
+        v = hist.get(periodo, math.nan)
+        if (periodo > hp.ultimo or np.isfinite(v)) and (r_hp, periodo) in hp.filas:
+            return celda_indice(r_hp, nombre, periodo)
+        if periodo > hp.ultimo:
+            return None
+        antes = [q for q, x in hist.items() if q < periodo and np.isfinite(x)]
+        despues = [q for q, x in hist.items() if q > periodo and np.isfinite(x)]
+        if not antes or not despues:
+            return None
+        pa, pb = max(antes), min(despues)
+        n = periodo_a_indice(pb) - periodo_a_indice(pa) - 1
+        a_, b_ = hist[pa], hist[pb]
+        if n > MAX_HUECO_INTERPOLABLE or (a_ > 0 and b_ > 0 and max(a_, b_) / min(a_, b_) > SALTO_NIVEL_HUECO):
+            return None
+        ra, rb = celda_indice(r_hp, nombre, pa), celda_indice(r_hp, nombre, pb)
+        if ra is None or rb is None:
+            return None
+        k = periodo_a_indice(periodo) - periodo_a_indice(pa)
+        return f"({ra}+({rb}-{ra})*{k}/{n + 1})"
     for (conc, p), fila in bd.filas.items():
         pref = conc.split()[0]
         if pref not in INDICE_BASE_PND:
             continue
         for (ind, r), c in cols.items():
-            v = indices.get((pref, p, r), {}).get(ind)
             celda = ws.cell(fila, c)
-            celda.value = float(v) if v is not None and np.isfinite(v) else None
             celda.number_format = COLUMNAS_INDICES_PND[ind]
+            if not formulas:
+                v = indices.get((pref, p, r), {}).get(ind)
+                celda.value = float(v) if v is not None and np.isfinite(v) else None
+                continue
+            # formulas: la base se calcula en el renglon BEL del mes; los demas renglones de la reserva la toman de ahi
+            f_bel = bd.filas.get((norm(f"{pref} BEL"), p))
+            is_ref = expr_indice(MAPA_RAMO_LAG.get(str(r)), INDICE_BASE_PND[pref][0], p)
+            ram = get_column_letter(bd.cols_ramo[r])
+            pnd_fila = f"{get_column_letter(cols[('PND/PD', r)])}{fila}"
+            if f_bel is None or is_ref is None:
+                celda.value = None
+                continue
+            if ind == "PND/PD":
+                if fila != f_bel:
+                    celda.value = f"={get_column_letter(c)}{f_bel}"
+                    continue
+                celda.value = f'=IFERROR(IF({ram}{f_bel}>0,{ram}{f_bel}/{is_ref},""),"")'
+            elif ind == "FA":
+                g = primas.GRUPO_DE_RAMO_RESERVA.get(str(r)) if primas is not None else None
+                if not pe or meses_pe is None or (meses_pe, g) not in pe["col"] or p not in pe["fila"]:
+                    celda.value = None
+                    continue
+                celda.value = f'=IFERROR({pnd_fila}/{HOJA_PRIMAS_PE}!{pe["col"][(meses_pe, g)]}{pe["fila"][p]},"")'
+            elif ind == "FACTOR GTO":
+                f_g = bd.filas.get((norm("RRC GTO"), p)) if pref == "RRC" else None
+                celda.value = f'=IFERROR({ram}{f_g}/{pnd_fila},"")' if f_g else None
+            else:
+                f_m = bd.filas.get((norm(f"{pref} MR"), p))
+                celda.value = f'=IFERROR({ram}{f_m}/{pnd_fila},"")' if f_m else None
     if ws.auto_filter and ws.auto_filter.ref:          # el filtro de la hoja llega a las columnas nuevas
         ini, fin = ws.auto_filter.ref.split(":")
         fila_fin = re.match(r"[A-Z]+(\d+)", fin).group(1)
@@ -2549,6 +2662,7 @@ class HParam:
     ultimo: int
     textos_limpiados: int
     lags_cero: list
+    filas: dict = field(default_factory=dict)   # (ramo_str, periodo) -> renglon "Real" (y "Proyeccion" al escribirla)
 
 
 def leer_hparametros(wb) -> HParam:
@@ -2562,7 +2676,7 @@ def leer_hparametros(wb) -> HParam:
     faltan = [n for n in necesarias if n not in cols]
     if faltan:
         raise ValueError(f"{HOJA_PARAMETROS}: faltan columnas {faltan}")
-    historia, textos, ultimos = {}, 0, {}
+    historia, textos, ultimos, filas_hp = {}, 0, {}, {}
     lags_cero = []
     for r in range(4, ws.max_row + 1):
         if norm(ws.cell(r, cols["Tipo de Indice"]).value) != norm(TIPO_INDICE_BASE):
@@ -2574,6 +2688,7 @@ def leer_hparametros(wb) -> HParam:
         fecha = int(fecha)
         clave_ramo = str(ramo).strip()
         ultimos.setdefault(fecha, []).append((ramo, r))
+        filas_hp[(clave_ramo, fecha)] = r
         max_previo = 0.0
         for nombre in INDICES + LAGS:
             v, fue_texto = a_numero(ws.cell(r, cols[nombre]).value)
@@ -2588,7 +2703,7 @@ def leer_hparametros(wb) -> HParam:
                     max_previo = max(max_previo, v)
             historia.setdefault((clave_ramo, nombre), {})[fecha] = v
     ultimo = max(ultimos)
-    return HParam(ws, cols, historia, ultimos[ultimo], ultimo, textos, lags_cero)
+    return HParam(ws, cols, historia, ultimos[ultimo], ultimo, textos, lags_cero, filas_hp)
 
 
 def series_hparametros(hp: HParam, h: int, ultimo: int) -> list[Serie]:
@@ -2651,6 +2766,7 @@ def escribir_hparametros(hp: HParam, resultados: dict, periodos_proy: list[int])
             ws.cell(fila, hp.cols["Llave"]).value = f"{p}-{ramo}"
             ws.cell(fila, hp.cols["Fecha"]).value = p
             ws.cell(fila, hp.cols["Ramo"]).value = ramo
+            hp.filas[(clave_ramo, p)] = fila
             for nombre in INDICES + LAGS:
                 v = resultados[("HPARAM", HOJA_PARAMETROS, nombre, clave_ramo)].pronostico[i]
                 celda = ws.cell(fila, hp.cols[nombre])
@@ -3454,11 +3570,17 @@ def main():
     actualizar_finales_factor(diag_factor, resultados, periodos_proy)
 
     info_danos = escribir_bd_montos(bd_danos, proy_danos, periodos_proy, SALIDA_BD_DANOS)
-    meses_bd = ESCENARIOS_PND.get(BD_CON_ESCENARIO_PND) or next(iter(ESCENARIOS_PND.values()), None)
-    if INDICES_PND_EN_BD and diag_pnd.get("_hist"):
-        escribir_indices_pnd(bd_danos, indices_pnd_bd(diag_pnd, resultados, proy_danos, periodos_proy, meses_bd))
     escribir_correccion_moneda(bd_danos, correcciones["DANOS"])
     n_hp = escribir_hparametros(hp, resultados, periodos_proy)
+    meses_bd = ESCENARIOS_PND.get(BD_CON_ESCENARIO_PND) or next(iter(ESCENARIOS_PND.values()), None)
+    hoja_pe = None
+    if INDICES_PND_EN_BD and diag_pnd.get("_hist"):
+        if INDICES_PND_FORMULAS and diag_pnd.get("_pe") and primas is not None:   # solo con prima completa y verificada
+            grupos_pe = [g for g in pr.mensual.columns
+                         if g in {primas.GRUPO_DE_RAMO_RESERVA.get(str(r)) for r in bd_danos.cols_ramo}]
+            hoja_pe = escribir_primas_pe(bd_danos.wb, pr, grupos_pe)
+        escribir_indices_pnd(bd_danos, indices_pnd_bd(diag_pnd, resultados, proy_danos, periodos_proy, meses_bd),
+                             hp, hoja_pe, meses_bd)
     guardar_libro(bd_danos.wb, SALIDA_BD_DANOS, original=ARCHIVO_BD_DANOS)
     info_rfv = escribir_bd_montos(bd_rfv, proy_rfv, periodos_proy, SALIDA_BD_RFV)
     escribir_correccion_moneda(bd_rfv, correcciones["FIANZAS"])
@@ -3470,7 +3592,7 @@ def main():
         escribir_bd_montos(bd_danos, proy_esc, periodos_proy, ruta)
         if INDICES_PND_EN_BD and diag_pnd.get("_hist"):
             escribir_indices_pnd(bd_danos, indices_pnd_bd(diag_pnd, resultados, proy_esc, periodos_proy,
-                                                          ESCENARIOS_PND[esc]))
+                                                          ESCENARIOS_PND[esc]), hp, hoja_pe, ESCENARIOS_PND[esc])
         guardar_libro(bd_danos.wb, ruta, original=ARCHIVO_BD_DANOS)
         archivos_pnd.append(ruta.name)
     viejos = [ruta_escenario_pnd(e).name for e in ESCENARIOS_PND
