@@ -12,11 +12,19 @@ Lee de entradas/ (todas opcionales; si falta alguna, la proyeccion de reservas s
   * PptoTecnico2027*.csv   presupuesto del ano siguiente (SAP BW): un renglon por mes x concepto x contrato x ano de
                            suscripcion; el ramo sale del centro de beneficio.
 
-Bases completas, nunca recortes: si hay varios archivos con el mismo patron (p. ej. un fragmento junto a la base
-completa) se usa el MAS GRANDE y los demas se reportan como ignorados. Un archivo que parece recortado (renglones en un
-limite tipico de extracto, LIMITES_TRUNCADO; un CSV del ano siguiente con menos de MIN_COBERTURA_PPTO de la prima de
-referencia; o un historico que no cubre el real del ano o el real al corte del reforecast) NO se usa y NADA se completa
-sobre el: la tabla "Archivos de primas" dice cual se uso y por que.
+Bases completas, nunca recortes. De cada patron se prueba primero el archivo MAS GRANDE (en el presupuesto del ano
+siguiente, primero los _Ced); si resulta recortado o incompleto se pasa al siguiente. Un archivo recortado o incompleto
+NO se usa para el factor y NADA se completa sobre el:
+  * recortado: renglones de datos o fisicos en un limite tipico de extracto (LIMITES_TRUNCADO);
+  * real del ano: debe traer el real al corte del reforecast por LN (o, sin reforecast, lo mismo que el historico en
+    los meses que comparten); las LN que no vienen en el reforecast se revisan contra el Ppto del ano;
+  * historico: por grupo contra el real del ano en los meses comunes; si no los hay, contra el real al corte del
+    reforecast o su ano anterior completo; sin nada con que verificarlo no se usa;
+  * presupuesto del ano siguiente: 12 meses, al menos MIN_COBERTURA_PPTO de la referencia, sin la forma de un export
+    ordenado por LN cortado (MAX_COLA_LN_AUSENTE) y, contra el dashboard, las LN que si trae deben cuadrar
+    (COBERTURA_LN_PRESENTES). Solo entonces se completan las LN que le falten.
+Si ninguna base de real sirve, se muestra tal cual como diagnostico, sin estimar nada encima. La tabla "Archivos de
+primas" dice que archivo se uso de cada base y por que quedaron fuera los demas.
 
 Todo en USD. El resultado es la prima tomada (bruta) mensual por GRUPO de ramo de reserva: el real agrupa AP, GMM y
 Salud en 30 y Terremoto e Hidro en 70, asi que las reservas 30, 34 y 37 comparten el grupo 30 y las 71 y 73 el 70.
@@ -35,6 +43,7 @@ from __future__ import annotations
 import hashlib
 import importlib.util
 import inspect
+import itertools
 import math
 import pickle
 import re
@@ -75,10 +84,13 @@ COMPLETAR_LN_PPTO = "dashboard"   # LN ausentes o incompletas en el CSV del ano 
 LN_INCOMPLETA = 0.50              # una LN del CSV esta incompleta si trae menos de 50 % de su referencia
 MIN_COBERTURA_PPTO = 0.50         # el CSV del ano siguiente completo debe traer al menos 50 % de la prima de referencia
                                   # (dashboard o ano en curso); con menos parece recortado: no se usa ni se completa
+COBERTURA_LN_PRESENTES = 0.90     # las LN que si trae el CSV deben sumar al menos 90 % de su cifra en el dashboard
+MAX_COLA_LN_AUSENTE = 0.25        # export ordenado por LN al que le faltan TODAS las LN finales: si pesan mas de 25 %
+                                  # de la referencia (o la ultima LN viene a medias) parece cortado
 RANGO_CRECIMIENTO_PRIMA = (-0.30, 0.50)   # aviso si la prima del ano siguiente de un grupo crece fuera de este rango
 CREDIBILIDAD_PRESUPUESTO = 1.0    # 1 = el crecimiento del plan tal cual; 0.5 = la mitad del crecimiento; 0 = plano
 ESCALA_MONEDA_CSV = ((0.5, 2.0), (8.0, 40.0))   # razon CSV / ano en curso: USD o MXN (se divide entre el TC)
-LIMITES_TRUNCADO = (65535, 65536, 69999, 99999, 100000, 1048575, 1048576)
+LIMITES_TRUNCADO = (65535, 65536, 69999, 70000, 99999, 100000, 1048575, 1048576)   # renglones de datos o fisicos
 
 # ramo de la fuente de primas -> grupo de reserva (None = no hay reserva de ese ramo en las BD)
 GRUPO_DE_RAMO_PRIMA = {
@@ -189,19 +201,24 @@ def _fila_encabezado(filas: list, marcas: tuple) -> int | None:
     return None
 
 
-def _leer_hoja(ruta: Path, hoja: str, marcas: tuple) -> pd.DataFrame:
-    """Lee una hoja chica buscando la fila de encabezados (la primera de las 10 primeras que trae todas las marcas)."""
+def _leer_hoja(ruta: Path, hoja: str, marcas: tuple) -> tuple[pd.DataFrame, int]:
+    """Lee una hoja chica buscando la fila de encabezados (la primera de las 10 primeras que trae todas las marcas).
+    Regresa (tabla, renglones fisicos de la hoja hasta el ultimo renglon con datos)."""
     motor = _motor_excel()
     muestra = pd.read_excel(ruta, sheet_name=hoja, header=None, nrows=10, engine=motor)
     fila = _fila_encabezado([muestra.iloc[i].tolist() for i in range(len(muestra))], marcas)
     if fila is None:
         raise ValueError(f"{ruta.name} / {hoja}: no se encontraron los encabezados {marcas}")
-    return pd.read_excel(ruta, sheet_name=hoja, header=fila, engine=motor)
+    df = pd.read_excel(ruta, sheet_name=hoja, header=fila, engine=motor)
+    no_vacios = df.dropna(how="all").index                                 # sin renglones vacios al final
+    df = df.loc[: no_vacios.max()] if len(no_vacios) else df.iloc[0:0]
+    return df, fila + 1 + len(df)
 
 
-def _leer_columnas(ruta: Path, hoja: str, marcas: tuple, columnas: dict) -> tuple[pd.DataFrame, int]:
+def _leer_columnas(ruta: Path, hoja: str, marcas: tuple, columnas: dict) -> tuple[pd.DataFrame, int, int]:
     """Lee una hoja grande en streaming, solo con las columnas pedidas ({nombre de salida: (nombres posibles)}).
-    Regresa (tabla, renglones de datos leidos)."""
+    Regresa (tabla, renglones de datos, renglones fisicos de la hoja), contando hasta el ultimo renglon con datos
+    (openpyxl entrega tambien renglones vacios que solo traen formato)."""
     if _motor_excel() == "calamine":
         import python_calamine
         filas = python_calamine.CalamineWorkbook.from_path(str(ruta)).get_sheet_by_name(hoja).iter_rows()
@@ -226,27 +243,94 @@ def _leer_columnas(ruta: Path, hoja: str, marcas: tuple, columnas: dict) -> tupl
         if pos is not None:
             idx[salida] = pos
     datos = {k: [] for k in idx}
-    leidos = 0
-    for fila in primeras[i + 1:]:                    # renglones ya leidos despues del encabezado
+    leidos = ultimo = 0
+    for fila in itertools.chain(primeras[i + 1:], filas):     # (las primeras ya se leyeron para el encabezado)
         leidos += 1
-        for k, p in idx.items():
-            datos[k].append(fila[p] if p < len(fila) else None)
-    for fila in filas:
-        leidos += 1
+        if any(v is not None and v != "" for v in fila):
+            ultimo = leidos
         for k, p in idx.items():
             datos[k].append(fila[p] if p < len(fila) else None)
     if cierre is not None:
         cierre.close()
-    return pd.DataFrame(datos), leidos
+    return pd.DataFrame({k: v[:ultimo] for k, v in datos.items()}), ultimo, i + 1 + ultimo
 
 
-def _buscar(patron: str) -> tuple[Path | None, list]:
-    """Archivo de entradas/ que cumple el patron. Si hay varios (p. ej. una copia recortada junto a la base completa),
-    se usa el MAS GRANDE (la base completa); a igual tamano, el _Ced y luego el mas reciente. Regresa (elegido,
-    candidatos)."""
+def _buscar(patron: str, preferir_ced: bool = False) -> list:
+    """Archivos de entradas/ que cumplen el patron, en orden de preferencia: el MAS GRANDE primero (si junto a la base
+    completa quedo una copia recortada) y, a igual tamano, el mas reciente; en el presupuesto del ano siguiente, los _Ced
+    antes que los demas (traen el % de cesion). Si el preferido resulta recortado o incompleto se usa el siguiente."""
     c = [p for p in ENTRADAS.glob(patron) if not p.name.startswith("~$") and p.is_file()]
-    c.sort(key=lambda p: (p.stat().st_size, "_ced" in p.name.lower(), p.stat().st_mtime), reverse=True)
-    return (c[0] if c else None), c
+    c.sort(key=lambda p: (preferir_ced and "_ced" in p.name.lower(), p.stat().st_size, p.stat().st_mtime), reverse=True)
+    return c
+
+
+def _cobertura_contra(real: pd.DataFrame, ref_ln: pd.Series, periodos, extra_ln: pd.Series | None = None,
+                      por_grupo: bool = True):
+    """Revisa que una base de real (periodo, ramo, ln, prima) este completa contra lo que deberia traer por LN en esos
+    periodos (ref_ln). extra_ln: presupuesto de esos meses para las LN que no estan en la referencia (una LN material
+    del presupuesto sin prima real tambien cuenta como faltante). Regresa (completa, {grupo: cobertura}, tabla por LN,
+    motivo). Incompleta si trae menos de MIN_COBERTURA_HISTORIA del total o le falta una LN material (menos de
+    LN_INCOMPLETA de su referencia); si solo alguna LN viene corta, baja la cobertura de los grupos que alimenta."""
+    r = real[real["periodo"].isin(list(periodos))]
+    r_ln = r.groupby("ln")["prima"].sum()
+    ref = ref_ln[ref_ln > 0]
+    tot = float(ref.sum())
+    if tot <= 0:
+        return None, {g: None for g in GRUPOS}, pd.DataFrame(), "sin referencia"
+    filas, ausentes, cob_ln = [], [], {}
+    for ln, f in ref.items():
+        v = float(r_ln.get(ln, 0.0))
+        cob_ln[ln] = v / f
+        material = f >= UMBRAL_LN_MATERIAL * tot
+        if material and v < LN_INCOMPLETA * f:
+            ausentes.append(ln)
+        filas.append({"LN": ln, "Base (M USD)": v / 1e6, "Referencia (M USD)": f / 1e6, "Cobertura": v / f,
+                      "Material": material, "Referencia de": "la base de control"})
+    if extra_ln is not None:
+        tot_e = float(extra_ln[extra_ln > 0].sum())
+        for ln, f in extra_ln.items():
+            if ln in ref.index or f <= 0 or f < UMBRAL_LN_MATERIAL * tot_e:
+                continue
+            v = float(r_ln.get(ln, 0.0))
+            if v < 0.10 * f:                         # presupuesto material y (casi) nada de prima real
+                ausentes.append(ln)
+            filas.append({"LN": ln, "Base (M USD)": v / 1e6, "Referencia (M USD)": f / 1e6, "Cobertura": v / f,
+                          "Material": True, "Referencia de": "presupuesto del ano (no viene en la base de control)"})
+    total = float(r_ln.reindex(ref.index).fillna(0.0).sum()) / tot
+    tabla = pd.DataFrame(filas)
+    if total < MIN_COBERTURA_HISTORIA or ausentes:
+        return (False, {g: None for g in GRUPOS}, tabla,
+                f"trae {total:.0%} de la prima" + (f" y le faltan {', '.join(ausentes)}" if ausentes else ""))
+    if not por_grupo:
+        return True, {g: 1.0 for g in GRUPOS}, tabla, f"trae {total:.1%} de la prima"
+    # por grupo: prima completa estimada = prima de cada LN / cobertura de la LN (las que vienen cortas pesan mas)
+    rg = _a_grupo(r).groupby(["grupo", "ln"])["prima"].sum().clip(lower=0)
+    cob = {}
+    for g in GRUPOS:
+        s_ = rg[rg.index.get_level_values(0) == g]
+        est = sum(v / min(1.0, cob_ln.get(ln, 1.0)) for (_, ln), v in s_.items() if cob_ln.get(ln, 1.0) > 0)
+        cob[g] = float(s_.sum() / est) if est > 0 else None
+    return True, cob, tabla, f"trae {total:.1%} de la prima"
+
+
+def _corte_por_ln(orden: list, csv_ln: pd.Series, referencia: dict) -> str | None:
+    """Los exports vienen ordenados por LN: uno cortado trae las primeras LN, la ultima a medias y ninguna de las
+    siguientes. Regresa el motivo si el CSV tiene esa forma; None si no (o si no viene ordenado por LN)."""
+    orden = [ln for ln in orden if ln in referencia or csv_ln.get(ln, 0.0) > 0]
+    tot = sum(v for v in referencia.values() if v > 0)
+    if not orden or orden != sorted(orden) or tot <= 0:
+        return None
+    ultima = orden[-1]
+    cola = [ln for ln in sorted(referencia) if ln > ultima and referencia[ln] > 0]
+    if not cola or any(csv_ln.get(ln, 0.0) >= LN_INCOMPLETA * referencia[ln] for ln in cola):
+        return None
+    ref_u = referencia.get(ultima, 0.0)
+    a_medias = ref_u > 0 and csv_ln.get(ultima, 0.0) < COBERTURA_LN_PRESENTES * ref_u
+    peso = sum(referencia[ln] for ln in cola) / tot
+    if a_medias or peso > MAX_COLA_LN_AUSENTE:
+        return (f"viene ordenado por LN y termina en {ultima}" + (" a medias" if a_medias else "") +
+                f"; no trae ninguna de las LN siguientes ({', '.join(cola)}: {peso:.0%} de la referencia)")
+    return None
 
 
 class _NoUsable(Exception):
@@ -315,9 +399,15 @@ def _rango_meses(periodos) -> str:
     return f"{p[0]} a {p[-1]} ({len(p)} meses)" if p else "sin meses"
 
 
-def _truncado(ctl: Control):
-    if ctl.renglones_leidos in LIMITES_TRUNCADO:
-        ctl.notas.append(f"{ctl.renglones_leidos:,} renglones: parece un extracto truncado (fragmento)")
+def _truncado(ctl: Control, fisicos: int | None = None):
+    """Un extracto cortado suele quedar en un numero redondo de renglones (de datos o fisicos, con el encabezado)."""
+    if ctl.renglones_leidos in LIMITES_TRUNCADO or fisicos in LIMITES_TRUNCADO:
+        n = ctl.renglones_leidos if ctl.renglones_leidos in LIMITES_TRUNCADO else fisicos
+        ctl.notas.append(f"{n:,} renglones: parece un extracto truncado (fragmento)")
+
+
+def _recortado(ctl) -> bool:
+    return any("truncado" in n for n in ctl.notas)
 
 
 def _a_grupo(tabla: pd.DataFrame, col: str = "ramo") -> pd.DataFrame:
@@ -346,9 +436,9 @@ def _agregar_real(ruta: Path):
     cols = {"periodo": ("Periodo",), "ramo": ("Ramo2", "Ramo"), "ln": ("LN2", "LN"), "tipo": ("Tipo Rea",),
             "compania": ("Compañía", "Compania"), "contrato": ("Num Contrato",), "prima": ("Primas USD",),
             "siniestros": ("Siniestros USD",), "comisiones": ("Comisiones USD",)}
-    df, leidos = _leer_columnas(ruta, "BD", ("Periodo", "Primas USD"), cols)
+    df, leidos, fisicos = _leer_columnas(ruta, "BD", ("Periodo", "Primas USD"), cols)
     ctl = Control(ruta.name, renglones_leidos=leidos)
-    _truncado(ctl)
+    _truncado(ctl, fisicos)
     for c in ("periodo", "ramo", "ln", "prima"):
         if c not in df:
             raise ValueError(f"{ruta.name}: falta la columna {cols[c][0]}")
@@ -382,9 +472,9 @@ def _agregar_real(ruta: Path):
 
 def _agregar_ppto_anio(ruta: Path, hoja: str):
     """Hoja del presupuesto del ano en curso (Ppto2026): mes a mes por LN y ramo."""
-    df = _leer_hoja(ruta, hoja, ("AñoPpto", "MesPpto"))
+    df, fisicos = _leer_hoja(ruta, hoja, ("AñoPpto", "MesPpto"))
     ctl = Control(f"{ruta.name} / {hoja}", renglones_leidos=len(df))
-    _truncado(ctl)
+    _truncado(ctl, fisicos)
     anio = pd.to_numeric(df[_col(df, "AñoPpto")], errors="coerce")
     mes = pd.to_numeric(df[_col(df, "MesPpto")], errors="coerce")
     ok = anio.notna() & mes.between(1, 12)
@@ -408,9 +498,9 @@ def _agregar_ppto_anio(ruta: Path, hoja: str):
 
 def _agregar_rfcst(ruta: Path, hoja: str):
     """Hoja del reforecast (BD_RFCST26): por renglon (contrato, cedente o MGA), prima real al corte y reforecast."""
-    df = _leer_hoja(ruta, hoja, ("Fuente/Hoja",))
+    df, fisicos = _leer_hoja(ruta, hoja, ("Fuente/Hoja",))
     ctl = Control(f"{ruta.name} / {hoja}", renglones_leidos=len(df))
-    _truncado(ctl)
+    _truncado(ctl, fisicos)
     c_ln = _col(df, "LN")
     df = df[df[c_ln].notna() & (df[c_ln].astype(str).str.strip() != "")].copy()
     # corte (real al mes) y ano del reforecast desde los nombres "Primas MMYY"
@@ -497,9 +587,13 @@ def _agregar_ppto_sig(ruta: Path, anio_sig: int):
         c = _col(muestra, nombre, obligatoria=False)
         if c is not None:
             cols[extra] = c
-    leidos, bloques, anios = 0, [], {}
+    leidos, bloques, anios, orden_ln = 0, [], {}, []
     for ch in pd.read_csv(ruta, encoding="utf-8-sig", dtype=str, usecols=list(set(cols.values())), chunksize=500_000):
         leidos += len(ch)
+        for v in pd.unique(ch[cols["ln"]].dropna()):          # orden en que aparecen las LN en el archivo
+            v = _ln(v)
+            if v not in orden_ln:
+                orden_ln.append(v)
         t = pd.DataFrame({k: ch[v] for k, v in cols.items()})
         t["per"] = t["per"].astype(str).str.strip()
         t["anio"] = pd.to_numeric(t["per"].str[:4], errors="coerce")
@@ -516,7 +610,7 @@ def _agregar_ppto_sig(ruta: Path, anio_sig: int):
         bloques.append(t)
     t = pd.concat(bloques, ignore_index=True) if bloques else pd.DataFrame(columns=list(cols) + ["ced"])
     ctl = Control(ruta.name, renglones_leidos=leidos)
-    _truncado(ctl)
+    _truncado(ctl, leidos + 1)                             # (+ 1: el renglon de encabezados)
     es_prima = t["gl"].isin(CUENTAS_PRIMA)
     otras_61 = sorted(t.loc[t["gl"].str.startswith("61") & ~es_prima, "gl"].unique())
     t["prima"] = np.where(es_prima, -t["imp"], 0.0)
@@ -553,7 +647,7 @@ def _agregar_ppto_sig(ruta: Path, anio_sig: int):
     t["ramo"] = t["ramo"].fillna("sin ramo")
     agg = t.groupby(["mes", "ramo", "ln"], as_index=False)[["prima", "retenida", "siniestros", "comisiones",
                                                            "anterior"]].sum()
-    return {"tabla": agg, "anios": anios}, ctl
+    return {"tabla": agg, "anios": anios, "orden_ln": orden_ln}, ctl
 
 
 # =============================================================================
@@ -690,9 +784,8 @@ def leer_primas(ultimo_reservas: int, periodo_fin: int, lineas_dashboard: dict |
     pat = {"hist": PATRON_REAL_HIST.format(**nombres), "anio": PATRON_REAL_ANIO.format(**nombres),
            "rfcst": PATRON_RFCST.format(**nombres), "ppto": PATRON_PPTO.format(**nombres)}
     hoja_rfcst, hoja_ppto_anio = HOJA_RFCST.format(**nombres), HOJA_PPTO_ANIO.format(**nombres)
-    encontrados = {k: _buscar(v) for k, v in pat.items()}
-    rutas = {k: v[0] for k, v in encontrados.items()}
-    if rutas["hist"] is None and rutas["anio"] is None:
+    cands = {k: _buscar(v, preferir_ced=(k == "ppto")) for k, v in pat.items()}
+    if not cands["hist"] and not cands["anio"]:
         return None
     controles, avisos, tablas = [], [], {}
 
@@ -700,48 +793,110 @@ def leer_primas(ultimo_reservas: int, periodo_fin: int, lineas_dashboard: dict |
         if verbose:
             print(f"   {msg}", flush=True)
 
-    # archivos encontrados: de cada patron se toma el mas grande; su estado final se llena al terminar
-    archivos, estado = [], {}
-    for k, (elegido, cands) in encontrados.items():
-        for c in cands:
-            st = c.stat()
-            archivos.append({"Base": {"hist": "real historico", "anio": "real del ano", "rfcst": "reforecast y "
-                                      "presupuesto del ano", "ppto": "presupuesto del ano siguiente"}[k],
-                             "Patron": pat[k], "Archivo": c.name, "Tamano (MB)": round(st.st_size / 2**20, 1),
-                             "Fecha": pd.Timestamp(st.st_mtime, unit="s").strftime("%Y-%m-%d %H:%M"), "_k": k,
-                             "_elegido": c == elegido})
-        if elegido is not None:
-            estado[k] = "se usa"
-        if len(cands) > 1:
-            avisos.append(f"Primas: hay {len(cands)} archivos que cumplen {pat[k]}: se usa el mas grande ({elegido.name}, "
-                          f"{elegido.stat().st_size / 2**20:,.1f} MB); se ignoran {', '.join(c.name for c in cands[1:])}")
-    nombre_archivos = "Archivos de primas (de cada patron se toma el mas grande)"
-    tablas[nombre_archivos] = None                  # (se llena al final, con el estado de cada archivo)
-    reales, llaves = {}, {}
-    recortados = []
+    # archivos: de cada patron se prueba primero el mas grande; uno recortado o incompleto no se usa y se pasa al
+    # siguiente. La tabla con el estado de cada archivo se arma al final.
+    rutas, estado = {k: None for k in pat}, {}
+    nombre_archivos = "Archivos de primas (de cada patron, el mas grande que este completo)"
+    tablas[nombre_archivos] = None
+    reales, llaves, descartados = {}, {}, {}
     for k in ("hist", "anio"):
-        if rutas[k] is not None:
-            (agg, ll, ctl), cache = _con_cache(rutas[k], "real", _agregar_real)
-            log(f"Primas: {rutas[k].name} ({'cache' if cache else 'leido'}; {ctl.renglones_leidos:,} renglones, "
-                f"{ctl.meses})")
-            reales[k], llaves[k] = agg, ll
+        for ruta in cands[k]:
+            (agg, ll, ctl), cache = _con_cache(ruta, "real", _agregar_real)
+            log(f"Primas: {ruta.name} ({'cache' if cache else 'leido'}; {ctl.renglones_leidos:,} renglones, {ctl.meses})")
             controles.append(ctl.fila())
-            if any("truncado" in n for n in ctl.notas):
-                recortados.append((k, ctl.renglones_leidos))
-    # una base recortada se deja fuera; si todas lo estan solo sirven de diagnostico (el factor no se aplica)
-    solo_diagnostico = bool(recortados) and len(recortados) == len(reales)
-    for k, n in recortados:
-        if solo_diagnostico:
-            estado[k] = "recortado: solo diagnostico (el factor no se aplica)"
-            avisos.append(f"Primas: {rutas[k].name} parece recortado ({n:,} renglones): solo se muestra como "
-                          "diagnostico, el factor no se aplica (ni se completa con otras fuentes); copia la base "
-                          "completa en entradas/")
+            if _recortado(ctl):
+                descartados.setdefault(k, (ruta, agg, ll))
+                estado[ruta] = "recortado: no se usa"
+                avisos.append(f"Primas: {ruta.name} parece recortado ({ctl.renglones_leidos:,} renglones): no se usa para el "
+                              "factor ni se completa con otras fuentes; copia la base completa en entradas/")
+                continue
+            rutas[k], reales[k], llaves[k] = ruta, agg, ll
+            estado[ruta] = "se usa"
+            break
+
+    # reforecast y presupuesto del ano en curso (el mismo libro, dos hojas)
+    ppto_anio = rfcst = None
+    for ruta in cands["rfcst"]:
+        try:
+            (rf_, ctl), cache = _con_cache(ruta, "rfcst", _agregar_rfcst, hoja_rfcst)
+            (pa_, ctl2), _ = _con_cache(ruta, "pptoanio", _agregar_ppto_anio, hoja_ppto_anio)
+        except Exception as e:  # noqa: BLE001
+            estado[ruta] = "no se pudo leer: no se usa"
+            avisos.append(f"Primas: no se pudo leer {ruta.name} ({e})")
+            continue
+        controles += [ctl.fila(), ctl2.fila()]
+        log(f"Primas: {ruta.name} ({'cache' if cache else 'leido'}; reforecast y presupuesto del ano)")
+        for c_ in (ctl, ctl2):
+            if _recortado(c_):
+                avisos.append(f"Primas: {c_.archivo} parece recortado ({c_.renglones_leidos:,} renglones): no se usa ni se "
+                              "completa con otras fuentes; copia la base completa en entradas/")
+        if _recortado(ctl):
+            if ppto_anio is None and not _recortado(ctl2):
+                ppto_anio = pa_
+                estado[ruta] = f"se usa solo la hoja {hoja_ppto_anio} ({hoja_rfcst} recortada)"
+            else:
+                estado[ruta] = "recortado: no se usa"
+            continue
+        rutas["rfcst"], rfcst = ruta, rf_
+        if _recortado(ctl2):
+            estado[ruta] = f"se usa sin la hoja {hoja_ppto_anio} (recortada)"
         else:
-            estado[k] = "recortado: no se usa"
-            avisos.append(f"Primas: {rutas[k].name} parece recortado ({n:,} renglones): no se usa (ni se completa con "
-                          "otras fuentes); copia la base completa en entradas/")
-            reales.pop(k, None)
-            llaves.pop(k, None)
+            ppto_anio = pa_
+            estado[ruta] = "se usa"
+        break
+    if reales and rfcst is not None:
+        a_ult = max(int(d["periodo"].max()) for d in reales.values()) // 100
+        if rfcst["anio"] != a_ult:
+            avisos.append(f"Primas: el reforecast es de {rfcst['anio']} y el real llega a {a_ult}: no se usa")
+            estado[rutas["rfcst"]] = f"es de {rfcst['anio']}: no se usa"
+            rfcst = None
+
+    def ref_corte() -> pd.Series:                  # real al corte del reforecast por LN
+        return rfcst["tabla"].groupby("ln")["prima_corte"].sum()
+
+    def ppto_hasta(anio_: int, mes_: int) -> pd.Series | None:     # presupuesto del ano por LN hasta el mes
+        if ppto_anio is None:
+            return None
+        pa = ppto_anio[(ppto_anio["anio"] == anio_) & (ppto_anio["mes"] <= mes_)]
+        return pa.groupby("ln")["prima"].sum()
+
+    # el real del ano debe traer lo mismo que el real al corte del reforecast (o que el historico en los meses que
+    # comparten): si trae menos, esta recortado y no se usa
+    if "anio" in reales:
+        anio_df, hist = reales["anio"], reales.get("hist")
+        a0, m0 = divmod(int(anio_df["periodo"].max()), 100)
+        comunes = sorted(set(anio_df["periodo"]) & set(hist["periodo"])) if hist is not None else []
+        motivo = None
+        if rfcst is not None and rfcst["anio"] == a0 and rfcst["mes_corte"] <= m0:
+            per = [a0 * 100 + m for m in range(1, rfcst["mes_corte"] + 1)]
+            ok, _, tabla, mot = _cobertura_contra(anio_df, ref_corte(), per, ppto_hasta(a0, rfcst["mes_corte"]),
+                                                  por_grupo=False)
+            tablas["Real del ano contra real al corte del reforecast (por LN)"] = tabla
+            if ok is False:
+                motivo = f"{mot} contra el real al corte {rfcst['mes_corte']:02d}/{a0} del reforecast"
+        elif comunes:
+            h_ = float(hist[hist["periodo"].isin(comunes)]["prima"].sum())
+            a_ = float(anio_df[anio_df["periodo"].isin(comunes)]["prima"].sum())
+            if h_ > 0 and a_ < MIN_COBERTURA_HISTORIA * h_:
+                motivo = f"trae {a_ / h_:.0%} de la prima del historico en los meses que comparten"
+        else:
+            avisos.append(f"Primas: no hay con que verificar que {rutas['anio'].name} este completo (sin reforecast del "
+                          "mismo corte ni meses en comun con el historico)")
+        if motivo:
+            avisos.append(f"Primas: {rutas['anio'].name} parece incompleto ({motivo}): no se usa ni se completa con otras "
+                          "fuentes; copia la base completa en entradas/")
+            estado[rutas["anio"]] = "incompleto: no se usa"
+            descartados.setdefault("anio", (rutas["anio"], reales.pop("anio"), llaves.pop("anio")))
+            rutas["anio"] = None
+
+    # si ninguna base de real esta completa, se muestran tal cual, solo como diagnostico
+    solo_diagnostico = not reales
+    if solo_diagnostico:
+        for k, (ruta, agg, ll) in descartados.items():
+            rutas[k], reales[k], llaves[k] = ruta, agg, ll
+            estado[ruta] = estado[ruta].replace("no se usa", "solo diagnostico (el factor no se aplica)")
+        avisos.append("Primas: ninguna base de prima real esta completa: se muestra tal cual, solo como diagnostico; no se "
+                      "estima el resto del ano, no se lee el presupuesto del ano siguiente y el factor no se aplica")
     hist, anio_df = reales.get("hist"), reales.get("anio")
     meses_anio = set(anio_df["periodo"]) if anio_df is not None else set()
     partes = []
@@ -757,10 +912,17 @@ def leer_primas(ultimo_reservas: int, periodo_fin: int, lineas_dashboard: dict |
     llaves_anio = _a_grupo(llaves.get("anio", llaves.get("hist")))
     llaves_anio = llaves_anio[llaves_anio["periodo"] // 100 == anio]
 
-    # cobertura del historico: en los meses que comparte con el real del ano debe traer (casi) la misma prima
-    cobertura, cobertura_supuesta = {}, False
-    comunes = sorted(meses_anio & set(hist["periodo"])) if hist is not None else []
-    if comunes:
+    # cobertura del historico por grupo: contra el real del ano en los meses que comparten; si no comparten meses,
+    # contra el real al corte del reforecast o contra su ano anterior completo. Sin nada con que verificarlo no se usa.
+    cobertura, medida = {g: None for g in GRUPOS}, ""
+    if solo_diagnostico:
+        medida = "bases recortadas: solo diagnostico"
+    elif hist is None:
+        medida = "sin historico"
+        avisos.append(f"Primas: sin {pat['hist']} completo solo hay {len(meses_anio)} meses de prima real: no alcanza "
+                      "para estimar la relacion reserva / prima")
+    elif comunes := sorted(meses_anio & set(hist["periodo"])):
+        medida = "real del ano (meses comunes)"
         h = _a_grupo(hist[hist["periodo"].isin(comunes)])
         a = _a_grupo(anio_df[anio_df["periodo"].isin(comunes)])
         hg, ag = h.groupby("grupo")["prima"].sum(), a.groupby("grupo")["prima"].sum()
@@ -777,27 +939,51 @@ def leer_primas(ultimo_reservas: int, periodo_fin: int, lineas_dashboard: dict |
         if difieren and all((c or 0) >= MIN_COBERTURA_HISTORIA for c in cobertura.values() if c is not None):
             avisos.append(f"Primas: historico y real del ano difieren mas de {TOLERANCIA_TRASLAPE:.0%} en "
                           f"{len(difieren)} grupo-mes ({', '.join(difieren[:6])}...)")
-    elif hist is not None:
-        truncado = any("truncado" in c.get("Notas", "") for c in controles if c["Archivo"] == rutas["hist"].name)
-        if truncado:                        # (ya avisado arriba como recortado)
-            cobertura = {g: None for g in GRUPOS}
-        else:                               # se mide abajo contra el real al corte del reforecast, si lo hay
-            cobertura = {g: 1.0 for g in GRUPOS}
-            cobertura_supuesta = True
     else:
-        avisos.append(f"Primas: sin {pat['hist']} completo solo hay {len(meses_anio)} meses de prima real: no alcanza "
-                      "para estimar la relacion reserva / prima")
-        cobertura = {g: None for g in GRUPOS}
-    if solo_diagnostico:                    # solo hay bases de real recortadas: no se usa ningun grupo
-        cobertura = {g: None for g in GRUPOS}
+        ok = None
+        if (rfcst is not None and anio_df is None
+                and rfcst["anio"] * 100 + rfcst["mes_corte"] <= int(hist["periodo"].max())):
+            per = [rfcst["anio"] * 100 + m for m in range(1, rfcst["mes_corte"] + 1)]
+            medida = f"real al corte {rfcst['mes_corte']:02d}/{rfcst['anio']} del reforecast"
+            ok, cob, tabla, mot = _cobertura_contra(hist, ref_corte(), per,
+                                                    ppto_hasta(rfcst["anio"], rfcst["mes_corte"]))
+            tablas["Historico contra real al corte del reforecast (por LN)"] = tabla
+        elif (rfcst is not None and float(rfcst["tabla"]["prima_ant"].sum()) > 0
+              and set(_rango((rfcst["anio"] - 1) * 100 + 1, (rfcst["anio"] - 1) * 100 + 12)) <= set(hist["periodo"])):
+            per = _rango((rfcst["anio"] - 1) * 100 + 1, (rfcst["anio"] - 1) * 100 + 12)
+            medida = f"real {rfcst['anio'] - 1} del reforecast"
+            ok, cob, tabla, mot = _cobertura_contra(hist, rfcst["tabla"].groupby("ln")["prima_ant"].sum(), per,
+                                                    por_grupo=False)
+            tablas[f"Historico contra real {rfcst['anio'] - 1} del reforecast (por LN)"] = tabla
+        if ok is None:
+            medida = "sin nada con que verificarlo"
+            avisos.append(f"Primas: no hay con que verificar que {rutas['hist'].name} este completo (sin meses en comun con "
+                          f"{pat['anio']} ni reforecast del mismo periodo): no se usa para el factor")
+            estado[rutas["hist"]] = "sin verificar: no se usa para el factor"
+        elif ok is False:
+            avisos.append(f"Primas: {rutas['hist'].name} parece incompleto ({mot} contra el {medida}): no se usa para el "
+                          "factor ni se completa con otras fuentes; copia la base completa en entradas/")
+            estado[rutas["hist"]] = "incompleto: no se usa para el factor"
+        else:
+            cobertura = cob
+            avisos.append(f"Primas: la cobertura de {rutas['hist'].name} se mide contra el {medida} ({mot})")
     incompletos = [f"{g} ({c:.0%})" for g, c in cobertura.items() if c is not None and c < MIN_COBERTURA_HISTORIA]
     if incompletos:
-        avisos.append(f"Primas: el historico trae menos de {MIN_COBERTURA_HISTORIA:.0%} de la prima del real del ano "
-                      f"en los grupos {', '.join(incompletos)} (fragmento o base incompleta): esos grupos se "
-                      "proyectan con la recta")
+        avisos.append(f"Primas: el historico trae menos de {MIN_COBERTURA_HISTORIA:.0%} de la prima esperada en los "
+                      f"grupos {', '.join(incompletos)} (fragmento o base incompleta): esos grupos se proyectan con la "
+                      "recta")
+    utiles = [g for g, c in cobertura.items() if c is not None and c >= MIN_COBERTURA_HISTORIA]
+    if not solo_diagnostico and anio_df is None and not utiles:
+        solo_diagnostico = True             # sin un real del ano confiable no se estima nada encima
+        avisos.append("Primas: sin una base de prima real completa y verificada no se estima el resto del ano ni se lee "
+                      "el presupuesto del ano siguiente: la prima real se muestra tal cual, solo como diagnostico")
+    if hist is not None and not solo_diagnostico and estado.get(rutas["hist"]) == "se usa":
+        if not utiles:
+            estado[rutas["hist"]] = "incompleto: no se usa para el factor"
+        elif len(utiles) < sum(c is not None for c in cobertura.values()):
+            estado[rutas["hist"]] = "se usa (salvo grupos incompletos)"
     tablas["Cobertura del historico por grupo"] = pd.DataFrame(
-        [{"Grupo": g, "Cobertura": c, "Se usa": bool(c is not None and c >= MIN_COBERTURA_HISTORIA)}
-         for g, c in cobertura.items()])
+        [{"Grupo": g, "Cobertura": c, "Medida contra": medida, "Se usa": g in utiles} for g, c in cobertura.items()])
     # continuidad del historico: un ano con menos de la mitad de la prima del anterior en un grupo material
     anual = real.groupby([real["periodo"] // 100, "grupo"])["prima"].sum().unstack(fill_value=0.0)
     for g in anual.columns:
@@ -815,56 +1001,6 @@ def leer_primas(ultimo_reservas: int, periodo_fin: int, lineas_dashboard: dict |
             mensual[g] = 0.0
     mensual = mensual[GRUPOS]
     fuente = pd.DataFrame("real", index=mensual.index, columns=GRUPOS)
-
-    # presupuesto y reforecast del ano en curso
-    ppto_anio = rfcst = None
-    if rutas["rfcst"] is not None:
-        try:
-            (rfcst, ctl), cache = _con_cache(rutas["rfcst"], "rfcst", _agregar_rfcst, hoja_rfcst)
-            controles.append(ctl.fila())
-            (ppto_anio, ctl2), _ = _con_cache(rutas["rfcst"], "pptoanio", _agregar_ppto_anio, hoja_ppto_anio)
-            controles.append(ctl2.fila())
-            log(f"Primas: {rutas['rfcst'].name} ({'cache' if cache else 'leido'}; reforecast y presupuesto del ano)")
-            for c_, nombre in ((ctl, "rfcst"), (ctl2, "ppto_anio")):
-                if any("truncado" in n for n in c_.notas):
-                    avisos.append(f"Primas: {c_.archivo} parece recortado ({c_.renglones_leidos:,} renglones): no se usa "
-                                  "(ni se completa con otras fuentes); copia la base completa en entradas/")
-                    if nombre == "rfcst":
-                        rfcst = None
-                    else:
-                        ppto_anio = None
-                    estado["rfcst"] = ("recortado: no se usa" if rfcst is None and ppto_anio is None else
-                                       f"se usa sin la hoja {c_.archivo.split(' / ')[-1]} (recortada)")
-        except Exception as e:  # noqa: BLE001
-            avisos.append(f"Primas: no se pudo leer {rutas['rfcst'].name} ({e}); el resto del ano va sin reforecast")
-            rfcst = ppto_anio = None
-            estado["rfcst"] = "no se pudo leer: no se usa"
-
-    # sin real del ano: la cobertura del historico se mide con el real al corte del reforecast (total, sin ramo)
-    if cobertura_supuesta:
-        if rfcst is not None and rfcst["anio"] == anio and rfcst["mes_corte"] <= mes_ult:
-            # todas las cuentas del historico (con y sin ramo de reserva), en las LN que trae el reforecast
-            lns = set(rfcst["tabla"]["ln"])
-            h = hist[(hist["periodo"] // 100 == anio) & (hist["periodo"] % 100 <= rfcst["mes_corte"])
-                     & hist["ln"].isin(lns)]
-            ref, h_ = float(rfcst["tabla"]["prima_corte"].sum()), float(h["prima"].sum())
-            c_ = h_ / ref if ref > 0 else None
-            tablas["Historico contra real al corte del reforecast"] = pd.DataFrame(
-                [{"Historico (M USD)": h_ / 1e6, "Reforecast al corte (M USD)": ref / 1e6, "Cobertura": c_}])
-            if c_ is None or c_ < MIN_COBERTURA_HISTORIA:
-                avisos.append(f"Primas: sin {pat['anio']} completo, {rutas['hist'].name} trae "
-                              f"{h_ / 1e6:,.1f} M de ene a {rfcst['mes_corte']:02d}/{anio} contra {ref / 1e6:,.1f} M "
-                              "del real al corte del reforecast: parece incompleto; no se usa para el factor")
-                cobertura = {g: None for g in GRUPOS}
-            else:
-                avisos.append(f"Primas: sin {pat['anio']} completo, la cobertura de {rutas['hist'].name} se mide contra "
-                              f"el real al corte del reforecast ({c_:.1%})")
-        else:
-            avisos.append(f"Primas: sin {pat['anio']} completo ni reforecast no se puede medir la cobertura de "
-                          f"{rutas['hist'].name}; se toma como completa")
-        tablas["Cobertura del historico por grupo"] = pd.DataFrame(
-            [{"Grupo": g, "Cobertura": c, "Se usa": bool(c is not None and c >= MIN_COBERTURA_HISTORIA)}
-             for g, c in cobertura.items()])
 
     # perfil mensual: el candidato que mejor explica la forma de los meses reales del ano
     grupos_hist = [g for g, c in cobertura.items() if c is not None and c >= MIN_COBERTURA_HISTORIA]
@@ -903,7 +1039,7 @@ def leer_primas(ultimo_reservas: int, periodo_fin: int, lineas_dashboard: dict |
     # resto del ano en curso
     meses_rest = list(range(mes_ult + 1, 13))
     resto_ln = {}                          # resto del ano estimado por LN (el mismo que va a la prima mensual)
-    if meses_rest and rfcst is not None:
+    if meses_rest and rfcst is not None and not solo_diagnostico:
         t = rfcst["tabla"].copy()
         escala = (12 - mes_ult) / (12 - rfcst["mes_corte"]) if rfcst["mes_corte"] < 12 else 1.0
         if rfcst["anio"] != anio:
@@ -990,7 +1126,7 @@ def leer_primas(ultimo_reservas: int, periodo_fin: int, lineas_dashboard: dict |
             rest = rest.clip(lower=0)
         mensual = pd.concat([mensual, rest])
         fuente = pd.concat([fuente, pd.DataFrame("reforecast", index=rest.index, columns=GRUPOS)])
-    elif meses_rest:
+    elif meses_rest and not solo_diagnostico:
         # sin reforecast: mismo mes del ano anterior por el crecimiento del ano
         filas = {}
         for g in GRUPOS:
@@ -1012,15 +1148,23 @@ def leer_primas(ultimo_reservas: int, periodo_fin: int, lineas_dashboard: dict |
     # presupuesto del ano siguiente
     anio_sig = anio + 1
     retenida, tiene_sig = None, False
-    if rutas["ppto"] is not None:
+    mensual0, fuente0 = mensual, fuente
+    lista_ppto = [] if solo_diagnostico else cands["ppto"]
+    if not solo_diagnostico and not lista_ppto:
+        avisos.append(f"Primas: sin {pat['ppto']} no hay prima del ano siguiente: el factor de prima no se aplica")
+    for i_ppto, ruta_ppto in enumerate(lista_ppto):     # el primero completo (si uno esta recortado, el siguiente)
+        rutas["ppto"] = ruta_ppto
+        n_avisos, n_tablas = len(avisos), set(tablas)
         try:
             (pp, ctl), cache = _con_cache(rutas["ppto"], "ppto", _agregar_ppto_sig, anio_sig)
             controles.append(ctl.fila())
             log(f"Primas: {rutas['ppto'].name} ({'cache' if cache else 'leido'}; {ctl.renglones_leidos:,} renglones)")
-            if any("truncado" in n for n in ctl.notas):
-                raise _NoUsable(f"parece recortado ({ctl.renglones_leidos:,} renglones); no se completa con el "
-                                "dashboard: copia la base completa en entradas/")
+            if _recortado(ctl):
+                raise _NoUsable(f"trae {ctl.renglones_leidos:,} renglones, un limite tipico de extracto")
             p = pp["tabla"].copy()
+            meses_csv = sorted(set(p.loc[p["prima"] != 0, "mes"].dropna().astype(int)))
+            if len(meses_csv) < 12:
+                raise _NoUsable(f"solo trae prima en {len(meses_csv)} meses de {anio_sig}")
             tablas["Presupuesto del ano siguiente: renglones por ano fiscal"] = pd.DataFrame(
                 [{"Ano fiscal": a, "Renglones": n, "Se usa": a == anio_sig} for a, n in sorted(pp["anios"].items())])
             # centros fuera del catalogo: van aparte como "sin ramo" (no entran a ningun grupo) y se reportan
@@ -1061,8 +1205,17 @@ def leer_primas(ultimo_reservas: int, periodo_fin: int, lineas_dashboard: dict |
             tot_csv, tot_ref = float(csv_ln_todo.sum()), float(sum(referencia.values()))
             if tot_ref and tot_csv < MIN_COBERTURA_PPTO * tot_ref:
                 raise _NoUsable(f"trae {tot_csv / 1e6:,.1f} M contra {tot_ref / 1e6:,.1f} M de referencia ({fuente_ref}), "
-                                f"menos de {MIN_COBERTURA_PPTO:.0%}: parece recortado o incompleto; no se completa con "
-                                "otras fuentes: revisa que en entradas/ este la base completa")
+                                f"menos de {MIN_COBERTURA_PPTO:.0%}")
+            corte = _corte_por_ln(pp.get("orden_ln", []), csv_ln_todo, referencia)
+            if corte:
+                raise _NoUsable(corte)
+            if fuente_ref == "dashboard":           # las LN que si trae deben cuadrar con su cifra en el dashboard
+                presentes = sorted(ln for ln, v in referencia.items() if csv_ln_todo.get(ln, 0.0) >= LN_INCOMPLETA * v)
+                sp = float(sum(csv_ln_todo.get(ln, 0.0) for ln in presentes))
+                sr = float(sum(referencia[ln] for ln in presentes))
+                if sr and sp < COBERTURA_LN_PRESENTES * sr:
+                    raise _NoUsable(f"las LN que si trae ({', '.join(presentes)}) suman {sp / sr:.0%} de su cifra en el "
+                                    "dashboard")
             filas, completar, origen = [], {}, {}
             for ln in sorted(set(referencia) | set(csv_ln_todo.index)):
                 c_ = float(csv_ln_todo.get(ln, 0.0))
@@ -1168,15 +1321,24 @@ def leer_primas(ultimo_reservas: int, periodo_fin: int, lineas_dashboard: dict |
             retenida = p.pivot_table(index="mes", columns="grupo", values="retenida", aggfunc="sum").fillna(0.0)
             retenida.index = [anio_sig * 100 + m for m in retenida.index]
             tiene_sig = True
-        except _NoUsable as e:
-            avisos.append(f"Primas: {rutas['ppto'].name} no se usa: {e}. Sin prima del ano siguiente el factor no se "
-                          "aplica")
-            estado["ppto"] = "recortado o incompleto: no se usa"
-        except Exception as e:  # noqa: BLE001
-            avisos.append(f"Primas: no se pudo usar {rutas['ppto'].name} ({type(e).__name__}: {e})")
-            estado["ppto"] = "no se pudo leer: no se usa"
-    else:
-        avisos.append(f"Primas: sin {pat['ppto']} no hay prima del ano siguiente: el factor de prima no se aplica")
+            estado[ruta_ppto] = "se usa"
+            break
+        except Exception as e:  # noqa: BLE001  (_NoUsable: recortado o incompleto)
+            mensual, fuente, retenida = mensual0, fuente0, None
+            hay_otro = i_ppto + 1 < len(lista_ppto)
+            if hay_otro:                            # lo de este intento no queda (se prueba el siguiente)
+                del avisos[n_avisos:]
+                for c in set(tablas) - n_tablas:
+                    del tablas[c]
+            sigue = f"; se prueba {lista_ppto[i_ppto + 1].name}" if hay_otro else \
+                ". Sin prima del ano siguiente el factor no se aplica"
+            if isinstance(e, _NoUsable):
+                avisos.append(f"Primas: {ruta_ppto.name} parece recortado o incompleto ({e}): no se usa ni se completa "
+                              f"con otras fuentes (copia la base completa en entradas/){sigue}")
+                estado[ruta_ppto] = "recortado o incompleto: no se usa"
+            else:
+                avisos.append(f"Primas: no se pudo usar {ruta_ppto.name} ({type(e).__name__}: {e}){sigue}")
+                estado[ruta_ppto] = "no se pudo usar"
 
     # meses posteriores al ultimo ano con plan: mismo mes del ano anterior
     ultimo_prima = int(mensual.index.max())
@@ -1188,9 +1350,23 @@ def leer_primas(ultimo_reservas: int, periodo_fin: int, lineas_dashboard: dict |
         fuente = pd.concat([fuente, pd.DataFrame("plan del ano anterior", index=extra_meses, columns=GRUPOS)])
         avisos.append(f"Primas: de {extra_meses[0]} a {periodo_fin} se repite la prima del ano anterior")
 
-    tablas[nombre_archivos] = pd.DataFrame(
-        [{**{c: v for c, v in a.items() if not c.startswith("_")},
-          "Estado": estado.get(a["_k"], "") if a["_elegido"] else "se ignora (hay uno mas grande)"} for a in archivos])
+    nombres_base = {"hist": "real historico", "anio": "real del ano", "rfcst": "reforecast y presupuesto del ano",
+                    "ppto": "presupuesto del ano siguiente"}
+    filas = []
+    for k, lista in cands.items():
+        usado = next((r for r in lista if estado.get(r, "").startswith("se usa")), None)
+        for ruta in lista:
+            st = ruta.stat()
+            filas.append({"Base": nombres_base[k], "Patron": pat[k], "Archivo": ruta.name,
+                          "Tamano (MB)": round(st.st_size / 2**20, 1),
+                          "Fecha": pd.Timestamp(st.st_mtime, unit="s").strftime("%Y-%m-%d %H:%M"),
+                          "Estado": estado.get(ruta, f"no se lee (se usa {usado.name})" if usado else "no se lee")})
+        if len(lista) > 1 and usado is not None:
+            recientes = [r.name for r in lista if r.stat().st_mtime > usado.stat().st_mtime and r not in estado]
+            avisos.append(f"Primas: hay {len(lista)} archivos que cumplen {pat[k]}: se usa {usado.name}"
+                          + (f"; ojo: {', '.join(recientes)} es mas reciente: si es la version vigente, deja solo esa "
+                             "en entradas/" if recientes else ""))
+    tablas[nombre_archivos] = pd.DataFrame(filas)
     mensual = mensual.groupby(level=0).sum().sort_index()
     fuente = fuente[~fuente.index.duplicated(keep="last")].sort_index()
     mensual.index = mensual.index.astype(int)
