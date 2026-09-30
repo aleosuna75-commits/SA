@@ -41,8 +41,8 @@ b) Modelo (MODELO_POR_TIPO):
          Es la linea de tendencia de Excel con los picos y valles del ano: la proyeccion sale paralela
          a ella, arranca del ultimo real y repite el patron en la medida en que se ha repetido;
        - razones (%GTO, %MR, %cedido) -> SES (nivel suavizado, sin tendencia: dependen de los contratos);
-       - RCONT -> Holt-Winters amortiguado con estacionalidad por mes del trimestre (acumula en los
-         meses 1-2 y libera en el 3) si hay al menos 12 meses; con menos, SES (nivel).
+       - RCONT -> Holt-Winters sin tendencia: nivel suavizado mas estacionalidad por mes del trimestre
+         (acumula en los meses 1-2 y libera en el 3) si hay al menos 12 meses; con menos, SES (nivel).
    Los intervalos al 80% salen de la variabilidad mensual alrededor de la tendencia (crece con la raiz
    del horizonte) o del propio modelo de suavizamiento.
 c) Backtest por serie: se vuelve a proyectar desde 16, 12 y 8 meses antes del final y se mide el
@@ -195,10 +195,8 @@ N_PROCESOS = None                # None = automatico (nucleos-1); 1 = sin parale
 #       los ultimos MESES_TENDENCIA meses, que se continua desde el ultimo dato real. Es la misma linea de
 #       tendencia de Excel; la proyeccion sale paralela a ella y arranca del ultimo real.
 #   "SES": nivel suavizado sin tendencia (razones: %GTO, %MR y %cedido dependen de los contratos).
-#   Tambien estan disponibles "Holt amortiguado", "Holt-Winters amortiguado (mensual)" y "Holt-Winters amortiguado
-#   (trimestral)" (suavizamiento exponencial); RCONT usa el trimestral por su estacionalidad (acumula meses 1-2,
-#   libera en el 3) si tiene al menos MIN_OBS_TRIMESTRAL meses; con menos se proyecta con SES (hoy: 8 meses, 2025
-#   viene vacio).
+#   Tambien estan disponibles "Holt amortiguado" y "Holt-Winters amortiguado (mensual)" (suavizamiento
+#   exponencial). RCONT usa MODELO_TRIMESTRAL si tiene al menos MIN_OBS_TRIMESTRAL meses; con menos, SES.
 MODELO_POR_TIPO = {
     "nivel": "Tendencia historica",   # montos (BEL, BRUTO), en logaritmos: crecimiento % mensual constante
     "indice": "Tendencia historica",  # indices de HParametros, en logaritmos
@@ -270,6 +268,13 @@ CREDIBILIDAD_PENDIENTE = {"nivel": 1.0, "indice": "r2", "lag": 1.0}
 # ellas: alpha ~ 1 (arranca del ultimo dato real), beta <= 0.15 (tendencia de los ultimos anos, no del ultimo mes),
 # phi entre 0.80 y 0.98. RCONT (Holt-Winters trimestral) suaviza el nivel (alpha >= 0.2) para separar la
 # estacionalidad. SES estima alpha libre.
+# Modelo de las series con estacionalidad trimestral (RCONT: acumula en los meses 1-2 del trimestre y libera en el 3):
+#   "Holt-Winters (trimestral)": nivel suavizado + patron por mes del trimestre, sin tendencia.
+#   "Holt-Winters amortiguado (trimestral)": ademas tendencia amortiguada. Con la RCONT de ene-25 a ago-26 esa
+#       tendencia extrapolaba la baja en pesos de 2025 (el nivel ya es estable en 2026); en backtest con 8 cortes
+#       (12 a 19 meses de entrenamiento, 1 a 8 meses adelante) el error en pesos fue 6.5 % contra 3.3 % sin tendencia
+#       (sin tendencia gana en 7 de los 8 cortes; pierde solo en el primero, el unico del backtest estandar).
+MODELO_TRIMESTRAL = "Holt-Winters (trimestral)"
 COTAS_SUAVIZAMIENTO = {"smoothing_level": (0.90, 0.99), "smoothing_trend": (0.02, 0.15), "damping_trend": (0.80, 0.98)}
 COTAS_ESTACIONAL = {**COTAS_SUAVIZAMIENTO, "smoothing_level": (0.20, 0.99)}
 MIN_OBS_HOLT = 12                # con menos observaciones los modelos Holt caen a SES
@@ -306,11 +311,13 @@ MESES_MEZCLA = 8                 # meses recientes para repartir por ramo los to
 #   Fianzas: MXN. La RFV es una reserva en pesos: de ene-25 a ago-26 la RFV NETO crecio 27 % en pesos pero 55 % en
 #       dolares, porque el peso paso de 20.7 a 17.0. Modelar en USD extrapolaba esa apreciacion (dic-27: 134 M USD)
 #       cuando Inversiones pronostica 18.5 a dic-27; en MXN con ese TC da 105 M USD. El unico corte de backtest de
-#       Fianzas (8 meses de 2026, con el peso aun apreciandose) favorecia USD (5.3 % contra 7.6 %) justamente por eso.
+#       Fianzas (8 meses de 2026, con el peso aun apreciandose) favorecia USD en el RFV BRUTO (5.3 % contra 7.6 %)
+#       justamente por eso.
 MODELAR_EN_MXN = {"DANOS": False, "FIANZAS": True}
 # Monedas mezcladas en la historia: si un tramo de la BD viene en MXN y otro en USD, el salto entre dos meses seguidos
 # es del tamano del TC (p. ej. RFV BRUTO 1,754 M en dic-25 y 104 M en ene-26) y la tendencia lo lee como una caida de
-# 94 %. True = se detecta (recorriendo la historia hacia atras desde el ultimo mes, que se toma como USD), los meses en
+# 94 %. True = se detecta por concepto (recorriendo la historia hacia atras desde el ultimo mes, que se toma como USD;
+# un concepto que ya viene en USD en esos meses, como la RCONT de 2025, no trae el salto y se deja), los meses en
 # MXN se convierten a USD con el TC de cada mes de la propia BD, en memoria y en la BD de salida (sin comentarios;
 # el detalle queda en la hoja Moneda_corregida), y se avisa en consola y en Alertas. El archivo de entrada no se
 # modifica.
@@ -393,6 +400,7 @@ MODELOS = {
     "Holt-Winters amortiguado (mensual)": dict(trend="add", damped_trend=True, seasonal="add", seasonal_periods=12),
     "Holt-Winters amortiguado (trimestral)": dict(trend="add", damped_trend=True, seasonal="add",
                                                   seasonal_periods=3),
+    "Holt-Winters (trimestral)": dict(seasonal="add", seasonal_periods=3),
 }
 ULTIMO_VALOR = "Ultimo valor"
 
@@ -436,10 +444,12 @@ class Resultado:
 def ajustar_ets(z, modelo: str, h: int):
     """Ajusta el modelo a z (en la escala del modelo) y devuelve pronostico, intervalo y parametros."""
     kw = MODELOS[modelo]
-    if not kw.get("trend"):
-        cotas = None                                    # SES: alpha libre
-    else:
+    if kw.get("trend"):
         cotas = dict(COTAS_ESTACIONAL if kw.get("seasonal") else COTAS_SUAVIZAMIENTO)
+    elif kw.get("seasonal"):
+        cotas = {"smoothing_level": COTAS_ESTACIONAL["smoothing_level"]}   # Holt-Winters sin tendencia
+    else:
+        cotas = None                                    # SES: alpha libre
     m = ETSModel(pd.Series(np.asarray(z, dtype=float)), error="add", bounds=cotas, **kw).fit(disp=False, maxiter=500)
     pred = m.get_prediction(start=len(z), end=len(z) + h - 1).summary_frame(alpha=1 - NIVEL_INTERVALO)
     nombres = {"smoothing_level": "alpha", "smoothing_trend": "beta", "damping_trend": "phi",
@@ -580,7 +590,7 @@ def elegir_modelo(tipo: str, n: int, trimestral: bool) -> str:
         return ULTIMO_VALOR
     if trimestral:
         # con menos de MIN_OBS_TRIMESTRAL meses no se puede separar la estacionalidad: nivel suavizado
-        return "Holt-Winters amortiguado (trimestral)" if n >= MIN_OBS_TRIMESTRAL else "SES"
+        return MODELO_TRIMESTRAL if n >= MIN_OBS_TRIMESTRAL else "SES"
     modelo = MODELO_POR_TIPO[tipo]
     minimo = {TENDENCIA: MIN_OBS_TENDENCIA, "Holt-Winters amortiguado (mensual)": MIN_OBS_HW_MENSUAL}.get(modelo, MIN_OBS_HOLT)
     if modelo != "SES" and n < minimo:
@@ -1045,13 +1055,14 @@ def periodo_ultimo_real(periodos_proy: list[int]) -> int:
     return indice_a_periodo(periodo_a_indice(periodos_proy[0]) - 1)
 
 
-def detectar_moneda_mezclada(bd: BDMontos, ultimo: int) -> dict:
+def detectar_moneda_mezclada(bd: BDMontos, ultimo: int, concepto: str | None = None) -> dict:
     """Meses de la historia que vienen en MXN dentro de una BD en USD: {periodo: TC de la BD}. Se recorre la historia
     hacia atras desde el ultimo mes (que se toma como USD); un salto entre dos meses seguidos del tamano del TC
-    (dentro de TOLERANCIA_SALTO_TC) marca un cambio de moneda. Se usa el total de todos los conceptos y ramos."""
+    (dentro de TOLERANCIA_SALTO_TC) marca un cambio de moneda. Se usa el total de ramos del concepto (o de todos los
+    conceptos si concepto es None)."""
     totales = {}
-    for (_, p, _), v in bd.valores.items():
-        if p <= ultimo and isinstance(v, (int, float)) and not math.isnan(v):
+    for (c, p, _), v in bd.valores.items():
+        if (concepto is None or c == concepto) and p <= ultimo and isinstance(v, (int, float)) and not math.isnan(v):
             totales[p] = totales.get(p, 0.0) + abs(v)
     periodos = [p for p in sorted(totales) if totales[p] > 0]
     tolerancia = math.log(1 + TOLERANCIA_SALTO_TC)
@@ -1070,20 +1081,29 @@ def detectar_moneda_mezclada(bd: BDMontos, ultimo: int) -> dict:
 
 
 def corregir_moneda_mezclada(bd: BDMontos, libro: str, ultimo: int, alertas: list) -> list:
-    """Convierte a USD (en memoria) los meses que la BD trae en MXN. Regresa las celdas corregidas
-    [(concepto, periodo, ramo, valor original, valor en USD, tc)] para escribirlas tambien en la BD de salida."""
-    en_mxn = detectar_moneda_mezclada(bd, ultimo)
-    if not en_mxn:
+    """Convierte a USD (en memoria) los meses que la BD trae en MXN. La deteccion es por concepto: un concepto que se
+    capturo en USD en esos meses (p. ej. RCONT de 2025) no trae el salto y se deja como viene. Regresa las celdas
+    corregidas [(concepto, periodo, ramo, valor original, valor en USD, tc)] para escribirlas en la BD de salida."""
+    conceptos = sorted({c for (c, _, _) in bd.valores})
+    por_concepto = {c: detectar_moneda_mezclada(bd, ultimo, c) for c in conceptos}
+    por_concepto = {c: m for c, m in por_concepto.items() if m}
+    if not por_concepto:
         return []
     cambios = []
     for (c, p, r), v in list(bd.valores.items()):
+        en_mxn = por_concepto.get(c, {})
         if p in en_mxn and v:
             bd.valores[(c, p, r)] = v / en_mxn[p]
             cambios.append((c, p, r, v, v / en_mxn[p], en_mxn[p]))
-    meses = sorted(en_mxn)
-    texto = (f"{len(meses)} meses ({meses[0]} a {meses[-1]}) venian en pesos (el salto contra el mes siguiente es del "
-             f"tamano del TC); se convirtieron a USD con el TC de cada mes de la BD ({len(cambios)} celdas). Sin esto la "
-             "tendencia leia el cambio de moneda como una caida de ~94 %. Revisa la BD de entrada.")
+    meses = sorted(set().union(*por_concepto.values()))
+    sin_salto = [c for c in conceptos if c not in por_concepto
+                 and any(bd.valores.get((c, p, r)) for p in meses for r in bd.cols_ramo)]
+    texto = (f"{', '.join(por_concepto)}: {len(meses)} meses ({meses[0]} a {meses[-1]}) venian en pesos (el salto "
+             f"contra el mes siguiente es del tamano del TC); se convirtieron a USD con el TC de cada mes de la BD "
+             f"({len(cambios)} celdas). Sin esto la tendencia leia el cambio de moneda como una caida de ~94 %."
+             + (f" {', '.join(sin_salto)}: sin ese salto en esos meses (ya venia en USD), se deja como viene."
+                if sin_salto else "")
+             + " Revisa la BD de entrada.")
     alertas.append((libro, "Moneda mezclada en la historia", texto + " Detalle por celda: hoja Moneda_corregida."))
     print(f"   AVISO {libro}: {texto}", flush=True)
     return cambios
@@ -1599,8 +1619,8 @@ def escribir_diagnostico(resultados: dict, periodos_proy: list[int], alertas_gen
                       "explica poco casi no se extrapola); en montos y LAGs la desviacion se conserva (arrancan del "
                       "ultimo real) y la pendiente se proyecta completa. Razones (%GTO, %MR, %cedido): SES (nivel sin "
                       "tendencia). RCONT: "
-                      "Holt-Winters amortiguado con estacionalidad por mes del trimestre si hay al menos 12 meses; "
-                      "con menos, SES (nivel). Series cortas: SES (< 6 obs para la tendencia) o ultimo valor (< 4). "
+                      f"{MODELO_TRIMESTRAL} (estacionalidad por mes del trimestre) si hay al menos "
+                      f"{MIN_OBS_TRIMESTRAL} meses; con menos, SES (nivel). Series cortas: SES (< 6 obs para la tendencia) o ultimo valor (< 4). "
                       "Los conceptos derivados (NETO, BRUTO de Danos, IRR, GTO, MR) y los totales por ramo no siguen "
                       "una recta propia: salen de las identidades y de la suma de ramos."),
         ("3. Parametros", f"Tendencia: pendiente de la regresion (columna 'Tendencia mensual' de Series_Modelos, en "
