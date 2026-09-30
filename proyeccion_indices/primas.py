@@ -26,7 +26,9 @@ Se puede correr solo para ver los controles:  python primas.py
 """
 from __future__ import annotations
 
+import hashlib
 import importlib.util
+import inspect
 import math
 import pickle
 import re
@@ -39,12 +41,20 @@ import pandas as pd
 CARPETA = Path(__file__).resolve().parent
 ENTRADAS = CARPETA / "entradas"
 CACHE = CARPETA / "salidas" / "cache_primas"     # tablas ya agregadas, por archivo (nombre, tamano y fecha)
-CACHE_VERSION = 2
+CACHE_VERSION = 3
 
+# =============================================================================
+# CONFIGURACION
+# =============================================================================
+# Los nombres de archivo y de hoja llevan el ano. Se arman solos con el ano del ultimo mes real de reservas
+# ({aa} = 26, {aaaa} = 2026, {sig} = 2027): BDReal26, BD_RFCST_26 con sus hojas BD_RFCST26 y Ppto2026, PptoTecnico2027.
+# Si el area cambia la forma de nombrarlos, ajustalos aqui.
 PATRON_REAL_HIST = "BD_Real*.xlsx"
-PATRON_REAL_ANIO = "BDReal26*.xlsx"
-PATRON_RFCST = "BD_RFCST_26*.xlsx"
-PATRON_PPTO = "PptoTecnico2027*.csv"
+PATRON_REAL_ANIO = "BDReal{aa}*.xlsx"
+PATRON_RFCST = "BD_RFCST_{aa}*.xlsx"
+HOJA_RFCST = "BD_RFCST{aa}"
+HOJA_PPTO_ANIO = "Ppto{aaaa}"
+PATRON_PPTO = "PptoTecnico{sig}*.csv"
 CUENTAS_PRIMA = ("6104010000", "6108010000", "6111090000")   # prima tomada (viene en negativo: se voltea)
 PREFIJO_SINIESTRO, PREFIJO_COMISION = "54", "53"
 MIN_COBERTURA_HISTORIA = 0.95     # el historico debe traer al menos 95 % de la prima de los meses que comparte con
@@ -77,33 +87,36 @@ GRUPO_DE_RAMO_RESERVA = {
 GRUPOS = sorted(set(GRUPO_DE_RAMO_RESERVA.values()), key=int)
 
 
+# Catalogo de centros de beneficio del area (/ERP/PROFTCTR -> ramo). Un centro que no este en la lista va aparte como
+# "sin ramo": no entra a ningun grupo y se reporta con su monto.
+CATALOGO_CENTROS = {
+    "10": ["A011000000", "A012000000", "A013000000", "A600000000"],
+    "20": [f"A02{i}000000" for i in range(1, 6)],
+    "31": ["A331003100", "A331003200", "A331003300"],
+    "35": ["A332003400", "A332003500", "A332003600"],
+    "39": ["A333003700", "A333003800", "A333003900"],
+    "40": ["A041000000", "A042000000", "A043000000"] + [f"A04400000{i}" for i in range(5)],
+    "50": [f"A05100000{i}" for i in range(3)] + ["A052000000"] + [f"A05200000{i}" for i in range(2, 7)],
+    "60": ["A060000000", "A060000001"],
+    "71": ["A071000000"],
+    "73": ["A073000000", "A073000001", "A075000000"],
+    "80": ["A081000000", "A082000000", "A083000000"],
+    "90": [f"A09{i}000000" for i in range(1, 6)] + ["A094000001"],
+    "100": ["A100000000", "A100000001", "A100000002"],
+    "110": ["A111000000", "A111000008", "A111000009"] + [f"A11200000{i}" for i in range(6)] + ["A112000009"],
+    "130": ([f"A13{i}000000" for i in range(1, 5)] + ["A141000000", "A142000000"]
+            + [f"A15{i}000000" for i in range(1, 4)] + [f"A16{i}000000" for i in range(1, 6)] + ["A165000001"]
+            + [f"A17{i}000000" for i in range(1, 5)]),
+}
+_RAMO_CENTRO = {c: r for r, cs in CATALOGO_CENTROS.items() for c in cs}
+
+
 def ramo_de_centro(centro) -> str | None:
-    """Centro de beneficio del presupuesto (/ERP/PROFTCTR, p. ej. A060000000) -> ramo (catalogo del area)."""
-    m = re.match(r"^A(\d{3})\d{6}$", str(centro or "").strip().upper())
-    if not m:
-        return None
-    t = m.group(1)
-    if t in ("011", "012", "013", "600"):
-        return "10"
-    if t in ("021", "022", "023", "024", "025"):
-        return "20"
-    reglas = {"331": "31", "332": "35", "333": "39", "060": "60", "071": "71", "073": "73", "075": "73",
-              "100": "100"}
-    if t in reglas:
-        return reglas[t]
-    if t in ("041", "042", "043", "044"):
-        return "40"
-    if t in ("051", "052"):
-        return "50"
-    if t in ("081", "082", "083"):
-        return "80"
-    if t in ("091", "092", "093", "094", "095"):
-        return "90"
-    if t in ("111", "112"):
-        return "110"
-    if t[:2] in ("13", "14", "15", "16", "17"):      # fianzas: A13x -> 130, A14x -> 140, ..., A17x -> 170
-        return t[:2] + "0"
-    return None
+    """Centro de beneficio del presupuesto -> ramo segun CATALOGO_CENTROS (None = fuera del catalogo). Los de Fianzas
+    (130 en el catalogo) se abren por su segundo y tercer digito en 130-170, como las columnas de la BD de RFV."""
+    c = str(centro or "").strip().upper()
+    r = _RAMO_CENTRO.get(c)
+    return c[1:3] + "0" if r == "130" else r
 
 
 # =============================================================================
@@ -149,6 +162,7 @@ def _ln(v) -> str:
     t = str(v).strip()
     if t.endswith(".0"):
         t = t[:-2]
+    t = re.sub(r"(?i)-agro$", "-Agro", t)
     if t.upper().startswith("LN"):
         return "LN" + t[2:]
     return "LN0" + t if t[:2] == "40" else t
@@ -225,12 +239,22 @@ def _buscar(patron: str) -> Path | None:
     return c[0] if c else None
 
 
+def _huella(funcion) -> str:
+    """Huella de la configuracion de lectura (cuentas, prefijos, catalogo, codigo del lector): si cambia, la cache se
+    recalcula."""
+    partes = (CUENTAS_PRIMA, PREFIJO_SINIESTRO, PREFIJO_COMISION, sorted(GRUPO_DE_RAMO_PRIMA.items(), key=str),
+              sorted(_RAMO_CENTRO.items()), LIMITES_TRUNCADO, inspect.getsource(funcion),
+              inspect.getsource(ramo_de_centro), inspect.getsource(_leer_columnas))
+    return hashlib.md5(repr(partes).encode()).hexdigest()[:8]
+
+
 def _con_cache(ruta: Path, clave: str, funcion, *args):
-    """Resultado de funcion(ruta, *args) guardado en salidas/cache_primas; se recalcula si cambia el archivo."""
+    """Resultado de funcion(ruta, *args) guardado en salidas/cache_primas; se recalcula si cambia el archivo, la
+    configuracion de lectura o CACHE_VERSION."""
     st = ruta.stat()
     base = f"{clave}_{re.sub(r'[^A-Za-z0-9]+', '_', ruta.stem)}"
-    sufijo = "_".join(str(a) for a in args)
-    archivo = CACHE / f"{base}_{st.st_size}_{int(st.st_mtime)}_{sufijo}_v{CACHE_VERSION}.pkl"
+    sufijo = "_".join(re.sub(r"[^A-Za-z0-9]+", "", str(a)) for a in args)
+    archivo = CACHE / f"{base}_{st.st_size}_{int(st.st_mtime)}_{sufijo}_v{CACHE_VERSION}_{_huella(funcion)}.pkl"
     if archivo.exists():
         try:
             with open(archivo, "rb") as f:
@@ -342,10 +366,10 @@ def _agregar_real(ruta: Path):
     return agg, llaves, ctl
 
 
-def _agregar_ppto_anio(ruta: Path):
-    """Hoja Ppto2026: presupuesto del ano en curso mes a mes por LN y ramo."""
-    df = _leer_hoja(ruta, "Ppto2026", ("AñoPpto", "MesPpto"))
-    ctl = Control(f"{ruta.name} / Ppto2026", renglones_leidos=len(df))
+def _agregar_ppto_anio(ruta: Path, hoja: str):
+    """Hoja del presupuesto del ano en curso (Ppto2026): mes a mes por LN y ramo."""
+    df = _leer_hoja(ruta, hoja, ("AñoPpto", "MesPpto"))
+    ctl = Control(f"{ruta.name} / {hoja}", renglones_leidos=len(df))
     anio = pd.to_numeric(df[_col(df, "AñoPpto")], errors="coerce")
     mes = pd.to_numeric(df[_col(df, "MesPpto")], errors="coerce")
     ok = anio.notna() & mes.between(1, 12)
@@ -367,10 +391,10 @@ def _agregar_ppto_anio(ruta: Path):
     return agg, ctl
 
 
-def _agregar_rfcst(ruta: Path):
-    """Hoja BD_RFCST26: por renglon (contrato, cedente o MGA), prima real al corte y reforecast del ano."""
-    df = _leer_hoja(ruta, "BD_RFCST26", ("Fuente/Hoja",))
-    ctl = Control(f"{ruta.name} / BD_RFCST26", renglones_leidos=len(df))
+def _agregar_rfcst(ruta: Path, hoja: str):
+    """Hoja del reforecast (BD_RFCST26): por renglon (contrato, cedente o MGA), prima real al corte y reforecast."""
+    df = _leer_hoja(ruta, hoja, ("Fuente/Hoja",))
+    ctl = Control(f"{ruta.name} / {hoja}", renglones_leidos=len(df))
     c_ln = _col(df, "LN")
     df = df[df[c_ln].notna() & (df[c_ln].astype(str).str.strip() != "")].copy()
     # corte (real al mes) y ano del reforecast desde los nombres "Primas MMYY"
@@ -443,13 +467,16 @@ def _agregar_ppto_sig(ruta: Path, anio_sig: int):
         "gl": _columna_por_contenido(muestra, "/ERP/GL_ACCT", lambda s: s.str.match(r"^[56]\d{9}$"), avisos),
         "ln": _columna_por_contenido(muestra, "/ERP/FUNCAREA", lambda s: s.str.startswith("LN040"), avisos),
         "cc": _columna_por_contenido(muestra, "/ERP/PROFTCTR", lambda s: s.str.match(r"^A\d{9}$"), avisos),
-        "anio": _columna_por_contenido(muestra, "0FISCYEAR", lambda s: s.str.match(r"^20\d{2}$"), avisos),
-        "mes": _columna_por_contenido(muestra, "0CALMONTH2", lambda s: s.str.match(r"^(0?[1-9]|1[0-2])$"), avisos),
-        "imp": _col(muestra, "/ERP/AMOUNT"),
+        # ano y mes salen del periodo fiscal AAAA0MM: es la unica columna con ese contenido (el ano fiscal suelto se
+        # confunde con ZPLANYEAR, 0CALYEAR o ZSUSCYEAR si los encabezados vienen corridos)
+        "per": _columna_por_contenido(muestra, "0FISCPER", lambda s: s.str.match(r"^20\d{2}0(0[1-9]|1[0-2])$"), avisos),
+        # importe: numerico, no constante y con negativos (la prima viene en negativo); descarta MANDT, _ID, PRCT_CED
+        "imp": _columna_por_contenido(
+            muestra, "/ERP/AMOUNT",
+            lambda s: (lambda x: x.notna() & (x.nunique() > 1) & bool((x < 0).any()))(
+                pd.to_numeric(s.str.replace(",", "", regex=False).str.replace('"', "", regex=False), errors="coerce")),
+            avisos),
     }
-    s_imp = muestra[cols["imp"]].dropna().astype(str).str.replace(",", "", regex=False)
-    if not (pd.to_numeric(s_imp, errors="coerce").notna().mean() > 0.95):
-        raise ValueError("la columna /ERP/AMOUNT no trae importes")
     for extra, nombre in (("ced", "PRCT_CED"), ("cohorte", "ZSUSCYEAR"), ("moneda", "0CURRENCY")):
         c = _col(muestra, nombre, obligatoria=False)
         if c is not None:
@@ -458,7 +485,9 @@ def _agregar_ppto_sig(ruta: Path, anio_sig: int):
     for ch in pd.read_csv(ruta, encoding="utf-8-sig", dtype=str, usecols=list(set(cols.values())), chunksize=500_000):
         leidos += len(ch)
         t = pd.DataFrame({k: ch[v] for k, v in cols.items()})
-        t["anio"] = pd.to_numeric(t["anio"], errors="coerce")
+        t["per"] = t["per"].astype(str).str.strip()
+        t["anio"] = pd.to_numeric(t["per"].str[:4], errors="coerce")
+        t["mes"] = t["per"].str[-2:]
         for a, n in t["anio"].value_counts().items():
             anios[int(a)] = anios.get(int(a), 0) + int(n)
         t = t[t["anio"] == anio_sig].copy()
@@ -490,14 +519,16 @@ def _agregar_ppto_sig(ruta: Path, anio_sig: int):
     ctl.prima, ctl.siniestros, ctl.comisiones = (float(t[c].sum()) for c in ("prima", "siniestros", "comisiones"))
     ctl.prima_por_ln = t.groupby("ln")["prima"].sum().to_dict()
     ctl.notas += avisos
+    if avisos:
+        ctl.notas.append("columnas localizadas por su contenido: revisa que el export no venga con encabezados corridos")
     if otras_61:
         ctl.notas.append(f"otras cuentas 61 no sumadas como prima: {otras_61[:5]}")
     if "moneda" in cols:
         ctl.notas.append(f"0CURRENCY = {sorted(t['moneda'].dropna().unique())[:3]} (se toma USD; ver escala)")
     sin_ramo = t[t["ramo"].isna() & (t["prima"] != 0)]
     if len(sin_ramo):
-        ctl.notas.append(f"centros sin ramo en el catalogo: {sorted(sin_ramo['cc'].astype(str).unique())[:8]} "
-                         f"({sin_ramo['prima'].sum() / 1e6:,.1f} M de prima)")
+        ctl.notas.append(f"centros fuera del catalogo: {sorted(sin_ramo['cc'].astype(str).unique())[:8]} "
+                         f"({sin_ramo['prima'].sum() / 1e6:,.1f} M de prima; van aparte como 'sin ramo')")
     if "ced" not in cols:
         ctl.notas.append("sin PRCT_CED: prima retenida = tomada")
     if ctl.prima:
@@ -638,8 +669,12 @@ def leer_primas(ultimo_reservas: int, periodo_fin: int, lineas_dashboard: dict |
                 tc_proy: dict | None = None, verbose: bool = True) -> Primas | None:
     """Arma la prima mensual por grupo con lo que haya en entradas/. None si no hay prima real.
     lineas_dashboard = {LN: prima del ano siguiente en el dashboard del presupuesto}; tc_proy = TC por mes."""
-    rutas = {k: _buscar(p) for k, p in (("hist", PATRON_REAL_HIST), ("anio", PATRON_REAL_ANIO),
-                                         ("rfcst", PATRON_RFCST), ("ppto", PATRON_PPTO))}
+    a_res = ultimo_reservas // 100
+    nombres = {"aa": f"{a_res % 100:02d}", "aaaa": str(a_res), "sig": str(a_res + 1)}
+    pat = {"hist": PATRON_REAL_HIST.format(**nombres), "anio": PATRON_REAL_ANIO.format(**nombres),
+           "rfcst": PATRON_RFCST.format(**nombres), "ppto": PATRON_PPTO.format(**nombres)}
+    hoja_rfcst, hoja_ppto_anio = HOJA_RFCST.format(**nombres), HOJA_PPTO_ANIO.format(**nombres)
+    rutas = {k: _buscar(v) for k, v in pat.items()}
     if rutas["hist"] is None and rutas["anio"] is None:
         return None
     controles, avisos, tablas = [], [], {}
@@ -696,15 +731,15 @@ def leer_primas(ultimo_reservas: int, periodo_fin: int, lineas_dashboard: dict |
     elif hist is not None:
         truncado = any("truncado" in c.get("Notas", "") for c in controles if c["Archivo"] == rutas["hist"].name)
         if truncado:
-            avisos.append(f"Primas: sin {PATRON_REAL_ANIO} no se puede medir la cobertura de {rutas['hist'].name} y el "
+            avisos.append(f"Primas: sin {pat['anio']} no se puede medir la cobertura de {rutas['hist'].name} y el "
                           "archivo parece truncado: no se usa")
             cobertura = {g: None for g in GRUPOS}
         else:
-            avisos.append(f"Primas: sin {PATRON_REAL_ANIO} no se puede medir la cobertura de {rutas['hist'].name}; "
+            avisos.append(f"Primas: sin {pat['anio']} no se puede medir la cobertura de {rutas['hist'].name}; "
                           "se toma como completa")
             cobertura = {g: 1.0 for g in GRUPOS}
     else:
-        avisos.append(f"Primas: sin {PATRON_REAL_HIST} solo hay {len(meses_anio)} meses de prima real: no alcanza "
+        avisos.append(f"Primas: sin {pat['hist']} solo hay {len(meses_anio)} meses de prima real: no alcanza "
                       "para estimar la relacion reserva / prima")
         cobertura = {g: None for g in GRUPOS}
     incompletos = [f"{g} ({c:.0%})" for g, c in cobertura.items() if c is not None and c < MIN_COBERTURA_HISTORIA]
@@ -737,9 +772,9 @@ def leer_primas(ultimo_reservas: int, periodo_fin: int, lineas_dashboard: dict |
     ppto_anio = rfcst = None
     if rutas["rfcst"] is not None:
         try:
-            (rfcst, ctl), cache = _con_cache(rutas["rfcst"], "rfcst", _agregar_rfcst)
+            (rfcst, ctl), cache = _con_cache(rutas["rfcst"], "rfcst", _agregar_rfcst, hoja_rfcst)
             controles.append(ctl.fila())
-            (ppto_anio, ctl2), _ = _con_cache(rutas["rfcst"], "pptoanio", _agregar_ppto_anio)
+            (ppto_anio, ctl2), _ = _con_cache(rutas["rfcst"], "pptoanio", _agregar_ppto_anio, hoja_ppto_anio)
             controles.append(ctl2.fila())
             log(f"Primas: {rutas['rfcst'].name} ({'cache' if cache else 'leido'}; reforecast y presupuesto del ano)")
         except Exception as e:  # noqa: BLE001
@@ -772,18 +807,17 @@ def leer_primas(ultimo_reservas: int, periodo_fin: int, lineas_dashboard: dict |
             filas.append({"Grupo": g, "Real acumulado (M USD)": rr / 1e6, "Presupuesto acumulado (M USD)": rp / 1e6,
                           "Sigma del plan": sigma[g]})
         tablas["Presupuesto del ano en curso contra real (acumulado)"] = pd.DataFrame(filas)
-        if elegido == "presupuesto":             # los meses del presupuesto tal cual
-            ppto_curso = pa.groupby(["mes", "grupo"])["prima"].sum().unstack(fill_value=0.0)
-            ppto_curso = ppto_curso.reindex(index=range(1, 13), columns=GRUPOS, fill_value=0.0)
-        else:                                     # total anual del presupuesto repartido con el perfil elegido
-            tot = pa.groupby("grupo")["prima"].sum()
-            ppto_curso = pd.DataFrame({g: float(tot.get(g, 0.0)) * forma[g] for g in GRUPOS}, index=range(1, 13))
+        # presupuesto del ano en curso con sus propios meses (para el backtest ex ante: sin informacion posterior al
+        # corte, a diferencia del perfil, que se elige con el real del ano)
+        ppto_curso = pa.groupby(["mes", "grupo"])["prima"].sum().unstack(fill_value=0.0)
+        ppto_curso = ppto_curso.reindex(index=range(1, 13), columns=GRUPOS, fill_value=0.0)
         ppto_curso.index = [anio * 100 + m for m in ppto_curso.index]
     else:
         sigma = {g: 0.15 for g in GRUPOS}
 
     # resto del ano en curso
     meses_rest = list(range(mes_ult + 1, 13))
+    resto_ln = {}                          # resto del ano estimado por LN (el mismo que va a la prima mensual)
     if meses_rest and rfcst is not None:
         t = rfcst["tabla"].copy()
         escala = (12 - mes_ult) / (12 - rfcst["mes_corte"]) if rfcst["mes_corte"] < 12 else 1.0
@@ -794,6 +828,7 @@ def leer_primas(ultimo_reservas: int, periodo_fin: int, lineas_dashboard: dict |
             avisos.append(f"Primas: el reforecast tiene corte a {rfcst['mes_corte']:02d} y el real llega a "
                           f"{mes_ult:02d}: el resto del reforecast se escala por {escala:.2f}")
         t["resto"] = (t["prima_anual"] - t["prima_corte"]) * escala
+        resto_ln = t.groupby("ln")["resto"].sum().to_dict()
         # control: real al corte del reforecast contra el real por LN
         rc = t.groupby("ln")["prima_corte"].sum()
         rr = real_anio[real_anio["mes"] <= rfcst["mes_corte"]].groupby("ln")["prima"].sum()
@@ -849,6 +884,7 @@ def leer_primas(ultimo_reservas: int, periodo_fin: int, lineas_dashboard: dict |
             if ln in set(t["ln"]) or total_anio <= 0 or acum < UMBRAL_LN_MATERIAL * total_anio:
                 continue
             resto = acum * (12 - mes_ult) / mes_ult
+            resto_ln[ln] = resto_ln.get(ln, 0.0) + resto
             mezcla = real_anio[real_anio["ln"] == ln].groupby("grupo")["prima"].sum().clip(lower=0)
             for g, w in (mezcla / mezcla.sum()).items():
                 asignado[g] += resto * w
@@ -881,9 +917,11 @@ def leer_primas(ultimo_reservas: int, periodo_fin: int, lineas_dashboard: dict |
                 p_ant = (anio - 1) * 100 + m
                 filas.setdefault(anio * 100 + m, {})[g] = (mensual.at[p_ant, g] if p_ant in mensual.index else 0) * crec
         rest = pd.DataFrame.from_dict(filas, orient="index")[GRUPOS]
+        k_ = float(rest.to_numpy().sum()) / max(float(real_anio["prima"].sum()), 1.0)
+        resto_ln = {ln: v * k_ for ln, v in real_anio.groupby("ln")["prima"].sum().items()}
         mensual = pd.concat([mensual, rest])
         fuente = pd.concat([fuente, pd.DataFrame("ano anterior x crecimiento", index=rest.index, columns=GRUPOS)])
-        avisos.append(f"Primas: sin {PATRON_RFCST}: el resto de {anio} se estima con el mismo mes del ano anterior por "
+        avisos.append(f"Primas: sin {pat['rfcst']}: el resto de {anio} se estima con el mismo mes del ano anterior por "
                       "el crecimiento del ano")
 
     # presupuesto del ano siguiente
@@ -900,74 +938,78 @@ def leer_primas(ultimo_reservas: int, periodo_fin: int, lineas_dashboard: dict |
             p = pp["tabla"].copy()
             tablas["Presupuesto del ano siguiente: renglones por ano fiscal"] = pd.DataFrame(
                 [{"Ano fiscal": a, "Renglones": n, "Se usa": a == anio_sig} for a, n in sorted(pp["anios"].items())])
-            # centros sin ramo: con la mezcla de su LN
-            sin = p[p["ramo"] == "sin ramo"]
-            p = p[p["ramo"] != "sin ramo"]
-            for ln, g in sin.groupby("ln"):
-                base = p[p["ln"] == ln]
-                if base["prima"].sum() <= 0:
-                    avisos.append(f"Primas: {g['prima'].sum() / 1e6:,.1f} M del presupuesto de {ln} sin ramo y sin "
-                                  "mezcla de la LN: no se usan")
-                    continue
-                w = base.groupby("ramo")["prima"].sum().clip(lower=0)
-                w = w / w.sum()
-                for m, gm in g.groupby("mes"):
-                    for ramo, wr in w.items():
-                        p = pd.concat([p, pd.DataFrame([{"mes": m, "ramo": ramo, "ln": ln,
-                                                          "prima": gm["prima"].sum() * wr,
-                                                          "retenida": gm["retenida"].sum() * wr,
-                                                          "siniestros": 0.0, "comisiones": 0.0, "anterior": 0.0}])])
-            p = _a_grupo(p)
-            # escala de moneda contra el ano en curso (real + resto)
-            curso = {}
-            if len(mensual):
-                real_ln = real_anio.groupby("ln")["prima"].sum()
-                resto_ln = {}
-                if rfcst is not None:
-                    resto_ln = (rfcst["tabla"].assign(r=lambda d: d["prima_anual"] - d["prima_corte"])
-                                .groupby("ln")["r"].sum().to_dict())
-                for ln in set(real_ln.index) | set(resto_ln):
-                    curso[ln] = float(real_ln.get(ln, 0.0)) + float(resto_ln.get(ln, 0.0))
-            csv_ln = p.groupby("ln")["prima"].sum()
-            razones = [csv_ln[ln] / curso[ln] for ln in csv_ln.index if curso.get(ln, 0) > 1e6 and csv_ln[ln] > 0]
-            if razones:
+            # centros fuera del catalogo: van aparte como "sin ramo" (no entran a ningun grupo) y se reportan
+            sin = p[(p["ramo"] == "sin ramo") & (p["prima"] != 0)]
+            if len(sin):
+                avisos.append(f"Primas: {sin['prima'].sum() / 1e6:,.1f} M del presupuesto {anio_sig} en centros de "
+                              "beneficio fuera del catalogo (van aparte como 'sin ramo' y no entran al factor; ver "
+                              "notas del control)")
+            csv_ln_todo = p.groupby("ln")["prima"].sum()        # toda la LN, como en el dashboard
+            sin_reserva = float(p[p["ramo"].map(lambda r: GRUPO_DE_RAMO_PRIMA.get(str(r)) is None)]["prima"].sum())
+            p = _a_grupo(p[p["ramo"] != "sin ramo"])
+            # ano en curso por LN: real + el mismo resto del ano que va a la prima mensual
+            real_ln = real_anio.groupby("ln")["prima"].sum()
+            curso = {ln: float(real_ln.get(ln, 0.0)) + float(resto_ln.get(ln, 0.0))
+                     for ln in set(real_ln.index) | set(resto_ln)}
+            # escala de moneda contra el ano en curso (solo si el ano en curso esta completo)
+            razones = [csv_ln_todo[ln] / curso[ln] for ln in csv_ln_todo.index
+                       if curso.get(ln, 0) > 1e6 and csv_ln_todo[ln] > 0]
+            if razones and resto_ln:
                 med = float(np.median(razones))
                 (u0, u1), (m0, m1) = ESCALA_MONEDA_CSV
                 if m0 <= med <= m1 and tc_proy:
                     tc_m = float(np.mean([v for k, v in tc_proy.items() if k // 100 == anio_sig] or [1.0]))
                     p[["prima", "retenida"]] = p[["prima", "retenida"]] / tc_m
-                    csv_ln = p.groupby("ln")["prima"].sum()
+                    csv_ln_todo = csv_ln_todo / tc_m
                     avisos.append(f"Primas: el presupuesto {anio_sig} parece venir en pesos (razon {med:.1f} contra "
                                   f"{anio}); se divide entre el TC promedio {tc_m:.2f}")
                 elif not (u0 <= med <= u1):
                     avisos.append(f"Primas: la escala del presupuesto {anio_sig} contra {anio} es {med:.2f}: revisa la "
                                   "moneda o el alcance del CSV")
-            # perimetro por LN: completar las LN ausentes o incompletas
+            # perimetro por LN: completar las LN ausentes o incompletas (misma base: toda la LN)
             referencia = {ln: float(v) for ln, v in (lineas_dashboard or {}).items() if v}
             fuente_ref = "dashboard" if referencia else "ano en curso"
             if not referencia:
                 referencia = curso
             total_curso = sum(curso.values()) or 1.0
-            filas, completar = [], {}
-            for ln in sorted(set(referencia) | set(csv_ln.index)):
-                c_ = float(csv_ln.get(ln, 0.0))
+            filas, completar, origen = [], {}, {}
+            for ln in sorted(set(referencia) | set(csv_ln_todo.index)):
+                c_ = float(csv_ln_todo.get(ln, 0.0))
                 ref = float(referencia.get(ln, 0.0))
                 material = curso.get(ln, 0.0) >= UMBRAL_LN_MATERIAL * total_curso or ref >= UMBRAL_LN_MATERIAL * total_curso
                 accion = "se usa tal cual"
-                if ref > 0 and c_ < LN_INCOMPLETA * ref and material and COMPLETAR_LN_PPTO != "no":
-                    meta = (ref if COMPLETAR_LN_PPTO == "dashboard" or fuente_ref == "ano en curso"
-                            else curso.get(ln, ref))
+                if ref == 0 and c_ > 0 and fuente_ref == "dashboard":
+                    accion = "LN del CSV que no esta en la referencia (se usa tal cual)"
+                    avisos.append(f"Primas: {ln} viene en el presupuesto {anio_sig} ({c_ / 1e6:,.1f} M) pero no en el "
+                                  "dashboard: revisa la etiqueta de la LN")
+                elif ref > 0 and c_ < LN_INCOMPLETA * ref and material and COMPLETAR_LN_PPTO != "no":
+                    if COMPLETAR_LN_PPTO == "plano" and ln in curso:
+                        meta, org = curso[ln], "ano en curso"
+                    else:
+                        meta, org = ref, fuente_ref
                     if meta > c_:
-                        completar[ln] = meta - c_
-                        accion = f"se completa con {meta / 1e6:,.1f} M ({COMPLETAR_LN_PPTO})"
+                        completar[ln], origen[ln] = meta - c_, org
+                        accion = f"se completa con {meta / 1e6:,.1f} M ({org})"
                 elif ref > 0 and abs(c_ / ref - 1) > 0.05:
                     accion = "diferencia senalada (no se ajusta)"
                 filas.append({"LN": ln, "CSV (M USD)": c_ / 1e6, f"Referencia {fuente_ref} (M USD)": ref / 1e6,
-                              f"Ano {anio} real + reforecast (M USD)": curso.get(ln, 0.0) / 1e6,
+                              f"Ano {anio} real + resto estimado (M USD)": curso.get(ln, 0.0) / 1e6,
                               "CSV / referencia": (c_ / ref) if ref else None, "Accion": accion,
                               "Completado (M USD)": completar.get(ln, 0.0) / 1e6})
+            tot_csv, tot_ref = float(csv_ln_todo.sum()), float(sum(referencia.values()))
+            # conciliacion: lo completado no puede llevar el total por arriba de la referencia
+            if completar and tot_ref and tot_csv + sum(completar.values()) > 1.05 * tot_ref:
+                avisos.append(f"Primas: completar {', '.join(completar)} llevaria el presupuesto {anio_sig} a "
+                              f"{(tot_csv + sum(completar.values())) / 1e6:,.1f} M contra {tot_ref / 1e6:,.1f} M de "
+                              "referencia (probables etiquetas de LN distintas): no se completa")
+                for f in filas:
+                    if f["LN"] in completar:
+                        f["Accion"], f["Completado (M USD)"] = "no se completa (el total pasaria la referencia)", 0.0
+                completar = {}
             tablas[f"Presupuesto {anio_sig}: perimetro por LN"] = pd.DataFrame(filas)
-            tot_csv, tot_ref = float(csv_ln.sum()), float(sum(referencia.values()))
+            if sin_reserva:
+                avisos.append(f"Primas: {sin_reserva / 1e6:,.1f} M del presupuesto {anio_sig} son de ramos sin reserva "
+                              "en las BD (p. ej. ramo 20): no entran al factor")
             if tot_ref and abs(tot_csv / tot_ref - 1) > 0.05:
                 avisos.append(f"Primas: el presupuesto {anio_sig} del CSV suma {tot_csv / 1e6:,.1f} M contra "
                               f"{tot_ref / 1e6:,.1f} M de referencia ({fuente_ref})"
@@ -1039,7 +1081,7 @@ def leer_primas(ultimo_reservas: int, periodo_fin: int, lineas_dashboard: dict |
         except Exception as e:  # noqa: BLE001
             avisos.append(f"Primas: no se pudo usar {rutas['ppto'].name} ({type(e).__name__}: {e})")
     else:
-        avisos.append(f"Primas: sin {PATRON_PPTO} no hay prima del ano siguiente: el factor de prima no se aplica")
+        avisos.append(f"Primas: sin {pat['ppto']} no hay prima del ano siguiente: el factor de prima no se aplica")
 
     # meses posteriores al ultimo ano con plan: mismo mes del ano anterior
     ultimo_prima = int(mensual.index.max())
@@ -1069,7 +1111,14 @@ def lineas_del_dashboard(ppto: dict | None) -> dict:
 if __name__ == "__main__":
     pd.set_option("display.width", 220)
     pd.set_option("display.max_columns", 30)
-    pr = leer_primas(202608, 202712)
+    lineas = {}
+    try:                                   # la misma referencia del dashboard del presupuesto que usa la corrida
+        import proyeccion_reservas as _prr
+        lineas = lineas_del_dashboard(_prr.leer_presupuesto())
+        ultimo_, fin_ = _prr.periodo_ultimo_real(_prr.rango_periodos(_prr.PERIODO_INICIO, _prr.PERIODO_FIN)), _prr.PERIODO_FIN
+    except Exception:  # noqa: BLE001
+        ultimo_, fin_ = 202608, 202712
+    pr = leer_primas(ultimo_, fin_, lineas)
     if pr is None:
         print("No hay archivos de prima real en entradas/.")
     else:

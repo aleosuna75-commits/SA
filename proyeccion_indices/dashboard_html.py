@@ -423,7 +423,7 @@ table.datos tbody tr:hover { background: var(--surface-2); }
 </main>
 <footer class="pie">
   <span>__PIE__</span>
-  <span>Generado el __GENERADO__ por proyeccion_reservas.py · azul = real, naranja punteado = proyección, gris fino = modelo ajustado sobre la historia: recta de tendencia más el patrón por mes del año cuando la serie lo tiene; la proyección arranca del último real y, en los índices, su desviación respecto al modelo se desvanece hacia el nivel del último año y la pendiente entra ponderada por su credibilidad (solo en las series que se proyectan directo: índices, LAGs y BEL/BRUTO por ramo; la RFV se modela en pesos) · banda = intervalo al 80%</span>
+  <span>Generado el __GENERADO__ por proyeccion_reservas.py · azul = real, naranja punteado = proyección, gris fino = modelo ajustado sobre la historia: recta de tendencia más el patrón por mes del año cuando la serie lo tiene; la proyección arranca del último real y, en los índices, su desviación respecto al modelo se desvanece hacia el nivel del último año y la pendiente entra ponderada por su credibilidad (solo en las series que se proyectan con la recta: índices, LAGs y BEL/BRUTO por ramo, salvo los que van con factor de prima; la RFV se modela en pesos) · banda = intervalo al 80%</span>
 </footer>
 <script>
 'use strict';

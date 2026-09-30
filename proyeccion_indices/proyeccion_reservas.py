@@ -360,13 +360,18 @@ TOLERANCIA_PRESUPUESTO = 0.10    # alerta si el crecimiento de la reserva difier
 # El "factor de error" es el error de ln(factor) como AR(1): su persistencia rho se estima y se reporta siempre, y
 # compite en la rejilla con la de fabrica (1 = anclado). Por tipo de reserva el backtest decide entre A (la recta de
 # siempre), B (factor de prima) y C (combinacion 50/50 en logaritmos): B si su error no pasa de 1.10 x el de la recta +
-# 0.5 pts con la prima real Y con el presupuesto del ano en curso; si no, C con las mismas condiciones; si no, A.
+# 0.5 pts con la prima real Y, en un corte propio en diciembre del ano anterior, con el presupuesto del ano en curso
+# (sus meses tal cual); si no, C con las mismas condiciones; si no, A. La regla favorece al factor cuando la historia no
+# distingue: estas reservas dependen de la prima por construccion.
 USAR_FACTOR_PRIMA = True
-MODELO_MONTOS = "auto"           # "auto" (decide el backtest) | "primas" | "combinacion" | "tendencia" (fuerza todo)
-MODELO_MONTOS_SERIE = {}         # {("DANOS", "RRC", "60"): "tendencia" | "primas" | "combinacion"} fuerza una serie
+MODELO_MONTOS = "auto"           # "auto" (decide el backtest) | "primas" | "combinacion" | "tendencia": fuerza la
+                                 # decision en todas las series elegibles (las no elegibles siguen con la recta)
+MODELO_MONTOS_SERIE = {}         # {("DANOS", "RRC", "60"): "tendencia" | "primas" | "combinacion"}: fuerza una serie
+                                 # elegible
 DRIVERS_FACTOR = {("DANOS", "RRC"): ("PND12", "P12"), ("DANOS", "SONR"): ("PDP", "P24", "P36"),
                   ("FIANZAS", "RFV"): ("P12", "P24")}
-PENDIENTES_FACTOR = (0.0, "r2")  # pendiente del factor: 0 (de fabrica) o ponderada por su R2 ajustado
+PENDIENTES_FACTOR = (0.0,)       # pendiente del factor: 0 = sin pendiente (el crecimiento lo pone la prima). Se puede
+                                 # agregar "r2" (ponderada por su R2 ajustado), pero deja que el factor copie la recta
 PERSISTENCIAS_FACTOR = (1.0, "estimada")   # desviacion del factor: se conserva (1) o se desvanece con su rho
 PRIOR_PERSISTENCIA_FACTOR = 0.8  # rho cuando hay menos de MIN_MESES_AR1 meses de factor
 MIN_MESES_AR1 = 24
@@ -1362,7 +1367,8 @@ SERIES_FACTOR = {("DANOS", "RRC"): "BEL", ("DANOS", "SONR"): "BEL", ("FIANZAS", 
 def persistencia_ar1(z, meses=None) -> tuple[float, float]:
     """"Factor de error" del factor de prima: el error de ln(factor) alrededor de su recta (sin el patron del mes)
     como AR(1). rho = sum e_t e_(t-1) / sum e_(t-1)^2 sobre los ultimos MESES_TENDENCIA meses, con la correccion de
-    sesgo de Kendall (rho + (1 + 3 rho) / n), acotado a [0, 1]. Regresa (rho corregido, persistencia a usar): con
+    sesgo de primer orden para residuos de una recta (rho + (2 + 4 rho) / n), acotado a [0, 1]; con 36 meses sigue
+    sesgado a la baja cerca de 1. Regresa (rho corregido, persistencia a usar): con
     menos de MIN_MESES_AR1 meses, PRIOR_PERSISTENCIA_FACTOR; con rho >= 0.98, 1 (el error no se desvanece)."""
     z = np.asarray(z, dtype=float)
     est = factores_estacionales(z, meses) if (ESTACIONALIDAD_MENSUAL and meses is not None) else None
@@ -1375,7 +1381,7 @@ def persistencia_ar1(z, meses=None) -> tuple[float, float]:
     e = w - np.polyval(np.polyfit(t, w, 1), t)
     den = float(np.sum(e[:-1] ** 2))
     rho = float(np.sum(e[1:] * e[:-1]) / den) if den > 0 else 0.0
-    rho_c = float(np.clip(rho + (1 + 3 * rho) / n, 0.0, 1.0))
+    rho_c = float(np.clip(rho + (2 + 4 * rho) / n, 0.0, 1.0))
     return rho_c, (1.0 if rho_c >= 0.98 else rho_c)
 
 
@@ -1527,7 +1533,12 @@ def aplicar_factor_prima(resultados: dict, pr, hp, tc: dict, bds: dict, periodos
                 ajustes[cfg] = a
                 # backtest de esta configuracion
                 cortes = {}
-                for c in CORTES_BACKTEST:
+                cs = list(CORTES_BACKTEST)
+                if pr.ppto_curso is not None and corte_ppto in per:     # ex ante en su propio corte de diciembre
+                    c_pp = len(per) - 1 - per.index(corte_ppto)
+                    if c_pp >= 1 and c_pp not in cs:
+                        cs.append(c_pp)
+                for c in cs:
                     o = len(y) - c
                     if o < MIN_ENTRENAMIENTO:
                         continue
@@ -1543,7 +1554,8 @@ def aplicar_factor_prima(resultados: dict, pr, hp, tc: dict, bds: dict, periodos
                         ra = _recta(y[:o], per[:o], hz)
                     except Exception:  # noqa: BLE001
                         continue
-                    fila = {"A": ra, "B": b["pron"], "C": np.exp(0.5 * (np.log(ra) + b["ln_pron"])), "real": real}
+                    fila = {"A": ra, "B": b["pron"], "C": np.exp(0.5 * (np.log(ra) + b["ln_pron"])), "real": real,
+                            "U": np.repeat(y[o - 1], hz), "cv": c in CORTES_BACKTEST}
                     # prima plana: despues del corte, el mismo mes del ano anterior
                     pl = prima.copy()
                     for x in pl.index:
@@ -1557,8 +1569,8 @@ def aplicar_factor_prima(resultados: dict, pr, hp, tc: dict, bds: dict, periodos
                         for x in pr.ppto_curso.index:
                             if x in pp.index and x > pc:
                                 pp[x] = pr.ppto_curso.at[x, grupo]
-                        if moneda == "MXN":
-                            pp = pp * pd.Series([tc.get(int(x), math.nan) for x in pp.index], index=pp.index)
+                        if moneda == "MXN":         # despues del corte, el TC disponible al corte (no el realizado)
+                            pp = pp * pd.Series([tc.get(int(min(x, pc)), math.nan) for x in pp.index], index=pp.index)
                         bx = ajustar_factor(per[:o], y[:o], primas.exposicion(pp, cfg[0], v_c), per_h, cfg, libro)
                         if bx is not None:
                             fila["B ppto"] = bx["pron"]
@@ -1577,7 +1589,7 @@ def aplicar_factor_prima(resultados: dict, pr, hp, tc: dict, bds: dict, periodos
         # (serie, corte) en que todas las configuraciones tienen backtest (se comparan en los mismos casos)
         comunes = set()
         for k in elegibles:
-            cortes_cfg = [set(por_serie[k]["bts"].get(cfg, {})) for cfg in cfgs]
+            cortes_cfg = [{pc for pc, f in por_serie[k]["bts"].get(cfg, {}).items() if f["cv"]} for cfg in cfgs]
             comunes |= {(k, pc) for pc in (set.intersection(*cortes_cfg) if cortes_cfg else set())}
         wape_cfg = {}
         for cfg in cfgs:
@@ -1600,8 +1612,9 @@ def aplicar_factor_prima(resultados: dict, pr, hp, tc: dict, bds: dict, periodos
             for pc, f in por_serie[k]["bts"].get(elegida, {}).items():
                 n_series.add(k)
                 den = float(np.sum(np.abs(f["real"])))
-                for m in ("A", "B", "C"):
-                    pares[m].append((float(np.sum(np.abs(f[m] - f["real"]))), den))
+                if f["cv"]:                        # cortes estandar: prueba con la prima real
+                    for m in ("A", "B", "C"):
+                        pares[m].append((float(np.sum(np.abs(f[m] - f["real"]))), den))
                 if "B ppto" in f:
                     pares["B ppto"].append((float(np.sum(np.abs(f["B ppto"] - f["real"]))), den))
                     pares["C ppto"].append((float(np.sum(np.abs(f["C ppto"] - f["real"]))), den))
@@ -1610,6 +1623,7 @@ def aplicar_factor_prima(resultados: dict, pr, hp, tc: dict, bds: dict, periodos
                     pares["B plana"].append((float(np.sum(np.abs(f["B plana"] - f["real"]))), den))
                     pares["A plana"].append((float(np.sum(np.abs(f["A"] - f["real"]))), den))
                 diag["backtest"].append({"Tipo": f"{tipo[0]} {tipo[1]}", "Ramo": k[3], "Corte": pc, "Meses": len(f["real"]),
+                                         "Corte estandar": bool(f["cv"]), "Configuracion": f"{elegida[0]}",
                                          "Recta (A)": _wape([(float(np.sum(np.abs(f["A"] - f["real"]))), den)]),
                                          "Factor, prima real (B)": _wape([(float(np.sum(np.abs(f["B"] - f["real"]))), den)]),
                                          "Factor, presupuesto (B)": _wape([(float(np.sum(np.abs(f["B ppto"] - f["real"]))), den)]) if "B ppto" in f else None,
@@ -1636,7 +1650,8 @@ def aplicar_factor_prima(resultados: dict, pr, hp, tc: dict, bds: dict, periodos
             else:
                 dec, motivo = "A", "la prima no mejora a la recta en este tipo de reserva"
             if not hay_ppto:
-                motivo += "; sin presupuesto del ano en curso decide solo la prima real"
+                motivo += (f"; sin prueba con el presupuesto del ano en curso (sin presupuesto mensual del ano o sin "
+                           f"historia suficiente al corte {corte_ppto}): decide solo la prima real")
             if len(n_series) < 2 or n_cortes < 3:
                 motivo += f"; indicativo ({len(n_series)} series, {n_cortes} cortes)"
         decision_tipo[tipo] = (dec, elegida)
@@ -1669,7 +1684,16 @@ def aplicar_factor_prima(resultados: dict, pr, hp, tc: dict, bds: dict, periodos
             res.factor = {"decision": "recta", "motivo": info["motivo"]}
             diag["series"].append(fila)
             continue
-        cfg = cfg if cfg in info["ajustes"] else next(iter(info["ajustes"]))
+        forzado_global = MODELO_MONTOS in ("primas", "combinacion")
+        if forzada in ("primas", "combinacion", "tendencia") or forzado_global:
+            fila["Motivo"] = f"forzado ({'MODELO_MONTOS_SERIE' if forzada else 'MODELO_MONTOS'})"
+        if cfg not in info["ajustes"]:
+            alterna = next((c for c in info["ajustes"] if c[1:] == (cfg or (None,))[1:]), next(iter(info["ajustes"])))
+            if forzada not in ("primas", "combinacion") and not forzado_global:
+                dec = "A"
+                fila["Motivo"] = (f"el driver del tipo ({cfg[0] if cfg else '-'}) no aplica a esta serie (factor fuera de "
+                                  f"rango o sin meses suficientes) y {alterna[0]} no paso por la decision del tipo: recta")
+            cfg = alterna
         a = info["ajustes"][cfg]
         prima = info["prima"]
         es_est = pd.Series(pr.fuente[info["grupo"]] != "real", index=pr.fuente.index)
@@ -1689,18 +1713,18 @@ def aplicar_factor_prima(resultados: dict, pr, hp, tc: dict, bds: dict, periodos
                      "Meses del factor": a["n"], "Factor al ultimo mes": a["kappa_hist"][-1],
                      "Rho del error (AR1)": a["rho"], "Persistencia usada": a["phi"],
                      "Credibilidad estacional del factor": pe.get("credibilidad_estacional"),
-                     "Pendiente del factor (mensual)": math.expm1(pe.get("pendiente", 0.0)),
+                     "Pendiente aplicada del factor (mensual)": math.expm1(pe.get("pendiente_aplicada", 0.0)),
+                     "Pendiente observada del factor (mensual)": math.expm1(pe.get("pendiente", 0.0)),
                      "R2 del factor": pe.get("r2"), "Elasticidad observada": elast,
                      "% del driver estimado a dic": f_est_proy[-1], "Nota LAG": a.get("nota_lag", "")})
         if np.isfinite(elast) and not (0.3 <= elast <= 2.0):
             res.alertas.append(f"Elasticidad observada reserva / prima de {elast:.2f} (fuera de 0.3-2): la reserva no se "
                                "ha movido en proporcion a su driver de prima")
-        wa = _wape([(float(np.sum(np.abs(f["A"] - f["real"]))), float(np.sum(f["real"])))
-                    for f in info["bts"].get(cfg, {}).values()])
-        wb_ = _wape([(float(np.sum(np.abs(f["B"] - f["real"]))), float(np.sum(f["real"])))
-                     for f in info["bts"].get(cfg, {}).values()])
-        wc = _wape([(float(np.sum(np.abs(f["C"] - f["real"]))), float(np.sum(f["real"])))
-                    for f in info["bts"].get(cfg, {}).values()])
+        bts_c = [f for f in info["bts"].get(cfg, {}).values() if f["cv"]]      # cortes estandar
+
+        def _w(m):
+            return _wape([(float(np.sum(np.abs(f[m] - f["real"]))), float(np.sum(f["real"]))) for f in bts_c])
+        wa, wb_, wc, wu = _w("A"), _w("B"), _w("C"), _w("U")
         fila.update({"Error % recta": wa, "Error % factor": wb_, "Error % combinacion": wc})
         if np.isfinite(wb_) and np.isfinite(wa) and wb_ > 2 * wa + 5:
             res.alertas.append(f"En el backtest de esta serie el factor de prima ({wb_:.1f}%) queda muy por arriba de "
@@ -1725,7 +1749,7 @@ def aplicar_factor_prima(resultados: dict, pr, hp, tc: dict, bds: dict, periodos
                          f"Crec. factor de prima {periodos_proy[j0]}-{periodos_proy[j1]}": pron_b[j1] / pron_b[j0] - 1})
         res.factor = {"decision": {"A": "recta", "B": "factor de prima", "C": "combinacion"}[dec], "driver": cfg[0],
                       "config": cfg, "pron_recta": list(recta), "li_recta": list(li_r), "ls_recta": list(ls_r),
-                      "error_recta": res.error_modelo, "modelo_recta": res.modelo, "pron_factor": list(pron_b),
+                      "error_recta": wa, "modelo_recta": res.modelo, "pron_factor": list(pron_b),
                       "descomposicion": decomp, "grupo": info["grupo"], "kappa_T": float(a["kappa_hist"][-1])}
         fila["Decision"] = res.factor["decision"]
         fila[f"Recta {periodos_proy[-1]}"] = recta[-1]
@@ -1736,7 +1760,15 @@ def aplicar_factor_prima(resultados: dict, pr, hp, tc: dict, bds: dict, periodos
             res.ls = [float(v) for v in np.exp(np.log(nuevo) + hw)]
             res.modelo = modelo
             res.error_modelo = wb_ if dec == "B" else wc
-            res.alertas = [x for x in res.alertas if not x.startswith("Cambio proyectado a")]
+            res.error_ultimo_valor, res.error_ses, res.n_cortes = wu, math.nan, len(bts_c)
+            # las alertas de la recta quedan como de la alternativa; las del backtest se rehacen con los mismos cortes
+            res.alertas = [("Recta alternativa: " + x) if x.startswith(("R2 de la tendencia", "La tendencia de",
+                                                                        "El ultimo mes esta")) else x
+                           for x in res.alertas
+                           if not x.startswith(("Cambio proyectado a", "En el backtest de esta serie el modelo ("))]
+            if res.n_cortes and np.isfinite(res.error_modelo) and np.isfinite(wu) and res.error_modelo > wu * 1.10 + 0.5:
+                res.alertas.append(f"En el backtest de esta serie el modelo ({res.error_modelo:.1f}%) no supera a "
+                                   f"repetir el ultimo valor ({wu:.1f}%)")
             _post_proceso(res, np.asarray(res.historia_valores, dtype=float), res.tipo)
             res.alertas.append(f"Modelo final: {modelo}; recta alternativa a {periodos_proy[-1]}: {recta[-1]:,.0f} "
                                f"{info['moneda']} (error backtest {wa:.1f}% contra {res.error_modelo:.1f}%)"
@@ -1799,23 +1831,29 @@ def _totales_neto(proy: dict, periodos: list[int]) -> dict:
 
 
 def comparar_factor(resultados: dict, diag: dict, pr, tc: dict, bds: dict, proys: dict, periodos_proy: list[int],
-                    tc_hist: dict, ultimo: int) -> dict:
-    """Totales NETO (todos los ramos, USD) de RRC, SONR y RFV con el modelo final, con la recta en todas las series y
-    con la prima del ano siguiente movida SENSIBILIDAD_PRIMA. La recta y la sensibilidad no llevan el ajuste por
-    rango esperado."""
+                    tc_hist: dict, ultimo: int, sin_rango: dict | None = None) -> dict:
+    """Totales NETO (todos los ramos, USD) de RRC, SONR y RFV con el modelo final (con el ajuste por rango esperado,
+    como en la BD), con el modelo final sin ese ajuste, con la recta en todas las series y con la prima del ano
+    siguiente movida SENSIBILIDAD_PRIMA. Los ultimos tres se arman con los pronosticos antes del rango esperado
+    (sin_rango), asi que son comparables entre si."""
     por_serie = diag.get("_por_serie") or {}
     con_factor = [k for k, i in por_serie.items() if i.get("elegible")
                   and resultados[k].factor.get("decision") in ("factor de prima", "combinacion")]
     if not con_factor:
         return {}
 
+    base = sin_rango or {}
+
     def derivar_con(mods: dict) -> dict:
-        res2 = {k: (replace(r, pronostico=list(mods[k])) if k in mods else r) for k, r in resultados.items()}
+        res2 = {k: replace(r, pronostico=list(mods[k]) if k in mods else list(base.get(k, r.pronostico)))
+                for k, r in resultados.items()}
         return {lib: derivar_montos(bds[lib], lib, ESTRUCTURA[lib], res2, periodos_proy, en_mxn=lib in tc_hist)
                 for lib in bds}
 
-    escenarios = {"Modelo final": proys,
-                  "Recta en todas las series": derivar_con({k: resultados[k].factor["pron_recta"] for k in con_factor})}
+    escenarios = {"Modelo final": proys}
+    if base and any(base[k] != list(r.pronostico) for k, r in resultados.items() if k in base):
+        escenarios["Modelo final sin rango esperado"] = derivar_con({})
+    escenarios["Recta en todas las series"] = derivar_con({k: resultados[k].factor["pron_recta"] for k in con_factor})
     for escala, mods in sensibilidad_factor(resultados, diag, pr, tc, periodos_proy).items():
         escenarios[f"Prima {pr.anio_sig} x {escala:.2f}"] = derivar_con(mods)
     dics = [p for p in periodos_proy if p % 100 == 12]
@@ -1841,6 +1879,22 @@ def comparar_factor(resultados: dict, diag: dict, pr, tc: dict, bds: dict, proys
                 fila[f"Crec. {dics[0]}-{dics[1]}"] = tot[pref][dics[1]] / tot[pref][dics[0]] - 1
             filas.append(fila)
     return {"filas": filas, "series_con_factor": len(con_factor)}
+
+
+def actualizar_finales_factor(diag: dict, resultados: dict, periodos_proy: list[int]):
+    """Despues del rango esperado: 'Final' y 'Reserva final' del diagnostico del factor con el pronostico que se
+    escribe en la BD."""
+    for fila in diag.get("series") or []:
+        clave = next((k for k in resultados if k[0] == fila["Libro"] and k[1] == fila["Reserva"] and k[3] == fila["Ramo"]
+                      and resultados[k].tipo == "nivel" and k[2] == SERIES_FACTOR.get((k[0], k[1]))), None)
+        if clave and f"Final {periodos_proy[-1]}" in fila:
+            fila[f"Final {periodos_proy[-1]}"] = resultados[clave].pronostico[-1]
+    pos = {p: i for i, p in enumerate(periodos_proy)}
+    for fila in diag.get("mensual") or []:
+        if fila["Tipo"] == "Proyeccion":
+            clave = (fila["Libro"], fila["Reserva"], SERIES_FACTOR[(fila["Libro"], fila["Reserva"])], fila["Ramo"])
+            if clave in resultados:
+                fila["Reserva final"] = resultados[clave].pronostico[pos[fila["Periodo"]]]
 
 
 def _mas_meses(periodo: int, meses: int) -> int:
@@ -2148,9 +2202,9 @@ def escribir_diagnostico(resultados: dict, periodos_proy: list[int], alertas_gen
         ("Factor de prima", (resumen.get("factor") or {}).get("estado", "")
          + (f"; perfil mensual de la prima estimada: {resumen['primas'].perfil['elegido']}"
             if resumen.get("primas") is not None else "")),
-        ("Factor de prima: decision", " | ".join(f"{d['Tipo']}: {d['Decision']} ({d['Motivo']})"
+        ("Factor de prima: decision", " | ".join(f"{d['Tipo']}: {d['Decision']} ({d['Configuracion']}; {d['Motivo']})"
                                                  for d in (resumen.get("factor") or {}).get("decision", [])) or "-"),
-        ("Factor de prima: reservas NETO", " | ".join(
+        ("Factor de prima: reservas NETO (M USD)", " | ".join(
             f"{f['Escenario']} {f['Reserva']}: " + ", ".join(f"{k[5:]} {v / 1e6:,.1f}" for k, v in f.items()
                                                            if k.startswith("Proy ") and v is not None)
             for f in (resumen.get("comparativo") or {}).get("filas", [])) or "-"),
@@ -2195,7 +2249,7 @@ def escribir_diagnostico(resultados: dict, periodos_proy: list[int], alertas_gen
                         "absolutos / suma de valores reales) del modelo, de repetir el ultimo valor y de SES. Hoja "
                         "Backtest: resumen por tipo; Series_Modelos: por serie. Fianzas (20 meses de historia) solo "
                         "alcanza el corte a 8 meses: indicativo. Sirve para juzgar la confiabilidad; no cambia el "
-                        "modelo."),
+                        "modelo, salvo en el factor de prima (8), donde decide entre la recta y el factor."),
         ("5. Intervalos", f"{NIVEL_INTERVALO:.0%}, calculados por el propio modelo (en logaritmos para montos e "
                           "indices, por lo que son asimetricos)."),
         ("6. Reglas", "Series en cero -> 0; parametros en escalon -> ultimo valor; dominio actuarial (cesion en "
@@ -2210,12 +2264,16 @@ def escribir_diagnostico(resultados: dict, periodos_proy: list[int], alertas_gen
                                "escriben como factor mensual x exposicion de prima del grupo de ramo: RRC con la prima no "
                                "devengada en 24avos (PND12), SONR con la prima devengada de los ultimos anos por la parte "
                                "pendiente de reportar segun los LAG (PDP), RFV con la prima de 12 meses en pesos. El "
-                               "factor se proyecta con la recta de 36 meses sin pendiente y con su patron del mes, anclado "
-                               "a su ultimo valor; su error como AR(1) (rho) es el 'factor de error'. Por tipo de reserva "
-                               "el backtest decide entre la recta, el factor o la combinacion 50/50 (hoja "
-                               "Factor_Prima_Resumen). La prima del resto del ano sale del reforecast repartido por "
-                               "contrato, cedente y LN, y la del ano siguiente del presupuesto mes a mes; controles en "
-                               "Primas_Controles."),
+                               "factor se proyecta con la recta de 36 meses y su patron del mes, sin pendiente "
+                               f"(PENDIENTES_FACTOR = {PENDIENTES_FACTOR}) y anclado a su ultimo valor; su error como "
+                               "AR(1) (rho) es el 'factor de error' y su persistencia compite en la rejilla. Por tipo de "
+                               "reserva el backtest decide entre la recta, el factor o la combinacion 50/50: con la prima "
+                               "real en los cortes estandar y con el presupuesto del ano en curso (sus meses tal cual) en "
+                               "un corte propio en diciembre del ano anterior (configuracion y decision en 'Factor de "
+                               "prima: decision' y en Factor_Prima_Resumen). La prima del resto del ano sale del "
+                               "reforecast repartido por contrato, cedente y LN; la del ano siguiente, del total del "
+                               "presupuesto por grupo repartido a meses con el perfil elegido (el mes a mes del CSV solo "
+                               "si el perfil es 'presupuesto'); controles en Primas_Controles."),
         ("Versiones", resumen.get("versiones", "")),
     ]
     for i, (a, b) in enumerate(lineas, start=1):
@@ -2500,7 +2558,7 @@ def _hojas_primas(wb, resumen: dict, negrita, encab):
                 for j, v in enumerate(reg, start=1):
                     ws.cell(fila, j, _celda(v))
             _formatear(ws, enc_fila, {**formato_pct, "Prima": "#,##0.00", "Real": "#,##0.00", "Presupuesto": "#,##0.00",
-                                      "CSV": "#,##0.00", "Referencia": "#,##0.00", "Ano": "#,##0.00",
+                                      "CSV": "#,##0.00", "Referencia": "#,##0.00", "Ano 20": "#,##0.00",
                                       "Historico": "#,##0.00", "Resto": "#,##0.00", "Completado": "#,##0.00",
                                       "Reforecast": "#,##0.00", "20": "#,##0.00", "1": "#,##0.00", "3": "#,##0.00",
                                       "4": "#,##0.00", "5": "#,##0.00", "6": "#,##0.00", "7": "#,##0.00",
@@ -2522,8 +2580,9 @@ def _hojas_primas(wb, resumen: dict, negrita, encab):
         bloques = [("Estado", [{"Factor de prima": diag.get("estado", "")}]),
                    ("Decision por tipo de reserva (error % del backtest agrupado)", diag.get("decision")),
                    ("Rejilla de configuraciones (error % del factor con la prima real, mismos casos)", diag.get("rejilla")),
-                   ("Reservas NETO totales (USD): modelo final contra la recta y sensibilidad a la prima del ano "
-                    "siguiente", comp.get("filas")),
+                   ("Reservas NETO totales (USD): modelo final (con el ajuste por RANGO_ESPERADO) contra el mismo "
+                    "sin ese ajuste, la recta y la sensibilidad a la prima del ano siguiente (estas tres sin el ajuste)",
+                    comp.get("filas")),
                    ("Detalle por serie", diag.get("series"))]
         for titulo, filas in bloques:
             ws.cell(fila, 1, titulo).font = negrita
@@ -2547,7 +2606,8 @@ def _hojas_primas(wb, resumen: dict, negrita, encab):
             _formatear(ws, enc_fila, {**formato_pct, "Real": "#,##0", "Proy": "#,##0", "Recta ": "#,##0",
                                       "Factor de prima 2": "#,##0", "Final": "#,##0", "Factor al": "0.000",
                                       "Rho": "0.00", "Persistencia usada": "0.00", "R2": "0.00",
-                                      "Elasticidad": "0.00", "Pendiente del factor (": "0.00%"}, fila)
+                                      "Elasticidad": "0.00", "Pendiente aplicada": "0.00%",
+                                      "Pendiente observada": "0.00%"}, fila)
             fila += 2
         ws.column_dimensions["A"].width = 26
         _hoja_filas(wb, "Factor_Mensual", diag.get("mensual") or [], negrita, encab,
@@ -2778,16 +2838,20 @@ def main():
             for a in (pr.avisos if pr is not None else []):
                 alertas.append(("PRIMAS", "Primas", a))
                 print(f"   AVISO {a}", flush=True)
-            respaldo = {k: (list(r.pronostico), list(r.li), list(r.ls), r.modelo, list(r.alertas), r.error_modelo)
+            respaldo = {k: (list(r.pronostico), list(r.li), list(r.ls), r.modelo, list(r.alertas), r.error_modelo,
+                            r.error_ultimo_valor, r.error_ses, r.n_cortes)
                         for k, r in resultados.items() if r.tipo == "nivel"}
+            n0 = len(alertas)
             try:
                 diag_factor = ({"estado": error_lectura} if error_lectura else
                                aplicar_factor_prima(resultados, pr, hp, tc_primas, {"DANOS": bd_danos, "FIANZAS": bd_rfv},
                                                     periodos_proy, ultimo, alertas))
             except Exception as e:  # noqa: BLE001
-                for k, (pn, lo, hi, mo, al, em) in respaldo.items():
+                del alertas[n0:]
+                for k, (pn, lo, hi, mo, al, em, eu, es, nc) in respaldo.items():
                     r = resultados[k]
-                    r.pronostico, r.li, r.ls, r.modelo, r.alertas, r.error_modelo, r.factor = pn, lo, hi, mo, al, em, {}
+                    r.pronostico, r.li, r.ls, r.modelo, r.alertas, r.factor = pn, lo, hi, mo, al, {}
+                    r.error_modelo, r.error_ultimo_valor, r.error_ses, r.n_cortes = em, eu, es, nc
                 diag_factor = {"estado": f"error en el factor de prima ({type(e).__name__}: {e}); se usa la recta"}
                 alertas.append(("PRIMAS", "Factor de prima", diag_factor["estado"]))
         print(f"   {diag_factor.get('estado')}", flush=True)
@@ -2797,13 +2861,15 @@ def main():
                                 en_mxn="DANOS" in tc_hist)
     proy_rfv = derivar_montos(bd_rfv, "FIANZAS", ESTRUCTURA["FIANZAS"], resultados, periodos_proy,
                               en_mxn="FIANZAS" in tc_hist)
+    sin_rango = {k: list(r.pronostico) for k, r in resultados.items()}   # para el comparativo del factor
     resumen_rangos = (aplicar_rango_esperado(proy_danos, bd_danos, "DANOS", ESTRUCTURA["DANOS"], resultados,
                                              periodos_proy, ultimo, alertas)
                       + aplicar_rango_esperado(proy_rfv, bd_rfv, "FIANZAS", ESTRUCTURA["FIANZAS"], resultados,
                                                periodos_proy, ultimo, alertas))
     validar(proy_danos, proy_rfv)
     comparativo = comparar_factor(resultados, diag_factor, pr, tc_primas, {"DANOS": bd_danos, "FIANZAS": bd_rfv},
-                                  {"DANOS": proy_danos, "FIANZAS": proy_rfv}, periodos_proy, tc_hist, ultimo)
+                                  {"DANOS": proy_danos, "FIANZAS": proy_rfv}, periodos_proy, tc_hist, ultimo, sin_rango)
+    actualizar_finales_factor(diag_factor, resultados, periodos_proy)
 
     info_danos = escribir_bd_montos(bd_danos, proy_danos, periodos_proy, SALIDA_BD_DANOS)
     escribir_correccion_moneda(bd_danos, correcciones["DANOS"])
