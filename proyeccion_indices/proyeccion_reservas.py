@@ -129,7 +129,7 @@ import numpy as np  # noqa: E402
 import openpyxl  # noqa: E402
 from openpyxl.formula.translate import Translator  # noqa: E402
 from openpyxl.styles import Alignment, Font, PatternFill  # noqa: E402
-from openpyxl.utils import get_column_letter  # noqa: E402
+from openpyxl.utils import column_index_from_string, get_column_letter  # noqa: E402
 import pandas as pd  # noqa: E402
 from scipy.stats import f_oneway as _f_oneway, norm as _normal  # noqa: E402
 from statsmodels.tsa.exponential_smoothing.ets import ETSModel  # noqa: E402
@@ -403,6 +403,8 @@ BD_CON_ESCENARIO_PND = None      # None: la BD principal no cambia y cada escena
 INDICE_BASE_PND = {"RRC": ("Ind Sin RRC", "PND"), "SONR": ("Ind Sin SONR Media", "PD")}   # indice y nombre de la base
 PERSISTENCIAS_PND = (1.0, "estimada")   # desviacion del FA: se conserva (1) o se desvanece con su rho
 RANGO_FA = (0.001, 20.0)         # FA (base / prima anualizada) sano al ultimo mes
+INDICES_PND_EN_BD = True         # columnas a la derecha de BD_Montos_RRC_SONR con los indicadores de toda la reserva
+COLUMNAS_INDICES_PND = {"PND/PD": "#,##0", "FA": "0.0000", "FACTOR GTO": "0.00%", "FACTOR MR": "0.00%"}
 ESTACIONALIDAD_TRIMESTRAL = ("RCONT",)   # acumula en meses 1-2 del trimestre y libera en el 3
 DOMINIO_CESION = (0.0, 1.0)      # IRR/BRUTO entre 0 y 100%
 DOMINIO_RAZON_BEL = (0.0, None)  # GTO/BEL y MR/BEL no negativos
@@ -1984,6 +1986,90 @@ def _indice_al_corte(hp, ramo, nombre: str, pc: int, h: int):
     return f if len(f) == h and np.all(np.isfinite(f)) and np.all(f > 0) else None
 
 
+def indices_pnd_bd(diag: dict, resultados: dict, proy: dict, periodos_proy: list[int], meses_pe: int | None) -> dict:
+    """Indicadores de toda la reserva (suma de los ramos con indice) por mes, para las columnas de la BD:
+    {(reserva, periodo): {"PND/PD": suma de la base BEL / indice, "FA": base / prima de los grupos de esos ramos (ultimos
+    meses_pe meses, anualizada), "FACTOR GTO": GTO / PND (RRC), "FACTOR MR": MR / base}}. La historia sale del real y la
+    proyeccion de proy (la base proyectada es el BEL escrito entre el indice proyectado de HParametros)."""
+    hist, pe_tab = diag.get("_hist") or {}, diag.get("_pe") or {}
+    esc = next((e for e, m in ESCENARIOS_PND.items() if m == meses_pe), None)
+    h = len(periodos_proy)
+    out = {}
+    for pref, (nombre_is, _) in INDICE_BASE_PND.items():
+        acum = {}
+        for (pf, ramo), d in hist.items():
+            if pf != pref:
+                continue
+            grupo = d.get("grupo")
+            for i, p in enumerate(d["per"]):
+                b = d["base"][i]
+                if np.isfinite(b) and b > 0:
+                    a = acum.setdefault(p, [0.0, 0.0, 0.0, set()])
+                    a[0] += b
+                    a[1] += float(np.nan_to_num(d["gto"][i]))
+                    a[2] += float(np.nan_to_num(d["mr"][i]))
+                    a[3].add(grupo)
+            r_is = resultados.get(("HPARAM", HOJA_PARAMETROS, nombre_is, MAPA_RAMO_LAG.get(str(ramo))))
+            is_f = np.asarray(r_is.pronostico, dtype=float) if r_is is not None else None
+            if is_f is None or len(is_f) != h:
+                continue
+            for j, p in enumerate(periodos_proy):
+                bel = proy.get((norm(f"{pref} BEL"), p, ramo), math.nan)
+                if not (np.isfinite(bel) and bel > 0 and np.isfinite(is_f[j]) and is_f[j] > 0):
+                    continue
+                a = acum.setdefault(p, [0.0, 0.0, 0.0, set()])
+                a[0] += bel / is_f[j]
+                a[1] += proy.get((norm("RRC GTO"), p, ramo), 0.0) if pref == "RRC" else 0.0
+                a[2] += proy.get((norm(f"{pref} MR"), p, ramo), 0.0)
+                a[3].add(grupo)
+        for p, (b, g, m, grupos) in acum.items():
+            fila = {"PND/PD": b, "FACTOR MR": m / b if b > 0 else None}
+            if pref == "RRC":
+                fila["FACTOR GTO"] = g / b if b > 0 else None
+            if esc is not None and pe_tab and None not in grupos:
+                pe = [float(pe_tab[(esc, gr)].get(p, math.nan)) for gr in grupos if (esc, gr) in pe_tab]
+                tot = sum(pe) if pe and all(np.isfinite(pe)) else math.nan
+                fila["FA"] = b / tot if np.isfinite(tot) and tot > 0 else None
+            out[(pref, p)] = fila
+    return out
+
+
+def escribir_indices_pnd(bd: BDMontos, indices: dict):
+    """Escribe los indicadores en columnas a la derecha de la hoja de montos (encabezados de COLUMNAS_INDICES_PND en
+    el renglon 3: si ya estan, se usan esas columnas; si no, se agregan despues de la ultima). Van en todos los
+    renglones de RRC y SONR (historia y proyeccion); sin dato, la celda queda vacia."""
+    ws = bd.ws
+    enc = {norm(ws.cell(3, c).value): c for c in range(1, ws.max_column + 1) if ws.cell(3, c).value}
+    ultima = max(enc.values())
+    cols = {}
+    for nombre in COLUMNAS_INDICES_PND:
+        c = enc.get(norm(nombre))
+        if c is None:
+            ultima += 1
+            c = ultima
+            _copiar_estilo(ws.cell(3, max(enc.values())), ws.cell(3, c))
+            ws.cell(3, c).value = nombre
+            ancho = ws.column_dimensions[get_column_letter(max(enc.values()))].width
+            if ancho:
+                ws.column_dimensions[get_column_letter(c)].width = ancho
+        cols[nombre] = c
+    for (conc, p), r in bd.filas.items():
+        pref = conc.split()[0]
+        if pref not in INDICE_BASE_PND:
+            continue
+        vals = indices.get((pref, p), {})
+        for nombre, c in cols.items():
+            v = vals.get(nombre)
+            celda = ws.cell(r, c)
+            celda.value = float(v) if v is not None and np.isfinite(v) else None
+            celda.number_format = COLUMNAS_INDICES_PND[nombre]
+    if ws.auto_filter and ws.auto_filter.ref:          # el filtro de la hoja llega a las columnas nuevas
+        ini, fin = ws.auto_filter.ref.split(":")
+        fila_fin = re.match(r"[A-Z]+(\d+)", fin).group(1)
+        if column_index_from_string(re.match(r"[A-Z]+", fin).group()) < max(cols.values()):
+            ws.auto_filter.ref = f"{ini}:{get_column_letter(max(cols.values()))}{fila_fin}"
+
+
 def escenarios_pnd(bd: BDMontos, hp, resultados: dict, pr, proy_base: dict, periodos_proy: list[int], ultimo: int,
                    alertas: list, motivo_sin_prima: str = "") -> dict:
     """Escenarios PND / PD de Danos (ver ESCENARIOS_PND). Regresa el diagnostico y, por escenario, el diccionario de
@@ -2237,6 +2323,8 @@ def escenarios_pnd(bd: BDMontos, hp, resultados: dict, pr, proy_base: dict, peri
                 diag.setdefault("rangos", {})[esc] = aplicar_rango_esperado(
                     proy, bd, "DANOS", ESTRUCTURA["DANOS"], {}, periodos_proy, ultimo, al_tmp)
             diag["proy"][esc] = proy
+
+    diag["_hist"], diag["_pe"] = hist, pe_tab       # (para las columnas de indicadores de la BD)
 
     # 5) tablas del diagnostico
     def _v(proy, conc, p, ramo):
@@ -3362,6 +3450,9 @@ def main():
     actualizar_finales_factor(diag_factor, resultados, periodos_proy)
 
     info_danos = escribir_bd_montos(bd_danos, proy_danos, periodos_proy, SALIDA_BD_DANOS)
+    meses_bd = ESCENARIOS_PND.get(BD_CON_ESCENARIO_PND) or next(iter(ESCENARIOS_PND.values()), None)
+    if INDICES_PND_EN_BD and diag_pnd.get("_hist"):
+        escribir_indices_pnd(bd_danos, indices_pnd_bd(diag_pnd, resultados, proy_danos, periodos_proy, meses_bd))
     escribir_correccion_moneda(bd_danos, correcciones["DANOS"])
     n_hp = escribir_hparametros(hp, resultados, periodos_proy)
     guardar_libro(bd_danos.wb, SALIDA_BD_DANOS, original=ARCHIVO_BD_DANOS)
@@ -3373,6 +3464,9 @@ def main():
     for esc, proy_esc in (diag_pnd.get("proy") or {}).items():
         ruta = ruta_escenario_pnd(esc)
         escribir_bd_montos(bd_danos, proy_esc, periodos_proy, ruta)
+        if INDICES_PND_EN_BD and diag_pnd.get("_hist"):
+            escribir_indices_pnd(bd_danos, indices_pnd_bd(diag_pnd, resultados, proy_esc, periodos_proy,
+                                                          ESCENARIOS_PND[esc]))
         guardar_libro(bd_danos.wb, ruta, original=ARCHIVO_BD_DANOS)
         archivos_pnd.append(ruta.name)
     viejos = [ruta_escenario_pnd(e).name for e in ESCENARIOS_PND
