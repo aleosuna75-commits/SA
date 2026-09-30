@@ -163,9 +163,7 @@ def preparar_datos() -> dict:
             "err_ultimo": _redondear(d.get("Error % ultimo valor (mediana)"), 1),
             "mejora": _redondear(d.get("% series en que el modelo mejora al ultimo valor"), 6),
         })
-    modelo_por_tipo = {}
-    for d in filas_metodo:
-        modelo_por_tipo.setdefault(d["tipo"], d["modelo"])
+    modelo_por_tipo = dx.etiquetas_modelo(metodo)
     resumen = leer_resumen()
     ventana = resumen.get("Ventana de tendencia (meses)")
     try:

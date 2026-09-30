@@ -222,11 +222,26 @@ def leer_montos(ultimo: int):
             tipo = "Real" if per <= ultimo else "Proyección"
             for ramo, k in c_ramos.items():
                 v = numero(f[k])
-                if v is None:                    # celda vacia (p. ej. RCONT de 2025): sin dato, no un cero real
+                if v is None:                    # celda vacia (mes sin captura): sin dato, no un cero real
                     continue
                 registros.append((libro, reserva, conc, ramo, per, tipo, v))
         wb.close()
     return registros, tc, ramos
+
+
+def etiquetas_modelo(metodo: list) -> dict:
+    """Modelo por tipo de serie para las etiquetas (hoja Backtest, una fila por tipo y libro): los modelos de todos los
+    libros sin repetir; el de las series trimestrales (RCONT) va aparte para no atribuirselo a todos los montos."""
+    modelos = {}
+    for d in metodo:
+        for m in str(d.get("Modelo") or "").split(", "):
+            if m and m not in modelos.setdefault(d.get("Tipo"), []):
+                modelos[d.get("Tipo")].append(m)
+    out = {}
+    for tipo, ms in modelos.items():
+        otros, trim = [m for m in ms if "trimestral" not in m], [m for m in ms if "trimestral" in m]
+        out[tipo] = ", ".join(otros) + (f"; RCONT: {', '.join(trim)}" if otros and trim else ", ".join(trim) if trim else "")
+    return out
 
 
 def nota_modelo() -> str:
@@ -364,7 +379,7 @@ def generar(ruta_salida: Path = SALIDA_DASHBOARD) -> Path:
     intervalos = leer_intervalos()
     registros_m, tc, ramos_m = leer_montos(ultimo)
     metodo = leer_metodo()
-    proc = {d.get("Tipo"): d.get("Modelo") or "n/d" for d in metodo}
+    proc = etiquetas_modelo(metodo)
     fin = max(r[3] for r in registros_i)
     fin_m = max(r[4] for r in registros_m)
     p_dic_actual = (ultimo // 100) * 100 + 12

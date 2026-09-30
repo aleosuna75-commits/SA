@@ -316,8 +316,9 @@ MESES_MEZCLA = 8                 # meses recientes para repartir por ramo los to
 MODELAR_EN_MXN = {"DANOS": False, "FIANZAS": True}
 # Monedas mezcladas en la historia: si un tramo de la BD viene en MXN y otro en USD, el salto entre dos meses seguidos
 # es del tamano del TC (p. ej. RFV BRUTO 1,754 M en dic-25 y 104 M en ene-26) y la tendencia lo lee como una caida de
-# 94 %. True = se detecta por concepto (recorriendo la historia hacia atras desde el ultimo mes, que se toma como USD;
-# un concepto que ya viene en USD en esos meses, como la RCONT de 2025, no trae el salto y se deja), los meses en
+# 94 %. True = se detecta por reserva (RFV, RCONT, RRC, SONR; recorriendo la historia hacia atras desde el ultimo mes,
+# que se toma como USD; una reserva que ya viene en USD en esos meses, como la RCONT de 2025, no trae el salto y se
+# deja como viene), los meses en
 # MXN se convierten a USD con el TC de cada mes de la propia BD, en memoria y en la BD de salida (sin comentarios;
 # el detalle queda en la hoja Moneda_corregida), y se avisa en consola y en Alertas. El archivo de entrada no se
 # modifica.
@@ -392,7 +393,8 @@ def norm(t) -> str:
 # =============================================================================
 #   Tendencia historica = linea de tendencia (regresion) sobre la ventana, continuada desde el ultimo real.
 #   Los demas son casos de suavizamiento exponencial (familia Holt-Winters): SES = solo nivel; Holt amortiguado =
-#   nivel + tendencia amortiguada; Holt-Winters = ademas estacionalidad (aqui la trimestral de RCONT).
+#   nivel + tendencia amortiguada; Holt-Winters = estacionalidad sobre el nivel (con o sin tendencia amortiguada;
+#   la RCONT usa MODELO_TRIMESTRAL, sin tendencia).
 TENDENCIA = "Tendencia historica"
 MODELOS = {
     "SES": dict(),
@@ -1055,14 +1057,14 @@ def periodo_ultimo_real(periodos_proy: list[int]) -> int:
     return indice_a_periodo(periodo_a_indice(periodos_proy[0]) - 1)
 
 
-def detectar_moneda_mezclada(bd: BDMontos, ultimo: int, concepto: str | None = None) -> dict:
+def detectar_moneda_mezclada(bd: BDMontos, ultimo: int, conceptos: list | None = None) -> dict:
     """Meses de la historia que vienen en MXN dentro de una BD en USD: {periodo: TC de la BD}. Se recorre la historia
     hacia atras desde el ultimo mes (que se toma como USD); un salto entre dos meses seguidos del tamano del TC
-    (dentro de TOLERANCIA_SALTO_TC) marca un cambio de moneda. Se usa el total de ramos del concepto (o de todos los
-    conceptos si concepto es None)."""
+    (dentro de TOLERANCIA_SALTO_TC) marca un cambio de moneda. Se usa el total de ramos de los conceptos dados (o de
+    todos si conceptos es None)."""
     totales = {}
     for (c, p, _), v in bd.valores.items():
-        if (concepto is None or c == concepto) and p <= ultimo and isinstance(v, (int, float)) and not math.isnan(v):
+        if (conceptos is None or c in conceptos) and p <= ultimo and isinstance(v, (int, float)) and not math.isnan(v):
             totales[p] = totales.get(p, 0.0) + abs(v)
     periodos = [p for p in sorted(totales) if totales[p] > 0]
     tolerancia = math.log(1 + TOLERANCIA_SALTO_TC)
@@ -1081,27 +1083,35 @@ def detectar_moneda_mezclada(bd: BDMontos, ultimo: int, concepto: str | None = N
 
 
 def corregir_moneda_mezclada(bd: BDMontos, libro: str, ultimo: int, alertas: list) -> list:
-    """Convierte a USD (en memoria) los meses que la BD trae en MXN. La deteccion es por concepto: un concepto que se
-    capturo en USD en esos meses (p. ej. RCONT de 2025) no trae el salto y se deja como viene. Regresa las celdas
-    corregidas [(concepto, periodo, ramo, valor original, valor en USD, tc)] para escribirlas en la BD de salida."""
-    conceptos = sorted({c for (c, _, _) in bd.valores})
-    por_concepto = {c: detectar_moneda_mezclada(bd, ultimo, c) for c in conceptos}
-    por_concepto = {c: m for c, m in por_concepto.items() if m}
-    if not por_concepto:
+    """Convierte a USD (en memoria) los meses que la BD trae en MXN. La deteccion es por reserva (primera palabra del
+    concepto: RFV, RCONT, RRC, SONR): los conceptos de una reserva (BRUTO, IRR, NETO...) se detectan juntos, asi que
+    se convierten juntos y las identidades se conservan; una reserva que se capturo en USD en esos meses (p. ej. la
+    RCONT de 2025) no trae el salto y se deja como viene. Regresa las celdas corregidas
+    [(concepto, periodo, ramo, valor original, valor en USD, tc)] para escribirlas en la BD de salida."""
+    familias = {}
+    for c in sorted({c for (c, _, _) in bd.valores}):
+        familias.setdefault(c.split(" ")[0], []).append(c)
+    por_familia = {f: detectar_moneda_mezclada(bd, ultimo, cs) for f, cs in familias.items()}
+    por_familia = {f: m for f, m in por_familia.items() if m}
+    if not por_familia:
         return []
     cambios = []
     for (c, p, r), v in list(bd.valores.items()):
-        en_mxn = por_concepto.get(c, {})
+        en_mxn = por_familia.get(c.split(" ")[0], {})
         if p in en_mxn and v:
             bd.valores[(c, p, r)] = v / en_mxn[p]
             cambios.append((c, p, r, v, v / en_mxn[p], en_mxn[p]))
-    meses = sorted(set().union(*por_concepto.values()))
-    sin_salto = [c for c in conceptos if c not in por_concepto
-                 and any(bd.valores.get((c, p, r)) for p in meses for r in bd.cols_ramo)]
-    texto = (f"{', '.join(por_concepto)}: {len(meses)} meses ({meses[0]} a {meses[-1]}) venian en pesos (el salto "
-             f"contra el mes siguiente es del tamano del TC); se convirtieron a USD con el TC de cada mes de la BD "
-             f"({len(cambios)} celdas). Sin esto la tendencia leia el cambio de moneda como una caida de ~94 %."
-             + (f" {', '.join(sin_salto)}: sin ese salto en esos meses (ya venia en USD), se deja como viene."
+    grupos = {}                                      # conceptos que comparten el mismo tramo en pesos
+    for f, m in por_familia.items():
+        grupos.setdefault(tuple(sorted(m)), []).extend(familias[f])
+    tramos = "; ".join(f"{', '.join(cs)}: {len(ms)} meses ({ms[0]} a {ms[-1]})" for ms, cs in grupos.items())
+    meses = sorted(set().union(*por_familia.values()))
+    sin_salto = [c for f, cs in familias.items() if f not in por_familia for c in cs
+                 if any(bd.valores.get((c, p, r)) for p in meses for r in bd.cols_ramo)]
+    texto = (f"{tramos} venian en pesos (el salto contra el mes siguiente es del tamano del TC); se convirtieron a USD "
+             f"con el TC de cada mes de la BD ({len(cambios)} celdas). Sin esto la tendencia leia el cambio de moneda "
+             "como una caida de ~94 %."
+             + (f" {', '.join(sin_salto)}: no trae ese salto en esos meses (se toma como USD) y se deja como viene."
                 if sin_salto else "")
              + " Revisa la BD de entrada.")
     alertas.append((libro, "Moneda mezclada en la historia", texto + " Detalle por celda: hoja Moneda_corregida."))
