@@ -2523,7 +2523,7 @@ def calcular_bel_fnd(bd: BDMontos, hp, resultados: dict, proy: dict, pe: dict, p
     pos = {p: i for i, p in enumerate(periodos_proy)}
     p12 = _suma_12(pe)
     out = {"proy": dict(proy), "aplica": set(), "fnd": {}, "razones": {}, "series": [], "resumen": [], "estado": "",
-           "p12": p12}
+           "p12": p12, "alertas": [], "neto_fijo": {}}
     if not pe:
         out["estado"] = "sin PE por ramo (PExRamo y FCST): el BEL sigue con el modelo"
         return out
@@ -2569,7 +2569,7 @@ def calcular_bel_fnd(bd: BDMontos, hp, resultados: dict, proy: dict, pe: dict, p
                 if len(fnd_f) != h:
                     motivo, fnd_f = "no se pudo proyectar el FND", None
             # FACTOR GTO, FACTOR MR y CESION reales (como los bloques de la hoja) y su recta desde el primer mes proyectado
-            fac_f = {}
+            fac_f, fac_u = {}, {}
             if fnd_f is not None:
                 specs = {"FACTOR GTO": ("GTO", "PND", DOMINIO_RAZON_BEL)} if pref == "RRC" else {}
                 specs.update({"FACTOR MR": ("MR", "PND", DOMINIO_RAZON_BEL), "CESION": ("IRR", "BRUTO", DOMINIO_CESION)})
@@ -2586,6 +2586,7 @@ def calcular_bel_fnd(bd: BDMontos, hp, resultados: dict, proy: dict, pe: dict, p
                         vals[p] = x / d if np.isfinite(x) and np.isfinite(d) and d != 0 else math.nan
                     ok_p = [p for p in per_hist if np.isfinite(vals[p])]
                     f = np.zeros(h)
+                    clave_al = f"{pref} | {nombre} | ramo {r}"
                     if ok_p:
                         per_f = rango_periodos(ok_p[0], ultimo)
                         res_f = pronosticar(Serie(("DANOS", pref, nombre, r), TIPO_MODELO_FACTORES, per_f,
@@ -2593,6 +2594,28 @@ def calcular_bel_fnd(bd: BDMontos, hp, resultados: dict, proy: dict, pe: dict, p
                         f = np.asarray(res_f.pronostico, dtype=float)
                         if len(f) != h or not np.all(np.isfinite(f)):
                             f = np.full(h, vals[ok_p[-1]])          # (sin recta: el ultimo real)
+                        prm = res_f.parametros or {}
+                        fila.update({f"{nombre} modelo": res_f.regla or res_f.modelo,
+                                     f"{nombre} R2": prm.get("r2", math.nan),
+                                     f"{nombre} pendiente mensual": prm.get("pendiente", math.nan),
+                                     f"{nombre} error % backtest (recta)": res_f.error_modelo,
+                                     f"{nombre} error % backtest (ultimo valor)": res_f.error_ultimo_valor})
+                        out["alertas"] += [("DANOS", clave_al, a) for a in res_f.alertas
+                                           if not str(a).startswith("Se usa")]
+                        u = vals[ok_p[-1]]
+                        fuera = [q for q in per_f[-MESES_TENDENCIA:] if np.isfinite(vals.get(q, math.nan))
+                                 and ((dom[0] is not None and vals[q] < dom[0]) or (dom[1] is not None and vals[q] > dom[1]))]
+                        if fuera:
+                            out["alertas"].append(("DANOS", clave_al, f"{len(fuera)} mes(es) real(es) fuera de rango "
+                                                   f"({fuera[0]} a {fuera[-1]}; ultimo {u:.2%}): revisar {conc} y "
+                                                   f"{base} de origen; la proyeccion se acota a {dom}"))
+                        if nombre == "CESION" and abs(f[-1] - u) > 0.10:
+                            out["alertas"].append(("DANOS", clave_al, f"la recta lleva la cesion de {u:.1%} ({ultimo}) a "
+                                                   f"{f[-1]:.1%} ({periodos_proy[-1]}); revisar si la tendencia sigue"))
+                        elif nombre != "CESION" and u > 0 and f[-1] < 0.5 * u:
+                            out["alertas"].append(("DANOS", clave_al, f"la recta baja el factor de {u:.2%} ({ultimo}) a "
+                                                   f"{f[-1]:.2%} ({periodos_proy[-1]}), menos de la mitad"))
+                        fac_u[nombre] = min(max(u, dom[0] if dom[0] is not None else u), dom[1] if dom[1] is not None else u)
                     fac_f[nombre] = f
                     fila[f"{nombre} {ultimo}"] = vals.get(ultimo, math.nan)
                     fila[f"{nombre} {periodos_proy[-1]}"] = float(f[-1])
@@ -2622,6 +2645,9 @@ def calcular_bel_fnd(bd: BDMontos, hp, resultados: dict, proy: dict, pe: dict, p
                     nuevos["GTO"] = gto
                 for c, x in nuevos.items():
                     out["proy"][(norm(f"{pref} {c}"), p, r)] = float(x)
+                b_fijo = bel_n + pnd_f * ((fac_u.get("FACTOR GTO", 0.0) if pref == "RRC" else 0.0)
+                                          + fac_u.get("FACTOR MR", 0.0))      # comparativo: factores fijos
+                out["neto_fijo"][(pref, p, r)] = b_fijo * (1 - fac_u.get("CESION", 0.0))
                 out["razones"][(pref, p, r)] = raz
                 out["aplica"].add((pref, p, r))
                 n_ap += 1
@@ -2633,6 +2659,9 @@ def calcular_bel_fnd(bd: BDMontos, hp, resultados: dict, proy: dict, pe: dict, p
                 fila[f"BEL modelo {p}"] = proy.get((norm(f"{pref} BEL"), p, r), math.nan)
                 fila[f"BEL por FND {p}"] = out["proy"].get((norm(f"{pref} BEL"), p, r), math.nan) \
                     if (pref, p, r) in out["aplica"] else math.nan
+                fila[f"NETO por FND {p}"] = out["proy"].get((norm(f"{pref} NETO"), p, r), math.nan) \
+                    if (pref, p, r) in out["aplica"] else math.nan
+                fila[f"NETO con factores fijos en {ultimo} {p}"] = out["neto_fijo"].get((pref, p, r), math.nan)
             out["resumen"].append(fila)
     n = len({(a, c) for a, _, c in out["aplica"]})
     out["estado"] = (f"{n} series (reserva x ramo) con BEL = IS x PEACUMULADA x FND desde {periodos_proy[0]}; "
@@ -4697,6 +4726,7 @@ def main():
         try:
             info_fnd = calcular_bel_fnd(bd_danos, hp, resultados, proy_danos, pe_mes, periodos_proy, ultimo)
             validar(info_fnd["proy"], proy_rfv)
+            alertas.extend(info_fnd.get("alertas") or [])
             proy_danos = info_fnd["proy"]
         except Exception as e:  # noqa: BLE001
             info_fnd = {"estado": f"error en el BEL por FND ({type(e).__name__}: {e}); el BEL sigue con el modelo",
@@ -4906,6 +4936,11 @@ def main():
                     tot = lambda dic, p: sum(dic.get((norm(f"{pref} {conc}"), p, r), 0.0) for r in bd_danos.cols_ramo)  # noqa: E731
                     print(f"      {pref} {conc:<5} (M USD) modelo / por FND: "
                           + " | ".join(f"{p}: {tot(pm, p) / 1e6:,.1f} / {tot(proy_danos, p) / 1e6:,.1f}" for p in dics))
+                nf = fnd.get("neto_fijo") or {}
+                fijo = lambda p: sum(nf.get((pref, p, r), proy_danos.get((norm(f"{pref} NETO"), p, r), 0.0))  # noqa: E731
+                                     for r in bd_danos.cols_ramo)
+                print(f"      {pref} NETO  (M USD) con FACTOR GTO, FACTOR MR y CESION fijos en {ultimo} (comparativo): "
+                      + " | ".join(f"{p}: {fijo(p) / 1e6:,.1f}" for p in dics))
     if viejos:
         print(f"   OJO: {', '.join(viejos)} en salidas/ son de una corrida anterior (esta vez no se generaron)")
     n_alertas = len(alertas) + sum(len(r.alertas) for r in resultados.values())
