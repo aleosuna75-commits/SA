@@ -209,6 +209,7 @@ MODELO_POR_TIPO = {
     "indice": "Tendencia historica",  # indices de HParametros, en logaritmos
     "lag": "Tendencia historica",     # patron de desarrollo (LAG 1-10); en logaritmos si es positivo
     "razon": "SES",
+    "factor": "Tendencia historica",  # FACTOR GTO, FACTOR MR y CESION del BEL por FND: recta en niveles (puntos por mes)
 }
 MESES_TENDENCIA = 36             # ventana de la tendencia historica (None = toda la historia). Con toda la historia
                                  # entran arranques desde cero y cambios de regimen (ramo 80 SONR, Hidro) que
@@ -409,7 +410,7 @@ PERSISTENCIAS_PND = (1.0, "estimada")   # desviacion del FA: se conserva (1) o s
 RANGO_FA = (0.001, 20.0)         # FA (base / prima anualizada) sano al ultimo mes
 INDICES_PND_EN_BD = True         # columnas a la derecha de BD_Montos_RRC_SONR con los indicadores por ramo: un bloque
                                  # por indicador, con una columna por ramo ("PND/PD 10", "FA 10", ...)
-COLUMNAS_INDICES_PND = {"PND/PD": "#,##0", "FA": "0.0000", "FACTOR GTO": "0.00%", "FACTOR MR": "0.00%",
+COLUMNAS_INDICES_PND = {"PND/PD": "#,##0", "FA": "0.0000", "FACTOR GTO": "0.00%", "FACTOR MR": "0.00%", "CESION": "0.00%",
                         "IS (RL)": "0.00%", "LAG (RL)": "0.00%", "PE FCST": "#,##0", "PRIMA N AÑOS": "#,##0",
                         "PEACUMULADA": "#,##0", "FD/FND": "0.0000"}
                                  # todos los bloques van en todos los renglones de RRC y SONR (historia y
@@ -463,6 +464,11 @@ USAR_BEL_POR_FND = True
 TIPO_MODELO_FND = "indice"       # el FND se proyecta como los indices: recta de los ultimos MESES_TENDENCIA meses con
                                  # patron del mes y pendiente ponderada por su credibilidad (R2)
 MIN_MESES_FND = 12               # meses minimos de FND real para proyectarlo
+TIPO_MODELO_FACTORES = "factor"  # FACTOR GTO (GTO / PND), FACTOR MR (MR / PND o PD) y CESION (IRR / BRUTO) de las series
+                                 # con BEL por FND: reales hasta el ultimo mes y, desde el primer mes proyectado, la recta de
+                                 # tendencia (regresion lineal, en niveles: puntos por mes) de los ultimos MESES_TENDENCIA
+                                 # meses continuada desde el ultimo real, sin patron del mes. GTO = PND x FACTOR GTO, MR = PND x
+                                 # FACTOR MR, BRUTO = BEL + GTO + MR, IRR = BRUTO x CESION, NETO = BRUTO - IRR
 CUENTA_PE_FCST = "61"            # cuenta de prima tomada en CtaMens (la que suma ER_ram)
 RAMO_FCST_A_BD = {"10": "10", "31": "30", "35": "34", "39": "37", "40": "40", "46": "40", "50": "50", "60": "60",
                   "71": "71", "73": "73", "80": "80", "90": "90", "100": "100", "110": "110"}
@@ -2508,7 +2514,9 @@ def _peacumulada(pref: str, r, p: int, p12: dict, lags: dict):
 def calcular_bel_fnd(bd: BDMontos, hp, resultados: dict, proy: dict, pe: dict, periodos_proy: list[int],
                      ultimo: int) -> dict:
     """BEL por FND: FND = PND / PEACUMULADA en la historia (PND = BEL / IS), proyectado con la tendencia desde el primer
-    mes proyectado; BEL = IS x PEACUMULADA x FND y GTO, MR, BRUTO, IRR y NETO con las razones del modelo sobre ese BEL.
+    mes proyectado; BEL = IS x PEACUMULADA x FND; GTO = PND x FACTOR GTO y MR = PND x FACTOR MR (PND = BEL / IS), con los
+    factores reales proyectados con su recta (TIPO_MODELO_FACTORES); BRUTO = BEL + GTO + MR; IRR = BRUTO x CESION (IRR /
+    BRUTO real proyectado igual); NETO = BRUTO - IRR.
     Regresa {"proy": montos con el BEL nuevo, "aplica": {(reserva, periodo, ramo)}, "fnd": {(reserva, periodo, ramo):
     FND proyectado}, "razones": {...}, "series": filas para el diagnostico, "resumen", "estado"}."""
     h = len(periodos_proy)
@@ -2560,6 +2568,34 @@ def calcular_bel_fnd(bd: BDMontos, hp, resultados: dict, proy: dict, pe: dict, p
                              f"FND {periodos_proy[-1]}": fnd_f[-1] if len(fnd_f) == h else math.nan})
                 if len(fnd_f) != h:
                     motivo, fnd_f = "no se pudo proyectar el FND", None
+            # FACTOR GTO, FACTOR MR y CESION reales (como los bloques de la hoja) y su recta desde el primer mes proyectado
+            fac_f = {}
+            if fnd_f is not None:
+                specs = {"FACTOR GTO": ("GTO", "PND", DOMINIO_RAZON_BEL)} if pref == "RRC" else {}
+                specs.update({"FACTOR MR": ("MR", "PND", DOMINIO_RAZON_BEL), "CESION": ("IRR", "BRUTO", DOMINIO_CESION)})
+                for nombre, (conc, base, dom) in specs.items():
+                    vals = {}
+                    for p in per_hist:
+                        x = bd.valores.get((f"{pref} {conc}", p, r), math.nan)
+                        if base == "PND":
+                            bel = bd.valores.get((f"{pref} BEL", p, r), math.nan)
+                            is_ = _hp_fuente(hp, resultados, r_hp, nombre_is, p, pos)[0]
+                            d = bel / is_ if np.isfinite(bel) and np.isfinite(is_) and is_ != 0 else math.nan
+                        else:
+                            d = bd.valores.get((f"{pref} BRUTO", p, r), math.nan)
+                        vals[p] = x / d if np.isfinite(x) and np.isfinite(d) and d != 0 else math.nan
+                    ok_p = [p for p in per_hist if np.isfinite(vals[p])]
+                    f = np.zeros(h)
+                    if ok_p:
+                        per_f = rango_periodos(ok_p[0], ultimo)
+                        res_f = pronosticar(Serie(("DANOS", pref, nombre, r), TIPO_MODELO_FACTORES, per_f,
+                                                  [vals.get(q, math.nan) for q in per_f], ultimo, h, dominio=dom))
+                        f = np.asarray(res_f.pronostico, dtype=float)
+                        if len(f) != h or not np.all(np.isfinite(f)):
+                            f = np.full(h, vals[ok_p[-1]])          # (sin recta: el ultimo real)
+                    fac_f[nombre] = f
+                    fila[f"{nombre} {ultimo}"] = vals.get(ultimo, math.nan)
+                    fila[f"{nombre} {periodos_proy[-1]}"] = float(f[-1])
             n_ap = 0
             for j, p in enumerate(periodos_proy):
                 is_f = _hp_fuente(hp, resultados, r_hp, nombre_is, p, pos)[0]
@@ -2567,19 +2603,20 @@ def calcular_bel_fnd(bd: BDMontos, hp, resultados: dict, proy: dict, pe: dict, p
                 fz = fnd_f[j] if fnd_f is not None else math.nan
                 bel_m = proy.get((norm(f"{pref} BEL"), p, r), math.nan)
                 bel_n = is_f * pa * fz if all(np.isfinite(x) for x in (is_f, pa, fz)) else math.nan
+                fac = {k: float(v[j]) for k, v in fac_f.items()}
                 out["series"].append({"Reserva": pref, "Ramo": r, "Periodo": p, "IS": is_f, "PEACUMULADA": pa,
-                                      "FND": fz, "BEL IS x PEACUMULADA x FND": bel_n, "BEL del modelo": bel_m})
+                                      "FND": fz, "BEL IS x PEACUMULADA x FND": bel_n, "BEL del modelo": bel_m,
+                                      "FACTOR GTO": fac.get("FACTOR GTO", math.nan),
+                                      "FACTOR MR": fac.get("FACTOR MR", math.nan), "CESION": fac.get("CESION", math.nan)})
                 if not np.isfinite(bel_n) or bel_n < 0:           # (PE o IS negativos: el mes sigue con el modelo)
                     continue
                 out["fnd"][(pref, p, r)] = float(fz)
-                g = lambda c: proy.get((norm(f"{pref} {c}"), p, r), math.nan)    # noqa: E731
-                raz = {"GTO": g("GTO") / bel_m if pref == "RRC" and bel_m else 0.0,
-                       "MR": g("MR") / bel_m if bel_m else 0.0,
-                       "IRR": g("IRR") / g("BRUTO") if g("BRUTO") else 0.0}
-                raz = {k: (float(x) if np.isfinite(x) else 0.0) for k, x in raz.items()}
-                gto, mr = raz["GTO"] * bel_n, raz["MR"] * bel_n
-                bruto = bel_n + (gto if pref == "RRC" else 0.0) + mr
-                irr = raz["IRR"] * bruto
+                raz = {"FACTOR GTO": fac.get("FACTOR GTO", 0.0) if pref == "RRC" else 0.0,
+                       "FACTOR MR": fac.get("FACTOR MR", 0.0), "CESION": fac.get("CESION", 0.0)}
+                pnd_f = pa * fz                                    # PND (PD) = BEL / IS = PEACUMULADA x FND
+                gto, mr = pnd_f * raz["FACTOR GTO"], pnd_f * raz["FACTOR MR"]
+                bruto = bel_n + gto + mr
+                irr = bruto * raz["CESION"]
                 nuevos = {"BEL": bel_n, "MR": mr, "BRUTO": bruto, "IRR": irr, "NETO": bruto - irr}
                 if pref == "RRC":
                     nuevos["GTO"] = gto
@@ -2706,6 +2743,7 @@ def escribir_indices_pnd(bd: BDMontos, ctx: dict, avisos: list | None = None) ->
     ws = bd.ws
     hp, resultados, periodos_proy, ultimo = ctx["hp"], ctx["resultados"], ctx["periodos_proy"], ctx["ultimo"]
     proy, pe, hoja_pe, fnd = ctx["proy"], ctx.get("pe") or {}, ctx.get("hoja_pe"), ctx.get("fnd") or {}
+    razones = ctx.get("razones") or {}             # FACTOR GTO, FACTOR MR y CESION proyectados (BEL por FND)
     primas_pe, pe_tab, meses_pe = ctx.get("primas_pe"), ctx.get("pe_tab") or {}, ctx.get("meses_pe")
     pos = {p: i for i, p in enumerate(periodos_proy)}
     formulas = INDICES_PND_FORMULAS and hp is not None and getattr(hp, "filas", None)
@@ -2758,6 +2796,8 @@ def escribir_indices_pnd(bd: BDMontos, ctx: dict, avisos: list | None = None) ->
     si_error = " (SI.ERROR: 0 si divide entre 0)"
     claves_hp = ", ".join(f"{r} -> {k}" for r, k in MAPA_RAMO_LAG.items() if str(r) != str(k) and r in ramos)
     na_pnd = f"; {TEXTO_SIN_DATO} si PND/PD es {TEXTO_SIN_DATO}"
+    proy_fac = (f"; desde {min(periodos_proy)}, en las series con BEL por FND, el proyectado con la recta de tendencia "
+                "(regresion lineal; valor) en todos los renglones del mes" if razones and periodos_proy else "")
     descripcion = {
         "PND/PD": ("PND/PD = BEL / IS (RL): en el renglon BEL, BEL del renglon / IS; en los demas renglones, el BEL del mes "
                    "con SUMAR.SI.CONJUNTO por CONCEPTO y PERIODO (ninguna formula apunta a otro renglon: la hoja se puede "
@@ -2768,9 +2808,12 @@ def escribir_indices_pnd(bd: BDMontos, ctx: dict, avisos: list | None = None) ->
                "FA = PND/PD / PRIMA N AÑOS del ramo (sin hoja " + f"{HOJA_PRIMAS_PE}: la prima del proyecto no esta "
                "completa)") + si_error + na_pnd,
         "FACTOR GTO": ("FACTOR GTO = GTO del mes / PND/PD (en el renglon RRC GTO, su monto; en los demas, con "
-                       "SUMAR.SI.CONJUNTO); SONR no tiene GTO: 0" + si_error + na_pnd),
+                       "SUMAR.SI.CONJUNTO); SONR no tiene GTO: 0" + si_error + na_pnd + proy_fac),
         "FACTOR MR": ("FACTOR MR = MR del mes / PND/PD (en el renglon MR de la reserva, su monto; en los demas, con "
-                      "SUMAR.SI.CONJUNTO)" + si_error + na_pnd),
+                      "SUMAR.SI.CONJUNTO)" + si_error + na_pnd + proy_fac),
+        "CESION": ("CESION = IRR del mes / BRUTO del mes (razon de cesion; en el renglon IRR o BRUTO, su monto; en los "
+                   "demas, con SUMAR.SI.CONJUNTO)" + si_error + f"; {TEXTO_SIN_DATO} sin montos (meses de prima)"
+                   + proy_fac),
         "IS (RL)": f"IS (RL) = {' / '.join(v[0] for v in INDICE_BASE_PND.values())} de {HOJA_PARAMETROS} del mes (real o "
                    f"proyectado; {TEXTO_SIN_DATO} si no hay; ramo de la hoja segun MAPA_RAMO_LAG: {claves_hp})",
         "LAG (RL)": f"LAG (RL) = LAG 1 de {HOJA_PARAMETROS} del mes (real o proyectado; {TEXTO_SIN_DATO} si no hay)",
@@ -2908,6 +2951,8 @@ def escribir_indices_pnd(bd: BDMontos, ctx: dict, avisos: list | None = None) ->
         es_bel = fila == f_bel
         f_gto = filas_todas.get((norm("RRC GTO"), p)) if pref == "RRC" else None
         f_mr = filas_todas.get((norm(f"{pref} MR"), p))
+        f_irr = filas_todas.get((norm(f"{pref} IRR"), p))
+        f_bruto = filas_todas.get((norm(f"{pref} BRUTO"), p))
         nombre_is = INDICE_BASE_PND[pref][0]
         anios = ANIOS_LAG_PEACUMULADA.get(pref, 0)
         for r in ramos:
@@ -2932,6 +2977,7 @@ def escribir_indices_pnd(bd: BDMontos, ctx: dict, avisos: list | None = None) ->
             else:
                 peac = p12_v
             fnd_proy = p > ultimo and (pref, p, r) in fnd       # (en todos los renglones del mes)
+            fac = razones.get((pref, p, r)) if fnd_proy else None   # factores proyectados (valores)
             fnd_v = fnd[(pref, p, r)] if fnd_proy else (div(pnd, peac) if hay_pnd and hay_peac else NA)
             g = primas.GRUPO_DE_RAMO_RESERVA.get(str(r)) if primas is not None else None
             pe_g = pe_tab.get(g)
@@ -2941,6 +2987,10 @@ def escribir_indices_pnd(bd: BDMontos, ctx: dict, avisos: list | None = None) ->
                     "FA": (div(pnd, pe_g if usa_primas else p12_v) if hay_pnd and (usa_primas or pe) else NA),
                     "FACTOR GTO": (div(monto(pref, "GTO", p, r), pnd) if hay_pnd else NA) if f_gto else 0.0,
                     "FACTOR MR": (div(monto(pref, "MR", p, r), pnd) if hay_pnd else NA) if f_mr else 0.0}
+            bruto_m = monto(pref, "BRUTO", p, r) if f_bruto else math.nan
+            vals["CESION"] = (div(monto(pref, "IRR", p, r), bruto_m) if f_irr else 0.0) if ok(bruto_m) else NA
+            if fac:
+                vals.update({k: float(x) for k, x in fac.items() if k != "FACTOR GTO" or f_gto})
             for ind in COLUMNAS_INDICES_PND:
                 c = cols[(ind, r)]
                 celda = ws.cell(fila, c)
@@ -2966,7 +3016,7 @@ def escribir_indices_pnd(bd: BDMontos, ctx: dict, avisos: list | None = None) ->
                     celda.value = v
                     celda.alignment = Alignment(horizontal="right")
                     continue
-                if not formulas or (ind == "FD/FND" and fnd_proy):   # (el FND proyectado va como valor)
+                if not formulas or (ind == "FD/FND" and fnd_proy) or (fac and ind in fac):   # (proyectados: valor)
                     celda.value = float(v)
                     continue
                 pnd_c = f"{L('PND/PD', r)}{fila}"
@@ -3011,6 +3061,9 @@ def escribir_indices_pnd(bd: BDMontos, ctx: dict, avisos: list | None = None) ->
                     celda.value = f"=IFERROR({del_mes(ram, f_gto, fila)}/{pnd_c},0)" if f_gto else 0.0
                 elif ind == "FACTOR MR":
                     celda.value = f"=IFERROR({del_mes(ram, f_mr, fila)}/{pnd_c},0)" if f_mr else 0.0
+                elif ind == "CESION":
+                    celda.value = (f"=IFERROR({del_mes(ram, f_irr, fila)}/{del_mes(ram, f_bruto, fila)},0)"
+                                   if f_irr else 0.0)
 
     def lista(xs):
         return f"{', '.join(xs[:5])}{'...' if len(xs) > 5 else ''}"
@@ -3052,27 +3105,25 @@ def _agrupar(ws, secciones: list):
 
 def escribir_bel_fnd(bd: BDMontos, info: dict, cols: dict):
     """En los meses donde aplica el BEL por FND, las celdas RAM_ de RRC y SONR van como formulas que solo usan celdas de
-    su propio renglon (IS (RL), PEACUMULADA y FD/FND, que son las del mes en todos los renglones), para que la hoja se
-    pueda ordenar y filtrar: BEL = IS x PEACUMULADA x FD/FND; GTO y MR = ese BEL x su razon del modelo; BRUTO = BEL x
-    (1 + razon GTO + razon MR) = BEL + GTO + MR; IRR = BRUTO x la razon de cesion del modelo; NETO = BRUTO x (1 - esa
-    razon) = BRUTO - IRR."""
+    su propio renglon (IS (RL), PEACUMULADA, FD/FND, FACTOR GTO, FACTOR MR y CESION, que son las del mes en todos los
+    renglones), sin numeros escritos en la formula, para que la hoja se pueda ordenar y filtrar:
+    BEL = IS x PEACUMULADA x FND; PND = BEL / IS = PEACUMULADA x FND; GTO = PND x FACTOR GTO; MR = PND x FACTOR MR;
+    BRUTO = BEL + GTO + MR; IRR = BRUTO x CESION; NETO = BRUTO x (1 - CESION) = BRUTO - IRR."""
     ws = bd.ws
-    n = lambda x: f"{x:.10g}"                                                  # noqa: E731
     for (pref, p, r) in sorted(info["aplica"]):
         ram = get_column_letter(bd.cols_ramo[r])
-        raz = info["razones"][(pref, p, r)]
-        g = raz["GTO"] if pref == "RRC" else 0.0
-        bruto = f"(1+{n(g)}+{n(raz['MR'])})" if pref == "RRC" else f"(1+{n(raz['MR'])})"
-        factores = {"BEL": "", "GTO": f"*{n(g)}", "MR": f"*{n(raz['MR'])}", "BRUTO": f"*{bruto}",
-                    "IRR": f"*{bruto}*{n(raz['IRR'])}", "NETO": f"*{bruto}*(1-{n(raz['IRR'])})"}
-        for c, fac in factores.items():
+        for c in ("BEL", "GTO", "MR", "BRUTO", "IRR", "NETO"):
             if c == "GTO" and pref != "RRC":
                 continue
             f = bd.filas.get((norm(f"{pref} {c}"), p))
             if not f:
                 continue
             L = lambda ind: f"{get_column_letter(cols[(ind, r)])}{f}"         # noqa: E731
-            ws[f"{ram}{f}"] = f"={L('IS (RL)')}*{L('PEACUMULADA')}*{L('FD/FND')}{fac}"
+            bel, pnd = f"{L('IS (RL)')}*{L('PEACUMULADA')}*{L('FD/FND')}", f"{L('PEACUMULADA')}*{L('FD/FND')}"
+            gto, mr = f"{pnd}*{L('FACTOR GTO')}", f"{pnd}*{L('FACTOR MR')}"
+            bruto = f"{bel}+{gto}+{mr}" if pref == "RRC" else f"{bel}+{mr}"
+            ws[f"{ram}{f}"] = "=" + {"BEL": bel, "GTO": gto, "MR": mr, "BRUTO": bruto,
+                                     "IRR": f"({bruto})*{L('CESION')}", "NETO": f"({bruto})*(1-{L('CESION')})"}[c]
 
 
 def escenarios_pnd(bd: BDMontos, hp, resultados: dict, pr, proy_base: dict, periodos_proy: list[int], ultimo: int,
@@ -4669,10 +4720,11 @@ def main():
     hoja_pe = hoja_pe_ramo = None
     avisos_ind = []
 
-    def ctx_indices(proy, meses, fnd):
+    def ctx_indices(proy, meses, fnd, razones=None):
         esc = next((e for e, m in ESCENARIOS_PND.items() if m == meses), None)
         return {"hp": hp, "resultados": resultados, "periodos_proy": periodos_proy, "ultimo": ultimo, "proy": proy,
                 "pe": pe_mes, "hoja_pe": hoja_pe_ramo, "primas_pe": hoja_pe, "meses_pe": meses, "fnd": fnd,
+                "razones": razones,
                 "pe_tab": {g: x for (e, g), x in (diag_pnd.get("_pe") or {}).items() if e == esc}}
     if INDICES_PND_EN_BD:
         if INDICES_PND_FORMULAS and diag_pnd.get("_pe") and primas is not None:   # solo con prima completa y verificada
@@ -4685,7 +4737,8 @@ def main():
                   f"{len(bd_danos.filas_prima)} renglones sin montos al final de {HOJA_MONTOS})", flush=True)
         hoja_pe_ramo = escribir_pe_ramo(bd_danos.wb, pe_mes, list(bd_danos.cols_ramo),
                                         sorted({p for _, p in {**bd_danos.filas, **bd_danos.filas_prima}}))
-        cols_ind = escribir_indices_pnd(bd_danos, ctx_indices(proy_danos, meses_bd, info_fnd.get("fnd")), avisos_ind)
+        cols_ind = escribir_indices_pnd(bd_danos, ctx_indices(proy_danos, meses_bd, info_fnd.get("fnd"),
+                                                              info_fnd.get("razones")), avisos_ind)
         if INDICES_PND_FORMULAS and info_fnd.get("aplica"):
             escribir_bel_fnd(bd_danos, info_fnd, cols_ind)
         for a in avisos_ind:
