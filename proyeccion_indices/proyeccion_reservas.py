@@ -429,8 +429,11 @@ HOJA_PRIMAS_PE = "Primas_PE"     # hoja que se agrega a la BD de Danos con la pr
 # FCST como lo arma la hoja ER_ram del archivo de FCST (por mes, -SUMAR.SI.CONJUNTO(CtaMens!AMOUNT; GL_ACCT = 61;
 # CALMONTH = mes; RamoN = ramo)). Se agrega a la BD la hoja HOJA_PE_RAMO (prima del mes en valores y su suma de 12
 # meses como formula) y los bloques "PE FCST <ramo>", "PRIMA N AÑOS <ramo>" y "PEACUMULADA <ramo>" la referencian.
-ARCHIVO_PE_FCST = ENTRADAS / "FCST_2027.xlsb"
-PATRON_PE_RAMO = "PExRamo*"      # base historica de PE por ramo y mes (en entradas/): periodo, Ramo, Sramo, PmaTom
+ARCHIVO_PE_FCST = ENTRADAS / "FCST_2027.xlsb"   # si no esta con ese nombre, se busca PATRON_PE_FCST en entradas/
+PATRON_PE_FCST = "FCST*"         # otro nombre del archivo del FCST (.xlsb, .xlsx o .xlsm con la hoja CtaMens; el mas
+                                 # reciente). No toma BD_RFCST_* (empieza con BD_)
+PATRON_PE_RAMO = "PExRamo*"      # base historica de PE por ramo y mes (en entradas/; .xlsx, .xlsm, .xlsb, .xls o .csv):
+                                 # periodo, Ramo, Sramo, PmaTom
 MONEDA_PE_RAMO = "MXN"           # PExRamo viene en pesos (dividida entre el TC del mes cuadra con la prima real en USD);
                                  # antes del primer mes con TC en la BD (202201) se usa ese primer TC
 SUBRAMO_A_BD = {"30": {"30": "30", "31": "30", "32": "30", "33": "30", "34": "34", "35": "34", "36": "34",
@@ -2098,14 +2101,37 @@ def _divisor_proyectado(resultados: dict, ramo, pref: str, h: int):
     return is_f, lag_f, is_f.copy()
 
 
+def _buscar_pe_fcst() -> Path | None:
+    """Archivo del FCST: ARCHIVO_PE_FCST si existe; si no, el mas reciente de entradas/ que coincida con PATRON_PE_FCST
+    (.xlsb, .xlsx o .xlsm) y traiga la hoja CtaMens."""
+    if ARCHIVO_PE_FCST.exists():
+        return ARCHIVO_PE_FCST
+    cands = sorted((c for c in ENTRADAS.glob(PATRON_PE_FCST) if c.suffix.lower() in (".xlsb", ".xlsx", ".xlsm")
+                    and not c.name.startswith("~$")), key=lambda c: c.stat().st_mtime, reverse=True)
+    if not cands:
+        return None
+    try:
+        _asegurar_paquetes({"python_calamine": "python-calamine"})
+        from python_calamine import CalamineWorkbook
+    except (ImportError, SystemExit):
+        return cands[0]                                # (leer_pe_fcst avisa si no lo puede leer)
+    for c in cands:
+        try:
+            if "CtaMens" in CalamineWorkbook.from_path(str(c)).sheet_names:
+                return c
+        except Exception:  # noqa: BLE001
+            continue
+    return None
+
+
 def leer_pe_fcst(ruta: Path | None = None) -> dict | None:
     """Prima tomada del FCST por ramo de la BD y mes (USD), como la arma la hoja ER_ram del archivo de FCST: por mes,
     -suma de AMOUNT de CtaMens con GL_ACCT = CUENTA_PE_FCST y el ramo (Ramo2 via RAMO_FCST_A_BD). Regresa
     {"ruta", "mensual": {(ramo, periodo): prima del mes}, "acumulada": {(ramo, periodo): acumulado del ano},
     "nombres": {ramo: "Incendio"...}, "periodos", "renglones", "usados", "fuera": {ramo del FCST: prima},
     "control": texto de la verificacion contra lo que muestra ER_ram, "avisos": [...]}; None si no hay archivo."""
-    ruta = Path(ruta or ARCHIVO_PE_FCST)
-    if not ruta.exists():
+    ruta = Path(ruta) if ruta else _buscar_pe_fcst()
+    if ruta is None or not ruta.exists():
         return None
     try:                                               # lee .xlsb (solo si hay archivo de FCST)
         _asegurar_paquetes({"python_calamine": "python-calamine"})
@@ -2250,13 +2276,30 @@ def leer_pe_ramo(tc: dict, ruta: Path | None = None) -> dict | None:
     su primer mes en la base, es prima 0 (la base omite las combinaciones sin movimiento). Regresa {"ruta", "mensual":
     {(ramo, periodo): USD}, "periodos", "renglones", "fuera": {ramo: USD}, "sin_mapa": {ramo/subramo: USD},
     "repartidos": USD, "avisos"} o None si no hay archivo."""
-    candidatos = [Path(ruta)] if ruta else sorted((c for c in ENTRADAS.glob(PATRON_PE_RAMO) if not c.name.startswith("~$")),
-                                                  key=lambda c: c.stat().st_size, reverse=True)
+    candidatos = [Path(ruta)] if ruta else sorted(
+        (c for c in ENTRADAS.glob(PATRON_PE_RAMO) if not c.name.startswith("~$")
+         and c.suffix.lower() in (".xlsx", ".xlsm", ".xlsb", ".xls", ".csv")),
+        key=lambda c: c.stat().st_size, reverse=True)
     if not candidatos or not candidatos[0].exists():
         return None
     ruta = candidatos[0]
-    wb = openpyxl.load_workbook(ruta, read_only=True, data_only=True)
-    filas = wb.worksheets[0].iter_rows(values_only=True)
+    if ruta.suffix.lower() in (".xlsx", ".xlsm"):
+        wb = openpyxl.load_workbook(ruta, read_only=True, data_only=True)
+        filas = wb.worksheets[0].iter_rows(values_only=True)
+    elif ruta.suffix.lower() == ".csv":
+        import csv
+        texto = ruta.read_bytes()
+        texto = texto.decode("utf-8-sig") if texto[:3] == b"\xef\xbb\xbf" else texto.decode("latin-1")
+        filas = iter([tuple(f) for f in csv.reader(texto.splitlines(), delimiter=";" if texto.count(";") >
+                                                    texto.count(",") else ",")])
+    else:                                              # .xlsb / .xls
+        try:
+            _asegurar_paquetes({"python_calamine": "python-calamine"})
+        except SystemExit as e:
+            raise ImportError(str(e)) from None
+        from python_calamine import CalamineWorkbook
+        cw = CalamineWorkbook.from_path(str(ruta))
+        filas = iter([tuple(f) for f in cw.get_sheet_by_name(cw.sheet_names[0]).to_python()])
     cab = next(filas, None)
     if cab is None:
         raise ValueError(f"{ruta.name}: la primera hoja no tiene renglones")
@@ -2771,12 +2814,16 @@ def escribir_indices_pnd(bd: BDMontos, ctx: dict, avisos: list | None = None) ->
         "IS (RL)": f"IS (RL) = {' / '.join(v[0] for v in INDICE_BASE_PND.values())} de {HOJA_PARAMETROS} del mes (real o "
                    f"proyectado; {TEXTO_SIN_DATO} si no hay; ramo de la hoja segun MAPA_RAMO_LAG: {claves_hp})",
         "LAG (RL)": f"LAG (RL) = LAG 1 de {HOJA_PARAMETROS} del mes (real o proyectado; {TEXTO_SIN_DATO} si no hay)",
-        "PE FCST": f"PE FCST = prima tomada del mes (hoja {HOJA_PE_RAMO}; 0 si ninguna fuente la trae; se puede capturar "
-                   "en el renglon BEL de la BD de entrada)",
-        "PRIMA N AÑOS": f"PRIMA N AÑOS = suma de los ultimos {MESES_PRIMA_N_ANOS} meses de PE (hoja {HOJA_PE_RAMO})",
+        "PE FCST": (f"PE FCST = prima tomada del mes (hoja {HOJA_PE_RAMO}; 0 si ninguna fuente la trae; se puede capturar "
+                    "en el renglon BEL de la BD de entrada)") if pe else (
+            f"PE FCST: {TEXTO_SIN_DATO} en esta corrida porque no se leyo ninguna prima por ramo (falta la base "
+            f"{PATRON_PE_RAMO} y el FCST {ARCHIVO_PE_FCST.name} en entradas/; ver Alertas del diagnostico)"),
+        "PRIMA N AÑOS": f"PRIMA N AÑOS = suma de los ultimos {MESES_PRIMA_N_ANOS} meses de PE (hoja {HOJA_PE_RAMO})"
+                        + ("" if pe else f"; {TEXTO_SIN_DATO}: sin prima por ramo en esta corrida"),
         "PEACUMULADA": "PEACUMULADA: RRC = PRIMA N AÑOS" + (f"; SONR = {peac_sonr} (LAG de {HOJA_PARAMETROS}; "
                                                             f"{TEXTO_SIN_DATO} si el mes no trae LAG)"
-                                                            if anios_sonr else ""),
+                                                            if anios_sonr else "")
+                       + ("" if pe else f"; {TEXTO_SIN_DATO}: sin prima por ramo en esta corrida"),
         "FD/FND": "FD/FND = PND/PD / PEACUMULADA" + si_error + (
             f"; desde {min(periodos_proy)}, en el renglon BEL de las series con BEL por FND, el FND proyectado (valor)"
             if fnd and periodos_proy else "") + f"; {TEXTO_SIN_DATO} si PND/PD o PEACUMULADA son {TEXTO_SIN_DATO}",
@@ -2902,10 +2949,10 @@ def escribir_indices_pnd(bd: BDMontos, ctx: dict, avisos: list | None = None) ->
             lag1, f_l1 = _hp_fuente(hp, resultados, r_hp, "LAG 1", p, pos)
             hay_pnd = ok(is_) and ok(bel)
             pnd = div(bel, is_) if hay_pnd else NA
-            pe_v = pe_val.get((r, p), num(pe.get((r, p), (None, None))[0]))
-            p12_v = p12_h.get((r, p), 0.0)
+            pe_v = pe_val.get((r, p), num(pe.get((r, p), (None, None))[0])) if pe else NA
+            p12_v = p12_h.get((r, p), 0.0) if pe else NA      # (sin ninguna PE por ramo: N/A, no 0)
             lags = {k: _hp_fuente(hp, resultados, r_hp, f"LAG {k}", p, pos) for k in range(1, anios + 1)}
-            hay_peac = not anios or any(ok(x) for x, _ in lags.values())
+            hay_peac = bool(pe) and (not anios or any(ok(x) for x, _ in lags.values()))
             if not hay_peac:
                 peac = NA
             elif anios:
@@ -2920,7 +2967,7 @@ def escribir_indices_pnd(bd: BDMontos, ctx: dict, avisos: list | None = None) ->
             pe_g = float(pe_g.get(p, math.nan)) if pe_g is not None else math.nan
             vals = {"PND/PD": pnd, "IS (RL)": is_ if ok(is_) else NA, "LAG (RL)": lag1 if ok(lag1) else NA,
                     "PE FCST": pe_v, "PRIMA N AÑOS": p12_v, "PEACUMULADA": peac, "FD/FND": fnd_v,
-                    "FA": div(pnd, pe_g if usa_primas else p12_v) if hay_pnd else NA,
+                    "FA": (div(pnd, pe_g if usa_primas else p12_v) if hay_pnd and (usa_primas or pe) else NA),
                     "FACTOR GTO": (div(monto(pref, "GTO", p, r), pnd) if hay_pnd else NA) if f_gto else 0.0,
                     "FACTOR MR": (div(monto(pref, "MR", p, r), pnd) if hay_pnd else NA) if f_mr else 0.0}
             for ind in COLUMNAS_INDICES_PND:
@@ -4530,7 +4577,9 @@ def main():
         for a in pef["avisos"]:
             alertas.append(("PND", "PE FCST", a))
     elif "pe_fcst" not in diag_pnd:
-        diag_pnd["pe_fcst"] = f"sin {ARCHIVO_PE_FCST.name} en entradas/"
+        diag_pnd["pe_fcst"] = (f"no se encontro el archivo del FCST en entradas/ ({ARCHIVO_PE_FCST.name} u otro "
+                               f"{PATRON_PE_FCST} .xlsb/.xlsx con la hoja CtaMens): sin PE de {PERIODO_FIN // 100}")
+        alertas.append(("PND", "PE FCST", diag_pnd["pe_fcst"]))
     try:
         pe_ramo = leer_pe_ramo(tc_primas)
     except Exception as e:  # noqa: BLE001
@@ -4583,7 +4632,9 @@ def main():
             if falta:
                 alertas.append(("PND", "PE por ramo", diag_pnd["pe_reforecast"]))
     elif "pe_ramo" not in diag_pnd:
-        diag_pnd["pe_ramo"] = f"sin {PATRON_PE_RAMO} en entradas/: la PE historica por ramo queda vacia"
+        diag_pnd["pe_ramo"] = (f"no se encontro la base {PATRON_PE_RAMO} en entradas/ (.xlsx, .xlsb o .csv): sin PE "
+                               "historica por ramo")
+        alertas.append(("PND", "PExRamo", diag_pnd["pe_ramo"]))
     if pef is not None and pe_ramo is not None and GRUPOS_CON_MEZCLA:
         mensual_rep, ramos_rep = repartir_grupos(pef["mensual"], pe_ramo["mensual"])
         if ramos_rep:
@@ -4609,6 +4660,12 @@ def main():
                                 "de definicion; el BEL por FND lo sigue"))
     print(f"   PE FCST (FCST): {diag_pnd['pe_fcst']}", flush=True)
     print(f"   PE historica (PExRamo): {diag_pnd['pe_ramo']}", flush=True)
+    if not pe_mes:
+        diag_pnd["sin_pe"] = (f"SIN PRIMA POR RAMO: no se leyo {PATRON_PE_RAMO} ni el FCST de entradas/; PE FCST, PRIMA N "
+                              f"AÑOS, PEACUMULADA y FD/FND van en {TEXTO_SIN_DATO} y el BEL por FND no aplica. Copia "
+                              f"la base PExRamo y {ARCHIVO_PE_FCST.name} en {ENTRADAS}")
+        alertas.append(("PND", "PE por ramo", diag_pnd["sin_pe"]))
+        print(f"   AVISO: {diag_pnd['sin_pe']}", flush=True)
     if diag_pnd.get("pe_reforecast"):
         print(f"   PE entre PExRamo y el FCST: {diag_pnd['pe_reforecast']}", flush=True)
     info_fnd = {"estado": "apagado (USAR_BEL_POR_FND = False)", "aplica": set(), "fnd": {}, "series": [], "resumen": []}
@@ -4813,6 +4870,8 @@ def main():
         if archivos_pnd:
             print(f"      Archivos: {', '.join(archivos_pnd)}")
     fnd = diag_pnd.get("bel_fnd") or {}
+    if diag_pnd.get("sin_pe"):
+        print(f"   AVISO: {diag_pnd['sin_pe']}")
     if USAR_BEL_POR_FND:
         print(f"   BEL por FND (Danos): {fnd.get('estado', '')}")
         if fnd.get("aplica"):
