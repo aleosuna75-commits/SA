@@ -1089,7 +1089,7 @@ def leer_bd_montos(ruta: Path) -> BDMontos:
         for ramo in cols_ramo:
             valores.pop((c, p, ramo), None)
     return BDMontos(ruta, wb, ws, enc["CONCEPTO"], enc["PERIODO"], enc["TC"], cols_ramo, filas, valores, tc,
-                    conceptos, set(filas.values()), filas_prima)
+                    conceptos, set(filas.values()) | set(filas_prima.values()), filas_prima)
 
 
 def tc_para_periodo(bd: BDMontos, p: int) -> float:
@@ -2436,7 +2436,7 @@ def leer_capturas_pe(bd: BDMontos) -> dict:
         c = enc.get(norm(f"PE FCST {r}"))
         if c is None:
             continue
-        for (conc, p), f in bd.filas.items():
+        for (conc, p), f in {**bd.filas, **bd.filas_prima}.items():    # (tambien los meses de prima sin montos)
             if conc in (norm("RRC BEL"), norm("SONR BEL")) and f in bd.filas_entrada:
                 v = ws.cell(f, c).value
                 if isinstance(v, str) and not v.strip().startswith("="):
@@ -2872,7 +2872,7 @@ def escribir_indices_pnd(bd: BDMontos, ctx: dict, avisos: list | None = None) ->
     for (r, p), (_, fuente_pe) in pe.items():
         if str(fuente_pe).startswith("captura"):
             for pref_ in ("RRC", "SONR"):
-                fb = bd.filas.get((norm(f"{pref_} BEL"), p))
+                fb = bd.filas.get((norm(f"{pref_} BEL"), p)) or bd.filas_prima.get((norm(f"{pref_} BEL"), p))
                 x = capturas.get(("PE FCST", r, fb))
                 if isinstance(x, str) and not x.strip().startswith("="):
                     x = a_numero(x)[0]
