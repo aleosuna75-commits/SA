@@ -4627,7 +4627,7 @@ def main():
         for a in pef["avisos"]:
             alertas.append(("PND", "PE FCST", a))
     elif "pe_fcst" not in diag_pnd:
-        diag_pnd["pe_fcst"] = f"no se encontro {ARCHIVO_PE_FCST.name} en entradas/: sin PE de {PERIODO_FIN // 100}"
+        diag_pnd["pe_fcst"] = f"no se encontro {ARCHIVO_PE_FCST.name} en entradas/"
         alertas.append(("PND", "PE FCST", diag_pnd["pe_fcst"]))
     try:
         pe_ramo = leer_pe_ramo(tc_primas)
@@ -4680,6 +4680,15 @@ def main():
                    if falta else ""))
             if falta:
                 alertas.append(("PND", "PE por ramo", diag_pnd["pe_reforecast"]))
+            anio = PERIODO_FIN // 100
+            if pef is None and any(p // 100 == anio for p in cub):   # sin FCST: el ano sale del presupuesto parejo
+                perfil = (getattr(pr, "perfil", None) or {}).get("elegido", "") if pr is not None else ""
+                diag_pnd["sin_fcst"] = (f"SIN FCST: {diag_pnd.get('pe_fcst', '')}. La PE de {anio} sale del presupuesto "
+                                        f"de primas.py por grupo repartido a meses con el perfil de la prima"
+                                        + (f" ({perfil})" if perfil else "") + ", no del FCST mes a mes (con el perfil "
+                                        "parejo, el mismo monto cada mes). Copia el FCST en entradas/ y revisa que se "
+                                        "pueda leer (python-calamine)")
+                alertas.append(("PND", "PE FCST", diag_pnd["sin_fcst"]))
     elif "pe_ramo" not in diag_pnd:
         diag_pnd["pe_ramo"] = f"no se encontro la base {PATRON_PE_RAMO} en entradas/: sin PE historica por ramo"
         alertas.append(("PND", "PExRamo", diag_pnd["pe_ramo"]))
@@ -4708,6 +4717,8 @@ def main():
                                 "de definicion; el BEL por FND lo sigue"))
     print(f"   PE FCST (FCST): {diag_pnd['pe_fcst']}", flush=True)
     print(f"   PE historica (PExRamo): {diag_pnd['pe_ramo']}", flush=True)
+    if diag_pnd.get("sin_fcst"):
+        print(f"   AVISO: {diag_pnd['sin_fcst']}", flush=True)
     if not pe_mes:
         no_leidos = [k for k in ("pe_ramo", "pe_fcst") if str(diag_pnd.get(k, "")).startswith("no se pudo leer")]
         diag_pnd["sin_pe"] = (f"SIN PRIMA POR RAMO (PExRamo: {diag_pnd.get('pe_ramo', '')}; FCST: "
@@ -4926,6 +4937,8 @@ def main():
     fnd = diag_pnd.get("bel_fnd") or {}
     if diag_pnd.get("sin_pe"):
         print(f"   AVISO: {diag_pnd['sin_pe']}")
+    if diag_pnd.get("sin_fcst"):
+        print(f"   AVISO: {diag_pnd['sin_fcst']}")
     if USAR_BEL_POR_FND:
         print(f"   BEL por FND (Danos): {fnd.get('estado', '')}")
         if fnd.get("aplica"):
