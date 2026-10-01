@@ -2439,6 +2439,8 @@ def leer_capturas_pe(bd: BDMontos) -> dict:
         for (conc, p), f in bd.filas.items():
             if conc in (norm("RRC BEL"), norm("SONR BEL")) and f in bd.filas_entrada:
                 v = ws.cell(f, c).value
+                if isinstance(v, str) and not v.strip().startswith("="):
+                    v = a_numero(v)[0]                # texto numerico ("12,345"): cuenta como numero
                 if isinstance(v, (int, float)) and not isinstance(v, bool) and np.isfinite(v) and v != 0:
                     if conc == norm("RRC BEL") or (r, p) not in out:
                         out[(r, p)] = float(v)
@@ -2754,6 +2756,7 @@ def escribir_indices_pnd(bd: BDMontos, ctx: dict, avisos: list | None = None) ->
     peac_sonr = " + ".join(["LAG 1 x PRIMA N AÑOS del mes"] + [f"LAG {k} x la de {12 * (k - 1)} meses antes"
                                                                 for k in range(2, anios_sonr + 1)])
     si_error = " (SI.ERROR: 0 si divide entre 0)"
+    claves_hp = ", ".join(f"{r} -> {k}" for r, k in MAPA_RAMO_LAG.items() if str(r) != str(k) and r in ramos)
     na_pnd = f"; {TEXTO_SIN_DATO} si PND/PD es {TEXTO_SIN_DATO}"
     descripcion = {
         "PND/PD": ("PND/PD = BEL / IS (RL) en el renglon BEL; en los demas renglones, la del renglon BEL del mes"
@@ -2766,7 +2769,7 @@ def escribir_indices_pnd(bd: BDMontos, ctx: dict, avisos: list | None = None) ->
         "FACTOR GTO": "FACTOR GTO = GTO (renglon RRC GTO) / PND/PD; SONR no tiene GTO: 0" + si_error + na_pnd,
         "FACTOR MR": "FACTOR MR = MR (renglon MR de la reserva) / PND/PD" + si_error + na_pnd,
         "IS (RL)": f"IS (RL) = {' / '.join(v[0] for v in INDICE_BASE_PND.values())} de {HOJA_PARAMETROS} del mes (real o "
-                   f"proyectado; {TEXTO_SIN_DATO} si no hay)",
+                   f"proyectado; {TEXTO_SIN_DATO} si no hay; ramo de la hoja segun MAPA_RAMO_LAG: {claves_hp})",
         "LAG (RL)": f"LAG (RL) = LAG 1 de {HOJA_PARAMETROS} del mes (real o proyectado; {TEXTO_SIN_DATO} si no hay)",
         "PE FCST": f"PE FCST = prima tomada del mes (hoja {HOJA_PE_RAMO}; 0 si ninguna fuente la trae; se puede capturar "
                    "en el renglon BEL de la BD de entrada)",
@@ -2865,15 +2868,17 @@ def escribir_indices_pnd(bd: BDMontos, ctx: dict, avisos: list | None = None) ->
         e = expr_hp(r_hp, nombre, fuente)
         return (e, fuente[0] == "interp") if e is not None else (None, False)
 
-    cap_fila = {}                      # PE capturada con numero que si entro a la PE: renglon BEL donde se capturo
+    cap_fila = {}                      # PE capturada con numero que si entro a la PE: (renglon BEL donde se capturo, USD)
     for (r, p), (_, fuente_pe) in pe.items():
         if str(fuente_pe).startswith("captura"):
             for pref_ in ("RRC", "SONR"):
                 fb = bd.filas.get((norm(f"{pref_} BEL"), p))
                 x = capturas.get(("PE FCST", r, fb))
+                if isinstance(x, str) and not x.strip().startswith("="):
+                    x = a_numero(x)[0]
                 if fb in bd.filas_entrada and isinstance(x, (int, float)) and not isinstance(x, bool) \
-                        and np.isfinite(x):
-                    cap_fila[(r, p)] = fb
+                        and np.isfinite(x) and x != 0:
+                    cap_fila[(r, p)] = (fb, float(x))
                     break
     propia = re.compile(rf"=\s*'?{re.escape(HOJA_PE_RAMO)}'?!\$?[A-Z]{{1,3}}\$?\d+\s*", re.I)
     filas_todas = {**bd.filas, **bd.filas_prima}      # (los meses de prima sin montos tambien llevan los bloques)
@@ -2924,8 +2929,8 @@ def escribir_indices_pnd(bd: BDMontos, ctx: dict, avisos: list | None = None) ->
                 celda.number_format = COLUMNAS_INDICES_PND[ind]
                 v = vals.get(ind, 0.0)
                 if ind == "PE FCST":
-                    if cap_fila.get((r, p)) == fila:          # PE capturada en este renglon: se conserva el numero
-                        celda.value = float(capturas[(ind, r, fila)])
+                    if cap_fila.get((r, p), (None,))[0] == fila:   # PE capturada en este renglon: se conserva el numero
+                        celda.value = cap_fila[(r, p)][1]
                         continue
                     x = capturas.get((ind, r, fila))
                     if (isinstance(x, str) and propia.fullmatch(x.strip())) or (isinstance(x, (int, float)) and x == 0):
