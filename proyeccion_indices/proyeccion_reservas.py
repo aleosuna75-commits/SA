@@ -432,6 +432,12 @@ HOJA_PRIMAS_PE = "Primas_PE"     # hoja que se agrega a la BD de Danos con la pr
 # meses como formula) y los bloques "PE FCST <ramo>", "PRIMA N AÑOS <ramo>" y "PEACUMULADA <ramo>" la referencian.
 ARCHIVO_PE_FCST = ENTRADAS / "FCST_2027.xlsb"
 PATRON_PE_RAMO = "PExRamo*"      # base historica de PE por ramo y mes (en entradas/): periodo, Ramo, Sramo, PmaTom
+PATRON_PE_RFCST_FA = "*RCST*_FA*.xlsx"   # reforecast del ano por mes y ramo (en entradas/; hoja Ana_RFCST<aa>_FA: MesProc,
+                                 # Tipo Rea, Susc, RAMO, Primas Tomadas USD y MXN): PE de los meses entre PExRamo y el
+                                 # FCST (sep-dic 2026). Sin el archivo, esos meses salen del reforecast por grupo de primas.py
+MONEDA_PE_RFCST_FA = "MXN"       # "MXN": Primas Tomadas MXN entre el TC del mes del proyecto (tipo_cambio.py, FCST de
+                                 # Inversiones), por indicacion del area; "USD": Primas Tomadas USD del archivo tal cual
+                                 # (convertidas con el TC de su columna TC)
 MONEDA_PE_RAMO = "MXN"           # PExRamo viene en pesos (dividida entre el TC del mes cuadra con la prima real en USD);
                                  # antes del primer mes con TC en la BD (202201) se usa ese primer TC
 SUBRAMO_A_BD = {"30": {"30": "30", "31": "30", "32": "30", "33": "30", "34": "34", "35": "34", "36": "34",
@@ -474,6 +480,9 @@ RAMO_FCST_A_BD = {"10": "10", "31": "30", "35": "34", "39": "37", "40": "40", "4
                   "71": "71", "73": "73", "80": "80", "90": "90", "100": "100", "110": "110"}
                                  # Ramo2 de CtaMens -> ramo de la BD (Resp. Civil trae 40 y 46; Fianzas, 140 a 170,
                                  # no esta en la BD de Danos)
+RAMO_RFCST_FA_A_BD = {**RAMO_FCST_A_BD, "34": "34", "37": "37"}
+                                 # RAMO del reforecast por mes (subramo del catalogo: 31 Acc Per., 34 GMM, 37 Salud y los
+                                 # demas con el numero del ramo) -> ramo de la BD; Fianzas (130) no esta en la BD de Danos
 ESTACIONALIDAD_TRIMESTRAL = ("RCONT",)   # acumula en meses 1-2 del trimestre y libera en el 3
 DOMINIO_CESION = (0.0, 1.0)      # IRR/BRUTO entre 0 y 100%
 DOMINIO_RAZON_BEL = (0.0, None)  # GTO/BEL y MR/BEL no negativos
@@ -2364,6 +2373,101 @@ def leer_pe_ramo(tc: dict, ruta: Path | None = None) -> dict | None:
             "repartidos": repartidos, "avisos": avisos, "periodos": sorted({p for _, p in mensual})}
 
 
+def leer_pe_rfcst_fa(tc: dict, ruta: Path | None = None) -> dict | None:
+    """Reforecast del ano por mes y ramo (archivo PATRON_PE_RFCST_FA, hoja con MesProc, RAMO y Primas Tomadas USD /
+    MXN; si la hoja repite el encabezado en otros bloques a la derecha, se toma el primero): prima tomada de cada
+    MesProc y RAMO, todas las Tipo Rea y Susc. Con MONEDA_PE_RFCST_FA = "MXN", Primas Tomadas MXN entre el TC del mes
+    del proyecto (tc; si no lo trae, TC_PROYECCION); con "USD", Primas Tomadas USD. RAMO_RFCST_FA_A_BD lleva el RAMO al
+    ramo de la BD; un ramo de la BD sin renglones en un mes del archivo es prima 0. Regresa {"ruta", "hoja", "mensual": {(ramo, periodo): USD},
+    "usd_archivo": {(ramo, periodo): USD del archivo}, "tc_archivo": {periodo: TC del archivo}, "tc_usado": {periodo:
+    TC}, "periodos", "renglones", "por_tipo": {Tipo Rea: renglones}, "fuera": {(ramo, periodo): USD}, "control",
+    "avisos"} o None si no hay archivo."""
+    candidatos = [Path(ruta)] if ruta else sorted(
+        (c for c in ENTRADAS.glob(PATRON_PE_RFCST_FA) if not c.name.startswith("~$")),
+        key=lambda c: c.stat().st_size, reverse=True)
+    if not candidatos or not candidatos[0].exists():
+        return None
+    ruta = candidatos[0]
+    nombres = {k: norm(v) for k, v in (("mes", "MesProc"), ("ramo", "RAMO"), ("tipo", "Tipo Rea"), ("tc", "TC"),
+                                       ("usd", "Primas Tomadas USD"), ("mxn", "Primas Tomadas MXN"))}
+    wb = openpyxl.load_workbook(ruta, read_only=True, data_only=True)
+    try:
+        hoja = filas = j = None
+        for ws in wb.worksheets:
+            filas = list(ws.iter_rows(values_only=True))
+            for i, f in enumerate(filas[:40]):
+                enc = [norm(x) for x in f]
+                if all(n in enc for n in nombres.values()):
+                    j = {k: enc.index(n) for k, n in nombres.items()}      # (el primer bloque de la hoja)
+                    hoja, i_enc = ws.title, i
+                    break
+            if hoja:
+                break
+    finally:
+        wb.close()
+    if hoja is None:
+        raise ValueError(f"{ruta.name}: ninguna hoja trae el encabezado {', '.join(sorted(set(nombres.values())))}")
+    usd_archivo, mxn, tc_archivo, por_tipo, desvio_tc = {}, {}, {}, {}, 0.0
+    renglones, omitidos = 0, []
+    for i, f in enumerate(filas[i_enc + 1:], start=i_enc + 2):
+        if not f:
+            continue
+        f = tuple(f) + (None,) * (max(j.values()) + 1 - len(f))
+        mes = a_numero(f[j["mes"]])[0]
+        if not (np.isfinite(mes) and 190001 <= mes <= 299912):
+            continue                                   # (totales, bloques de otras columnas o renglones vacios)
+        u, m, r_num, t = (a_numero(f[j[k]])[0] for k in ("usd", "mxn", "ramo", "tc"))
+        if not (np.isfinite(u) and np.isfinite(m) and np.isfinite(r_num)):
+            omitidos.append(i)
+            continue
+        renglones += 1
+        p, r = int(mes), str(int(r_num))
+        por_tipo[f[j["tipo"]]] = por_tipo.get(f[j["tipo"]], 0) + 1
+        usd_archivo[(r, p)] = usd_archivo.get((r, p), 0.0) + u
+        mxn[(r, p)] = mxn.get((r, p), 0.0) + m
+        if np.isfinite(t) and t > 0:
+            tc_archivo.setdefault(p, t)
+            desvio_tc = max(desvio_tc, abs(u * t - m))
+    if not renglones:
+        raise ValueError(f"{ruta.name} › {hoja}: ningun renglon con MesProc AAAAMM, RAMO y Primas Tomadas numericos")
+    periodos = sorted({p for _, p in usd_archivo})
+    tc_usado, avisos = {}, []
+    for p in periodos:
+        tc_usado[p] = tc.get(p) or TC_PROYECCION.get(p)
+    if MONEDA_PE_RFCST_FA == "MXN":
+        sin_tc = [p for p in periodos if not tc_usado[p]]
+        if sin_tc:
+            avisos.append(f"{', '.join(map(str, sin_tc))} sin TC del proyecto: se toma Primas Tomadas USD del archivo")
+        fuente = {k: (v / tc_usado[k[1]] if tc_usado[k[1]] else usd_archivo[k]) for k, v in mxn.items()}
+    else:
+        fuente = dict(usd_archivo)
+    mensual, fuera = {}, {}
+    for (r, p), v in fuente.items():
+        destino = RAMO_RFCST_FA_A_BD.get(r)
+        if destino is None:
+            fuera[(r, p)] = fuera.get((r, p), 0.0) + v
+            continue
+        mensual[(destino, p)] = mensual.get((destino, p), 0.0) + v
+    for destino in set(RAMO_RFCST_FA_A_BD.values()):   # un ramo de la BD sin renglones en el mes es prima 0
+        for p in periodos:
+            mensual.setdefault((destino, p), 0.0)
+    total = sum(usd_archivo.values())
+    arriba = [x for f in filas[:i_enc] if f and len(f) > j["usd"]
+              for x in [a_numero(f[j["usd"]])[0]] if np.isfinite(x) and x]
+    control = (f"Primas Tomadas USD suman {total / 1e6:,.1f} M"
+               + ("; igual al total del encabezado del archivo" if any(abs(x - total) <= 1.0 for x in arriba) else
+                  (f"; el total del encabezado del archivo dice {arriba[0] / 1e6:,.1f} M (filtro aplicado?)"
+                   if arriba else "")))
+    if desvio_tc > 1.0:
+        avisos.append(f"en algun renglon MXN no es USD x TC del archivo (diferencia maxima {desvio_tc:,.0f} MXN)")
+    if omitidos:
+        avisos.append(f"{len(omitidos)} renglones con RAMO o Primas Tomadas no numericos omitidos (primero: renglon "
+                      f"{omitidos[0]})")
+    return {"ruta": ruta, "hoja": hoja, "mensual": mensual, "usd_archivo": usd_archivo, "tc_archivo": tc_archivo,
+            "tc_usado": tc_usado, "periodos": periodos, "renglones": renglones, "por_tipo": por_tipo, "fuera": fuera,
+            "control": control, "avisos": avisos}
+
+
 def _mezcla(pe_hist: dict, ramos: list) -> dict:
     """{ramo: peso} con la PE historica de los ultimos 12 meses (partes iguales si no hay)."""
     ult = max((p for _, p in pe_hist), default=None)
@@ -2415,14 +2519,15 @@ def pe_reforecast(pr, pe_hist: dict, desde: int, hasta: int) -> dict:
 def pe_por_mes(pe_ramo: dict | None, pef: dict | None, pe_rf: dict | None = None,
                capturas: dict | None = None) -> dict:
     """{(ramo, periodo): (prima del mes USD, fuente)}: PExRamo en su historia, el reforecast entre la historia y el
-    FCST, y el FCST en los meses que no traen los otros (en un mes que traigan varios, manda el real); una PE capturada
-    en la BD de entrada solo entra en los meses que ninguna fuente trae."""
+    FCST (pe_rf: valor, o (valor, fuente) si no es el de primas.py), y el FCST en los meses que no traen los otros (en
+    un mes que traigan varios, manda el real); una PE capturada en la BD de entrada solo entra en los meses que ninguna
+    fuente trae."""
     out = {}
     if pef:
         for (r, p), v in pef["mensual"].items():
             out[(r, p)] = (float(v), (pef.get("fuente_ramo") or {}).get(r, pef["ruta"].name))
-    for (r, p), v in (pe_rf or {}).items():
-        out[(r, p)] = (float(v), "reforecast")
+    for (r, p), v in (pe_rf or {}).items():       # (valor o (valor, fuente))
+        out[(r, p)] = (float(v[0]), v[1]) if isinstance(v, tuple) else (float(v), "reforecast")
     if pe_ramo:
         for (r, p), v in pe_ramo["mensual"].items():
             out[(r, p)] = (float(v), pe_ramo["ruta"].name)
@@ -4634,7 +4739,16 @@ def main():
     except Exception as e:  # noqa: BLE001
         diag_pnd["pe_ramo"] = f"no se pudo leer la base PExRamo ({type(e).__name__}: {e})"
         alertas.append(("PND", "PExRamo", diag_pnd["pe_ramo"]))
-    pe_rf = {}
+    pe_rf, pe_rfa = {}, None
+    try:
+        pe_rfa = leer_pe_rfcst_fa(tc_primas)
+    except Exception as e:  # noqa: BLE001
+        diag_pnd["pe_rfcst_fa"] = (f"no se pudo leer el reforecast por mes y ramo ({PATRON_PE_RFCST_FA}: "
+                                   f"{type(e).__name__}: {e}); sep-dic sale del reforecast por grupo de primas.py")
+        alertas.append(("PND", "PE reforecast", diag_pnd["pe_rfcst_fa"]))
+    if pe_rfa is not None:
+        for a in pe_rfa["avisos"]:
+            alertas.append(("PND", "PE reforecast", a))
     if pe_ramo is not None and pe_ramo["periodos"]:
         # control: PExRamo en USD contra la prima real por grupo del proyecto, en los meses que comparten
         control = ""
@@ -4663,7 +4777,8 @@ def main():
             + control)
         for a in pe_ramo.get("avisos") or []:
             alertas.append(("PND", "PExRamo", a))
-        # meses entre PExRamo y el FCST: reforecast del ano por grupo (primas.py)
+        # meses entre PExRamo y el FCST: reforecast del ano por mes y ramo (PATRON_PE_RFCST_FA) o, si no esta, el
+        # reforecast por grupo de primas.py
         desde = _mes_menos(pe_ramo["periodos"][-1], -1)
         hasta = _mes_menos(pef["periodos"][0], 1) if pef else periodos_proy[-1]
         if desde > hasta:
@@ -4671,13 +4786,51 @@ def main():
                                          f"{pef['periodos'][0] if pef else '-'}): no hace falta reforecast")
         else:
             pe_rf = pe_reforecast(pr, pe_ramo["mensual"], desde, hasta)
+            meses_fa = [p for p in rango_periodos(desde, hasta) if pe_rfa and p in pe_rfa["periodos"]]
+            txt_fa = ""
+            if meses_fa:
+                nombre = pe_rfa["ruta"].name
+                fa, ramos_fa = repartir_grupos({k: v for k, v in pe_rfa["mensual"].items() if k[1] in meses_fa},
+                                               pe_ramo["mensual"])
+                antes = sum(v for (_, q), v in pe_rf.items() if q in meses_fa)
+                pe_rf = {k: v for k, v in pe_rf.items() if k[1] not in meses_fa}
+                pe_rf.update({(r, p): (v, f"{nombre} (total del grupo repartido con la mezcla de PExRamo)"
+                                       if r in ramos_fa else nombre) for (r, p), v in fa.items()})
+                tcs, tca = pe_rfa["tc_usado"], pe_rfa["tc_archivo"]
+                tc_txt = ", ".join(f"{p} {tcs[p]:.4f}" for p in meses_fa if tcs[p])
+                tca_txt = ", ".join(f"{p} {tca[p]:.4f}" for p in meses_fa if p in tca)
+                moneda = (f"Primas Tomadas MXN / TC del proyecto ({tc_txt}; el archivo trae TC {tca_txt})"
+                          if MONEDA_PE_RFCST_FA == "MXN" else f"Primas Tomadas USD del archivo (TC del archivo {tca_txt})")
+                otros = [p for p in pe_rfa["periodos"] if p not in meses_fa]
+                fuera_fa = {}
+                for (r, p), v in pe_rfa["fuera"].items():
+                    if p in meses_fa:
+                        fuera_fa[r] = fuera_fa.get(r, 0.0) + v
+                despues = sum(v for (_, q), v in fa.items() if q in meses_fa)
+                txt_fa = (f"{meses_fa[0]} a {meses_fa[-1]}: {nombre} › {pe_rfa['hoja']}, reforecast por mes y ramo "
+                          f"({pe_rfa['renglones']:,} renglones, todas las Tipo Rea ("
+                          + ", ".join(f"{k}: {v}" for k, v in sorted(pe_rfa["por_tipo"].items(), key=lambda x: str(x[0])))
+                          + f") y Susc; {moneda}); {pe_rfa['control']}; Danos {despues / 1e6:,.1f} M USD en esos meses "
+                          f"(el reforecast por grupo de primas.py daba {antes / 1e6:,.1f} M)"
+                          + (f"; ramos {', '.join(ramos_fa)}: total de su grupo repartido con la mezcla de PExRamo de "
+                             "los ultimos 12 meses (GRUPOS_CON_MEZCLA)" if ramos_fa else "")
+                          + (f"; meses del archivo que no se usan (real o FCST): {', '.join(map(str, otros))}" if otros else "")
+                          + "; fuera de la BD de Danos: " + (", ".join(f"{k} ({v / 1e6:,.1f} M USD)" for k, v in
+                                                                      sorted(fuera_fa.items())) or "nada"))
             cub = sorted({p for _, p in pe_rf})
             falta = [p for p in rango_periodos(desde, hasta) if p not in cub]
+            de_primas = [p for p in cub if p not in meses_fa]
             diag_pnd["pe_reforecast"] = (
-                (f"{cub[0]} a {cub[-1]}: reforecast del ano por grupo (primas.py), 30 y 70 repartidos con la mezcla de "
-                 "PExRamo de los ultimos 12 meses" if cub else "sin reforecast (sin bases de primas)")
-                + (f"; {falta[0]} a {falta[-1]} sin PE (ni reforecast ni FCST): el BEL de esos meses sigue con el modelo"
-                   if falta else ""))
+                "; ".join(x for x in (
+                    txt_fa,
+                    (f"{de_primas[0]} a {de_primas[-1]}: reforecast del ano por grupo (primas.py), 30 y 70 repartidos con "
+                     "la mezcla de PExRamo de los ultimos 12 meses" if de_primas else "")) if x)
+                or "sin reforecast (sin bases de primas)")
+            diag_pnd["pe_reforecast"] += (f"; {falta[0]} a {falta[-1]} sin PE (ni reforecast ni FCST): el BEL de esos "
+                                          "meses sigue con el modelo" if falta else "")
+            if pe_rfa is None and not diag_pnd.get("pe_rfcst_fa"):
+                diag_pnd["pe_reforecast"] += (f"; no se encontro el reforecast por mes y ramo ({PATRON_PE_RFCST_FA}) en "
+                                              "entradas/")
             if falta:
                 alertas.append(("PND", "PE por ramo", diag_pnd["pe_reforecast"]))
             anio = PERIODO_FIN // 100
