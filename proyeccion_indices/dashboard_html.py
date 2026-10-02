@@ -106,6 +106,25 @@ def leer_tendencias() -> dict:
     return out
 
 
+def leer_estatutarios() -> list:
+    """Ramos de HParametros cuyos indices y LAGs se dejan fijos por ser estatutarios (regla en Series_Modelos)."""
+    if not dx.ARCHIVO_DIAGNOSTICO.exists():
+        return []
+    wb = openpyxl.load_workbook(dx.ARCHIVO_DIAGNOSTICO, read_only=True, data_only=True)
+    ramos = set()
+    try:
+        if "Series_Modelos" in wb.sheetnames:
+            filas = wb["Series_Modelos"].iter_rows(values_only=True)
+            enc = [str(h) for h in next(filas)]
+            for f in filas:
+                r = dict(zip(enc, f))
+                if r.get("Libro") == "HPARAM" and str(r.get("Regla") or "").startswith("Ramo estatutario"):
+                    ramos.add(str(r.get("Ramo")))
+    finally:
+        wb.close()
+    return sorted(ramos)
+
+
 def leer_contraste_presupuesto() -> dict | None:
     """Hoja Contraste_Presupuesto del diagnostico (si se leyo el presupuesto): {"enc": [...], "filas": [[...]]}."""
     if not dx.ARCHIVO_DIAGNOSTICO.exists():
@@ -208,6 +227,7 @@ def preparar_datos() -> dict:
         "tc": {str(p): _redondear(t, 6) for p, t in tc.items()},
         "metodo": filas_metodo, "modelo_por_tipo": modelo_por_tipo, "ventana_tendencia": ventana,
         "persistencia_indices": persistencia,
+        "estatutarios": leer_estatutarios(),
         "nota_rangos": nota_rangos,
         "ppto": leer_contraste_presupuesto(),
         "tend": leer_tendencias(),
@@ -882,7 +902,8 @@ const decInd = serie => 4;
 function pintarIndices() {
   const { ramo, serie } = E, iPer = idx(P_I, E.periodo);
   const vals = serieInd(ramo, serie), esLag = D.lags.includes(serie);
-  document.getElementById('nota-ind').textContent = `Real hasta ${eti(D.ultimo)} · proyección ${eti(P_I[iUlt + 1])} a ${eti(D.fin)} · ${esLag ? 'LAGs' : 'Índices'}: ${D.modelo_por_tipo[esLag ? 'lag' : 'indice'] || 'n/d'}`;
+  document.getElementById('nota-ind').textContent = `Real hasta ${eti(D.ultimo)} · proyección ${eti(P_I[iUlt + 1])} a ${eti(D.fin)} · ${(D.estatutarios || []).includes(ramo)
+    ? 'ramo estatutario: IS y LAGs fijos en el último valor real' : `${esLag ? 'LAGs' : 'Índices'}: ${D.modelo_por_tipo[esLag ? 'lag' : 'indice'] || 'n/d'}`}`;
   const ult = vals[iUlt], pDic = vals[iDic], pFin = vals[iFin], prom = promedio12(vals);
   const f4 = v => fmt(v, 4), conPatron = tieneEstacionalidad(`HPARAM|${serie}|${ramo}`);
   document.getElementById('kpis-ind').replaceChildren(
@@ -900,7 +921,10 @@ function pintarIndices() {
 
   const nombreTend = nombreModelo(`HPARAM|${serie}|${ramo}`);
   const tendI = rectaModelo(`HPARAM|${serie}|${ramo}`, real, P_I, 1);
-  const c1 = tarjeta(`Evolución mensual · ${serie} · ramo ${ramo}`, (!tendI ? 'Real y proyección con banda al 80 %' : conPatron
+  const estatutario = (D.estatutarios || []).includes(ramo);
+  const c1 = tarjeta(`Evolución mensual · ${serie} · ramo ${ramo}`, estatutario
+    ? 'Ramo estatutario: la CNSF otorga sus IS y LAGs, así que la proyección se queda en el último valor real'
+    : (!tendI ? 'Real y proyección con banda al 80 %' : conPatron
     ? 'Real, modelo ajustado (tendencia + patrón del año) y proyección con banda al 80 %' : 'Real, línea de tendencia y proyección con banda al 80 %')
     + (!esLag && D.persistencia_indices != null && D.persistencia_indices < 1 ? ` · la desviación del último mes se desvanece hacia el nivel del último año (persistencia ${D.persistencia_indices}) y la pendiente entra ponderada por lo que explica la recta` : ''),
     (cuerpo, W) => graficaLineas(cuerpo, W, {
@@ -909,7 +933,7 @@ function pintarIndices() {
       series: [
         ...(tendI ? [{ nombre: nombreTend, valores: tendI, color: cssVar('--deemph-ink'), fino: true }] : []),
         { nombre: 'Real', valores: real, color: cssVar('--real'), etiquetaFin: true },
-        { nombre: 'Proyección', valores: proy, color: cssVar('--proy'), dash: true, banda, etiquetaFin: true },
+        { nombre: 'Proyección', valores: proy, color: cssVar('--proy'), dash: true, banda: estatutario ? null : banda, etiquetaFin: true },
       ],
     }),
     () => tablaDatos(['Mes', 'Real', 'Proyección', 'Banda inferior', 'Banda superior', ...(tendI ? [nombreTend] : [])],

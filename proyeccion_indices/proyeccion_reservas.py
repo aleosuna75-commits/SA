@@ -49,6 +49,8 @@ c) Backtest por serie: se vuelve a proyectar desde 16, 12 y 8 meses antes del fi
    error contra lo real, del modelo y de las alternativas simples (ultimo valor y SES). Se
    reporta por serie (Series_Modelos) y por tipo (Backtest); no cambia el modelo.
 d) Reglas actuariales / de calidad de datos (todas reportadas en la hoja "Alertas"):
+       - ramos estatutarios (RAMOS_ESTATUTARIOS: la CNSF otorga sus IS y LAGs) -> los indices y LAG 1-10
+         de HParametros se quedan fijos en el ultimo valor real;
        - series en cero en los ultimos 6 meses -> se proyectan en cero;
        - parametros "en escalon" (se actualizan esporadicamente, >=50% de meses sin
          cambio) -> se mantiene el ultimo valor;
@@ -401,6 +403,12 @@ MIN_MESES_FACTOR = {"DANOS": 24, "FIANZAS": 12}   # meses minimos de factor para
 ANIOS_LAG_SONR = 3               # anos de suscripcion en la exposicion de SONR (PDP)
 MAPA_RAMO_LAG = {"10": "10", "30": "31", "34": "35", "37": "39", "40": "40", "50": "50", "60": "60", "71": "TEV",
                  "73": "Hidro", "80": "80", "90": "90", "100": "100", "110": "110"}   # ramo de reserva -> HParametros
+# Ramos estatutarios: la CNSF otorga sus IS y sus LAGs, asi que en HParametros no se modelan; la proyeccion de los
+# indices y de los LAG 1-10 se queda fija en el ultimo valor real (si el ultimo real tiene mas de MESES_SIN_DATO_MAX
+# meses no se proyecta, como en los demas ramos).
+RAMOS_ESTATUTARIOS = ("37", "71", "73", "100")   # ramos de reserva (Salud, TEV, Hidro, Credito)
+HP_ESTATUTARIOS = {MAPA_RAMO_LAG[r] for r in RAMOS_ESTATUTARIOS}   # su clave en HParametros
+REGLA_ESTATUTARIO = "Ramo estatutario (IS y LAG de la CNSF): se mantiene el ultimo valor real"
 PENDIENTE_DEFECTO = (0.9, 0.5, 0.2)   # parte pendiente por ano si el ramo no trae LAG en HParametros
 UMBRAL_PRIMA_FACTOR = 5e6        # prima de 12 meses minima del grupo (USD) para usar el factor
 UMBRAL_RESERVA_FACTOR = 1e6      # reserva minima (USD) para usar el factor
@@ -784,7 +792,7 @@ def elegir_modelo(tipo: str, n: int, trimestral: bool) -> str:
 
 def preparar(serie: Serie):
     """Reglas de calidad de datos. Devuelve (res, prep): si la serie queda resuelta por una regla
-    (ceros, constante, escalon, sin datos) prep es None y res trae la proyeccion; si no, prep trae
+    (ramo estatutario, ceros, constante, escalon, sin datos) prep es None y res trae la proyeccion; si no, prep trae
     la historia limpia {y, per, brecha}."""
     tipo, h = serie.tipo, serie.h
     per = list(serie.periodos)
@@ -868,7 +876,9 @@ def preparar(serie: Serie):
     if brecha > 0:
         res.alertas.append(f"Ultimo dato en {per[-1]}; se proyecta desde ahi ({brecha} mes(es) de rezago)")
 
-    # 5) series extintas / constantes / en escalon
+    # 5) ramos estatutarios / series extintas / constantes / en escalon
+    if serie.clave[0] == "HPARAM" and str(serie.clave[3]).strip() in HP_ESTATUTARIOS:
+        return _constante(y[-1], REGLA_ESTATUTARIO)
     if tipo == "nivel" and n >= MESES_CERO_EXTINTA and np.all(y[-MESES_CERO_EXTINTA:] == 0):
         return _constante(0.0, f"Serie en cero los ultimos {MESES_CERO_EXTINTA} meses (se proyecta en cero)")
     if n == 1 or np.all(np.abs(np.diff(y[-25:])) < 1e-12):
@@ -4261,7 +4271,9 @@ def escribir_diagnostico(resultados: dict, periodos_proy: list[int], alertas_gen
                         "modelo, salvo en el factor de prima (8), donde decide entre la recta y el factor."),
         ("5. Intervalos", f"{NIVEL_INTERVALO:.0%}, calculados por el propio modelo (en logaritmos para montos e "
                           "indices, por lo que son asimetricos)."),
-        ("6. Reglas", "Series en cero -> 0; parametros en escalon -> ultimo valor; dominio actuarial (cesion en "
+        ("6. Reglas", "Ramos estatutarios (" + ", ".join(RAMOS_ESTATUTARIOS) + "; IS y LAGs de la CNSF) -> indices y "
+                      "LAGs fijos en el ultimo valor real; "
+                      "series en cero -> 0; parametros en escalon -> ultimo valor; dominio actuarial (cesion en "
                       "[0,1], %GTO y %MR >= 0, LAGs >= 0); 99.5% >= media si siempre lo fue; limpieza de textos "
                       "y LAG=0 marcadores; alertas de saltos atipicos y de cambios mayores a los historicos."),
         ("7. Tipo de cambio", "Columna TC = supuesto de Inversiones (TC_Real_Esti.xlsx, hoja TC: FCST 2026 y "
