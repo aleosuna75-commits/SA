@@ -440,6 +440,10 @@ PATRON_IS_FA = "PPTO*FA*.xlsx"   # indices de siniestralidad de la funcion actua
                                  # MesProc, IS RRC e IS SONR, desde el primer mes proyectado): bloque "IS (FA) <ramo>",
                                  # con IS RRC en los renglones de RRC e IS SONR en los de SONR (como el IS (RL)); N/A en
                                  # los meses y ramos que no trae. Solo se muestra: el BEL sigue con el IS (RL)
+COLUMNAS_TABLERO_PND = ("PND/PD", "FACTOR GTO", "FACTOR MR", "CESION", "IS (RL)", "IS (FA)", "PE FCST", "PRIMA N AÑOS",
+                        "PEACUMULADA", "FD/FND")   # indicadores por ramo y mes que van a la hoja HOJA_INDICADORES_RAMO del
+                                 # diagnostico (los mismos valores de los bloques de la BD principal), para el tablero
+HOJA_INDICADORES_RAMO = "Indicadores_Ramo"
 HOJA_IS_FA = "IS_FA"             # hoja de apoyo en la BD de Danos con la tabla del archivo de la funcion actuarial
 COLUMNA_IS_FA = {"RRC": "IS RRC", "SONR": "IS SONR"}   # columna del archivo para cada reserva
 MAX_IS_FA = 10.0                 # aviso si un indice del archivo pasa de 1,000 % (p. ej. si viene en % y no en razon)
@@ -3059,6 +3063,8 @@ def escribir_indices_pnd(bd: BDMontos, ctx: dict, avisos: list | None = None) ->
     razones = ctx.get("razones") or {}             # FACTOR GTO, FACTOR MR y CESION proyectados (BEL por FND)
     is_fa = ctx.get("is_fa") or {}                 # {"val": {(reserva, ramo, periodo): IS}, "ref": {...: celda}, ...}
     is_fa_val, is_fa_ref = is_fa.get("val") or {}, is_fa.get("ref") or {}
+    registro = ctx.get("registro")                 # {(reserva, ramo, periodo): {indicador: valor}} para el tablero
+    filas_bd = set(bd.filas.values())              # (sin los meses de prima anteriores a la BD)
     primas_pe, pe_tab, meses_pe = ctx.get("primas_pe"), ctx.get("pe_tab") or {}, ctx.get("meses_pe")
     pos = {p: i for i, p in enumerate(periodos_proy)}
     formulas = INDICES_PND_FORMULAS and hp is not None and getattr(hp, "filas", None)
@@ -3329,6 +3335,11 @@ def escribir_indices_pnd(bd: BDMontos, ctx: dict, avisos: list | None = None) ->
             vals["CESION"] = (div(monto(pref, "IRR", p, r), bruto_m) if f_irr else 0.0) if ok(bruto_m) else NA
             if fac:
                 vals.update({k: float(x) for k, x in fac.items() if k != "FACTOR GTO" or f_gto})
+            if registro is not None and es_bel and fila in filas_bd:   # (el valor que muestra la hoja)
+                registro[(pref, str(r), p)] = {**{k: (None if isinstance(x, str) else float(x)) for k, x in vals.items()},
+                                               "BEL": bel if ok(bel) else None,
+                                               "BRUTO": bruto_m if ok(bruto_m) else None,
+                                               "GTO": 1.0 if f_gto else 0.0}
             for ind in COLUMNAS_INDICES_PND:
                 c = cols[(ind, r)]
                 celda = ws.cell(fila, c)
@@ -4588,6 +4599,10 @@ def _hojas_pnd(wb, diag: dict, negrita, encab):
     implicita y los factores mes a mes (historia y proyeccion) y el backtest por serie y corte; y las del BEL por FND."""
     def hojas_fnd():
         fnd = (diag or {}).get("bel_fnd") or {}
+        if (diag or {}).get("indicadores_ramo"):        # (lo lee el tablero: pestana PND/PD)
+            _hoja_filas(wb, HOJA_INDICADORES_RAMO, diag["indicadores_ramo"], negrita, encab,
+                        {**{c: COLUMNAS_INDICES_PND.get(c, "0.0000") for c in COLUMNAS_TABLERO_PND},
+                         "BEL": "#,##0", "BRUTO": "#,##0"})
         if (diag or {}).get("is_fa_comp"):
             _hoja_filas(wb, "IS_FA_Comparativo", diag["is_fa_comp"], negrita, encab,
                         {"IS (FA)": "0.00%", "IS (RL)": "0.00%", "Diferencia": "0.00"})
@@ -5203,8 +5218,15 @@ def main():
         if is_fa is not None:
             ctx_is_fa = {"val": is_fa["val"], "ref": ref_is_fa or {}, "archivo": is_fa["ruta"].name,
                          "periodos": is_fa["periodos"], "ramos": is_fa["ramos"]}
-        cols_ind = escribir_indices_pnd(bd_danos, ctx_indices(proy_danos, meses_bd, info_fnd.get("fnd"),
-                                                              info_fnd.get("razones")), avisos_ind)
+        registro_ind = {}
+        cols_ind = escribir_indices_pnd(bd_danos, {**ctx_indices(proy_danos, meses_bd, info_fnd.get("fnd"),
+                                                                 info_fnd.get("razones")), "registro": registro_ind},
+                                        avisos_ind)
+        diag_pnd["indicadores_ramo"] = [
+            {"Reserva": pref, "Ramo": r, "Periodo": p, "Tipo": "Real" if p <= ultimo else "Proyección",
+             **{c: v.get(c) for c in COLUMNAS_TABLERO_PND}, "BEL": v.get("BEL"), "BRUTO": v.get("BRUTO"),
+             "Lleva GTO": v.get("GTO")}
+            for (pref, r, p), v in sorted(registro_ind.items(), key=lambda x: (x[0][0], int(x[0][1]), x[0][2]))]
         if INDICES_PND_FORMULAS and info_fnd.get("aplica"):
             escribir_bel_fnd(bd_danos, info_fnd, cols_ind)
         for a in avisos_ind:

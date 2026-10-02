@@ -8,8 +8,11 @@ Genera salidas/Dashboard_Indices_Reservas.xlsx a partir de las salidas de proyec
                            resumen de los 4 indices del ramo.
   * "Dashboard Reservas" : selectores de reserva, concepto, ramo y moneda (USD/MXN con el TC de la BD);
                            indicadores; mensual 2025-2027; historico 2022-2027; por ramo; por concepto.
+  * "Dashboard PND-PD"   : selectores de ramo (con "Todos") y reserva; indicadores; PND / PD, FACTOR GTO, FACTOR MR,
+                           CESION, FD / FND, IS (RL), IS (FA), PE FCST, PRIMA N AÑOS y PEACUMULADA, real y proyeccion
+                           (hoja Indicadores_Ramo del diagnostico: los valores de los bloques de la BD de Danos).
   * "Análisis"           : tablas con mapas de calor (indices por ramo y totales de reservas) y metodo.
-  * "BD_Indices", "BD_Reservas": bases de datos (tablas de Excel con filtros).
+  * "BD_Indices", "BD_Reservas", "BD_PND": bases de datos (tablas de Excel con filtros).
 Los dashboards son interactivos sin macros: las listas desplegables alimentan formulas (SUMIFS) y las
 graficas se recalculan al cambiar la seleccion.
 
@@ -236,6 +239,81 @@ def leer_montos(ultimo: int):
     return registros, tc, ramos
 
 
+HOJA_INDICADORES_RAMO = "Indicadores_Ramo"      # hoja del diagnostico con los indicadores por ramo de la BD de Danos
+# indicadores de la pestaña PND/PD: (columna de la hoja, titulo, unidad: "monto" en USD, "pct" razon o "fnd")
+INDICADORES_PND = [
+    ("PND/PD", "PND / PD", "monto"),
+    ("FACTOR GTO", "FACTOR GTO (GTO / PND)", "pct"),
+    ("FACTOR MR", "FACTOR MR (MR / PND o PD)", "pct"),
+    ("CESION", "CESIÓN (IRR / BRUTO)", "pct"),
+    ("FD/FND", "FD / FND (PND o PD / PEACUMULADA)", "fnd"),
+    ("IS (RL)", "IS (RL): índice de siniestralidad de HParametros", "pct"),
+    ("IS (FA)", "IS (FA): índice de siniestralidad de la función actuarial", "pct"),
+    ("PE FCST", "PE FCST: prima tomada del mes", "monto"),
+    ("PRIMA N AÑOS", "PRIMA N AÑOS: prima de los últimos 12 meses", "monto"),
+    ("PEACUMULADA", "PEACUMULADA", "monto"),
+]
+# "Todos los ramos": los montos se suman; los factores e indices son el promedio ponderado de los ramos con dato, que
+# equivale a la razon de las sumas: FACTOR GTO, FACTOR MR e IS con el PND / PD (GTO / PND, MR / PND, BEL / PND),
+# CESION con el BRUTO (IRR / BRUTO) y FD / FND = suma de PND / suma de PEACUMULADA
+PESO_TODOS = {"FACTOR GTO": "PND/PD", "FACTOR MR": "PND/PD", "IS (RL)": "PND/PD", "IS (FA)": "PND/PD", "CESION": "BRUTO"}
+
+
+def leer_indicadores_ramo() -> dict | None:
+    """Hoja HOJA_INDICADORES_RAMO del diagnostico (los valores de los bloques de indicadores de la BD de Danos, RRC y
+    SONR, por ramo y mes): {"periodos": [...], "ramos": [...], "datos": {reserva: {ramo o "Todos": {indicador:
+    [valor por periodo o None]}}}, "con_fa": [ramos con IS (FA)], "lleva_gto": {reserva: bool}, "renglones": n}.
+    None si no esta la hoja (diagnostico de una version anterior)."""
+    if not ARCHIVO_DIAGNOSTICO.exists():
+        return None
+    wb = openpyxl.load_workbook(ARCHIVO_DIAGNOSTICO, read_only=True, data_only=True)
+    try:
+        if HOJA_INDICADORES_RAMO not in wb.sheetnames:
+            return None
+        filas = wb[HOJA_INDICADORES_RAMO].iter_rows(values_only=True)
+        enc = [str(h) if h is not None else "" for h in next(filas)]
+        crudos = [dict(zip(enc, f)) for f in filas if f and f[0] in ("RRC", "SONR")]
+    finally:
+        wb.close()
+    if not crudos:
+        return None
+    periodos = sorted({int(r["Periodo"]) for r in crudos})
+    ramos = sorted({str(r["Ramo"]) for r in crudos}, key=lambda x: int(x) if x.isdigit() else 10 ** 6)
+    pos = {p: i for i, p in enumerate(periodos)}
+    columnas = [c for c, _, _ in INDICADORES_PND] + ["BRUTO"]
+    datos, lleva_gto = {}, {}
+    for r in crudos:
+        res, ramo, i = r["Reserva"], str(r["Ramo"]), pos[int(r["Periodo"])]
+        d = datos.setdefault(res, {}).setdefault(ramo, {c: [None] * len(periodos) for c in columnas})
+        for c in columnas:
+            d[c][i] = numero(r.get(c))
+        if numero(r.get("Lleva GTO")):
+            lleva_gto[res] = True
+    for res, por_ramo in datos.items():
+        lleva_gto.setdefault(res, False)
+        if not lleva_gto[res]:                 # SONR no tiene GTO: la BD pone 0; en el tablero va sin dato, no 0
+            for v in por_ramo.values():
+                v["FACTOR GTO"] = [None] * len(periodos)
+        tot = {c: [None] * len(periodos) for c in columnas}
+        for i in range(len(periodos)):
+            for c in columnas:
+                if c not in PESO_TODOS and c != "FD/FND":          # montos: suma de los ramos con dato
+                    xs = [v[c][i] for v in por_ramo.values() if v[c][i] is not None]
+                    tot[c][i] = sum(xs) if xs else None
+            for c, w in PESO_TODOS.items():                         # razones: ponderadas (razon de las sumas)
+                pares = [(v[c][i], v[w][i]) for v in por_ramo.values() if v[c][i] is not None and v[w][i] is not None]
+                sw = sum(b for _, b in pares)
+                tot[c][i] = sum(a * b for a, b in pares) / sw if pares and sw > 0 else None
+            pares = [(v["PND/PD"][i], v["PEACUMULADA"][i]) for v in por_ramo.values()
+                     if v["PND/PD"][i] is not None and v["PEACUMULADA"][i] is not None]
+            sp = sum(b for _, b in pares)
+            tot["FD/FND"][i] = sum(a for a, _ in pares) / sp if pares and sp > 0 else None
+        por_ramo["Todos"] = tot
+    con_fa = [r for r in ramos if any(x is not None for res in datos.values() for x in res.get(r, {}).get("IS (FA)", []))]
+    return {"periodos": periodos, "ramos": ramos, "datos": datos, "con_fa": con_fa, "lleva_gto": lleva_gto,
+            "renglones": len(crudos)}
+
+
 def etiquetas_modelo(metodo: list) -> dict:
     """Modelo por tipo de serie para las etiquetas (hoja Backtest, una fila por tipo y libro): los modelos de todos los
     libros sin repetir; el de las series trimestrales (RCONT) va aparte para no atribuirselo a todos los montos."""
@@ -391,16 +469,20 @@ def generar(ruta_salida: Path = SALIDA_DASHBOARD) -> Path:
     fin_m = max(r[4] for r in registros_m)
     p_dic_actual = (ultimo // 100) * 100 + 12
     p_12 = mover(ultimo, -12)
+    pnd = leer_indicadores_ramo()                    # None con un diagnostico de una version anterior
 
     wb = openpyxl.Workbook()
     wd_i = wb.active
     wd_i.title = "Dashboard Índices"
     wd_r = wb.create_sheet("Dashboard Reservas")
+    wd_p = wb.create_sheet("Dashboard PND-PD") if pnd else None
     wa = wb.create_sheet("Análisis")
     wbi = wb.create_sheet("BD_Indices")
     wbr = wb.create_sheet("BD_Reservas")
+    wbp = wb.create_sheet("BD_PND") if pnd else None
     wl = wb.create_sheet("Listas")
     wc = wb.create_sheet("Calc")
+    wcp = wb.create_sheet("CalcPND") if pnd else None
 
     def nombre(n, ref):
         wb.defined_names[n] = DefinedName(n, attr_text=ref)
@@ -447,6 +529,8 @@ def generar(ruta_salida: Path = SALIDA_DASHBOARD) -> Path:
         **{f"Conceptos_{k}": v for k, v in conceptos.items()},
         **{f"Ramos_{k}": ["Todos"] + ramos_m.get(k, []) for k in conceptos},
         **{f"RamosSin_{k}": ramos_m.get(k, []) for k in conceptos},
+        **({"L_RamosPnd": ["Todos"] + pnd["ramos"], "L_ResPnd": list(pnd["datos"]), "L_RamosFA": pnd["con_fa"] or ["-"]}
+           if pnd else {}),
     }
     for j, (n_, valores) in enumerate(listas.items(), start=1):
         letra = get_column_letter(j)
@@ -476,6 +560,7 @@ def generar(ruta_salida: Path = SALIDA_DASHBOARD) -> Path:
     ws["B3"] = "◆ ÍNDICES Y RESERVAS"
     ws["B3"].font = fuente(13, True)
     menu = [("Dashboard Índices", "'Dashboard Índices'!A1"), ("Dashboard Reservas", "'Dashboard Reservas'!A1"),
+            *([("Dashboard PND/PD", "'Dashboard PND-PD'!A1")] if pnd else []),
             ("Análisis", "'Análisis'!A1"), ("Base de datos: índices", "'BD_Indices'!A1"),
             ("Base de datos: reservas", "'BD_Reservas'!A1")]
 
@@ -845,15 +930,18 @@ def generar(ruta_salida: Path = SALIDA_DASHBOARD) -> Path:
     colocar(ws, ch, "U30", "AG46")
     wc.sheet_state = "hidden"
 
+    if pnd:
+        construir_pnd(wd_p, wbp, wcp, pnd, ultimo, p_dic_actual, nombre, selector, navegacion)
+
     # ------------------------------------------------------------ analisis (valores)
     construir_analisis(wa, registros_i, ramos_i, registros_m, ultimo, p_dic_actual, fin, fin_m, p_12, metodo)
-    for hoja, area in ((wd_i, "A1:AH47"), (wd_r, "A1:AH47"), (wa, None)):
+    for hoja, area in ((wd_i, "A1:AH47"), (wd_r, "A1:AH47"), *([(wd_p, "A1:AH124")] if wd_p else []), (wa, None)):
         hoja.sheet_properties.tabColor = "8EA9DB"
         hoja.page_setup.orientation = "landscape"
         hoja.page_setup.paperSize = hoja.PAPERSIZE_LETTER
         hoja.sheet_properties.pageSetUpPr.fitToPage = True
         hoja.page_setup.fitToWidth = 1
-        hoja.page_setup.fitToHeight = 1 if area else 0
+        hoja.page_setup.fitToHeight = 1 if area and hoja is not wd_p else 0
         hoja.print_options.horizontalCentered = True
         hoja.page_margins.left = hoja.page_margins.right = 0.3
         hoja.page_margins.top = hoja.page_margins.bottom = 0.4
@@ -866,6 +954,151 @@ def generar(ruta_salida: Path = SALIDA_DASHBOARD) -> Path:
     guardar_libro(wb, ruta_salida)
     print(f"   Dashboard: {ruta_salida.name}", flush=True)
     return ruta_salida
+
+
+def construir_pnd(ws, wbp, wcp, pnd: dict, ultimo: int, p_dic: int, nombre, selector, navegacion) -> None:
+    """Hoja "Dashboard PND-PD": selectores de ramo (con "Todos") y reserva, indicadores y una grafica de lineas (real y
+    proyeccion) por indicador de INDICADORES_PND. Los datos van en BD_PND (valores de leer_indicadores_ramo, con
+    "Todos" ya agregado) y las series en CalcPND con formulas (INDEX / MATCH por reserva, ramo y periodo), asi las
+    graficas se actualizan al cambiar los selectores; un dato que no hay va como #N/D (hueco en la linea)."""
+    periodos, cols = pnd["periodos"], [c for c, _, _ in INDICADORES_PND]
+    # ---- base de datos
+    wbp.append(["Clave", "Reserva", "Ramo", "Periodo", "Tipo"] + cols)
+    for res, por_ramo in pnd["datos"].items():
+        for ramo in ["Todos"] + pnd["ramos"]:
+            if ramo not in por_ramo:
+                continue
+            for i, p in enumerate(periodos):
+                wbp.append([f"{res}|{ramo}|{p}", res, ramo, p, "Real" if p <= ultimo else "Proyección"]
+                           + [por_ramo[ramo][c][i] for c in cols])
+    n_p = wbp.max_row
+    tabla = Table(displayName="TablaPND", ref=f"A1:{get_column_letter(5 + len(cols))}{n_p}")
+    tabla.tableStyleInfo = TableStyleInfo(name="TableStyleLight9", showRowStripes=True)
+    wbp.add_table(tabla)
+    wbp.freeze_panes = "B2"
+    unidad = {c: u for c, _, u in INDICADORES_PND}
+    for k in range(1, 6 + len(cols)):
+        wbp.column_dimensions[get_column_letter(k)].width = 14
+    for fila in wbp.iter_rows(min_row=2, min_col=3, max_col=3):
+        for c in fila:
+            c.number_format = "@"
+    for j, c_ in enumerate(cols, start=6):
+        fmt = {"monto": "#,##0", "pct": "0.00%", "fnd": "0.0000"}[unidad[c_]]
+        for fila in wbp.iter_rows(min_row=2, min_col=j, max_col=j):
+            for c in fila:
+                c.number_format = fmt
+    nombre("P_Clave", f"BD_PND!$A$2:$A${n_p}")
+    for j, c_ in enumerate(cols, start=6):
+        letra = get_column_letter(j)
+        nombre(f"P_{j - 5}", f"BD_PND!${letra}$2:${letra}${n_p}")
+
+    # ---- hoja
+    preparar_hoja(ws, filas=124)
+    caja(ws, "B2:B46")
+    ws["B3"] = "◆ ÍNDICES Y RESERVAS"
+    ws["B3"].font = fuente(13, True)
+    navegacion(ws, "Dashboard PND/PD")
+    selector(ws, 12, "RAMO", "Todos", "=L_RamosPnd", "SelRamoPnd")
+    selector(ws, 15, "RESERVA", "RRC", "=L_ResPnd", "SelResPnd")
+    notas = [f"Real hasta {etiqueta(ultimo)}", f"Proyección {etiqueta(mover(ultimo, 1))} a {etiqueta(periodos[-1])}", "",
+             "RRC: PND · SONR: PD", "Todos los ramos: montos", "sumados; factores e índices", "ponderados por el PND / PD",
+             "(CESIÓN por el BRUTO).", "", "Mismos valores que los", "bloques de la BD de Daños.", "",
+             "#N/D = sin dato (por ejemplo", "IS (FA) antes de sep-26 o", "en ramos que FA no manda)."]
+    for k, t in enumerate(notas):
+        ws.cell(19 + k, 2, t).font = fuente(9, k < 2, TEXTO_2, k >= 3)
+    ws["D2"] = "Dashboard de PND / PD y sus indicadores por ramo"
+    ws["D2"].font = fuente(18, True)
+    ws["D3"] = (f"Real {etiqueta(periodos[0])} a {etiqueta(ultimo)} y proyección {etiqueta(mover(ultimo, 1))} a "
+                f"{etiqueta(periodos[-1])} · BD_Montos_RRC_SONR (Daños)")
+    ws["D3"].font = fuente(10, False, TEXTO_2)
+
+    # ---- CalcPND: una columna Real y una Proyeccion por indicador
+    wcp["A1"], wcp["B1"], wcp["C1"] = "Periodo", "Mes", "Renglon en BD_PND"
+    esc = {"monto": 1e-6, "pct": 1, "fnd": 1}
+    fila_de = {}
+    for k, p in enumerate(periodos, start=2):
+        fila_de[p] = k
+        wcp.cell(k, 1, p)
+        wcp.cell(k, 2, etiqueta(p))
+        wcp.cell(k, 3, f'=IFERROR(MATCH(SelResPnd&"|"&SelRamoPnd&"|"&$A{k},P_Clave,0),0)')
+    col_real = {}
+    for j, c_ in enumerate(cols):
+        cr, cp = 4 + 2 * j, 5 + 2 * j
+        col_real[c_] = cr
+        wcp.cell(1, cr, "Real")
+        wcp.cell(1, cp, "Proyección")
+        rng, f = f"P_{j + 1}", esc[unidad[c_]]
+        fmt = {"monto": "#,##0.0", "pct": "0.0%", "fnd": "0.000"}[unidad[c_]]
+        for k, p in enumerate(periodos, start=2):
+            v = f'IF($C{k}=0,NA(),IF(INDEX({rng},$C{k})="",NA(),INDEX({rng},$C{k}){"/1000000" if f == 1e-6 else ""}))'
+            wcp.cell(k, cr, f"=IF($A{k}>{ultimo},NA(),{v})").number_format = fmt
+            wcp.cell(k, cp, f"=IF($A{k}<{ultimo},NA(),{v})").number_format = fmt
+    n_c = len(periodos) + 1
+    wcp.sheet_state = "hidden"
+
+    # ---- indicadores (PND / PD)
+    L = get_column_letter
+    cpnd = col_real["PND/PD"]
+    nb = 'IF(SelResPnd="RRC","PND","PD")'
+    p12 = mover(ultimo, 12)
+    kpis = [
+        (f'={nb}&" real {etiqueta(ultimo)} (M USD)"', f"=CalcPND!{L(cpnd)}{fila_de[ultimo]}", "#,##0.0"),
+        (f'={nb}&" proyección {etiqueta(p_dic)} (M USD)"', f"=CalcPND!{L(cpnd + 1)}{fila_de.get(p_dic, n_c)}", "#,##0.0"),
+        (f'={nb}&" proyección {etiqueta(periodos[-1])} (M USD)"', f"=CalcPND!{L(cpnd + 1)}{n_c}", "#,##0.0"),
+        (f'="Crec. "&{nb}&" 12 m ({etiqueta(ultimo)} a {etiqueta(p12)})"',
+         f"=CalcPND!{L(cpnd + 1)}{fila_de.get(p12, n_c)}/CalcPND!{L(cpnd)}{fila_de[ultimo]}-1", "+0.0%;-0.0%;0.0%"),
+    ]
+    pintar(ws, "D5:AG8", BANDA_KPI)
+    for k, (tit, form, fmt) in enumerate(kpis):
+        col = 4 + k * 8                                  # D:J, L:R, T:Z, AB:AG
+        fin_col = min(col + 6, 33)
+        ws.merge_cells(start_row=5, start_column=col, end_row=6, end_column=fin_col)
+        ws.merge_cells(start_row=7, start_column=col, end_row=8, end_column=fin_col)
+        ws.cell(5, col, tit).font = fuente(9.5, True, TEXTO_2)
+        ws.cell(5, col).alignment = Alignment(horizontal="left", vertical="bottom", indent=1)
+        c = ws.cell(7, col, f'=IFERROR({form[1:]},"s/d")')
+        c.number_format = fmt
+        c.font = fuente(20, True)
+        c.alignment = Alignment(horizontal="left", vertical="center", indent=1)
+
+    # ---- paneles y graficas
+    ramo_txt = 'IF(SelRamoPnd="Todos","todos los ramos","ramo "&SelRamoPnd)'
+    titulos = {
+        "PND/PD": f'=IF(SelResPnd="RRC","PND (RRC)","PD (SONR)")&" · "&{ramo_txt}&" · M USD"',
+        "FACTOR GTO": f'=IF(SelResPnd="RRC","FACTOR GTO (GTO / PND) · "&{ramo_txt},"FACTOR GTO · "&SelResPnd&" no lleva GTO (solo RRC)")',
+        "FACTOR MR": f'="FACTOR MR (MR / "&{nb}&") · "&{ramo_txt}',
+        "CESION": f'="CESIÓN (IRR / BRUTO) · "&{ramo_txt}',
+        "FD/FND": f'=IF(SelResPnd="RRC","FND (PND / PEACUMULADA)","FD (PD / PEACUMULADA)")&" · "&{ramo_txt}',
+        "IS (RL)": f'="IS (RL): "&IF(SelResPnd="RRC","Ind Sin RRC","Ind Sin SONR Media")&" de HParametros · "&{ramo_txt}',
+        "IS (FA)": (f'="IS (FA): función actuarial · "&{ramo_txt}&IF(SelRamoPnd="Todos"," (solo los ramos de FA)",'
+                    f'IF(ISNUMBER(MATCH(SelRamoPnd,L_RamosFA,0)),""," · FA no manda este ramo"))'),
+        "PE FCST": f'="PE FCST (prima tomada del mes) · "&{ramo_txt}&" · M USD"',
+        "PRIMA N AÑOS": f'="PRIMA N AÑOS (12 meses de PE) · "&{ramo_txt}&" · M USD"',
+        "PEACUMULADA": (f'="PEACUMULADA · "&{ramo_txt}&IF(SelResPnd="RRC"," (en RRC = PRIMA N AÑOS)",'
+                        f'" (LAG 1 a 3 × PRIMA N AÑOS)")&" · M USD"'),
+    }
+    for j, c_ in enumerate(cols):
+        fila0 = 10 + 19 * ((j + 1) // 2) if 0 < j < len(cols) - 1 else (10 if j == 0 else 10 + 19 * ((len(cols) - 1) // 2 + 1))
+        ancha = j in (0, len(cols) - 1)
+        izq = ancha or j % 2 == 1
+        c1, c2 = ("D", "AG") if ancha else (("D", "S") if izq else ("U", "AG"))
+        caja(ws, f"{c1}{fila0}:{c2}{fila0 + 17}")
+        ws[f"{c1}{fila0}"] = titulos[c_]
+        ws[f"{c1}{fila0}"].font = fuente(11.5, True)
+        ws[f"{c1}{fila0}"].alignment = Alignment(indent=1, vertical="center")
+        ws.row_dimensions[fila0].height = 22
+        cr = col_real[c_]
+        ch = LineChart()
+        ch.add_data(Reference(wcp, min_col=cr, max_col=cr + 1, min_row=1, max_row=n_c), titles_from_data=True)
+        ch.set_categories(Reference(wcp, min_col=2, min_row=2, max_row=n_c))
+        linea(ch.series[0], AZUL, 2.0)
+        linea(ch.series[1], NARANJA, 2.0, punteada=True)
+        estilo_grafica(ch, {"monto": "#,##0", "pct": "0%", "fnd": "0.00"}[unidad[c_]])
+        if unidad[c_] == "pct":
+            ch.y_axis.number_format = "0.0%" if c_ in ("FACTOR GTO", "FACTOR MR") else "0%"
+        ch.x_axis.tickLblSkip = 6
+        ch.x_axis.tickMarkSkip = 6
+        colocar(ws, ch, f"{c1}{fila0 + 1}", f"{c2}{fila0 + 17}")
 
 
 def clasificar(wb) -> None:

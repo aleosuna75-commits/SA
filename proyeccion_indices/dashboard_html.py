@@ -9,6 +9,9 @@ Genera salidas/Dashboard_Indices_Reservas.html a partir de las mismas salidas qu
                           con banda al 80%; comparativo por ramo; patron de desarrollo (LAG 1-10); resumen del ramo.
   * pestaña "Reservas"  : filtros (reserva, concepto, ramo, moneda); indicadores; mensual 2025-2027; por ramo;
                           historico 2022-2027; por concepto.
+  * pestaña "PND / PD"  : filtros (ramo, con "Todos", y reserva); PND / PD y sus indicadores por ramo (FACTOR GTO,
+                          FACTOR MR, CESION, FD / FND, IS (RL), IS (FA), PE FCST, PRIMA N AÑOS y PEACUMULADA), real y
+                          proyeccion, de la hoja Indicadores_Ramo del diagnostico (los valores de la BD de Danos).
   * pestaña "Analisis"  : tablas con mapa de calor (indices por ramo, totales por concepto) y modelo por tipo.
 Cada grafica tiene tooltip (en las de lineas tambien con las flechas del teclado; en barras, con Tab) y una vista
 de tabla equivalente.
@@ -183,6 +186,13 @@ def preparar_datos() -> dict:
         persistencia = float(texto.split("persistencia")[1].split(";")[0].strip()) if "persistencia" in texto else None
     except (IndexError, ValueError):
         persistencia = None
+    pnd = dx.leer_indicadores_ramo()                 # pestaña PND / PD (None con un diagnostico anterior)
+    if pnd:
+        unidad = {c: u for c, _, u in dx.INDICADORES_PND}
+        pnd = {"periodos": pnd["periodos"], "ramos": pnd["ramos"], "con_fa": pnd["con_fa"], "lleva_gto": pnd["lleva_gto"],
+               "indicadores": [[c, t, u] for c, t, u in dx.INDICADORES_PND],
+               "datos": {res: {ramo: {c: [_redondear(x, 0 if unidad[c] == "monto" else 6) for x in v[c]] for c in unidad}
+                               for ramo, v in por_ramo.items()} for res, por_ramo in pnd["datos"].items()}}
     sin_tc = [p for p in periodos_m if not tc.get(p)]
     if sin_tc:
         print(f"   Aviso: sin tipo de cambio en la BD para {sin_tc}; en MXN esos meses se muestran como s/d")
@@ -199,6 +209,7 @@ def preparar_datos() -> dict:
         "nota_rangos": nota_rangos,
         "ppto": leer_contraste_presupuesto(),
         "tend": leer_tendencias(),
+        "pnd": pnd,
         "generado": datetime.now().strftime("%Y-%m-%d %H:%M"),
     }
 
@@ -274,7 +285,7 @@ button, select { font: inherit; color: inherit; }
 .acciones { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .tabs { display: flex; gap: 4px; background: var(--surface-2); border-radius: 10px; padding: 4px; }
 .tabs button { border: 0; background: transparent; padding: 7px 14px; border-radius: 7px; cursor: pointer;
-  color: var(--ink-2); font-weight: 500; }
+  color: var(--ink-2); font-weight: 500; white-space: nowrap; }
 .tabs button[aria-selected="true"] { background: var(--surface); color: var(--ink); box-shadow: var(--shadow);
   border: 1px solid var(--border); }
 .tabs button:focus-visible, .btn:focus-visible, select:focus-visible, .plot:focus-visible {
@@ -391,6 +402,7 @@ table.datos tbody tr:hover { background: var(--surface-2); }
     <div class="tabs" role="tablist" aria-label="Vistas">
       <button role="tab" id="tab-indices" aria-selected="true" aria-controls="vista-indices">Índices</button>
       <button role="tab" id="tab-reservas" aria-selected="false" aria-controls="vista-reservas">Reservas</button>
+      <button role="tab" id="tab-pnd" aria-selected="false" aria-controls="vista-pnd">PND/PD</button>
       <button role="tab" id="tab-analisis" aria-selected="false" aria-controls="vista-analisis">Análisis</button>
     </div>
     <button class="btn" id="tema" type="button" title="Cambiar tema">Tema: sistema</button>
@@ -418,6 +430,15 @@ table.datos tbody tr:hover { background: var(--surface-2); }
     <div class="kpis" id="kpis-res"></div>
     <p class="sub" id="cedido" style="margin:0 0 10px;color:var(--ink-2)"></p>
     <div class="rejilla" id="rejilla-res"></div>
+  </section>
+  <section class="vista" id="vista-pnd" role="tabpanel" aria-labelledby="tab-pnd" hidden>
+    <div class="filtros">
+      <div class="filtro"><label for="f-ramo-pnd">Ramo</label><select id="f-ramo-pnd"></select></div>
+      <div class="filtro"><label for="f-reserva-pnd">Reserva</label><select id="f-reserva-pnd"></select></div>
+      <div class="nota" id="nota-pnd"></div>
+    </div>
+    <div class="kpis" id="kpis-pnd"></div>
+    <div class="rejilla" id="rejilla-pnd"></div>
   </section>
   <section class="vista analisis" id="vista-analisis" role="tabpanel" aria-labelledby="tab-analisis" hidden></section>
 </main>
@@ -601,13 +622,13 @@ function graficaLineas(cuerpo, W, o) {
   const X = i => n > 1 ? x0 + (x1 - x0) * i / (n - 1) : (x0 + x1) / 2;
   const todos = [];
   for (const se of o.series) { todos.push(...se.valores); if (se.banda) { todos.push(...se.banda.lo, ...se.banda.hi); } }
-  const [lo, hi] = dominio(todos, o.incluirCero);
+  const [lo, hi] = o.dominio || dominio(todos, o.incluirCero);      // (o.dominio: la misma escala en varias graficas)
   const Y = v => y0 - (y0 - y1) * (v - lo) / (hi - lo);
   const ts = ticks(lo, hi, 5), decT = decimalesPaso(ts, o.decTick || 0);
   for (const t of ts) {
     if (t < lo || t > hi) continue;
     s.append(svg('line', { class: 'grid', x1: x0, x2: x1, y1: Y(t), y2: Y(t) }));
-    const tx = svg('text', { class: 'tick', x: x0 - 8, y: Y(t) + 4, 'text-anchor': 'end' }); tx.textContent = fmt(t, decT); s.append(tx);
+    const tx = svg('text', { class: 'tick', x: x0 - 8, y: Y(t) + 4, 'text-anchor': 'end' }); tx.textContent = o.fmtTick ? o.fmtTick(t, decT) : fmt(t, decT); s.append(tx);
   }
   s.append(svg('line', { class: 'base', x1: x0, x2: x1, y1: y0, y2: y0 }));
   const auto = Math.max(1, Math.ceil(n / Math.max(2, Math.floor((x1 - x0) / 62))));
@@ -813,7 +834,7 @@ function colorDivergente(v, lim) {
 // ---------------------------------------------------------------- estado
 const E = {
   ramo: D.ramos_i.includes('10') ? '10' : D.ramos_i[0], serie: D.indices[0], periodo: D.fin,
-  reserva: 'RRC', concepto: 'NETO', ramoRes: 'Todos', moneda: 'USD', vista: 'indices',
+  reserva: 'RRC', concepto: 'NETO', ramoRes: 'Todos', moneda: 'USD', vista: 'indices', ramoPnd: 'Todos', reservaPnd: 'RRC',
 };
 const tarjetasVivas = [];
 function redibujarTodo() {
@@ -1009,6 +1030,87 @@ function pintarReservas() {
   redibujarTodo();
 }
 
+// ---------------------------------------------------------------- vista: PND / PD
+// Indicadores por ramo de la BD de Danos (hoja Indicadores_Ramo del diagnostico). "Todos" = montos sumados; factores e
+// indices ponderados por el PND / PD (CESION por el BRUTO), que es la razon de las sumas; FD / FND = suma de PND / PD
+// entre suma de PEACUMULADA.
+const PN = D.pnd;
+const P_N = PN ? PN.periodos : [], nUlt = PN ? idx(P_N, D.ultimo) : -1, nDic = PN ? idx(P_N, D.p_dic) : -1;
+const nFin = P_N.length - 1;
+const UNIDAD_PND = {
+  monto: { esc: 1e-6, dec: 1, suf: '', eje: 'millones de USD' },
+  pct: { esc: 100, dec: 1, suf: ' %', eje: 'en %' },
+  fnd: { esc: 1, dec: 3, suf: '', eje: 'razón' },
+};
+function explicaPnd(col, res, ramo) {
+  const nb = res === 'RRC' ? 'PND' : 'PD';
+  const faRamos = (PN.con_fa || []).join(', ');
+  return {
+    'PND/PD': `${nb} = BEL / IS (RL); desde ${eti(P_N[nUlt + 1])}, PEACUMULADA × FND. Millones de USD`,
+    'FACTOR GTO': `GTO / PND, en %; desde ${eti(P_N[nUlt + 1])}, la recta de tendencia`,
+    'FACTOR MR': `MR / ${nb}, en %; desde ${eti(P_N[nUlt + 1])}, la recta de tendencia`,
+    'CESION': `Razón de cesión IRR / BRUTO, en %; desde ${eti(P_N[nUlt + 1])}, la recta de tendencia`,
+    'FD/FND': `${nb} / PEACUMULADA (razón); desde ${eti(P_N[nUlt + 1])}, el FND proyectado`,
+    'IS (RL)': `${res === 'RRC' ? 'Ind Sin RRC' : 'Ind Sin SONR Media'} de HParametros, en %; misma escala que IS (FA)`,
+    'IS (FA)': `${res === 'RRC' ? 'IS RRC' : 'IS SONR'} de la función actuarial (solo proyección), en %; misma escala que IS (RL)`
+      + (ramo === 'Todos' ? `; Todos = solo los ramos que manda FA (${faRamos})` : ''),
+    'PE FCST': 'Prima tomada del mes (PExRamo, reforecast y FCST), millones de USD; la misma en RRC y SONR',
+    'PRIMA N AÑOS': 'Suma de los últimos 12 meses de PE FCST, millones de USD; la misma en RRC y SONR',
+    'PEACUMULADA': res === 'RRC' ? 'En RRC es igual a PRIMA N AÑOS. Millones de USD'
+      : 'LAG 1 × PRIMA N AÑOS del mes + LAG 2 × la de 12 meses antes + LAG 3 × la de 24 meses antes. Millones de USD',
+  }[col] || '';
+}
+function seriePnd(res, ramo, col) {
+  const u = UNIDAD_PND[(PN.indicadores.find(x => x[0] === col) || [])[2] || 'monto'];
+  return (((PN.datos[res] || {})[ramo] || {})[col] || new Array(P_N.length).fill(null)).map(v => v == null ? null : v * u.esc);
+}
+function pintarPnd() {
+  const ramo = E.ramoPnd, res = E.reservaPnd, nb = res === 'RRC' ? 'PND' : 'PD';
+  const etiqRamo = ramo === 'Todos' ? 'todos los ramos' : `ramo ${ramo}`;
+  document.getElementById('nota-pnd').textContent = `Real hasta ${eti(D.ultimo)} · proyección ${eti(P_N[nUlt + 1])} a ${eti(P_N[nFin])} · `
+    + (ramo === 'Todos' ? 'Todos: montos sumados; factores e índices ponderados (razón de las sumas)' : 'Valores de los bloques de la BD de Daños');
+  const pnd = seriePnd(res, ramo, 'PND/PD'), f1 = v => fmt(v, 1);
+  const u = pnd[nUlt], pd = pnd[nDic], pf = pnd[nFin], p12 = pnd[nUlt + 12];
+  document.getElementById('kpis-pnd').replaceChildren(
+    kpi(`${nb} real ${eti(D.ultimo)} (M USD)`, f1(u)),
+    kpi(`${nb} proyección ${eti(D.p_dic)} (M USD)`, f1(pd), varPct(u, pd) == null ? null : fmtPct(varPct(u, pd)) + ' vs último real'),
+    kpi(`${nb} proyección ${eti(P_N[nFin])} (M USD)`, f1(pf), varPct(u, pf) == null ? null : fmtPct(varPct(u, pf)) + ' vs último real'),
+    kpi(`Crecimiento ${nb} 12 meses`, fmtPct(varPct(u, p12)), `${eti(D.ultimo)} a ${eti(P_N[nUlt + 12])}, mismo mes`),
+  );
+  const rejilla = document.getElementById('rejilla-pnd'); rejilla.replaceChildren(); tarjetasVivas.length = 0;
+  // IS (RL) e IS (FA) con la misma escala para poder compararlas
+  const domIS = dominio([...seriePnd(res, ramo, 'IS (RL)'), ...seriePnd(res, ramo, 'IS (FA)')], false);
+  PN.indicadores.forEach(([col, titulo, unidad], k) => {
+    const un = UNIDAD_PND[unidad], vals = seriePnd(res, ramo, col);
+    const fv = v => v == null ? 's/d' : fmt(v, un.dec) + un.suf;
+    const real = vals.map((v, i) => i <= nUlt ? v : null), proy = vals.map((v, i) => i >= nUlt ? v : null);
+    const hayReal = real.some(v => v != null), hayProy = proy.some((v, i) => v != null && i > nUlt);
+    let vacio = null;
+    if (col === 'FACTOR GTO' && !PN.lleva_gto[res]) vacio = `${res} no lleva GTO: el gasto (GTO) solo existe en RRC.`;
+    else if (col === 'IS (FA)' && !hayProy) vacio = `La función actuarial no manda índice de este ramo; manda los ramos ${(PN.con_fa || []).join(', ')}.`;
+    else if (!hayReal && !hayProy) vacio = 'Sin datos para esta selección.';
+    const titNb = { 'PND/PD': `${nb} (${res})`, 'FACTOR MR': `FACTOR MR (MR / ${nb})`,
+      'FD/FND': res === 'RRC' ? 'FND (PND / PEACUMULADA)' : res === 'SONR' ? 'FD (PD / PEACUMULADA)' : titulo }[col] || titulo;
+    const c = tarjeta(`${titNb} · ${etiqRamo}`, explicaPnd(col, res, ramo),
+      (cuerpo, W) => {
+        if (vacio) { cuerpo.append(el('p', { class: 'sub', style: 'margin:24px 0;color:var(--ink-2)', text: vacio })); return; }
+        graficaLineas(cuerpo, W, {
+          labels: P_N.map(eti), tituloX: i => etiLarga(P_N[i]) + (i <= nUlt ? ' (real)' : ' (proyección)'), fmt: fv, cadaX: 6, etiquetasFin: true,
+          incluirCero: unidad === 'monto', dominio: (col === 'IS (RL)' || col === 'IS (FA)') ? domIS : null,
+          fmtTick: unidad === 'pct' ? (t, d) => fmt(t, d) + ' %' : null,
+          aria: `${titNb} de ${etiqRamo}, real y proyección`,
+          series: [...(hayReal ? [{ nombre: 'Real', valores: real, color: cssVar('--real'), etiquetaFin: true }] : []),
+                   ...(hayProy ? [{ nombre: 'Proyección', valores: proy, color: cssVar('--proy'), dash: true, etiquetaFin: true }] : [])],
+        });
+        if (!(hayReal && hayProy)) cuerpo.append(leyenda([hayReal ? { nombre: 'Real', color: cssVar('--real') } : { nombre: 'Proyección', color: cssVar('--proy'), dash: true }]));
+      },
+      () => tablaDatos(['Mes', 'Tipo', `${titNb} (${un.eje})`], P_N.map((p, i) => [etiLarga(p), i <= nUlt ? 'Real' : 'Proyección', fv(vals[i])])),
+      k === 0 || k === PN.indicadores.length - 1);
+    rejilla.append(c); tarjetasVivas.push(c);
+  });
+  redibujarTodo();
+}
+
 // ---------------------------------------------------------------- vista: analisis
 function pintarAnalisis() {
   const v = document.getElementById('vista-analisis'); v.replaceChildren();
@@ -1107,12 +1209,22 @@ function iniciar() {
   fRR.addEventListener('change', () => { E.ramoRes = fRR.value; pintarReservas(); });
   fMon.addEventListener('change', () => { E.moneda = fMon.value; pintarReservas(); });
 
-  const tabs = document.querySelectorAll('.tabs [role=tab]');
+  if (PN) {
+    const fRP = document.getElementById('f-ramo-pnd'), fResP = document.getElementById('f-reserva-pnd');
+    llenarSelect(fRP, ['Todos', ...PN.ramos].map(r => ({ v: r, t: r === 'Todos' ? 'Todos los ramos' : r })), E.ramoPnd);
+    llenarSelect(fResP, Object.keys(PN.datos).map(r => ({ v: r, t: r === 'RRC' ? 'RRC (PND)' : r === 'SONR' ? 'SONR (PD)' : r })), E.reservaPnd);
+    fRP.addEventListener('change', () => { E.ramoPnd = fRP.value; pintarPnd(); });
+    fResP.addEventListener('change', () => { E.reservaPnd = fResP.value; pintarPnd(); });
+  } else {
+    document.getElementById('tab-pnd').hidden = true;     // diagnostico de una version anterior: sin la pestaña
+  }
+  const tabs = document.querySelectorAll('.tabs [role=tab]:not([hidden])');
   const mostrarVista = nombre => {
     E.vista = nombre;
     for (const t of tabs) { const on = t.id === 'tab-' + nombre; t.setAttribute('aria-selected', String(on)); document.getElementById('vista-' + nombre.replace('tab-', '')).hidden = false; }
     for (const v of document.querySelectorAll('.vista')) v.hidden = v.id !== 'vista-' + nombre;
-    if (nombre === 'indices') pintarIndices(); else if (nombre === 'reservas') pintarReservas(); else pintarAnalisis();
+    if (nombre === 'indices') pintarIndices(); else if (nombre === 'reservas') pintarReservas();
+    else if (nombre === 'pnd') pintarPnd(); else pintarAnalisis();
     try { localStorage.setItem('vista', nombre); } catch (e) { /* sin almacenamiento */ }
   };
   for (const t of tabs) t.addEventListener('click', () => mostrarVista(t.id.replace('tab-', '')));
@@ -1125,7 +1237,7 @@ function iniciar() {
   });
   let vistaInicial = 'indices';
   try { vistaInicial = localStorage.getItem('vista') || 'indices'; } catch (e) { /* sin almacenamiento */ }
-  if (!['indices', 'reservas', 'analisis'].includes(vistaInicial)) vistaInicial = 'indices';
+  if (!['indices', 'reservas', 'analisis', ...(PN ? ['pnd'] : [])].includes(vistaInicial)) vistaInicial = 'indices';
   aplicarTema();
   mostrarVista(vistaInicial);
 }
