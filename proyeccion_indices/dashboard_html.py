@@ -1065,8 +1065,8 @@ function explicaPnd(col, res, ramo) {
   const desde = {                                      // como se proyecta desde el primer mes proyectado
     monto: todos ? `desde ${ini}, suma de los ramos (PEACUMULADA × ${fd} en los que llevan BEL por FND, el modelo en los demás)`
       : conFnd ? `desde ${ini}, PEACUMULADA × ${fd}` : `desde ${ini}, el BEL del modelo entre el IS (este ramo no lleva BEL por FND)`,
-    factor: todos ? `desde ${ini}, el modelo del FND (tendencia con el patrón del mes) en los ramos con BEL por FND y el modelo de reservas en los demás`
-      : conFnd ? `desde ${ini}, el modelo del FND: tendencia con el patrón del mes` : `desde ${ini}, la razón del modelo (este ramo no lleva BEL por FND)`,
+    factor: todos ? `desde ${ini}, como el FND (desde el último real, la tendencia con el patrón del mes) en los ramos con BEL por FND y el modelo de reservas en los demás`
+      : conFnd ? `desde ${ini}, como el FND: desde el último real, la tendencia con el patrón del mes` : `desde ${ini}, la razón del modelo (este ramo no lleva BEL por FND)`,
     fnd: todos ? `desde ${ini}, con el ${fd} proyectado en los ramos con BEL por FND`
       : conFnd ? `desde ${ini}, el ${fd} proyectado` : `desde ${ini}, ${nb} del modelo / PEACUMULADA (este ramo no lleva BEL por FND)`,
   };
@@ -1075,9 +1075,9 @@ function explicaPnd(col, res, ramo) {
   return {
     'PND/PD': `${nb} = BEL / IS (RL); ${desde.monto}. Millones de USD`,
     'FACTOR GTO': `GTO / PND, en %; ${desde.factor}`,
-    'FACTOR MR': `MR / ${nb}, en %; ${desde.factor}`,
+    'FACTOR MR': `MR / ${nb}, en %; ${desde.factor}${conFnd ? ' (arranca del nivel de los últimos 3 meses: tiene picos de un mes)' : ''}`,
     'CESION': `Razón de cesión IRR / BRUTO, en %; ${desde.factor}`,
-    'FD/FND': `${nb} / PEACUMULADA (razón); ${desde.fnd}`,
+    'FD/FND': `${nb} / PEACUMULADA (razón); ${desde.fnd}${conFnd ? ': desde el último real, la tendencia con el patrón del mes' : ''}`,
     'IS (RL)': `${res === 'RRC' ? 'Ind Sin RRC' : 'Ind Sin SONR Media'} de HParametros, en %; misma escala que IS (FA)`
       + (todos ? '; incluye ramos que FA no manda (como TEV e Hidro, con IS bajo): para comparar con FA, ve la línea gris en IS (FA)' : ''),
     'IS (FA)': `${res === 'RRC' ? 'IS RRC' : 'IS SONR'} de la función actuarial (solo proyección), en %; misma escala que IS (RL)`

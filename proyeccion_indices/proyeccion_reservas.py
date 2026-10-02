@@ -210,7 +210,9 @@ MODELO_POR_TIPO = {
     "indice": "Tendencia historica",  # indices de HParametros, en logaritmos
     "lag": "Tendencia historica",     # patron de desarrollo (LAG 1-10); en logaritmos si es positivo
     "razon": "SES",
-    "factor": "Tendencia historica",  # CESION del BEL por FND: el modelo de los indices, pero en niveles (puntos por mes)
+    "fnd": "Tendencia historica",     # FND, FACTOR GTO y FACTOR MR del BEL por FND: como los indices (en logaritmos), pero
+                                      # anclados al ultimo real (PERSISTENCIA_DESVIACION)
+    "factor": "Tendencia historica",  # CESION del BEL por FND: igual, en niveles (puntos por mes)
 }
 MESES_TENDENCIA = 36             # ventana de la tendencia historica (None = toda la historia). Con toda la historia
                                  # entran arranques desde cero y cambios de regimen (ramo 80 SONR, Hidro) que
@@ -241,8 +243,8 @@ CREDIBILIDAD_ESTACIONAL = "buhlmann"  # cuanto del patron observado se aplica (1
                                  #   "completa": 100 % del patron cuando la prueba F lo detecta (p < P_ESTACIONALIDAD)
                                  #       y nada en caso contrario (20.0 % / 15.3 %; deja sin patron a la mitad).
 P_ESTACIONALIDAD = 0.10          # umbral de la prueba F para la opcion "completa"
-TIPOS_CON_ESTACIONALIDAD = ("nivel", "indice", "factor")   # montos, indices y factores del BEL por FND. Los LAGs
-                                 # (patron de desarrollo) no tienen mes del
+TIPOS_CON_ESTACIONALIDAD = ("nivel", "indice", "fnd", "factor")   # montos, indices, FND y factores del BEL por FND.
+                                 # Los LAGs (patron de desarrollo) no tienen mes del
                                  # ano: en backtest no cambiaba nada y solo agregaba dientes menores a 3 %.
 DESCRIPCION_CREDIBILIDAD = {
     "buhlmann": "credibilidad de Buhlmann Z = n/(n+K), K = varianza dentro del mes / varianza entre meses",
@@ -257,7 +259,20 @@ DESCRIPCION_CREDIBILIDAD = {
 #       conserva 80 %, a los 3 meses la mitad). En backtest mejora a los indices (18.3 % contra 18.9 % a 1-16 meses,
 #       8.5 % contra 9.5 % en la prueba anidada, medido con la pendiente completa) y evita que un mes bajo arrastre
 #       todo el horizonte.
-PERSISTENCIA_DESVIACION = {"nivel": 1.0, "indice": 0.8, "lag": 1.0, "factor": 0.8}   # (factor: como los indices)
+#   FND y factores del BEL por FND (fnd, factor): se conserva (phi = 1), por decision del area. Son razones que vienen
+#       con tendencia o con cambios de nivel recientes (el FACTOR MR de Acc. Personales bajo de 10 % a 2.5 % en un ano; el
+#       FACTOR GTO cambia por escalones anuales): si la desviacion se desvaneciera hacia el nivel del ultimo ano, la
+#       proyeccion arrancaria con una curva de regreso hacia donde estaba la serie hace meses, en contra de su tendencia.
+#       Anclada, la proyeccion arranca del ultimo real y sigue la tendencia (ponderada por su R2) con el patron del mes.
+PERSISTENCIA_DESVIACION = {"nivel": 1.0, "indice": 0.8, "lag": 1.0, "fnd": 1.0, "factor": 1.0}
+# Con la desviacion conservada (phi = 1), de donde arranca la proyeccion: la desviacion del ultimo mes (1) o el promedio
+# de las desviaciones de los ultimos k meses respecto a la recta (k > 1: arranca del nivel reciente de la serie, no de un
+# solo mes; util en razones con picos, como el FACTOR MR, donde anclar a un mes atipico arrastra el pico a todo el
+# horizonte). No aplica a los tipos con phi < 1.
+ANCLA_MESES = {"nivel": 1, "lag": 1, "fnd": 1, "factor": 1}
+ANCLA_MESES_SERIE = {"FACTOR MR": 3}   # por nombre de serie, encima del tipo. FACTOR MR tiene picos de un mes: anclado al
+                                 # ultimo mes su backtest es 32.9 % de error mediano, anclado a 3 meses 24.2 % (el FND y la
+                                 # CESION van mejor con 1 mes: 15.4 % y 14.1 %; FACTOR GTO cambia por escalones y da igual)
 MESES_NIVEL_LOCAL = 12           # meses del nivel promedio (respecto a la recta) al que converge la desviacion
 MEDIA_ARITMETICA_INDICES = False # los indices se modelan en logaritmos: el nivel al que convergen es el promedio
                                  # geometrico del ultimo ano, que queda por debajo del promedio aritmetico (el que se ve en
@@ -273,7 +288,8 @@ ANCLAR_SERIES = set()            # series (Serie, Ramo) de indices que se dejan 
 #       pendiente que la recta explica poco (ramo 31: +1.3 % mensual con R2 0.16) proyecta subidas o bajadas que la
 #       serie nunca sostuvo. Backtest de indices (error % mediano a 1-16 / 1-6 meses): pendiente completa 16.5 / 12.6;
 #       ponderada por R2 13.6 / 12.5; sin pendiente 13.4 / 11.6. Un numero entre 0 y 1 fija la proporcion.
-CREDIBILIDAD_PENDIENTE = {"nivel": 1.0, "indice": "r2", "lag": 1.0, "factor": "r2"}   # (factor: como los indices)
+CREDIBILIDAD_PENDIENTE = {"nivel": 1.0, "indice": "r2", "lag": 1.0, "fnd": "r2", "factor": "r2"}   # (fnd y factor: como
+                                 # los indices: una pendiente que la recta explica poco no se extrapola)
 # Cotas de los modelos de suavizamiento exponencial (si se eligen), estimadas por maxima verosimilitud dentro de
 # ellas: alpha ~ 1 (arranca del ultimo dato real), beta <= 0.15 (tendencia de los ultimos anos, no del ultimo mes),
 # phi entre 0.80 y 0.98. RCONT (Holt-Winters trimestral) suaviza el nivel (alpha >= 0.2) para separar la
@@ -480,19 +496,18 @@ ANIOS_LAG_PEACUMULADA = {"SONR": 3}    # SONR: PEACUMULADA = LAG 1 x PRIMA N AÑ
 # FCST. GTO y MR = su razon proyectada sobre el BEL (la del modelo) x el BEL nuevo; BRUTO = BEL + GTO + MR; IRR = BRUTO x
 # la razon de cesion del modelo; NETO = BRUTO - IRR. En la BD principal van como formulas en las columnas RAM_.
 USAR_BEL_POR_FND = True
-TIPO_MODELO_FND = "indice"       # el FND se proyecta como los indices: recta de los ultimos MESES_TENDENCIA meses con
-                                 # patron del mes y pendiente ponderada por su credibilidad (R2)
+TIPO_MODELO_FND = "fnd"          # el FND se proyecta como los indices (recta de los ultimos MESES_TENDENCIA meses con
+                                 # patron del mes y pendiente ponderada por su credibilidad, R2), pero anclado al ultimo
+                                 # real: la proyeccion arranca donde esta la serie (PERSISTENCIA_DESVIACION["fnd"])
 MIN_MESES_FND = 12               # meses minimos de FND real para proyectarlo
-TIPO_MODELO_FACTORES = {"FACTOR GTO": "indice", "FACTOR MR": "indice", "CESION": "factor"}
+TIPO_MODELO_FACTORES = {"FACTOR GTO": "fnd", "FACTOR MR": "fnd", "CESION": "factor"}
                                  # FACTOR GTO (GTO / PND), FACTOR MR (MR / PND o PD) y CESION (IRR / BRUTO) de las series con
-                                 # BEL por FND: reales hasta el ultimo mes y, desde el primer mes proyectado, el modelo del FND
-                                 # (por decision del area): la recta de los ultimos MESES_TENDENCIA meses con el patron del mes
-                                 # del ano, la pendiente ponderada por su R2 y la desviacion del ultimo mes que se desvanece
-                                 # hacia el nivel del ultimo ano. GTO y MR en logaritmos, como el FND ("indice"); la CESION en
-                                 # niveles ("factor", puntos por mes): es una proporcion acotada a 100 % y en logaritmos la
-                                 # tendencia es de crecimiento % constante (RRC 10, que paso de 1 % a 63 % de cesion, llegaba a
-                                 # 100 % en tres meses). Backtest (error % mediano por serie) de GTO / MR / CESION: este modelo
-                                 # 3.6 / 23.0 / 16.4; la recta sola 4.1 / 30.5 / 14.7; repetir el ultimo valor 3.9 / 27.6 / 9.8.
+                                 # BEL por FND: reales hasta el ultimo mes y, desde el primer mes proyectado, el mismo modelo
+                                 # que el FND (por decision del area): desde el ultimo real, la recta de los ultimos
+                                 # MESES_TENDENCIA meses con el patron del mes del ano y la pendiente ponderada por su R2. GTO y
+                                 # MR en logaritmos, como el FND; la CESION en niveles ("factor", puntos por mes): es una
+                                 # proporcion acotada a 100 % y en logaritmos la tendencia es de crecimiento % constante (RRC
+                                 # 10, que paso de 1 % a 63 % de cesion, llegaba a 100 % en tres meses).
                                  # GTO = PND x FACTOR GTO, MR = PND x FACTOR MR, BRUTO = BEL + GTO + MR, IRR = BRUTO x CESION,
                                  # NETO = BRUTO - IRR
 CUENTA_PE_FCST = "61"            # cuenta de prima tomada en CtaMens (la que suma ER_ram)
@@ -675,7 +690,8 @@ def factores_estacionales(z, meses):
             "amplitud": float(s.max() - s.min())}
 
 
-def ajustar_tendencia(z, h: int, meses=None, phi_desv: float = 1.0, cred_pend=1.0, media_aritmetica: bool = False):
+def ajustar_tendencia(z, h: int, meses=None, phi_desv: float = 1.0, cred_pend=1.0, media_aritmetica: bool = False,
+                      ancla_meses: int = 1):
     """Linea de tendencia (regresion lineal sobre los ultimos MESES_TENDENCIA valores de z, en la escala del modelo)
     mas, si ESTACIONALIDAD_MENSUAL y se conocen los meses, el patron por mes del ano; continuada desde el ultimo
     dato real con amortiguacion AMORTIGUACION_TENDENCIA. La desviacion del ultimo mes respecto al modelo se
@@ -683,7 +699,8 @@ def ajustar_tendencia(z, h: int, meses=None, phi_desv: float = 1.0, cred_pend=1.
     MESES_NIVEL_LOCAL meses (indices). Intervalo: con phi_desv = 1, la variabilidad mensual alrededor de la
     tendencia (sin el patron), que crece con la raiz del horizonte; con phi_desv < 1, la banda estacionaria de los
     residuos mas la incertidumbre de la pendiente. cred_pend: proporcion de la pendiente que se proyecta (1 = toda;
-    "r2" = el R2 ajustado de la recta, para indices)."""
+    "r2" = el R2 ajustado de la recta, para indices). ancla_meses: con phi_desv = 1, la proyeccion arranca del promedio
+    de las desviaciones de los ultimos ancla_meses meses (1 = la del ultimo mes)."""
     z = np.asarray(z, dtype=float)
     est = factores_estacionales(z, meses) if (ESTACIONALIDAD_MENSUAL and meses is not None) else None
     if est is not None:
@@ -726,8 +743,9 @@ def ajustar_tendencia(z, h: int, meses=None, phi_desv: float = 1.0, cred_pend=1.
                    if len(w) > 2 and np.sum((t - t.mean()) ** 2) > 0 else 0.0)
         ancho = _cuantil_normal() * np.sqrt(sd_e ** 2 * (1 - phi_d ** (2 * hh)) + (se_pend * hh) ** 2)
     else:
-        objetivo = e_ultimo
-        desviacion = e_ultimo                                          # se conserva: arranca del ultimo real
+        k = max(1, min(int(ancla_meses), len(e)))
+        objetivo = float(np.mean(e[-k:]))                              # se conserva: arranca del ultimo real (k = 1) o
+        desviacion = objetivo                                          # del nivel de los ultimos k meses
         sd = float(np.std(np.diff(w) - pendiente, ddof=1)) if len(w) > 2 else 0.0
         ancho = _cuantil_normal() * sd * np.sqrt(hh)
     pron = ajuste_ultimo + pendiente_aplicada * pasos + desviacion + estacional_fut   # con phi_d = 1 y cred 1: d[-1] + pendiente*pasos + s
@@ -742,11 +760,12 @@ def ajustar_tendencia(z, h: int, meses=None, phi_desv: float = 1.0, cred_pend=1.
     return pron, pron - ancho, pron + ancho, params, float(pendiente)
 
 
-def ajustar(z, modelo: str, h: int, meses=None, phi_desv: float = 1.0, cred_pend=1.0, media_aritmetica: bool = False):
+def ajustar(z, modelo: str, h: int, meses=None, phi_desv: float = 1.0, cred_pend=1.0, media_aritmetica: bool = False,
+            ancla_meses: int = 1):
     """Pronostico en la escala del modelo: (pronostico, li, ls, parametros, pendiente final). meses = mes del ano
     (1-12) de cada observacion, para la estacionalidad de la tendencia historica; phi_desv = persistencia de la
     desviacion del ultimo mes (1 = se conserva); cred_pend = proporcion de la pendiente que se proyecta."""
-    return (ajustar_tendencia(z, h, meses, phi_desv, cred_pend, media_aritmetica) if modelo == TENDENCIA
+    return (ajustar_tendencia(z, h, meses, phi_desv, cred_pend, media_aritmetica, ancla_meses) if modelo == TENDENCIA
             else ajustar_ets(z, modelo, h))
 
 
@@ -877,7 +896,7 @@ def _pronosticar(serie: Serie) -> Resultado:
     hh = h + brecha                       # si el ultimo dato es anterior al ultimo mes real
 
     res.moneda = serie.moneda
-    usar_log = tipo in ("nivel", "indice", "lag") and np.all(y > 0)   # LAGs positivos: tendencia en % (no cruzan 0)
+    usar_log = tipo in ("nivel", "indice", "lag", "fnd") and np.all(y > 0)   # LAGs positivos: tendencia en % (no cruzan 0)
     res.transformacion = "log" if usar_log else "ninguna"
     z = np.log(y) if usar_log else y.copy()
     meses = (np.array([p % 100 for p in per], dtype=int)              # mes del ano de cada observacion
@@ -887,6 +906,7 @@ def _pronosticar(serie: Serie) -> Resultado:
         phi_desv = 1.0
         res.alertas.append("Serie anclada al ultimo real por decision del area (ANCLAR_SERIES)")
     cred_pend = CREDIBILIDAD_PENDIENTE.get(tipo, 1.0)                  # indices: pendiente ponderada por su R2
+    ancla = int(ANCLA_MESES_SERIE.get(str(serie.clave[2]), ANCLA_MESES.get(tipo, 1)))   # con phi = 1: de donde arranca
     media_arit = bool(MEDIA_ARITMETICA_INDICES and usar_log and phi_desv < 1)   # converger al promedio aritmetico
 
     def inv(v):
@@ -909,7 +929,7 @@ def _pronosticar(serie: Serie) -> Resultado:
     pron = li = ls = None
     while modelo != ULTIMO_VALOR:
         try:
-            f, lo, hi, params, pendiente = ajustar(z, modelo, hh, meses, phi_desv, cred_pend, media_arit)
+            f, lo, hi, params, pendiente = ajustar(z, modelo, hh, meses, phi_desv, cred_pend, media_arit, ancla)
             if np.all(np.isfinite(f)):
                 pron, li, ls = inv(f), inv(lo), inv(hi)
                 res.parametros = params
@@ -946,7 +966,7 @@ def _pronosticar(serie: Serie) -> Resultado:
 
     # backtest: se re-proyecta desde cortes pasados con el mismo modelo y se compara contra lo real
     res.error_modelo, res.error_ultimo_valor, res.error_ses, res.n_cortes = backtest(z, y, modelo, inv, meses, phi_desv,
-                                                                                  cred_pend, media_arit)
+                                                                                  cred_pend, media_arit, ancla)
     if (res.n_cortes and np.isfinite(res.error_modelo) and np.isfinite(res.error_ultimo_valor)
             and res.error_modelo > res.error_ultimo_valor * 1.10 + 0.5):
         res.alertas.append(f"En el backtest de esta serie el modelo ({res.error_modelo:.1f}%) no supera a repetir "
@@ -956,7 +976,8 @@ def _pronosticar(serie: Serie) -> Resultado:
     return _post_proceso(res, y, tipo, serie.dominio)
 
 
-def backtest(z, y, modelo: str, inv, meses=None, phi_desv: float = 1.0, cred_pend=1.0, media_arit: bool = False):
+def backtest(z, y, modelo: str, inv, meses=None, phi_desv: float = 1.0, cred_pend=1.0, media_arit: bool = False,
+             ancla_meses: int = 1):
     """Error % (WAPE = suma |error| / suma |real|) del modelo, del ultimo valor y de SES, re-proyectando desde
     CORTES_BACKTEST meses antes del final (horizontes de 1 a 16 meses). La estacionalidad se re-estima en cada
     corte solo con la historia anterior al corte."""
@@ -973,7 +994,7 @@ def backtest(z, y, modelo: str, inv, meses=None, phi_desv: float = 1.0, cred_pen
         for nombre, mod in (("modelo", modelo), ("ses", "SES")):
             try:
                 preds[nombre] = (inv(ajustar(z[:o], mod, hz, None if meses is None else meses[:o], phi_desv, cred_pend,
-                                             media_arit)[0])
+                                             media_arit, ancla_meses)[0])
                                  if mod != ULTIMO_VALOR else preds["ultimo"])
             except Exception:  # noqa: BLE001
                 preds[nombre] = None
