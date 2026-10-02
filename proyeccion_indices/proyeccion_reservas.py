@@ -274,8 +274,9 @@ PERSISTENCIA_DESVIACION = {"nivel": 1.0, "indice": 0.8, "lag": 1.0, "fnd": 1.0, 
 # horizonte). No aplica a los tipos con phi < 1.
 ANCLA_MESES = {"nivel": 1, "lag": 1, "fnd": 1, "factor": 1}
 ANCLA_MESES_SERIE = {"FACTOR MR": 3}   # por nombre de serie, encima del tipo. FACTOR MR tiene picos de un mes: anclado al
-                                 # ultimo mes su backtest es 32.9 % de error mediano, anclado a 3 meses 24.2 % (el FND y la
-                                 # CESION van mejor con 1 mes: 15.4 % y 14.1 %; FACTOR GTO cambia por escalones y da igual)
+                                 # ultimo mes su backtest es 30.3 % de error mediano, anclado a 3 meses 25.1 % (con la
+                                 # pendiente combinada; el FND y la CESION van con 1 mes: 15.3 % y 15.0 %; FACTOR GTO
+                                 # cambia por escalones y da igual)
 MESES_NIVEL_LOCAL = 12           # meses del nivel promedio (respecto a la recta) al que converge la desviacion
 MEDIA_ARITMETICA_INDICES = False # los indices se modelan en logaritmos: el nivel al que convergen es el promedio
                                  # geometrico del ultimo ano, que queda por debajo del promedio aritmetico (el que se ve en
@@ -314,11 +315,12 @@ CREDIBILIDAD_PENDIENTE = {"nivel": 1.0, "indice": "r2", "lag": 1.0, "fnd": "comb
 #      asi que no hay curvas de regreso) y se reduce, sin cambiar de signo, si a meses_tope meses sacaria la razon del
 #      rango de los ultimos 36 meses reales ampliado tope_rango veces ese rango (salvaguarda de plausibilidad).
 #   La proyeccion arranca del ultimo real (FACTOR MR: del nivel de sus ultimos 3 meses, ANCLA_MESES_SERIE).
-# Se eligio en un banco de pruebas de las 75 series (13 ramos RRC x FND/GTO/MR/CESION y 9 ramos SONR x FND/MR/CESION,
-# historia a ago-26) contra cuatro alternativas (recta ponderada por recencia, Holt amortiguado, tendencia del ultimo
+# Se eligio en un banco de pruebas de las 75 series (13 ramos RRC x FND/CESION, 11 x GTO/MR y 9 ramos SONR x
+# FND/MR/CESION, historia a ago-26) contra cuatro alternativas (recta ponderada por recencia, Holt amortiguado, tendencia del ultimo
 # tramo y pendiente robusta en 4 ventanas): backtest con 9 cortes (4 a 20 meses antes del final, horizonte hasta 16)
 # error % mediano / medio 16.4 / 23.7 contra 17.4 / 24.0 de la recta ponderada por R2 (repetir el ultimo valor: 14.9);
-# series aplanadas 13 contra 31 (casi todas por la regla de salto o de meseta), ninguna contraria a su tendencia.
+# series aplanadas 13 contra 31 (7 por las reglas de salto o meseta; las demas por la escala logaritmica, el plano en
+# el promedio o la cota de 100 %), ninguna contraria a su tendencia.
 # t_clara, t_meseta, k_salto, la amortiguacion y el tope son criterios de modelacion, no se estimaron de los datos.
 PENDIENTE_COMBINADA = {
     "ventanas": (24, 36),               # rectas candidatas (meses), ademas del plano; la primera da la direccion
@@ -1146,8 +1148,10 @@ def _pronosticar(serie: Serie) -> Resultado:
                                    f"esa diferencia con persistencia {pe['phi_desviacion']:.2f}")
         if n >= 13 and y[-13] > 0 and y[-1] > 0:
             cambio12 = y[-1] / y[-13] - 1
-            if abs(cambio12) > 0.05 and np.sign(res.tendencia_mensual) != np.sign(cambio12):
-                res.alertas.append(f"La tendencia de {res.parametros['ventana']} meses ({res.tendencia_mensual:+.1%} "
+            if abs(cambio12) > 0.05 and np.sign(res.tendencia_mensual) == -np.sign(cambio12):
+                etiqueta = ("La pendiente proyectada" if "regla_pendiente" in res.parametros
+                            else f"La tendencia de {res.parametros['ventana']} meses")
+                res.alertas.append(f"{etiqueta} ({res.tendencia_mensual:+.1%} "
                                    f"mensual) va en sentido contrario al cambio real de los ultimos 12 meses "
                                    f"({cambio12:+.0%})")
 
@@ -4408,9 +4412,10 @@ def escribir_diagnostico(resultados: dict, periodos_proy: list[int], alertas_gen
                                   "(R2 ajustado de la recta)" if CREDIBILIDAD_PENDIENTE.get("indice") == "r2"
                                   else f"proporcion de la pendiente por tipo: {CREDIBILIDAD_PENDIENTE}")
                                  + ("; FND y factores del BEL por FND: pendiente combinada (promedio de plano y rectas "
-                                    "Theil-Sen de 24 y 36 meses; sin el plano si la tendencia de 24 meses es clara, "
-                                    f"|t| >= {PENDIENTE_COMBINADA['t_clara']}; la mitad de la recta de 24 si los ultimos 12 "
-                                    "meses no la confirman; sin tendencia tras un salto del ultimo mes; amortiguada "
+                                    "Theil-Sen de 24 y 36 meses, minimos cuadrados en el FACTOR GTO; sin el plano si la "
+                                    f"tendencia de 24 meses es clara, |t| >= {PENDIENTE_COMBINADA['t_clara']}; la mitad de "
+                                    "la recta de 24 si los ultimos 12 meses no la confirman (en el GTO el plano se queda en "
+                                    "el promedio); sin tendencia tras un salto del ultimo mes en FND y CESION; amortiguada "
                                     f"{PENDIENTE_COMBINADA['amortiguacion']} por mes y topada al rango de 36 meses)"
                                     if "combinada" in CREDIBILIDAD_PENDIENTE.values() else "")),
         ("Desviacion del ultimo mes", f"indices: se desvanece hacia el nivel promedio de los ultimos {MESES_NIVEL_LOCAL} meses con "
