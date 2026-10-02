@@ -212,8 +212,8 @@ MODELO_POR_TIPO = {
     "indice": "Tendencia historica",  # indices de HParametros, en logaritmos
     "lag": "Tendencia historica",     # patron de desarrollo (LAG 1-10); en logaritmos si es positivo
     "razon": "SES",
-    "fnd": "Tendencia historica",     # FND, FACTOR GTO y FACTOR MR del BEL por FND: como los indices (en logaritmos), pero
-                                      # anclados al ultimo real (PERSISTENCIA_DESVIACION)
+    "fnd": "Tendencia historica",     # FND, FACTOR GTO y FACTOR MR del BEL por FND: en logaritmos, anclados al ultimo real
+                                      # y con la pendiente combinada (CREDIBILIDAD_PENDIENTE, PENDIENTE_COMBINADA)
     "factor": "Tendencia historica",  # CESION del BEL por FND: igual, en niveles (puntos por mes)
 }
 MESES_TENDENCIA = 36             # ventana de la tendencia historica (None = toda la historia). Con toda la historia
@@ -265,7 +265,8 @@ DESCRIPCION_CREDIBILIDAD = {
 #       con tendencia o con cambios de nivel recientes (el FACTOR MR de Acc. Personales bajo de 10 % a 2.5 % en un ano; el
 #       FACTOR GTO cambia por escalones anuales): si la desviacion se desvaneciera hacia el nivel del ultimo ano, la
 #       proyeccion arrancaria con una curva de regreso hacia donde estaba la serie hace meses, en contra de su tendencia.
-#       Anclada, la proyeccion arranca del ultimo real y sigue la tendencia (ponderada por su R2) con el patron del mes.
+#       Anclada, la proyeccion arranca del ultimo real y sigue su tendencia (pendiente combinada, PENDIENTE_COMBINADA)
+#       con el patron del mes.
 PERSISTENCIA_DESVIACION = {"nivel": 1.0, "indice": 0.8, "lag": 1.0, "fnd": 1.0, "factor": 1.0}
 # Con la desviacion conservada (phi = 1), de donde arranca la proyeccion: la desviacion del ultimo mes (1) o el promedio
 # de las desviaciones de los ultimos k meses respecto a la recta (k > 1: arranca del nivel reciente de la serie, no de un
@@ -290,8 +291,50 @@ ANCLAR_SERIES = set()            # series (Serie, Ramo) de indices que se dejan 
 #       pendiente que la recta explica poco (ramo 31: +1.3 % mensual con R2 0.16) proyecta subidas o bajadas que la
 #       serie nunca sostuvo. Backtest de indices (error % mediano a 1-16 / 1-6 meses): pendiente completa 16.5 / 12.6;
 #       ponderada por R2 13.6 / 12.5; sin pendiente 13.4 / 11.6. Un numero entre 0 y 1 fija la proporcion.
-CREDIBILIDAD_PENDIENTE = {"nivel": 1.0, "indice": "r2", "lag": 1.0, "fnd": "r2", "factor": "r2"}   # (fnd y factor: como
-                                 # los indices: una pendiente que la recta explica poco no se extrapola)
+#   FND y factores del BEL por FND (fnd, factor): "combinada" (PENDIENTE_COMBINADA). Con el R2 de la recta de 36 meses
+#       quedaban planas 31 de 75 series: cuando una razon dio la vuelta dentro de la ventana (cesion RRC 40: 21 % -> 41 %
+#       en ene-25 -> 28.6 % en ago-26) el R2 vale casi 0 y la proyeccion era una linea recta en el ultimo real.
+CREDIBILIDAD_PENDIENTE = {"nivel": 1.0, "indice": "r2", "lag": 1.0, "fnd": "combinada", "factor": "combinada"}
+# Pendiente "combinada" del FND, FACTOR GTO, FACTOR MR y CESION (sobre la serie sin el patron del mes, en la escala del
+# modelo: logaritmos en FND, GTO y MR, puntos en la CESION):
+#   1. Rectas de los ultimos 24 y 36 meses con Theil-Sen (mediana de las pendientes entre todos los pares de meses: un
+#      pico o un salto de un solo mes casi no la mueve); el FACTOR GTO con minimos cuadrados, porque cambia por
+#      escalones anuales y Theil-Sen da 0 cuando la mayoria de los pares cae en el mismo escalon. Cada recta lleva su
+#      estadistico t con el error estandar corregido por la autocorrelacion de sus residuos (AR(1)).
+#   2. Se promedian, con pesos iguales, pronosticos que arrancan del mismo punto: plano, recta de 24 meses y recta de
+#      36 (esta solo si no va en contra de la de 24: si apunta al reves describe un regimen anterior). Si la recta de 24
+#      meses tiene tendencia clara (|t| >= t_clara) el plano sale del promedio: la proyeccion no queda plana.
+#   3. Meseta: si los ultimos 12 meses no confirman la direccion de la recta de 24 (su t en esa direccion < t_meseta,
+#      sin tendencia o ya dando la vuelta) se proyecta la mitad de la recta de 24 meses (plano y recta de 24), sin la de
+#      36. En el GTO (series_gto_meseta) el plano solo se queda en el promedio.
+#   4. Salto del ultimo mes (FND y CESION): si el ultimo cambio mensual supera k_salto veces la mediana de las
+#      desviaciones absolutas (MAD) de los cambios de 24 meses, no se extrapola tendencia desde el nuevo nivel
+#      (pendiente 0; se conserva el patron del mes).
+#   5. La pendiente se amortigua (amortiguacion 0.95 por mes: a 16 meses recorre 66 % de la recta; nunca da la vuelta,
+#      asi que no hay curvas de regreso) y se reduce, sin cambiar de signo, si a meses_tope meses sacaria la razon del
+#      rango de los ultimos 36 meses reales ampliado tope_rango veces ese rango (salvaguarda de plausibilidad).
+#   La proyeccion arranca del ultimo real (FACTOR MR: del nivel de sus ultimos 3 meses, ANCLA_MESES_SERIE).
+# Se eligio en un banco de pruebas de las 75 series (13 ramos RRC x FND/GTO/MR/CESION y 9 ramos SONR x FND/MR/CESION,
+# historia a ago-26) contra cuatro alternativas (recta ponderada por recencia, Holt amortiguado, tendencia del ultimo
+# tramo y pendiente robusta en 4 ventanas): backtest con 9 cortes (4 a 20 meses antes del final, horizonte hasta 16)
+# error % mediano / medio 16.4 / 23.7 contra 17.4 / 24.0 de la recta ponderada por R2 (repetir el ultimo valor: 14.9);
+# series aplanadas 13 contra 31 (casi todas por la regla de salto o de meseta), ninguna contraria a su tendencia.
+# t_clara, t_meseta, k_salto, la amortiguacion y el tope son criterios de modelacion, no se estimaron de los datos.
+PENDIENTE_COMBINADA = {
+    "ventanas": (24, 36),               # rectas candidatas (meses), ademas del plano; la primera da la direccion
+    "ventana_meseta": 12,
+    "estimador": "theil",               # "theil" (Theil-Sen) o "mco" (minimos cuadrados)
+    "estimador_serie": {"FACTOR GTO": "mco"},
+    "t_clara": 2.5,                     # |t| (AR(1)) de la recta de 24 meses: tendencia clara
+    "t_meseta": 1.0,                    # t (AR(1)) de la recta de 12 meses en la direccion de la de 24: debajo, meseta
+    "series_gto_meseta": ("FACTOR GTO",),   # en meseta el plano se queda en el promedio (sin la regla de la mitad)
+    "k_salto": 5.0,                     # ultimo cambio mensual > k_salto x MAD de los cambios de 24 meses: salto
+    "series_salto": ("FND", "CESION"),  # el GTO cambia por escalones y el MR ya arranca del nivel de 3 meses
+    "amortiguacion": 0.95,              # el mes k suma 0.95^k de la pendiente
+    "tope_rango": 0.5,                  # rango de 36 meses +- 0.5 veces el rango (None = sin tope)
+    "meses_tope": 16,
+    "min_obs": 6,                       # menos observaciones: sin pendiente
+}
 # Cotas de los modelos de suavizamiento exponencial (si se eligen), estimadas por maxima verosimilitud dentro de
 # ellas: alpha ~ 1 (arranca del ultimo dato real), beta <= 0.15 (tendencia de los ultimos anos, no del ultimo mes),
 # phi entre 0.80 y 0.98. RCONT (Holt-Winters trimestral) suaviza el nivel (alpha >= 0.2) para separar la
@@ -504,15 +547,15 @@ ANIOS_LAG_PEACUMULADA = {"SONR": 3}    # SONR: PEACUMULADA = LAG 1 x PRIMA N AÑ
 # FCST. GTO y MR = su razon proyectada sobre el BEL (la del modelo) x el BEL nuevo; BRUTO = BEL + GTO + MR; IRR = BRUTO x
 # la razon de cesion del modelo; NETO = BRUTO - IRR. En la BD principal van como formulas en las columnas RAM_.
 USAR_BEL_POR_FND = True
-TIPO_MODELO_FND = "fnd"          # el FND se proyecta como los indices (recta de los ultimos MESES_TENDENCIA meses con
-                                 # patron del mes y pendiente ponderada por su credibilidad, R2), pero anclado al ultimo
-                                 # real: la proyeccion arranca donde esta la serie (PERSISTENCIA_DESVIACION["fnd"])
+TIPO_MODELO_FND = "fnd"          # el FND se proyecta en logaritmos con el patron del mes y la pendiente combinada
+                                 # (PENDIENTE_COMBINADA: rectas robustas de 24 y 36 meses, amortiguada 0.95 por mes),
+                                 # anclado al ultimo real: la proyeccion arranca donde esta la serie
 MIN_MESES_FND = 12               # meses minimos de FND real para proyectarlo
 TIPO_MODELO_FACTORES = {"FACTOR GTO": "fnd", "FACTOR MR": "fnd", "CESION": "factor"}
                                  # FACTOR GTO (GTO / PND), FACTOR MR (MR / PND o PD) y CESION (IRR / BRUTO) de las series con
                                  # BEL por FND: reales hasta el ultimo mes y, desde el primer mes proyectado, el mismo modelo
-                                 # que el FND (por decision del area): desde el ultimo real, la recta de los ultimos
-                                 # MESES_TENDENCIA meses con el patron del mes del ano y la pendiente ponderada por su R2. GTO y
+                                 # que el FND (por decision del area): desde el ultimo real, la pendiente combinada
+                                 # (PENDIENTE_COMBINADA) con el patron del mes del ano. GTO y
                                  # MR en logaritmos, como el FND; la CESION en niveles ("factor", puntos por mes): es una
                                  # proporcion acotada a 100 % y en logaritmos la tendencia es de crecimiento % constante (RRC
                                  # 10, que paso de 1 % a 63 % de cesion, llegaba a 100 % en tres meses).
@@ -698,8 +741,130 @@ def factores_estacionales(z, meses):
             "amplitud": float(s.max() - s.min())}
 
 
+def _recta_robusta(w, estimador: str = "theil"):
+    """Pendiente y estadistico t de la recta sobre w: Theil-Sen (mediana de las pendientes entre todos los pares de
+    meses) o minimos cuadrados ("mco"); el error estandar se corrige por la autocorrelacion de primer orden de los
+    residuos (rho acotada a [0, 0.95]: n efectivo = n (1 - rho) / (1 + rho))."""
+    w = np.asarray(w, dtype=float)
+    n = len(w)
+    t = np.arange(n, dtype=float)
+    if estimador == "theil":
+        i, j = np.triu_indices(n, 1)
+        b = float(np.median((w[j] - w[i]) / (j - i)))
+        a = float(np.median(w - b * t))
+    else:
+        b, a = (float(v) for v in np.polyfit(t, w, 1))
+    r = w - (a + b * t)
+    sxx = float(np.sum((t - t.mean()) ** 2))
+    s2 = float(np.sum((r - r.mean()) ** 2)) / max(1, n - 2)
+    se = math.sqrt(s2 / sxx) if sxx > 0 and s2 > 0 else math.inf
+    rho = 0.0
+    if n >= 4 and np.std(r) > 0:
+        rho = float(np.corrcoef(r[:-1], r[1:])[0, 1])
+        rho = min(max(0.0, rho if np.isfinite(rho) else 0.0), 0.95)
+    if np.isfinite(se):
+        se *= math.sqrt((1 + rho) / (1 - rho))
+    t_est = b / se if np.isfinite(se) and se > 0 else (0.0 if b == 0 else math.copysign(99.0, b))
+    return b, float(t_est)
+
+
+def pendiente_combinada(d, z, nombre: str = ""):
+    """Pendiente mensual (escala del modelo, sin amortiguar ni topar) del FND y los factores del BEL por FND
+    (PENDIENTE_COMBINADA) y el detalle: d = serie sin el patron del mes, z = serie en la escala del modelo con el patron
+    (para la regla de salto: un mes que solo se aparta del patron no es salto)."""
+    P = PENDIENTE_COMBINADA
+    d = np.asarray(d, dtype=float)
+    det = {"regla_pendiente": "", "clara": False, "meseta": False, "salto": False}
+    if len(d) < P["min_obs"]:
+        det["regla_pendiente"] = f"menos de {P['min_obs']} meses: sin pendiente"
+        return 0.0, det
+    est = P["estimador_serie"].get(nombre, P["estimador"])
+    v_dir, v_larga = P["ventanas"]
+    b_dir, t_dir = _recta_robusta(d[-v_dir:], est)
+    b_larga, _ = _recta_robusta(d[-v_larga:], est)
+    det.update({"pendiente_24": b_dir, "t_24": t_dir, "pendiente_36": b_larga})
+    usar_larga = np.sign(b_larga) != -np.sign(b_dir)             # la de 36 no va en contra de la de 24
+    if len(d) < 12:
+        b = float(np.mean([0.0, b_dir, b_larga]))
+        det["regla_pendiente"] = "menos de 12 meses: promedio de plano y rectas"
+        return b, det
+    b12, t12 = _recta_robusta(d[-P["ventana_meseta"]:], est)
+    det.update({"pendiente_12": b12, "t_12": t12})
+    if nombre in P["series_salto"] and len(d) >= 13 and z is not None:
+        dif = np.diff(np.asarray(z, dtype=float)[-24:])
+        mad = float(np.median(np.abs(dif - np.median(dif))))
+        if mad > 0 and abs(float(dif[-1])) > P["k_salto"] * mad:
+            det.update(salto=True, regla_pendiente=f"salto del ultimo mes ({abs(float(dif[-1])) / mad:.1f} MAD): "
+                                                    "sin tendencia desde el nuevo nivel")
+            return 0.0, det
+    clara = abs(t_dir) >= P["t_clara"]
+    meseta = bool(t12 * np.sign(b_dir) < P["t_meseta"])
+    det.update(clara=clara, meseta=meseta)
+    if meseta and nombre not in P["series_gto_meseta"]:
+        det["regla_pendiente"] = "meseta: los ultimos 12 meses no confirman la recta de 24; mitad de su pendiente"
+        return 0.5 * b_dir, det
+    rectas = [b_dir] + ([b_larga] if usar_larga else [])
+    if clara:
+        rectas = [b for b in rectas if np.sign(b) == np.sign(b_dir)]
+    con_plano = not clara or meseta
+    valores = rectas + ([0.0] if con_plano else [])
+    det["regla_pendiente"] = (("tendencia clara: " if clara else "") + ("promedio de " if len(valores) > 1 else "")
+                              + " y ".join((["plano"] if con_plano else [])
+                                           + [f"recta de {v} meses" for v, b in ((v_dir, b_dir), (v_larga, b_larga))
+                                              if b in rectas]))
+    return float(np.mean(valores)) if valores else 0.0, det
+
+
+def _tope_rango(b: float, a0: float, y, escala_log: bool) -> float:
+    """Reduce la pendiente (nunca la invierte) para que a meses_tope meses la tendencia quede dentro del rango de los
+    ultimos 36 meses reales ampliado tope_rango veces ese rango."""
+    P = PENDIENTE_COMBINADA
+    y36 = np.asarray(y, dtype=float)[-36:]
+    lo, hi = float(y36.min()), float(y36.max())
+    lo, hi = lo - P["tope_rango"] * (hi - lo), hi + P["tope_rango"] * (hi - lo)
+    pasos = float(np.sum(P["amortiguacion"] ** np.arange(1, P["meses_tope"] + 1)))
+    if escala_log:
+        lim = math.log(hi) if b > 0 else (math.log(lo) if lo > 0 else -math.inf)
+    else:
+        lim = hi if b > 0 else lo
+    fin = a0 + b * pasos
+    if (b > 0 and fin > lim) or (b < 0 and fin < lim):
+        b_nuevo = (lim - a0) / pasos
+        return b_nuevo if np.sign(b_nuevo) == np.sign(b) else 0.0
+    return b
+
+
+def _tendencia_combinada(z, d, h: int, estacional_fut, est, ancla_meses: int, nombre: str, escala_log: bool):
+    """Proyeccion del FND y los factores del BEL por FND con la pendiente combinada (PENDIENTE_COMBINADA): arranca del
+    ultimo real sin su patron del mes (o del nivel de los ultimos ancla_meses meses, llevado al ultimo mes con la recta
+    de 24), suma la pendiente amortiguada (y topada al rango) y el patron del mes. Intervalo: la variabilidad mensual
+    alrededor de la pendiente, que crece con la raiz del horizonte. Regresa lo mismo que ajustar_tendencia."""
+    P = PENDIENTE_COMBINADA
+    b, det = pendiente_combinada(d, z, nombre)
+    k = max(1, min(int(ancla_meses), len(d)))
+    b_ref = det.get("pendiente_24", b)
+    a0 = float(d[-1]) if k == 1 else float(np.mean(d[-k:] + b_ref * np.arange(k)[::-1]))
+    b_sin_tope = b
+    if P["tope_rango"] is not None and b != 0:
+        b = _tope_rango(b, a0, np.exp(z) if escala_log else z, escala_log)
+    hh = np.arange(1, h + 1)
+    pron = a0 + b * np.cumsum(P["amortiguacion"] ** hh) + estacional_fut
+    w = d if MESES_TENDENCIA is None or len(d) <= MESES_TENDENCIA else d[-MESES_TENDENCIA:]
+    sd = float(np.std(np.diff(w) - b, ddof=1)) if len(w) > 2 else 0.0
+    ancho = _cuantil_normal() * sd * np.sqrt(hh)
+    params = {"pendiente": float(b), "pendiente_aplicada": float(b), "pendiente_sin_tope": float(b_sin_tope),
+              "tope": bool(b != b_sin_tope), "ventana": int(P["ventanas"][0]), "r2": math.nan,
+              "amortiguacion": float(P["amortiguacion"]), "phi_desviacion": 1.0, "ancla": a0,
+              "sd_residual": sd, **det}
+    if est is not None:
+        params.update({"estacional": [float(v) for v in est["factores"]], "credibilidad_estacional": est["credibilidad"],
+                       "p_estacional": est["p"], "r2_estacional": est["r2"], "obs_estacional": est["obs"],
+                       "amplitud_estacional": est["amplitud"]})
+    return pron, pron - ancho, pron + ancho, params, float(b)
+
+
 def ajustar_tendencia(z, h: int, meses=None, phi_desv: float = 1.0, cred_pend=1.0, media_aritmetica: bool = False,
-                      ancla_meses: int = 1):
+                      ancla_meses: int = 1, nombre: str = "", escala_log: bool = False):
     """Linea de tendencia (regresion lineal sobre los ultimos MESES_TENDENCIA valores de z, en la escala del modelo)
     mas, si ESTACIONALIDAD_MENSUAL y se conocen los meses, el patron por mes del ano; continuada desde el ultimo
     dato real con amortiguacion AMORTIGUACION_TENDENCIA. La desviacion del ultimo mes respecto al modelo se
@@ -707,8 +872,10 @@ def ajustar_tendencia(z, h: int, meses=None, phi_desv: float = 1.0, cred_pend=1.
     MESES_NIVEL_LOCAL meses (indices). Intervalo: con phi_desv = 1, la variabilidad mensual alrededor de la
     tendencia (sin el patron), que crece con la raiz del horizonte; con phi_desv < 1, la banda estacionaria de los
     residuos mas la incertidumbre de la pendiente. cred_pend: proporcion de la pendiente que se proyecta (1 = toda;
-    "r2" = el R2 ajustado de la recta, para indices). ancla_meses: con phi_desv = 1, la proyeccion arranca del promedio
-    de las desviaciones de los ultimos ancla_meses meses (1 = la del ultimo mes)."""
+    "r2" = el R2 ajustado de la recta, para indices; "combinada" = la pendiente combinada del FND y los factores del
+    BEL por FND, _tendencia_combinada, que usa nombre = serie y escala_log = z en logaritmos). ancla_meses: con
+    phi_desv = 1, la proyeccion arranca del promedio de las desviaciones de los ultimos ancla_meses meses (1 = la del
+    ultimo mes)."""
     z = np.asarray(z, dtype=float)
     est = factores_estacionales(z, meses) if (ESTACIONALIDAD_MENSUAL and meses is not None) else None
     if est is not None:
@@ -719,6 +886,8 @@ def ajustar_tendencia(z, h: int, meses=None, phi_desv: float = 1.0, cred_pend=1.
         estacional_fut = s[m_fut]
     else:
         d, estacional_fut = z, 0.0
+    if cred_pend == "combinada":                                       # FND y factores del BEL por FND
+        return _tendencia_combinada(z, d, h, estacional_fut, est, ancla_meses, nombre, escala_log)
     w = d if MESES_TENDENCIA is None or len(d) <= MESES_TENDENCIA else d[-MESES_TENDENCIA:]
     t = np.arange(len(w), dtype=float)
     pendiente, ordenada = np.polyfit(t, w, 1)
@@ -769,11 +938,12 @@ def ajustar_tendencia(z, h: int, meses=None, phi_desv: float = 1.0, cred_pend=1.
 
 
 def ajustar(z, modelo: str, h: int, meses=None, phi_desv: float = 1.0, cred_pend=1.0, media_aritmetica: bool = False,
-            ancla_meses: int = 1):
+            ancla_meses: int = 1, nombre: str = "", escala_log: bool = False):
     """Pronostico en la escala del modelo: (pronostico, li, ls, parametros, pendiente final). meses = mes del ano
     (1-12) de cada observacion, para la estacionalidad de la tendencia historica; phi_desv = persistencia de la
     desviacion del ultimo mes (1 = se conserva); cred_pend = proporcion de la pendiente que se proyecta."""
-    return (ajustar_tendencia(z, h, meses, phi_desv, cred_pend, media_aritmetica, ancla_meses) if modelo == TENDENCIA
+    return (ajustar_tendencia(z, h, meses, phi_desv, cred_pend, media_aritmetica, ancla_meses, nombre, escala_log)
+            if modelo == TENDENCIA
             else ajustar_ets(z, modelo, h))
 
 
@@ -917,6 +1087,7 @@ def _pronosticar(serie: Serie) -> Resultado:
         res.alertas.append("Serie anclada al ultimo real por decision del area (ANCLAR_SERIES)")
     cred_pend = CREDIBILIDAD_PENDIENTE.get(tipo, 1.0)                  # indices: pendiente ponderada por su R2
     ancla = int(ANCLA_MESES_SERIE.get(str(serie.clave[2]), ANCLA_MESES.get(tipo, 1)))   # con phi = 1: de donde arranca
+    nombre_serie = str(serie.clave[2])                                 # FND, FACTOR GTO, ... (pendiente combinada)
     media_arit = bool(MEDIA_ARITMETICA_INDICES and usar_log and phi_desv < 1)   # converger al promedio aritmetico
 
     def inv(v):
@@ -939,7 +1110,8 @@ def _pronosticar(serie: Serie) -> Resultado:
     pron = li = ls = None
     while modelo != ULTIMO_VALOR:
         try:
-            f, lo, hi, params, pendiente = ajustar(z, modelo, hh, meses, phi_desv, cred_pend, media_arit, ancla)
+            f, lo, hi, params, pendiente = ajustar(z, modelo, hh, meses, phi_desv, cred_pend, media_arit, ancla,
+                                                   nombre_serie, usar_log)
             if np.all(np.isfinite(f)):
                 pron, li, ls = inv(f), inv(lo), inv(hi)
                 res.parametros = params
@@ -961,6 +1133,11 @@ def _pronosticar(serie: Serie) -> Resultado:
             res.alertas.append(f"R2 de la tendencia {r2:.2f}: la recta explica poco de los ultimos "
                                f"{res.parametros['ventana']} meses; revisar antes de usar la pendiente")
         pe = res.parametros
+        if pe.get("salto"):
+            res.alertas.append(f"Pendiente combinada: {pe['regla_pendiente']}; revisar si el nuevo nivel se sostiene")
+        if pe.get("tope"):
+            res.alertas.append(f"Pendiente combinada: la tendencia se redujo para quedar a {PENDIENTE_COMBINADA['meses_tope']} "
+                               f"meses dentro del rango de 36 meses ampliado {PENDIENTE_COMBINADA['tope_rango']:.0%}")
         if pe.get("phi_desviacion", 1.0) < 1 and pe.get("sd_residual", 0) > 0:
             brecha_nivel = pe["desviacion_ultimo"] - pe["nivel_local"]
             if abs(brecha_nivel) > 2 * pe["sd_residual"]:
@@ -976,7 +1153,8 @@ def _pronosticar(serie: Serie) -> Resultado:
 
     # backtest: se re-proyecta desde cortes pasados con el mismo modelo y se compara contra lo real
     res.error_modelo, res.error_ultimo_valor, res.error_ses, res.n_cortes = backtest(z, y, modelo, inv, meses, phi_desv,
-                                                                                  cred_pend, media_arit, ancla)
+                                                                                  cred_pend, media_arit, ancla,
+                                                                                  nombre_serie, usar_log)
     if (res.n_cortes and np.isfinite(res.error_modelo) and np.isfinite(res.error_ultimo_valor)
             and res.error_modelo > res.error_ultimo_valor * 1.10 + 0.5):
         res.alertas.append(f"En el backtest de esta serie el modelo ({res.error_modelo:.1f}%) no supera a repetir "
@@ -987,7 +1165,7 @@ def _pronosticar(serie: Serie) -> Resultado:
 
 
 def backtest(z, y, modelo: str, inv, meses=None, phi_desv: float = 1.0, cred_pend=1.0, media_arit: bool = False,
-             ancla_meses: int = 1):
+             ancla_meses: int = 1, nombre: str = "", escala_log: bool = False):
     """Error % (WAPE = suma |error| / suma |real|) del modelo, del ultimo valor y de SES, re-proyectando desde
     CORTES_BACKTEST meses antes del final (horizontes de 1 a 16 meses). La estacionalidad se re-estima en cada
     corte solo con la historia anterior al corte."""
@@ -1001,19 +1179,19 @@ def backtest(z, y, modelo: str, inv, meses=None, phi_desv: float = 1.0, cred_pen
         hz = min(16, n - o)
         real = y[o:o + hz]
         preds = {"ultimo": np.repeat(inv(z[o - 1]), hz)}
-        for nombre, mod in (("modelo", modelo), ("ses", "SES")):
+        for nombre_p, mod in (("modelo", modelo), ("ses", "SES")):
             try:
-                preds[nombre] = (inv(ajustar(z[:o], mod, hz, None if meses is None else meses[:o], phi_desv, cred_pend,
-                                             media_arit, ancla_meses)[0])
+                preds[nombre_p] = (inv(ajustar(z[:o], mod, hz, None if meses is None else meses[:o], phi_desv,
+                                               cred_pend, media_arit, ancla_meses, nombre, escala_log)[0])
                                  if mod != ULTIMO_VALOR else preds["ultimo"])
             except Exception:  # noqa: BLE001
-                preds[nombre] = None
+                preds[nombre_p] = None
         if any(p is None or not np.all(np.isfinite(p)) for p in preds.values()):
             continue
         cortes += 1
-        for nombre, p in preds.items():
-            errores[nombre][0] += float(np.sum(np.abs(p - real)))
-            errores[nombre][1] += float(np.sum(np.abs(real)))
+        for nombre_p, p in preds.items():
+            errores[nombre_p][0] += float(np.sum(np.abs(p - real)))
+            errores[nombre_p][1] += float(np.sum(np.abs(real)))
 
     def wape(e):
         return (e[0] / e[1] * 100) if cortes and e[1] > 0 else math.nan
@@ -2799,6 +2977,15 @@ def _peacumulada(pref: str, r, p: int, p12: dict, lags: dict):
     return tot
 
 
+def _cambio_mensual(res: Resultado, ultimo_real: float) -> float:
+    """Pendiente mensual proyectada (la del primer mes, antes de amortiguar) en unidades de la razon: en logaritmos,
+    ultimo real x (e^pendiente - 1); en niveles, la pendiente."""
+    b = (res.parametros or {}).get("pendiente", math.nan)
+    if not np.isfinite(b) or not np.isfinite(ultimo_real):
+        return math.nan
+    return float(ultimo_real * math.expm1(b)) if res.transformacion == "log" else float(b)
+
+
 def calcular_bel_fnd(bd: BDMontos, hp, resultados: dict, proy: dict, pe: dict, periodos_proy: list[int],
                      ultimo: int) -> dict:
     """BEL por FND: FND = PND / PEACUMULADA en la historia (PND = BEL / IS), proyectado con la tendencia desde el primer
@@ -2849,7 +3036,12 @@ def calcular_bel_fnd(bd: BDMontos, hp, resultados: dict, proy: dict, pe: dict, p
                 res = pronosticar(Serie(("DANOS", pref, "FND", r), TIPO_MODELO_FND, per, v, ultimo, h,
                                         dominio=(0.0, None)))
                 fnd_f = np.asarray(res.pronostico, dtype=float)
+                out["alertas"] += [("DANOS", f"{pref} | FND | ramo {r}", a) for a in res.alertas
+                                   if str(a).startswith("Pendiente combinada")]
+                prm_fnd = res.parametros or {}
                 fila.update({"Modelo": res.modelo if hasattr(res, "modelo") else "",
+                             "FND regla de la pendiente": res.regla or prm_fnd.get("regla_pendiente", ""),
+                             "Cambio mensual de la tendencia del FND": _cambio_mensual(res, [x for x in v if np.isfinite(x)][-1]),
                              "Error % backtest (modelo)": getattr(res, "error_modelo", math.nan),
                              "Error % backtest (ultimo valor)": getattr(res, "error_ultimo_valor", math.nan),
                              f"FND {ultimo}": fnd_h[per_hist.index(ultimo)] if ultimo in per_hist else math.nan,
@@ -2884,8 +3076,8 @@ def calcular_bel_fnd(bd: BDMontos, hp, resultados: dict, proy: dict, pe: dict, p
                             f = np.full(h, vals[ok_p[-1]])          # (sin modelo: el ultimo real)
                         prm = res_f.parametros or {}
                         fila.update({f"{nombre} modelo": res_f.regla or res_f.modelo,
-                                     f"{nombre} R2": prm.get("r2", math.nan),
-                                     f"{nombre} pendiente mensual": prm.get("pendiente", math.nan),
+                                     f"{nombre} regla de la pendiente": prm.get("regla_pendiente", ""),
+                                     f"{nombre} cambio mensual de la tendencia": _cambio_mensual(res_f, vals[ok_p[-1]]),
                                      f"{nombre} error % backtest (modelo)": res_f.error_modelo,
                                      f"{nombre} error % backtest (ultimo valor)": res_f.error_ultimo_valor})
                         out["alertas"] += [("DANOS", clave_al, a) for a in res_f.alertas
@@ -4212,9 +4404,15 @@ def escribir_diagnostico(resultados: dict, periodos_proy: list[int], alertas_gen
         ("Moneda mezclada corregida", ", ".join(f"{k}: {v} celdas convertidas de MXN a USD"
                                                 for k, v in (resumen.get("moneda_corregida") or {}).items())
                                       or "no se detecto"),
-        ("Pendiente proyectada", "montos y LAGs: la pendiente completa de la recta; indices: ponderada por su credibilidad "
-                                 "(R2 ajustado de la recta)" if CREDIBILIDAD_PENDIENTE.get("indice") == "r2"
-                                 else f"proporcion de la pendiente por tipo: {CREDIBILIDAD_PENDIENTE}"),
+        ("Pendiente proyectada", ("montos y LAGs: la pendiente completa de la recta; indices: ponderada por su credibilidad "
+                                  "(R2 ajustado de la recta)" if CREDIBILIDAD_PENDIENTE.get("indice") == "r2"
+                                  else f"proporcion de la pendiente por tipo: {CREDIBILIDAD_PENDIENTE}")
+                                 + ("; FND y factores del BEL por FND: pendiente combinada (promedio de plano y rectas "
+                                    "Theil-Sen de 24 y 36 meses; sin el plano si la tendencia de 24 meses es clara, "
+                                    f"|t| >= {PENDIENTE_COMBINADA['t_clara']}; la mitad de la recta de 24 si los ultimos 12 "
+                                    "meses no la confirman; sin tendencia tras un salto del ultimo mes; amortiguada "
+                                    f"{PENDIENTE_COMBINADA['amortiguacion']} por mes y topada al rango de 36 meses)"
+                                    if "combinada" in CREDIBILIDAD_PENDIENTE.values() else "")),
         ("Desviacion del ultimo mes", f"indices: se desvanece hacia el nivel promedio de los ultimos {MESES_NIVEL_LOCAL} meses con "
                                        f"persistencia {PERSISTENCIA_DESVIACION.get('indice', 1.0)}; montos y LAGs: se conserva "
                                        f"(persistencia {PERSISTENCIA_DESVIACION.get('nivel', 1.0)} / {PERSISTENCIA_DESVIACION.get('lag', 1.0)})"),
@@ -4652,7 +4850,9 @@ def _hojas_pnd(wb, diag: dict, negrita, encab):
                         {"IS (FA)": "0.00%", "IS (RL)": "0.00%", "Diferencia": "0.00"})
         if fnd.get("resumen") or fnd.get("series"):
             _hoja_filas(wb, "BEL_FND_Resumen", fnd.get("resumen") or [], negrita, encab,
-                        {"FND": "0.0000", "Error": "0.0", "BEL": "#,##0"})
+                        {"Cambio mensual de la tendencia del FND": "0.0000", "FACTOR GTO cambio": "0.000%",
+                         "FACTOR MR cambio": "0.000%", "CESION cambio": "0.00%", "FND": "0.0000", "Error": "0.0",
+                         "BEL": "#,##0"})
             _hoja_filas(wb, "BEL_FND_Mensual", fnd.get("series") or [], negrita, encab,
                         {"IS": "0.0000", "FND": "0.0000", "PEACUMULADA": "#,##0", "BEL": "#,##0"})
     if not diag or not (diag.get("mensual") or diag.get("resumen")):
