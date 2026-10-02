@@ -115,6 +115,7 @@ _asegurar_paquetes({
 
 import math  # noqa: E402
 
+import fnmatch  # noqa: E402
 import json  # noqa: E402
 import re  # noqa: E402
 import time  # noqa: E402
@@ -432,10 +433,10 @@ HOJA_PRIMAS_PE = "Primas_PE"     # hoja que se agrega a la BD de Danos con la pr
 # meses como formula) y los bloques "PE FCST <ramo>", "PRIMA N AÑOS <ramo>" y "PEACUMULADA <ramo>" la referencian.
 ARCHIVO_PE_FCST = ENTRADAS / "FCST_2027.xlsb"
 PATRON_PE_RAMO = "PExRamo*"      # base historica de PE por ramo y mes (en entradas/): periodo, Ramo, Sramo, PmaTom
-PATRON_PE_RFCST_FA = "*RCST*_FA*.xlsx"   # reforecast del ano por mes y ramo (en entradas/; hoja Ana_RFCST<aa>_FA: MesProc,
+PATRON_PE_RFCST_FA = "*RCST*FA*.xlsx"    # reforecast del ano por mes y ramo (en entradas/; hoja Ana_RFCST<aa>_FA: MesProc,
                                  # Tipo Rea, Susc, RAMO, Primas Tomadas USD y MXN): PE de los meses entre PExRamo y el
                                  # FCST (sep-dic 2026). Sin el archivo, esos meses salen del reforecast por grupo de primas.py
-PATRON_IS_FA = "PPTO*_FA*.xlsx"  # indices de siniestralidad de la funcion actuarial (en entradas/; una hoja con Ramo,
+PATRON_IS_FA = "PPTO*FA*.xlsx"   # indices de siniestralidad de la funcion actuarial (en entradas/; una hoja con Ramo,
                                  # MesProc, IS RRC e IS SONR, desde el primer mes proyectado): bloque "IS (FA) <ramo>",
                                  # con IS RRC en los renglones de RRC e IS SONR en los de SONR (como el IS (RL)); N/A en
                                  # los meses y ramos que no trae. Solo se muestra: el BEL sigue con el IS (RL)
@@ -2389,9 +2390,7 @@ def leer_pe_rfcst_fa(tc: dict, ruta: Path | None = None) -> dict | None:
     "usd_archivo": {(ramo, periodo): USD del archivo}, "tc_archivo": {periodo: TC del archivo}, "tc_usado": {periodo:
     TC}, "periodos", "renglones", "por_tipo": {Tipo Rea: renglones}, "fuera": {(ramo, periodo): USD}, "control",
     "avisos"} o None si no hay archivo."""
-    candidatos = [Path(ruta)] if ruta else sorted(
-        (c for c in ENTRADAS.glob(PATRON_PE_RFCST_FA) if not c.name.startswith("~$")),
-        key=lambda c: c.stat().st_size, reverse=True)
+    candidatos = [Path(ruta)] if ruta else _archivos_entrada(PATRON_PE_RFCST_FA)
     if not candidatos or not candidatos[0].exists():
         return None
     ruta = candidatos[0]
@@ -2475,6 +2474,17 @@ def leer_pe_rfcst_fa(tc: dict, ruta: Path | None = None) -> dict | None:
             "control": control, "avisos": avisos}
 
 
+def _archivos_entrada(patron: str) -> list:
+    """Archivos de entradas/ cuyo nombre cumple el patron sin distinguir mayusculas ni el separador antes de las
+    letras (como en Windows: "PPTO_2026_2027 FA" y "PPTO_2026_2027_FA" cumplen "PPTO*FA*.xlsx"), sin los temporales
+    de Office (~$), del mas grande al mas chico."""
+    if not ENTRADAS.exists():
+        return []
+    pat = patron.lower()
+    return sorted((c for c in ENTRADAS.iterdir() if c.is_file() and not c.name.startswith("~$")
+                   and fnmatch.fnmatch(c.name.lower(), pat)), key=lambda c: c.stat().st_size, reverse=True)
+
+
 def _num_is(v) -> tuple:
     """(valor, venia como texto) de un indice: numero, o texto con coma decimal ('0,894') o con % ('89.4%')."""
     if isinstance(v, str):
@@ -2494,34 +2504,47 @@ def leer_is_fa(ruta: Path | None = None) -> dict | None:
     validos tal cual, con los indices que venian como texto ya como numero], "val": {(reserva, ramo, periodo): IS}
     (reserva segun COLUMNA_IS_FA; el primero con dato si se repite), "tipo": {(reserva, ramo, periodo): Tipo del renglon
     que se usa}, "periodos", "ramos", "renglones", "omitidos", "por_tipo": {Tipo: [meses]}, "otros": [archivos que
-    tambien cumplen el nombre], "avisos"} o None si no hay archivo."""
-    candidatos = [Path(ruta)] if ruta else sorted(
-        (c for c in ENTRADAS.glob(PATRON_IS_FA) if not c.name.startswith("~$")),
-        key=lambda c: c.stat().st_size, reverse=True)
+    tambien cumplen el nombre], "avisos"} o None si no hay archivo. Con varios archivos que cumplen el nombre (sin
+    distinguir mayusculas ni "_FA" de " FA"), usa el mas grande que traiga ese encabezado."""
+    candidatos = [Path(ruta)] if ruta else _archivos_entrada(PATRON_IS_FA)
     if not candidatos or not candidatos[0].exists():
         return None
-    ruta, otros = candidatos[0], [c.name for c in candidatos[1:]]
     nombres = {"ramo": "RAMO", "mes": "MESPROC", **{k: norm(v) for k, v in COLUMNA_IS_FA.items()}}
-    wb = openpyxl.load_workbook(ruta, read_only=True, data_only=True)
-    try:
-        hoja = None
-        for ws in wb.worksheets:
-            filas = list(ws.iter_rows(values_only=True))
-            for i, f in enumerate(filas[:40]):
-                enc = [norm(x) for x in f]
-                if all(n in enc for n in nombres.values()):
-                    j = {k: enc.index(n) for k, n in nombres.items()}
-                    j_tipo = enc.index("TIPO") if "TIPO" in enc else None
-                    ult = max(k for k, x in enumerate(f) if x not in (None, ""))
-                    hoja, i_enc, cab = ws.title, i, [x for x in f[:ult + 1]]
+    hoja, sin_enc, errores = None, [], []
+    for cand in candidatos:
+        try:
+            wb = openpyxl.load_workbook(cand, read_only=True, data_only=True)
+        except Exception as e:  # noqa: BLE001
+            errores.append(f"{cand.name} ({type(e).__name__}: {e})")
+            continue
+        try:
+            for ws in wb.worksheets:
+                it = ws.iter_rows(values_only=True)
+                filas = []
+                for i, f in enumerate(it):                 # (el encabezado se busca en los primeros 40 renglones)
+                    filas.append(f)
+                    enc = [norm(x) for x in f]
+                    if all(n in enc for n in nombres.values()):
+                        j = {k: enc.index(n) for k, n in nombres.items()}
+                        j_tipo = enc.index("TIPO") if "TIPO" in enc else None
+                        ult = max(k for k, x in enumerate(f) if x not in (None, ""))
+                        hoja, i_enc, cab = ws.title, i, [x for x in f[:ult + 1]]
+                        filas += list(it)
+                        break
+                    if i >= 39:
+                        break
+                if hoja:
                     break
-            if hoja:
-                break
-    finally:
-        wb.close()
+        finally:
+            wb.close()
+        if hoja:
+            ruta = cand
+            break
+        sin_enc.append(cand.name)
     if hoja is None:
-        raise ValueError(f"{ruta.name}: ninguna hoja trae el encabezado Ramo, MesProc, "
-                         f"{', '.join(COLUMNA_IS_FA.values())}")
+        raise ValueError(f"ningun archivo que cumple {PATRON_IS_FA} trae una hoja con el encabezado Ramo, MesProc, "
+                         f"{', '.join(COLUMNA_IS_FA.values())} (revisados: {', '.join(sin_enc + errores)})")
+    otros = [c.name for c in candidatos if c != ruta]
     tabla, val, tipo_val, por_tipo = [], {}, {}, {}
     omitidos, repetidos, negativos, altos, textos, no_num = [], [], [], [], [], []
     for i, f in enumerate(filas[i_enc + 1:], start=i_enc + 2):
@@ -2576,7 +2599,9 @@ def leer_is_fa(ruta: Path | None = None) -> dict | None:
         avisos.append(f"{len(omitidos)} renglones sin MesProc AAAAMM o Ramo numerico omitidos (primero: renglon "
                       f"{omitidos[0]})")
     if otros:
-        avisos.append(f"tambien cumplen {PATRON_IS_FA}: {', '.join(otros)}; se usa {ruta.name} (el mas grande)")
+        avisos.append(f"tambien cumplen {PATRON_IS_FA}: {', '.join(otros)}; se usa {ruta.name} (el mas grande con el "
+                      "encabezado de indices)" + (f"; sin ese encabezado: {', '.join(sin_enc)}" if sin_enc else "")
+                      + (f"; no se pudieron abrir: {', '.join(errores)}" if errores else ""))
     return {"ruta": ruta, "hoja": hoja, "cab": cab, "tabla": tabla, "val": val, "tipo": tipo_val,
             "periodos": sorted({p for _, _, p in val}), "ramos": sorted({r for _, r, _ in val}, key=int),
             "renglones": len(tabla), "omitidos": len(omitidos), "por_tipo": {k: sorted(v) for k, v in por_tipo.items()}, "otros": otros,
@@ -5113,9 +5138,18 @@ def main():
                                  "Diferencia FA - RL (puntos %)": (v - rl) * 100 if np.isfinite(rl) else None})
         diag_pnd["is_fa_comp"] = comp
     elif "is_fa" not in diag_pnd:
-        diag_pnd["is_fa"] = f"no se encontro {PATRON_IS_FA} en entradas/: el bloque IS (FA) va en {TEXTO_SIN_DATO}"
+        parecidos = sorted(c.name for c in (ENTRADAS.iterdir() if ENTRADAS.exists() else [])
+                           if c.suffix.lower() in (".xlsx", ".xlsm", ".xls") and not c.name.startswith("~$")
+                           and ("fa" in c.stem.lower() or "ppto" in c.stem.lower()))
+        diag_pnd["is_fa"] = (f"no se encontro {PATRON_IS_FA} en entradas/: el bloque IS (FA) va en {TEXTO_SIN_DATO}"
+                             + (f" (en entradas/ hay {', '.join(parecidos)}; el nombre debe empezar con PPTO y llevar "
+                                "FA, y ser .xlsx)" if parecidos else ""))
         alertas.append(("PND", "IS (FA)", diag_pnd["is_fa"]))
-    print(f"   IS de la funcion actuarial: {diag_pnd['is_fa']}", flush=True)
+    if is_fa is None:
+        diag_pnd["sin_is_fa"] = f"SIN IS (FA): {diag_pnd['is_fa']}"
+        print(f"   AVISO: {diag_pnd['sin_is_fa']}", flush=True)
+    else:
+        print(f"   IS de la funcion actuarial: {diag_pnd['is_fa']}", flush=True)
     info_fnd = {"estado": "apagado (USAR_BEL_POR_FND = False)", "aplica": set(), "fnd": {}, "series": [], "resumen": []}
     proy_modelo = proy_danos
     if USAR_BEL_POR_FND:
@@ -5330,6 +5364,8 @@ def main():
         print(f"   AVISO: {diag_pnd['sin_pe']}")
     if diag_pnd.get("sin_fcst"):
         print(f"   AVISO: {diag_pnd['sin_fcst']}")
+    if diag_pnd.get("sin_is_fa"):
+        print(f"   AVISO: {diag_pnd['sin_is_fa']}")
     if USAR_BEL_POR_FND:
         print(f"   BEL por FND (Danos): {fnd.get('estado', '')}")
         if fnd.get("aplica"):
