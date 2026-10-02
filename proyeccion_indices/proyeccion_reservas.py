@@ -441,6 +441,7 @@ PATRON_IS_FA = "PPTO*_FA*.xlsx"  # indices de siniestralidad de la funcion actua
                                  # los meses y ramos que no trae. Solo se muestra: el BEL sigue con el IS (RL)
 HOJA_IS_FA = "IS_FA"             # hoja de apoyo en la BD de Danos con la tabla del archivo de la funcion actuarial
 COLUMNA_IS_FA = {"RRC": "IS RRC", "SONR": "IS SONR"}   # columna del archivo para cada reserva
+MAX_IS_FA = 10.0                 # aviso si un indice del archivo pasa de 1,000 % (p. ej. si viene en % y no en razon)
 MONEDA_PE_RFCST_FA = "MXN"       # "MXN": Primas Tomadas MXN entre el TC del mes del proyecto (tipo_cambio.py, FCST de
                                  # Inversiones), por indicacion del area; "USD": Primas Tomadas USD del archivo tal cual
                                  # (convertidas con el TC de su columna TC)
@@ -2474,12 +2475,26 @@ def leer_pe_rfcst_fa(tc: dict, ruta: Path | None = None) -> dict | None:
             "control": control, "avisos": avisos}
 
 
+def _num_is(v) -> tuple:
+    """(valor, venia como texto) de un indice: numero, o texto con coma decimal ('0,894') o con % ('89.4%')."""
+    if isinstance(v, str):
+        t = v.strip().replace("\xa0", "").replace(" ", "")
+        pct = t.endswith("%")
+        t = t.rstrip("%")
+        if t.count(",") == 1 and "." not in t:
+            t = t.replace(",", ".")
+        x = a_numero(t)[0] if t else math.nan
+        return (x / 100 if pct else x), True
+    return a_numero(v)[0], False
+
+
 def leer_is_fa(ruta: Path | None = None) -> dict | None:
     """Indices de siniestralidad de la funcion actuarial (archivo PATRON_IS_FA): la primera hoja con Ramo, MesProc,
     IS RRC e IS SONR en su encabezado. Regresa {"ruta", "hoja", "cab": encabezado del archivo, "tabla": [renglones
-    validos tal cual], "val": {(reserva, ramo, periodo): IS} (reserva segun COLUMNA_IS_FA; el primero si se repite),
-    "periodos", "ramos", "renglones", "por_tipo": {Tipo: [meses]}, "otros": [archivos que tambien cumplen el nombre],
-    "avisos"} o None si no hay archivo."""
+    validos tal cual, con los indices que venian como texto ya como numero], "val": {(reserva, ramo, periodo): IS}
+    (reserva segun COLUMNA_IS_FA; el primero con dato si se repite), "tipo": {(reserva, ramo, periodo): Tipo del renglon
+    que se usa}, "periodos", "ramos", "renglones", "omitidos", "por_tipo": {Tipo: [meses]}, "otros": [archivos que
+    tambien cumplen el nombre], "avisos"} o None si no hay archivo."""
     candidatos = [Path(ruta)] if ruta else sorted(
         (c for c in ENTRADAS.glob(PATRON_IS_FA) if not c.name.startswith("~$")),
         key=lambda c: c.stat().st_size, reverse=True)
@@ -2507,30 +2522,41 @@ def leer_is_fa(ruta: Path | None = None) -> dict | None:
     if hoja is None:
         raise ValueError(f"{ruta.name}: ninguna hoja trae el encabezado Ramo, MesProc, "
                          f"{', '.join(COLUMNA_IS_FA.values())}")
-    tabla, val, por_tipo, omitidos, repetidos, negativos = [], {}, {}, [], [], []
+    tabla, val, tipo_val, por_tipo = [], {}, {}, {}
+    omitidos, repetidos, negativos, altos, textos, no_num = [], [], [], [], [], []
     for i, f in enumerate(filas[i_enc + 1:], start=i_enc + 2):
         if not f or all(x in (None, "") for x in f):
             continue
-        f = tuple(f) + (None,) * (len(cab) - len(f))
-        mes, r_num = a_numero(f[j["mes"]])[0], a_numero(f[j["ramo"]])[0]
+        f = list(f[:len(cab)]) + [None] * (len(cab) - len(f))
+        v_mes = f[j["mes"]]
+        mes = float(v_mes.year * 100 + v_mes.month) if isinstance(v_mes, datetime) else a_numero(v_mes)[0]
+        r_num = a_numero(f[j["ramo"]])[0]
         if not (np.isfinite(mes) and 190001 <= mes <= 299912 and 1 <= int(mes) % 100 <= 12 and np.isfinite(r_num)):
             omitidos.append(i)
             continue
         p, r = int(mes), str(int(r_num))
-        tabla.append(f[:len(cab)])
+        f[j["mes"]], f[j["ramo"]] = p, int(r_num)
         tipo = f[j_tipo] if j_tipo is not None else None
         por_tipo.setdefault(tipo, set()).add(p)
         for pref in COLUMNA_IS_FA:
-            x = a_numero(f[j[pref]])[0]
+            x, era_texto = _num_is(f[j[pref]])
             if not np.isfinite(x):
+                if isinstance(f[j[pref]], str) and f[j[pref]].strip():
+                    no_num.append(f"{pref} {r} {p} ('{f[j[pref]].strip()}')")
                 continue                               # sin dato de esa reserva: N/A en el bloque
+            if era_texto:
+                textos.append(f"{pref} {r} {p}")
+                f[j[pref]] = x                         # (en la hoja IS_FA va como numero, igual que en el bloque)
             if x < 0:
                 negativos.append(f"{pref} {r} {p}")
+            if x > MAX_IS_FA:
+                altos.append(f"{pref} {r} {p} ({x:,.2f})")
             if (pref, r, p) in val:
                 if abs(val[(pref, r, p)] - x) > 1e-12:
                     repetidos.append(f"{pref} {r} {p}")
                 continue
-            val[(pref, r, p)] = x
+            val[(pref, r, p)], tipo_val[(pref, r, p)] = x, tipo
+        tabla.append(tuple(f))
     if not val:
         raise ValueError(f"{ruta.name} › {hoja}: ningun renglon con Ramo, MesProc AAAAMM e indice numerico")
     avisos = []
@@ -2539,14 +2565,21 @@ def leer_is_fa(ruta: Path | None = None) -> dict | None:
                       f"({', '.join(repetidos[:5])})")
     if negativos:
         avisos.append(f"{len(negativos)} indice(s) negativos ({', '.join(negativos[:5])})")
+    if altos:
+        avisos.append(f"{len(altos)} indice(s) mayores a {MAX_IS_FA:.0%}: revisar si vienen en % y no como razon "
+                      f"({', '.join(altos[:5])})")
+    if textos:
+        avisos.append(f"{len(textos)} indice(s) venian como texto y se tomaron como numero ({', '.join(textos[:5])})")
+    if no_num:
+        avisos.append(f"{len(no_num)} indice(s) con texto no numerico van en {TEXTO_SIN_DATO} ({', '.join(no_num[:5])})")
     if omitidos:
         avisos.append(f"{len(omitidos)} renglones sin MesProc AAAAMM o Ramo numerico omitidos (primero: renglon "
                       f"{omitidos[0]})")
     if otros:
         avisos.append(f"tambien cumplen {PATRON_IS_FA}: {', '.join(otros)}; se usa {ruta.name} (el mas grande)")
-    return {"ruta": ruta, "hoja": hoja, "cab": cab, "tabla": tabla, "val": val,
+    return {"ruta": ruta, "hoja": hoja, "cab": cab, "tabla": tabla, "val": val, "tipo": tipo_val,
             "periodos": sorted({p for _, _, p in val}), "ramos": sorted({r for _, r, _ in val}, key=int),
-            "renglones": len(tabla), "por_tipo": {k: sorted(v) for k, v in por_tipo.items()}, "otros": otros,
+            "renglones": len(tabla), "omitidos": len(omitidos), "por_tipo": {k: sorted(v) for k, v in por_tipo.items()}, "otros": otros,
             "avisos": avisos}
 
 
@@ -2951,7 +2984,9 @@ def escribir_is_fa(wb, is_fa: dict | None) -> dict | None:
     ws = wb.create_sheet(HOJA_IS_FA)
     negrita = Font(bold=True)
     ws.cell(1, 1, f"Indices de siniestralidad de la funcion actuarial: {is_fa['ruta'].name} › {is_fa['hoja']}, tal "
-                  "cual. El bloque IS (FA) de la hoja de montos toma " + " y ".join(
+                  "cual" + (f" (sin {is_fa['omitidos']} renglon(es) sin Ramo o MesProc validos; ver Alertas)"
+                            if is_fa.get("omitidos") else "")
+                  + ". El bloque IS (FA) de la hoja de montos toma " + " y ".join(
                       f"{c} en los renglones de {p}" for p, c in COLUMNA_IS_FA.items())).font = negrita
     ws.cell(2, 1, f"En el bloque va {TEXTO_SIN_DATO} en los meses y ramos que no vienen aqui; si un ramo y mes se "
                   "repite, se usa el primer renglon")
@@ -2967,9 +3002,9 @@ def escribir_is_fa(wb, is_fa: dict | None) -> dict | None:
             c = ws.cell(fila, k, x)
             if k - 1 in [j[p] for p in COLUMNA_IS_FA] or (isinstance(x, float) and "IS" in enc[k - 1]):
                 c.number_format = "0.00%"
-        clave = (str(int(a_numero(f[j["ramo"]])[0])), int(a_numero(f[j["mes"]])[0]))
+        clave = (str(int(f[j["ramo"]])), int(f[j["mes"]]))
         for p in COLUMNA_IS_FA:
-            if np.isfinite(a_numero(f[j[p]])[0]):
+            if isinstance(f[j[p]], (int, float)) and not isinstance(f[j[p]], bool) and np.isfinite(f[j[p]]):
                 ref.setdefault((p,) + clave, f"{hoja}!${get_column_letter(j[p] + 1)}${fila}")
     ws.freeze_panes = "A4"
     for k in range(1, len(is_fa["cab"]) + 1):
@@ -3009,6 +3044,16 @@ def escribir_indices_pnd(bd: BDMontos, ctx: dict, avisos: list | None = None) ->
                  | {norm(f"{i} RAMO") for i in todos})   # (un encabezado "IS (FA) RAMO" escrito a mano es del bloque)
     fijas = [c for n, c in enc.items() if n not in de_bloque]
     viejas = sorted(c for n, c in enc.items() if n in de_bloque)
+    for n, c in enc.items():                           # encabezado "<indicador> RAMO" escrito a mano: se limpia
+        if n in {norm(f"{i} RAMO") for i in todos}:
+            k = sum(1 for f in range(4, ws.max_row + 1) if ws.cell(f, c).value not in (None, ""))
+            if k and avisos is not None:
+                ind_ = str(ws.cell(3, c).value).strip()[:-len("RAMO")].strip()
+                captura_ = next((i for i in INDICES_PND_CAPTURA if norm(i) == norm(ind_)), None)
+                avisos.append(f"La columna '{ws.cell(3, c).value}' (encabezado sin numero de ramo) traia {k} dato(s); "
+                              "se toma como parte de los bloques y se limpia; "
+                              + (f"para capturar, usa la columna del ramo (p. ej. '{captura_} 60')" if captura_ else
+                                 "ese bloque se llena solo (no lleva captura)"))
     # capturas de la BD de entrada (columnas "<indicador> <ramo>" de los datos de captura), antes de limpiar
     capturas = {}
     for ind in INDICES_PND_CAPTURA:
@@ -5037,7 +5082,9 @@ def main():
         sin_fa = [r for r in ramos_bd if r not in is_fa["ramos"]]
         fuera_fa = [r for r in is_fa["ramos"] if r not in ramos_bd]
         diag_pnd["is_fa"] = (
-            f"{is_fa['ruta'].name} › {is_fa['hoja']}: {is_fa['renglones']:,} renglones, sin filtros; ramos "
+            f"{is_fa['ruta'].name} › {is_fa['hoja']}: {is_fa['renglones']:,} renglones, "
+            + (f"{is_fa['omitidos']} omitidos sin Ramo o MesProc validos" if is_fa["omitidos"] else "sin filtros")
+            + "; ramos "
             f"{', '.join(is_fa['ramos'])}; meses {is_fa['periodos'][0]} a {is_fa['periodos'][-1]} ("
             + "; ".join(f"{t}: {m[0]} a {m[-1]}" for t, m in is_fa["por_tipo"].items()) + "); "
             + " y ".join(f"{c} en {p}" for p, c in COLUMNA_IS_FA.items())
@@ -5052,7 +5099,6 @@ def main():
         if fuera_fa:
             alertas.append(("PND", "IS (FA)", f"ramos del archivo que no estan en la BD de Danos (no entran al bloque): "
                                               f"{', '.join(fuera_fa)}"))
-        tipo_mes = {p: t for t, ms in is_fa["por_tipo"].items() for p in ms}
         pos_proy = {p: i for i, p in enumerate(periodos_proy)}
         comp = []
         for pref in COLUMNA_IS_FA:
@@ -5062,7 +5108,7 @@ def main():
                     if v is None:
                         continue
                     rl, _ = _hp_fuente(hp, resultados, MAPA_RAMO_LAG.get(str(r)), INDICE_BASE_PND[pref][0], p, pos_proy)
-                    comp.append({"Reserva": pref, "Ramo": r, "Periodo": p, "Tipo (FA)": tipo_mes.get(p),
+                    comp.append({"Reserva": pref, "Ramo": r, "Periodo": p, "Tipo (FA)": is_fa["tipo"].get((pref, r, p)),
                                  "IS (FA)": v, "IS (RL)": rl if np.isfinite(rl) else None,
                                  "Diferencia FA - RL (puntos %)": (v - rl) * 100 if np.isfinite(rl) else None})
         diag_pnd["is_fa_comp"] = comp
