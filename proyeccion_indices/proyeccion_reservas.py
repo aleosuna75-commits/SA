@@ -210,7 +210,7 @@ MODELO_POR_TIPO = {
     "indice": "Tendencia historica",  # indices de HParametros, en logaritmos
     "lag": "Tendencia historica",     # patron de desarrollo (LAG 1-10); en logaritmos si es positivo
     "razon": "SES",
-    "factor": "Tendencia historica",  # FACTOR GTO, FACTOR MR y CESION del BEL por FND: recta en niveles (puntos por mes)
+    "factor": "Tendencia historica",  # CESION del BEL por FND: el modelo de los indices, pero en niveles (puntos por mes)
 }
 MESES_TENDENCIA = 36             # ventana de la tendencia historica (None = toda la historia). Con toda la historia
                                  # entran arranques desde cero y cambios de regimen (ramo 80 SONR, Hidro) que
@@ -241,7 +241,8 @@ CREDIBILIDAD_ESTACIONAL = "buhlmann"  # cuanto del patron observado se aplica (1
                                  #   "completa": 100 % del patron cuando la prueba F lo detecta (p < P_ESTACIONALIDAD)
                                  #       y nada en caso contrario (20.0 % / 15.3 %; deja sin patron a la mitad).
 P_ESTACIONALIDAD = 0.10          # umbral de la prueba F para la opcion "completa"
-TIPOS_CON_ESTACIONALIDAD = ("nivel", "indice")   # montos e indices. Los LAGs (patron de desarrollo) no tienen mes del
+TIPOS_CON_ESTACIONALIDAD = ("nivel", "indice", "factor")   # montos, indices y factores del BEL por FND. Los LAGs
+                                 # (patron de desarrollo) no tienen mes del
                                  # ano: en backtest no cambiaba nada y solo agregaba dientes menores a 3 %.
 DESCRIPCION_CREDIBILIDAD = {
     "buhlmann": "credibilidad de Buhlmann Z = n/(n+K), K = varianza dentro del mes / varianza entre meses",
@@ -256,7 +257,7 @@ DESCRIPCION_CREDIBILIDAD = {
 #       conserva 80 %, a los 3 meses la mitad). En backtest mejora a los indices (18.3 % contra 18.9 % a 1-16 meses,
 #       8.5 % contra 9.5 % en la prueba anidada, medido con la pendiente completa) y evita que un mes bajo arrastre
 #       todo el horizonte.
-PERSISTENCIA_DESVIACION = {"nivel": 1.0, "indice": 0.8, "lag": 1.0}
+PERSISTENCIA_DESVIACION = {"nivel": 1.0, "indice": 0.8, "lag": 1.0, "factor": 0.8}   # (factor: como los indices)
 MESES_NIVEL_LOCAL = 12           # meses del nivel promedio (respecto a la recta) al que converge la desviacion
 MEDIA_ARITMETICA_INDICES = False # los indices se modelan en logaritmos: el nivel al que convergen es el promedio
                                  # geometrico del ultimo ano, que queda por debajo del promedio aritmetico (el que se ve en
@@ -272,7 +273,7 @@ ANCLAR_SERIES = set()            # series (Serie, Ramo) de indices que se dejan 
 #       pendiente que la recta explica poco (ramo 31: +1.3 % mensual con R2 0.16) proyecta subidas o bajadas que la
 #       serie nunca sostuvo. Backtest de indices (error % mediano a 1-16 / 1-6 meses): pendiente completa 16.5 / 12.6;
 #       ponderada por R2 13.6 / 12.5; sin pendiente 13.4 / 11.6. Un numero entre 0 y 1 fija la proporcion.
-CREDIBILIDAD_PENDIENTE = {"nivel": 1.0, "indice": "r2", "lag": 1.0}
+CREDIBILIDAD_PENDIENTE = {"nivel": 1.0, "indice": "r2", "lag": 1.0, "factor": "r2"}   # (factor: como los indices)
 # Cotas de los modelos de suavizamiento exponencial (si se eligen), estimadas por maxima verosimilitud dentro de
 # ellas: alpha ~ 1 (arranca del ultimo dato real), beta <= 0.15 (tendencia de los ultimos anos, no del ultimo mes),
 # phi entre 0.80 y 0.98. RCONT (Holt-Winters trimestral) suaviza el nivel (alpha >= 0.2) para separar la
@@ -482,11 +483,18 @@ USAR_BEL_POR_FND = True
 TIPO_MODELO_FND = "indice"       # el FND se proyecta como los indices: recta de los ultimos MESES_TENDENCIA meses con
                                  # patron del mes y pendiente ponderada por su credibilidad (R2)
 MIN_MESES_FND = 12               # meses minimos de FND real para proyectarlo
-TIPO_MODELO_FACTORES = "factor"  # FACTOR GTO (GTO / PND), FACTOR MR (MR / PND o PD) y CESION (IRR / BRUTO) de las series
-                                 # con BEL por FND: reales hasta el ultimo mes y, desde el primer mes proyectado, la recta de
-                                 # tendencia (regresion lineal, en niveles: puntos por mes) de los ultimos MESES_TENDENCIA
-                                 # meses continuada desde el ultimo real, sin patron del mes. GTO = PND x FACTOR GTO, MR = PND x
-                                 # FACTOR MR, BRUTO = BEL + GTO + MR, IRR = BRUTO x CESION, NETO = BRUTO - IRR
+TIPO_MODELO_FACTORES = {"FACTOR GTO": "indice", "FACTOR MR": "indice", "CESION": "factor"}
+                                 # FACTOR GTO (GTO / PND), FACTOR MR (MR / PND o PD) y CESION (IRR / BRUTO) de las series con
+                                 # BEL por FND: reales hasta el ultimo mes y, desde el primer mes proyectado, el modelo del FND
+                                 # (por decision del area): la recta de los ultimos MESES_TENDENCIA meses con el patron del mes
+                                 # del ano, la pendiente ponderada por su R2 y la desviacion del ultimo mes que se desvanece
+                                 # hacia el nivel del ultimo ano. GTO y MR en logaritmos, como el FND ("indice"); la CESION en
+                                 # niveles ("factor", puntos por mes): es una proporcion acotada a 100 % y en logaritmos la
+                                 # tendencia es de crecimiento % constante (RRC 10, que paso de 1 % a 63 % de cesion, llegaba a
+                                 # 100 % en tres meses). Backtest (error % mediano por serie) de GTO / MR / CESION: este modelo
+                                 # 3.6 / 23.0 / 16.4; la recta sola 4.1 / 30.5 / 14.7; repetir el ultimo valor 3.9 / 27.6 / 9.8.
+                                 # GTO = PND x FACTOR GTO, MR = PND x FACTOR MR, BRUTO = BEL + GTO + MR, IRR = BRUTO x CESION,
+                                 # NETO = BRUTO - IRR
 CUENTA_PE_FCST = "61"            # cuenta de prima tomada en CtaMens (la que suma ER_ram)
 RAMO_FCST_A_BD = {"10": "10", "31": "30", "35": "34", "39": "37", "40": "40", "46": "40", "50": "50", "60": "60",
                   "71": "71", "73": "73", "80": "80", "90": "90", "100": "100", "110": "110"}
@@ -2764,7 +2772,7 @@ def calcular_bel_fnd(bd: BDMontos, hp, resultados: dict, proy: dict, pe: dict, p
                      ultimo: int) -> dict:
     """BEL por FND: FND = PND / PEACUMULADA en la historia (PND = BEL / IS), proyectado con la tendencia desde el primer
     mes proyectado; BEL = IS x PEACUMULADA x FND; GTO = PND x FACTOR GTO y MR = PND x FACTOR MR (PND = BEL / IS), con los
-    factores reales proyectados con su recta (TIPO_MODELO_FACTORES); BRUTO = BEL + GTO + MR; IRR = BRUTO x CESION (IRR /
+    factores reales proyectados con el modelo del FND (TIPO_MODELO_FACTORES); BRUTO = BEL + GTO + MR; IRR = BRUTO x CESION (IRR /
     BRUTO real proyectado igual); NETO = BRUTO - IRR.
     Regresa {"proy": montos con el BEL nuevo, "aplica": {(reserva, periodo, ramo)}, "fnd": {(reserva, periodo, ramo):
     FND proyectado}, "razones": {...}, "series": filas para el diagnostico, "resumen", "estado"}."""
@@ -2838,16 +2846,16 @@ def calcular_bel_fnd(bd: BDMontos, hp, resultados: dict, proy: dict, pe: dict, p
                     clave_al = f"{pref} | {nombre} | ramo {r}"
                     if ok_p:
                         per_f = rango_periodos(ok_p[0], ultimo)
-                        res_f = pronosticar(Serie(("DANOS", pref, nombre, r), TIPO_MODELO_FACTORES, per_f,
+                        res_f = pronosticar(Serie(("DANOS", pref, nombre, r), TIPO_MODELO_FACTORES[nombre], per_f,
                                                   [vals.get(q, math.nan) for q in per_f], ultimo, h, dominio=dom))
                         f = np.asarray(res_f.pronostico, dtype=float)
                         if len(f) != h or not np.all(np.isfinite(f)):
-                            f = np.full(h, vals[ok_p[-1]])          # (sin recta: el ultimo real)
+                            f = np.full(h, vals[ok_p[-1]])          # (sin modelo: el ultimo real)
                         prm = res_f.parametros or {}
                         fila.update({f"{nombre} modelo": res_f.regla or res_f.modelo,
                                      f"{nombre} R2": prm.get("r2", math.nan),
                                      f"{nombre} pendiente mensual": prm.get("pendiente", math.nan),
-                                     f"{nombre} error % backtest (recta)": res_f.error_modelo,
+                                     f"{nombre} error % backtest (modelo)": res_f.error_modelo,
                                      f"{nombre} error % backtest (ultimo valor)": res_f.error_ultimo_valor})
                         out["alertas"] += [("DANOS", clave_al, a) for a in res_f.alertas
                                            if not str(a).startswith("Se usa")]
@@ -2859,10 +2867,10 @@ def calcular_bel_fnd(bd: BDMontos, hp, resultados: dict, proy: dict, pe: dict, p
                                                    f"({fuera[0]} a {fuera[-1]}; ultimo {u:.2%}): revisar {conc} y "
                                                    f"{base} de origen; la proyeccion se acota a {dom}"))
                         if nombre == "CESION" and abs(f[-1] - u) > 0.10:
-                            out["alertas"].append(("DANOS", clave_al, f"la recta lleva la cesion de {u:.1%} ({ultimo}) a "
+                            out["alertas"].append(("DANOS", clave_al, f"la proyeccion lleva la cesion de {u:.1%} ({ultimo}) a "
                                                    f"{f[-1]:.1%} ({periodos_proy[-1]}); revisar si la tendencia sigue"))
                         elif nombre != "CESION" and u > 0 and f[-1] < 0.5 * u:
-                            out["alertas"].append(("DANOS", clave_al, f"la recta baja el factor de {u:.2%} ({ultimo}) a "
+                            out["alertas"].append(("DANOS", clave_al, f"la proyeccion baja el factor de {u:.2%} ({ultimo}) a "
                                                    f"{f[-1]:.2%} ({periodos_proy[-1]}), menos de la mitad"))
                         fac_u[nombre] = min(max(u, dom[0] if dom[0] is not None else u), dom[1] if dom[1] is not None else u)
                     fac_f[nombre] = f
@@ -3130,8 +3138,8 @@ def escribir_indices_pnd(bd: BDMontos, ctx: dict, avisos: list | None = None) ->
     si_error = " (SI.ERROR: 0 si divide entre 0)"
     claves_hp = ", ".join(f"{r} -> {k}" for r, k in MAPA_RAMO_LAG.items() if str(r) != str(k) and r in ramos)
     na_pnd = f"; {TEXTO_SIN_DATO} si PND/PD es {TEXTO_SIN_DATO}"
-    proy_fac = (f"; desde {min(periodos_proy)}, en las series con BEL por FND, el proyectado con la recta de tendencia "
-                "(regresion lineal; valor) en todos los renglones del mes" if razones and periodos_proy else "")
+    proy_fac = (f"; desde {min(periodos_proy)}, en las series con BEL por FND, el proyectado con el modelo del FND "
+                "(tendencia con patron del mes; valor) en todos los renglones del mes" if razones and periodos_proy else "")
     descripcion = {
         "PND/PD": ("PND/PD = BEL / IS (RL): en el renglon BEL, BEL del renglon / IS; en los demas renglones, el BEL del mes "
                    "con SUMAR.SI.CONJUNTO por CONCEPTO y PERIODO (ninguna formula apunta a otro renglon: la hoja se puede "

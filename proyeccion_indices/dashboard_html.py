@@ -1065,8 +1065,8 @@ function explicaPnd(col, res, ramo) {
   const desde = {                                      // como se proyecta desde el primer mes proyectado
     monto: todos ? `desde ${ini}, suma de los ramos (PEACUMULADA × ${fd} en los que llevan BEL por FND, el modelo en los demás)`
       : conFnd ? `desde ${ini}, PEACUMULADA × ${fd}` : `desde ${ini}, el BEL del modelo entre el IS (este ramo no lleva BEL por FND)`,
-    factor: todos ? `desde ${ini}, la recta de tendencia en los ramos con BEL por FND y el modelo en los demás`
-      : conFnd ? `desde ${ini}, la recta de tendencia` : `desde ${ini}, la razón del modelo (este ramo no lleva BEL por FND)`,
+    factor: todos ? `desde ${ini}, el modelo del FND (tendencia con el patrón del mes) en los ramos con BEL por FND y el modelo de reservas en los demás`
+      : conFnd ? `desde ${ini}, el modelo del FND: tendencia con el patrón del mes` : `desde ${ini}, la razón del modelo (este ramo no lleva BEL por FND)`,
     fnd: todos ? `desde ${ini}, con el ${fd} proyectado en los ramos con BEL por FND`
       : conFnd ? `desde ${ini}, el ${fd} proyectado` : `desde ${ini}, ${nb} del modelo / PEACUMULADA (este ramo no lleva BEL por FND)`,
   };
