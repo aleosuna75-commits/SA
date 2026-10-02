@@ -412,7 +412,7 @@ INDICES_PND_EN_BD = True         # columnas a la derecha de BD_Montos_RRC_SONR c
                                  # por indicador, con una columna por ramo ("PND/PD 10", "FA 10", ...)
 COLUMNAS_INDICES_PND = {"PND/PD": "#,##0", "FA": "0.0000", "FACTOR GTO": "0.00%", "FACTOR MR": "0.00%", "CESION": "0.00%",
                         "IS (RL)": "0.00%", "LAG (RL)": "0.00%", "PE FCST": "#,##0", "PRIMA N AÑOS": "#,##0",
-                        "PEACUMULADA": "#,##0", "FD/FND": "0.0000"}
+                        "PEACUMULADA": "#,##0", "FD/FND": "0.0000", "IS (FA)": "0.00%"}
                                  # todos los bloques van en todos los renglones de RRC y SONR (historia y
                                  # proyeccion), aunque el modelo no los use; las divisiones con SI.ERROR (0 en un 0/0)
 INDICES_PND_RETIRADOS = ("PD/PND CORREGIDA", "BEL", "BEL (MEC)", "FD/FND (MEC)")   # bloques de versiones anteriores: se limpian
@@ -435,6 +435,12 @@ PATRON_PE_RAMO = "PExRamo*"      # base historica de PE por ramo y mes (en entra
 PATRON_PE_RFCST_FA = "*RCST*_FA*.xlsx"   # reforecast del ano por mes y ramo (en entradas/; hoja Ana_RFCST<aa>_FA: MesProc,
                                  # Tipo Rea, Susc, RAMO, Primas Tomadas USD y MXN): PE de los meses entre PExRamo y el
                                  # FCST (sep-dic 2026). Sin el archivo, esos meses salen del reforecast por grupo de primas.py
+PATRON_IS_FA = "PPTO*_FA*.xlsx"  # indices de siniestralidad de la funcion actuarial (en entradas/; una hoja con Ramo,
+                                 # MesProc, IS RRC e IS SONR, desde el primer mes proyectado): bloque "IS (FA) <ramo>",
+                                 # con IS RRC en los renglones de RRC e IS SONR en los de SONR (como el IS (RL)); N/A en
+                                 # los meses y ramos que no trae. Solo se muestra: el BEL sigue con el IS (RL)
+HOJA_IS_FA = "IS_FA"             # hoja de apoyo en la BD de Danos con la tabla del archivo de la funcion actuarial
+COLUMNA_IS_FA = {"RRC": "IS RRC", "SONR": "IS SONR"}   # columna del archivo para cada reserva
 MONEDA_PE_RFCST_FA = "MXN"       # "MXN": Primas Tomadas MXN entre el TC del mes del proyecto (tipo_cambio.py, FCST de
                                  # Inversiones), por indicacion del area; "USD": Primas Tomadas USD del archivo tal cual
                                  # (convertidas con el TC de su columna TC)
@@ -2468,6 +2474,82 @@ def leer_pe_rfcst_fa(tc: dict, ruta: Path | None = None) -> dict | None:
             "control": control, "avisos": avisos}
 
 
+def leer_is_fa(ruta: Path | None = None) -> dict | None:
+    """Indices de siniestralidad de la funcion actuarial (archivo PATRON_IS_FA): la primera hoja con Ramo, MesProc,
+    IS RRC e IS SONR en su encabezado. Regresa {"ruta", "hoja", "cab": encabezado del archivo, "tabla": [renglones
+    validos tal cual], "val": {(reserva, ramo, periodo): IS} (reserva segun COLUMNA_IS_FA; el primero si se repite),
+    "periodos", "ramos", "renglones", "por_tipo": {Tipo: [meses]}, "otros": [archivos que tambien cumplen el nombre],
+    "avisos"} o None si no hay archivo."""
+    candidatos = [Path(ruta)] if ruta else sorted(
+        (c for c in ENTRADAS.glob(PATRON_IS_FA) if not c.name.startswith("~$")),
+        key=lambda c: c.stat().st_size, reverse=True)
+    if not candidatos or not candidatos[0].exists():
+        return None
+    ruta, otros = candidatos[0], [c.name for c in candidatos[1:]]
+    nombres = {"ramo": "RAMO", "mes": "MESPROC", **{k: norm(v) for k, v in COLUMNA_IS_FA.items()}}
+    wb = openpyxl.load_workbook(ruta, read_only=True, data_only=True)
+    try:
+        hoja = None
+        for ws in wb.worksheets:
+            filas = list(ws.iter_rows(values_only=True))
+            for i, f in enumerate(filas[:40]):
+                enc = [norm(x) for x in f]
+                if all(n in enc for n in nombres.values()):
+                    j = {k: enc.index(n) for k, n in nombres.items()}
+                    j_tipo = enc.index("TIPO") if "TIPO" in enc else None
+                    ult = max(k for k, x in enumerate(f) if x not in (None, ""))
+                    hoja, i_enc, cab = ws.title, i, [x for x in f[:ult + 1]]
+                    break
+            if hoja:
+                break
+    finally:
+        wb.close()
+    if hoja is None:
+        raise ValueError(f"{ruta.name}: ninguna hoja trae el encabezado Ramo, MesProc, "
+                         f"{', '.join(COLUMNA_IS_FA.values())}")
+    tabla, val, por_tipo, omitidos, repetidos, negativos = [], {}, {}, [], [], []
+    for i, f in enumerate(filas[i_enc + 1:], start=i_enc + 2):
+        if not f or all(x in (None, "") for x in f):
+            continue
+        f = tuple(f) + (None,) * (len(cab) - len(f))
+        mes, r_num = a_numero(f[j["mes"]])[0], a_numero(f[j["ramo"]])[0]
+        if not (np.isfinite(mes) and 190001 <= mes <= 299912 and 1 <= int(mes) % 100 <= 12 and np.isfinite(r_num)):
+            omitidos.append(i)
+            continue
+        p, r = int(mes), str(int(r_num))
+        tabla.append(f[:len(cab)])
+        tipo = f[j_tipo] if j_tipo is not None else None
+        por_tipo.setdefault(tipo, set()).add(p)
+        for pref in COLUMNA_IS_FA:
+            x = a_numero(f[j[pref]])[0]
+            if not np.isfinite(x):
+                continue                               # sin dato de esa reserva: N/A en el bloque
+            if x < 0:
+                negativos.append(f"{pref} {r} {p}")
+            if (pref, r, p) in val:
+                if abs(val[(pref, r, p)] - x) > 1e-12:
+                    repetidos.append(f"{pref} {r} {p}")
+                continue
+            val[(pref, r, p)] = x
+    if not val:
+        raise ValueError(f"{ruta.name} › {hoja}: ningun renglon con Ramo, MesProc AAAAMM e indice numerico")
+    avisos = []
+    if repetidos:
+        avisos.append(f"{len(repetidos)} indice(s) repetidos con otro valor para el mismo ramo y mes; se toma el primero "
+                      f"({', '.join(repetidos[:5])})")
+    if negativos:
+        avisos.append(f"{len(negativos)} indice(s) negativos ({', '.join(negativos[:5])})")
+    if omitidos:
+        avisos.append(f"{len(omitidos)} renglones sin MesProc AAAAMM o Ramo numerico omitidos (primero: renglon "
+                      f"{omitidos[0]})")
+    if otros:
+        avisos.append(f"tambien cumplen {PATRON_IS_FA}: {', '.join(otros)}; se usa {ruta.name} (el mas grande)")
+    return {"ruta": ruta, "hoja": hoja, "cab": cab, "tabla": tabla, "val": val,
+            "periodos": sorted({p for _, _, p in val}), "ramos": sorted({r for _, r, _ in val}, key=int),
+            "renglones": len(tabla), "por_tipo": {k: sorted(v) for k, v in por_tipo.items()}, "otros": otros,
+            "avisos": avisos}
+
+
 def _mezcla(pe_hist: dict, ramos: list) -> dict:
     """{ramo: peso} con la PE historica de los ultimos 12 meses (partes iguales si no hay)."""
     ult = max((p for _, p in pe_hist), default=None)
@@ -2858,6 +2940,43 @@ def escribir_pe_ramo(wb, pe: dict, ramos: list, periodos_bd=()) -> dict | None:
             "p12": {r: get_column_letter(c) for r, c in c_12.items()}, "val": val, "suma": suma}
 
 
+def escribir_is_fa(wb, is_fa: dict | None) -> dict | None:
+    """Hoja HOJA_IS_FA con la tabla del archivo de la funcion actuarial tal cual (valores). Regresa {(reserva, ramo,
+    periodo): referencia absoluta a la celda del indice} (la del renglon que se usa: el primero de ese ramo y mes con
+    dato) o None sin archivo."""
+    if HOJA_IS_FA in wb.sheetnames:
+        del wb[HOJA_IS_FA]
+    if not is_fa:
+        return None
+    ws = wb.create_sheet(HOJA_IS_FA)
+    negrita = Font(bold=True)
+    ws.cell(1, 1, f"Indices de siniestralidad de la funcion actuarial: {is_fa['ruta'].name} › {is_fa['hoja']}, tal "
+                  "cual. El bloque IS (FA) de la hoja de montos toma " + " y ".join(
+                      f"{c} en los renglones de {p}" for p, c in COLUMNA_IS_FA.items())).font = negrita
+    ws.cell(2, 1, f"En el bloque va {TEXTO_SIN_DATO} en los meses y ramos que no vienen aqui; si un ramo y mes se "
+                  "repite, se usa el primer renglon")
+    for k, t in enumerate(is_fa["cab"], start=1):
+        ws.cell(3, k, t).font = negrita
+    enc = [norm(x) for x in is_fa["cab"]]
+    j = {"ramo": enc.index("RAMO"), "mes": enc.index("MESPROC"),
+         **{p: enc.index(norm(c)) for p, c in COLUMNA_IS_FA.items()}}
+    ref, hoja = {}, _ref_hoja(HOJA_IS_FA)
+    for i, f in enumerate(is_fa["tabla"]):
+        fila = 4 + i
+        for k, x in enumerate(f, start=1):
+            c = ws.cell(fila, k, x)
+            if k - 1 in [j[p] for p in COLUMNA_IS_FA] or (isinstance(x, float) and "IS" in enc[k - 1]):
+                c.number_format = "0.00%"
+        clave = (str(int(a_numero(f[j["ramo"]])[0])), int(a_numero(f[j["mes"]])[0]))
+        for p in COLUMNA_IS_FA:
+            if np.isfinite(a_numero(f[j[p]])[0]):
+                ref.setdefault((p,) + clave, f"{hoja}!${get_column_letter(j[p] + 1)}${fila}")
+    ws.freeze_panes = "A4"
+    for k in range(1, len(is_fa["cab"]) + 1):
+        ws.column_dimensions[get_column_letter(k)].width = 16
+    return ref
+
+
 def _ref_hoja(nombre: str) -> str:
     return nombre if re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", nombre) else f"'{nombre}'"
 
@@ -2878,13 +2997,16 @@ def escribir_indices_pnd(bd: BDMontos, ctx: dict, avisos: list | None = None) ->
     hp, resultados, periodos_proy, ultimo = ctx["hp"], ctx["resultados"], ctx["periodos_proy"], ctx["ultimo"]
     proy, pe, hoja_pe, fnd = ctx["proy"], ctx.get("pe") or {}, ctx.get("hoja_pe"), ctx.get("fnd") or {}
     razones = ctx.get("razones") or {}             # FACTOR GTO, FACTOR MR y CESION proyectados (BEL por FND)
+    is_fa = ctx.get("is_fa") or {}                 # {"val": {(reserva, ramo, periodo): IS}, "ref": {...: celda}, ...}
+    is_fa_val, is_fa_ref = is_fa.get("val") or {}, is_fa.get("ref") or {}
     primas_pe, pe_tab, meses_pe = ctx.get("primas_pe"), ctx.get("pe_tab") or {}, ctx.get("meses_pe")
     pos = {p: i for i, p in enumerate(periodos_proy)}
     formulas = INDICES_PND_FORMULAS and hp is not None and getattr(hp, "filas", None)
     todos = list(COLUMNAS_INDICES_PND) + list(INDICES_PND_RETIRADOS)
     ramos = list(bd.cols_ramo)
     enc = {norm(ws.cell(3, c).value): c for c in range(1, ws.max_column + 1) if ws.cell(3, c).value}
-    de_bloque = {norm(f"{i} {r}") for i in todos for r in ramos} | {norm(i) for i in todos}
+    de_bloque = ({norm(f"{i} {r}") for i in todos for r in ramos} | {norm(i) for i in todos}
+                 | {norm(f"{i} RAMO") for i in todos})   # (un encabezado "IS (FA) RAMO" escrito a mano es del bloque)
     fijas = [c for n, c in enc.items() if n not in de_bloque]
     viejas = sorted(c for n, c in enc.items() if n in de_bloque)
     # capturas de la BD de entrada (columnas "<indicador> <ramo>" de los datos de captura), antes de limpiar
@@ -2961,6 +3083,16 @@ def escribir_indices_pnd(bd: BDMontos, ctx: dict, avisos: list | None = None) ->
                                                             f"{TEXTO_SIN_DATO} si el mes no trae LAG)"
                                                             if anios_sonr else "")
                        + ("" if pe else f"; {TEXTO_SIN_DATO}: sin prima por ramo en esta corrida"),
+        "IS (FA)": (f"IS (FA) = indice de siniestralidad de la funcion actuarial (hoja {HOJA_IS_FA}, de "
+                    f"{is_fa['archivo']}): " + "; ".join(f"{c} en los renglones de {p}" for p, c in COLUMNA_IS_FA.items())
+                    + f"; {TEXTO_SIN_DATO} en los meses y ramos que no trae"
+                    + (f" (trae {is_fa['periodos'][0]} a {is_fa['periodos'][-1]}; sin ramos "
+                       f"{', '.join(r for r in ramos if r not in is_fa['ramos'])})"
+                       if is_fa.get("periodos") and any(r not in is_fa["ramos"] for r in ramos) else
+                       (f" (trae {is_fa['periodos'][0]} a {is_fa['periodos'][-1]})" if is_fa.get("periodos") else ""))
+                    + ". Solo se muestra: el BEL usa el IS (RL)") if is_fa_val else (
+            f"IS (FA): {TEXTO_SIN_DATO} en esta corrida porque no se leyo el archivo de la funcion actuarial "
+            f"({PATRON_IS_FA} en entradas/; el motivo esta en Alertas del diagnostico)"),
         "FD/FND": "FD/FND = PND/PD / PEACUMULADA" + si_error + (
             f"; desde {min(periodos_proy)}, en las series con BEL por FND, el FND proyectado (valor) en todos los renglones "
             "del mes"
@@ -3116,7 +3248,9 @@ def escribir_indices_pnd(bd: BDMontos, ctx: dict, avisos: list | None = None) ->
             g = primas.GRUPO_DE_RAMO_RESERVA.get(str(r)) if primas is not None else None
             pe_g = pe_tab.get(g)
             pe_g = float(pe_g.get(p, math.nan)) if pe_g is not None else math.nan
+            is_fa_v = is_fa_val.get((pref, str(r), p))
             vals = {"PND/PD": pnd, "IS (RL)": is_ if ok(is_) else NA, "LAG (RL)": lag1 if ok(lag1) else NA,
+                    "IS (FA)": is_fa_v if ok(is_fa_v) else NA,
                     "PE FCST": pe_v, "PRIMA N AÑOS": p12_v, "PEACUMULADA": peac, "FD/FND": fnd_v,
                     "FA": (div(pnd, pe_g if usa_primas else p12_v) if hay_pnd and (usa_primas or pe) else NA),
                     "FACTOR GTO": (div(monto(pref, "GTO", p, r), pnd) if hay_pnd else NA) if f_gto else 0.0,
@@ -3159,6 +3293,9 @@ def escribir_indices_pnd(bd: BDMontos, ctx: dict, avisos: list | None = None) ->
                         celda.value = f"=IFERROR({ram}{fila}/{L('IS (RL)', r)}{fila},0)"
                     else:                                 # el BEL del mes sin apuntar a otro renglon
                         celda.value = f"=IFERROR({del_mes(ram, f_bel, fila)}/{L('IS (RL)', r)}{fila},0)"
+                elif ind == "IS (FA)":
+                    e = is_fa_ref.get((pref, str(r), p))
+                    celda.value = f"={e}" if e else float(v)
                 elif ind in ("IS (RL)", "LAG (RL)"):
                     e, _ = hp_expr(r_hp, nombre_is, f_is) if ind == "IS (RL)" else hp_expr(r_hp, "LAG 1", f_l1)
                     celda.value = f"={e}" if e else float(v)
@@ -4381,6 +4518,9 @@ def _hojas_pnd(wb, diag: dict, negrita, encab):
     implicita y los factores mes a mes (historia y proyeccion) y el backtest por serie y corte; y las del BEL por FND."""
     def hojas_fnd():
         fnd = (diag or {}).get("bel_fnd") or {}
+        if (diag or {}).get("is_fa_comp"):
+            _hoja_filas(wb, "IS_FA_Comparativo", diag["is_fa_comp"], negrita, encab,
+                        {"IS (FA)": "0.00%", "IS (RL)": "0.00%", "Diferencia": "0.00"})
         if fnd.get("resumen") or fnd.get("series"):
             _hoja_filas(wb, "BEL_FND_Resumen", fnd.get("resumen") or [], negrita, encab,
                         {"FND": "0.0000", "Error": "0.0", "BEL": "#,##0"})
@@ -4394,6 +4534,7 @@ def _hojas_pnd(wb, diag: dict, negrita, encab):
     bloques = [("Estado", [{"Escenarios PND / PD": diag.get("estado", ""), "PE FCST (FCST)": diag.get("pe_fcst", ""),
                             "PE historica (PExRamo)": diag.get("pe_ramo", ""),
                             "PE entre PExRamo y el FCST": diag.get("pe_reforecast", ""),
+                            "IS de la funcion actuarial (IS (FA))": diag.get("is_fa", ""),
                             "BEL por FND": (diag.get("bel_fnd") or {}).get("estado", "")}]),
                ("Backtest agrupado por escenario y reserva (error %: la recta, tendencia historica, contra el escenario, "
                 "con el indice proyectado desde cada corte. 'Escenario' usa la prima que si se emitio despues del "
@@ -4883,6 +5024,52 @@ def main():
         print(f"   AVISO: {diag_pnd['sin_pe']}", flush=True)
     if diag_pnd.get("pe_reforecast"):
         print(f"   PE entre PExRamo y el FCST: {diag_pnd['pe_reforecast']}", flush=True)
+    # IS de la funcion actuarial (bloque IS (FA); solo se muestra) y su comparativo contra el IS (RL)
+    is_fa = None
+    try:
+        is_fa = leer_is_fa()
+    except Exception as e:  # noqa: BLE001
+        diag_pnd["is_fa"] = (f"no se pudo leer el archivo de la funcion actuarial ({PATRON_IS_FA}: {type(e).__name__}: "
+                             f"{e}); el bloque IS (FA) va en {TEXTO_SIN_DATO}")
+        alertas.append(("PND", "IS (FA)", diag_pnd["is_fa"]))
+    if is_fa is not None:
+        ramos_bd = list(bd_danos.cols_ramo)
+        sin_fa = [r for r in ramos_bd if r not in is_fa["ramos"]]
+        fuera_fa = [r for r in is_fa["ramos"] if r not in ramos_bd]
+        diag_pnd["is_fa"] = (
+            f"{is_fa['ruta'].name} › {is_fa['hoja']}: {is_fa['renglones']:,} renglones, sin filtros; ramos "
+            f"{', '.join(is_fa['ramos'])}; meses {is_fa['periodos'][0]} a {is_fa['periodos'][-1]} ("
+            + "; ".join(f"{t}: {m[0]} a {m[-1]}" for t, m in is_fa["por_tipo"].items()) + "); "
+            + " y ".join(f"{c} en {p}" for p, c in COLUMNA_IS_FA.items())
+            + (f"; ramos de la BD sin indice ({TEXTO_SIN_DATO}): {', '.join(sin_fa)}" if sin_fa else "")
+            + (f"; ramos del archivo que no estan en la BD de Danos: {', '.join(fuera_fa)}" if fuera_fa else "")
+            + f"; antes de {is_fa['periodos'][0]}: {TEXTO_SIN_DATO}")
+        for a in is_fa["avisos"]:
+            alertas.append(("PND", "IS (FA)", a))
+        if sin_fa:
+            alertas.append(("PND", "IS (FA)", f"la funcion actuarial no trae indice de los ramos {', '.join(sin_fa)}: su "
+                                              f"bloque IS (FA) va en {TEXTO_SIN_DATO}"))
+        if fuera_fa:
+            alertas.append(("PND", "IS (FA)", f"ramos del archivo que no estan en la BD de Danos (no entran al bloque): "
+                                              f"{', '.join(fuera_fa)}"))
+        tipo_mes = {p: t for t, ms in is_fa["por_tipo"].items() for p in ms}
+        pos_proy = {p: i for i, p in enumerate(periodos_proy)}
+        comp = []
+        for pref in COLUMNA_IS_FA:
+            for r in [x for x in ramos_bd if x in is_fa["ramos"]]:
+                for p in is_fa["periodos"]:
+                    v = is_fa["val"].get((pref, r, p))
+                    if v is None:
+                        continue
+                    rl, _ = _hp_fuente(hp, resultados, MAPA_RAMO_LAG.get(str(r)), INDICE_BASE_PND[pref][0], p, pos_proy)
+                    comp.append({"Reserva": pref, "Ramo": r, "Periodo": p, "Tipo (FA)": tipo_mes.get(p),
+                                 "IS (FA)": v, "IS (RL)": rl if np.isfinite(rl) else None,
+                                 "Diferencia FA - RL (puntos %)": (v - rl) * 100 if np.isfinite(rl) else None})
+        diag_pnd["is_fa_comp"] = comp
+    elif "is_fa" not in diag_pnd:
+        diag_pnd["is_fa"] = f"no se encontro {PATRON_IS_FA} en entradas/: el bloque IS (FA) va en {TEXTO_SIN_DATO}"
+        alertas.append(("PND", "IS (FA)", diag_pnd["is_fa"]))
+    print(f"   IS de la funcion actuarial: {diag_pnd['is_fa']}", flush=True)
     info_fnd = {"estado": "apagado (USAR_BEL_POR_FND = False)", "aplica": set(), "fnd": {}, "series": [], "resumen": []}
     proy_modelo = proy_danos
     if USAR_BEL_POR_FND:
@@ -4912,13 +5099,14 @@ def main():
     n_hp = escribir_hparametros(hp, resultados, periodos_proy)
     meses_bd = ESCENARIOS_PND.get(BD_CON_ESCENARIO_PND) or next(iter(ESCENARIOS_PND.values()), None)
     hoja_pe = hoja_pe_ramo = None
+    ctx_is_fa = None                       # IS (FA): valores y celdas de la hoja HOJA_IS_FA
     avisos_ind = []
 
     def ctx_indices(proy, meses, fnd, razones=None):
         esc = next((e for e, m in ESCENARIOS_PND.items() if m == meses), None)
         return {"hp": hp, "resultados": resultados, "periodos_proy": periodos_proy, "ultimo": ultimo, "proy": proy,
                 "pe": pe_mes, "hoja_pe": hoja_pe_ramo, "primas_pe": hoja_pe, "meses_pe": meses, "fnd": fnd,
-                "razones": razones,
+                "razones": razones, "is_fa": ctx_is_fa,
                 "pe_tab": {g: x for (e, g), x in (diag_pnd.get("_pe") or {}).items() if e == esc}}
     if INDICES_PND_EN_BD:
         if INDICES_PND_FORMULAS and diag_pnd.get("_pe") and primas is not None:   # solo con prima completa y verificada
@@ -4931,6 +5119,10 @@ def main():
                   f"{len(bd_danos.filas_prima)} renglones sin montos al final de {HOJA_MONTOS})", flush=True)
         hoja_pe_ramo = escribir_pe_ramo(bd_danos.wb, pe_mes, list(bd_danos.cols_ramo),
                                         sorted({p for _, p in {**bd_danos.filas, **bd_danos.filas_prima}}))
+        ref_is_fa = escribir_is_fa(bd_danos.wb, is_fa)
+        if is_fa is not None:
+            ctx_is_fa = {"val": is_fa["val"], "ref": ref_is_fa or {}, "archivo": is_fa["ruta"].name,
+                         "periodos": is_fa["periodos"], "ramos": is_fa["ramos"]}
         cols_ind = escribir_indices_pnd(bd_danos, ctx_indices(proy_danos, meses_bd, info_fnd.get("fnd"),
                                                               info_fnd.get("razones")), avisos_ind)
         if INDICES_PND_FORMULAS and info_fnd.get("aplica"):
