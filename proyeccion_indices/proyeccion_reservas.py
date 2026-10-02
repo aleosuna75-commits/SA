@@ -3056,7 +3056,9 @@ def escribir_indices_pnd(bd: BDMontos, ctx: dict, avisos: list | None = None) ->
     en ese dato y en lo que se calcula con el. El renglon 2 describe cada bloque.
     ctx: hp, resultados, periodos_proy, ultimo, proy (montos proyectados de este archivo), pe (pe_por_mes), hoja_pe
     (escribir_pe_ramo), primas_pe (escribir_primas_pe), pe_tab y meses_pe (PE de Primas_PE para el FA), fnd ({(reserva,
-    periodo, ramo): FND proyectado} solo en la BD principal). Regresa {(indicador, ramo): columna}."""
+    periodo, ramo): FND proyectado} solo en la BD principal), registro (solo en la BD principal: dict que se llena con
+    {(reserva, ramo, periodo): {indicador: valor del renglon BEL}} de los meses de la BD, para el tablero). Regresa
+    {(indicador, ramo): columna}."""
     ws = bd.ws
     hp, resultados, periodos_proy, ultimo = ctx["hp"], ctx["resultados"], ctx["periodos_proy"], ctx["ultimo"]
     proy, pe, hoja_pe, fnd = ctx["proy"], ctx.get("pe") or {}, ctx.get("hoja_pe"), ctx.get("fnd") or {}
@@ -3339,7 +3341,8 @@ def escribir_indices_pnd(bd: BDMontos, ctx: dict, avisos: list | None = None) ->
                 registro[(pref, str(r), p)] = {**{k: (None if isinstance(x, str) else float(x)) for k, x in vals.items()},
                                                "BEL": bel if ok(bel) else None,
                                                "BRUTO": bruto_m if ok(bruto_m) else None,
-                                               "GTO": 1.0 if f_gto else 0.0}
+                                               "GTO": 1.0 if f_gto else 0.0,
+                                               "FND": 1.0 if fnd_proy else 0.0}
             for ind in COLUMNAS_INDICES_PND:
                 c = cols[(ind, r)]
                 celda = ws.cell(fila, c)
@@ -4599,7 +4602,7 @@ def _hojas_pnd(wb, diag: dict, negrita, encab):
     implicita y los factores mes a mes (historia y proyeccion) y el backtest por serie y corte; y las del BEL por FND."""
     def hojas_fnd():
         fnd = (diag or {}).get("bel_fnd") or {}
-        if (diag or {}).get("indicadores_ramo"):        # (lo lee el tablero: pestana PND/PD)
+        if (diag or {}).get("indicadores_ramo"):        # (lo lee el tablero: seccion Razones)
             _hoja_filas(wb, HOJA_INDICADORES_RAMO, diag["indicadores_ramo"], negrita, encab,
                         {**{c: COLUMNAS_INDICES_PND.get(c, "0.0000") for c in COLUMNAS_TABLERO_PND},
                          "BEL": "#,##0", "BRUTO": "#,##0"})
@@ -5225,7 +5228,8 @@ def main():
         diag_pnd["indicadores_ramo"] = [
             {"Reserva": pref, "Ramo": r, "Periodo": p, "Tipo": "Real" if p <= ultimo else "Proyección",
              **{c: v.get(c) for c in COLUMNAS_TABLERO_PND}, "BEL": v.get("BEL"), "BRUTO": v.get("BRUTO"),
-             "Lleva GTO": v.get("GTO")}
+             "Lleva GTO": v.get("GTO"), "BEL por FND": v.get("FND"),
+             "Meses PRIMA N AÑOS": MESES_PRIMA_N_ANOS, "Años LAG PEACUMULADA": ANIOS_LAG_PEACUMULADA.get(pref, 0)}
             for (pref, r, p), v in sorted(registro_ind.items(), key=lambda x: (x[0][0], int(x[0][1]), x[0][2]))]
         if INDICES_PND_FORMULAS and info_fnd.get("aplica"):
             escribir_bel_fnd(bd_danos, info_fnd, cols_ind)

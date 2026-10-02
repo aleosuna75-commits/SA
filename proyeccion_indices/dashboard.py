@@ -26,6 +26,7 @@ import os
 import re
 import subprocess
 import sys
+import textwrap
 
 
 def _asegurar_paquetes(paquetes: dict[str, str]) -> None:
@@ -64,6 +65,7 @@ from openpyxl.utils.cell import coordinate_from_string  # noqa: E402
 from openpyxl.workbook.defined_name import DefinedName  # noqa: E402
 from openpyxl.worksheet.datavalidation import DataValidation  # noqa: E402
 from openpyxl.worksheet.hyperlink import Hyperlink  # noqa: E402
+from openpyxl.worksheet.pagebreak import Break  # noqa: E402
 from openpyxl.worksheet.table import Table, TableStyleInfo  # noqa: E402
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -254,16 +256,37 @@ INDICADORES_PND = [
     ("PRIMA N AÑOS", "PRIMA N AÑOS: prima de los últimos 12 meses", "monto"),
     ("PEACUMULADA", "PEACUMULADA", "monto"),
 ]
-# "Todos los ramos": los montos se suman; los factores e indices son el promedio ponderado de los ramos con dato, que
-# equivale a la razon de las sumas: FACTOR GTO, FACTOR MR e IS con el PND / PD (GTO / PND, MR / PND, BEL / PND),
-# CESION con el BRUTO (IRR / BRUTO) y FD / FND = suma de PND / suma de PEACUMULADA
+# "Todos los ramos": en cada mes, los ramos con PND / PD (sin IS (RL) no hay PND, y un PD en 0 no es reserva); los montos
+# se suman y los factores e indices son el promedio ponderado de esos ramos, que equivale a la razon de las sumas: FACTOR
+# GTO, FACTOR MR e IS con el PND / PD (GTO / PND, MR / PND, BEL / PND), CESION con el BRUTO (IRR / BRUTO) y FD / FND =
+# suma de PND / suma de PEACUMULADA. Todas las graficas de "Todos" usan los mismos ramos en cada mes
 PESO_TODOS = {"FACTOR GTO": "PND/PD", "FACTOR MR": "PND/PD", "IS (RL)": "PND/PD", "IS (FA)": "PND/PD", "CESION": "BRUTO"}
+# una razon cuyo denominador casi no existe (menos de 1 USD o del 0.1 % de su nivel tipico en la serie: p. ej. el BEL de
+# SONR 80 en 0 desde 2022) va sin dato en el tablero: en la BD la formula da ruido de punto flotante (miles de millones
+# de %) o 0 por SI.ERROR
+DENOMINADOR = {"FACTOR GTO": "PND/PD", "FACTOR MR": "PND/PD", "CESION": "BRUTO", "FD/FND": "PEACUMULADA"}
+DENOMINADOR_MIN, DENOMINADOR_REL = 1.0, 0.001
+
+
+def _rangos_meses(meses: list) -> list:
+    """[(primer, ultimo)] de los tramos consecutivos de una lista ordenada de AAAAMM."""
+    out = []
+    for p in meses:
+        if out and mover(out[-1][1], 1) == p:
+            out[-1][1] = p
+        else:
+            out.append([p, p])
+    return [tuple(x) for x in out]
 
 
 def leer_indicadores_ramo() -> dict | None:
     """Hoja HOJA_INDICADORES_RAMO del diagnostico (los valores de los bloques de indicadores de la BD de Danos, RRC y
     SONR, por ramo y mes): {"periodos": [...], "ramos": [...], "datos": {reserva: {ramo o "Todos": {indicador:
-    [valor por periodo o None]}}}, "con_fa": [ramos con IS (FA)], "lleva_gto": {reserva: bool}, "renglones": n}.
+    [valor por periodo o None]}}} ("Todos" trae ademas "IS (RL) ramos FA": el IS (RL) ponderado solo con los ramos de
+    IS (FA), para compararlos), "con_fa": [ramos con IS (FA)], "lleva_gto": {reserva: bool}, "fnd": {reserva: [ramos con
+    BEL por FND]}, "faltan": {reserva: texto de los ramos que no entran a "Todos" y en que meses}, "distinto": {reserva:
+    [posiciones de los meses en que "Todos" no tiene los mismos ramos que en el ultimo mes real]}, "sin_denominador":
+    {reserva: n de razones sin dato por denominador casi nulo}, "meses_n", "anios_lag": {reserva: n}, "renglones": n}.
     None si no esta la hoja (diagnostico de una version anterior)."""
     if not ARCHIVO_DIAGNOSTICO.exists():
         return None
@@ -282,7 +305,8 @@ def leer_indicadores_ramo() -> dict | None:
     ramos = sorted({str(r["Ramo"]) for r in crudos}, key=lambda x: int(x) if x.isdigit() else 10 ** 6)
     pos = {p: i for i, p in enumerate(periodos)}
     columnas = [c for c, _, _ in INDICADORES_PND] + ["BRUTO"]
-    datos, lleva_gto = {}, {}
+    datos, lleva_gto, fnd, anios_lag = {}, {}, {}, {}
+    meses_n = next((int(numero(r.get("Meses PRIMA N AÑOS"))) for r in crudos if numero(r.get("Meses PRIMA N AÑOS"))), 12)
     for r in crudos:
         res, ramo, i = r["Reserva"], str(r["Ramo"]), pos[int(r["Periodo"])]
         d = datos.setdefault(res, {}).setdefault(ramo, {c: [None] * len(periodos) for c in columnas})
@@ -290,28 +314,68 @@ def leer_indicadores_ramo() -> dict | None:
             d[c][i] = numero(r.get(c))
         if numero(r.get("Lleva GTO")):
             lleva_gto[res] = True
+        if numero(r.get("BEL por FND")) and ramo not in fnd.setdefault(res, []):
+            fnd[res].append(ramo)
+        if numero(r.get("Años LAG PEACUMULADA")) is not None:
+            anios_lag[res] = int(numero(r.get("Años LAG PEACUMULADA")))
+    faltan, sin_den, distinto = {}, {}, {}
     for res, por_ramo in datos.items():
         lleva_gto.setdefault(res, False)
-        if not lleva_gto[res]:                 # SONR no tiene GTO: la BD pone 0; en el tablero va sin dato, no 0
-            for v in por_ramo.values():
+        sin_den[res] = 0
+        for v in por_ramo.values():
+            if not lleva_gto[res]:             # SONR no tiene GTO: la BD pone 0; en el tablero va sin dato, no 0
                 v["FACTOR GTO"] = [None] * len(periodos)
-        tot = {c: [None] * len(periodos) for c in columnas}
+            for c, den in DENOMINADOR.items():  # razones con denominador casi nulo: sin dato
+                tipicos = sorted(abs(x) for x in v[den] if x is not None and abs(x) >= DENOMINADOR_MIN)
+                umbral = max(DENOMINADOR_MIN, DENOMINADOR_REL * (tipicos[len(tipicos) // 2] if tipicos else 0))
+                for i, x in enumerate(v[den]):
+                    if v[c][i] is not None and (x is None or abs(x) < umbral):
+                        v[c][i] = None
+                        sin_den[res] += 1
+        # "Todos": en cada mes, los ramos con PND / PD (los mismos en todas las graficas)
+        dentro = {r: [x is not None and abs(x) >= DENOMINADOR_MIN for x in v["PND/PD"]] for r, v in por_ramo.items()}
+        tot = {c: [None] * len(periodos) for c in columnas + ["IS (RL) ramos FA"]}
+        con_fa_res = {r for r, v in por_ramo.items() if any(x is not None for x in v["IS (FA)"])}
         for i in range(len(periodos)):
+            rs = [r for r in por_ramo if dentro[r][i]]
+            if not rs:
+                continue
             for c in columnas:
-                if c not in PESO_TODOS and c != "FD/FND":          # montos: suma de los ramos con dato
-                    xs = [v[c][i] for v in por_ramo.values() if v[c][i] is not None]
+                if c not in PESO_TODOS and c != "FD/FND":          # montos: suma de los ramos
+                    xs = [por_ramo[r][c][i] for r in rs if por_ramo[r][c][i] is not None]
                     tot[c][i] = sum(xs) if xs else None
-            for c, w in PESO_TODOS.items():                         # razones: ponderadas (razon de las sumas)
-                pares = [(v[c][i], v[w][i]) for v in por_ramo.values() if v[c][i] is not None and v[w][i] is not None]
+            for c, w in list(PESO_TODOS.items()) + [("IS (RL) ramos FA", "PND/PD")]:   # razones ponderadas
+                col = "IS (RL)" if c == "IS (RL) ramos FA" else c
+                pares = [(por_ramo[r][col][i], por_ramo[r][w][i]) for r in rs
+                         if (c != "IS (RL) ramos FA" or r in con_fa_res)
+                         and por_ramo[r][col][i] is not None and por_ramo[r][w][i] is not None]
                 sw = sum(b for _, b in pares)
                 tot[c][i] = sum(a * b for a, b in pares) / sw if pares and sw > 0 else None
-            pares = [(v["PND/PD"][i], v["PEACUMULADA"][i]) for v in por_ramo.values()
-                     if v["PND/PD"][i] is not None and v["PEACUMULADA"][i] is not None]
+            pares = [(por_ramo[r]["PND/PD"][i], por_ramo[r]["PEACUMULADA"][i]) for r in rs
+                     if por_ramo[r]["PEACUMULADA"][i] is not None]
             sp = sum(b for _, b in pares)
-            tot["FD/FND"][i] = sum(a for a, _ in pares) / sp if pares and sp > 0 else None
+            tot["FD/FND"][i] = sum(a for a, _ in pares) / sp if pares and sp >= DENOMINADOR_MIN else None
+        # meses en que "Todos" no tiene los mismos ramos que en el ultimo mes real (se sombrean en el HTML)
+        i_ult = max((pos[int(r["Periodo"])] for r in crudos if r.get("Tipo") == "Real"), default=len(periodos) - 1)
+        base = {r for r in por_ramo if dentro[r][i_ult]}
+        distinto[res] = [i for i in range(len(periodos)) if {r for r in por_ramo if dentro[r][i]} != base]
+        # ramos que no entran a "Todos" y en que meses (en el rango con algun ramo)
+        activos = [i for i in range(len(periodos)) if any(dentro[r][i] for r in por_ramo)]
+        grupos = {}
+        for r in por_ramo:
+            fuera = [periodos[i] for i in activos if not dentro[r][i]]
+            if fuera:
+                grupos.setdefault(tuple(_rangos_meses(fuera)), []).append(r)
+        faltan[res] = "; ".join(
+            f"{', '.join(rs[:-1]) + ' y ' + rs[-1] if len(rs) > 1 else rs[0]}: "
+            + ("todo el periodo" if len(tramos) == 1 and tramos[0] == (periodos[activos[0]], periodos[activos[-1]])
+               else ", ".join(f"{etiqueta(a)} a {etiqueta(b)}" if a != b else etiqueta(a) for a, b in tramos))
+            for tramos, rs in sorted(grupos.items(), key=lambda x: (x[0][0][0], x[1])))
         por_ramo["Todos"] = tot
     con_fa = [r for r in ramos if any(x is not None for res in datos.values() for x in res.get(r, {}).get("IS (FA)", []))]
     return {"periodos": periodos, "ramos": ramos, "datos": datos, "con_fa": con_fa, "lleva_gto": lleva_gto,
+            "fnd": {res: sorted(v, key=lambda x: int(x) if x.isdigit() else 10 ** 6) for res, v in fnd.items()},
+            "faltan": faltan, "distinto": distinto, "sin_denominador": sin_den, "meses_n": meses_n, "anios_lag": anios_lag,
             "renglones": len(crudos)}
 
 
@@ -567,7 +631,7 @@ def generar(ruta_salida: Path = SALIDA_DASHBOARD) -> Path:
 
     def navegacion(hoja, activo):
         for k, (texto, destino) in enumerate(menu):
-            c = hoja.cell(5 + k, 2, ("▸ " if texto == activo else "   ") + texto)
+            c = hoja.cell(4 + k, 2, ("▸ " if texto == activo else "   ") + texto)
             c.hyperlink = Hyperlink(ref=c.coordinate, location=destino)
             c.font = fuente(10.5, texto == activo, TEXTO if texto == activo else TEXTO_2)
             c.fill = relleno(NAV_ACTIVO if texto == activo else PANEL)
@@ -948,6 +1012,11 @@ def generar(ruta_salida: Path = SALIDA_DASHBOARD) -> Path:
         hoja.page_margins.top = hoja.page_margins.bottom = 0.4
         if area:
             hoja.print_area = area
+    if wd_p is not None:                       # Razones: tres hojas carta con cortes entre paneles (sin partir graficas)
+        wd_p.sheet_properties.pageSetUpPr.fitToPage = False
+        wd_p.page_setup.scale = 62
+        for fila in (46, 84):
+            wd_p.row_breaks.append(Break(id=fila))
     wd_i.sheet_view.tabSelected = True
     wb.active = 0
     wb.calculation.fullCalcOnLoad = True
@@ -1002,11 +1071,17 @@ def construir_pnd(ws, wbp, wcp, pnd: dict, ultimo: int, p_dic: int, nombre, sele
     selector(ws, 12, "RAMO", "Todos", "=L_RamosPnd", "SelRamoPnd")
     selector(ws, 15, "RESERVA", "RRC", "=L_ResPnd", "SelResPnd")
     notas = [f"Real hasta {etiqueta(ultimo)}", f"Proyección {etiqueta(mover(ultimo, 1))} a {etiqueta(periodos[-1])}", "",
-             "RRC: PND · SONR: PD", "Todos los ramos: montos", "sumados; factores e índices", "ponderados por el PND / PD",
-             "(CESIÓN por el BRUTO).", "", "Mismos valores que los", "bloques de la BD de Daños.", "",
-             "#N/D = sin dato (por ejemplo", "IS (FA) antes de sep-26 o", "en ramos que FA no manda)."]
-    for k, t in enumerate(notas):
-        ws.cell(19 + k, 2, t).font = fuente(9, k < 2, TEXTO_2, k >= 3)
+             "RRC: PND · SONR: PD", "Mismos valores que los bloques de la BD de Daños.", "",
+             "Todos los ramos: en cada mes, los ramos con PND / PD; montos sumados, factores e índices ponderados "
+             "por el PND / PD (CESIÓN por el BRUTO).",
+             *[f"No entran a Todos en {res}: {txt}." for res, txt in pnd.get("faltan", {}).items() if txt], "",
+             f"#N/D = sin dato: IS (FA) antes de {etiqueta(mover(ultimo, 1))} o en ramos que FA no manda; SONR sin GTO; "
+             "una razón cuyo denominador es casi 0."]
+    fila = 19
+    for k, t in enumerate(notas):                    # (renglones cortos: la rejilla de la hoja no cambia de alto)
+        for linea_ in textwrap.wrap(t, 31) or [""]:
+            ws.cell(fila, 2, linea_).font = fuente(9, k < 2, TEXTO_2, k >= 3)
+            fila += 1
     ws["D2"] = "Dashboard de Razones: PND / PD y sus indicadores por ramo"
     ws["D2"].font = fuente(18, True)
     ws["D3"] = (f"Real {etiqueta(periodos[0])} a {etiqueta(ultimo)} y proyección {etiqueta(mover(ultimo, 1))} a "
@@ -1046,7 +1121,7 @@ def construir_pnd(ws, wbp, wcp, pnd: dict, ultimo: int, p_dic: int, nombre, sele
         (f'={nb}&" real {etiqueta(ultimo)} (M USD)"', f"=CalcPND!{L(cpnd)}{fila_de[ultimo]}", "#,##0.0"),
         (f'={nb}&" proyección {etiqueta(p_dic)} (M USD)"', f"=CalcPND!{L(cpnd + 1)}{fila_de.get(p_dic, n_c)}", "#,##0.0"),
         (f'={nb}&" proyección {etiqueta(periodos[-1])} (M USD)"', f"=CalcPND!{L(cpnd + 1)}{n_c}", "#,##0.0"),
-        (f'="Crec. "&{nb}&" 12 m ({etiqueta(ultimo)} a {etiqueta(p12)})"',
+        (f'="Crec. "&{nb}&" {etiqueta(ultimo)} a {etiqueta(p12)}"',
          f"=CalcPND!{L(cpnd + 1)}{fila_de.get(p12, n_c)}/CalcPND!{L(cpnd)}{fila_de[ultimo]}-1", "+0.0%;-0.0%;0.0%"),
     ]
     pintar(ws, "D5:AG8", BANDA_KPI)
@@ -1071,12 +1146,13 @@ def construir_pnd(ws, wbp, wcp, pnd: dict, ultimo: int, p_dic: int, nombre, sele
         "CESION": f'="CESIÓN (IRR / BRUTO) · "&{ramo_txt}',
         "FD/FND": f'=IF(SelResPnd="RRC","FND (PND / PEACUMULADA)","FD (PD / PEACUMULADA)")&" · "&{ramo_txt}',
         "IS (RL)": f'="IS (RL): "&IF(SelResPnd="RRC","Ind Sin RRC","Ind Sin SONR Media")&" de HParametros · "&{ramo_txt}',
-        "IS (FA)": (f'="IS (FA): función actuarial · "&{ramo_txt}&IF(SelRamoPnd="Todos"," (solo los ramos de FA)",'
-                    f'IF(ISNUMBER(MATCH(SelRamoPnd,L_RamosFA,0)),""," · FA no manda este ramo"))'),
+        "IS (FA)": (f'=IF(INDEX(L_RamosFA,1)="-","IS (FA): no se cargó el archivo de la función actuarial",'
+                    f'"IS (FA): función actuarial · "&{ramo_txt}&IF(SelRamoPnd="Todos"," (solo los ramos de FA)",'
+                    f'IF(ISNUMBER(MATCH(SelRamoPnd,L_RamosFA,0)),""," · FA no manda este ramo")))'),
         "PE FCST": f'="PE FCST (prima tomada del mes) · "&{ramo_txt}&" · M USD"',
-        "PRIMA N AÑOS": f'="PRIMA N AÑOS (12 meses de PE) · "&{ramo_txt}&" · M USD"',
+        "PRIMA N AÑOS": f'="PRIMA N AÑOS ({pnd.get("meses_n", 12)} meses de PE) · "&{ramo_txt}&" · M USD"',
         "PEACUMULADA": (f'="PEACUMULADA · "&{ramo_txt}&IF(SelResPnd="RRC"," (en RRC = PRIMA N AÑOS)",'
-                        f'" (LAG 1 a 3 × PRIMA N AÑOS)")&" · M USD"'),
+                        f'" (LAG 1 a {pnd.get("anios_lag", {}).get("SONR", 1)} × PRIMA N AÑOS)")&" · M USD"'),
     }
     for j, c_ in enumerate(cols):
         fila0 = 10 + 19 * ((j + 1) // 2) if 0 < j < len(cols) - 1 else (10 if j == 0 else 10 + 19 * ((len(cols) - 1) // 2 + 1))

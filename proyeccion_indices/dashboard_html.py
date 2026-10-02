@@ -188,11 +188,13 @@ def preparar_datos() -> dict:
         persistencia = None
     pnd = dx.leer_indicadores_ramo()                 # pestaña Razones (None con un diagnostico anterior)
     if pnd:
-        unidad = {c: u for c, _, u in dx.INDICADORES_PND}
-        pnd = {"periodos": pnd["periodos"], "ramos": pnd["ramos"], "con_fa": pnd["con_fa"], "lleva_gto": pnd["lleva_gto"],
+        unidad = {**{c: u for c, _, u in dx.INDICADORES_PND}, "IS (RL) ramos FA": "pct"}
+        pnd = {**{k: pnd[k] for k in ("periodos", "ramos", "con_fa", "lleva_gto", "fnd", "faltan", "distinto",
+                                     "sin_denominador", "meses_n", "anios_lag")},
                "indicadores": [[c, t, u] for c, t, u in dx.INDICADORES_PND],
-               "datos": {res: {ramo: {c: [_redondear(x, 0 if unidad[c] == "monto" else 6) for x in v[c]] for c in unidad}
-                               for ramo, v in por_ramo.items()} for res, por_ramo in pnd["datos"].items()}}
+               "datos": {res: {ramo: {c: [_redondear(x, 0 if unidad[c] == "monto" else 6) for x in v[c]]
+                                      for c in unidad if c in v} for ramo, v in por_ramo.items()}
+                         for res, por_ramo in pnd["datos"].items()}}
     sin_tc = [p for p in periodos_m if not tc.get(p)]
     if sin_tc:
         print(f"   Aviso: sin tipo de cambio en la BD para {sin_tc}; en MXN esos meses se muestran como s/d")
@@ -286,6 +288,8 @@ button, select { font: inherit; color: inherit; }
 .tabs { display: flex; gap: 4px; background: var(--surface-2); border-radius: 10px; padding: 4px; }
 .tabs button { border: 0; background: transparent; padding: 7px 14px; border-radius: 7px; cursor: pointer;
   color: var(--ink-2); font-weight: 500; white-space: nowrap; }
+.tabs { flex-wrap: wrap; }
+@media (max-width: 400px) { .tabs button { padding: 7px 9px; } }
 .tabs button[aria-selected="true"] { background: var(--surface); color: var(--ink); box-shadow: var(--shadow);
   border: 1px solid var(--border); }
 .tabs button:focus-visible, .btn:focus-visible, select:focus-visible, .plot:focus-visible {
@@ -331,6 +335,7 @@ main { max-width: 1320px; margin: 0 auto; }
 .marcador { stroke: var(--surface); stroke-width: 2; }
 .etq { fill: var(--ink-2); font-size: 11px; }
 .etq.fuerte { fill: var(--ink); font-weight: 600; }
+.etq { paint-order: stroke; stroke: var(--surface); stroke-width: 3px; stroke-linejoin: round; }
 .cruz { stroke: var(--muted); stroke-width: 1; shape-rendering: crispEdges; pointer-events: none; }
 .barra { transition: filter .1s; }
 .barra:hover, .barra.activa, .barra:focus-visible { filter: brightness(1.12); }
@@ -456,7 +461,11 @@ const NF = {};
 const nf = d => (NF[d] ||= new Intl.NumberFormat('es-MX', { minimumFractionDigits: d, maximumFractionDigits: d }));
 const fmt = (v, d) => { if (v == null || !isFinite(v)) return 's/d'; if (Math.abs(v) < Math.pow(10, -d) / 2) v = 0; return nf(d).format(v); };
 const varPct = (base, v) => (base > 0 && v != null && isFinite(v)) ? v / base - 1 : null;   // variacion solo con base positiva
-const decimalesPaso = (ts, minimo) => { const paso = ts.length > 1 ? Math.abs(ts[1] - ts[0]) : 1; return Math.max(minimo || 0, Math.min(6, Math.ceil(-Math.log10(paso) - 1e-9))); };
+const decimalesPaso = (ts, minimo) => {             // los decimales que necesita el paso (2.5 -> 1, 0.25 -> 2)
+  const paso = ts.length > 1 ? Math.abs(ts[1] - ts[0]) : 1; let d = 0;
+  while (d < 6 && Math.abs(paso * Math.pow(10, d) - Math.round(paso * Math.pow(10, d))) > 1e-9 * Math.max(1, paso * Math.pow(10, d))) d++;
+  return Math.max(minimo || 0, d);
+};
 const fmtPct = v => { if (v == null || !isFinite(v)) return 's/d'; const r = Math.round(v * 1000) / 1000; return (r > 0 ? '+' : r < 0 ? '−' : '') + nf(1).format(Math.abs(r) * 100) + ' %'; };
 const cssVar = n => `var(${n})`;                    // las marcas usan la variable: siguen al tema y a la impresion
 const cssHex = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
@@ -631,6 +640,10 @@ function graficaLineas(cuerpo, W, o) {
     const tx = svg('text', { class: 'tick', x: x0 - 8, y: Y(t) + 4, 'text-anchor': 'end' }); tx.textContent = o.fmtTick ? o.fmtTick(t, decT) : fmt(t, decT); s.append(tx);
   }
   s.append(svg('line', { class: 'base', x1: x0, x2: x1, y1: y0, y2: y0 }));
+  for (const [a, b] of (o.sombras || [])) {          // tramos sombreados (p. ej. meses con otro conjunto de ramos)
+    const paso = n > 1 ? (x1 - x0) / (n - 1) : 0, xa = Math.max(x0, X(a) - paso / 2), xb = Math.min(x1, X(b) + paso / 2);
+    s.insertBefore(svg('rect', { x: xa, y: y1, width: Math.max(1, xb - xa), height: y0 - y1, fill: cssVar('--grid'), 'fill-opacity': 0.6 }), s.firstChild);
+  }
   const auto = Math.max(1, Math.ceil(n / Math.max(2, Math.floor((x1 - x0) / 62))));
   const cada = Math.max(o.cadaX || 1, Math.ceil(auto / (o.cadaX || 1)) * (o.cadaX || 1));
   for (let i = 0; i < n; i += cada) {
@@ -666,8 +679,9 @@ function graficaLineas(cuerpo, W, o) {
       const texto = o.fmt(se.valores[i]), ancho = anchoTexto(texto);
       let x = X(i) + 6, y = Y(se.valores[i]), ancla = 'start';
       if (x + ancho > W) { x = X(i); y -= 9; ancla = 'middle'; }         // sin lugar a la derecha: encima del punto
-      for (const p of puestas) if (Math.abs(p.x - x) < ancho && Math.abs(p.y - y) < 12) y = p.y + (y >= p.y ? 12 : -12);
-      puestas.push({ x, y });
+      const izq = ancla === 'middle' ? x - ancho / 2 : x, der = izq + ancho;   // (extension real del texto)
+      for (const p of puestas) if (izq < p.der && p.izq < der && Math.abs(p.y - y) < 13) y = p.y + (y >= p.y ? 13 : -13);
+      puestas.push({ izq, der, y });
       const tx = svg('text', { class: 'etq fuerte', x, y: y + 4, 'text-anchor': ancla }); tx.textContent = texto; s.append(tx);
     }
   }
@@ -717,6 +731,7 @@ function graficaLineas(cuerpo, W, o) {
   if (o.series.length > 1) {
     const items = o.series.map(se => ({ nombre: se.nombre, color: se.color, dash: se.dash, marcador: se.marcadores, fino: se.fino }));
     if (o.series.some(se => se.banda)) items.push({ nombre: 'Intervalo al 80 %', color: cssVar('--proy'), caja: true, opacidad: 0.3 });
+    if ((o.sombras || []).length) items.push({ nombre: 'Meses sin todos los ramos (ver nota)', color: cssVar('--grid'), caja: true, opacidad: 0.6 });
     cuerpo.append(leyenda(items));
   }
 }
@@ -1043,32 +1058,47 @@ const UNIDAD_PND = {
   fnd: { esc: 1, dec: 3, suf: '', eje: 'razón' },
 };
 function explicaPnd(col, res, ramo) {
-  const nb = res === 'RRC' ? 'PND' : 'PD';
-  const faRamos = (PN.con_fa || []).join(', ');
+  const nb = res === 'RRC' ? 'PND' : 'PD', fd = res === 'RRC' ? 'FND' : 'FD', ini = eti(P_N[nUlt + 1]);
+  const faRamos = (PN.con_fa || []).join(', '), todos = ramo === 'Todos';
+  const conFnd = !todos && ((PN.fnd || {})[res] || []).includes(ramo);
+  const anios = (PN.anios_lag || {})[res] || 0, meses = PN.meses_n || 12;
+  const desde = {                                      // como se proyecta desde el primer mes proyectado
+    monto: todos ? `desde ${ini}, suma de los ramos (PEACUMULADA × ${fd} en los que llevan BEL por FND, el modelo en los demás)`
+      : conFnd ? `desde ${ini}, PEACUMULADA × ${fd}` : `desde ${ini}, el BEL del modelo entre el IS (este ramo no lleva BEL por FND)`,
+    factor: todos ? `desde ${ini}, la recta de tendencia en los ramos con BEL por FND y el modelo en los demás`
+      : conFnd ? `desde ${ini}, la recta de tendencia` : `desde ${ini}, la razón del modelo (este ramo no lleva BEL por FND)`,
+    fnd: todos ? `desde ${ini}, con el ${fd} proyectado en los ramos con BEL por FND`
+      : conFnd ? `desde ${ini}, el ${fd} proyectado` : `desde ${ini}, ${nb} del modelo / PEACUMULADA (este ramo no lleva BEL por FND)`,
+  };
+  const peac = res === 'RRC' || !anios ? 'En RRC es igual a PRIMA N AÑOS'
+    : Array.from({ length: anios }, (_, k) => k === 0 ? 'LAG 1 × PRIMA N AÑOS del mes' : `LAG ${k + 1} × la de ${12 * k} meses antes`).join(' + ');
   return {
-    'PND/PD': `${nb} = BEL / IS (RL); desde ${eti(P_N[nUlt + 1])}, PEACUMULADA × FND. Millones de USD`,
-    'FACTOR GTO': `GTO / PND, en %; desde ${eti(P_N[nUlt + 1])}, la recta de tendencia`,
-    'FACTOR MR': `MR / ${nb}, en %; desde ${eti(P_N[nUlt + 1])}, la recta de tendencia`,
-    'CESION': `Razón de cesión IRR / BRUTO, en %; desde ${eti(P_N[nUlt + 1])}, la recta de tendencia`,
-    'FD/FND': `${nb} / PEACUMULADA (razón); desde ${eti(P_N[nUlt + 1])}, el FND proyectado`,
-    'IS (RL)': `${res === 'RRC' ? 'Ind Sin RRC' : 'Ind Sin SONR Media'} de HParametros, en %; misma escala que IS (FA)`,
+    'PND/PD': `${nb} = BEL / IS (RL); ${desde.monto}. Millones de USD`,
+    'FACTOR GTO': `GTO / PND, en %; ${desde.factor}`,
+    'FACTOR MR': `MR / ${nb}, en %; ${desde.factor}`,
+    'CESION': `Razón de cesión IRR / BRUTO, en %; ${desde.factor}`,
+    'FD/FND': `${nb} / PEACUMULADA (razón); ${desde.fnd}`,
+    'IS (RL)': `${res === 'RRC' ? 'Ind Sin RRC' : 'Ind Sin SONR Media'} de HParametros, en %; misma escala que IS (FA)`
+      + (todos ? '; incluye ramos que FA no manda (como TEV e Hidro, con IS bajo): para comparar con FA, ve la línea gris en IS (FA)' : ''),
     'IS (FA)': `${res === 'RRC' ? 'IS RRC' : 'IS SONR'} de la función actuarial (solo proyección), en %; misma escala que IS (RL)`
-      + (ramo === 'Todos' ? `; Todos = solo los ramos que manda FA (${faRamos})` : ''),
+      + (todos && faRamos ? `; Todos = solo los ramos que manda FA (${faRamos}); gris: IS (RL) de esos mismos ramos` : ''),
     'PE FCST': 'Prima tomada del mes (PExRamo, reforecast y FCST), millones de USD; la misma en RRC y SONR',
-    'PRIMA N AÑOS': 'Suma de los últimos 12 meses de PE FCST, millones de USD; la misma en RRC y SONR',
-    'PEACUMULADA': res === 'RRC' ? 'En RRC es igual a PRIMA N AÑOS. Millones de USD'
-      : 'LAG 1 × PRIMA N AÑOS del mes + LAG 2 × la de 12 meses antes + LAG 3 × la de 24 meses antes. Millones de USD',
+    'PRIMA N AÑOS': `Suma de los últimos ${meses} meses de PE FCST, millones de USD; la misma en RRC y SONR`,
+    'PEACUMULADA': `${peac}. Millones de USD`,
   }[col] || '';
 }
 function seriePnd(res, ramo, col) {
-  const u = UNIDAD_PND[(PN.indicadores.find(x => x[0] === col) || [])[2] || 'monto'];
+  const u = UNIDAD_PND[col === 'IS (RL) ramos FA' ? 'pct' : (PN.indicadores.find(x => x[0] === col) || [])[2] || 'monto'];
   return (((PN.datos[res] || {})[ramo] || {})[col] || new Array(P_N.length).fill(null)).map(v => v == null ? null : v * u.esc);
 }
 function pintarPnd() {
-  const ramo = E.ramoPnd, res = E.reservaPnd, nb = res === 'RRC' ? 'PND' : 'PD';
-  const etiqRamo = ramo === 'Todos' ? 'todos los ramos' : `ramo ${ramo}`;
+  const ramo = E.ramoPnd, res = E.reservaPnd, nb = res === 'RRC' ? 'PND' : 'PD', todos = ramo === 'Todos';
+  const etiqRamo = todos ? 'todos los ramos' : `ramo ${ramo}`;
+  const faltan = todos ? ((PN.faltan || {})[res] || '') : '';
   document.getElementById('nota-pnd').textContent = `Real hasta ${eti(D.ultimo)} · proyección ${eti(P_N[nUlt + 1])} a ${eti(P_N[nFin])} · `
-    + (ramo === 'Todos' ? 'Todos: montos sumados; factores e índices ponderados (razón de las sumas)' : 'Valores de los bloques de la BD de Daños');
+    + (todos ? 'Todos: en cada mes, los ramos con PND / PD; montos sumados, factores e índices ponderados (razón de las sumas)'
+      + (faltan ? ` · no entran: ${faltan} (sombreado)` : '') : 'Valores de los bloques de la BD de Daños')
+    + ' · una razón cuyo denominador es casi 0 va sin dato (s/d)';
   const pnd = seriePnd(res, ramo, 'PND/PD'), f1 = v => fmt(v, 1);
   const u = pnd[nUlt], pd = pnd[nDic], pf = pnd[nFin], p12 = pnd[nUlt + 12];
   document.getElementById('kpis-pnd').replaceChildren(
@@ -1078,8 +1108,17 @@ function pintarPnd() {
     kpi(`Crecimiento ${nb} 12 meses`, fmtPct(varPct(u, p12)), `${eti(D.ultimo)} a ${eti(P_N[nUlt + 12])}, mismo mes`),
   );
   const rejilla = document.getElementById('rejilla-pnd'); rejilla.replaceChildren(); tarjetasVivas.length = 0;
-  // IS (RL) e IS (FA) con la misma escala para poder compararlas
-  const domIS = dominio([...seriePnd(res, ramo, 'IS (RL)'), ...seriePnd(res, ramo, 'IS (FA)')], false);
+  // meses en que "Todos" no tiene los mismos ramos que en el ultimo mes real: se sombrean
+  const sombras = [];
+  if (todos) for (const i of ((PN.distinto || {})[res] || [])) {
+    if (sombras.length && sombras[sombras.length - 1][1] === i - 1) sombras[sombras.length - 1][1] = i; else sombras.push([i, i]);
+  }
+  // IS (RL) e IS (FA) con la misma escala para poder compararlas (con Todos, tambien el IS (RL) de los ramos de FA)
+  const isRlFa = todos ? seriePnd(res, 'Todos', 'IS (RL) ramos FA').map((v, i) => i > nUlt ? v : null) : null;
+  const domIS = dominio([...seriePnd(res, ramo, 'IS (RL)'), ...seriePnd(res, ramo, 'IS (FA)'), ...(isRlFa || [])], false);
+  // ultimo mes con PND / PD (si la serie se acaba antes del ultimo real, se avisa)
+  const iPnd = ultimoFinito(pnd);
+  const sinDesde = iPnd >= 0 && iPnd < nUlt ? `sin ${nb} desde ${eti(P_N[iPnd + 1])}` : (iPnd < 0 ? `sin ${nb} en el periodo` : '');
   PN.indicadores.forEach(([col, titulo, unidad], k) => {
     const un = UNIDAD_PND[unidad], vals = seriePnd(res, ramo, col);
     const fv = v => v == null ? 's/d' : fmt(v, un.dec) + un.suf;
@@ -1087,24 +1126,31 @@ function pintarPnd() {
     const hayReal = real.some(v => v != null), hayProy = proy.some((v, i) => v != null && i > nUlt);
     let vacio = null;
     if (col === 'FACTOR GTO' && !PN.lleva_gto[res]) vacio = `${res} no lleva GTO: el gasto (GTO) solo existe en RRC.`;
+    else if (col === 'IS (FA)' && !(PN.con_fa || []).length) vacio = 'No se cargó el archivo de índices de la función actuarial (ver el AVISO «SIN IS (FA)» de la consola).';
     else if (col === 'IS (FA)' && !hayProy) vacio = `La función actuarial no manda índice de este ramo; manda los ramos ${(PN.con_fa || []).join(', ')}.`;
-    else if (!hayReal && !hayProy) vacio = 'Sin datos para esta selección.';
+    else if (!hayReal && !hayProy) vacio = `Sin datos para esta selección${sinDesde && col !== 'PE FCST' && col !== 'PRIMA N AÑOS' ? ` (${sinDesde})` : ''}.`;
     const titNb = { 'PND/PD': `${nb} (${res})`, 'FACTOR MR': `FACTOR MR (MR / ${nb})`,
       'FD/FND': res === 'RRC' ? 'FND (PND / PEACUMULADA)' : res === 'SONR' ? 'FD (PD / PEACUMULADA)' : titulo }[col] || titulo;
-    const c = tarjeta(`${titNb} · ${etiqRamo}`, explicaPnd(col, res, ramo),
+    const extra = col === 'PND/PD' && sinDesde && !vacio ? ` · ${sinDesde}` : '';
+    const gris = col === 'IS (FA)' && isRlFa && isRlFa.some(v => v != null)
+      ? [{ nombre: 'IS (RL) de los mismos ramos', valores: isRlFa, color: cssVar('--deemph-ink'), fino: true }] : [];
+    const c = tarjeta(`${titNb} · ${etiqRamo}`, explicaPnd(col, res, ramo) + extra,
       (cuerpo, W) => {
         if (vacio) { cuerpo.append(el('p', { class: 'sub', style: 'margin:24px 0;color:var(--ink-2)', text: vacio })); return; }
+        const series = [...gris, ...(hayReal ? [{ nombre: 'Real', valores: real, color: cssVar('--real'), etiquetaFin: true }] : []),
+                        ...(hayProy ? [{ nombre: 'Proyección', valores: proy, color: cssVar('--proy'), dash: true, etiquetaFin: true }] : [])];
         graficaLineas(cuerpo, W, {
           labels: P_N.map(eti), tituloX: i => etiLarga(P_N[i]) + (i <= nUlt ? ' (real)' : ' (proyección)'), fmt: fv, cadaX: 6, etiquetasFin: true,
           incluirCero: unidad === 'monto', dominio: (col === 'IS (RL)' || col === 'IS (FA)') ? domIS : null,
-          fmtTick: unidad === 'pct' ? (t, d) => fmt(t, d) + ' %' : null,
-          aria: `${titNb} de ${etiqRamo}, real y proyección`,
-          series: [...(hayReal ? [{ nombre: 'Real', valores: real, color: cssVar('--real'), etiquetaFin: true }] : []),
-                   ...(hayProy ? [{ nombre: 'Proyección', valores: proy, color: cssVar('--proy'), dash: true, etiquetaFin: true }] : [])],
+          fmtTick: unidad === 'pct' ? (t, d) => fmt(t, d) + ' %' : null, sombras,
+          aria: `${titNb} de ${etiqRamo}, real y proyección`, series,
         });
-        if (!(hayReal && hayProy)) cuerpo.append(leyenda([hayReal ? { nombre: 'Real', color: cssVar('--real') } : { nombre: 'Proyección', color: cssVar('--proy'), dash: true }]));
+        if (series.length === 1) cuerpo.append(leyenda([{ nombre: series[0].nombre, color: series[0].color, dash: series[0].dash },
+          ...(sombras.length ? [{ nombre: 'Meses sin todos los ramos (ver nota)', color: cssVar('--grid'), caja: true, opacidad: 0.6 }] : [])]));
       },
-      () => tablaDatos(['Mes', 'Tipo', `${titNb} (${un.eje})`], P_N.map((p, i) => [etiLarga(p), i <= nUlt ? 'Real' : 'Proyección', fv(vals[i])])),
+      () => vacio ? el('p', { class: 'sub', style: 'margin:12px 8px', text: vacio })
+        : tablaDatos(['Mes', 'Tipo', `${titNb} (${un.eje})`, ...(gris.length ? ['IS (RL) de los mismos ramos (%)'] : [])],
+          P_N.map((p, i) => [etiLarga(p), i <= nUlt ? 'Real' : 'Proyección', fv(vals[i]), ...(gris.length ? [fv(isRlFa[i])] : [])])),
       k === 0 || k === PN.indicadores.length - 1);
     rejilla.append(c); tarjetasVivas.push(c);
   });
