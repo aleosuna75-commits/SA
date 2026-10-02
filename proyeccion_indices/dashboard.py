@@ -8,7 +8,7 @@ Genera salidas/Dashboard_Indices_Reservas.xlsx a partir de las salidas de proyec
                            resumen de los 4 indices del ramo.
   * "Dashboard Reservas" : selectores de reserva, concepto, ramo y moneda (USD/MXN con el TC de la BD);
                            indicadores; mensual 2025-2027; historico 2022-2027; por ramo; por concepto.
-  * "Dashboard PND-PD"   : selectores de ramo (con "Todos") y reserva; indicadores; PND / PD, FACTOR GTO, FACTOR MR,
+  * "Dashboard Razones"  : selectores de ramo (con "Todos") y reserva; indicadores; PND / PD, FACTOR GTO, FACTOR MR,
                            CESION, FD / FND, IS (RL), IS (FA), PE FCST, PRIMA N AÑOS y PEACUMULADA, real y proyeccion
                            (hoja Indicadores_Ramo del diagnostico: los valores de los bloques de la BD de Danos).
   * "Análisis"           : tablas con mapas de calor (indices por ramo y totales de reservas) y metodo.
@@ -239,8 +239,9 @@ def leer_montos(ultimo: int):
     return registros, tc, ramos
 
 
+HOJA_RAZONES = "Dashboard Razones"                # seccion Razones (en el HTML, la pestaña "Razones")
 HOJA_INDICADORES_RAMO = "Indicadores_Ramo"      # hoja del diagnostico con los indicadores por ramo de la BD de Danos
-# indicadores de la pestaña PND/PD: (columna de la hoja, titulo, unidad: "monto" en USD, "pct" razon o "fnd")
+# indicadores de la seccion Razones (pestaña del HTML y hoja del Excel): (columna de la hoja, titulo, unidad: "monto" en USD, "pct" razon o "fnd")
 INDICADORES_PND = [
     ("PND/PD", "PND / PD", "monto"),
     ("FACTOR GTO", "FACTOR GTO (GTO / PND)", "pct"),
@@ -475,7 +476,7 @@ def generar(ruta_salida: Path = SALIDA_DASHBOARD) -> Path:
     wd_i = wb.active
     wd_i.title = "Dashboard Índices"
     wd_r = wb.create_sheet("Dashboard Reservas")
-    wd_p = wb.create_sheet("Dashboard PND-PD") if pnd else None
+    wd_p = wb.create_sheet(HOJA_RAZONES) if pnd else None
     wa = wb.create_sheet("Análisis")
     wbi = wb.create_sheet("BD_Indices")
     wbr = wb.create_sheet("BD_Reservas")
@@ -560,7 +561,7 @@ def generar(ruta_salida: Path = SALIDA_DASHBOARD) -> Path:
     ws["B3"] = "◆ ÍNDICES Y RESERVAS"
     ws["B3"].font = fuente(13, True)
     menu = [("Dashboard Índices", "'Dashboard Índices'!A1"), ("Dashboard Reservas", "'Dashboard Reservas'!A1"),
-            *([("Dashboard PND/PD", "'Dashboard PND-PD'!A1")] if pnd else []),
+            *([(HOJA_RAZONES, f"'{HOJA_RAZONES}'!A1")] if pnd else []),
             ("Análisis", "'Análisis'!A1"), ("Base de datos: índices", "'BD_Indices'!A1"),
             ("Base de datos: reservas", "'BD_Reservas'!A1")]
 
@@ -957,7 +958,7 @@ def generar(ruta_salida: Path = SALIDA_DASHBOARD) -> Path:
 
 
 def construir_pnd(ws, wbp, wcp, pnd: dict, ultimo: int, p_dic: int, nombre, selector, navegacion) -> None:
-    """Hoja "Dashboard PND-PD": selectores de ramo (con "Todos") y reserva, indicadores y una grafica de lineas (real y
+    """Hoja HOJA_RAZONES: selectores de ramo (con "Todos") y reserva, indicadores y una grafica de lineas (real y
     proyeccion) por indicador de INDICADORES_PND. Los datos van en BD_PND (valores de leer_indicadores_ramo, con
     "Todos" ya agregado) y las series en CalcPND con formulas (INDEX / MATCH por reserva, ramo y periodo), asi las
     graficas se actualizan al cambiar los selectores; un dato que no hay va como #N/D (hueco en la linea)."""
@@ -997,7 +998,7 @@ def construir_pnd(ws, wbp, wcp, pnd: dict, ultimo: int, p_dic: int, nombre, sele
     caja(ws, "B2:B46")
     ws["B3"] = "◆ ÍNDICES Y RESERVAS"
     ws["B3"].font = fuente(13, True)
-    navegacion(ws, "Dashboard PND/PD")
+    navegacion(ws, HOJA_RAZONES)
     selector(ws, 12, "RAMO", "Todos", "=L_RamosPnd", "SelRamoPnd")
     selector(ws, 15, "RESERVA", "RRC", "=L_ResPnd", "SelResPnd")
     notas = [f"Real hasta {etiqueta(ultimo)}", f"Proyección {etiqueta(mover(ultimo, 1))} a {etiqueta(periodos[-1])}", "",
@@ -1006,7 +1007,7 @@ def construir_pnd(ws, wbp, wcp, pnd: dict, ultimo: int, p_dic: int, nombre, sele
              "#N/D = sin dato (por ejemplo", "IS (FA) antes de sep-26 o", "en ramos que FA no manda)."]
     for k, t in enumerate(notas):
         ws.cell(19 + k, 2, t).font = fuente(9, k < 2, TEXTO_2, k >= 3)
-    ws["D2"] = "Dashboard de PND / PD y sus indicadores por ramo"
+    ws["D2"] = "Dashboard de Razones: PND / PD y sus indicadores por ramo"
     ws["D2"].font = fuente(18, True)
     ws["D3"] = (f"Real {etiqueta(periodos[0])} a {etiqueta(ultimo)} y proyección {etiqueta(mover(ultimo, 1))} a "
                 f"{etiqueta(periodos[-1])} · BD_Montos_RRC_SONR (Daños)")

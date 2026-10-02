@@ -9,7 +9,7 @@ Genera salidas/Dashboard_Indices_Reservas.html a partir de las mismas salidas qu
                           con banda al 80%; comparativo por ramo; patron de desarrollo (LAG 1-10); resumen del ramo.
   * pestaña "Reservas"  : filtros (reserva, concepto, ramo, moneda); indicadores; mensual 2025-2027; por ramo;
                           historico 2022-2027; por concepto.
-  * pestaña "PND / PD"  : filtros (ramo, con "Todos", y reserva); PND / PD y sus indicadores por ramo (FACTOR GTO,
+  * pestaña "Razones"  : filtros (ramo, con "Todos", y reserva); PND / PD y sus indicadores por ramo (FACTOR GTO,
                           FACTOR MR, CESION, FD / FND, IS (RL), IS (FA), PE FCST, PRIMA N AÑOS y PEACUMULADA), real y
                           proyeccion, de la hoja Indicadores_Ramo del diagnostico (los valores de la BD de Danos).
   * pestaña "Analisis"  : tablas con mapa de calor (indices por ramo, totales por concepto) y modelo por tipo.
@@ -186,7 +186,7 @@ def preparar_datos() -> dict:
         persistencia = float(texto.split("persistencia")[1].split(";")[0].strip()) if "persistencia" in texto else None
     except (IndexError, ValueError):
         persistencia = None
-    pnd = dx.leer_indicadores_ramo()                 # pestaña PND / PD (None con un diagnostico anterior)
+    pnd = dx.leer_indicadores_ramo()                 # pestaña Razones (None con un diagnostico anterior)
     if pnd:
         unidad = {c: u for c, _, u in dx.INDICADORES_PND}
         pnd = {"periodos": pnd["periodos"], "ramos": pnd["ramos"], "con_fa": pnd["con_fa"], "lleva_gto": pnd["lleva_gto"],
@@ -402,7 +402,7 @@ table.datos tbody tr:hover { background: var(--surface-2); }
     <div class="tabs" role="tablist" aria-label="Vistas">
       <button role="tab" id="tab-indices" aria-selected="true" aria-controls="vista-indices">Índices</button>
       <button role="tab" id="tab-reservas" aria-selected="false" aria-controls="vista-reservas">Reservas</button>
-      <button role="tab" id="tab-pnd" aria-selected="false" aria-controls="vista-pnd">PND/PD</button>
+      <button role="tab" id="tab-pnd" aria-selected="false" aria-controls="vista-pnd">Razones</button>
       <button role="tab" id="tab-analisis" aria-selected="false" aria-controls="vista-analisis">Análisis</button>
     </div>
     <button class="btn" id="tema" type="button" title="Cambiar tema">Tema: sistema</button>
@@ -1030,7 +1030,7 @@ function pintarReservas() {
   redibujarTodo();
 }
 
-// ---------------------------------------------------------------- vista: PND / PD
+// ---------------------------------------------------------------- vista: Razones (PND / PD y sus indicadores)
 // Indicadores por ramo de la BD de Danos (hoja Indicadores_Ramo del diagnostico). "Todos" = montos sumados; factores e
 // indices ponderados por el PND / PD (CESION por el BRUTO), que es la razon de las sumas; FD / FND = suma de PND / PD
 // entre suma de PEACUMULADA.
