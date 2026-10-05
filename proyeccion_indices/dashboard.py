@@ -290,8 +290,9 @@ def leer_indicadores_ramo() -> dict | None:
     BEL por FND]}, "faltan": {reserva: texto de los ramos que no entran a "Todos" y en que meses}, "distinto": {reserva:
     [posiciones de los meses en que "Todos" no tiene los mismos ramos que en el ultimo mes real]}, "sin_denominador":
     {reserva: n de razones sin dato por denominador casi nulo}, "metodo_area": {reserva: [ramos cuya historia del FND
-    sale del metodo del area; sus datos traen ademas "<indicador> (metodo del area)"]}, "meses_n", "anios_lag": {reserva:
-    n}, "renglones": n}.
+    sale del metodo del area; sus datos traen ademas "<indicador> (metodo del area)"]}, "falla_area": {reserva: {ramo:
+    por que no se pudo usar el metodo del area (su BEL queda en 0)}}, "meses_n", "anios_lag": {reserva: n},
+    "renglones": n}.
     None si no esta la hoja (diagnostico de una version anterior)."""
     if not ARCHIVO_DIAGNOSTICO.exists():
         return None
@@ -310,7 +311,7 @@ def leer_indicadores_ramo() -> dict | None:
     ramos = sorted({str(r["Ramo"]) for r in crudos}, key=lambda x: int(x) if x.isdigit() else 10 ** 6)
     pos = {p: i for i, p in enumerate(periodos)}
     columnas = [c for c, _, _ in INDICADORES_PND] + ["BRUTO"]
-    datos, lleva_gto, fnd, anios_lag, metodo_area = {}, {}, {}, {}, {}
+    datos, lleva_gto, fnd, anios_lag, metodo_area, falla_area = {}, {}, {}, {}, {}, {}
     meses_n = next((int(numero(r.get("Meses PRIMA N AÑOS"))) for r in crudos if numero(r.get("Meses PRIMA N AÑOS"))), 12)
     for r in crudos:
         res, ramo, i = r["Reserva"], str(r["Ramo"]), pos[int(r["Periodo"])]
@@ -321,7 +322,10 @@ def leer_indicadores_ramo() -> dict | None:
             lleva_gto[res] = True
         if numero(r.get("BEL por FND")) and ramo not in fnd.setdefault(res, []):
             fnd[res].append(ramo)
-        if r.get("Historia del BEL") == "metodo del area":
+        hist_bel = str(r.get("Historia del BEL") or "")
+        if hist_bel.startswith(("sin metodo del area", "no se pudo usar el metodo del area")):
+            falla_area.setdefault(res, {})[ramo] = hist_bel.split(": ", 1)[-1]
+        if hist_bel == "metodo del area":
             if ramo not in metodo_area.setdefault(res, []):
                 metodo_area[res].append(ramo)
             for c in COLUMNAS_METODO_AREA:
@@ -390,7 +394,7 @@ def leer_indicadores_ramo() -> dict | None:
             "lleva_gto": lleva_gto,
             "fnd": {res: sorted(v, key=lambda x: int(x) if x.isdigit() else 10 ** 6) for res, v in fnd.items()},
             "faltan": faltan, "distinto": distinto, "sin_denominador": sin_den, "meses_n": meses_n, "anios_lag": anios_lag,
-            "metodo_area": metodo_area,
+            "metodo_area": metodo_area, "falla_area": falla_area,
             "renglones": len(crudos)}
 
 
@@ -407,6 +411,19 @@ def etiquetas_modelo(metodo: list) -> dict:
         otros, trim = [m for m in ms if "trimestral" not in m], [m for m in ms if "trimestral" in m]
         out[tipo] = ", ".join(otros) + (f"; RCONT: {', '.join(trim)}" if otros and trim else ", ".join(trim) if trim else "")
     return out
+
+
+def version_codigo() -> str:
+    """Version de los scripts que generaron el diagnostico (hoja Resumen, "Version del codigo")."""
+    if not ARCHIVO_DIAGNOSTICO.exists():
+        return "sin diagnostico"
+    wb = openpyxl.load_workbook(ARCHIVO_DIAGNOSTICO, read_only=True, data_only=True)
+    try:
+        filas = {str(a).strip(): b for a, b, *_ in wb["Resumen"].iter_rows(values_only=True) if a} \
+            if "Resumen" in wb.sheetnames else {}
+    finally:
+        wb.close()
+    return str(filas.get("Version del codigo") or "anterior a 2026-10-05b")
 
 
 def nota_modelo() -> str:
@@ -1091,7 +1108,9 @@ def construir_pnd(ws, wbp, wcp, pnd: dict, ultimo: int, p_dic: int, nombre, sele
              "por el PND / PD (CESIÓN por el BRUTO).",
              *[f"No entran a Todos en {res}: {txt}." for res, txt in pnd.get("faltan", {}).items() if txt],
              *[f"{res} {', '.join(rs)}: SAP registra 0; la proyección sale de la historia del método del área "
-               "(Res_Rvas)." for res, rs in (pnd.get("metodo_area") or {}).items() if rs], "",
+               "(Res_Rvas)." for res, rs in (pnd.get("metodo_area") or {}).items() if rs],
+             *[f"{res} {', '.join(fs)}: SAP registra 0 y no se pudo usar el método del área (ver Alertas del "
+               "diagnóstico): sigue en 0." for res, fs in (pnd.get("falla_area") or {}).items() if fs], "",
              f"#N/D = sin dato: IS (FA) antes de {etiqueta(mover(ultimo, 1))} o en ramos que FA no manda; SONR sin GTO; "
              "una razón cuyo denominador es casi 0."]
     fila = 19
@@ -1102,7 +1121,7 @@ def construir_pnd(ws, wbp, wcp, pnd: dict, ultimo: int, p_dic: int, nombre, sele
     ws["D2"] = "Dashboard de Razones: PND / PD y sus indicadores por ramo"
     ws["D2"].font = fuente(18, True)
     ws["D3"] = (f"Real {etiqueta(periodos[0])} a {etiqueta(ultimo)} y proyección {etiqueta(mover(ultimo, 1))} a "
-                f"{etiqueta(periodos[-1])} · BD_Montos_RRC_SONR (Daños)")
+                f"{etiqueta(periodos[-1])} · BD_Montos_RRC_SONR (Daños) · versión del código {version_codigo()}")
     ws["D3"].font = fuente(10, False, TEXTO_2)
 
     # ---- CalcPND: una columna Real y una Proyeccion por indicador

@@ -210,6 +210,7 @@ def preparar_datos() -> dict:
         unidad = {**{c: u for c, _, u in dx.INDICADORES_PND}, "IS (RL) ramos FA": "pct"}
         unidad.update({f"{c} {dx.SUFIJO_METODO_AREA}": unidad[c] for c in dx.COLUMNAS_METODO_AREA})
         pnd = {"is_fa_bel": pnd.get("is_fa_bel") or {}, "metodo_area": pnd.get("metodo_area") or {},
+               "falla_area": pnd.get("falla_area") or {},
                **{k: pnd[k] for k in ("periodos", "ramos", "con_fa", "lleva_gto", "fnd", "faltan", "distinto",
                                      "sin_denominador", "meses_n", "anios_lag")},
                "indicadores": [[c, t, u] for c, t, u in dx.INDICADORES_PND],
@@ -235,6 +236,7 @@ def preparar_datos() -> dict:
         "tend": leer_tendencias(),
         "pnd": pnd,
         "generado": datetime.now().strftime("%Y-%m-%d %H:%M"),
+        "version": dx.version_codigo(),
     }
 
 
@@ -244,7 +246,7 @@ def generar(ruta_salida: Path = SALIDA_HTML) -> Path:
     json_datos = json.dumps(datos, ensure_ascii=False, separators=(",", ":")).replace("</", "<\\/")
     html = (PLANTILLA.replace("__DATOS__", json_datos)
             .replace("__PIE__", dx.PIE_PAGINA)
-            .replace("__GENERADO__", datos["generado"]))
+            .replace("__GENERADO__", datos["generado"]).replace("__VERSION__", datos["version"].replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")))
     tmp = ruta_salida.with_suffix(".tmp.html")
     tmp.write_text(html, encoding="utf-8")
     tmp.replace(ruta_salida)
@@ -464,6 +466,7 @@ table.datos tbody tr:hover { background: var(--surface-2); }
       <div class="filtro"><label for="f-reserva-pnd">Reserva</label><select id="f-reserva-pnd"></select></div>
       <div class="nota" id="nota-pnd"></div>
     </div>
+    <p class="aviso" id="aviso-pnd" role="status" hidden></p>
     <div class="kpis" id="kpis-pnd"></div>
     <div class="rejilla" id="rejilla-pnd"></div>
   </section>
@@ -471,7 +474,7 @@ table.datos tbody tr:hover { background: var(--surface-2); }
 </main>
 <footer class="pie">
   <span>__PIE__</span>
-  <span>Generado el __GENERADO__ por proyeccion_reservas.py · azul = real, naranja punteado = proyección, gris fino = modelo ajustado sobre la historia: recta de tendencia más el patrón por mes del año cuando la serie lo tiene; la proyección arranca del último real y, en los índices, su desviación respecto al modelo se desvanece hacia el nivel del último año y la pendiente entra ponderada por su credibilidad (solo en las series que se proyectan con la recta: índices, LAGs y BEL/BRUTO por ramo, salvo los que van con factor de prima; la RFV se modela en pesos) · banda = intervalo al 80%</span>
+  <span>Generado el __GENERADO__ por proyeccion_reservas.py, versión del código __VERSION__ · azul = real, naranja punteado = proyección, gris fino = modelo ajustado sobre la historia: recta de tendencia más el patrón por mes del año cuando la serie lo tiene; la proyección arranca del último real y, en los índices, su desviación respecto al modelo se desvanece hacia el nivel del último año y la pendiente entra ponderada por su credibilidad (solo en las series que se proyectan con la recta: índices, LAGs y BEL/BRUTO por ramo, salvo los que van con factor de prima; la RFV se modela en pesos) · banda = intervalo al 80%</span>
 </footer>
 <script>
 'use strict';
@@ -1089,8 +1092,11 @@ function explicaPnd(col, res, ramo) {
   const conFnd = !todos && ((PN.fnd || {})[res] || []).includes(ramo);
   const area = !todos && ((PN.metodo_area || {})[res] || []).includes(ramo);
   const anios = (PN.anios_lag || {})[res] || 0, meses = PN.meses_n || 12;
+  const falla = todos ? null : ((PN.falla_area || {})[res] || {})[ramo];
   const notaArea = area && ['PND/PD', 'FACTOR MR', 'CESION', 'FD/FND'].includes(col)
-    ? `. SAP registra 0 en este ramo: la proyección sale de la historia del método del área (Res_Rvas), en gris` : '';
+    ? `. SAP registra 0 en este ramo: la proyección sale de la historia del método del área (Res_Rvas), en gris`
+    : falla && ['PND/PD', 'FACTOR MR', 'CESION', 'FD/FND'].includes(col)
+      ? `. ATENCIÓN: SAP registra 0 en este ramo y no se pudo usar el método del área, así que sigue en 0. Motivo: ${falla}. Pon los Res_Rvas en entradas/ y vuelve a correr la proyección` : '';
   const desde = {                                      // como se proyecta desde el primer mes proyectado
     monto: todos ? `desde ${ini}, suma de los ramos (PEACUMULADA × ${fd} en los que llevan BEL por FND, el modelo en los demás)`
       : conFnd ? `desde ${ini}, PEACUMULADA × ${fd}` : `desde ${ini}, el BEL del modelo entre el IS (este ramo no lleva BEL por FND)`,
@@ -1126,10 +1132,14 @@ function pintarPnd() {
   const ramo = E.ramoPnd, res = E.reservaPnd, nb = res === 'RRC' ? 'PND' : 'PD', todos = ramo === 'Todos';
   const etiqRamo = todos ? 'todos los ramos' : `ramo ${ramo}`;
   const faltan = todos ? ((PN.faltan || {})[res] || '') : '';
+  const fallaSel = todos ? null : ((PN.falla_area || {})[res] || {})[ramo];
   document.getElementById('nota-pnd').textContent = `Real hasta ${eti(D.ultimo)} · proyección ${eti(P_N[nUlt + 1])} a ${eti(P_N[nFin])} · `
     + (todos ? 'Todos: en cada mes, los ramos con PND / PD; montos sumados, factores e índices ponderados (razón de las sumas)'
       + (faltan ? ` · no entran: ${faltan} (sombreado)` : '') : 'Valores de los bloques de la BD de Daños')
     + ' · una razón cuyo denominador es casi 0 va sin dato (s/d)';
+  const aviso = document.getElementById('aviso-pnd');      // (sin el metodo del area el IBNR del ramo queda en 0)
+  aviso.hidden = !fallaSel;
+  aviso.textContent = fallaSel ? `⚠ Atención: el ${nb} de este ramo sigue en 0 porque no se pudo usar el método del área. Motivo: ${fallaSel}. Pon los Res_Rvas en entradas/ y vuelve a correr la proyección.` : '';
   const pnd = seriePnd(res, ramo, 'PND/PD'), f1 = v => fmt(v, 1);
   const u = pnd[nUlt], pd = pnd[nDic], pf = pnd[nFin], p12 = pnd[nUlt + 12];
   document.getElementById('kpis-pnd').replaceChildren(
