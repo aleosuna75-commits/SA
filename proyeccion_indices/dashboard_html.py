@@ -208,7 +208,8 @@ def preparar_datos() -> dict:
     pnd = dx.leer_indicadores_ramo()                 # pestaña Razones (None con un diagnostico anterior)
     if pnd:
         unidad = {**{c: u for c, _, u in dx.INDICADORES_PND}, "IS (RL) ramos FA": "pct"}
-        pnd = {"is_fa_bel": pnd.get("is_fa_bel") or {},
+        unidad.update({f"{c} {dx.SUFIJO_METODO_AREA}": unidad[c] for c in dx.COLUMNAS_METODO_AREA})
+        pnd = {"is_fa_bel": pnd.get("is_fa_bel") or {}, "metodo_area": pnd.get("metodo_area") or {},
                **{k: pnd[k] for k in ("periodos", "ramos", "con_fa", "lleva_gto", "fnd", "faltan", "distinto",
                                      "sin_denominador", "meses_n", "anios_lag")},
                "indicadores": [[c, t, u] for c, t, u in dx.INDICADORES_PND],
@@ -1086,7 +1087,10 @@ function explicaPnd(col, res, ramo) {
   const nb = res === 'RRC' ? 'PND' : 'PD', fd = res === 'RRC' ? 'FND' : 'FD', ini = eti(P_N[nUlt + 1]);
   const faRamos = (PN.con_fa || []).join(', '), todos = ramo === 'Todos', rsFa = (PN.is_fa_bel || {})[res] || [];
   const conFnd = !todos && ((PN.fnd || {})[res] || []).includes(ramo);
+  const area = !todos && ((PN.metodo_area || {})[res] || []).includes(ramo);
   const anios = (PN.anios_lag || {})[res] || 0, meses = PN.meses_n || 12;
+  const notaArea = area && ['PND/PD', 'FACTOR MR', 'CESION', 'FD/FND'].includes(col)
+    ? `. SAP registra 0 en este ramo: la proyección sale de la historia del método del área (Res_Rvas), en gris` : '';
   const desde = {                                      // como se proyecta desde el primer mes proyectado
     monto: todos ? `desde ${ini}, suma de los ramos (PEACUMULADA × ${fd} en los que llevan BEL por FND, el modelo en los demás)`
       : conFnd ? `desde ${ini}, PEACUMULADA × ${fd}` : `desde ${ini}, el BEL del modelo entre el IS (este ramo no lleva BEL por FND)`,
@@ -1097,7 +1101,7 @@ function explicaPnd(col, res, ramo) {
   };
   const peac = res === 'RRC' || !anios ? 'En RRC es igual a PRIMA N AÑOS'
     : Array.from({ length: anios }, (_, k) => k === 0 ? 'LAG 1 × PRIMA N AÑOS del mes' : `LAG ${k + 1} × la de ${12 * k} meses antes`).join(' + ');
-  return {
+  return ({
     'PND/PD': `${nb} = BEL / IS (RL)${rsFa.length && (rsFa.includes(ramo) || todos) ? ` (desde ${ini}, BEL / IS (FA) en ${todos ? 'los ramos ' + rsFa.join(', ') : 'este ramo'})` : ''}; ${desde.monto}. Millones de USD`,
     'FACTOR GTO': `GTO / PND, en %; ${desde.factor}`,
     'FACTOR MR': `MR / ${nb}, en %; ${desde.factor}${conFnd ? ' (arranca del nivel de los últimos 3 meses: tiene picos de un mes)' : ''}`,
@@ -1110,10 +1114,12 @@ function explicaPnd(col, res, ramo) {
     'PE FCST': 'Prima tomada del mes (PExRamo, reforecast y FCST), millones de USD; la misma en RRC y SONR',
     'PRIMA N AÑOS': `Suma de los últimos ${meses} meses de PE FCST, millones de USD; la misma en RRC y SONR`,
     'PEACUMULADA': `${peac}. Millones de USD`,
-  }[col] || '';
+  }[col] || '') + notaArea;
 }
+const SUF_AREA = ' (metodo del area)';               // historia del metodo del area (Res_Rvas) de las series que SAP no registra
 function seriePnd(res, ramo, col) {
-  const u = UNIDAD_PND[col === 'IS (RL) ramos FA' ? 'pct' : (PN.indicadores.find(x => x[0] === col) || [])[2] || 'monto'];
+  const base = col.endsWith(SUF_AREA) ? col.slice(0, -SUF_AREA.length) : col;
+  const u = UNIDAD_PND[base === 'IS (RL) ramos FA' ? 'pct' : (PN.indicadores.find(x => x[0] === base) || [])[2] || 'monto'];
   return (((PN.datos[res] || {})[ramo] || {})[col] || new Array(P_N.length).fill(null)).map(v => v == null ? null : v * u.esc);
 }
 function pintarPnd() {
@@ -1153,6 +1159,10 @@ function pintarPnd() {
       real = rl.map((v, i) => i <= nUlt ? v : null);
       proy = vals.map((v, i) => i > nUlt ? v : (i === nUlt ? rl[i] : null));
     }
+    const areaCol = !todos && ((PN.metodo_area || {})[res] || []).includes(ramo)
+      ? seriePnd(res, ramo, col + SUF_AREA).map((v, i) => i <= nUlt ? v : null) : null;
+    const hayArea = !!areaCol && areaCol.some(v => v != null);
+    if (hayArea && areaCol[nUlt] != null) proy = proy.map((v, i) => i === nUlt ? areaCol[nUlt] : v);   // arranca de su historia
     const hayReal = real.some(v => v != null), hayProy = proy.some((v, i) => v != null && i > nUlt);
     let vacio = null;
     if (col === 'FACTOR GTO' && !PN.lleva_gto[res]) vacio = `${res} no lleva GTO: el gasto (GTO) solo existe en RRC.`;
@@ -1163,11 +1173,14 @@ function pintarPnd() {
       'FD/FND': res === 'RRC' ? 'FND (PND / PEACUMULADA)' : res === 'SONR' ? 'FD (PD / PEACUMULADA)' : titulo }[col] || titulo;
     const extra = col === 'PND/PD' && sinDesde && !vacio ? ` · ${sinDesde}` : '';
     const gris = col === 'IS (FA)' && isRlFa && isRlFa.some(v => v != null)
-      ? [{ nombre: 'IS (RL) de los mismos ramos', valores: isRlFa, color: cssVar('--deemph-ink'), fino: true }] : [];
+      ? [{ nombre: 'IS (RL) de los mismos ramos', valores: isRlFa, color: cssVar('--deemph-ink'), fino: true }]
+      : hayArea ? [{ nombre: 'Método del área (Res_Rvas)', valores: areaCol, color: cssVar('--deemph-ink'), fino: true }] : [];
+    const titGris = hayArea ? `Método del área, Res_Rvas (${un.eje})` : 'IS (RL) de los mismos ramos (%)';
+    const serieGris = hayArea ? areaCol : isRlFa;
     const c = tarjeta(`${titNb} · ${etiqRamo}`, explicaPnd(col, res, ramo) + extra,
       (cuerpo, W) => {
         if (vacio) { cuerpo.append(el('p', { class: 'sub', style: 'margin:24px 0;color:var(--ink-2)', text: vacio })); return; }
-        const series = [...gris, ...(hayReal ? [{ nombre: col === 'IS (FA)' ? 'Real (IS RL)' : 'Real', valores: real, color: cssVar('--real'), etiquetaFin: true }] : []),
+        const series = [...gris, ...(hayReal ? [{ nombre: col === 'IS (FA)' ? 'Real (IS RL)' : hayArea ? 'Real (SAP)' : 'Real', valores: real, color: cssVar('--real'), etiquetaFin: true }] : []),
                         ...(hayProy ? [{ nombre: col === 'IS (FA)' ? 'Proyección (IS FA)' : 'Proyección', valores: proy, color: cssVar('--proy'), dash: true, etiquetaFin: true }] : [])];
         graficaLineas(cuerpo, W, {
           labels: P_N.map(eti), tituloX: i => etiLarga(P_N[i]) + (i <= nUlt ? ' (real)' : ' (proyección)'), fmt: fv, cadaX: 6, etiquetasFin: true,
@@ -1179,8 +1192,8 @@ function pintarPnd() {
           ...(sombras.length ? [{ nombre: 'Meses sin todos los ramos (ver nota)', color: cssVar('--grid'), caja: true, opacidad: 0.6 }] : [])]));
       },
       () => vacio ? el('p', { class: 'sub', style: 'margin:12px 8px', text: vacio })
-        : tablaDatos(['Mes', 'Tipo', `${titNb} (${un.eje})`, ...(gris.length ? ['IS (RL) de los mismos ramos (%)'] : [])],
-          P_N.map((p, i) => [etiLarga(p), i <= nUlt ? (col === 'IS (FA)' ? 'Real (IS RL)' : 'Real') : 'Proyección', fv(i <= nUlt ? real[i] : vals[i]), ...(gris.length ? [fv(isRlFa[i])] : [])])),
+        : tablaDatos(['Mes', 'Tipo', `${titNb} (${un.eje})`, ...(gris.length ? [titGris] : [])],
+          P_N.map((p, i) => [etiLarga(p), i <= nUlt ? (col === 'IS (FA)' ? 'Real (IS RL)' : hayArea ? 'Real (SAP)' : 'Real') : 'Proyección', fv(i <= nUlt ? real[i] : vals[i]), ...(gris.length ? [fv(serieGris[i])] : [])])),
       k === 0 || k === PN.indicadores.length - 1);
     rejilla.append(c); tarjetasVivas.push(c);
   });

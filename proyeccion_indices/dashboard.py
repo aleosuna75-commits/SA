@@ -260,6 +260,8 @@ INDICADORES_PND = [
 # se suman y los factores e indices son el promedio ponderado de esos ramos, que equivale a la razon de las sumas: FACTOR
 # GTO, FACTOR MR e IS con el PND / PD (GTO / PND, MR / PND, BEL / PND), CESION con el BRUTO (IRR / BRUTO) y FD / FND =
 # suma de PND / suma de PEACUMULADA. Todas las graficas de "Todos" usan los mismos ramos en cada mes
+COLUMNAS_METODO_AREA = ("PND/PD", "FACTOR MR", "CESION", "FD/FND")   # historia del metodo del area (Res_Rvas) de las
+SUFIJO_METODO_AREA = "(metodo del area)"     # series que SAP no registra (BEL_METODO_AREA del script): va en gris
 PESO_TODOS = {"FACTOR GTO": "PND/PD", "FACTOR MR": "PND/PD", "IS (RL)": "PND/PD", "IS (FA)": "PND/PD", "CESION": "BRUTO"}
 # una razon cuyo denominador casi no existe (menos de 1 USD o del 0.1 % de su nivel tipico en la serie: p. ej. el BEL de
 # SONR 80 en 0 desde 2022) va sin dato en el tablero: en la BD la formula da ruido de punto flotante (miles de millones
@@ -287,7 +289,9 @@ def leer_indicadores_ramo() -> dict | None:
     proyectados usan el IS (FA)]}, "lleva_gto": {reserva: bool}, "fnd": {reserva: [ramos con
     BEL por FND]}, "faltan": {reserva: texto de los ramos que no entran a "Todos" y en que meses}, "distinto": {reserva:
     [posiciones de los meses en que "Todos" no tiene los mismos ramos que en el ultimo mes real]}, "sin_denominador":
-    {reserva: n de razones sin dato por denominador casi nulo}, "meses_n", "anios_lag": {reserva: n}, "renglones": n}.
+    {reserva: n de razones sin dato por denominador casi nulo}, "metodo_area": {reserva: [ramos cuya historia del FND
+    sale del metodo del area; sus datos traen ademas "<indicador> (metodo del area)"]}, "meses_n", "anios_lag": {reserva:
+    n}, "renglones": n}.
     None si no esta la hoja (diagnostico de una version anterior)."""
     if not ARCHIVO_DIAGNOSTICO.exists():
         return None
@@ -306,7 +310,7 @@ def leer_indicadores_ramo() -> dict | None:
     ramos = sorted({str(r["Ramo"]) for r in crudos}, key=lambda x: int(x) if x.isdigit() else 10 ** 6)
     pos = {p: i for i, p in enumerate(periodos)}
     columnas = [c for c, _, _ in INDICADORES_PND] + ["BRUTO"]
-    datos, lleva_gto, fnd, anios_lag = {}, {}, {}, {}
+    datos, lleva_gto, fnd, anios_lag, metodo_area = {}, {}, {}, {}, {}
     meses_n = next((int(numero(r.get("Meses PRIMA N AÑOS"))) for r in crudos if numero(r.get("Meses PRIMA N AÑOS"))), 12)
     for r in crudos:
         res, ramo, i = r["Reserva"], str(r["Ramo"]), pos[int(r["Periodo"])]
@@ -317,6 +321,12 @@ def leer_indicadores_ramo() -> dict | None:
             lleva_gto[res] = True
         if numero(r.get("BEL por FND")) and ramo not in fnd.setdefault(res, []):
             fnd[res].append(ramo)
+        if r.get("Historia del BEL") == "metodo del area":
+            if ramo not in metodo_area.setdefault(res, []):
+                metodo_area[res].append(ramo)
+            for c in COLUMNAS_METODO_AREA:
+                d.setdefault(f"{c} {SUFIJO_METODO_AREA}", [None] * len(periodos))[i] = numero(
+                    r.get(f"{c} {SUFIJO_METODO_AREA}"))
         if numero(r.get("Años LAG PEACUMULADA")) is not None:
             anios_lag[res] = int(numero(r.get("Años LAG PEACUMULADA")))
     faltan, sin_den, distinto = {}, {}, {}
@@ -380,6 +390,7 @@ def leer_indicadores_ramo() -> dict | None:
             "lleva_gto": lleva_gto,
             "fnd": {res: sorted(v, key=lambda x: int(x) if x.isdigit() else 10 ** 6) for res, v in fnd.items()},
             "faltan": faltan, "distinto": distinto, "sin_denominador": sin_den, "meses_n": meses_n, "anios_lag": anios_lag,
+            "metodo_area": metodo_area,
             "renglones": len(crudos)}
 
 
@@ -1078,7 +1089,9 @@ def construir_pnd(ws, wbp, wcp, pnd: dict, ultimo: int, p_dic: int, nombre, sele
              "RRC: PND · SONR: PD", "Mismos valores que los bloques de la BD de Daños.", "",
              "Todos los ramos: en cada mes, los ramos con PND / PD; montos sumados, factores e índices ponderados "
              "por el PND / PD (CESIÓN por el BRUTO).",
-             *[f"No entran a Todos en {res}: {txt}." for res, txt in pnd.get("faltan", {}).items() if txt], "",
+             *[f"No entran a Todos en {res}: {txt}." for res, txt in pnd.get("faltan", {}).items() if txt],
+             *[f"{res} {', '.join(rs)}: SAP registra 0; la proyección sale de la historia del método del área "
+               "(Res_Rvas)." for res, rs in (pnd.get("metodo_area") or {}).items() if rs], "",
              f"#N/D = sin dato: IS (FA) antes de {etiqueta(mover(ultimo, 1))} o en ramos que FA no manda; SONR sin GTO; "
              "una razón cuyo denominador es casi 0."]
     fila = 19

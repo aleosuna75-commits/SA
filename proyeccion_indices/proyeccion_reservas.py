@@ -545,12 +545,24 @@ COLUMNAS_TABLERO_PND = ("PND/PD", "FACTOR GTO", "FACTOR MR", "CESION", "IS (RL)"
                         "PEACUMULADA", "FD/FND")   # indicadores por ramo y mes que van a la hoja HOJA_INDICADORES_RAMO del
                                  # diagnostico (los mismos valores de los bloques de la BD principal), para el tablero
 HOJA_INDICADORES_RAMO = "Indicadores_Ramo"
+COLUMNAS_METODO_AREA = ("PND/PD", "FACTOR MR", "CESION", "FD/FND")   # historia del metodo del area (BEL_METODO_AREA) que
+SUFIJO_METODO_AREA = "(metodo del area)"     # va a HOJA_INDICADORES_RAMO como "<indicador> (metodo del area)", para el tablero
 HOJA_IS_FA = "IS_FA"             # hoja de apoyo en la BD de Danos con la tabla del archivo de la funcion actuarial
 RAMOS_IS_FA_BEL = {"RRC": ("40", "50", "80", "90"), "SONR": ("40", "50", "80", "90")}
                                  # ramos cuyo BEL por FND usa el IS de la funcion actuarial (IS (FA)) en lugar del IS (RL)
                                  # de HParametros, por decision del area: BEL = IS (FA) x PEACUMULADA x FND y PND / PD =
                                  # BEL / IS (FA) desde el primer mes proyectado (la historia y el FND siguen con el IS (RL));
                                  # en un mes sin IS (FA) se usa el IS (RL) con aviso. Los demas ramos siguen con el IS (RL).
+BEL_METODO_AREA = {("SONR", "80"): (3, 2)}
+                                 # series cuyo BEL no registra SAP pero que el area si calcula con su metodo (SONR 80: la
+                                 # BD trae BEL 0 desde 202206 y la hoja "Base SONR" de los Res_Rvas lo calcula). Mientras
+                                 # el BEL real del ultimo mes no sea positivo, la historia del FND, del FACTOR MR y de la
+                                 # CESION sale del BEL, MR, BRUTO e IRR en USD de la hoja "Base <reserva>" de los
+                                 # Res_Rvas_*.xlsx de entradas/, con los escenarios en orden de preferencia por mes
+                                 # (3 = Recalculo / Backtesting; 2 = Reforecast, que en los meses reales coincide con el 3
+                                 # y trae 202512, que el 3 no trae). El BEL proyectado queda como en los demas ramos:
+                                 # IS x PEACUMULADA x FND, formulado. La historia de la BD (SAP) no se toca. {} = esas
+                                 # series siguen con el modelo (BEL 0)
 PERFIL_REFORECAST = "FCST"       # meses del reforecast (entre PExRamo y el FCST, hoy sep-dic 2026): "FCST" = el total de
                                  # esos meses por ramo se reparte entre ellos con la mezcla mensual de los mismos meses del
                                  # FCST del ano siguiente (el archivo de reforecast concentra la prima en uno o dos meses,
@@ -1506,6 +1518,69 @@ def leer_tc_real(bd: BDMontos, ultimo: int, libro: str = "", alertas: list | Non
             alertas.append((libro, "TC de la historia", texto))
             print(f"   AVISO {libro}: {texto}", flush=True)
     return tc
+
+
+def leer_bel_metodo_area(ultimo: int, alertas: list | None = None) -> dict:
+    """BEL, MR, BRUTO e IRR en USD de las series de BEL_METODO_AREA, de la hoja "Base <reserva>" de los Res_Rvas_*.xlsx
+    de entradas/ (columnas Escenario, Tipo Monto, Ramo, Periodo y Monto_USD), en los meses hasta el ultimo real. En cada
+    mes se toma el primer escenario de la lista que trae BEL positivo, con sus cuatro conceptos; si dos archivos traen el
+    mismo mes, el ultimo en orden de nombre. Regresa {(reserva, ramo): {"valores": {(concepto, periodo): USD},
+    "meses": [...], "escenarios": {periodo: escenario}, "archivos": [...], "renglones": n}}."""
+    if not BEL_METODO_AREA:
+        return {}
+    conceptos = ("BEL", "MR", "BRUTO", "IRR")
+    crudo: dict = {}                  # (reserva, ramo) -> periodo -> escenario -> {concepto: USD}
+    archivos, renglones = {}, {}
+    buscadas = {(pref, str(r)) for (pref, r) in BEL_METODO_AREA}
+    for ruta in sorted(ENTRADAS.glob("Res_Rvas_*.xlsx")):
+        if ruta.name.startswith("~$"):
+            continue
+        try:
+            wb = openpyxl.load_workbook(ruta, read_only=True, data_only=True)
+        except Exception as e:  # noqa: BLE001
+            if alertas is not None:
+                alertas.append(("PND", "BEL del metodo del area", f"no se pudo leer {ruta.name}: {type(e).__name__}"))
+            continue
+        for pref in sorted({p for p, _ in buscadas}):
+            hoja = f"Base {pref}"
+            if hoja not in wb.sheetnames:
+                continue
+            col = None
+            for fila in wb[hoja].iter_rows(values_only=True):
+                if col is None:                       # renglon de encabezados
+                    nombres = [norm(x) if isinstance(x, str) else None for x in fila]
+                    req = {k: norm(k) for k in ("Escenario", "Tipo Monto", "Ramo", "Periodo", "Monto_USD")}
+                    if all(v in nombres for v in req.values()):
+                        col = {k: nombres.index(v) for k, v in req.items()}
+                    continue
+                try:
+                    esc, conc = int(fila[col["Escenario"]]), norm(str(fila[col["Tipo Monto"]]))
+                    ramo, per = str(int(fila[col["Ramo"]])), int(fila[col["Periodo"]])
+                    usd = float(fila[col["Monto_USD"]])
+                except (TypeError, ValueError):
+                    continue
+                if (pref, ramo) not in buscadas or per > ultimo or conc not in conceptos or not np.isfinite(usd):
+                    continue
+                if esc not in BEL_METODO_AREA.get((pref, ramo), ()):
+                    continue
+                crudo.setdefault((pref, ramo), {}).setdefault(per, {}).setdefault(esc, {})[conc] = usd
+                archivos.setdefault((pref, ramo), set()).add(ruta.name)
+                renglones[(pref, ramo)] = renglones.get((pref, ramo), 0) + 1
+        wb.close()
+    out = {}
+    for (pref, ramo), por_mes in crudo.items():
+        valores, escs = {}, {}
+        for per in sorted(por_mes):
+            for esc in BEL_METODO_AREA[(pref, ramo)]:
+                d = por_mes[per].get(esc, {})
+                if d.get("BEL", 0.0) > UMBRAL_CERO_MONTOS:
+                    valores.update({(c, per): d.get(c, math.nan) for c in conceptos})
+                    escs[per] = esc
+                    break
+        if escs:
+            out[(pref, ramo)] = {"valores": valores, "meses": sorted(escs), "escenarios": escs,
+                                 "archivos": sorted(archivos[(pref, ramo)]), "renglones": renglones[(pref, ramo)]}
+    return out
 
 
 def series_montos(bd: BDMontos, libro: str, reservas: dict, ultimo: int, h: int,
@@ -3139,13 +3214,15 @@ def _cambio_mensual(res: Resultado, ultimo_real: float) -> float:
 
 
 def calcular_bel_fnd(bd: BDMontos, hp, resultados: dict, proy: dict, pe: dict, periodos_proy: list[int],
-                     ultimo: int, is_fa_val: dict | None = None) -> dict:
+                     ultimo: int, is_fa_val: dict | None = None, bel_area: dict | None = None) -> dict:
     """BEL por FND: FND = PND / PEACUMULADA en la historia (PND = BEL / IS), proyectado con la tendencia desde el primer
     mes proyectado; BEL = IS x PEACUMULADA x FND; GTO = PND x FACTOR GTO y MR = PND x FACTOR MR (PND = BEL / IS), con los
     factores reales proyectados con el modelo del FND (TIPO_MODELO_FACTORES); BRUTO = BEL + GTO + MR; IRR = BRUTO x CESION (IRR /
     BRUTO real proyectado igual); NETO = BRUTO - IRR.
     En los ramos de RAMOS_IS_FA_BEL el IS del BEL (y del PND / PD) es el de la funcion actuarial, is_fa_val
     {(reserva, ramo, periodo): IS}; sin IS (FA) en un mes, el IS (RL) con aviso.
+    En las series de BEL_METODO_AREA sin BEL real positivo al ultimo mes, la historia del FND y de los factores sale de
+    bel_area (leer_bel_metodo_area: BEL, MR, BRUTO e IRR del metodo del area) en lugar de la BD.
     Regresa {"proy": montos con el BEL nuevo, "aplica": {(reserva, periodo, ramo)}, "fnd": {(reserva, periodo, ramo):
     FND proyectado}, "razones": {...}, "is_fa_bel": {(reserva, periodo, ramo) con IS (FA)}, "series": filas para el
     diagnostico, "resumen", "estado"}."""
@@ -3153,8 +3230,9 @@ def calcular_bel_fnd(bd: BDMontos, hp, resultados: dict, proy: dict, pe: dict, p
     pos = {p: i for i, p in enumerate(periodos_proy)}
     p12 = _suma_12(pe)
     out = {"proy": dict(proy), "aplica": set(), "fnd": {}, "razones": {}, "series": [], "resumen": [], "estado": "",
-           "p12": p12, "alertas": [], "neto_fijo": {}, "is_fa_bel": set()}
+           "p12": p12, "alertas": [], "neto_fijo": {}, "is_fa_bel": set(), "bel_area": {}}
     is_fa_val = is_fa_val or {}
+    bel_area = bel_area or {}
     if not pe:
         out["estado"] = "sin PE por ramo (PExRamo y FCST): el BEL sigue con el modelo"
         return out
@@ -3167,9 +3245,19 @@ def calcular_bel_fnd(bd: BDMontos, hp, resultados: dict, proy: dict, pe: dict, p
             def peac(p):
                 lags = {k: _hp_fuente(hp, resultados, r_hp, f"LAG {k}", p, pos)[0] for k in range(1, anios + 1)}
                 return _peacumulada(pref, r, p, p12, lags)
+            # historia: la BD (SAP) o, en las series de BEL_METODO_AREA sin BEL real positivo al ultimo mes, el BEL, MR,
+            # BRUTO e IRR del metodo del area (Res_Rvas)
+            area = bel_area.get((pref, str(r))) if (pref, str(r)) in BEL_METODO_AREA else None
+            bel_u_bd = bd.valores.get((f"{pref} BEL", ultimo, r), math.nan)
+            usa_area = area is not None and not (np.isfinite(bel_u_bd) and bel_u_bd > UMBRAL_CERO_MONTOS)
+
+            def val(conc, p, _area=area if usa_area else None, _pref=pref, _r=r):
+                if _area is not None:
+                    return _area["valores"].get((conc, p), math.nan)
+                return bd.valores.get((f"{_pref} {conc}", p, _r), math.nan)
             fnd_h, per_ok = [], []
             for p in per_hist:
-                bel = bd.valores.get((f"{pref} BEL", p, r), math.nan)
+                bel = val("BEL", p)
                 is_ = _hp_fuente(hp, resultados, r_hp, nombre_is, p, pos)[0]
                 pa = peac(p)
                 f = (bel / is_) / pa if np.isfinite(bel) and np.isfinite(is_) and is_ != 0 and np.isfinite(pa) \
@@ -3178,13 +3266,23 @@ def calcular_bel_fnd(bd: BDMontos, hp, resultados: dict, proy: dict, pe: dict, p
                 if np.isfinite(f):
                     per_ok.append(p)
             fila = {"Reserva": pref, "Ramo": r, "Meses de FND real": len(per_ok),
-                    "Desde": per_ok[0] if per_ok else None, "Hasta": per_ok[-1] if per_ok else None}
+                    "Desde": per_ok[0] if per_ok else None, "Hasta": per_ok[-1] if per_ok else None,
+                    "Historia del BEL": "BD (SAP)"}
+            if usa_area:
+                escs = sorted(set(area["escenarios"].values()), key=BEL_METODO_AREA[(pref, str(r))].index)
+                otros = [f"{q}: escenario {e}" for q, e in sorted(area["escenarios"].items()) if e != escs[0]]
+                fila["Historia del BEL"] = (f"metodo del area ({', '.join(area['archivos'])}, hoja Base {pref}, "
+                                            f"escenario {escs[0]}{'; ' + ', '.join(otros) if otros else ''}): SAP "
+                                            f"registra BEL {f'{bel_u_bd:,.0f}' if np.isfinite(bel_u_bd) else 'vacio'} en {ultimo}")
+            elif area is not None:
+                fila["Historia del BEL"] = "BD (SAP): ya registra BEL, no se usa el metodo del area"
             motivo = ""
-            bel_u = bd.valores.get((f"{pref} BEL", ultimo, r), math.nan)
+            bel_u = val("BEL", ultimo)
             if len(per_ok) < MIN_MESES_FND:
                 motivo = f"menos de {MIN_MESES_FND} meses de FND real (falta PE, IS o LAG)"
             elif not (np.isfinite(bel_u) and bel_u > 0):
-                motivo = "BEL real no positivo al ultimo mes"
+                motivo = ("el BEL del metodo del area no llega al ultimo mes real" if usa_area
+                          else "BEL real no positivo al ultimo mes")
             fnd_f = None
             if not motivo:
                 per = rango_periodos(per_ok[0], ultimo)
@@ -3212,13 +3310,13 @@ def calcular_bel_fnd(bd: BDMontos, hp, resultados: dict, proy: dict, pe: dict, p
                 for nombre, (conc, base, dom) in specs.items():
                     vals = {}
                     for p in per_hist:
-                        x = bd.valores.get((f"{pref} {conc}", p, r), math.nan)
+                        x = val(conc, p)
                         if base == "PND":
-                            bel = bd.valores.get((f"{pref} BEL", p, r), math.nan)
+                            bel = val("BEL", p)
                             is_ = _hp_fuente(hp, resultados, r_hp, nombre_is, p, pos)[0]
                             d = bel / is_ if np.isfinite(bel) and np.isfinite(is_) and is_ != 0 else math.nan
                         else:
-                            d = bd.valores.get((f"{pref} BRUTO", p, r), math.nan)
+                            d = val("BRUTO", p)
                         vals[p] = x / d if np.isfinite(x) and np.isfinite(d) and d != 0 else math.nan
                     ok_p = [p for p in per_hist if np.isfinite(vals[p])]
                     f = np.zeros(h)
@@ -3303,6 +3401,24 @@ def calcular_bel_fnd(bd: BDMontos, hp, resultados: dict, proy: dict, pe: dict, p
                 out["aplica"].add((pref, p, r))
                 n_ap += 1
             fila["Meses con BEL por FND"] = n_ap
+            if usa_area and n_ap:
+                out["bel_area"][(pref, str(r))] = {"desde": per_ok[0] if per_ok else None, "hasta": ultimo,
+                                              "meses": len(per_ok), "fuente": fila["Historia del BEL"]}
+                hist_a = {}                                   # la historia que se uso, para el tablero
+                for p in per_ok:
+                    is_ = _hp_fuente(hp, resultados, r_hp, nombre_is, p, pos)[0]
+                    pd_a = val("BEL", p) / is_
+                    mr_a, irr_a, br_a = val("MR", p), val("IRR", p), val("BRUTO", p)
+                    hist_a[p] = {"PND/PD": pd_a, "FD/FND": fnd_h[per_hist.index(p)],
+                                 "FACTOR MR": mr_a / pd_a if np.isfinite(mr_a) and pd_a else math.nan,
+                                 "CESION": irr_a / br_a if np.isfinite(irr_a) and np.isfinite(br_a) and br_a else math.nan}
+                out["bel_area"][(pref, str(r))]["historia"] = hist_a
+                out["alertas"].append(("DANOS", f"{pref} | BEL | ramo {r}",
+                                       f"SAP registra BEL {f'{bel_u_bd:,.0f}' if np.isfinite(bel_u_bd) else 'vacio'} en {ultimo}: "
+                                       f"la historia del FND, del FACTOR MR y de la CESION ({len(per_ok)} meses, "
+                                       f"{per_ok[0]} a {per_ok[-1]}) sale del {fila['Historia del BEL'].split(': SAP')[0]}; "
+                                       f"el BEL proyectado es IS x PEACUMULADA x FND como en los demas ramos "
+                                       f"(BEL_METODO_AREA)"))
             if con_fa and sin_fa and fnd_f is not None:
                 out["alertas"].append(("DANOS", f"{pref} | BEL | ramo {r}",
                                        f"{len(sin_fa)} mes(es) sin IS de la funcion actuarial ({sin_fa[0]} a {sin_fa[-1]}): "
@@ -3545,6 +3661,10 @@ def escribir_indices_pnd(bd: BDMontos, ctx: dict, avisos: list | None = None) ->
                 "la pendiente combinada en logaritmos con el patron del mes" if modelo_f == TENDENCIA else modelo_f)
         return f"; desde {min(periodos_proy)}, en las series con BEL por FND, {como} (valor) en todos los renglones del mes"
     ramos_fa_bel = "; ".join(f"{k} {', '.join(v)}" for k, v in RAMOS_IS_FA_BEL.items() if v)
+    bel_area = ctx.get("bel_area") or {}           # {(reserva, ramo): ...} series con la historia del metodo del area
+    nota_area = "".join(f"; {pr_} {r_}: SAP no registra BEL, el valor proyectado sale de la historia del metodo del area "
+                        f"({d_['desde']} a {d_['hasta']}, Res_Rvas; BEL_METODO_AREA, ver BEL_FND_Resumen del diagnostico)"
+                        for (pr_, r_), d_ in sorted(bel_area.items())) if periodos_proy else ""
     descripcion = {
         "PND/PD": ("PND/PD = BEL / IS (RL): en el renglon BEL, BEL del renglon / IS; en los demas renglones, el BEL del mes "
                    "con SUMAR.SI.CONJUNTO por CONCEPTO y PERIODO (ninguna formula apunta a otro renglon: la hoja se puede "
@@ -3559,10 +3679,10 @@ def escribir_indices_pnd(bd: BDMontos, ctx: dict, avisos: list | None = None) ->
         "FACTOR GTO": ("FACTOR GTO = GTO del mes / PND/PD (en el renglon RRC GTO, su monto; en los demas, con "
                        "SUMAR.SI.CONJUNTO); SONR no tiene GTO: 0" + si_error + na_pnd + _proy_fac("FACTOR GTO")),
         "FACTOR MR": ("FACTOR MR = MR del mes / PND/PD (en el renglon MR de la reserva, su monto; en los demas, con "
-                      "SUMAR.SI.CONJUNTO)" + si_error + na_pnd + _proy_fac("FACTOR MR")),
+                      "SUMAR.SI.CONJUNTO)" + si_error + na_pnd + _proy_fac("FACTOR MR") + nota_area),
         "CESION": ("CESION = IRR del mes / BRUTO del mes (razon de cesion; en el renglon IRR o BRUTO, su monto; en los "
                    "demas, con SUMAR.SI.CONJUNTO)" + si_error + f"; {TEXTO_SIN_DATO} sin montos (meses de prima)"
-                   + _proy_fac("CESION")),
+                   + _proy_fac("CESION") + nota_area),
         "IS (RL)": f"IS (RL) = {' / '.join(v[0] for v in INDICE_BASE_PND.values())} de {HOJA_PARAMETROS} del mes (real o "
                    f"proyectado; {TEXTO_SIN_DATO} si no hay; ramo de la hoja segun MAPA_RAMO_LAG: {claves_hp})",
         "LAG (RL)": f"LAG (RL) = LAG 1 de {HOJA_PARAMETROS} del mes (real o proyectado; {TEXTO_SIN_DATO} si no hay)",
@@ -3592,7 +3712,8 @@ def escribir_indices_pnd(bd: BDMontos, ctx: dict, avisos: list | None = None) ->
         "FD/FND": "FD/FND = PND/PD / PEACUMULADA" + si_error + (
             f"; desde {min(periodos_proy)}, en las series con BEL por FND, el FND proyectado (valor) en todos los renglones "
             "del mes"
-            if fnd and periodos_proy else "") + f"; {TEXTO_SIN_DATO} si PND/PD o PEACUMULADA son {TEXTO_SIN_DATO}",
+            if fnd and periodos_proy else "") + f"; {TEXTO_SIN_DATO} si PND/PD o PEACUMULADA son {TEXTO_SIN_DATO}"
+                  + nota_area,
     }
     col_estilo = max(fijas)
     col_ramo = next(iter(bd.cols_ramo.values()))
@@ -5045,6 +5166,7 @@ def _hojas_pnd(wb, diag: dict, negrita, encab):
         if (diag or {}).get("indicadores_ramo"):        # (lo lee el tablero: seccion Razones)
             _hoja_filas(wb, HOJA_INDICADORES_RAMO, diag["indicadores_ramo"], negrita, encab,
                         {**{c: COLUMNAS_INDICES_PND.get(c, "0.0000") for c in COLUMNAS_TABLERO_PND},
+                         **{f"{c} {SUFIJO_METODO_AREA}": COLUMNAS_INDICES_PND.get(c, "0.0000") for c in COLUMNAS_METODO_AREA},
                          "BEL": "#,##0", "BRUTO": "#,##0"})
         if (diag or {}).get("is_fa_comp"):
             _hoja_filas(wb, "IS_FA_Comparativo", diag["is_fa_comp"], negrita, encab,
@@ -5636,8 +5758,14 @@ def main():
     if USAR_BEL_POR_FND:
         print("BEL por FND (Danos) ...", flush=True)
         try:
+            bel_area = leer_bel_metodo_area(ultimo, alertas)
+            for (pref_a, r_a) in BEL_METODO_AREA:
+                d_a = bel_area.get((pref_a, str(r_a)))
+                print(f"   BEL del metodo del area {pref_a} {r_a}: " + (
+                      f"{d_a['renglones']} renglones de {', '.join(d_a['archivos'])}, {len(d_a['meses'])} meses con BEL "
+                      f"({d_a['meses'][0]} a {d_a['meses'][-1]})" if d_a else "sin datos en entradas/"), flush=True)
             info_fnd = calcular_bel_fnd(bd_danos, hp, resultados, proy_danos, pe_mes, periodos_proy, ultimo,
-                                        is_fa["val"] if is_fa is not None else None)
+                                        is_fa["val"] if is_fa is not None else None, bel_area)
             validar(info_fnd["proy"], proy_rfv)
             alertas.extend(info_fnd.get("alertas") or [])
             proy_danos = info_fnd["proy"]
@@ -5670,6 +5798,7 @@ def main():
                 "pe": pe_mes, "hoja_pe": hoja_pe_ramo, "primas_pe": hoja_pe, "meses_pe": meses, "fnd": fnd,
                 "razones": razones, "is_fa": ctx_is_fa,
                 "is_fa_bel": (info_fnd.get("is_fa_bel") or set()) if fnd is not None else set(),
+                "bel_area": (info_fnd.get("bel_area") or {}) if fnd is not None else {},
                 "pe_tab": {g: x for (e, g), x in (diag_pnd.get("_pe") or {}).items() if e == esc}}
     if INDICES_PND_EN_BD:
         if INDICES_PND_FORMULAS and diag_pnd.get("_pe") and primas is not None:   # solo con prima completa y verificada
@@ -5687,6 +5816,7 @@ def main():
             ctx_is_fa = {"val": is_fa["val"], "ref": ref_is_fa or {}, "archivo": is_fa["ruta"].name,
                          "periodos": is_fa["periodos"], "ramos": is_fa["ramos"]}
         registro_ind = {}
+        hist_area = {k: d.get("historia") or {} for k, d in (info_fnd.get("bel_area") or {}).items()}
         cols_ind = escribir_indices_pnd(bd_danos, {**ctx_indices(proy_danos, meses_bd, info_fnd.get("fnd"),
                                                                  info_fnd.get("razones")), "registro": registro_ind},
                                         avisos_ind)
@@ -5694,7 +5824,9 @@ def main():
             {"Reserva": pref, "Ramo": r, "Periodo": p, "Tipo": "Real" if p <= ultimo else "Proyección",
              **{c: v.get(c) for c in COLUMNAS_TABLERO_PND}, "BEL": v.get("BEL"), "BRUTO": v.get("BRUTO"),
              "Lleva GTO": v.get("GTO"), "BEL por FND": v.get("FND"), "IS del BEL": v.get("IS del BEL"),
-             "Meses PRIMA N AÑOS": MESES_PRIMA_N_ANOS, "Años LAG PEACUMULADA": ANIOS_LAG_PEACUMULADA.get(pref, 0)}
+             "Meses PRIMA N AÑOS": MESES_PRIMA_N_ANOS, "Años LAG PEACUMULADA": ANIOS_LAG_PEACUMULADA.get(pref, 0),
+             "Historia del BEL": "metodo del area" if (pref, r) in hist_area else "SAP",
+             **{f"{c} {SUFIJO_METODO_AREA}": hist_area.get((pref, r), {}).get(p, {}).get(c) for c in COLUMNAS_METODO_AREA}}
             for (pref, r, p), v in sorted(registro_ind.items(), key=lambda x: (x[0][0], int(x[0][1]), x[0][2]))]
         if INDICES_PND_FORMULAS and info_fnd.get("aplica"):
             escribir_bel_fnd(bd_danos, info_fnd, cols_ind)
