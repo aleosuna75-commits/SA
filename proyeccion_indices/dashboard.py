@@ -1109,10 +1109,14 @@ def construir_pnd(ws, wbp, wcp, pnd: dict, ultimo: int, p_dic: int, nombre, sele
         wcp.cell(1, cp, "Proyección")
         rng, f = f"P_{j + 1}", esc[unidad[c_]]
         fmt = {"monto": "#,##0.0", "pct": "0.0%", "fnd": "0.000"}[unidad[c_]]
+        # IS (FA): la historia real es el IS (RL) y la proyeccion de FA arranca del ultimo real del IS (RL)
+        rng_real = f"P_{cols.index('IS (RL)') + 1}" if c_ == "IS (FA)" and "IS (RL)" in cols else rng
         for k, p in enumerate(periodos, start=2):
-            v = f'IF($C{k}=0,NA(),IF(INDEX({rng},$C{k})="",NA(),INDEX({rng},$C{k}){"/1000000" if f == 1e-6 else ""}))'
-            wcp.cell(k, cr, f"=IF($A{k}>{ultimo},NA(),{v})").number_format = fmt
-            wcp.cell(k, cp, f"=IF($A{k}<{ultimo},NA(),{v})").number_format = fmt
+            def v(r):
+                return f'IF($C{k}=0,NA(),IF(INDEX({r},$C{k})="",NA(),INDEX({r},$C{k}){"/1000000" if f == 1e-6 else ""}))'
+            wcp.cell(k, cr, f"=IF($A{k}>{ultimo},NA(),{v(rng_real)})").number_format = fmt
+            proy = v(rng) if rng_real == rng else f"IF($A{k}={ultimo},{v(rng_real)},{v(rng)})"
+            wcp.cell(k, cp, f"=IF($A{k}<{ultimo},NA(),{proy})").number_format = fmt
     n_c = len(periodos) + 1
     wcp.sheet_state = "hidden"
 
@@ -1153,7 +1157,7 @@ def construir_pnd(ws, wbp, wcp, pnd: dict, ultimo: int, p_dic: int, nombre, sele
         "FD/FND": f'=IF(SelResPnd="RRC","FND (PND / PEACUMULADA)","FD (PD / PEACUMULADA)")&" · "&{ramo_txt}',
         "IS (RL)": f'="IS (RL): "&IF(SelResPnd="RRC","Ind Sin RRC","Ind Sin SONR Media")&" de HParametros · "&{ramo_txt}',
         "IS (FA)": (f'=IF(INDEX(L_RamosFA,1)="-","IS (FA): no se cargó el archivo de la función actuarial",'
-                    f'"IS (FA): función actuarial · "&{ramo_txt}&IF(SelRamoPnd="Todos"," (solo los ramos de FA)",'
+                    f'"IS (FA): real = IS (RL); proyección = función actuarial · "&{ramo_txt}&IF(SelRamoPnd="Todos"," (solo los ramos de FA)",'
                     f'IF(ISNUMBER(MATCH(SelRamoPnd,L_RamosFA,0)),""," · FA no manda este ramo")))'),
         "PE FCST": f'="PE FCST (prima tomada del mes) · "&{ramo_txt}&" · M USD"',
         "PRIMA N AÑOS": f'="PRIMA N AÑOS ({pnd.get("meses_n", 12)} meses de PE) · "&{ramo_txt}&" · M USD"',

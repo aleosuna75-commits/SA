@@ -1105,7 +1105,7 @@ function explicaPnd(col, res, ramo) {
     'FD/FND': `${nb} / PEACUMULADA (razón); ${desde.fnd}${conFnd ? ' con Holt amortiguado (serie de tiempo): arranca del último real y sigue el promedio de los cambios mensuales recientes, frenado 5 % por mes, con el patrón del mes; un salto de un mes mueve el nivel pero no la tendencia' : ''}`,
     'IS (RL)': `${res === 'RRC' ? 'Ind Sin RRC' : 'Ind Sin SONR Media'} de HParametros, en %; misma escala que IS (FA)`
       + (todos ? '; incluye ramos que FA no manda (como TEV e Hidro, con IS bajo): para comparar con FA, ve la línea gris en IS (FA)' : ''),
-    'IS (FA)': `${res === 'RRC' ? 'IS RRC' : 'IS SONR'} de la función actuarial (solo proyección), en %; misma escala que IS (RL)`
+    'IS (FA)': `Real: ${res === 'RRC' ? 'Ind Sin RRC' : 'Ind Sin SONR Media'} de HParametros hasta ${eti(D.ultimo)}; proyección: ${res === 'RRC' ? 'IS RRC' : 'IS SONR'} de la función actuarial, en %; misma escala que IS (RL)`
       + (todos && faRamos ? `; Todos = solo los ramos que manda FA (${faRamos}); gris: IS (RL) de esos mismos ramos` : ''),
     'PE FCST': 'Prima tomada del mes (PExRamo, reforecast y FCST), millones de USD; la misma en RRC y SONR',
     'PRIMA N AÑOS': `Suma de los últimos ${meses} meses de PE FCST, millones de USD; la misma en RRC y SONR`,
@@ -1147,7 +1147,12 @@ function pintarPnd() {
   PN.indicadores.forEach(([col, titulo, unidad], k) => {
     const un = UNIDAD_PND[unidad], vals = seriePnd(res, ramo, col);
     const fv = v => v == null ? 's/d' : fmt(v, un.dec) + un.suf;
-    const real = vals.map((v, i) => i <= nUlt ? v : null), proy = vals.map((v, i) => i >= nUlt ? v : null);
+    let real = vals.map((v, i) => i <= nUlt ? v : null), proy = vals.map((v, i) => i >= nUlt ? v : null);
+    if (col === 'IS (FA)') {                       // la historia real es el IS (RL); la proyeccion de FA arranca de su ultimo real
+      const rl = seriePnd(res, ramo, 'IS (RL)');
+      real = rl.map((v, i) => i <= nUlt ? v : null);
+      proy = vals.map((v, i) => i > nUlt ? v : (i === nUlt ? rl[i] : null));
+    }
     const hayReal = real.some(v => v != null), hayProy = proy.some((v, i) => v != null && i > nUlt);
     let vacio = null;
     if (col === 'FACTOR GTO' && !PN.lleva_gto[res]) vacio = `${res} no lleva GTO: el gasto (GTO) solo existe en RRC.`;
@@ -1162,8 +1167,8 @@ function pintarPnd() {
     const c = tarjeta(`${titNb} · ${etiqRamo}`, explicaPnd(col, res, ramo) + extra,
       (cuerpo, W) => {
         if (vacio) { cuerpo.append(el('p', { class: 'sub', style: 'margin:24px 0;color:var(--ink-2)', text: vacio })); return; }
-        const series = [...gris, ...(hayReal ? [{ nombre: 'Real', valores: real, color: cssVar('--real'), etiquetaFin: true }] : []),
-                        ...(hayProy ? [{ nombre: 'Proyección', valores: proy, color: cssVar('--proy'), dash: true, etiquetaFin: true }] : [])];
+        const series = [...gris, ...(hayReal ? [{ nombre: col === 'IS (FA)' ? 'Real (IS RL)' : 'Real', valores: real, color: cssVar('--real'), etiquetaFin: true }] : []),
+                        ...(hayProy ? [{ nombre: col === 'IS (FA)' ? 'Proyección (IS FA)' : 'Proyección', valores: proy, color: cssVar('--proy'), dash: true, etiquetaFin: true }] : [])];
         graficaLineas(cuerpo, W, {
           labels: P_N.map(eti), tituloX: i => etiLarga(P_N[i]) + (i <= nUlt ? ' (real)' : ' (proyección)'), fmt: fv, cadaX: 6, etiquetasFin: true,
           incluirCero: unidad === 'monto', dominio: (col === 'IS (RL)' || col === 'IS (FA)') ? domIS : null,
@@ -1175,7 +1180,7 @@ function pintarPnd() {
       },
       () => vacio ? el('p', { class: 'sub', style: 'margin:12px 8px', text: vacio })
         : tablaDatos(['Mes', 'Tipo', `${titNb} (${un.eje})`, ...(gris.length ? ['IS (RL) de los mismos ramos (%)'] : [])],
-          P_N.map((p, i) => [etiLarga(p), i <= nUlt ? 'Real' : 'Proyección', fv(vals[i]), ...(gris.length ? [fv(isRlFa[i])] : [])])),
+          P_N.map((p, i) => [etiLarga(p), i <= nUlt ? (col === 'IS (FA)' ? 'Real (IS RL)' : 'Real') : 'Proyección', fv(i <= nUlt ? real[i] : vals[i]), ...(gris.length ? [fv(isRlFa[i])] : [])])),
       k === 0 || k === PN.indicadores.length - 1);
     rejilla.append(c); tarjetasVivas.push(c);
   });
