@@ -161,8 +161,8 @@ except Exception as _e:  # noqa: BLE001
 # =============================================================================
 CARPETA = Path(__file__).resolve().parent
 ENTRADAS = CARPETA / "entradas"
-VERSION_CODIGO = "2026-10-05b"   # version de los scripts: sale en la consola, en la hoja Resumen del diagnostico y en el pie
-                                 # de los tableros, para saber con que version se corrio
+VERSION_CODIGO = "2026-10-05b"   # version de los scripts: sale en la consola, en la hoja Resumen del diagnostico, en el pie
+                                 # del tablero HTML y en la hoja Dashboard Razones del Excel, para saber con que version se corrio
 SALIDAS = CARPETA / "salidas"
 
 ARCHIVO_BD_DANOS = ENTRADAS / "BD_ BEL - IRR - MR.xlsx"
@@ -556,18 +556,20 @@ RAMOS_IS_FA_BEL = {"RRC": ("40", "50", "80", "90"), "SONR": ("40", "50", "80", "
                                  # BEL / IS (FA) desde el primer mes proyectado (la historia y el FND siguen con el IS (RL));
                                  # en un mes sin IS (FA) se usa el IS (RL) con aviso. Los demas ramos siguen con el IS (RL).
 BEL_METODO_AREA = {("SONR", "80"): (3, 2)}
-PATRON_RES_RVAS = r"res[\s_\-.]*rvas.*\.(xlsx|xlsm)$"   # Res_Rvas de entradas/ (TC real y BEL del metodo del area), en
-                                 # cualquier parte del nombre y sin distinguir mayusculas ni el separador: "Res_Rvas_2026",
-                                 # "Res Rvas 2026", "Copia de Res_Rvas_2026", "Res_Rvas_2026 - copia"
                                  # series cuyo BEL no registra SAP pero que el area si calcula con su metodo (SONR 80: la
                                  # BD trae BEL 0 desde 202206 y la hoja "Base SONR" de los Res_Rvas lo calcula). Mientras
                                  # el BEL real del ultimo mes no sea positivo, la historia del FND, del FACTOR MR y de la
                                  # CESION sale del BEL, MR, BRUTO e IRR en USD de la hoja "Base <reserva>" de los
-                                 # Res_Rvas_*.xlsx de entradas/, con los escenarios en orden de preferencia por mes
+                                 # Res_Rvas de entradas/ (PATRON_RES_RVAS), con los escenarios en orden de preferencia por mes
                                  # (3 = Recalculo / Backtesting; 2 = Reforecast, que en los meses reales coincide con el 3
                                  # y trae 202512, que el 3 no trae). El BEL proyectado queda como en los demas ramos:
                                  # IS x PEACUMULADA x FND, formulado. La historia de la BD (SAP) no se toca. {} = esas
                                  # series siguen con el modelo (BEL 0)
+PATRON_RES_RVAS = r"res[\s_\-.]*rvas.*\.(xlsx|xlsm)$"   # Res_Rvas de entradas/ (TC real y BEL del metodo del area), en
+                                 # cualquier parte del nombre y sin distinguir mayusculas ni el separador: "Res_Rvas_2026",
+                                 # "Res Rvas 2026", "Copia de Res_Rvas_2026", "Res_Rvas_2026 - copia". Se leen en orden de
+                                 # nombre y el ultimo gana en un mes repetido; los de nombre exacto ("Res_Rvas_2026.xlsx")
+                                 # van al final, asi que ganan sobre las copias
 PERFIL_REFORECAST = "FCST"       # meses del reforecast (entre PExRamo y el FCST, hoy sep-dic 2026): "FCST" = el total de
                                  # esos meses por ramo se reparte entre ellos con la mezcla mensual de los mismos meses del
                                  # FCST del ano siguiente (el archivo de reforecast concentra la prima en uno o dos meses,
@@ -1493,12 +1495,15 @@ def tc_para_periodo(bd: BDMontos, p: int) -> float:
 
 
 def archivos_res_rvas() -> list:
-    """Res_Rvas de entradas/ (PATRON_RES_RVAS), sin los temporales de Office (~$), en orden de nombre."""
+    """Res_Rvas de entradas/ (PATRON_RES_RVAS), sin los temporales de Office (~$), por ano del nombre y nombre, con los de
+    nombre exacto (Res_Rvas_AAAA) al final: el ultimo gana en un mes que traigan dos archivos."""
     if not ENTRADAS.exists():
         return []
     pat = re.compile(PATRON_RES_RVAS, re.I)
+    exacto = re.compile(r"res[\s_\-.]*rvas[\s_\-.]*\d{4}\.(xlsx|xlsm)", re.I)
     return sorted((c for c in ENTRADAS.iterdir() if c.is_file() and not c.name.startswith("~$") and pat.search(c.name)),
-                  key=lambda c: c.name.lower())
+                  key=lambda c: (bool(exacto.fullmatch(c.name)),
+                                 int(m.group(1)) if (m := re.search(r"(20\d\d)", c.name)) else 0, c.name.lower()))
 
 
 def _parecidos_res_rvas() -> list:
@@ -1506,8 +1511,9 @@ def _parecidos_res_rvas() -> list:
     if not ENTRADAS.exists():
         return []
     leidos = {c.name for c in archivos_res_rvas()}
+    nombre = re.compile(r"res[\s_\-.]*rvas", re.I)
     return sorted(c.name for c in ENTRADAS.iterdir() if c.is_file() and not c.name.startswith("~$")
-                  and "rvas" in c.name.lower() and c.name not in leidos)
+                  and nombre.search(c.stem) and c.name not in leidos)
 
 
 def leer_tc_real(bd: BDMontos, ultimo: int, libro: str = "", alertas: list | None = None) -> dict:
@@ -1558,7 +1564,10 @@ def leer_bel_metodo_area(ultimo: int, alertas: list | None = None, info: dict | 
     con {"archivos": [Res_Rvas encontrados], "motivos": {(reserva, ramo): por que no hay datos de esa serie}}."""
     config = _bel_metodo_area()
     info = info if info is not None else {}
-    info.update({"archivos": [], "con_hoja": [], "motivos": {}})
+    info.update({"archivos": [], "con_hoja": [], "ilegibles": [], "motivos": {}, "parecidos": _parecidos_res_rvas()})
+    if info["parecidos"] and alertas is not None:
+        alertas.append(("PND", "BEL del metodo del area", f"{', '.join(info['parecidos'])} parecen Res_Rvas pero no se "
+                        "leen (deben ser .xlsx o .xlsm): guardalos como .xlsx si traen meses que faltan"))
     if not config:
         return {}
     conceptos = ("BEL", "MR", "BRUTO", "IRR")
@@ -1570,6 +1579,7 @@ def leer_bel_metodo_area(ultimo: int, alertas: list | None = None, info: dict | 
         try:
             wb = openpyxl.load_workbook(ruta, read_only=True, data_only=True)
         except Exception as e:  # noqa: BLE001
+            info["ilegibles"].append(f"{ruta.name} ({type(e).__name__})")
             if alertas is not None:
                 alertas.append(("PND", "BEL del metodo del area", f"no se pudo leer {ruta.name}: {type(e).__name__}"))
             continue
@@ -1604,17 +1614,22 @@ def leer_bel_metodo_area(ultimo: int, alertas: list | None = None, info: dict | 
     for (pref, ramo), escs_cfg in config.items():         # por que una serie no trae datos
         if (pref, ramo) in out:
             continue
+        legibles = [n for n in info["archivos"] if not any(x.startswith(n + " (") for x in info["ilegibles"])]
         if not info["archivos"]:
-            parecidos = _parecidos_res_rvas()
             m = ("no hay ningun archivo Res_Rvas en entradas/" + (
-                f"; hay {', '.join(parecidos)}, pero deben ser .xlsx o .xlsm" if parecidos else
-                f", se esperan Res_Rvas_{ultimo // 100 - 1}.xlsx y Res_Rvas_{ultimo // 100}.xlsx"))
+                f"; hay {', '.join(info['parecidos'])}, pero deben ser .xlsx o .xlsm: guardalos como .xlsx"
+                if info["parecidos"] else
+                f": pon ahi Res_Rvas_{ultimo // 100 - 1}.xlsx y Res_Rvas_{ultimo // 100}.xlsx"))
+        elif not legibles:
+            m = (f"no se pudieron abrir {', '.join(info['ilegibles'])}: revisa que no esten danados ni protegidos con "
+                 "contrasena o con una etiqueta de confidencialidad")
         elif not info["con_hoja"]:
-            m = (f"{', '.join(info['archivos'])} no traen la hoja Base {pref} con las columnas Escenario, Tipo Monto, "
-                 "Ramo, Periodo y Monto_USD")
+            m = (f"{', '.join(legibles)} no traen la hoja Base {pref} con las columnas Escenario, Tipo Monto, Ramo, "
+                 "Periodo y Monto_USD: revisa que sean los Res_Rvas del area"
+                 + (f" (tampoco se pudieron abrir {', '.join(info['ilegibles'])})" if info["ilegibles"] else ""))
         else:
             m = (f"{', '.join(info['con_hoja'])} no traen BEL positivo del ramo {ramo} en los escenarios "
-                 f"{', '.join(str(e) for e in escs_cfg)} hasta {ultimo}")
+                 f"{', '.join(str(e) for e in escs_cfg)} hasta {ultimo}: revisa que esten al dia")
         info["motivos"][(pref, ramo)] = m
     return out
 
@@ -3352,6 +3367,8 @@ def calcular_bel_fnd(bd: BDMontos, hp, resultados: dict, proy: dict, pe: dict, p
             elif area is not None:
                 fila["Historia del BEL"] = "BD (SAP): ya registra BEL, no se usa el metodo del area"
                 out["estado_area"][(pref, str(r))] = "SAP: ya registra BEL"
+            elif (pref, str(r)) in config_area and np.isfinite(bel_u_bd) and bel_u_bd > UMBRAL_CERO_MONTOS:
+                out["estado_area"][(pref, str(r))] = "SAP: ya registra BEL"     # (no hace falta el metodo del area)
             elif (pref, str(r)) in config_area:                # sin datos del metodo del area y SAP en 0
                 m_a = motivo_area.get((pref, str(r)), "sin datos del metodo del area")
                 fila["Historia del BEL"] = f"sin metodo del area: {m_a}"
@@ -3366,8 +3383,8 @@ def calcular_bel_fnd(bd: BDMontos, hp, resultados: dict, proy: dict, pe: dict, p
             if len(per_ok) < MIN_MESES_FND:
                 motivo = f"menos de {MIN_MESES_FND} meses de FND real (falta PE, IS o LAG)"
             elif not (np.isfinite(bel_u) and bel_u > 0):
-                motivo = (f"el BEL del metodo del area llega a {area['meses'][-1]} y el real a {ultimo}" if usa_area
-                          else "BEL real no positivo al ultimo mes")
+                motivo = (f"el BEL del metodo del area llega a {area['meses'][-1]} y el real a {ultimo}: actualiza los "
+                          "Res_Rvas de entradas/ con el mes" if usa_area else "BEL real no positivo al ultimo mes")
             fnd_f = None
             if not motivo:
                 per = rango_periodos(per_ok[0], ultimo)
@@ -3493,8 +3510,7 @@ def calcular_bel_fnd(bd: BDMontos, hp, resultados: dict, proy: dict, pe: dict, p
                 out["alertas"].append(("DANOS", f"{pref} | BEL | ramo {r}",
                                        f"SAP registra BEL {f'{bel_u_bd:,.0f}' if np.isfinite(bel_u_bd) else 'vacio'} en "
                                        f"{ultimo} y la historia del metodo del area no alcanza ({motivo or 'sin meses con BEL por FND'}): "
-                                       "el BEL proyectado queda con el modelo (0, sin formula). Actualiza los Res_Rvas de "
-                                       "entradas/ con el mes"))
+                                       "el BEL proyectado queda con el modelo (0, sin formula)"))
             if usa_area and n_ap:
                 out["estado_area"][(pref, str(r))] = "metodo del area"
                 out["bel_area"][(pref, str(r))] = {"desde": per_ok[0] if per_ok else None, "hasta": ultimo,
@@ -5886,8 +5902,7 @@ def main():
         print(f"   {info_fnd['estado']}", flush=True)
         if info_fnd.get("sin_area"):                      # (el IBNR de esas series queda en 0, sin formula)
             diag_pnd["sin_metodo_area"] = ("SIN METODO DEL AREA: " + " | ".join(info_fnd["sin_area"])
-                                           + ". Ese BEL queda en 0, sin formula: pon los Res_Rvas en entradas/ y vuelve a "
-                                           "correr")
+                                           + ". Ese BEL queda en 0, sin formula; corrigelo y vuelve a correr")
             print(f"   AVISO: {diag_pnd['sin_metodo_area']}", flush=True)
         diag_pnd["metodo_area"] = "; ".join(f"{k[0]} {k[1]}: {v}" for k, v in sorted(
             (info_fnd.get("estado_area") or {}).items())) or ("sin series en BEL_METODO_AREA" if not BEL_METODO_AREA else "")

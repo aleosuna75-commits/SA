@@ -1096,7 +1096,7 @@ function explicaPnd(col, res, ramo) {
   const notaArea = area && ['PND/PD', 'FACTOR MR', 'CESION', 'FD/FND'].includes(col)
     ? `. SAP registra 0 en este ramo: la proyección sale de la historia del método del área (Res_Rvas), en gris`
     : falla && ['PND/PD', 'FACTOR MR', 'CESION', 'FD/FND'].includes(col)
-      ? `. ATENCIÓN: SAP registra 0 en este ramo y no se pudo usar el método del área, así que sigue en 0. Motivo: ${falla}. Pon los Res_Rvas en entradas/ y vuelve a correr la proyección` : '';
+      ? `. ATENCIÓN: SAP registra 0 en este ramo y no se pudo usar el método del área, así que sigue en 0. Motivo: ${falla}. Corrígelo y vuelve a correr la proyección` : '';
   const desde = {                                      // como se proyecta desde el primer mes proyectado
     monto: todos ? `desde ${ini}, suma de los ramos (PEACUMULADA × ${fd} en los que llevan BEL por FND, el modelo en los demás)`
       : conFnd ? `desde ${ini}, PEACUMULADA × ${fd}` : `desde ${ini}, el BEL del modelo entre el IS (este ramo no lleva BEL por FND)`,
@@ -1139,7 +1139,7 @@ function pintarPnd() {
     + ' · una razón cuyo denominador es casi 0 va sin dato (s/d)';
   const aviso = document.getElementById('aviso-pnd');      // (sin el metodo del area el IBNR del ramo queda en 0)
   aviso.hidden = !fallaSel;
-  aviso.textContent = fallaSel ? `⚠ Atención: el ${nb} de este ramo sigue en 0 porque no se pudo usar el método del área. Motivo: ${fallaSel}. Pon los Res_Rvas en entradas/ y vuelve a correr la proyección.` : '';
+  aviso.textContent = fallaSel ? `⚠ Atención: el ${nb} de este ramo sigue en 0 porque no se pudo usar el método del área. Motivo: ${fallaSel}. Corrígelo y vuelve a correr la proyección.` : '';
   const pnd = seriePnd(res, ramo, 'PND/PD'), f1 = v => fmt(v, 1);
   const u = pnd[nUlt], pd = pnd[nDic], pf = pnd[nFin], p12 = pnd[nUlt + 12];
   document.getElementById('kpis-pnd').replaceChildren(
