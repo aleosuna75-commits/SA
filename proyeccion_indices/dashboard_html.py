@@ -1084,7 +1084,7 @@ const UNIDAD_PND = {
 };
 function explicaPnd(col, res, ramo) {
   const nb = res === 'RRC' ? 'PND' : 'PD', fd = res === 'RRC' ? 'FND' : 'FD', ini = eti(P_N[nUlt + 1]);
-  const faRamos = (PN.con_fa || []).join(', '), todos = ramo === 'Todos';
+  const faRamos = (PN.con_fa || []).join(', '), todos = ramo === 'Todos', rsFa = (PN.is_fa_bel || {})[res] || [];
   const conFnd = !todos && ((PN.fnd || {})[res] || []).includes(ramo);
   const anios = (PN.anios_lag || {})[res] || 0, meses = PN.meses_n || 12;
   const desde = {                                      // como se proyecta desde el primer mes proyectado
@@ -1098,7 +1098,7 @@ function explicaPnd(col, res, ramo) {
   const peac = res === 'RRC' || !anios ? 'En RRC es igual a PRIMA N AÑOS'
     : Array.from({ length: anios }, (_, k) => k === 0 ? 'LAG 1 × PRIMA N AÑOS del mes' : `LAG ${k + 1} × la de ${12 * k} meses antes`).join(' + ');
   return {
-    'PND/PD': `${nb} = BEL / IS (RL)${(PN.is_fa_bel || {})[res] && (PN.is_fa_bel[res].includes(ramo) || todos) ? ` (desde ${ini}, BEL / IS (FA) en ${todos ? 'los ramos ' + PN.is_fa_bel[res].join(', ') : 'este ramo'})` : ''}; ${desde.monto}. Millones de USD`,
+    'PND/PD': `${nb} = BEL / IS (RL)${rsFa.length && (rsFa.includes(ramo) || todos) ? ` (desde ${ini}, BEL / IS (FA) en ${todos ? 'los ramos ' + rsFa.join(', ') : 'este ramo'})` : ''}; ${desde.monto}. Millones de USD`,
     'FACTOR GTO': `GTO / PND, en %; ${desde.factor}`,
     'FACTOR MR': `MR / ${nb}, en %; ${desde.factor}${conFnd ? ' (arranca del nivel de los últimos 3 meses: tiene picos de un mes)' : ''}`,
     'CESION': `Razón de cesión IRR / BRUTO, en %; ${todos ? `desde ${ini}, el nivel suavizado de los últimos meses (SES, sin tendencia: depende de los contratos de reaseguro) en los ramos con BEL por FND y el modelo de reservas en los demás` : conFnd ? `desde ${ini}, el nivel suavizado de los últimos meses (SES), sin tendencia: depende de los contratos de reaseguro` : `desde ${ini}, la razón del modelo (este ramo no lleva BEL por FND)`}`,

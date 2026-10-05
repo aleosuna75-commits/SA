@@ -539,7 +539,8 @@ PATRON_PE_RFCST_FA = "*RCST*FA*.xlsx"    # reforecast del ano por mes y ramo (en
 PATRON_IS_FA = "PPTO*FA*.xlsx"   # indices de siniestralidad de la funcion actuarial (en entradas/; una hoja con Ramo,
                                  # MesProc, IS RRC e IS SONR, desde el primer mes proyectado): bloque "IS (FA) <ramo>",
                                  # con IS RRC en los renglones de RRC e IS SONR en los de SONR (como el IS (RL)); N/A en
-                                 # los meses y ramos que no trae. Solo se muestra: el BEL sigue con el IS (RL)
+                                 # los meses y ramos que no trae. El BEL por FND y el PND / PD lo usan en los ramos de
+                                 # RAMOS_IS_FA_BEL; los demas ramos siguen con el IS (RL)
 COLUMNAS_TABLERO_PND = ("PND/PD", "FACTOR GTO", "FACTOR MR", "CESION", "IS (RL)", "IS (FA)", "PE FCST", "PRIMA N AÑOS",
                         "PEACUMULADA", "FD/FND")   # indicadores por ramo y mes que van a la hoja HOJA_INDICADORES_RAMO del
                                  # diagnostico (los mismos valores de los bloques de la BD principal), para el tablero
@@ -552,9 +553,9 @@ RAMOS_IS_FA_BEL = {"RRC": ("40", "50", "80", "90"), "SONR": ("40", "50", "80", "
                                  # en un mes sin IS (FA) se usa el IS (RL) con aviso. Los demas ramos siguen con el IS (RL).
 PERFIL_REFORECAST = "FCST"       # meses del reforecast (entre PExRamo y el FCST, hoy sep-dic 2026): "FCST" = el total de
                                  # esos meses por ramo se reparte entre ellos con la mezcla mensual de los mismos meses del
-                                 # FCST del ano siguiente (el archivo de reforecast concentra la prima en septiembre u
-                                 # octubre y casi no deja prima en noviembre y diciembre, lo que achata la PEACUMULADA de
-                                 # diciembre); None = los meses del archivo tal cual
+                                 # FCST del ano siguiente (el archivo de reforecast concentra la prima en uno o dos meses,
+                                 # septiembre u octubre en casi todos los ramos, y deja casi vacios los ultimos, lo que
+                                 # achata la PEACUMULADA de diciembre); None = los meses del archivo tal cual
 RAMOS_PERFIL_REFORECAST = None   # None = todos los ramos; o una tupla de ramos de la BD, p. ej. ("10", "60")
 COLUMNA_IS_FA = {"RRC": "IS RRC", "SONR": "IS SONR"}   # columna del archivo para cada reserva
 MAX_IS_FA = 10.0                 # aviso si un indice del archivo pasa de 1,000 % (p. ej. si viene en % y no en razon)
@@ -597,15 +598,14 @@ MIN_MESES_FND = 12               # meses minimos de FND real para proyectarlo
 TIPO_MODELO_FACTORES = {"FACTOR GTO": "factor_log", "FACTOR MR": "factor_log", "CESION": "razon"}
                                  # CESION: "razon" = nivel suavizado sin tendencia (SES, como las demas razones de cesion
                                  # del modelo): depende de los contratos de reaseguro, y con la tendencia la cesion de Vida
-                                 # (RRC 10) subia de 62 % a 86 % y la RRC retenida bajaba de mas (observacion del area);
-                                 # "factor" = la pendiente combinada en niveles
-                                 # FACTOR GTO (GTO / PND), FACTOR MR (MR / PND o PD) y CESION (IRR / BRUTO) de las series con
-                                 # BEL por FND: reales hasta el ultimo mes y, desde el primer mes proyectado, el mismo modelo
-                                 # que el FND (por decision del area): desde el ultimo real, la pendiente combinada
-                                 # (PENDIENTE_COMBINADA) con el patron del mes del ano. GTO y
-                                 # MR en logaritmos, como el FND; la CESION en niveles ("factor", puntos por mes): es una
-                                 # proporcion acotada a 100 % y en logaritmos la tendencia es de crecimiento % constante (RRC
-                                 # 10, que paso de 1 % a 63 % de cesion, llegaba a 100 % en tres meses).
+                                 # (RRC 10) subia de 62.5 % a 86 % y la RRC retenida bajaba de mas (observacion del area).
+                                 # FACTOR GTO (GTO / PND) y FACTOR MR (MR / PND o PD) de las series con BEL por FND: reales
+                                 # hasta el ultimo mes y, desde el primer mes proyectado, la pendiente combinada
+                                 # (PENDIENTE_COMBINADA) con el patron del mes del ano, en logaritmos ("factor_log"; por
+                                 # decision del area siguen su comportamiento y no una recta). "factor" = la pendiente
+                                 # combinada en niveles (puntos por mes), alternativa para la CESION: en logaritmos la
+                                 # tendencia es de crecimiento % constante y la de RRC 10, que paso de 1 % a 63 %, llegaba a
+                                 # 100 % en tres meses.
                                  # GTO = PND x FACTOR GTO, MR = PND x FACTOR MR, BRUTO = BEL + GTO + MR, IRR = BRUTO x CESION,
                                  # NETO = BRUTO - IRR
 CUENTA_PE_FCST = "61"            # cuenta de prima tomada en CtaMens (la que suma ER_ram)
@@ -3537,24 +3537,32 @@ def escribir_indices_pnd(bd: BDMontos, ctx: dict, avisos: list | None = None) ->
     si_error = " (SI.ERROR: 0 si divide entre 0)"
     claves_hp = ", ".join(f"{r} -> {k}" for r, k in MAPA_RAMO_LAG.items() if str(r) != str(k) and r in ramos)
     na_pnd = f"; {TEXTO_SIN_DATO} si PND/PD es {TEXTO_SIN_DATO}"
-    proy_fac = (f"; desde {min(periodos_proy)}, en las series con BEL por FND, el proyectado con el modelo del FND "
-                "(tendencia con patron del mes; valor) en todos los renglones del mes" if razones and periodos_proy else "")
+    def _proy_fac(nombre):
+        if not (razones and periodos_proy):
+            return ""
+        modelo_f = MODELO_POR_TIPO.get(TIPO_MODELO_FACTORES.get(nombre, ""), "")
+        como = ("el nivel suavizado de los ultimos meses (SES), sin tendencia" if modelo_f == "SES" else
+                "la pendiente combinada en logaritmos con el patron del mes" if modelo_f == TENDENCIA else modelo_f)
+        return f"; desde {min(periodos_proy)}, en las series con BEL por FND, {como} (valor) en todos los renglones del mes"
+    ramos_fa_bel = "; ".join(f"{k} {', '.join(v)}" for k, v in RAMOS_IS_FA_BEL.items() if v)
     descripcion = {
         "PND/PD": ("PND/PD = BEL / IS (RL): en el renglon BEL, BEL del renglon / IS; en los demas renglones, el BEL del mes "
                    "con SUMAR.SI.CONJUNTO por CONCEPTO y PERIODO (ninguna formula apunta a otro renglon: la hoja se puede "
-                   "ordenar y filtrar)" + si_error + f"; {TEXTO_SIN_DATO} sin IS o sin BEL (meses de prima sin montos)"),
+                   "ordenar y filtrar)" + si_error + f"; {TEXTO_SIN_DATO} sin IS o sin BEL (meses de prima sin montos)"
+                   + (f"; en los ramos {ramos_fa_bel}, desde el primer mes proyectado con BEL por FND, BEL / IS (FA) "
+                      "(RAMOS_IS_FA_BEL)" if ramos_fa_bel else "")),
         "FA": ((f"FA = PND/PD / PE de {meses_pe} meses del grupo (hoja {HOJA_PRIMAS_PE})" if formulas and primas_pe else
                 f"FA = PND/PD / PE de {meses_pe} meses del grupo (prima de primas.py; la hoja {HOJA_PRIMAS_PE} solo se "
                 "agrega con formulas)") if usa_primas else
                "FA = PND/PD / PRIMA N AÑOS del ramo (sin hoja " + f"{HOJA_PRIMAS_PE}: la prima del proyecto no esta "
                "completa)") + si_error + na_pnd,
         "FACTOR GTO": ("FACTOR GTO = GTO del mes / PND/PD (en el renglon RRC GTO, su monto; en los demas, con "
-                       "SUMAR.SI.CONJUNTO); SONR no tiene GTO: 0" + si_error + na_pnd + proy_fac),
+                       "SUMAR.SI.CONJUNTO); SONR no tiene GTO: 0" + si_error + na_pnd + _proy_fac("FACTOR GTO")),
         "FACTOR MR": ("FACTOR MR = MR del mes / PND/PD (en el renglon MR de la reserva, su monto; en los demas, con "
-                      "SUMAR.SI.CONJUNTO)" + si_error + na_pnd + proy_fac),
+                      "SUMAR.SI.CONJUNTO)" + si_error + na_pnd + _proy_fac("FACTOR MR")),
         "CESION": ("CESION = IRR del mes / BRUTO del mes (razon de cesion; en el renglon IRR o BRUTO, su monto; en los "
                    "demas, con SUMAR.SI.CONJUNTO)" + si_error + f"; {TEXTO_SIN_DATO} sin montos (meses de prima)"
-                   + proy_fac),
+                   + _proy_fac("CESION")),
         "IS (RL)": f"IS (RL) = {' / '.join(v[0] for v in INDICE_BASE_PND.values())} de {HOJA_PARAMETROS} del mes (real o "
                    f"proyectado; {TEXTO_SIN_DATO} si no hay; ramo de la hoja segun MAPA_RAMO_LAG: {claves_hp})",
         "LAG (RL)": f"LAG (RL) = LAG 1 de {HOJA_PARAMETROS} del mes (real o proyectado; {TEXTO_SIN_DATO} si no hay)",
@@ -5660,7 +5668,8 @@ def main():
         esc = next((e for e, m in ESCENARIOS_PND.items() if m == meses), None)
         return {"hp": hp, "resultados": resultados, "periodos_proy": periodos_proy, "ultimo": ultimo, "proy": proy,
                 "pe": pe_mes, "hoja_pe": hoja_pe_ramo, "primas_pe": hoja_pe, "meses_pe": meses, "fnd": fnd,
-                "razones": razones, "is_fa": ctx_is_fa, "is_fa_bel": info_fnd.get("is_fa_bel") or set(),
+                "razones": razones, "is_fa": ctx_is_fa,
+                "is_fa_bel": (info_fnd.get("is_fa_bel") or set()) if fnd is not None else set(),
                 "pe_tab": {g: x for (e, g), x in (diag_pnd.get("_pe") or {}).items() if e == esc}}
     if INDICES_PND_EN_BD:
         if INDICES_PND_FORMULAS and diag_pnd.get("_pe") and primas is not None:   # solo con prima completa y verificada
@@ -5738,6 +5747,9 @@ def main():
     if GENERAR_DASHBOARD:
         try:
             import dashboard  # noqa: WPS433
+            # los dashboards leen las salidas de ESTA corrida (y no la carpeta salidas/ fija) si se redirigieron
+            dashboard.SALIDAS, dashboard.ARCHIVO_DANOS = SALIDAS, SALIDA_BD_DANOS
+            dashboard.ARCHIVO_RFV, dashboard.ARCHIVO_DIAGNOSTICO = SALIDA_BD_RFV, SALIDA_DIAGNOSTICO
             dashboard.MONTOS_CALCULADOS = {("DANOS", c, p, r): v for (c, p, r), v in proy_danos.items()}
             dashboard.generar(SALIDA_DASHBOARD)
             dashboard_ok = True
@@ -5746,6 +5758,8 @@ def main():
         try:
             import dashboard as _dx  # noqa: WPS433
             import dashboard_html  # noqa: WPS433
+            _dx.SALIDAS, _dx.ARCHIVO_DANOS = SALIDAS, SALIDA_BD_DANOS
+            _dx.ARCHIVO_RFV, _dx.ARCHIVO_DIAGNOSTICO = SALIDA_BD_RFV, SALIDA_DIAGNOSTICO
             _dx.MONTOS_CALCULADOS = {("DANOS", c, p, r): v for (c, p, r), v in proy_danos.items()}
             dashboard_html.generar(SALIDA_DASHBOARD_HTML)
             html_ok = True
