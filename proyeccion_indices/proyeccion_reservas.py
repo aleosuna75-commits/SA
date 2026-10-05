@@ -515,6 +515,17 @@ COLUMNAS_TABLERO_PND = ("PND/PD", "FACTOR GTO", "FACTOR MR", "CESION", "IS (RL)"
                                  # diagnostico (los mismos valores de los bloques de la BD principal), para el tablero
 HOJA_INDICADORES_RAMO = "Indicadores_Ramo"
 HOJA_IS_FA = "IS_FA"             # hoja de apoyo en la BD de Danos con la tabla del archivo de la funcion actuarial
+RAMOS_IS_FA_BEL = {"RRC": ("40", "50", "80", "90"), "SONR": ("40", "50", "80", "90")}
+                                 # ramos cuyo BEL por FND usa el IS de la funcion actuarial (IS (FA)) en lugar del IS (RL)
+                                 # de HParametros, por decision del area: BEL = IS (FA) x PEACUMULADA x FND y PND / PD =
+                                 # BEL / IS (FA) desde el primer mes proyectado (la historia y el FND siguen con el IS (RL));
+                                 # en un mes sin IS (FA) se usa el IS (RL) con aviso. Los demas ramos siguen con el IS (RL).
+PERFIL_REFORECAST = "FCST"       # meses del reforecast (entre PExRamo y el FCST, hoy sep-dic 2026): "FCST" = el total de
+                                 # esos meses por ramo se reparte entre ellos con la mezcla mensual de los mismos meses del
+                                 # FCST del ano siguiente (el archivo de reforecast concentra la prima en septiembre u
+                                 # octubre y casi no deja prima en noviembre y diciembre, lo que achata la PEACUMULADA de
+                                 # diciembre); None = los meses del archivo tal cual
+RAMOS_PERFIL_REFORECAST = None   # None = todos los ramos; o una tupla de ramos de la BD, p. ej. ("10", "60")
 COLUMNA_IS_FA = {"RRC": "IS RRC", "SONR": "IS SONR"}   # columna del archivo para cada reserva
 MAX_IS_FA = 10.0                 # aviso si un indice del archivo pasa de 1,000 % (p. ej. si viene en % y no en razon)
 MONEDA_PE_RFCST_FA = "MXN"       # "MXN": Primas Tomadas MXN entre el TC del mes del proyecto (tipo_cambio.py, FCST de
@@ -553,7 +564,11 @@ TIPO_MODELO_FND = "fnd"          # el FND se proyecta en logaritmos con el patro
                                  # (PENDIENTE_COMBINADA: rectas robustas de 24 y 36 meses, amortiguada 0.95 por mes),
                                  # anclado al ultimo real: la proyeccion arranca donde esta la serie
 MIN_MESES_FND = 12               # meses minimos de FND real para proyectarlo
-TIPO_MODELO_FACTORES = {"FACTOR GTO": "fnd", "FACTOR MR": "fnd", "CESION": "factor"}
+TIPO_MODELO_FACTORES = {"FACTOR GTO": "fnd", "FACTOR MR": "fnd", "CESION": "razon"}
+                                 # CESION: "razon" = nivel suavizado sin tendencia (SES, como las demas razones de cesion
+                                 # del modelo): depende de los contratos de reaseguro, y con la tendencia la cesion de Vida
+                                 # (RRC 10) subia de 62 % a 86 % y la RRC retenida bajaba de mas (observacion del area);
+                                 # "factor" = la pendiente combinada en niveles
                                  # FACTOR GTO (GTO / PND), FACTOR MR (MR / PND o PD) y CESION (IRR / BRUTO) de las series con
                                  # BEL por FND: reales hasta el ultimo mes y, desde el primer mes proyectado, el mismo modelo
                                  # que el FND (por decision del area): desde el ultimo real, la pendiente combinada
@@ -2861,6 +2876,29 @@ def repartir_grupos(mensual: dict, pe_hist: dict) -> tuple[dict, list]:
     return out, repartidos
 
 
+def perfilar_reforecast(fa: dict, meses: list, pef_mensual: dict, grupos_mezcla: dict) -> tuple[dict, list]:
+    """PERFIL_REFORECAST = "FCST": el total de los meses del reforecast de cada ramo se reparte entre esos meses con la
+    mezcla mensual de los mismos meses del calendario en el FCST del ano siguiente (pef_mensual, {(ramo, periodo): USD};
+    en los ramos de un grupo con mezcla, grupos_mezcla {ramo: [ramos del grupo]}, la mezcla es la del grupo). Un ramo
+    sin FCST positivo en esos meses, o con total negativo o cero en el reforecast, se deja como viene. Regresa
+    ({(ramo, periodo): USD}, [ramos reperfilados])."""
+    out, hechos = dict(fa), []
+    ramos = sorted({r for r, _ in fa})
+    for r in ramos:
+        if RAMOS_PERFIL_REFORECAST and r not in RAMOS_PERFIL_REFORECAST:
+            continue
+        tot = sum(fa.get((r, p), 0.0) for p in meses)
+        base = grupos_mezcla.get(r, [r])
+        pesos = {p: sum(pef_mensual.get((x, p + 100), 0.0) for x in base) for p in meses}   # mismo mes, ano siguiente
+        if tot <= 0 or any(w < 0 for w in pesos.values()) or sum(pesos.values()) <= 0:
+            continue
+        s_w = sum(pesos.values())
+        for p in meses:
+            out[(r, p)] = tot * pesos[p] / s_w
+        hechos.append(r)
+    return out, hechos
+
+
 def pe_reforecast(pr, pe_hist: dict, desde: int, hasta: int) -> dict:
     """PE de los meses entre la historia (PExRamo) y el FCST, del reforecast del ano por grupo que arma primas.py.
     Los grupos con varios ramos de la BD (30: 30, 34 y 37; 70: 71 y 73) se reparten con la mezcla de la PE historica
@@ -2991,18 +3029,22 @@ def _cambio_mensual(res: Resultado, ultimo_real: float) -> float:
 
 
 def calcular_bel_fnd(bd: BDMontos, hp, resultados: dict, proy: dict, pe: dict, periodos_proy: list[int],
-                     ultimo: int) -> dict:
+                     ultimo: int, is_fa_val: dict | None = None) -> dict:
     """BEL por FND: FND = PND / PEACUMULADA en la historia (PND = BEL / IS), proyectado con la tendencia desde el primer
     mes proyectado; BEL = IS x PEACUMULADA x FND; GTO = PND x FACTOR GTO y MR = PND x FACTOR MR (PND = BEL / IS), con los
     factores reales proyectados con el modelo del FND (TIPO_MODELO_FACTORES); BRUTO = BEL + GTO + MR; IRR = BRUTO x CESION (IRR /
     BRUTO real proyectado igual); NETO = BRUTO - IRR.
+    En los ramos de RAMOS_IS_FA_BEL el IS del BEL (y del PND / PD) es el de la funcion actuarial, is_fa_val
+    {(reserva, ramo, periodo): IS}; sin IS (FA) en un mes, el IS (RL) con aviso.
     Regresa {"proy": montos con el BEL nuevo, "aplica": {(reserva, periodo, ramo)}, "fnd": {(reserva, periodo, ramo):
-    FND proyectado}, "razones": {...}, "series": filas para el diagnostico, "resumen", "estado"}."""
+    FND proyectado}, "razones": {...}, "is_fa_bel": {(reserva, periodo, ramo) con IS (FA)}, "series": filas para el
+    diagnostico, "resumen", "estado"}."""
     h = len(periodos_proy)
     pos = {p: i for i, p in enumerate(periodos_proy)}
     p12 = _suma_12(pe)
     out = {"proy": dict(proy), "aplica": set(), "fnd": {}, "razones": {}, "series": [], "resumen": [], "estado": "",
-           "p12": p12, "alertas": [], "neto_fijo": {}}
+           "p12": p12, "alertas": [], "neto_fijo": {}, "is_fa_bel": set()}
+    is_fa_val = is_fa_val or {}
     if not pe:
         out["estado"] = "sin PE por ramo (PExRamo y FCST): el BEL sigue con el modelo"
         return out
@@ -3079,8 +3121,11 @@ def calcular_bel_fnd(bd: BDMontos, hp, resultados: dict, proy: dict, pe: dict, p
                         if len(f) != h or not np.all(np.isfinite(f)):
                             f = np.full(h, vals[ok_p[-1]])          # (sin modelo: el ultimo real)
                         prm = res_f.parametros or {}
+                        regla_p = prm.get("regla_pendiente", "")
+                        if not regla_p and res_f.modelo == "SES":
+                            regla_p = f"nivel suavizado (SES, alpha {prm.get('alpha', math.nan):.2f}), sin tendencia"
                         fila.update({f"{nombre} modelo": res_f.regla or res_f.modelo,
-                                     f"{nombre} regla de la pendiente": prm.get("regla_pendiente", ""),
+                                     f"{nombre} regla de la pendiente": regla_p,
                                      f"{nombre} cambio mensual de la tendencia": _cambio_mensual(res_f, vals[ok_p[-1]]),
                                      f"{nombre} error % backtest (modelo)": res_f.error_modelo,
                                      f"{nombre} error % backtest (ultimo valor)": res_f.error_ultimo_valor})
@@ -3103,21 +3148,33 @@ def calcular_bel_fnd(bd: BDMontos, hp, resultados: dict, proy: dict, pe: dict, p
                     fac_f[nombre] = f
                     fila[f"{nombre} {ultimo}"] = vals.get(ultimo, math.nan)
                     fila[f"{nombre} {periodos_proy[-1]}"] = float(f[-1])
-            n_ap = 0
+            n_ap, sin_fa = 0, []
+            con_fa = str(r) in RAMOS_IS_FA_BEL.get(pref, ())     # el BEL con el IS de la funcion actuarial
+            fila["IS del BEL"] = "IS (FA)" if con_fa else "IS (RL)"
             for j, p in enumerate(periodos_proy):
-                is_f = _hp_fuente(hp, resultados, r_hp, nombre_is, p, pos)[0]
+                is_rl = _hp_fuente(hp, resultados, r_hp, nombre_is, p, pos)[0]
+                is_f, fuente_is = is_rl, "RL"
+                if con_fa:
+                    v_fa = is_fa_val.get((pref, str(r), p))
+                    if v_fa is not None and np.isfinite(v_fa):
+                        is_f, fuente_is = float(v_fa), "FA"
+                    else:
+                        sin_fa.append(p)
                 pa = peac(p)
                 fz = fnd_f[j] if fnd_f is not None else math.nan
                 bel_m = proy.get((norm(f"{pref} BEL"), p, r), math.nan)
                 bel_n = is_f * pa * fz if all(np.isfinite(x) for x in (is_f, pa, fz)) else math.nan
                 fac = {k: float(v[j]) for k, v in fac_f.items()}
-                out["series"].append({"Reserva": pref, "Ramo": r, "Periodo": p, "IS": is_f, "PEACUMULADA": pa,
+                out["series"].append({"Reserva": pref, "Ramo": r, "Periodo": p, "IS": is_f, "IS usado": fuente_is,
+                                      "IS (RL)": is_rl, "PEACUMULADA": pa,
                                       "FND": fz, "BEL IS x PEACUMULADA x FND": bel_n, "BEL del modelo": bel_m,
                                       "FACTOR GTO": fac.get("FACTOR GTO", math.nan),
                                       "FACTOR MR": fac.get("FACTOR MR", math.nan), "CESION": fac.get("CESION", math.nan)})
                 if not np.isfinite(bel_n) or bel_n < 0:           # (PE o IS negativos: el mes sigue con el modelo)
                     continue
                 out["fnd"][(pref, p, r)] = float(fz)
+                if fuente_is == "FA":
+                    out["is_fa_bel"].add((pref, p, r))
                 raz = {"FACTOR GTO": fac.get("FACTOR GTO", 0.0) if pref == "RRC" else 0.0,
                        "FACTOR MR": fac.get("FACTOR MR", 0.0), "CESION": fac.get("CESION", 0.0)}
                 pnd_f = pa * fz                                    # PND (PD) = BEL / IS = PEACUMULADA x FND
@@ -3136,6 +3193,10 @@ def calcular_bel_fnd(bd: BDMontos, hp, resultados: dict, proy: dict, pe: dict, p
                 out["aplica"].add((pref, p, r))
                 n_ap += 1
             fila["Meses con BEL por FND"] = n_ap
+            if con_fa and sin_fa and fnd_f is not None:
+                out["alertas"].append(("DANOS", f"{pref} | BEL | ramo {r}",
+                                       f"{len(sin_fa)} mes(es) sin IS de la funcion actuarial ({sin_fa[0]} a {sin_fa[-1]}): "
+                                       "el BEL de esos meses usa el IS (RL)"))
             fila["Motivo"] = motivo if motivo else ("" if n_ap == h else
                                                     f"{h - n_ap} mes(es) sin IS, LAG o PE, o con BEL negativo (quedan "
                                                     "con el modelo)")
@@ -3298,6 +3359,7 @@ def escribir_indices_pnd(bd: BDMontos, ctx: dict, avisos: list | None = None) ->
     hp, resultados, periodos_proy, ultimo = ctx["hp"], ctx["resultados"], ctx["periodos_proy"], ctx["ultimo"]
     proy, pe, hoja_pe, fnd = ctx["proy"], ctx.get("pe") or {}, ctx.get("hoja_pe"), ctx.get("fnd") or {}
     razones = ctx.get("razones") or {}             # FACTOR GTO, FACTOR MR y CESION proyectados (BEL por FND)
+    is_fa_bel = ctx.get("is_fa_bel") or set()        # (reserva, periodo, ramo) cuyo BEL y PND / PD usan el IS (FA)
     is_fa = ctx.get("is_fa") or {}                 # {"val": {(reserva, ramo, periodo): IS}, "ref": {...: celda}, ...}
     is_fa_val, is_fa_ref = is_fa.get("val") or {}, is_fa.get("ref") or {}
     registro = ctx.get("registro")                 # {(reserva, ramo, periodo): {indicador: valor}} para el tablero
@@ -3403,7 +3465,10 @@ def escribir_indices_pnd(bd: BDMontos, ctx: dict, avisos: list | None = None) ->
                        f"{', '.join(r for r in ramos if r not in is_fa['ramos'])})"
                        if is_fa.get("periodos") and any(r not in is_fa["ramos"] for r in ramos) else
                        (f" (trae {is_fa['periodos'][0]} a {is_fa['periodos'][-1]})" if is_fa.get("periodos") else ""))
-                    + ". Solo se muestra: el BEL usa el IS (RL)") if is_fa_val else (
+                    + ". El BEL por FND y el PND / PD de los ramos " + ", ".join(
+                        f"{k}: {', '.join(v)}" for k, v in RAMOS_IS_FA_BEL.items() if v)
+                    + " lo usan desde el primer mes proyectado (RAMOS_IS_FA_BEL); los demas ramos usan el IS (RL)")
+                   if is_fa_val else (
             f"IS (FA): {TEXTO_SIN_DATO} en esta corrida porque no se leyo el archivo de la funcion actuarial "
             f"({PATRON_IS_FA} en entradas/; el motivo esta en Alertas del diagnostico)"),
         "FD/FND": "FD/FND = PND/PD / PEACUMULADA" + si_error + (
@@ -3542,8 +3607,11 @@ def escribir_indices_pnd(bd: BDMontos, ctx: dict, avisos: list | None = None) ->
             bel = monto(pref, "BEL", p, r) if f_bel else math.nan
             is_, f_is = _hp_fuente(hp, resultados, r_hp, nombre_is, p, pos)
             lag1, f_l1 = _hp_fuente(hp, resultados, r_hp, "LAG 1", p, pos)
-            hay_pnd = ok(is_) and ok(bel)
-            pnd = div(bel, is_) if hay_pnd else NA
+            is_fa_v = is_fa_val.get((pref, str(r), p))
+            usa_fa = (pref, p, r) in is_fa_bel and ok(is_fa_v)   # PND / PD = BEL / IS (FA) en esos ramos y meses
+            is_b = is_fa_v if usa_fa else is_
+            hay_pnd = ok(is_b) and ok(bel)
+            pnd = div(bel, is_b) if hay_pnd else NA
             pe_v = pe_val.get((r, p), num(pe.get((r, p), (None, None))[0])) if pe else NA
             p12_v = p12_h.get((r, p), 0.0) if pe else NA      # (sin ninguna PE por ramo: N/A, no 0)
             lags = {k: _hp_fuente(hp, resultados, r_hp, f"LAG {k}", p, pos) for k in range(1, anios + 1)}
@@ -3561,7 +3629,6 @@ def escribir_indices_pnd(bd: BDMontos, ctx: dict, avisos: list | None = None) ->
             g = primas.GRUPO_DE_RAMO_RESERVA.get(str(r)) if primas is not None else None
             pe_g = pe_tab.get(g)
             pe_g = float(pe_g.get(p, math.nan)) if pe_g is not None else math.nan
-            is_fa_v = is_fa_val.get((pref, str(r), p))
             vals = {"PND/PD": pnd, "IS (RL)": is_ if ok(is_) else NA, "LAG (RL)": lag1 if ok(lag1) else NA,
                     "IS (FA)": is_fa_v if ok(is_fa_v) else NA,
                     "PE FCST": pe_v, "PRIMA N AÑOS": p12_v, "PEACUMULADA": peac, "FD/FND": fnd_v,
@@ -3577,7 +3644,8 @@ def escribir_indices_pnd(bd: BDMontos, ctx: dict, avisos: list | None = None) ->
                                                "BEL": bel if ok(bel) else None,
                                                "BRUTO": bruto_m if ok(bruto_m) else None,
                                                "GTO": 1.0 if f_gto else 0.0,
-                                               "FND": 1.0 if fnd_proy else 0.0}
+                                               "FND": 1.0 if fnd_proy else 0.0,
+                                               "IS del BEL": "FA" if usa_fa else "RL"}
             for ind in COLUMNAS_INDICES_PND:
                 c = cols[(ind, r)]
                 celda = ws.cell(fila, c)
@@ -3608,10 +3676,11 @@ def escribir_indices_pnd(bd: BDMontos, ctx: dict, avisos: list | None = None) ->
                     continue
                 pnd_c = f"{L('PND/PD', r)}{fila}"
                 if ind == "PND/PD":
+                    is_col = L("IS (FA)" if usa_fa else "IS (RL)", r)
                     if es_bel:
-                        celda.value = f"=IFERROR({ram}{fila}/{L('IS (RL)', r)}{fila},0)"
+                        celda.value = f"=IFERROR({ram}{fila}/{is_col}{fila},0)"
                     else:                                 # el BEL del mes sin apuntar a otro renglon
-                        celda.value = f"=IFERROR({del_mes(ram, f_bel, fila)}/{L('IS (RL)', r)}{fila},0)"
+                        celda.value = f"=IFERROR({del_mes(ram, f_bel, fila)}/{is_col}{fila},0)"
                 elif ind == "IS (FA)":
                     e = is_fa_ref.get((pref, str(r), p))
                     celda.value = f"={e}" if e else float(v)
@@ -3695,8 +3764,9 @@ def _agrupar(ws, secciones: list):
 
 def escribir_bel_fnd(bd: BDMontos, info: dict, cols: dict):
     """En los meses donde aplica el BEL por FND, las celdas RAM_ de RRC y SONR van como formulas que solo usan celdas de
-    su propio renglon (IS (RL), PEACUMULADA, FD/FND, FACTOR GTO, FACTOR MR y CESION, que son las del mes en todos los
-    renglones), sin numeros escritos en la formula, para que la hoja se pueda ordenar y filtrar:
+    su propio renglon (IS (RL), o IS (FA) en los ramos de RAMOS_IS_FA_BEL, PEACUMULADA, FD/FND, FACTOR GTO, FACTOR MR y
+    CESION, que son las del mes en todos los renglones), sin numeros escritos en la formula, para que la hoja se pueda
+    ordenar y filtrar:
     BEL = IS x PEACUMULADA x FND; PND = BEL / IS = PEACUMULADA x FND; GTO = PND x FACTOR GTO; MR = PND x FACTOR MR;
     BRUTO = BEL + GTO + MR; IRR = BRUTO x CESION; NETO = BRUTO x (1 - CESION) = BRUTO - IRR."""
     ws = bd.ws
@@ -3709,7 +3779,8 @@ def escribir_bel_fnd(bd: BDMontos, info: dict, cols: dict):
             if not f:
                 continue
             L = lambda ind: f"{get_column_letter(cols[(ind, r)])}{f}"         # noqa: E731
-            bel, pnd = f"{L('IS (RL)')}*{L('PEACUMULADA')}*{L('FD/FND')}", f"{L('PEACUMULADA')}*{L('FD/FND')}"
+            is_col = "IS (FA)" if (pref, p, r) in (info.get("is_fa_bel") or set()) else "IS (RL)"
+            bel, pnd = f"{L(is_col)}*{L('PEACUMULADA')}*{L('FD/FND')}", f"{L('PEACUMULADA')}*{L('FD/FND')}"
             gto, mr = f"{pnd}*{L('FACTOR GTO')}", f"{pnd}*{L('FACTOR MR')}"
             bruto = f"{bel}+{gto}+{mr}" if pref == "RRC" else f"{bel}+{mr}"
             ws[f"{ram}{f}"] = "=" + {"BEL": bel, "GTO": gto, "MR": mr, "BRUTO": bruto,
@@ -5269,8 +5340,28 @@ def main():
                                                pe_ramo["mensual"])
                 antes = sum(v for (_, q), v in pe_rf.items() if q in meses_fa)
                 pe_rf = {k: v for k, v in pe_rf.items() if k[1] not in meses_fa}
+                perfilados, txt_perfil = [], ""
+                if PERFIL_REFORECAST == "FCST" and pef is not None:
+                    grupos_mz = {}
+                    if primas is not None:
+                        for g in GRUPOS_CON_MEZCLA:
+                            rs = [x for x in MAPA_RAMO_LAG if primas.GRUPO_DE_RAMO_RESERVA.get(x) == g]
+                            grupos_mz.update({x: rs for x in rs})
+                    archivo_fa = dict(fa)
+                    fa, perfilados = perfilar_reforecast(fa, meses_fa, pef["mensual"], grupos_mz)
+                    if perfilados:
+                        cambios = ", ".join(f"{r}: " + "/".join(f"{archivo_fa.get((r, q), 0.0) / 1e6:.1f}" for q in meses_fa)
+                                            + " -> " + "/".join(f"{fa.get((r, q), 0.0) / 1e6:.1f}" for q in meses_fa)
+                                            for r in perfilados)
+                        txt_perfil = (f"; PERFIL_REFORECAST: el total de {meses_fa[0]} a {meses_fa[-1]} de cada ramo se "
+                                      f"reparte entre esos meses con la mezcla mensual de los mismos meses del FCST "
+                                      f"{pef['periodos'][0] // 100} (el archivo concentra la prima en uno o dos meses y "
+                                      f"deja casi vacios los ultimos); M USD por mes, archivo -> perfilado: {cambios}")
                 pe_rf.update({(r, p): (v, f"{nombre} (total del grupo repartido con la mezcla de PExRamo)"
                                        if r in ramos_fa else nombre) for (r, p), v in fa.items()})
+                if perfilados:
+                    pe_rf.update({(r, p): (v, f"{pe_rf[(r, p)][1]}; meses perfilados con el FCST")
+                                  for (r, p), v in fa.items() if r in perfilados})
                 tcs, tca = pe_rfa["tc_usado"], pe_rfa["tc_archivo"]
                 tc_txt = ", ".join(f"{p} {tcs[p]:.4f}" for p in meses_fa if tcs[p])
                 tca_txt = ", ".join(f"{p} {tca[p]:.4f}" for p in meses_fa if p in tca)
@@ -5291,7 +5382,8 @@ def main():
                              "los ultimos 12 meses (GRUPOS_CON_MEZCLA)" if ramos_fa else "")
                           + (f"; meses del archivo que no se usan (real o FCST): {', '.join(map(str, otros))}" if otros else "")
                           + "; fuera de la BD de Danos: " + (", ".join(f"{k} ({v / 1e6:,.1f} M USD)" for k, v in
-                                                                      sorted(fuera_fa.items())) or "nada"))
+                                                                      sorted(fuera_fa.items())) or "nada")
+                          + txt_perfil)
             cub = sorted({p for _, p in pe_rf})
             falta = [p for p in rango_periodos(desde, hasta) if p not in cub]
             de_primas = [p for p in cub if p not in meses_fa]
@@ -5419,7 +5511,8 @@ def main():
     if USAR_BEL_POR_FND:
         print("BEL por FND (Danos) ...", flush=True)
         try:
-            info_fnd = calcular_bel_fnd(bd_danos, hp, resultados, proy_danos, pe_mes, periodos_proy, ultimo)
+            info_fnd = calcular_bel_fnd(bd_danos, hp, resultados, proy_danos, pe_mes, periodos_proy, ultimo,
+                                        is_fa["val"] if is_fa is not None else None)
             validar(info_fnd["proy"], proy_rfv)
             alertas.extend(info_fnd.get("alertas") or [])
             proy_danos = info_fnd["proy"]
@@ -5450,7 +5543,7 @@ def main():
         esc = next((e for e, m in ESCENARIOS_PND.items() if m == meses), None)
         return {"hp": hp, "resultados": resultados, "periodos_proy": periodos_proy, "ultimo": ultimo, "proy": proy,
                 "pe": pe_mes, "hoja_pe": hoja_pe_ramo, "primas_pe": hoja_pe, "meses_pe": meses, "fnd": fnd,
-                "razones": razones, "is_fa": ctx_is_fa,
+                "razones": razones, "is_fa": ctx_is_fa, "is_fa_bel": info_fnd.get("is_fa_bel") or set(),
                 "pe_tab": {g: x for (e, g), x in (diag_pnd.get("_pe") or {}).items() if e == esc}}
     if INDICES_PND_EN_BD:
         if INDICES_PND_FORMULAS and diag_pnd.get("_pe") and primas is not None:   # solo con prima completa y verificada
@@ -5474,7 +5567,7 @@ def main():
         diag_pnd["indicadores_ramo"] = [
             {"Reserva": pref, "Ramo": r, "Periodo": p, "Tipo": "Real" if p <= ultimo else "Proyección",
              **{c: v.get(c) for c in COLUMNAS_TABLERO_PND}, "BEL": v.get("BEL"), "BRUTO": v.get("BRUTO"),
-             "Lleva GTO": v.get("GTO"), "BEL por FND": v.get("FND"),
+             "Lleva GTO": v.get("GTO"), "BEL por FND": v.get("FND"), "IS del BEL": v.get("IS del BEL"),
              "Meses PRIMA N AÑOS": MESES_PRIMA_N_ANOS, "Años LAG PEACUMULADA": ANIOS_LAG_PEACUMULADA.get(pref, 0)}
             for (pref, r, p), v in sorted(registro_ind.items(), key=lambda x: (x[0][0], int(x[0][1]), x[0][2]))]
         if INDICES_PND_FORMULAS and info_fnd.get("aplica"):

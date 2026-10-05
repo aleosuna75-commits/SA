@@ -283,7 +283,8 @@ def leer_indicadores_ramo() -> dict | None:
     """Hoja HOJA_INDICADORES_RAMO del diagnostico (los valores de los bloques de indicadores de la BD de Danos, RRC y
     SONR, por ramo y mes): {"periodos": [...], "ramos": [...], "datos": {reserva: {ramo o "Todos": {indicador:
     [valor por periodo o None]}}} ("Todos" trae ademas "IS (RL) ramos FA": el IS (RL) ponderado solo con los ramos de
-    IS (FA), para compararlos), "con_fa": [ramos con IS (FA)], "lleva_gto": {reserva: bool}, "fnd": {reserva: [ramos con
+    IS (FA), para compararlos), "con_fa": [ramos con IS (FA)], "is_fa_bel": {reserva: [ramos cuyo BEL y PND / PD
+    proyectados usan el IS (FA)]}, "lleva_gto": {reserva: bool}, "fnd": {reserva: [ramos con
     BEL por FND]}, "faltan": {reserva: texto de los ramos que no entran a "Todos" y en que meses}, "distinto": {reserva:
     [posiciones de los meses en que "Todos" no tiene los mismos ramos que en el ultimo mes real]}, "sin_denominador":
     {reserva: n de razones sin dato por denominador casi nulo}, "meses_n", "anios_lag": {reserva: n}, "renglones": n}.
@@ -373,7 +374,10 @@ def leer_indicadores_ramo() -> dict | None:
             for tramos, rs in sorted(grupos.items(), key=lambda x: (x[0][0][0], x[1])))
         por_ramo["Todos"] = tot
     con_fa = [r for r in ramos if any(x is not None for res in datos.values() for x in res.get(r, {}).get("IS (FA)", []))]
-    return {"periodos": periodos, "ramos": ramos, "datos": datos, "con_fa": con_fa, "lleva_gto": lleva_gto,
+    is_fa_bel = {res: sorted({str(f["Ramo"]) for f in crudos if f.get("Reserva") == res and f.get("IS del BEL") == "FA"},
+                             key=lambda x: int(x) if x.isdigit() else 10 ** 6) for res in datos}
+    return {"periodos": periodos, "ramos": ramos, "datos": datos, "con_fa": con_fa, "is_fa_bel": is_fa_bel,
+            "lleva_gto": lleva_gto,
             "fnd": {res: sorted(v, key=lambda x: int(x) if x.isdigit() else 10 ** 6) for res, v in fnd.items()},
             "faltan": faltan, "distinto": distinto, "sin_denominador": sin_den, "meses_n": meses_n, "anios_lag": anios_lag,
             "renglones": len(crudos)}
@@ -1140,7 +1144,9 @@ def construir_pnd(ws, wbp, wcp, pnd: dict, ultimo: int, p_dic: int, nombre, sele
     # ---- paneles y graficas
     ramo_txt = 'IF(SelRamoPnd="Todos","todos los ramos","ramo "&SelRamoPnd)'
     titulos = {
-        "PND/PD": f'=IF(SelResPnd="RRC","PND (RRC)","PD (SONR)")&" · "&{ramo_txt}&" · M USD"',
+        "PND/PD": f'=IF(SelResPnd="RRC","PND (RRC)","PD (SONR)")&" · "&{ramo_txt}&" · M USD"' + "".join(
+            f'&IF(AND(SelResPnd="{res}",OR({",".join(f"SelRamoPnd={chr(34)}{r}{chr(34)}" for r in rs)}))," · BEL / IS (FA) en la proyección","")'
+            for res, rs in (pnd.get("is_fa_bel") or {}).items() if rs),
         "FACTOR GTO": f'=IF(SelResPnd="RRC","FACTOR GTO (GTO / PND) · "&{ramo_txt},"FACTOR GTO · "&SelResPnd&" no lleva GTO (solo RRC)")',
         "FACTOR MR": f'="FACTOR MR (MR / "&{nb}&") · "&{ramo_txt}',
         "CESION": f'="CESIÓN (IRR / BRUTO) · "&{ramo_txt}',

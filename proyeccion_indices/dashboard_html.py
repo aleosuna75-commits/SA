@@ -208,7 +208,8 @@ def preparar_datos() -> dict:
     pnd = dx.leer_indicadores_ramo()                 # pestaña Razones (None con un diagnostico anterior)
     if pnd:
         unidad = {**{c: u for c, _, u in dx.INDICADORES_PND}, "IS (RL) ramos FA": "pct"}
-        pnd = {**{k: pnd[k] for k in ("periodos", "ramos", "con_fa", "lleva_gto", "fnd", "faltan", "distinto",
+        pnd = {"is_fa_bel": pnd.get("is_fa_bel") or {},
+               **{k: pnd[k] for k in ("periodos", "ramos", "con_fa", "lleva_gto", "fnd", "faltan", "distinto",
                                      "sin_denominador", "meses_n", "anios_lag")},
                "indicadores": [[c, t, u] for c, t, u in dx.INDICADORES_PND],
                "datos": {res: {ramo: {c: [_redondear(x, 0 if unidad[c] == "monto" else 6) for x in v[c]]
@@ -1097,10 +1098,10 @@ function explicaPnd(col, res, ramo) {
   const peac = res === 'RRC' || !anios ? 'En RRC es igual a PRIMA N AÑOS'
     : Array.from({ length: anios }, (_, k) => k === 0 ? 'LAG 1 × PRIMA N AÑOS del mes' : `LAG ${k + 1} × la de ${12 * k} meses antes`).join(' + ');
   return {
-    'PND/PD': `${nb} = BEL / IS (RL); ${desde.monto}. Millones de USD`,
+    'PND/PD': `${nb} = BEL / IS (RL)${(PN.is_fa_bel || {})[res] && (PN.is_fa_bel[res].includes(ramo) || todos) ? ` (desde ${ini}, BEL / IS (FA) en ${todos ? 'los ramos ' + PN.is_fa_bel[res].join(', ') : 'este ramo'})` : ''}; ${desde.monto}. Millones de USD`,
     'FACTOR GTO': `GTO / PND, en %; ${desde.factor}`,
     'FACTOR MR': `MR / ${nb}, en %; ${desde.factor}${conFnd ? ' (arranca del nivel de los últimos 3 meses: tiene picos de un mes)' : ''}`,
-    'CESION': `Razón de cesión IRR / BRUTO, en %; ${desde.factor}`,
+    'CESION': `Razón de cesión IRR / BRUTO, en %; ${todos ? `desde ${ini}, el nivel suavizado de los últimos meses (SES, sin tendencia: depende de los contratos de reaseguro) en los ramos con BEL por FND y el modelo de reservas en los demás` : conFnd ? `desde ${ini}, el nivel suavizado de los últimos meses (SES), sin tendencia: depende de los contratos de reaseguro` : `desde ${ini}, la razón del modelo (este ramo no lleva BEL por FND)`}`,
     'FD/FND': `${nb} / PEACUMULADA (razón); ${desde.fnd}${conFnd ? ': desde el último real, su tendencia de 24 y 36 meses frenada 5 % por mes, con el patrón del mes' : ''}`,
     'IS (RL)': `${res === 'RRC' ? 'Ind Sin RRC' : 'Ind Sin SONR Media'} de HParametros, en %; misma escala que IS (FA)`
       + (todos ? '; incluye ramos que FA no manda (como TEV e Hidro, con IS bajo): para comparar con FA, ve la línea gris en IS (FA)' : ''),
