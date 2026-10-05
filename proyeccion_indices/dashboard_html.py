@@ -1090,8 +1090,8 @@ function explicaPnd(col, res, ramo) {
   const desde = {                                      // como se proyecta desde el primer mes proyectado
     monto: todos ? `desde ${ini}, suma de los ramos (PEACUMULADA × ${fd} en los que llevan BEL por FND, el modelo en los demás)`
       : conFnd ? `desde ${ini}, PEACUMULADA × ${fd}` : `desde ${ini}, el BEL del modelo entre el IS (este ramo no lleva BEL por FND)`,
-    factor: todos ? `desde ${ini}, como el FND (desde el último real, su tendencia de 24 y 36 meses frenada 5 % por mes, con el patrón del mes) en los ramos con BEL por FND y el modelo de reservas en los demás`
-      : conFnd ? `desde ${ini}, como el FND: desde el último real, su tendencia de 24 y 36 meses frenada 5 % por mes, con el patrón del mes` : `desde ${ini}, la razón del modelo (este ramo no lleva BEL por FND)`,
+    factor: todos ? `desde ${ini}, desde el último real, su tendencia de 24 y 36 meses frenada 5 % por mes, con el patrón del mes, en los ramos con BEL por FND y el modelo de reservas en los demás`
+      : conFnd ? `desde ${ini}, desde el último real, su tendencia de 24 y 36 meses frenada 5 % por mes, con el patrón del mes` : `desde ${ini}, la razón del modelo (este ramo no lleva BEL por FND)`,
     fnd: todos ? `desde ${ini}, con el ${fd} proyectado en los ramos con BEL por FND`
       : conFnd ? `desde ${ini}, el ${fd} proyectado` : `desde ${ini}, ${nb} del modelo / PEACUMULADA (este ramo no lleva BEL por FND)`,
   };
@@ -1102,7 +1102,7 @@ function explicaPnd(col, res, ramo) {
     'FACTOR GTO': `GTO / PND, en %; ${desde.factor}`,
     'FACTOR MR': `MR / ${nb}, en %; ${desde.factor}${conFnd ? ' (arranca del nivel de los últimos 3 meses: tiene picos de un mes)' : ''}`,
     'CESION': `Razón de cesión IRR / BRUTO, en %; ${todos ? `desde ${ini}, el nivel suavizado de los últimos meses (SES, sin tendencia: depende de los contratos de reaseguro) en los ramos con BEL por FND y el modelo de reservas en los demás` : conFnd ? `desde ${ini}, el nivel suavizado de los últimos meses (SES), sin tendencia: depende de los contratos de reaseguro` : `desde ${ini}, la razón del modelo (este ramo no lleva BEL por FND)`}`,
-    'FD/FND': `${nb} / PEACUMULADA (razón); ${desde.fnd}${conFnd ? ': desde el último real, su tendencia de 24 y 36 meses frenada 5 % por mes, con el patrón del mes' : ''}`,
+    'FD/FND': `${nb} / PEACUMULADA (razón); ${desde.fnd}${conFnd ? ' con Holt amortiguado (serie de tiempo): arranca del último real y sigue el promedio de los cambios mensuales recientes, frenado 5 % por mes, con el patrón del mes; un salto de un mes mueve el nivel pero no la tendencia' : ''}`,
     'IS (RL)': `${res === 'RRC' ? 'Ind Sin RRC' : 'Ind Sin SONR Media'} de HParametros, en %; misma escala que IS (FA)`
       + (todos ? '; incluye ramos que FA no manda (como TEV e Hidro, con IS bajo): para comparar con FA, ve la línea gris en IS (FA)' : ''),
     'IS (FA)': `${res === 'RRC' ? 'IS RRC' : 'IS SONR'} de la función actuarial (solo proyección), en %; misma escala que IS (RL)`

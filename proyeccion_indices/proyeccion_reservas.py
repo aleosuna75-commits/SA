@@ -41,6 +41,8 @@ b) Modelo (MODELO_POR_TIPO):
          Es la linea de tendencia de Excel con los picos y valles del ano: la proyeccion sale paralela
          a ella, arranca del ultimo real y repite el patron en la medida en que se ha repetido;
        - razones (%GTO, %MR, %cedido) -> SES (nivel suavizado, sin tendencia: dependen de los contratos);
+       - BEL por FND (Danos): el FND con Holt amortiguado con guardia de saltos (serie de tiempo, HOLT_FND), FACTOR GTO
+         y FACTOR MR con la pendiente combinada (PENDIENTE_COMBINADA) y la CESION con SES;
        - RCONT -> Holt-Winters sin tendencia: nivel suavizado mas estacionalidad por mes del trimestre
          (acumula en los meses 1-2 y libera en el 3) si hay al menos 12 meses; con menos, SES (nivel).
    Los intervalos al 80% salen de la variabilidad mensual alrededor de la tendencia (crece con la raiz
@@ -212,9 +214,10 @@ MODELO_POR_TIPO = {
     "indice": "Tendencia historica",  # indices de HParametros, en logaritmos
     "lag": "Tendencia historica",     # patron de desarrollo (LAG 1-10); en logaritmos si es positivo
     "razon": "SES",
-    "fnd": "Tendencia historica",     # FND, FACTOR GTO y FACTOR MR del BEL por FND: en logaritmos, anclados al ultimo real
-                                      # y con la pendiente combinada (CREDIBILIDAD_PENDIENTE, PENDIENTE_COMBINADA)
-    "factor": "Tendencia historica",  # CESION del BEL por FND: igual, en niveles (puntos por mes)
+    "fnd": "Holt amortiguado con guardia de saltos",   # FND del BEL por FND: serie de tiempo (HOLT_FND), en logaritmos,
+                                      # anclado al ultimo real; "Tendencia historica" = la pendiente combinada
+    "factor_log": "Tendencia historica",   # FACTOR GTO y FACTOR MR del BEL por FND: igual que el FND (en logaritmos)
+    "factor": "Tendencia historica",  # (sin uso hoy) pendiente combinada en niveles, puntos por mes; p. ej. la CESION
 }
 MESES_TENDENCIA = 36             # ventana de la tendencia historica (None = toda la historia). Con toda la historia
                                  # entran arranques desde cero y cambios de regimen (ramo 80 SONR, Hidro) que
@@ -245,7 +248,7 @@ CREDIBILIDAD_ESTACIONAL = "buhlmann"  # cuanto del patron observado se aplica (1
                                  #   "completa": 100 % del patron cuando la prueba F lo detecta (p < P_ESTACIONALIDAD)
                                  #       y nada en caso contrario (20.0 % / 15.3 %; deja sin patron a la mitad).
 P_ESTACIONALIDAD = 0.10          # umbral de la prueba F para la opcion "completa"
-TIPOS_CON_ESTACIONALIDAD = ("nivel", "indice", "fnd", "factor")   # montos, indices, FND y factores del BEL por FND.
+TIPOS_CON_ESTACIONALIDAD = ("nivel", "indice", "fnd", "factor_log", "factor")   # montos, indices, FND y factores del BEL por FND.
                                  # Los LAGs (patron de desarrollo) no tienen mes del
                                  # ano: en backtest no cambiaba nada y solo agregaba dientes menores a 3 %.
 DESCRIPCION_CREDIBILIDAD = {
@@ -267,12 +270,12 @@ DESCRIPCION_CREDIBILIDAD = {
 #       proyeccion arrancaria con una curva de regreso hacia donde estaba la serie hace meses, en contra de su tendencia.
 #       Anclada, la proyeccion arranca del ultimo real y sigue su tendencia (pendiente combinada, PENDIENTE_COMBINADA)
 #       con el patron del mes.
-PERSISTENCIA_DESVIACION = {"nivel": 1.0, "indice": 0.8, "lag": 1.0, "fnd": 1.0, "factor": 1.0}
+PERSISTENCIA_DESVIACION = {"nivel": 1.0, "indice": 0.8, "lag": 1.0, "fnd": 1.0, "factor_log": 1.0, "factor": 1.0}
 # Con la desviacion conservada (phi = 1), de donde arranca la proyeccion: la desviacion del ultimo mes (1) o el promedio
 # de las desviaciones de los ultimos k meses respecto a la recta (k > 1: arranca del nivel reciente de la serie, no de un
 # solo mes; util en razones con picos, como el FACTOR MR, donde anclar a un mes atipico arrastra el pico a todo el
 # horizonte). No aplica a los tipos con phi < 1.
-ANCLA_MESES = {"nivel": 1, "lag": 1, "fnd": 1, "factor": 1}
+ANCLA_MESES = {"nivel": 1, "lag": 1, "fnd": 1, "factor_log": 1, "factor": 1}
 ANCLA_MESES_SERIE = {"FACTOR MR": 3}   # por nombre de serie, encima del tipo. FACTOR MR tiene picos de un mes: anclado al
                                  # ultimo mes su backtest es 30.3 % de error mediano, anclado a 3 meses 25.1 % (con la
                                  # pendiente combinada; el FND y la CESION van con 1 mes: 15.3 % y 15.0 %; FACTOR GTO
@@ -295,7 +298,8 @@ ANCLAR_SERIES = set()            # series (Serie, Ramo) de indices que se dejan 
 #   FND y factores del BEL por FND (fnd, factor): "combinada" (PENDIENTE_COMBINADA). Con el R2 de la recta de 36 meses
 #       quedaban planas 31 de 75 series: cuando una razon dio la vuelta dentro de la ventana (cesion RRC 40: 21 % -> 41 %
 #       en ene-25 -> 28.6 % en ago-26) el R2 vale casi 0 y la proyeccion era una linea recta en el ultimo real.
-CREDIBILIDAD_PENDIENTE = {"nivel": 1.0, "indice": "r2", "lag": 1.0, "fnd": "combinada", "factor": "combinada"}
+CREDIBILIDAD_PENDIENTE = {"nivel": 1.0, "indice": "r2", "lag": 1.0, "fnd": "combinada", "factor_log": "combinada",
+                          "factor": "combinada"}
 # Pendiente "combinada" del FND, FACTOR GTO, FACTOR MR y CESION (sobre la serie sin el patron del mes, en la escala del
 # modelo: logaritmos en FND, GTO y MR, puntos en la CESION):
 #   1. Rectas de los ultimos 24 y 36 meses con Theil-Sen (mediana de las pendientes entre todos los pares de meses: un
@@ -322,6 +326,32 @@ CREDIBILIDAD_PENDIENTE = {"nivel": 1.0, "indice": "r2", "lag": 1.0, "fnd": "comb
 # series aplanadas 13 contra 31 (7 por las reglas de salto o meseta; las demas por la escala logaritmica, el plano en
 # el promedio o la cota de 100 %), ninguna contraria a su tendencia.
 # t_clara, t_meseta, k_salto, la amortiguacion y el tope son criterios de modelacion, no se estimaron de los datos.
+# FND: Holt amortiguado con guardia de saltos (MODELO_POR_TIPO["fnd"]), un modelo de series de tiempo (ETS(A,Ad,N), por
+# indicacion del area: "para el FND utiliza series de tiempo"), sobre el logaritmo del FND sin su patron del mes:
+#   - nivel = el ultimo real (alpha = 1: la proyeccion arranca donde esta la serie, sin salto);
+#   - tendencia = promedio exponencial de los cambios mensuales (beta = 0.05: memoria media de unos 9 meses, ni el ultimo
+#     mes ni toda la historia), amortiguada phi = 0.95 por mes (en 16 meses se recorren 10.6 meses de tendencia y nunca
+#     da la vuelta: no hay curvas de regreso);
+#   - guardia de saltos: un cambio mensual mayor a k_salto MAD de los cambios de los 24 meses anteriores mueve el nivel
+#     pero no entra a la tendencia (en toda la historia, para que la proyeccion no cambie de golpe cuando el salto deja de
+#     ser el ultimo mes); si el salto es el ultimo mes, no se proyecta tendencia desde el nuevo nivel
+#     (salto_ultimo_sin_tendencia, como la regla de la pendiente combinada);
+#   - tope de plausibilidad: la tendencia se reduce, sin invertirse, si a meses_tope meses sacaria el FND del rango de los
+#     ultimos 36 meses reales ampliado tope_rango veces el rango; encima va el patron del mes del ano.
+# beta, phi, k_salto y el tope son supuestos de modelacion declarados, no estimados: toda estimacion por verosimilitud o
+# AICc (ETS, SARIMA) lleva la tendencia a cero y aplana (una deriva de 1 % mensual contra un ruido de 10 % no la paga la
+# verosimilitud a un mes). Elegido en el banco de pruebas de los 22 FND contra ETS por maxima verosimilitud, SARIMA con
+# deriva, Theta y la pendiente combinada: backtest con 9 cortes (4 a 20 meses antes del final) error % mediano / medio
+# 13.7 / 20.3 contra 15.9 / 22.2 de la pendiente combinada (gana en 15 de 22 series), ninguna serie fuera del rango de
+# 36 meses ni con cambio mayor a 30 %, arranque en el ultimo real en las 22; la malla beta 0.03-0.05 x phi 0.92-0.98 da
+# resultados parecidos (no es un optimo puntual). Costo declarado: cada mes real nuevo mueve la tendencia (revision media
+# de la proyeccion 10.5 % contra 8.6 % con la pendiente combinada).
+HOLT_FND = {
+    "alpha": 1.0, "beta": 0.05, "phi": 0.95,
+    "k_salto": 5.0, "ventana_salto": 24, "min_cambios_salto": 12,
+    "salto_ultimo_sin_tendencia": True,
+    "tope_rango": 0.5, "meses_tope": 16,
+}
 PENDIENTE_COMBINADA = {
     "ventanas": (24, 36),               # rectas candidatas (meses), ademas del plano; la primera da la direccion
     "ventana_meseta": 12,
@@ -560,11 +590,11 @@ ANIOS_LAG_PEACUMULADA = {"SONR": 3}    # SONR: PEACUMULADA = LAG 1 x PRIMA N AÑ
 # FCST. GTO y MR = su razon proyectada sobre el BEL (la del modelo) x el BEL nuevo; BRUTO = BEL + GTO + MR; IRR = BRUTO x
 # la razon de cesion del modelo; NETO = BRUTO - IRR. En la BD principal van como formulas en las columnas RAM_.
 USAR_BEL_POR_FND = True
-TIPO_MODELO_FND = "fnd"          # el FND se proyecta en logaritmos con el patron del mes y la pendiente combinada
-                                 # (PENDIENTE_COMBINADA: rectas robustas de 24 y 36 meses, amortiguada 0.95 por mes),
-                                 # anclado al ultimo real: la proyeccion arranca donde esta la serie
+TIPO_MODELO_FND = "fnd"          # el FND se proyecta en logaritmos con el patron del mes y el modelo de
+                                 # MODELO_POR_TIPO["fnd"] (Holt amortiguado con guardia de saltos, HOLT_FND), anclado al
+                                 # ultimo real: la proyeccion arranca donde esta la serie
 MIN_MESES_FND = 12               # meses minimos de FND real para proyectarlo
-TIPO_MODELO_FACTORES = {"FACTOR GTO": "fnd", "FACTOR MR": "fnd", "CESION": "razon"}
+TIPO_MODELO_FACTORES = {"FACTOR GTO": "factor_log", "FACTOR MR": "factor_log", "CESION": "razon"}
                                  # CESION: "razon" = nivel suavizado sin tendencia (SES, como las demas razones de cesion
                                  # del modelo): depende de los contratos de reaseguro, y con la tendencia la cesion de Vida
                                  # (RRC 10) subia de 62 % a 86 % y la RRC retenida bajaba de mas (observacion del area);
@@ -832,14 +862,19 @@ def pendiente_combinada(d, z, nombre: str = ""):
     return float(np.mean(valores)) if valores else 0.0, det
 
 
-def _tope_rango(b: float, a0: float, y, escala_log: bool) -> float:
+def _tope_rango(b: float, a0: float, y, escala_log: bool, phi: float | None = None, tope: float | None = None,
+                meses: int | None = None) -> float:
     """Reduce la pendiente (nunca la invierte) para que a meses_tope meses la tendencia quede dentro del rango de los
-    ultimos 36 meses reales ampliado tope_rango veces ese rango."""
+    ultimos 36 meses reales ampliado tope_rango veces ese rango (phi, tope y meses: los de PENDIENTE_COMBINADA si no
+    se dan)."""
     P = PENDIENTE_COMBINADA
+    phi = P["amortiguacion"] if phi is None else phi
+    tope = P["tope_rango"] if tope is None else tope
+    meses = P["meses_tope"] if meses is None else meses
     y36 = np.asarray(y, dtype=float)[-36:]
     lo, hi = float(y36.min()), float(y36.max())
-    lo, hi = lo - P["tope_rango"] * (hi - lo), hi + P["tope_rango"] * (hi - lo)
-    pasos = float(np.sum(P["amortiguacion"] ** np.arange(1, P["meses_tope"] + 1)))
+    lo, hi = lo - tope * (hi - lo), hi + tope * (hi - lo)
+    pasos = float(np.sum(phi ** np.arange(1, meses + 1)))
     if escala_log:
         lim = math.log(hi) if b > 0 else (math.log(lo) if lo > 0 else -math.inf)
     else:
@@ -849,6 +884,71 @@ def _tope_rango(b: float, a0: float, y, escala_log: bool) -> float:
         b_nuevo = (lim - a0) / pasos
         return b_nuevo if np.sign(b_nuevo) == np.sign(b) else 0.0
     return b
+
+
+HOLT_GUARDIA = "Holt amortiguado con guardia de saltos"
+
+
+def _saltos_holt(z):
+    """Mascara por mes: True si el cambio mensual de z (en la escala del modelo, con el patron) supera k_salto veces la
+    MAD de los cambios de los ultimos ventana_salto meses (ventana que termina en ese mes), como en pendiente_combinada."""
+    P = HOLT_FND
+    z = np.asarray(z, dtype=float)
+    m = np.zeros(len(z), dtype=bool)
+    for t in range(1, len(z)):
+        dif = np.diff(z[max(0, t - P["ventana_salto"] + 1):t + 1])
+        if len(dif) < P["min_cambios_salto"]:
+            continue
+        mad = float(np.median(np.abs(dif - np.median(dif))))
+        if mad > 0 and abs(float(dif[-1])) > P["k_salto"] * mad:
+            m[t] = True
+    return m
+
+
+def ajustar_holt_guardia(z, h: int, meses=None, escala_log: bool = False):
+    """FND: Holt amortiguado (ETS(A,Ad,N)) con alpha = 1 y guardia de saltos (HOLT_FND) sobre z sin el patron del mes:
+    nivel = ultimo real; tendencia b_t = phi b_{t-1} + beta (d_t - l_{t-1} - phi b_{t-1}), que no se actualiza en los
+    meses marcados como salto; proyeccion = nivel + b (phi + ... + phi^k) + patron del mes. Intervalo: la variabilidad
+    mensual alrededor de la tendencia, que crece con la raiz del horizonte. Mismo contrato que ajustar_tendencia."""
+    P = HOLT_FND
+    z = np.asarray(z, dtype=float)
+    est = factores_estacionales(z, meses) if (ESTACIONALIDAD_MENSUAL and meses is not None) else None
+    if est is not None:
+        meses = np.asarray(meses, dtype=int)
+        s = est["factores"]
+        d = z - s[meses - 1]
+        estacional_fut = s[(meses[-1] - 1 + np.arange(1, h + 1)) % 12]
+    else:
+        d, estacional_fut = z, 0.0
+    masc = _saltos_holt(z)
+    alpha, beta, phi = P["alpha"], P["beta"], P["phi"]
+    nivel, b = float(d[0]), 0.0
+    for t, x in enumerate(d):
+        e = x - (nivel + phi * b)
+        nivel = nivel + phi * b + alpha * e
+        b = phi * b if masc[t] else phi * b + beta * e
+    regla = f"Holt amortiguado (beta {beta}, phi {phi}): tendencia {b:+.4f}/mes"
+    if P["salto_ultimo_sin_tendencia"] and len(masc) and masc[-1]:
+        b, regla = 0.0, "salto del ultimo mes: sin tendencia desde el nuevo nivel (Holt amortiguado)"
+    b_sin_tope, tope = b, False
+    if P["tope_rango"] is not None and b != 0:
+        b = _tope_rango(b, nivel, np.exp(z) if escala_log else z, escala_log, phi, P["tope_rango"], P["meses_tope"])
+        tope = b != b_sin_tope
+    hh = np.arange(1, h + 1)
+    pron = nivel + b * np.cumsum(phi ** hh) + estacional_fut
+    w = d if MESES_TENDENCIA is None or len(d) <= MESES_TENDENCIA else d[-MESES_TENDENCIA:]
+    sd = float(np.std(np.diff(w) - b, ddof=1)) if len(w) > 2 else 0.0
+    ancho = _cuantil_normal() * sd * np.sqrt(hh)
+    params = {"pendiente": float(b), "pendiente_aplicada": float(b), "pendiente_sin_tope": float(b_sin_tope),
+              "tope": bool(tope), "ventana": int(len(d)), "r2": math.nan, "amortiguacion": float(phi),
+              "phi_desviacion": 1.0, "ancla": float(nivel), "sd_residual": sd, "alpha": float(alpha),
+              "beta": float(beta), "phi": float(phi), "n_saltos": int(masc.sum()),
+              "salto": bool(len(masc) and masc[-1]), "regla_pendiente": regla}
+    if est is not None:
+        params.update({"estacional": [float(v) for v in est["factores"]], "credibilidad_estacional": est["credibilidad"],
+                       "p_estacional": est["p"], "r2_estacional": est["r2"], "obs_estacional": est["obs"],
+                       "amplitud_estacional": est["amplitud"]})
+    return pron, pron - ancho, pron + ancho, params, float(b)
 
 
 def _tendencia_combinada(z, d, h: int, estacional_fut, est, ancla_meses: int, nombre: str, escala_log: bool):
@@ -959,9 +1059,11 @@ def ajustar(z, modelo: str, h: int, meses=None, phi_desv: float = 1.0, cred_pend
     """Pronostico en la escala del modelo: (pronostico, li, ls, parametros, pendiente final). meses = mes del ano
     (1-12) de cada observacion, para la estacionalidad de la tendencia historica; phi_desv = persistencia de la
     desviacion del ultimo mes (1 = se conserva); cred_pend = proporcion de la pendiente que se proyecta."""
-    return (ajustar_tendencia(z, h, meses, phi_desv, cred_pend, media_aritmetica, ancla_meses, nombre, escala_log)
-            if modelo == TENDENCIA
-            else ajustar_ets(z, modelo, h))
+    if modelo == TENDENCIA:
+        return ajustar_tendencia(z, h, meses, phi_desv, cred_pend, media_aritmetica, ancla_meses, nombre, escala_log)
+    if modelo == HOLT_GUARDIA:
+        return ajustar_holt_guardia(z, h, meses, escala_log)
+    return ajustar_ets(z, modelo, h)
 
 
 def elegir_modelo(tipo: str, n: int, trimestral: bool) -> str:
@@ -1093,7 +1195,7 @@ def _pronosticar(serie: Serie) -> Resultado:
     hh = h + brecha                       # si el ultimo dato es anterior al ultimo mes real
 
     res.moneda = serie.moneda
-    usar_log = tipo in ("nivel", "indice", "lag", "fnd") and np.all(y > 0)   # LAGs positivos: tendencia en % (no cruzan 0)
+    usar_log = tipo in ("nivel", "indice", "lag", "fnd", "factor_log") and np.all(y > 0)   # LAGs positivos: tendencia en %
     res.transformacion = "log" if usar_log else "ninguna"
     z = np.log(y) if usar_log else y.copy()
     meses = (np.array([p % 100 for p in per], dtype=int)              # mes del ano de cada observacion
@@ -1144,6 +1246,14 @@ def _pronosticar(serie: Serie) -> Resultado:
         sd = (np.std(np.diff(z), ddof=1) if n > 2 else 0.0) * np.sqrt(np.arange(1, hh + 1)) * _cuantil_normal()
         li, ls = inv(z[-1] - sd), inv(z[-1] + sd)
     res.modelo = modelo
+    if modelo == HOLT_GUARDIA and res.parametros:
+        pe = res.parametros
+        if pe.get("salto"):
+            res.alertas.append("Holt con guardia: el ultimo mes es un salto (mas de "
+                               f"{HOLT_FND['k_salto']:.0f} MAD); no se proyecta tendencia desde el nuevo nivel")
+        if pe.get("tope"):
+            res.alertas.append(f"Holt con guardia: la tendencia se redujo para quedar a {HOLT_FND['meses_tope']} meses "
+                               f"dentro del rango de 36 meses ampliado {HOLT_FND['tope_rango']:.0%}")
     if modelo == TENDENCIA and res.parametros:
         r2 = res.parametros.get("r2", math.nan)
         if np.isfinite(r2) and r2 < 0.3:
@@ -3083,7 +3193,7 @@ def calcular_bel_fnd(bd: BDMontos, hp, resultados: dict, proy: dict, pe: dict, p
                                         dominio=(0.0, None)))
                 fnd_f = np.asarray(res.pronostico, dtype=float)
                 out["alertas"] += [("DANOS", f"{pref} | FND | ramo {r}", a) for a in res.alertas
-                                   if str(a).startswith("Pendiente combinada")]
+                                   if str(a).startswith(("Pendiente combinada", "Holt con guardia"))]
                 prm_fnd = res.parametros or {}
                 fila.update({"Modelo": res.modelo if hasattr(res, "modelo") else "",
                              "FND regla de la pendiente": res.regla or prm_fnd.get("regla_pendiente", ""),
@@ -4482,13 +4592,16 @@ def escribir_diagnostico(resultados: dict, periodos_proy: list[int], alertas_gen
         ("Pendiente proyectada", ("montos y LAGs: la pendiente completa de la recta; indices: ponderada por su credibilidad "
                                   "(R2 ajustado de la recta)" if CREDIBILIDAD_PENDIENTE.get("indice") == "r2"
                                   else f"proporcion de la pendiente por tipo: {CREDIBILIDAD_PENDIENTE}")
-                                 + ("; FND y factores del BEL por FND: pendiente combinada (promedio de plano y rectas "
+                                 + ("; FACTOR GTO y FACTOR MR del BEL por FND: pendiente combinada (promedio de plano y rectas "
                                     "Theil-Sen de 24 y 36 meses, minimos cuadrados en el FACTOR GTO; sin el plano si la "
                                     f"tendencia de 24 meses es clara, |t| >= {PENDIENTE_COMBINADA['t_clara']}; la mitad de "
                                     "la recta de 24 si los ultimos 12 meses no la confirman (en el GTO el plano se queda en "
-                                    "el promedio); sin tendencia tras un salto del ultimo mes en FND y CESION; amortiguada "
+                                    "el promedio); amortiguada "
                                     f"{PENDIENTE_COMBINADA['amortiguacion']} por mes y topada al rango de 36 meses)"
-                                    if "combinada" in CREDIBILIDAD_PENDIENTE.values() else "")),
+                                    if "combinada" in CREDIBILIDAD_PENDIENTE.values() else "")
+                                 + (f"; FND: {MODELO_POR_TIPO['fnd']} (HOLT_FND: alpha {HOLT_FND['alpha']}, beta "
+                                    f"{HOLT_FND['beta']}, phi {HOLT_FND['phi']}, salto > {HOLT_FND['k_salto']:.0f} MAD, tope "
+                                    f"{HOLT_FND['tope_rango']:.0%} del rango de 36 meses)" if MODELO_POR_TIPO.get("fnd") == HOLT_GUARDIA else "")),
         ("Desviacion del ultimo mes", f"indices: se desvanece hacia el nivel promedio de los ultimos {MESES_NIVEL_LOCAL} meses con "
                                        f"persistencia {PERSISTENCIA_DESVIACION.get('indice', 1.0)}; montos y LAGs: se conserva "
                                        f"(persistencia {PERSISTENCIA_DESVIACION.get('nivel', 1.0)} / {PERSISTENCIA_DESVIACION.get('lag', 1.0)})"),
@@ -4523,7 +4636,11 @@ def escribir_diagnostico(resultados: dict, periodos_proy: list[int], alertas_gen
                       "se proyecta ponderada por su credibilidad (R2 ajustado de la recta: una pendiente que la recta "
                       "explica poco casi no se extrapola); en montos y LAGs la desviacion se conserva (arrancan del "
                       "ultimo real) y la pendiente se proyecta completa. Razones (%GTO, %MR, %cedido): SES (nivel sin "
-                      "tendencia). RCONT: "
+                      "tendencia). BEL por FND (Danos): FND con Holt amortiguado con guardia de saltos (serie de tiempo: "
+                      f"nivel = ultimo real, tendencia = promedio exponencial de los cambios mensuales, beta {HOLT_FND['beta']}, "
+                      f"amortiguada {HOLT_FND['phi']} por mes; un salto de mas de {HOLT_FND['k_salto']:.0f} MAD mueve el nivel "
+                      "y no la tendencia; tope al rango de 36 meses; con el patron del mes), FACTOR GTO y FACTOR MR con la "
+                      "pendiente combinada (ver 'Pendiente proyectada') y CESION con SES. RCONT: "
                       f"{MODELO_TRIMESTRAL} (estacionalidad por mes del trimestre) si hay al menos "
                       f"{MIN_OBS_TRIMESTRAL} meses; con menos, SES (nivel). Series cortas: SES (< 6 obs para la tendencia) o ultimo valor (< 4). "
                       "Los conceptos derivados (NETO, BRUTO de Danos, IRR, GTO, MR) y los totales por ramo no siguen "
