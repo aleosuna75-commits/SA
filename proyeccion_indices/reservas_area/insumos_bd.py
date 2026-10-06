@@ -41,7 +41,7 @@ import numpy as np
 import openpyxl
 import pandas as pd
 
-VERSION_AOD = "2026-10-06d"      # version que piden los scripts _aod_BD.py (parchar_aod.py)
+VERSION_AOD = "2026-10-06e"      # version que piden los scripts _aod_BD.py (parchar_aod.py)
 HOJA_MONTOS = "BD_Montos_RRC_SONR"
 TC_BD_DESDE = 202601             # desde este mes el TC MXN / USD de los scripts _aod sale de la columna TC de la BD
                                  # (TC_Real_Esti.xlsx: FCST, columna J, en 2026; FCST 2027, columna M, en 2027)
@@ -326,6 +326,8 @@ class InsumosBD:
         self._fnd_uso: dict = {}               # (reserva, ramo, mes) -> [con FND de la BD, del area por antiguedad,
                                                #                          del area porque la BD no trae FND]
         self._fnd_fuera: dict = {}             # ramo -> meses con FND de la BD fuera de [0, 1] (se acota)
+        self._fnd_detalle: dict = {}           # (reserva, ramo, mes) -> FND del area, resultante, factor y prima / PRIMA N AÑOS
+        self._fnd_incompleto: dict = {}        # reserva -> {mes: ultimo CALMONTH de la base} (sin prima del mes)
         wb = openpyxl.load_workbook(self.ruta_bd, read_only=True, data_only=True)
         try:
             self.hoja_hp = next((n for n in wb.sheetnames if norm(n).startswith("HPARAMETROS")), None)
@@ -1039,32 +1041,78 @@ class InsumosBD:
             self._fnd[k] = v
         return self._fnd[k]
 
-    def fnd_contrato(self, reserva: str, ramo, periodo, calmonth, valor_area):
-        """FND de un contrato para los scripts del area: el FND de la BD del ramo en el mes de valuacion (fnd_bd) si el
-        contrato es de los ultimos 12 meses (CALMONTH en (periodo - 12 meses, periodo]), que es la prima sobre la que la
-        BD calcula su FND; si no, o si la BD no trae el FND del ramo, el del area (valor_area). RRC: es el PORC_ND del
-        contrato; SONR: el FND con el que el script saca la prima devengada (1 - FND)."""
-        clave = self._ramo_area(ramo)
-        try:
-            periodo, cm = int(periodo), int(float(calmonth))
-        except (TypeError, ValueError):
-            cm = None
-        v = self.fnd_bd(clave, periodo) if clave is not None and cm is not None else math.nan
-        en_ventana = cm is not None and mes_mas(periodo, -12) < cm <= periodo
-        uso = self._fnd_uso.setdefault((reserva, clave, periodo), [0, 0, 0])
-        if not en_ventana:
-            uso[1] += 1
-            return valor_area
-        if math.isnan(v):
-            uso[2] += 1
-            return valor_area
-        uso[0] += 1
-        return v
+    def fnd_contratos(self, reserva: str, df: pd.DataFrame, periodo, col_ramo: str, col_calmonth: str, col_fnd: str,
+                      col_prima: str, col_tc: str, modo="ESCALAR") -> pd.Series:
+        """FND de cada contrato (mismo indice que df) con nuestro FND por ramo y mes de valuacion (fnd_bd), sobre los
+        contratos de los ultimos 12 meses (CALMONTH en (periodo - 12 meses, periodo]), que es la prima sobre la que la BD
+        mide su FND (PND / PRIMA N AÑOS):
+          modo "ESCALAR" (o True): se conserva el perfil por contrato del area (un contrato del mes queda mas por
+            devengar que uno de hace 11 meses) y se escala para que el FND del ramo, ponderado por la prima en pesos del
+            contrato (col_prima x col_tc), sea el de la BD; los que llegarian a mas de 1 se quedan en 1 y el resto se
+            reescala. Si el ramo no tiene FND del area con que escalar, todos llevan el FND de la BD.
+          modo "PLANO": todos los contratos del ramo llevan el FND de la BD.
+        Los contratos de mas de 12 meses, los ramos sin FND en la BD y los meses que la base todavia no trae (el CALMONTH
+        mas reciente es anterior al mes de valuacion: falta la prima nueva) quedan con el FND del area (col_fnd).
+        RRC: es el PORC_ND; SONR: el FND con que sale la prima devengada (1 - FND)."""
+        modo = "PLANO" if str(modo).upper() == "PLANO" else "ESCALAR"
+        periodo = int(periodo)
+        fnd_area = pd.to_numeric(df[col_fnd], errors="coerce").astype(float)
+        out = fnd_area.copy()
+        cm = pd.to_numeric(df[col_calmonth], errors="coerce")
+        ramos = df[col_ramo].map(self._ramo_area)
+        en_ventana = (cm > mes_mas(periodo, -12)) & (cm <= periodo)
+        if cm.notna().any() and cm.max() < periodo:                     # la base no trae prima de ese mes
+            self._fnd_incompleto.setdefault(reserva, {})[periodo] = int(cm.max())
+            en_ventana = en_ventana & False
+        prima = pd.to_numeric(df[col_prima], errors="coerce") * pd.to_numeric(df[col_tc], errors="coerce")
+        for clave in sorted({int(c) for c in ramos.dropna().unique()}):
+            del_ramo = ramos == clave
+            uso = self._fnd_uso.setdefault((reserva, clave, periodo), [0, 0, 0])
+            uso[1] += int((del_ramo & ~en_ventana).sum())
+            sel = del_ramo & en_ventana
+            if not sel.any():
+                continue
+            f_bd = self.fnd_bd(clave, periodo)
+            if math.isnan(f_bd):
+                uso[2] += int(sel.sum())
+                continue
+            uso[0] += int(sel.sum())
+            p, fa = prima[sel], fnd_area[sel].fillna(0.0).clip(0.0, 1.0)
+            ok = p.notna()
+            nuevo = pd.Series(f_bd, index=p.index)
+            tot = float(p[ok].sum())
+            base = float((p[ok] * fa[ok]).sum())
+            k = math.nan
+            if modo == "ESCALAR" and ok.any() and tot != 0 and base != 0 and f_bd * tot / base > 0:
+                objetivo, topados = f_bd * tot, pd.Series(False, index=p.index)
+                for _ in range(30):
+                    libres = ok & ~topados
+                    base_l = float((p[libres] * fa[libres]).sum())
+                    resto = objetivo - float(p[ok & topados].sum())
+                    if base_l == 0 or resto / base_l <= 0:
+                        break
+                    k = resto / base_l
+                    nuevo[libres] = fa[libres] * k
+                    nuevos_topes = libres & (nuevo > 1.0)
+                    if not nuevos_topes.any():
+                        break
+                    nuevo[nuevos_topes] = 1.0
+                    topados = topados | nuevos_topes
+            out[sel] = nuevo
+            tc_usd = self.tc_de(periodo)
+            p12 = self.bloque("PRIMA N AÑOS", "RRC", clave, periodo)
+            self._fnd_detalle[(reserva, clave, periodo)] = {
+                "FND del area (ponderado)": base / tot if tot else math.nan,
+                "FND resultante (ponderado)": float((p[ok] * nuevo[ok]).sum()) / tot if tot else math.nan,
+                "Factor de escala": k if modo == "ESCALAR" else math.nan,
+                "Prima del script / PRIMA N AÑOS de la BD": abs(tot / tc_usd) / p12 if tot and tc_usd and p12 else math.nan}
+        return out
 
     def tabla_fnd(self) -> pd.DataFrame:
         """Uso del FND por reserva, ramo y mes de valuacion: el FND de la BD y cuantos contratos lo tomaron."""
         filas = [{"Reserva": r, "Ramo": c, "Mes": p, "FND de la BD": self._fnd.get((c, p), math.nan),
-                  "Contratos con FND de la BD": n_bd, "Contratos de mas de 12 meses (FND del area)": n_ant,
+                  **self._fnd_detalle.get((r, c, p), {}),
+                  "Contratos con FND de la BD": n_bd, "Contratos de mas de 12 meses o mes sin prima (FND del area)": n_ant,
                   "Contratos sin FND en la BD (FND del area)": n_sin}
                  for (r, c, p), (n_bd, n_ant, n_sin) in sorted(self._fnd_uso.items(),
                                                               key=lambda x: (x[0][0], x[0][1] or 0, x[0][2]))]
@@ -1077,7 +1125,18 @@ class InsumosBD:
             n_bd, n_ant, n_sin = (sum(v[i] for v in usos.values()) for i in range(3))
             sin = sorted({c for (r, c, p), v in usos.items() if v[2] and c is not None})
             out.append(f"FND {reserva}: {n_bd} contrato(s) con el FND de la BD de su ramo y mes; con el del area, {n_ant} "
-                       f"de mas de 12 meses" + (f" y {n_sin} de ramos sin FND en la BD ({sin})" if n_sin else ""))
+                       f"de mas de 12 meses o de meses sin prima en la base" +
+                       (f" y {n_sin} de ramos sin FND en la BD ({sin})" if n_sin else ""))
+            inc = self._fnd_incompleto.get(reserva, {})
+            if inc:
+                out.append(f"FND {reserva}: en {len(inc)} mes(es) de valuacion ({min(inc)} a {max(inc)}) la base Access todavia no "
+                           f"trae la prima del mes (la ultima es {max(inc.values())}): se valua el portafolio que ya esta, con el "
+                           "FND del area y sin la prima nueva; no es la reserva completa de esos meses")
+            dif = sorted({c for (r, c, p), d in self._fnd_detalle.items() if r == reserva and p <= self.ultimo_real
+                          and abs(d.get("Prima del script / PRIMA N AÑOS de la BD", 1.0) - 1) > 0.10})
+            if dif:
+                out.append(f"FND {reserva}: en los ramos {dif} la prima de 12 meses de la base Access difiere en mas de 10 % de "
+                           "la PRIMA N AÑOS de la BD (sobre la que se midio el FND); ver la hoja FND")
         for clave, ps in sorted(self._fnd_fuera.items()):
             ps = sorted(set(ps))
             out.append(f"FND ramo {clave}: {len(ps)} mes(es) con FND de la BD fuera de [0, 1] ({ps[0]} a {ps[-1]}): se acota")

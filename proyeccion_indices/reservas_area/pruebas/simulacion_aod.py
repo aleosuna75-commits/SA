@@ -282,6 +282,26 @@ def verificar_tc(ins: InsumosBD, g_rrc: dict, g_sonr: dict, capturas: dict, marc
     return res
 
 
+def fnd_ramo(ins: InsumosBD, df: pd.DataFrame, p: int, col_ramo: str, col_fnd: str, col_prima: str, col_tc: str):
+    """(ramos que cumplen, ramos revisados) en el mes: el FND de los contratos de los ultimos 12 meses ponderado por su
+    prima en pesos es el FND de la BD. Solo en meses que la base trae completos (CALMONTH del mes)."""
+    cm = pd.to_numeric(df["CALMONTH"], errors="coerce")
+    if not cm.notna().any() or cm.max() < p:
+        return 0, 0
+    en = (cm > mes_mas(p, -12)) & (cm <= p)
+    prima = pd.to_numeric(df[col_prima], errors="coerce") * pd.to_numeric(df[col_tc], errors="coerce")
+    fnd = pd.to_numeric(df[col_fnd], errors="coerce")
+    ok, tot = 0, 0
+    for ramo in sorted(pd.to_numeric(df.loc[en, col_ramo], errors="coerce").dropna().astype(int).unique()):
+        sel = en & (pd.to_numeric(df[col_ramo], errors="coerce") == ramo) & prima.notna()
+        esp = ins.fnd_bd(int(ramo), p)
+        if not sel.any() or math.isnan(esp):
+            continue
+        tot += 1
+        ok += _igual(float((prima[sel] * fnd[sel]).sum()) / float(prima[sel].sum()), esp)
+    return ok, tot
+
+
 def verificar_rrc(ins: InsumosBD, g: dict, capturas: dict, anio: int) -> list[str]:
     res = []
     if not g:
@@ -311,10 +331,7 @@ def verificar_rrc(ins: InsumosBD, g: dict, capturas: dict, anio: int) -> list[st
             fm = ins._factor_crudo("MR", "RRC", ramo, p)
             esp = {"BELMEDIA": esp_media, "BEL99": v99 if not math.isnan(v99) else AREA["IS99"],
                    "BELGASTO": g_ if not math.isnan(g_) else AREA["GTO"], "FACTORMR": fm}
-            fnd = ins.fnd_bd(ramo, p) if mes_mas(p, -12) < int(r["CALMONTH"]) <= p else math.nan
-            if not math.isnan(fnd):
-                esp["PORC_ND"] = fnd
-                fnd_bd += 1
+
             if not math.isnan(fm):
                 esp["MR2026_TCVal"] = r["MONTO_PI"] * r["PORC_ND"] * fm * r["TC_Valuación"]
                 mr_bd += 1
@@ -323,6 +340,9 @@ def verificar_rrc(ins: InsumosBD, g: dict, capturas: dict, anio: int) -> list[st
                 esp["MR2026_TCVal"] = -1 * r["DESVIACION2026"] * g["RCS"] * g["COC"] * dur * (1 / bc)
                 mr_formula += 1
             malos += sum(not _igual(r[c], v) for c, v in esp.items())
+        ok_f, tot_f = fnd_ramo(ins, df, p, "Ramo", "PORC_ND", "MONTO_PI", "TC_Valuación")
+        fnd_bd += ok_f
+        malos += tot_f - ok_f
         if m >= 9:
             for ramo in (40, 50, 80, 90):
                 sub = df[df["Ramo"] == ramo]
@@ -331,7 +351,8 @@ def verificar_rrc(ins: InsumosBD, g: dict, capturas: dict, anio: int) -> list[st
                     res.append(f"MAL RRC {p} ramo {ramo}: no usa el IS de FA")
     res.append(f"{'OK ' if not malos else 'MAL'} RRC 12 meses: {n} contratos, {malos} indices distintos a los esperados; "
                f"IS de FA en {fa} contratos (40, 50, 80 y 90 proyectados), IS del area en {area_usada}; MR con FACTOR MR "
-               f"de la BD en {mr_bd} y con la formula de capital en {mr_formula}; FND de la BD en {fnd_bd} contratos")
+               f"de la BD en {mr_bd} y con la formula de capital en {mr_formula}; FND del ramo igual al de la BD en {fnd_bd} "
+               "ramos x mes (FND de cada contrato ponderado por su prima)")
     return res
 
 
@@ -347,12 +368,9 @@ def verificar_sonr(ins: InsumosBD, g: dict, marcos: list, texto_script: str, ani
     for f in consultas:
         col = next(c for c in f.columns if str(c).startswith("FND_"))
         p = int(str(col)[4:])
-        for _, r in f.iterrows():
-            if mes_mas(p, -12) < int(r["CALMONTH"]) <= p:
-                v = ins.fnd_bd(int(r["Ramo_filt"]), p)
-                if not math.isnan(v):
-                    fnd_bd += 1
-                    fnd_mal += not _igual(r[col], v)
+        ok_f, tot_f = fnd_ramo(ins, f, p, "Ramo_filt", col, "PmaTomOri", "cTCAD_Mnt_x")
+        fnd_bd += ok_f
+        fnd_mal += tot_f - ok_f
     res = []
     if len(meses) != 12:
         res.append(f"MAL SONR: {len(meses)} meses de metodo propio (se esperaban 12)")
@@ -380,8 +398,8 @@ def verificar_sonr(ins: InsumosBD, g: dict, marcos: list, texto_script: str, ani
                 esp["MR"] = (r["Desviacion"] / -bc) * bc2
                 mr_formula += 1
             malos += sum(not _igual(r[c], x) for c, x in esp.items())
-    res.append(f"{'OK ' if not fnd_mal and len(consultas) == 12 else 'MAL'} SONR FND: {fnd_bd} contratos de los ultimos 12 meses "
-               f"con el FND de la BD en {len(consultas)} meses, {fnd_mal} distintos")
+    res.append(f"{'OK ' if not fnd_mal and len(consultas) == 12 and fnd_bd else 'MAL'} SONR FND: en {fnd_bd} ramos x mes el FND "
+               f"ponderado de los contratos de 12 meses es el de la BD, {fnd_mal} distintos ({len(consultas)} meses)")
     res.append(f"{'OK ' if not malos else 'MAL'} SONR 12 meses: {n} renglones (ramo x LAG x mes), {malos} parametros "
                f"distintos a los esperados; IS de FA en {fa}, {area} celdas del area; MR con Factor_MR de la BD en "
                f"{mr_bd} y con la formula del script en {mr_formula}")
@@ -426,6 +444,9 @@ def main():
         esperado = [p for p in rango_meses(anio * 100 + 1, anio * 100 + 12) if p > tc_hasta]
         res.append(f"{'OK ' if sorted(set(sin_tc)) == esperado else 'MAL'} aviso de contratos sin tipo de cambio (solo la "
                    f"moneda que la BD no trae): {sin_tc or 'ninguno'}")
+        inc = [t for t in textos if "todavia no trae la prima del mes" in t]
+        res.append(f"{'OK ' if len(inc) == 2 else 'MAL'} aviso de meses de valuacion sin prima en la base Access (RRC y SONR): "
+                   f"{len(inc)} aviso(s)")
         lineas += res
         ok = ok and not any(x.startswith("MAL") for x in res)
     print("\n===== VERIFICACION")
