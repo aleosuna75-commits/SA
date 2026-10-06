@@ -221,6 +221,10 @@ En montos de Daños y en LAGs la línea de tendencia pierde contra la línea pla
 - **Diagnóstico**: `BEL_FND_Resumen` (por serie: meses de FND real, modelo y error de backtest, FND al último mes y al final, y el BEL del modelo contra el BEL por FND) y `BEL_FND_Mensual` (IS, PEACUMULADA, FND y BEL mes a mes, contra el del modelo). En la consola, los totales de BEL y NETO a dic-26 y dic-27 con el modelo y con el FND.
 - **Hoy aplica** en 23 de las 26 series (reserva × ramo), SONR 80 con la historia del método del área. No aplica en SONR 71 y 73 (BEL real en cero y sin cálculo del área en `Res_Rvas`) ni en SONR 37, que tiene menos de 12 meses de FND real (la prima de Salud empieza en 2023 y la PEACUMULADA de SONR necesita la suma de 12 meses de dos años antes).
 
+## 2bis. Scripts del área con nuestros insumos (`reservas_area/`)
+
+La carpeta `reservas_area/` trae las versiones de los scripts de valuación del área (RRC y SONR) que toman sus parámetros de la BD proyectada en lugar de los CSV del año: índices de siniestralidad media y 99.5 % por mes (`Real` hasta el último mes y `Proyección` después, con el IS (FA) en 40, 50, 80 y 90), índice de gasto, LAGs, factor de retención, tipo de cambio y escenario base. La lógica de valuación es la de los scripts originales. Las rutas internas y los parámetros de capital van en `config_local.py`, que no se versiona. El detalle insumo por insumo y cómo correrlos está en `reservas_area/README.md`.
+
 ## 3. Salidas y formato
 
 - **BD_Montos_RRC_SONR** (Daños y Fianzas): se llenan los renglones 202609–202612 (que venían en 0 en Daños y vacíos en Fianzas) y se agregan al final los bloques 2027, en el mismo orden de conceptos del bloque 2026. Se copia el formato de la fila equivalente de 2026 y se trasladan las fórmulas `RVATOT` / `RVA_SEXC`. En Daños se agregan después los meses de prima anteriores a la BD (2019 a 2021), sin montos (sección 2h).
