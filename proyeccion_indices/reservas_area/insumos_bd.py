@@ -961,7 +961,7 @@ class InsumosBD:
             if len(t) != 2 or not t[0].strip().isdigit():
                 return None, None
             r = _num(t[1])
-            return (int(t[0]), int(r)) if not math.isnan(r) and r == int(r) else (None, None)
+            return (int(t[0]), int(r)) if math.isfinite(r) and r == int(r) else (None, None)
         llaves = [partes(x) for x in df["Llave"]]
         exactas = {(p, c) for (p, c), x in zip(llaves, df["Llave"]) if p and str(x) == f"{p}-{c}"}
         raras = [str(x) for (p, c), x in zip(llaves, df["Llave"]) if not p or str(x) != f"{p}-{c}"]
@@ -969,12 +969,16 @@ class InsumosBD:
             self.avisos.append(f"ParamSONR del area: {len(raras)} llave(s) con otro formato que AAAAMM-ramo (p. ej. "
                                f"'{raras[0]}'); el script solo cruza las de ese formato")
         meses = sorted({p for p, _ in llaves if p}) or rango_meses(self.anio * 100 + 1, self.anio * 100 + 12)
+        parecidas = {pc: i for i, pc in zip(df.index, llaves) if pc[0]}         # (fila del area con otra llave)
+
+        def ret_disponible(p, c):
+            if c in ramos_factor_ret_area:                    # (el del area: solo si una fila parecida lo trae)
+                return (p, c) in parecidas and not math.isnan(_num(df.at[parecidas[(p, c)], "Factor_Ret"]))
+            return not math.isnan(self._factor_crudo("RET", "SONR", c, p))
         extra = [(p, c) for p in meses for c in RAMOS_SONR if (p, c) not in exactas
-                 and not math.isnan(self._is_crudo("SONR", c, p)[0])
-                 and (c in ramos_factor_ret_area or not math.isnan(self._factor_crudo("RET", "SONR", c, p)))]
+                 and not math.isnan(self._is_crudo("SONR", c, p)[0]) and ret_disponible(p, c)]
         self._ret_fuera = {}
         if extra:
-            parecidas = {pc: i for i, pc in zip(df.index, llaves) if pc[0]}     # (fila del area con otra llave)
             nuevas = pd.DataFrame({"Llave": [f"{p}-{c}" for p, c in extra]})
             for c in cols:
                 nuevas[c] = [df.at[parecidas[pc], c] if pc in parecidas else math.nan for pc in extra]
