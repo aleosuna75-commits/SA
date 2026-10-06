@@ -33,7 +33,7 @@ import sys
 from pathlib import Path
 
 MARCA = "### INDICES BD"
-VERSION_AOD = "2026-10-06e"      # la de insumos_bd.py que piden los scripts generados
+VERSION_AOD = "2026-10-06f"      # la de insumos_bd.py que piden los scripts generados
 
 
 def _bloque_inicio(reserva: str) -> str:
@@ -162,7 +162,7 @@ def parchar_sonr(t: str) -> str:
     t = _tc(t)
     t = _rep(t, r"^(ParamSONR_inc = pd\.read_csv\(.*\)[ \t]*\n)", lambda m: m.group(1) + (
         f"_ParamSONR_area = ParamSONR                                   {MARCA}: el ParamSONR del area solo da\n"
-        "ParamSONR = INS.param_sonr_area(_ParamSONR_area, RAMOS_FACTOR_RET_AREA)   # lo que la BD no trae\n"
+        "ParamSONR = INS.param_sonr_area(_ParamSONR_area, RAMOS_FACTOR_RET_AREA, anio=zAño)   # lo que la BD no trae\n"
         "for _a in INS.avisos_texto():                                  # (de donde salio cada indice)\n"
         "    print('   AVISO:', _a)\n"))
     t = _rep(t, r'^([ \t]*Tbase_mp_ = Tbase_mp_\.merge\(ParamSONR\[\["Llave","Factor_Ret",)', r'\1"Factor_MR",')

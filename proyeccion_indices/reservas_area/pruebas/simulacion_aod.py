@@ -308,19 +308,19 @@ def fnd_ramo(ins: InsumosBD, df: pd.DataFrame, p: int, col_ramo: str, col_fnd: s
     return ok, tot
 
 
-def verificar_rrc(ins: InsumosBD, g: dict, capturas: dict, anio: int) -> list[str]:
+def verificar_rrc(ins: InsumosBD, g: dict, capturas: dict, anio: int, sufijo: str = "") -> list[str]:
     res = []
     if not g:
         return ["MAL RRC: el script no termino"]
     area_cat = {71: AREA["CAT71"], 73: AREA["CAT73"]}
     malos, n, fa, area_usada, mr_bd, mr_formula, fnd_bd = 0, 0, 0, 0, 0, 0, 0
     for m in range(1, 13):
-        df = capturas.get(f"ConsultaPPTO_RRC_{m}_tradicional.xlsx")
+        df = capturas.get(f"ConsultaPPTO_RRC_{m}_tradicional{sufijo}.xlsx")
         if df is None or not len(df):
             res.append(f"MAL RRC mes {m}: no hay ConsultaR")
             continue
         p = anio * 100 + m
-        bc = pd.to_numeric(df["DESVIACION2026"]).sum() + g.get("BC_SONR_2026", 0)
+        bc = pd.to_numeric(df[f"DESVIACION{anio}"]).sum() + g.get(f"BC_SONR_{anio}", 0)
         for _, r in df.iterrows():
             ramo = int(r["Ramo"])
             n += 1
@@ -339,11 +339,11 @@ def verificar_rrc(ins: InsumosBD, g: dict, capturas: dict, anio: int) -> list[st
                    "BELGASTO": g_ if not math.isnan(g_) else AREA["GTO"], "FACTORMR": fm}
 
             if not math.isnan(fm):
-                esp["MR2026_TCVal"] = r["MONTO_PI"] * r["PORC_ND"] * fm * r["TC_Valuación"]
+                esp[f"MR{anio}_TCVal"] = r["MONTO_PI"] * r["PORC_ND"] * fm * r["TC_Valuación"]
                 mr_bd += 1
             else:
                 dur = r["DURMXN"] if r["MonedaOri"] == 1 else r["DUROTR"]
-                esp["MR2026_TCVal"] = -1 * r["DESVIACION2026"] * g["RCS"] * g["COC"] * dur * (1 / bc)
+                esp[f"MR{anio}_TCVal"] = -1 * r[f"DESVIACION{anio}"] * g["RCS"] * g["COC"] * dur * (1 / bc)
                 mr_formula += 1
             malos += sum(not _igual(r[c], v) for c, v in esp.items())
         ok_f, tot_f = fnd_ramo(ins, df, p, "Ramo", "PORC_ND", "MONTO_PI", "TC_Valuación")

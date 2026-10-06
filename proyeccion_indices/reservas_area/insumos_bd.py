@@ -41,12 +41,13 @@ import numpy as np
 import openpyxl
 import pandas as pd
 
-VERSION_AOD = "2026-10-06e"      # version que piden los scripts _aod_BD.py (parchar_aod.py)
+VERSION_AOD = "2026-10-06f"      # version que piden los scripts _aod_BD.py (parchar_aod.py)
 HOJA_MONTOS = "BD_Montos_RRC_SONR"
 TC_BD_DESDE = 202601             # desde este mes el TC MXN / USD de los scripts _aod sale de la columna TC de la BD
                                  # (TC_Real_Esti.xlsx: FCST, columna J, en 2026; FCST 2027, columna M, en 2027)
 MONEDA_USD, MONEDA_MXN = 31, 1   # cMON_Id / MonedaOri de la base de valuacion
 HOJA_IS_FA = "IS_FA"
+HOJA_PE = "PE_RAMO"                 # prima tomada del mes por ramo (USD): real (PExRamo) y FCST
 HOJA_DIAG_INDICADORES = "Indicadores_Ramo"
 HOJA_DIAG_MONTOS = "Montos_Proyectados"
 RAMOS_SCRIPT = [10, 31, 35, 39, 40, 50, 60, 71, 73, 80, 90, 100, 110]
@@ -328,6 +329,7 @@ class InsumosBD:
         self._fnd_fuera: dict = {}             # ramo -> meses con FND de la BD fuera de [0, 1] (se acota)
         self._fnd_detalle: dict = {}           # (reserva, ramo, mes) -> FND del area, resultante, factor y prima / PRIMA N AÑOS
         self._fnd_incompleto: dict = {}        # reserva -> {mes: ultimo CALMONTH de la base} (sin prima del mes)
+        self._pe_faltan: set = set()           # meses pedidos a la hoja PE_RAMO que no trae (contratos de 2027)
         wb = openpyxl.load_workbook(self.ruta_bd, read_only=True, data_only=True)
         try:
             self.hoja_hp = next((n for n in wb.sheetnames if norm(n).startswith("HPARAMETROS")), None)
@@ -336,6 +338,7 @@ class InsumosBD:
             self._leer_hp(wb[self.hoja_hp])
             self._leer_montos(wb[HOJA_MONTOS])
             self._leer_is_fa(wb[HOJA_IS_FA] if HOJA_IS_FA in wb.sheetnames else None)
+            self._leer_pe(wb[HOJA_PE] if HOJA_PE in wb.sheetnames else None)
         finally:
             wb.close()
         self.anio, self.mes = self.ultimo_real // 100, self.ultimo_real % 100
@@ -482,6 +485,28 @@ class InsumosBD:
                     self.is_fa.setdefault((reserva, clave, periodo), {"media": media, "99.5": p99})   # primer renglon
         if not self.is_fa:
             self.avisos.append(f"la hoja {HOJA_IS_FA} no trae indices: el IS (FA) no se usa")
+
+    def _leer_pe(self, ws):
+        """Hoja PE_RAMO: prima tomada (PE) del mes por ramo en USD; real (PExRamo) hasta el ultimo mes real y FCST
+        despues. self.pe = {(clave del script, mes): PE}."""
+        self.pe: dict = {}
+        if ws is None:
+            return
+        try:
+            fila, col = self._encabezado(ws, ("PERIODO", "FUENTE"))
+        except ValueError:
+            return
+        c_per = col[norm("PERIODO")]
+        c_ram = {clave: col.get(norm(f"PE {self.ramo_bd(clave)}")) for clave in RAMOS_SCRIPT}
+        for r in ws.iter_rows(min_row=fila + 1, values_only=True):
+            per = _num(r[c_per]) if c_per < len(r) else math.nan
+            if math.isnan(per):
+                continue
+            for clave, c in c_ram.items():
+                if c is not None and c < len(r):
+                    v = _num(r[c])
+                    if not math.isnan(v):
+                        self.pe[(clave, int(per))] = v
 
     def _cargar_diag(self):
         if self._diag is not None:
@@ -950,7 +975,7 @@ class InsumosBD:
                                f"{nuevos[-1]}) se agregaron con el indice de la BD; con la tabla del area salian vacios")
         return df.sort_values("IS Bel Media", kind="stable").reset_index(drop=True)
 
-    def param_sonr_area(self, area, ramos_factor_ret_area: tuple = ()) -> pd.DataFrame:
+    def param_sonr_area(self, area, ramos_factor_ret_area: tuple = (), anio: int | None = None) -> pd.DataFrame:
         """ParamSONR del area (DataFrame o ruta; Llave 'AAAAMM-ramo') con nuestros parametros donde la BD los trae: Ind
         Sin SONR Media y 99.5% (IS de FA en RAMOS_IS_FA en los meses proyectados), LAG 1 a LAG 10, Factor_Ret (1 - IRR /
         BEL del SONR; en los ramos de ramos_factor_ret_area, el del area) y Factor_MR (MR / PD; si no, vacio y el script
@@ -979,20 +1004,37 @@ class InsumosBD:
         if raras:
             self.avisos.append(f"ParamSONR del area: {len(raras)} llave(s) con otro formato que AAAAMM-ramo (p. ej. "
                                f"'{raras[0]}'); el script solo cruza las de ese formato")
-        meses = sorted({p for p, _ in llaves if p}) or rango_meses(self.anio * 100 + 1, self.anio * 100 + 12)
+        meses = sorted({p for p, _ in llaves if p} | (set(rango_meses(anio * 100 + 1, anio * 100 + 12)) if anio else set())) \
+            or rango_meses(self.anio * 100 + 1, self.anio * 100 + 12)
         parecidas = {pc: i for i, pc in zip(df.index, llaves) if pc[0]}         # (fila del area con otra llave)
+        por_ramo: dict = {}                                                    # ramo -> [(mes, fila)] de la tabla del area
+        for i, (pp, cc) in zip(df.index, llaves):
+            if pp:
+                por_ramo.setdefault(cc, []).append((pp, i))
+
+        def fila_area(p, c):
+            """Fila del area para la llave: la misma (con otro formato) o la del ultimo mes del ramo hasta p (si no, la
+            primera): para un ano que la tabla del area no trae, sus ultimos parametros."""
+            if (p, c) in parecidas:
+                return parecidas[(p, c)]
+            filas = sorted(por_ramo.get(c, []))
+            antes = [i for m, i in filas if m <= p]
+            return antes[-1] if antes else (filas[0][1] if filas else None)
 
         def ret_disponible(p, c):
-            if c in ramos_factor_ret_area:                    # (el del area: solo si una fila parecida lo trae)
-                return (p, c) in parecidas and not math.isnan(_num(df.at[parecidas[(p, c)], "Factor_Ret"]))
-            return not math.isnan(self._factor_crudo("RET", "SONR", c, p))
+            fa = fila_area(p, c)
+            del_area = fa is not None and not math.isnan(_num(df.at[fa, "Factor_Ret"]))
+            if c in ramos_factor_ret_area:
+                return del_area
+            return del_area or not math.isnan(self._factor_crudo("RET", "SONR", c, p))
         extra = [(p, c) for p in meses for c in RAMOS_SONR if (p, c) not in exactas
-                 and not math.isnan(self._is_crudo("SONR", c, p)[0]) and ret_disponible(p, c)]
+                 and (not math.isnan(self._is_crudo("SONR", c, p)[0]) or fila_area(p, c) is not None) and ret_disponible(p, c)]
         self._ret_fuera = {}
         if extra:
             nuevas = pd.DataFrame({"Llave": [f"{p}-{c}" for p, c in extra]})
+            respaldo = [fila_area(p, c) for p, c in extra]
             for c in cols:
-                nuevas[c] = [df.at[parecidas[pc], c] if pc in parecidas else math.nan for pc in extra]
+                nuevas[c] = [df.at[i, c] if i is not None else math.nan for i in respaldo]
             df = pd.concat([df, nuevas], ignore_index=True)
             llaves += extra
             for c in cols:
@@ -1025,8 +1067,8 @@ class InsumosBD:
         if extra:
             ramos_extra = sorted({c for _, c in extra})
             self.avisos.append(f"ParamSONR: {len(extra)} llave(s) que la tabla del area no traia con el formato AAAAMM-ramo "
-                               f"(ramos {ramos_extra}) se agregaron con los parametros de la BD; con la tabla del area "
-                               "salian vacias")
+                               f"(ramos {ramos_extra}) se agregaron con los parametros de la BD; lo que la BD no trae, de la "
+                               "misma llave o del ultimo mes del ramo en la tabla del area")
         return df
 
     def fnd_bd(self, clave: int, periodo: int) -> float:
@@ -1156,7 +1198,9 @@ class InsumosBD:
         f = pd.to_numeric(df["cTCAD_FecAMD"], errors="coerce")
         df["cTCAD_Mnt"] = pd.to_numeric(df["cTCAD_Mnt"], errors="coerce").astype(float)
         m = f.isin(list(nuestros))
+        antes = df.loc[m, "cTCAD_Mnt"].to_numpy()
         df.loc[m, "cTCAD_Mnt"] = [nuestros[int(x)] for x in f[m]]
+        cambiados = int((abs(antes - df.loc[m, "cTCAD_Mnt"].to_numpy()) > 1e-12).sum())
         ya = set(f[m].astype(int))
         nuevos = [p for p in nuestros if p not in ya]
         if nuevos:
@@ -1164,9 +1208,9 @@ class InsumosBD:
                            ignore_index=True)
         orden = pd.to_numeric(df["cTCAD_FecAMD"], errors="coerce").to_numpy()
         df = df.iloc[np.argsort(orden, kind="stable")].reset_index(drop=True)
-        if nuestros:
+        if nuestros and (cambiados or nuevos):
             self.avisos.append(f"TC USD: {len(nuestros)} mes(es) de la BD ({min(nuestros)} a {max(nuestros)}); "
-                               f"{len(ya)} reemplazan los de la base Access y {len(nuevos)} se agregan. Los meses "
+                               f"{cambiados} cambian el de la base Access y {len(nuevos)} se agregan. Los meses "
                                f"anteriores a {desde}, de la base")
         return df
 
@@ -1202,6 +1246,104 @@ class InsumosBD:
             self.avisos.append(f"TC de otras monedas: la base Access no trae {len(otras)} moneda(s) ({otras}) de {sin[0]} a "
                                f"{sin[-1]}; la BD solo trae el dolar, asi que esos contratos salen vacios en esos meses")
         return df
+
+    # ------------------------------------------------------------------ scripts _aod_2027: sin la base Access
+    def tc_monedas_bd(self) -> pd.DataFrame:
+        """Tabla de tipos de cambio con la forma de la de la base Access (cTCAD_FecAMD, cMON_Id, cTCAD_Mnt, Llave) armada
+        con la columna TC de la BD: el dolar con el TC de la BD y el peso en 1, en todos los meses de la BD."""
+        filas = []
+        for p, v in sorted(self.tc.items()):
+            if not math.isnan(_num(v)):
+                filas += [(p, MONEDA_USD, float(v)), (p, MONEDA_MXN, 1.0)]
+        return pd.DataFrame({"cTCAD_FecAMD": [a for a, _, _ in filas], "cMON_Id": [b for _, b, _ in filas],
+                             "cTCAD_Mnt": [c for _, _, c in filas], "Llave": [f"{a}-{b}" for a, b, _ in filas]})
+
+    def _contratos_bd(self, meses: list[int], ramos) -> list[dict]:
+        """Un "contrato" por ramo y mes con la prima tomada de la BD (hoja PE_RAMO, USD): lo que los scripts de 2027 valuan en
+        lugar de los contratos de la base. Se avisa si faltan meses de prima."""
+        out, sin = [], []
+        for p in meses:
+            hay = False
+            for clave in ramos:
+                pe = self.pe.get((clave, p))
+                if pe is None or math.isnan(pe):
+                    continue
+                hay = True
+                if pe == 0:
+                    continue
+                out.append({"clave": clave, "p": p, "pe": pe})
+            if not hay:
+                sin.append(p)
+        self._pe_faltan.update(sin)
+        return out
+
+    def contratos_rrc_bd(self, desde_excl, hasta) -> pd.DataFrame:
+        """Contratos del RRC armados con la prima de la BD para CALMONTH en (desde_excl, hasta], con las columnas que deja la
+        consulta de la base y el ramo ya como clave del script: prima tomada negativa (convencion de la base), en dolares
+        (MonedaOri 31), proporcional (TipoRea 1, frecuencia 1), vigencia de 12 meses desde el mes y la cesion del bloque
+        CESION del RRC de la BD del mes (PrimaCedidaOri = CESION x prima, asi el script calcula esa cesion)."""
+        meses = rango_meses(mes_mas(int(desde_excl), 1), int(hasta))
+        filas = []
+        for d in self._contratos_bd(meses, RAMOS_SCRIPT):
+            clave, p, pe = d["clave"], d["p"], d["pe"]
+            tc = self.tc_de(p)
+            ces = self.bloque("CESION", "RRC", clave, p)
+            ces = 0.0 if math.isnan(ces) else ces
+            ini = pd.Timestamp(year=p // 100, month=p % 100, day=1)
+            filas.append({"SRamo": clave, "Pais": math.nan, "TipoRea": 1, "OfiRepPt": 1, "MonedaOri": MONEDA_USD,
+                          "CorrTom": 0, "CiaTom": 0, "CtoTom": 0, "Susc": p // 100, "Período": 1, "CALMONTH": p,
+                          "IniVig": ini, "FinVig": ini + pd.DateOffset(months=12),
+                          "PrimaTomadaOri": -pe, "PmaTom_sEROri": -pe, "PrimaCedidaOri": ces * pe,
+                          "PrimaTomadaNal": -pe * tc, "PmaTom_sERNal": -pe * tc, "PrimaCedidaNal": ces * pe * tc,
+                          "Ramo": clave})
+        cols = ["SRamo", "Pais", "TipoRea", "OfiRepPt", "MonedaOri", "CorrTom", "CiaTom", "CtoTom", "Susc", "Período",
+                "CALMONTH", "IniVig", "FinVig", "PrimaTomadaOri", "PmaTom_sEROri", "PrimaCedidaOri", "PrimaTomadaNal",
+                "PmaTom_sERNal", "PrimaCedidaNal", "Ramo"]
+        df = pd.DataFrame(filas, columns=cols)
+        df["Pais"] = df["Pais"].astype(float)
+        return df
+
+    def contratos_sonr_bd(self, desde, hasta) -> pd.DataFrame:
+        """Contratos del SONR armados con la prima de la BD para CALMONTH en [desde, hasta], con las columnas de la consulta
+        de la base: prima tomada positiva (la consulta la cambia de signo), en dolares, proporcional, frecuencia 1."""
+        meses = rango_meses(int(desde), int(hasta))
+        filas = []
+        for d in self._contratos_bd(meses, RAMOS_SCRIPT):
+            clave, p, pe = d["clave"], d["p"], d["pe"]
+            ini = pd.Timestamp(year=p // 100, month=p % 100, day=1)
+            filas.append({"CALMONTH": p, "Ramo_filt": clave, "Pais": math.nan, "TipoRea": 1, "CorrTom": 0, "CiaTom": 0,
+                          "CtoTom": 0, "Susc": p // 100, "MonedaOri": MONEDA_USD, "IniVig": ini,
+                          "FinVig": ini + pd.DateOffset(months=12), "Periodo": 1, "PmaTomOri": pe,
+                          "PmaTomNal": pe * self.tc_de(p)})
+        cols = ["CALMONTH", "Ramo_filt", "Pais", "TipoRea", "CorrTom", "CiaTom", "CtoTom", "Susc", "MonedaOri", "IniVig",
+                "FinVig", "Periodo", "PmaTomOri", "PmaTomNal"]
+        df = pd.DataFrame(filas, columns=cols)
+        df["Pais"] = df["Pais"].astype(float)
+        return df
+
+    def escenario_base_area(self, reserva: str, tabla, anio: int) -> pd.DataFrame:
+        """Escenarios 0 y 1 para un ano sin la base: del Escenario_base del area se quedan el escenario 0 de diciembre del
+        ano anterior y el escenario 1 (presupuesto) de los meses del ano; si no trae el escenario 0, sale de los montos de la
+        BD de ese diciembre (proyectados si es despues del ultimo mes real). Los renglones de otros anos se quitan."""
+        df = tabla.copy() if isinstance(tabla, pd.DataFrame) else pd.DataFrame(columns=COLUMNAS_ESC)
+        for c in COLUMNAS_ESC:
+            if c not in df.columns:
+                df[c] = math.nan
+        per = pd.to_numeric(df["Periodo"], errors="coerce")
+        esc = pd.to_numeric(df["Escenario"], errors="coerce")
+        base = (anio - 1) * 100 + 12
+        e0 = df[(esc == 0) & (per == base)]
+        e1 = df[(esc == 1) & (per // 100 == anio)]
+        quitados = len(df) - len(e0) - len(e1)
+        if e0.empty:
+            e0 = self.escenario_base(reserva, anio)
+            self.avisos.append(f"Escenario 0 {reserva}: {base} de los montos de la BD"
+                               + (" (proyectados)" if base > self.ultimo_real else "") + "; el Escenario_base del area no lo trae")
+        if e1.empty:
+            self.avisos.append(f"Escenario 1 {reserva}: el Escenario_base del area no trae presupuesto de {anio}; no se incluye")
+        if quitados:
+            self.avisos.append(f"Escenario_base {reserva}: {quitados} renglon(es) de otros anos se quitaron")
+        return pd.concat([e0[COLUMNAS_ESC], e1[COLUMNAS_ESC]], ignore_index=True)
 
     def exportar_tablas(self, ruta, tablas: dict):
         """Escribe en un xlsx las tablas que uso un script, la hoja Fuentes (de donde salio cada celda) y los avisos."""
@@ -1273,6 +1415,10 @@ class InsumosBD:
         for etiqueta, d, h, n in self._huecos:
             grupos.setdefault((d, h, n), []).append(etiqueta)
         out = list(self.avisos) + self._avisos_fnd()
+        if self._pe_faltan:
+            f = sorted(self._pe_faltan)
+            out.append(f"Prima de la BD: {len(f)} mes(es) sin PE en la hoja {HOJA_PE} ({f[0]} a {f[-1]}): esos meses no tienen "
+                       "contratos (en el IBNR, los anos de LAG mas viejos van sin prima)")
         for (d, h, n), etiquetas in sorted(grupos.items()):
             rango = f"{d}" if d == h else f"{d} a {h}"
             out.append(f"{n} mes(es) sin dato ({rango}) llenados con los meses vecinos en {len(etiquetas)} serie(s): "
