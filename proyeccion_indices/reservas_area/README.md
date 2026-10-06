@@ -63,13 +63,13 @@ python parchar_aod_2027.py ReforecastRRC_aod.py ReforecastSONR_aod.py
 | Año | `zAño = 2027`; el diccionario de meses (`xAños`), la fecha de valuación del RRC y la consulta de monedas del SONR ya no traen 2026 fijo; las columnas `BELRIESGO2027`, `MR2027`, ... |
 | Contratos | Sin SQL: un "contrato" por ramo y mes con la prima tomada de la BD (hoja `PE_RAMO`, USD: real de PExRamo hasta el último mes real y FCST después), proporcional, de 12 meses de vigencia, en dólares, con la cesión del bloque `CESION` del RRC de su mes. En el IBNR, la historia de prima desde 2019 (los años de LAG anteriores van sin prima, con aviso). El resto del método del área no cambia: FND por antigüedad escalado a nuestro FND, IS, LAG, MR y escenarios; así la PND del RRC de cada ramo y mes es nuestro FND por nuestra prima de 12 meses. |
 | Tipo de cambio | El de la BD (M en 2027, J en 2026); el peso en 1. |
-| Escenarios 0 y 1 | Del `Escenario_base` del área, diciembre 2026 y el presupuesto 2027 si los trae; si no trae diciembre 2026, sale de los montos de la BD (proyectados). Los renglones de otros años se quitan. |
-| Parámetros del área | Para un año que sus tablas no traen, lo que la BD no tiene sale del mismo mes en `ParametrosMens` y del último mes del ramo en `ParamSONR`. |
+| Escenarios 0 y 1 | Del `Escenario_base` del área, diciembre 2026 y el presupuesto 2027 si los trae; si no trae diciembre 2026, sale de los montos de la BD (proyectados). Si no trae el presupuesto 2027 y `PREVIO_CON_2026 = True`, va el presupuesto 2026 con los meses de 2027, solo como previo y con aviso (`False`: sin escenario 1). Los renglones de otros años se quitan. |
+| Parámetros del área | Lo que la BD no tiene y los archivos del área no traen para 2027 sale de los de 2026, solo como previo: el mismo mes de 2026 en `ParamSONR` (con aviso) y en `ParametrosMens`, que no trae año. |
 | Salidas | Con `_2027`: `RRC_esc_2027.xlsx`, `SONR_esc_2027.xlsx`, `Parametros_usados_RRC_2027.xlsx`, `Parametros_usados_SONR_2027.xlsx`, `TablaTCRRC_2027.xlsx`, `TablaTCSONR_2027.xlsx`, `ConsultaPPTO_RRC_<mes>_tradicional_2027.xlsx`, `auxSONR_sum_2027.xlsx`. |
 
 `pruebas/simulacion_aod_2027.py <carpeta con los _2027.py> ["<BD>"]` los corre con una base Access que falla si se le
 consulta y revisa mes por mes que la prima de los contratos es la de la BD, que la PND del RRC es nuestro FND por esa
-prima, los índices, el MR, el tipo de cambio y los nombres de las salidas.
+prima, los índices, el MR, el tipo de cambio, los nombres de las salidas y el previo con 2026 (escenario 1 y `ParamSONR`).
 
 ## De dónde sale cada insumo
 

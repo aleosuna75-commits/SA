@@ -41,7 +41,7 @@ import numpy as np
 import openpyxl
 import pandas as pd
 
-VERSION_AOD = "2026-10-06f"      # version que piden los scripts _aod_BD.py (parchar_aod.py)
+VERSION_AOD = "2026-10-06g"      # version que piden los scripts _aod_BD.py (parchar_aod.py)
 HOJA_MONTOS = "BD_Montos_RRC_SONR"
 TC_BD_DESDE = 202601             # desde este mes el TC MXN / USD de los scripts _aod sale de la columna TC de la BD
                                  # (TC_Real_Esti.xlsx: FCST, columna J, en 2026; FCST 2027, columna M, en 2027)
@@ -1012,11 +1012,19 @@ class InsumosBD:
             if pp:
                 por_ramo.setdefault(cc, []).append((pp, i))
 
+        respaldo_anterior: dict = {}                                         # (mes, ramo) -> mes del area que se uso
+
         def fila_area(p, c):
-            """Fila del area para la llave: la misma (con otro formato) o la del ultimo mes del ramo hasta p (si no, la
-            primera): para un ano que la tabla del area no trae, sus ultimos parametros."""
+            """Fila del area para la llave: la misma (con otro formato); si la tabla no trae el ano, la del mismo mes de un
+            ano anterior (el archivo de 2026 para 2027, como previo); si tampoco, la del ultimo mes del ramo hasta p (si no,
+            la primera)."""
             if (p, c) in parecidas:
                 return parecidas[(p, c)]
+            meses_ramo = dict(por_ramo.get(c, []))
+            for k in range(1, 6) if p // 100 not in {m // 100 for m in meses_ramo} else ():
+                if mes_mas(p, -12 * k) in meses_ramo:
+                    respaldo_anterior[(p, c)] = mes_mas(p, -12 * k)
+                    return meses_ramo[mes_mas(p, -12 * k)]
             filas = sorted(por_ramo.get(c, []))
             antes = [i for m, i in filas if m <= p]
             return antes[-1] if antes else (filas[0][1] if filas else None)
@@ -1066,9 +1074,12 @@ class InsumosBD:
                                "RAMOS_FACTOR_RET_AREA para tomar el del area")
         if extra:
             ramos_extra = sorted({c for _, c in extra})
+            previas = sorted({m for pc, m in respaldo_anterior.items() if pc in set(extra)})
             self.avisos.append(f"ParamSONR: {len(extra)} llave(s) que la tabla del area no traia con el formato AAAAMM-ramo "
                                f"(ramos {ramos_extra}) se agregaron con los parametros de la BD; lo que la BD no trae, de la "
-                               "misma llave o del ultimo mes del ramo en la tabla del area")
+                               "tabla del area: la misma llave, el mismo mes de un ano que la tabla si trae"
+                               + (f" (sus meses {previas[0]} a {previas[-1]}, solo como previo)" if previas else "")
+                               + " o el ultimo mes del ramo")
         return df
 
     def fnd_bd(self, clave: int, periodo: int) -> float:
@@ -1321,7 +1332,7 @@ class InsumosBD:
         df["Pais"] = df["Pais"].astype(float)
         return df
 
-    def escenario_base_area(self, reserva: str, tabla, anio: int) -> pd.DataFrame:
+    def escenario_base_area(self, reserva: str, tabla, anio: int, previo_ano_anterior: bool = False) -> pd.DataFrame:
         """Escenarios 0 y 1 para un ano sin la base: del Escenario_base del area se quedan el escenario 0 de diciembre del
         ano anterior y el escenario 1 (presupuesto) de los meses del ano; si no trae el escenario 0, sale de los montos de la
         BD de ese diciembre (proyectados si es despues del ultimo mes real). Los renglones de otros anos se quitan."""
@@ -1339,6 +1350,14 @@ class InsumosBD:
             e0 = self.escenario_base(reserva, anio)
             self.avisos.append(f"Escenario 0 {reserva}: {base} de los montos de la BD"
                                + (" (proyectados)" if base > self.ultimo_real else "") + "; el Escenario_base del area no lo trae")
+        if e1.empty and previo_ano_anterior:
+            e1 = df[(esc == 1) & (per // 100 == anio - 1)].copy()
+            if len(e1):
+                e1["Periodo"] = pd.to_numeric(e1["Periodo"], errors="coerce").astype(int) + 100
+                quitados -= len(e1)
+                self.avisos.append(f"Escenario 1 {reserva}: el Escenario_base del area no trae presupuesto de {anio}; va el "
+                                   f"presupuesto de {anio - 1} con los meses de {anio} (solo como previo, no es el presupuesto "
+                                   f"{anio}): {len(e1)} renglon(es)")
         if e1.empty:
             self.avisos.append(f"Escenario 1 {reserva}: el Escenario_base del area no trae presupuesto de {anio}; no se incluye")
         if quitados:

@@ -46,7 +46,7 @@ def sin_base():
     sys.modules["mec_devengamiento"] = mec
 
 
-def verificar_2027(ins: InsumosBD, capturas: dict, marcos_sonr: list, salida: Path, anio: int) -> list[str]:
+def verificar_2027(ins: InsumosBD, capturas: dict, marcos_sonr: list, salida: Path, anio: int, area: Path) -> list[str]:
     res = []
     # contratos = prima de la BD y PND = nuestro FND x esa prima, por ramo y mes
     malos_pe, malos_pnd, n = 0, 0, 0
@@ -108,6 +108,29 @@ def verificar_2027(ins: InsumosBD, capturas: dict, marcos_sonr: list, salida: Pa
         res.append(f"{'OK ' if ok else 'MAL'} {nombre}: escenarios {sorted(out['Escenario'].unique().tolist())}; escenario 0 en "
                    f"{sorted(pd.to_numeric(e0['Periodo']).unique().tolist())}; los demas de {per[out['Escenario'] != 0].min()} a "
                    f"{per[out['Escenario'] != 0].max()} ({len(otros)} renglones)")
+        # el area no trae presupuesto del ano: va el del ano anterior con los meses del ano (previo)
+        base = pd.read_csv(area / f"Escenario_base_{nombre.split('_')[0]}.csv")
+        b1 = base[(base["Escenario"] == 1) & (pd.to_numeric(base["Periodo"]) // 100 == anio - 1)].copy()
+        b1["Periodo"] = pd.to_numeric(b1["Periodo"]) + 100
+        e1 = out[out["Escenario"] == 1].copy()
+        e1["Periodo"] = pd.to_numeric(e1["Periodo"])
+        llave = ["Tipo de Monto", "Ramo", "Periodo"]
+        cruce = b1.merge(e1, on=llave, how="outer", suffixes=("_area", "_sal"), indicator=True)
+        malos = int((cruce["_merge"] != "both").sum()) + int(sum(not _igual(a, b) for a, b in zip(
+            cruce["Monto_USD_area"], cruce["Monto_USD_sal"]) if pd.notna(a) and pd.notna(b)))
+        res.append(f"{'OK ' if len(b1) and not malos else 'MAL'} {nombre}: escenario 1 = presupuesto {anio - 1} con los meses de "
+                   f"{anio} (previo): {len(e1)} renglones de {len(b1)}, {malos} distintos")
+    # ParamSONR: lo que falta del ano sale del mismo mes del ano anterior de la tabla del area
+    prueba = InsumosBD.__new__(InsumosBD)
+    prueba.__dict__.update(ins.__dict__)
+    prueba.avisos = []
+    tabla = pd.DataFrame([{"Llave": f"{(anio - 1) * 100 + m}-80", "Factor_Ret": 0.5 + m / 100, "Factor_MR": math.nan,
+                           "Ind Sin SONR Media": 0.6, "Ind Sin SONR 99.5%": 0.7} for m in range(1, 13)])
+    df = prueba.param_sonr_area(tabla, ramos_factor_ret_area=(80,), anio=anio)
+    malos = sum(not _igual(float(df.loc[df["Llave"] == f"{anio * 100 + m}-80", "Factor_Ret"].iloc[0]), 0.5 + m / 100)
+                if (df["Llave"] == f"{anio * 100 + m}-80").any() else True for m in range(1, 13))
+    res.append(f"{'OK ' if not malos else 'MAL'} ParamSONR: el Factor_Ret del area de {anio} sale del mismo mes de {anio - 1} "
+               f"en {12 - malos} de 12 meses")
     return res
 
 
@@ -140,7 +163,7 @@ def main():
     lineas = [f"{'OK ' if g_rrc and g_sonr else 'MAL'} los dos scripts terminaron sin consultar la base Access"]
     lineas += verificar_rrc(ins, g_rrc, capturas, anio, sufijo="_2027")
     lineas += verificar_sonr(ins, g_sonr, marcos[n_rrc:], (trabajo / sonr.name).read_text(encoding="utf-8"), anio)
-    lineas += verificar_2027(ins, capturas, marcos[n_rrc:], salida, anio)
+    lineas += verificar_2027(ins, capturas, marcos[n_rrc:], salida, anio, trabajo / "area")
     print("\n===== VERIFICACION")
     for x in lineas:
         print("  ", x)

@@ -13,6 +13,9 @@ necesario para valuar 2027 sin la base de valuacion Access (marcado con "### 202
     antiguedad escalado a nuestro FND, IS, LAG, MR, escenarios) no cambia.
   - Escenarios 0 y 1: del Escenario_base del area se quedan diciembre del ano anterior y el presupuesto del ano; si no trae
     el escenario 0, sale de los montos de la BD de diciembre 2026.
+  - Lo que falte de 2027 en los archivos del area sale de los de 2026, solo como previo: en ParamSONR el mismo mes de 2026
+    (ParametrosMens no trae ano: sus columnas por mes ya son las de 2026) y, con PREVIO_CON_2026 = True, el presupuesto
+    2026 con los meses de 2027 en el escenario 1 (False: sin escenario 1).
   - Las salidas llevan _2027 en el nombre (RRC_esc_2027.xlsx, SONR_esc_2027.xlsx, Parametros_usados_RRC_2027.xlsx, ...).
 """
 from __future__ import annotations
@@ -43,7 +46,10 @@ def _sin_conexion(t: str, inicio: str, fin: str, lectura: str, nuevo: str) -> st
 def _comunes(t: str, reserva: str) -> str:
     t = _rep(t, r"\A(.*\n)(.*\n)", lambda m: m.group(1) + m.group(2) + (
         f"# Version 2027 sin la base de valuacion Access: los contratos son la prima de la BD por ramo y mes (hoja PE_RAMO)\n"
-        f"# y el tipo de cambio el de la BD; cambios para 2027 marcados con {M27}. Las salidas llevan _2027.\n"))
+        f"# y el tipo de cambio el de la BD; cambios para 2027 marcados con {M27}. Las salidas llevan _2027.\n"
+        f"PREVIO_CON_2026 = True   {M27}: si el Escenario_base del area no trae presupuesto 2027, va el de 2026 con los\n"
+        "                         # meses de 2027, solo como previo; False: el escenario 1 no se incluye. Los parametros que\n"
+        "                         # falten de 2027 (ParamSONR) salen del mismo mes de los archivos de 2026, tambien como previo\n"))
     t = _rep(t, r"^import pyodbc[ \t]*\n", f"try:                                   {M27}: no se usa (sin la base Access)\n"
                                             "    import pyodbc\nexcept ImportError:\n    pyodbc = None\n")
     # diccionario mes - k -> AAAAMM armado con el ano que se valua
@@ -53,7 +59,8 @@ def _comunes(t: str, reserva: str) -> str:
     # columnas con el ano en el nombre (BELRIESGO2026_TCVal, MR2026, PMADEV_2026, BC_SONR_2026, ...): 2027
     lineas = []
     for linea in t.split("\n"):
-        if not linea.lstrip().startswith("#") and "read_csv" not in linea and "xFolder" not in linea and "VERSION_AOD" not in linea:
+        if (not linea.lstrip().startswith("#") and "read_csv" not in linea and "xFolder" not in linea
+                and "VERSION_AOD" not in linea and M27 not in linea):
             linea = re.sub(r"(?<=[A-Za-zÑñ_])2026(?![0-9])", str(ANIO), linea)
         lineas.append(linea)
     t = "\n".join(lineas)
@@ -63,8 +70,8 @@ def _comunes(t: str, reserva: str) -> str:
     t = _rep(t, rf"Parametros_usados_{reserva}\.xlsx", f"Parametros_usados_{reserva}_2027.xlsx", n=2)
     # escenarios 0 y 1 del ano
     t = _rep(t, r"^(xEsc_base = xEsc_base\[columnas_finales\][ \t]*\n)", lambda m: m.group(1) + (
-        f'xEsc_base = INS.escenario_base_area("{reserva}", xEsc_base, zAño)   {M27}: diciembre anterior y presupuesto del ano;\n'
-        "                                                              # sin escenario 0 del area, el de la BD\n"))
+        f'xEsc_base = INS.escenario_base_area("{reserva}", xEsc_base, zAño, PREVIO_CON_2026)   {M27}: diciembre anterior\n'
+        "              # y presupuesto del ano; sin escenario 0 del area, el de la BD; sin presupuesto del ano, el de 2026 (previo)\n"))
     # tipo de cambio de la BD (sin la base)
     t = _sin_conexion(t, "def ConsultaMoneda_usd():", "TC_USD = ConsultaMoneda_usd()",
                       "ConsultaTC_USD = pd.read_sql(xSQL, conn)", "ConsultaTC_USD = INS.tc_tabla()                  # TC USD de la BD")
