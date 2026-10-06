@@ -27,6 +27,7 @@ import sys
 from pathlib import Path
 
 MARCA = "### INDICES BD"
+VERSION_AOD = "2026-10-06b"      # la de insumos_bd.py que piden los scripts generados
 
 
 def _bloque_inicio(reserva: str) -> str:
@@ -51,7 +52,7 @@ for _c in (_AQUI, CARPETA_INDICES):          # (gana el insumos_bd.py de CARPETA
         sys.path.insert(0, _c)
 sys.modules.pop("insumos_bd", None)        # (con Run Cell, que lea el insumos_bd.py que hay hoy en disco)
 import insumos_bd
-if not hasattr(getattr(insumos_bd, "InsumosBD", None), "param_sonr_area"):
+if getattr(insumos_bd, "VERSION_AOD", "") < "{VERSION_AOD}":
     raise SystemExit(f"{{insumos_bd.__file__}} es una version anterior: copia el insumos_bd.py nuevo en {{CARPETA_INDICES}}")
 from insumos_bd import InsumosBD, buscar_bd
 RAMOS_IS_FA = {{"RRC": (40, 50, 80, 90), "SONR": (40, 50, 80, 90)}}   # siniestralidad de FA en los meses proyectados
@@ -62,7 +63,8 @@ MR_DESDE_BD = True     # True: {mr} (donde la BD no modela el ramo, la formula d
 
 def _aviso_tc(sangria: str = "    ") -> str:
     return (f"{sangria}if not (pd.to_numeric(ConsultaTC['cTCAD_FecAMD'], errors='coerce') == Meses).any():   {MARCA}: aviso\n"
-            f"{sangria}    print(f'   AVISO: la base Access no trae tipo de cambio de {{Meses}}: los montos de ese mes salen vacios')\n")
+            f"{sangria}    print(f'   AVISO: la base Access no trae tipo de cambio de {{Meses}}: ese mes no se puede valuar y sale en 0 o '\n"
+            f"{sangria}          'vacio (no es la reserva); carga el TC en la base o no uses ese mes')\n")
 
 
 def _final(reserva: str, tablas: str) -> str:
@@ -95,7 +97,9 @@ def parchar_rrc(t: str) -> str:
     t = _rep(t, r"^(Nomeses = .*\n)", lambda m: m.group(1) + (
         f"_xRRC_area, _xIS_CAT_area = xRRC, xIS_CAT                    {MARCA}: las tablas del area solo dan lo\n"
         "xRRC = INS.parametros_rrc_area(zAño, _xRRC_area)             # que la BD no trae (duracion, retencion, huecos)\n"
-        "xIS_CAT = INS.is_cat_area(_xIS_CAT_area)\n"))
+        "xIS_CAT = INS.is_cat_area(_xIS_CAT_area)\n"
+        "for _a in INS.avisos_texto():                                  # (de donde salio cada indice)\n"
+        "    print('   AVISO:', _a)\n"))
     ini, fin = "def ConsultaReal(IS,IS_CAT, MES):", "#%% FUNCION RRC MENSUALIZADOS"
     t = _en_seccion(t, ini, fin, r'("Resto Monedas_ret", "Ind\. Gasto", )(f"IS Bel Media-\{MES\}")', r'\1"FACTOR MR", \2')
     t = _en_seccion(t, ini, fin, r'^([ \t]*f"IS Bel 99\.5%-\{MES\}":"BEL99",\n)',
@@ -105,7 +109,10 @@ def parchar_rrc(t: str) -> str:
                         lambda m, tc=tc: (f"{m.group(1)}row['MONTO_PI']*row['PORC_ND']*row['FACTORMR']*row['{tc}'] "
                                           f"if MR_DESDE_BD and pd.notna(row['FACTORMR']) else {m.group(2)}{m.group(3)}   {MARCA}"))
     t = _rep(t, r"^([ \t]*)(df_Real_IS_Real = ConsultaReal\(xRRC,\s*xIS_CAT,\s*mes_calculo\)\n)",
-             lambda m: (f"{m.group(1)}xRRC['Ind. Gasto'] = xRRC[f'Ind. Gasto-{{mes_calculo}}']       {MARCA}: gasto y FACTOR MR\n"
+             lambda m: (f"{m.group(1)}if f'Ind. Gasto-{{mes_calculo}}' not in xRRC.columns:      {MARCA}: (si se volvio a leer\n"
+                        f"{m.group(1)}    xRRC = INS.parametros_rrc_area(zAño, xRRC)                   # la celda de los CSV)\n"
+                        f"{m.group(1)}    xIS_CAT = INS.is_cat_area(xIS_CAT)\n"
+                        f"{m.group(1)}xRRC['Ind. Gasto'] = xRRC[f'Ind. Gasto-{{mes_calculo}}']       {MARCA}: gasto y FACTOR MR\n"
                         f"{m.group(1)}xRRC['FACTOR MR'] = xRRC[f'FACTOR MR-{{mes_calculo}}']         # del mes que se valua\n"
                         + _aviso_tc(m.group(1)) + m.group(1) + m.group(2)))
     t = _rep(t, r"^(xRRC_saldos\.to_excel\(fileName, index=False\)\n)",
@@ -118,7 +125,9 @@ def parchar_sonr(t: str) -> str:
     t = _rep(t, r"^(warnings\.filterwarnings\('ignore'\)\n)", lambda m: m.group(1) + _bloque_inicio("SONR"))
     t = _rep(t, r"^(ParamSONR_inc = pd\.read_csv\(.*\)[ \t]*\n)", lambda m: m.group(1) + (
         f"_ParamSONR_area = ParamSONR                                   {MARCA}: el ParamSONR del area solo da\n"
-        "ParamSONR = INS.param_sonr_area(_ParamSONR_area, RAMOS_FACTOR_RET_AREA)   # lo que la BD no trae\n"))
+        "ParamSONR = INS.param_sonr_area(_ParamSONR_area, RAMOS_FACTOR_RET_AREA)   # lo que la BD no trae\n"
+        "for _a in INS.avisos_texto():                                  # (de donde salio cada indice)\n"
+        "    print('   AVISO:', _a)\n"))
     t = _rep(t, r'^([ \t]*Tbase_mp_ = Tbase_mp_\.merge\(ParamSONR\[\["Llave","Factor_Ret",)', r'\1"Factor_MR",')
     t = _rep(t, r"^([ \t]*Tbase_mp_\['MR'\] = Tbase_mp_\.apply\(lambda row: )(\(row\['Desviacion'\] / -BC\) \* BC2)(, axis=1\))[ \t]*$",
              lambda m: (f"{m.group(1)}(row['Prima Dev'] * row['LAG'] * row['Factor_MR']) if MR_DESDE_BD and "

@@ -40,6 +40,7 @@ from pathlib import Path
 import openpyxl
 import pandas as pd
 
+VERSION_AOD = "2026-10-06b"      # version que piden los scripts _aod_BD.py (parchar_aod.py)
 HOJA_MONTOS = "BD_Montos_RRC_SONR"
 HOJA_IS_FA = "IS_FA"
 HOJA_DIAG_INDICADORES = "Indicadores_Ramo"

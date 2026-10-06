@@ -38,9 +38,10 @@ trae el dato; donde no lo trae se queda el valor del área. No se llenan huecos 
 
 Los scripts buscan `insumos_bd.py` y la BD en `CARPETA_INDICES` (por omisión `Documents\Proyección Indices` y su
 `salidas\`); la BD se reconoce por su nombre exacto, sin las variantes `_PE12`, `_PE18` ni `ProyeccionP`. Si se carga un
-`insumos_bd.py` anterior se detienen con el aviso. Al final escriben `Parametros_usados_<reserva>.xlsx` junto a su
+`insumos_bd.py` anterior (sin `VERSION_AOD` vigente) se detienen con el aviso. Los avisos de qué celdas salieron de la BD y cuáles del área
+se imprimen al armar las tablas, antes del ciclo. Al final escriben `Parametros_usados_<reserva>.xlsx` junto a su
 salida: las tablas que usaron, la hoja `Fuentes` (de dónde salió cada celda) y los avisos. Si la base Access no trae
-tipo de cambio de un mes que se valúa, lo avisan (ese mes sale vacío, como antes).
+tipo de cambio de un mes que se valúa, lo avisan: ese mes sale en 0 o vacío (no es la reserva), como ya pasaba.
 
 `pruebas/simulacion_aod.py <carpeta con los _BD.py> ["<BD>"]` los corre sin Access, con tablas del área inventadas, y
 compara contrato por contrato y mes por mes los índices y el MR contra los esperados.
