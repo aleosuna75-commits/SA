@@ -323,7 +323,8 @@ class InsumosBD:
         self._ret_fuera: dict = {}             # Factor_Ret fuera de [0, 1] (IRR mayor que el BEL) por ramo
         self._mr_negativo: dict = {}           # (reserva, ramo) -> meses con MR negativo en la BD (se usa 0)
         self._fnd: dict = {}                   # (ramo, mes) -> FND de la BD o nan (fnd_contrato)
-        self._fnd_uso: dict = {}               # (reserva, ramo, mes) -> [contratos con FND de la BD, con el del area]
+        self._fnd_uso: dict = {}               # (reserva, ramo, mes) -> [con FND de la BD, del area por antiguedad,
+                                               #                          del area porque la BD no trae FND]
         self._fnd_fuera: dict = {}             # ramo -> meses con FND de la BD fuera de [0, 1] (se acota)
         wb = openpyxl.load_workbook(self.ruta_bd, read_only=True, data_only=True)
         try:
@@ -1048,11 +1049,14 @@ class InsumosBD:
             periodo, cm = int(periodo), int(float(calmonth))
         except (TypeError, ValueError):
             cm = None
-        usa = clave is not None and cm is not None and mes_mas(periodo, -12) < cm <= periodo
-        v = self.fnd_bd(clave, periodo) if usa else math.nan
-        uso = self._fnd_uso.setdefault((reserva, clave, periodo), [0, 0])
-        if math.isnan(v):
+        v = self.fnd_bd(clave, periodo) if clave is not None and cm is not None else math.nan
+        en_ventana = cm is not None and mes_mas(periodo, -12) < cm <= periodo
+        uso = self._fnd_uso.setdefault((reserva, clave, periodo), [0, 0, 0])
+        if not en_ventana:
             uso[1] += 1
+            return valor_area
+        if math.isnan(v):
+            uso[2] += 1
             return valor_area
         uso[0] += 1
         return v
@@ -1060,19 +1064,20 @@ class InsumosBD:
     def tabla_fnd(self) -> pd.DataFrame:
         """Uso del FND por reserva, ramo y mes de valuacion: el FND de la BD y cuantos contratos lo tomaron."""
         filas = [{"Reserva": r, "Ramo": c, "Mes": p, "FND de la BD": self._fnd.get((c, p), math.nan),
-                  "Contratos con FND de la BD": n_bd, "Contratos con FND del area": n_area}
-                 for (r, c, p), (n_bd, n_area) in sorted(self._fnd_uso.items(), key=lambda x: (x[0][0], x[0][1] or 0, x[0][2]))]
+                  "Contratos con FND de la BD": n_bd, "Contratos de mas de 12 meses (FND del area)": n_ant,
+                  "Contratos sin FND en la BD (FND del area)": n_sin}
+                 for (r, c, p), (n_bd, n_ant, n_sin) in sorted(self._fnd_uso.items(),
+                                                              key=lambda x: (x[0][0], x[0][1] or 0, x[0][2]))]
         return pd.DataFrame(filas)
 
     def _avisos_fnd(self) -> list[str]:
         out = []
         for reserva in sorted({r for r, _, _ in self._fnd_uso}):
             usos = {k: v for k, v in self._fnd_uso.items() if k[0] == reserva}
-            n_bd, n_area = sum(v[0] for v in usos.values()), sum(v[1] for v in usos.values())
-            sin = sorted({c for (r, c, p), v in usos.items() if v[1] and math.isnan(self._fnd.get((c, p), math.nan))
-                          and c is not None})
-            out.append(f"FND {reserva}: {n_bd} contrato(s) con el FND de la BD de su ramo y mes; {n_area} con el del area "
-                       "(contratos de mas de 12 meses" + (f" o ramos sin FND en la BD: {sin}" if sin else "") + ")")
+            n_bd, n_ant, n_sin = (sum(v[i] for v in usos.values()) for i in range(3))
+            sin = sorted({c for (r, c, p), v in usos.items() if v[2] and c is not None})
+            out.append(f"FND {reserva}: {n_bd} contrato(s) con el FND de la BD de su ramo y mes; con el del area, {n_ant} "
+                       f"de mas de 12 meses" + (f" y {n_sin} de ramos sin FND en la BD ({sin})" if n_sin else ""))
         for clave, ps in sorted(self._fnd_fuera.items()):
             ps = sorted(set(ps))
             out.append(f"FND ramo {clave}: {len(ps)} mes(es) con FND de la BD fuera de [0, 1] ({ps[0]} a {ps[-1]}): se acota")
