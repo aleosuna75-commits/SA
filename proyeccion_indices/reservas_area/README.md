@@ -30,7 +30,7 @@ código con `### INSUMOS BD`.
 | Meses del escenario 3 que el script no valúa (después del último mes real) | Renglones del presupuesto (escenario 1) | Saldos proyectados de la BD (BEL por FND y derivados), `MESES_FALTANTES_ESC3 = "BD"`. Con `"CSV"` se toman del presupuesto, como antes. |
 | Año y mes de valuación | Constantes en el script (2025, 9 y 12) | El último mes real de la BD (hoy 2026 y 8). Se pueden fijar en `config_local.py` (`ANIO`, `MES`). |
 | Base Access, catálogos, CSV auxiliares, presupuesto técnico, ajustes manuales | Rutas fijas en el script | Rutas en `config_local.py`. El presupuesto técnico acepta los nombres de columna de BW (`/ERP/GL_ACCT`, `0CALMONTH`). |
-| Parámetros del margen de riesgo (`RCS`, `COC`, `BC`, `BC_SONR`; `BC` y `BC2` del SONR) | Constantes en el script | `config_local.py` (`MR_RRC`, `MR_SONR`), con los mismos valores. |
+| Margen de riesgo (MR) | Fórmula de capital: RRC `−Desviación × RCS × COC × duración / base de capital`; SONR `Desviación / −BC × BC2`, con constantes en el script | `MR_DESDE = "BD"`: MR del contrato = su prima no devengada (RRC: `MONTO_PI × PORC_ND`; SONR: `Prima Dev × (1 − LAG)`) × el bloque `FACTOR MR` (MR / PND o PD) del ramo y mes de valuación, el mismo factor con que la BD calcula su MR. Con `MR_DESDE = "AREA"` queda la fórmula original, con sus parámetros (`RCS`, `COC`, `BC`, `BC_SONR`; `BC` y `BC2` del SONR) en `config_local.py`. |
 | Contratos de la base de valuación, cesión, `PORC_ND`, `FND` | Igual | Igual. |
 
 Los montos y factores proyectados de la hoja de montos son fórmulas: `insumos_bd.py` lee los valores que Excel guardó.

@@ -222,8 +222,8 @@ def verificar(ins: InsumosBD, g_rrc: dict, g_sonr: dict, trabajo: Path) -> list[
         res.append(f"{'OK ' if (salida / nombre).exists() else 'FALTA'} {nombre}")
     ult = ins.ultimo_real
     # RRC: ConsultaR del ultimo mes real (escenario 2) y la del escenario 4 (indices de diciembre)
-    for etiqueta, llave, periodo in (("RRC escenario 2 mes real", "df_Real_IS_Real", ult),
-                                     ("RRC escenario 4 (real, indices de diciembre)", "xReforecast_Real", ins.anio * 100 + 12)):
+    for etiqueta, llave, periodo, con_tc in (("RRC escenario 2 mes real", "df_Real_IS_Real", ult, True),
+                                             ("RRC escenario 4 (real, indices de diciembre)", "xReforecast_Real", ins.anio * 100 + 12, False)):
         df = g_rrc.get(llave)
         if df is None or not len(df):
             res.append(f"SIN DATOS {etiqueta}")
@@ -239,6 +239,13 @@ def verificar(ins: InsumosBD, g_rrc: dict, g_sonr: dict, trabajo: Path) -> list[
                 if not (abs(x - v) <= 1e-9 or (np.isnan(x) and np.isnan(v))):
                     malos += 1
         res.append(f"{'OK ' if not malos else 'MAL'} {etiqueta}: {len(df)} contratos, {malos} indices distintos a la BD")
+        col_mr = next((c for c in df.columns if str(c).startswith("MR") and str(c).endswith("_TCVal")), None)
+        if col_mr is not None:
+            tc = pd.to_numeric(df["TC_Valuación"]) if con_tc else 1.0     # (el escenario 4 ya trabaja en USD: sin TC)
+            fmr = pd.Series([ins.factor_mr("RRC", int(x), periodo) for x in df["Ramo"]], index=df.index)
+            esp_mr = pd.to_numeric(df["MONTO_PI"]) * pd.to_numeric(df["PORC_ND"]) * fmr * tc
+            dif = int((abs(pd.to_numeric(df[col_mr]) - esp_mr) > 1e-6 * (1 + abs(esp_mr))).sum())
+            res.append(f"{'OK ' if not dif else 'MAL'} {etiqueta}: MR = PND x FACTOR MR de la BD en {len(df) - dif} de {len(df)} contratos")
     # SONR: metodo propio del ultimo mes real
     df = g_sonr.get("df_Real_IS_Real")
     if df is None or not len(df):
@@ -251,11 +258,13 @@ def verificar(ins: InsumosBD, g_rrc: dict, g_sonr: dict, trabajo: Path) -> list[
             esp_lag = 1 - ins.parametro(f"LAG {k}", ramo, ult)
             esp_fr = ins.factor_ret(ramo, ult)
             bel = r["Prima Dev"] * r["LAG"] * r["Ind Sin SONR Media"]
+            esp_mr = r["Prima Dev"] * r["LAG"] * ins.factor_mr("SONR", ramo, ult)
             if abs(r["Ind Sin SONR Media"] - esp_is) > 1e-9 or abs(r["LAG"] - esp_lag) > 1e-9 \
-                    or abs(r["Factor_Ret"] - esp_fr) > 1e-9 or abs(bel - r["BEL_RIESGO"]) > 1e-6:
+                    or abs(r["Factor_Ret"] - esp_fr) > 1e-9 or abs(bel - r["BEL_RIESGO"]) > 1e-6 \
+                    or abs(esp_mr - r["MR"]) > 1e-6 * (1 + abs(esp_mr)):
                 malos += 1
         res.append(f"{'OK ' if not malos else 'MAL'} SONR metodo propio {ult}: {len(df)} renglones (ramo x LAG), {malos} con "
-                   "IS, LAG o Factor_Ret distintos a la BD")
+                   "IS, LAG, Factor_Ret o MR distintos a la BD")
     # escenarios y meses en las salidas
     for nombre, reserva in (("RRC_esc.xlsx", "RRC"), ("SONR_esc.xlsx", "SONR")):
         ruta = salida / nombre

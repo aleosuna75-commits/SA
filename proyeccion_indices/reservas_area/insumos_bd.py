@@ -18,6 +18,8 @@ ParamSONR (SONR)                   HParametros: Ind Sin SONR Media / 99.5% y LAG
                                   IS (FA) en los ramos de RAMOS_IS_FA en los meses proyectados) y Factor_Ret =
                                   1 - IRR / BEL de SONR de la hoja de montos (en los meses proyectados, con la
                                   CESION y el FACTOR MR proyectados).
+FACTOR MR (RRC y SONR)             Bloque FACTOR MR de la hoja de montos (MR / PND o PD) por mes y ramo: el MR de los
+                                  scripts es PND del contrato x FACTOR MR (config MR_DESDE = "BD").
 Tipo de cambio USD                 Columna TC de la hoja de montos (real hasta el ultimo mes y pronostico despues).
 Escenario base (0)                 Montos reales de diciembre del ano anterior de la hoja de montos.
 Saldos proyectados                 Montos proyectados de la hoja de montos (BEL por FND y sus derivados).
@@ -330,6 +332,8 @@ class InsumosBD:
         """Monto USD del concepto ('RRC BEL', 'SONR IRR', ...) del ramo y mes: el valor que guardo Excel; si la celda
         es formula sin valor, el del diagnostico; si tampoco, error."""
         ramo_bd = self.ramo_bd(clave)
+        if periodo not in self.periodos_con_montos:        # (meses de prima sin montos: no hay dato)
+            return math.nan
         v = _num(self.montos.get((norm(concepto), periodo, ramo_bd)))
         if math.isnan(v) and (norm(concepto), periodo, ramo_bd) in self.montos:
             v = _num(self._cargar_diag()["montos"].get((norm(concepto), periodo, ramo_bd)))
@@ -349,11 +353,32 @@ class InsumosBD:
     def factor_gasto(self, clave: int, periodo: int) -> float:
         """Ind. Gasto del RRC = FACTOR GTO (GTO / PND) del ramo y mes."""
         v = self.bloque("FACTOR GTO", "RRC", clave, periodo)
-        if math.isnan(v) and periodo <= self.ultimo_real:
+        if math.isnan(v) and periodo <= self.ultimo_real and periodo in self.periodos_con_montos:
             bel, gto = self.monto("RRC BEL", periodo, clave), self.monto("RRC GTO", periodo, clave)
             is_ = self.parametro("IS_RRC", clave, periodo)
             v = gto * is_ / bel if bel and not math.isnan(bel) and abs(bel) >= UMBRAL_CERO and not math.isnan(is_) else math.nan
         return v
+
+    def _factor_mr_crudo(self, reserva: str, clave: int, periodo: int) -> float:
+        v = self.bloque("FACTOR MR", reserva, clave, periodo)
+        if math.isnan(v) and periodo <= self.ultimo_real and periodo in self.periodos_con_montos:
+            bel, mr = self.monto(f"{reserva} BEL", periodo, clave), self.monto(f"{reserva} MR", periodo, clave)
+            is_ = self.parametro("IS_RRC" if reserva == "RRC" else "IS_SONR", clave, periodo)
+            v = mr * is_ / bel if bel and not math.isnan(bel) and abs(bel) >= UMBRAL_CERO and not math.isnan(is_) else math.nan
+        return v
+
+    def factor_mr(self, reserva: str, clave: int, periodo: int) -> float:
+        """FACTOR MR = MR / PND (RRC) o MR / PD (SONR) del ramo y mes: el bloque de la hoja de montos (en un mes real sin
+        valor guardado, MR / (BEL / IS) de los montos); en un mes sin BEL, el del mes mas cercano con dato."""
+        k = ("FACTOR_MR", reserva, clave)
+        if k not in self._series:
+            periodos = sorted(self.periodos_con_montos)
+            crudo = {p: self._factor_mr_crudo(reserva, clave, p) for p in periodos}
+            self._series[k] = _interpolar(crudo, periodos, self._huecos, f"FACTOR MR {reserva} ramo {clave}")
+        s = self._series[k]
+        if periodo in s:
+            return s[periodo]
+        return s[min(s)] if periodo < min(s) else s[max(s)]
 
     def _factor_ret_crudo(self, clave: int, periodo: int) -> float:
         bel = _num(self.montos.get(("SONR BEL", periodo, self.ramo_bd(clave))))
@@ -386,9 +411,9 @@ class InsumosBD:
 
     # ------------------------------------------------------------------ tablas para los scripts
     def parametros_rrc(self, anio: int | None = None, csv_duracion=None) -> pd.DataFrame:
-        """ParametrosMens del RRC: un renglon por ramo con 'IS Bel Media-m', 'IS Bel 99.5%-m' e 'Ind. Gasto-m' para
-        m = 1..12 del ano (mes de valuacion), mas Pesos_dur, Resto Monedas_dur, Pesos_ret y Resto Monedas_ret del CSV
-        del area (csv_duracion) si se indica."""
+        """ParametrosMens del RRC: un renglon por ramo con 'IS Bel Media-m', 'IS Bel 99.5%-m', 'Ind. Gasto-m' y
+        'FACTOR MR-m' (MR / PND de la BD) para m = 1..12 del ano (mes de valuacion), mas Pesos_dur, Resto Monedas_dur,
+        Pesos_ret y Resto Monedas_ret del CSV del area (csv_duracion) si se indica."""
         anio = anio or self.anio
         filas = []
         for clave in RAMOS_SCRIPT:
@@ -398,6 +423,7 @@ class InsumosBD:
                 f[f"IS Bel Media-{m}"] = self.indice("RRC", clave, p, "media")
                 f[f"IS Bel 99.5%-{m}"] = self.indice("RRC", clave, p, "99.5")
                 f[f"Ind. Gasto-{m}"] = self.factor_gasto(clave, p)
+                f[f"FACTOR MR-{m}"] = self.factor_mr("RRC", clave, p)
             filas.append(f)
         df = pd.DataFrame(filas)
         dur = ["Pesos_dur", "Resto Monedas_dur", "Pesos_ret", "Resto Monedas_ret"]
@@ -450,8 +476,8 @@ class InsumosBD:
 
     def param_sonr(self, desde: int | None = None, hasta: int | None = None, csv_param_sonr=None,
                    ramos_factor_ret_csv: tuple = ()) -> pd.DataFrame:
-        """ParamSONR: un renglon por mes y ramo con Llave 'AAAAMM-ramo', Factor_Ret, Ind Sin SONR Media, Ind Sin SONR
-        99.5% y LAG 1 a LAG 10 (los parametros del mes de valuacion). En los ramos de ramos_factor_ret_csv el Factor_Ret
+        """ParamSONR: un renglon por mes y ramo con Llave 'AAAAMM-ramo', Factor_Ret, Factor_MR (MR / PD de la BD), Ind
+        Sin SONR Media, Ind Sin SONR 99.5% y LAG 1 a LAG 10 (los parametros del mes de valuacion). En los ramos de ramos_factor_ret_csv el Factor_Ret
         sale del ParamSONR del area (csv_param_sonr, por Llave; en un mes que el CSV no trae, el ultimo que trae)."""
         desde = desde or self.primer_periodo_hp
         hasta = hasta or self.ultimo_proyectado or self.ultimo_real
@@ -489,7 +515,7 @@ class InsumosBD:
                 if math.isnan(media) and all(math.isnan(v) for v in lags.values()):
                     continue
                 filas.append({"Llave": f"{p}-{clave}", "AñoMes": p, "Ramo": clave,
-                              "Factor_Ret": factor_ret_de(clave, p),
+                              "Factor_Ret": factor_ret_de(clave, p), "Factor_MR": self.factor_mr("SONR", clave, p),
                               "Ind Sin SONR Media": media, "Ind Sin SONR 99.5%": self.indice("SONR", clave, p, "99.5"),
                               **lags, "Fuente IS": self.fuente_indice("SONR", clave, p)})
         return pd.DataFrame(filas)

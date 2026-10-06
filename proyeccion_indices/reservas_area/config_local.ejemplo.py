@@ -46,7 +46,11 @@ RAMOS_FACTOR_RET_CSV = ()        # ramos cuyo Factor_Ret se toma del CSV del are
                                  # (31,): en Acc. Personales SAP registra IRR mayor que el BEL desde jun-26 y la BD da 0
 FINVIG_AJUSTE_MANUAL = 45930     # FinVig (serial de Excel) con que vienen los ajustes manuales del SONR; su FND es 0
 
-# ---- Margen de riesgo: parametros del area (ponlos tal cual los traen los scripts originales)
+# ---- Margen de riesgo
+MR_DESDE = "BD"                  # "BD" = MR = PND (o PD) del contrato x FACTOR MR de la BD (MR / PND o PD por ramo y mes, el
+                                 # mismo factor con que la BD calcula el MR); "AREA" = la formula de capital de los scripts
+                                 # originales (RCS, COC, duracion y base de capital), con los parametros de abajo
+# Parametros del area para MR_DESDE = "AREA" (ponlos tal cual los traen los scripts originales)
 MR_RRC = {"REAL": {"RCS": None, "COC": 0.1},              # ConsultaReal (escenarios 2 y 3): MR = -DESV x RCS x COC x DUR / BC_total
           "REAL_USD": {"RCS": None, "COC": 0.1},          # ConsultaReal_USD (escenario 4, parte real)
           "PPTO": {"RCS": None, "BC": None, "COC": 0.1},  # ConsultaPPTO (escenario 4, parte presupuesto): divide entre BC

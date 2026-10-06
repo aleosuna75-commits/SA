@@ -127,9 +127,12 @@ xTC_PPTO = INS.tc_dict()                                     ### INSUMOS BD: TC 
 #%% VARIABLES INPUT                                          ### INSUMOS BD: parametros del margen de riesgo en config_local
 Nomeses = [1,12]
 _MR = cfg.MR_RRC
-for _k, _d in _MR.items():
-    if isinstance(_d, dict) and any(v is None for v in _d.values()):
-        raise SystemExit(f"config_local.MR_RRC['{_k}'] trae valores vacios: pon los parametros del margen de riesgo")
+MR_DESDE_BD = str(getattr(cfg, "MR_DESDE", "BD")).upper() == "BD"   ### INSUMOS BD: MR = PND del contrato x FACTOR MR de la BD
+if not MR_DESDE_BD:
+    for _k, _d in _MR.items():
+        if isinstance(_d, dict) and any(v is None for v in _d.values()):
+            raise SystemExit(f"config_local.MR_RRC['{_k}'] trae valores vacios: pon los parametros del margen de riesgo")
+print('   MR del RRC: ' + ('PND x FACTOR MR de la BD' if MR_DESDE_BD else 'formula de capital del area (RCS, COC, duracion, BC)'))
 BC_SONR = _MR.get("BC_SONR", 0) or 0
 
 
@@ -311,12 +314,13 @@ def ConsultaReal_USD(IS,IS_CAT, MES):
     ConsultaR['MONTO_PI'] = ConsultaR.apply(lambda row: (row['PmaTom_sEROri'] if row['TipoRea'] == 2 and row['Ramo'] != 71 and row['Ramo'] != 73 else row['PrimaTomadaOri']) * row["TC_USD"], axis = 1)
     
     ##Cruce xRRC e IS BEL MEDIA (CAT)
-    ConsultaR= ConsultaR.merge(IS[["Ramo","Pesos_dur", "Resto Monedas_dur", "Pesos_ret", "Resto Monedas_ret", "Ind. Gasto-12", f"IS Bel Media-12", f"IS Bel 99.5%-12"]].drop_duplicates()
+    ConsultaR= ConsultaR.merge(IS[["Ramo","Pesos_dur", "Resto Monedas_dur", "Pesos_ret", "Resto Monedas_ret", "Ind. Gasto-12", "FACTOR MR-12", f"IS Bel Media-12", f"IS Bel 99.5%-12"]].drop_duplicates()
                             .rename(columns={
                             "Pesos_dur":"DURMXN",
                             "Resto Monedas_dur":"DUROTR",
                             "Pesos_ret":"RETMXN",
                             "Resto Monedas_ret":"RETOTR",
+                            "FACTOR MR-12":"FACTORMR",                  ### INSUMOS BD: MR / PND de la BD (diciembre)
                             "Ind. Gasto-12":"BELGASTO",                 ### INSUMOS BD: gasto del mes de valuacion (diciembre)
                             f"IS Bel 99.5%-12":"BEL99",
                             }),
@@ -365,9 +369,9 @@ def ConsultaReal_USD(IS,IS_CAT, MES):
     ConsultaR[f'DESVIACION{zAño}'] = ConsultaR.apply(lambda row: row['MONTO_PI']*row['PORC_ND']*(row['BEL99']-row['BELMEDIA'])*(row['RETMXN'] if row['MonedaOri'] == 1 else row['RETOTR']), axis = 1)
     BC_RRC = ConsultaR[f'DESVIACION{zAño}'].sum()
     BC_TOTAL = BC_RRC + BC_SONR
-    RCS = _MR["REAL_USD"]["RCS"]                               ### INSUMOS BD: parametros del MR de config_local
-    COC = _MR["REAL_USD"]["COC"]
-    ConsultaR[f'MR{zAño}_TCVal'] = ConsultaR.apply(lambda row: -1*row[f'DESVIACION{zAño}']*RCS*COC*(row['DURMXN'] if row['MonedaOri'] == 1 else (row['DUROTR']))*(1/BC_TOTAL), axis = 1)
+    RCS = _MR["REAL_USD"].get("RCS") or 0                      ### INSUMOS BD: parametros del MR de config_local (solo MR_DESDE = "AREA")
+    COC = _MR["REAL_USD"].get("COC") or 0
+    ConsultaR[f'MR{zAño}_TCVal'] = ConsultaR.apply(lambda row: (row['MONTO_PI']*row['PORC_ND']*row['FACTORMR']) if MR_DESDE_BD else -1*row[f'DESVIACION{zAño}']*RCS*COC*(row['DURMXN'] if row['MonedaOri'] == 1 else (row['DUROTR']))*(1/BC_TOTAL), axis = 1)   ### INSUMOS BD
     
     
     ConsultaR[f'PMADEV_{zAño}'] = ConsultaR.apply(lambda row: row['MONTO_PI']*(1-row['PORC_ND']), axis = 1)
@@ -375,7 +379,7 @@ def ConsultaReal_USD(IS,IS_CAT, MES):
     ConsultaR[f'BELRIESGO{zAño}_TCAñoAnt'] = ConsultaR.apply(lambda row: row['MONTO_PI']*row['PORC_ND']*row['BELMEDIA'], axis = 1)
     ConsultaR[f'BELGASTO{zAño}_TCAñoAnt'] = ConsultaR.apply(lambda row: row['MONTO_PI']*row['PORC_ND']*row['BELGASTO'], axis = 1)
     ConsultaR[f'IRR{zAño}_TCAñoAnt'] = ConsultaR.apply(lambda row: row[f'BELRIESGO{zAño}_TCAñoAnt']*row['CESION'], axis = 1)																											
-    ConsultaR[f'MR{zAño}_TCAñoAnt'] = ConsultaR.apply(lambda row: -1*row[f'DESVIACION{zAño}']*RCS*COC*(row['DURMXN'] if row['MonedaOri'] == 1 else (row['DUROTR']))*(1/BC_TOTAL), axis = 1)
+    ConsultaR[f'MR{zAño}_TCAñoAnt'] = ConsultaR.apply(lambda row: (row['MONTO_PI']*row['PORC_ND']*row['FACTORMR']) if MR_DESDE_BD else -1*row[f'DESVIACION{zAño}']*RCS*COC*(row['DURMXN'] if row['MonedaOri'] == 1 else (row['DUROTR']))*(1/BC_TOTAL), axis = 1)   ### INSUMOS BD
     
 
     xColumnas = ['SRamo', 'Pais', 'TipoRea', 'OfiRepPt', 'MonedaOri', 'CorrTom', 
@@ -417,12 +421,13 @@ def ConsultaPPTO(MES):
     ConsultaPPTO = ConsultaPPTO.drop('CeBe', axis=1)
     
 
-    ConsultaPPTO= ConsultaPPTO.merge(xRRC[["Ramo", "Pesos_dur", "Resto Monedas_dur", "Pesos_ret", "Resto Monedas_ret", "Ind. Gasto-12", f"IS Bel Media-12", f"IS Bel 99.5%-12"]].drop_duplicates()
+    ConsultaPPTO= ConsultaPPTO.merge(xRRC[["Ramo", "Pesos_dur", "Resto Monedas_dur", "Pesos_ret", "Resto Monedas_ret", "Ind. Gasto-12", "FACTOR MR-12", f"IS Bel Media-12", f"IS Bel 99.5%-12"]].drop_duplicates()
                             .rename(columns={
                             "Pesos_dur":"DURMXN",
                             "Resto Monedas_dur":"DUROTR",
                             "Pesos_ret":"RETMXN",
                             "Resto Monedas_ret":"RETOTR",
+                            "FACTOR MR-12":"FACTORMR",                  ### INSUMOS BD: MR / PND de la BD (diciembre)
                             "Ind. Gasto-12":"BELGASTO",                 ### INSUMOS BD
                             f"IS Bel 99.5%-12":"BEL99",
                             f"IS Bel Media-12":"BELMEDIA"
@@ -502,12 +507,12 @@ def ConsultaPPTO(MES):
     ConsultaPPTO[f'DESVIACION{zAño}'] = ConsultaPPTO.apply(lambda row: row['MONTO_PI']*row['PORC_ND']*(row['BEL99']-row['BELMEDIA'])*(row['RETMXN'] if row['TWAERS'] == "MXN" else row['RETOTR']), axis = 1)
     BC_RRC = ConsultaPPTO[f'DESVIACION{zAño}'].sum()
     BC_TOTAL = BC_RRC + BC_SONR
-    BC = _MR["PPTO"]["BC"]                                     ### INSUMOS BD: parametros del MR de config_local
-    RCS = _MR["PPTO"]["RCS"]
-    COC = _MR["PPTO"]["COC"]
+    BC = _MR["PPTO"].get("BC") or 1                            ### INSUMOS BD: parametros del MR de config_local (solo MR_DESDE = "AREA")
+    RCS = _MR["PPTO"].get("RCS") or 0
+    COC = _MR["PPTO"].get("COC") or 0
 
     
-    ConsultaPPTO[f'MR{zAño}'] = ConsultaPPTO.apply(lambda row: -1*row[f'DESVIACION{zAño}']*RCS*COC*(row['DURMXN'] if row['TWAERS'] == "MXN" else (row['DUROTR']))*(1/BC), axis = 1)
+    ConsultaPPTO[f'MR{zAño}'] = ConsultaPPTO.apply(lambda row: (row['MONTO_PI']*row['PORC_ND']*row['FACTORMR']) if MR_DESDE_BD else -1*row[f'DESVIACION{zAño}']*RCS*COC*(row['DURMXN'] if row['TWAERS'] == "MXN" else (row['DUROTR']))*(1/BC), axis = 1)   ### INSUMOS BD
     
     ConsultaPPTO[f'PMADEV_{zAño}'] = ConsultaPPTO.apply(lambda row: row['MONTO_PI']*(1-row['PORC_ND']), axis = 1)
 
@@ -578,12 +583,13 @@ def ConsultaReal(IS,IS_CAT, MES):
     ConsultaR['MONTO_PI'] = ConsultaR.apply(lambda row: row['PmaTom_sEROri'] if row['TipoRea'] == 2 and row['Ramo'] != 71 and row['Ramo'] != 73 else row['PrimaTomadaOri'], axis = 1)
     
     ##Cruce xRRC e IS BEL MEDIA (CAT)
-    ConsultaR= ConsultaR.merge(IS[["Ramo","Pesos_dur", "Resto Monedas_dur", "Pesos_ret", "Resto Monedas_ret", f"Ind. Gasto-{MES}", f"IS Bel Media-{MES}", f"IS Bel 99.5%-{MES}"]].drop_duplicates()
+    ConsultaR= ConsultaR.merge(IS[["Ramo","Pesos_dur", "Resto Monedas_dur", "Pesos_ret", "Resto Monedas_ret", f"Ind. Gasto-{MES}", f"FACTOR MR-{MES}", f"IS Bel Media-{MES}", f"IS Bel 99.5%-{MES}"]].drop_duplicates()
                             .rename(columns={
                             "Pesos_dur":"DURMXN",
                             "Resto Monedas_dur":"DUROTR",
                             "Pesos_ret":"RETMXN",
                             "Resto Monedas_ret":"RETOTR",
+                            f"FACTOR MR-{MES}":"FACTORMR",              ### INSUMOS BD: MR / PND de la BD del mes de valuacion
                             f"Ind. Gasto-{MES}":"BELGASTO",             ### INSUMOS BD: gasto del mes de valuacion
                             f"IS Bel 99.5%-{MES}":"BEL99",
                             }),
@@ -635,15 +641,15 @@ def ConsultaReal(IS,IS_CAT, MES):
     ConsultaR[f'DESVIACION{zAño}'] = ConsultaR.apply(lambda row: row['MONTO_PI']*row['PORC_ND']*(row['BEL99']-row['BELMEDIA'])*row['TC_Valuación']*(row['RETMXN'] if row['MonedaOri'] == 1 else row['RETOTR']), axis = 1)
     BC_RRC = ConsultaR[f'DESVIACION{zAño}'].sum()
     BC_TOTAL = BC_RRC + BC_SONR
-    COC = _MR["REAL"]["COC"]                                   ### INSUMOS BD: parametros del MR de config_local
-    RCS = _MR["REAL"]["RCS"]
-    ConsultaR[f'MR{zAño}_TCVal'] = ConsultaR.apply(lambda row: -1*row[f'DESVIACION{zAño}']*RCS*COC*(row['DURMXN'] if row['MonedaOri'] == 1 else (row['DUROTR']))*(1/BC_TOTAL), axis = 1)
+    COC = _MR["REAL"].get("COC") or 0                          ### INSUMOS BD: parametros del MR de config_local (solo MR_DESDE = "AREA")
+    RCS = _MR["REAL"].get("RCS") or 0
+    ConsultaR[f'MR{zAño}_TCVal'] = ConsultaR.apply(lambda row: (row['MONTO_PI']*row['PORC_ND']*row['FACTORMR']*row['TC_Valuación']) if MR_DESDE_BD else -1*row[f'DESVIACION{zAño}']*RCS*COC*(row['DURMXN'] if row['MonedaOri'] == 1 else (row['DUROTR']))*(1/BC_TOTAL), axis = 1)   ### INSUMOS BD
     ConsultaR[f'PMADEV_{zAño}'] = ConsultaR.apply(lambda row: row['MONTO_PI']*(1-row['PORC_ND']), axis = 1)
 
     ConsultaR[f'BELRIESGO{zAño}_TCAñoAnt'] = ConsultaR.apply(lambda row: row['MONTO_PI']*row['PORC_ND']*row['BELMEDIA']*row['TC_CierreAnterior'], axis = 1)
     ConsultaR[f'BELGASTO{zAño}_TCAñoAnt'] = ConsultaR.apply(lambda row: row['MONTO_PI']*row['PORC_ND']*row['BELGASTO']*row['TC_CierreAnterior'], axis = 1)
     ConsultaR[f'IRR{zAño}_TCAñoAnt'] = ConsultaR.apply(lambda row: row[f'BELRIESGO{zAño}_TCAñoAnt']*row['CESION'], axis = 1)																											
-    ConsultaR[f'MR{zAño}_TCAñoAnt'] = ConsultaR.apply(lambda row: -1*row[f'DESVIACION{zAño}']*RCS*COC*(row['DURMXN'] if row['MonedaOri'] == 1 else (row['DUROTR']))*(1/BC_TOTAL), axis = 1)
+    ConsultaR[f'MR{zAño}_TCAñoAnt'] = ConsultaR.apply(lambda row: (row['MONTO_PI']*row['PORC_ND']*row['FACTORMR']*row['TC_CierreAnterior']) if MR_DESDE_BD else -1*row[f'DESVIACION{zAño}']*RCS*COC*(row['DURMXN'] if row['MonedaOri'] == 1 else (row['DUROTR']))*(1/BC_TOTAL), axis = 1)   ### INSUMOS BD
 
     xColumnas = ['SRamo', 'Pais', 'TipoRea', 'OfiRepPt', 'MonedaOri', 'CorrTom', 
              'CiaTom', 'CtoTom', 'Susc', 'Período', 'CALMONTH', 'IniVig', 'FinVig', 

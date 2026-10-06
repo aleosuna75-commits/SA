@@ -64,8 +64,10 @@ zAñoPpto = zAño
 zMes = cfg.MES or INS.mes                                    # ultimo mes real
 print(f'Valuacion {zAño}, meses reales 1 a {zMes}')
 _MR = cfg.MR_SONR
-if any(v is None for v in _MR.values()):
+MR_DESDE_BD = str(getattr(cfg, "MR_DESDE", "BD")).upper() == "BD"   ### INSUMOS BD: MR = PD del ano x FACTOR MR de la BD
+if not MR_DESDE_BD and any(v is None for v in _MR.values()):
     raise SystemExit("config_local.MR_SONR trae valores vacios: pon los parametros del margen de riesgo (BC y BC2)")
+print('   MR del SONR: ' + ('PD x FACTOR MR de la BD' if MR_DESDE_BD else 'Desviacion / -BC x BC2 (area)'))
 
 #%% INPUTS (archivos del area que la BD no trae)
 xFolder = str(cfg.CSV_AUXILIARES_SONR)
@@ -477,8 +479,8 @@ def ConsultaReal_USD(MES, FECVAL, AÑOMES):
 #%% FUNCIÓN MÉTODO PROPIO
 def Metodo_propio():
     global Tbase_mp, ConsultaR
-    BC = _MR["BC"]                                           ### INSUMOS BD: parametros del MR de config_local
-    BC2 = _MR["BC2"]
+    BC = _MR.get("BC") or 1                                  ### INSUMOS BD: parametros del MR de config_local (solo MR_DESDE = "AREA")
+    BC2 = _MR.get("BC2") or 0
     Tbase_mp_ = Tbase_mp
     Tbase_mp_['Año'] = zAño
     Tbase_mp_['AñoMes'] = Meses
@@ -486,7 +488,7 @@ def Metodo_propio():
     Tbase_mp_['Fecha Inicio'] = Tbase_mp_.apply(lambda row: (row['Año']-row['NoLAG'])*100 + mes_calculo, axis=1)
     Tbase_mp_['Fecha Fin'] = Tbase_mp_.apply(lambda row: row['Fecha Inicio'] + 100, axis=1)
     Tbase_mp_['Llave'] = Tbase_mp_[['AñoMes', 'Ramo']].apply(lambda x: '-'.join(x.astype('str')), axis=1)
-    Tbase_mp_ = Tbase_mp_.merge(ParamSONR[["Llave","Factor_Ret","Ind Sin SONR Media","Ind Sin SONR 99.5%", "LAG 1", "LAG 2", "LAG 3", "LAG 4", "LAG 5", "LAG 6", "LAG 7", "LAG 8", "LAG 9", "LAG 10"]].drop_duplicates(),
+    Tbase_mp_ = Tbase_mp_.merge(ParamSONR[["Llave","Factor_Ret","Factor_MR","Ind Sin SONR Media","Ind Sin SONR 99.5%", "LAG 1", "LAG 2", "LAG 3", "LAG 4", "LAG 5", "LAG 6", "LAG 7", "LAG 8", "LAG 9", "LAG 10"]].drop_duplicates(),
                              how="left", left_on="Llave", right_on="Llave")
     Tbase_mp_['Llave_lag'] = f'LAG ' + Tbase_mp_['NoLAG'].astype('str')
     Tbase_mp_['LAG'] = Tbase_mp_.apply(lambda row: 1 - row[str(row['Llave_lag'])], axis=1) 
@@ -496,7 +498,7 @@ def Metodo_propio():
     Tbase_mp_['IRR'] = Tbase_mp_.apply(lambda row: row['BEL_RIESGO'] * (1-row['Factor_Ret']), axis=1)
     Tbase_mp_['Desviacion'] = Tbase_mp_.apply(lambda row: row['Prima Dev'] * row['LAG'] * (row['Ind Sin SONR 99.5%']-row['Ind Sin SONR Media']), axis=1)
     ####MERGE BASE DE CAPITAL (Archivo MR y desviaciones para RRC y SONR)
-    Tbase_mp_['MR'] = Tbase_mp_.apply(lambda row: (row['Desviacion'] / -BC) * BC2, axis=1)
+    Tbase_mp_['MR'] = Tbase_mp_.apply(lambda row: (row['Prima Dev'] * row['LAG'] * row['Factor_MR']) if MR_DESDE_BD else (row['Desviacion'] / -BC) * BC2, axis=1)   ### INSUMOS BD
 
     
 
@@ -557,8 +559,8 @@ def ConsultaPresupuesto(MES):                                ### INSUMOS BD: (an
 #%% FUNCIÓN MÉTODO PROPIO REFORECAST
 def Metodo_propio_reforecast():
     global Tbase_mp, ConsultaR
-    BC = _MR["BC"]                                           ### INSUMOS BD: parametros del MR de config_local
-    BC2 = _MR["BC2"]
+    BC = _MR.get("BC") or 1                                  ### INSUMOS BD: parametros del MR de config_local (solo MR_DESDE = "AREA")
+    BC2 = _MR.get("BC2") or 0
     Tbase_mp_0 = []
     for mes in range(12):
         Tbase_mp_ = Tbase_mp.copy()
@@ -573,7 +575,7 @@ def Metodo_propio_reforecast():
     Tbase_mp_f['Fecha Inicio'] = Tbase_mp_f.apply(lambda row: (row['Año']-row['NoLAG'])*100 + (row['AñoMes'] - zAño * 100), axis=1)
     Tbase_mp_f['Fecha Fin'] = Tbase_mp_f.apply(lambda row: row['Fecha Inicio'] + 100, axis=1)
     Tbase_mp_f['Llave'] = Tbase_mp_f[['AñoMes', 'Ramo']].apply(lambda x: '-'.join(x.astype('str')), axis=1)
-    Tbase_mp_f = Tbase_mp_f.merge(ParamSONR[["Llave","Factor_Ret","Ind Sin SONR Media","Ind Sin SONR 99.5%", "LAG 1", "LAG 2", "LAG 3", "LAG 4", "LAG 5", "LAG 6", "LAG 7", "LAG 8", "LAG 9", "LAG 10"]].drop_duplicates(),
+    Tbase_mp_f = Tbase_mp_f.merge(ParamSONR[["Llave","Factor_Ret","Factor_MR","Ind Sin SONR Media","Ind Sin SONR 99.5%", "LAG 1", "LAG 2", "LAG 3", "LAG 4", "LAG 5", "LAG 6", "LAG 7", "LAG 8", "LAG 9", "LAG 10"]].drop_duplicates(),
                              how="left", left_on="Llave", right_on="Llave")
     Tbase_mp_f['Llave_lag'] = f'LAG ' + Tbase_mp_f['NoLAG'].astype('str')
     Tbase_mp_f['LAG'] = Tbase_mp_f.apply(lambda row: 1 - row[str(row['Llave_lag'])], axis=1) 
@@ -584,13 +586,13 @@ def Metodo_propio_reforecast():
     Tbase_mp_f['IRR'] = Tbase_mp_f.apply(lambda row: row['BEL_RIESGO'] * (1-row['Factor_Ret']), axis=1)
     Tbase_mp_f['Desviacion'] = Tbase_mp_f.apply(lambda row: row['Prima Dev'] * row['LAG'] * (row['Ind Sin SONR 99.5%']-row['Ind Sin SONR Media']), axis=1)
     ####MERGE BASE DE CAPITAL (Archivo MR y desviaciones para RRC y SONR)
-    Tbase_mp_f['MR'] = Tbase_mp_f.apply(lambda row: (row['Desviacion'] / -BC) * BC2, axis=1)
+    Tbase_mp_f['MR'] = Tbase_mp_f.apply(lambda row: (row['Prima Dev'] * row['LAG'] * row['Factor_MR']) if MR_DESDE_BD else (row['Desviacion'] / -BC) * BC2, axis=1)   ### INSUMOS BD
     return Tbase_mp_f
 
 def Metodo_propio_reforecast_dic():
     global Tbase_mp, ConsultaR
-    BC = _MR["BC"]                                           ### INSUMOS BD: parametros del MR de config_local
-    BC2 = _MR["BC2"]
+    BC = _MR.get("BC") or 1                                  ### INSUMOS BD: parametros del MR de config_local (solo MR_DESDE = "AREA")
+    BC2 = _MR.get("BC2") or 0
     Tbase_mp_0 = []
     for mes in range(12):
         Tbase_mp_ = Tbase_mp.copy()
@@ -605,7 +607,7 @@ def Metodo_propio_reforecast_dic():
     Tbase_mp_f['Fecha Inicio'] = Tbase_mp_f.apply(lambda row: (row['Año']-row['NoLAG'])*100 + (row['AñoMes'] - zAño * 100), axis=1)
     Tbase_mp_f['Fecha Fin'] = Tbase_mp_f.apply(lambda row: row['Fecha Inicio'] + 100, axis=1)
     Tbase_mp_f['Llave'] = Tbase_mp_f[['AñoMes', 'Ramo']].apply(lambda x: '-'.join(x.astype('str')), axis=1)
-    Tbase_mp_f = Tbase_mp_f.merge(ParamSONR[["Llave","Factor_Ret","Ind Sin SONR Media","Ind Sin SONR 99.5%", "LAG 1", "LAG 2", "LAG 3", "LAG 4", "LAG 5", "LAG 6", "LAG 7", "LAG 8", "LAG 9", "LAG 10"]].drop_duplicates(),
+    Tbase_mp_f = Tbase_mp_f.merge(ParamSONR[["Llave","Factor_Ret","Factor_MR","Ind Sin SONR Media","Ind Sin SONR 99.5%", "LAG 1", "LAG 2", "LAG 3", "LAG 4", "LAG 5", "LAG 6", "LAG 7", "LAG 8", "LAG 9", "LAG 10"]].drop_duplicates(),
                              how="left", left_on="Llave", right_on="Llave")
     Tbase_mp_f['Llave_lag'] = f'LAG ' + Tbase_mp_f['NoLAG'].astype('str')
     Tbase_mp_f['LAG'] = Tbase_mp_f.apply(lambda row: 1 - row[str(row['Llave_lag'])], axis=1) 
@@ -615,7 +617,7 @@ def Metodo_propio_reforecast_dic():
     Tbase_mp_f['IRR'] = Tbase_mp_f.apply(lambda row: row['BEL_RIESGO'] * (1-row['Factor_Ret']), axis=1)
     Tbase_mp_f['Desviacion'] = Tbase_mp_f.apply(lambda row: row['Prima Dev'] * row['LAG'] * (row['Ind Sin SONR 99.5%']-row['Ind Sin SONR Media']), axis=1)
     ####MERGE BASE DE CAPITAL (Archivo MR y desviaciones para RRC y SONR)
-    Tbase_mp_f['MR'] = Tbase_mp_f.apply(lambda row: (row['Desviacion'] / -BC) * BC2, axis=1)
+    Tbase_mp_f['MR'] = Tbase_mp_f.apply(lambda row: (row['Prima Dev'] * row['LAG'] * row['Factor_MR']) if MR_DESDE_BD else (row['Desviacion'] / -BC) * BC2, axis=1)   ### INSUMOS BD
     return Tbase_mp_f
 
 
@@ -852,6 +854,7 @@ df_concatenado = df_concatenado[Columnas]
 fileName = Path(cfg.CARPETA_SALIDA) / "SONR_esc.xlsx"              ### INSUMOS BD: salida en la carpeta local
 df_concatenado.to_excel(fileName, index=False)
 INS.exportar(Path(cfg.CARPETA_SALIDA) / "Parametros_usados_SONR.xlsx", zAño,
+             csv_duracion=getattr(cfg, "CSV_DURACION_RRC", None), csv_is_cat=getattr(cfg, "CSV_IS_CAT", None),
              csv_param_sonr=getattr(cfg, "CSV_PARAM_SONR", None),
              ramos_factor_ret_csv=tuple(getattr(cfg, "RAMOS_FACTOR_RET_CSV", ()) or ()))
 print(f'Saldos en {fileName}; insumos usados en Parametros_usados_SONR.xlsx')
