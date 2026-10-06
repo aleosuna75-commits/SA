@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 #RESERVA RRC - version con los insumos de la BD proyectada (proyeccion_reservas.py)
 #   Cambios respecto a reforecastRRC_v10_Esc1_ocl.py (marcados con "### INSUMOS BD"):
 #   - IS Bel Media / 99.5% e Ind. Gasto por mes salen de la BD (HParametros Real + Proyección, IS (FA) en los ramos
@@ -91,9 +92,15 @@ xEsc_base = INS.escenario_base("RRC", zAño)
 _ruta_esc = (getattr(cfg, "ESCENARIO_BASE_CSV", None) or {}).get("RRC")
 if _ruta_esc and Path(_ruta_esc).exists():
     _csv = pd.read_csv(_ruta_esc)
-    _csv = _csv[_csv["Escenario"] == 1] if "Escenario" in _csv.columns else _csv.iloc[0:0]
-    xEsc_base = pd.concat([xEsc_base, _csv], ignore_index=True)
-    print(f'   Escenario 1 (presupuesto): {len(_csv)} renglones de {Path(_ruta_esc).name}')
+    _faltan = [c for c in ("Reserva", "Escenario", "Tipo de Monto", "Ramo", "Periodo", "Monto_USD") if c not in _csv.columns]
+    if _faltan:
+        print(f'   AVISO: {Path(_ruta_esc).name} no trae las columnas {_faltan}: el escenario 1 (presupuesto) no se incluye')
+    else:
+        _csv = _csv[_csv["Escenario"] == 1].copy()
+        _csv["Periodo"] = pd.to_numeric(_csv["Periodo"], errors="coerce")
+        _csv = _csv[_csv["Periodo"].notna()]
+        xEsc_base = pd.concat([xEsc_base, _csv], ignore_index=True)
+        print(f'   Escenario 1 (presupuesto): {len(_csv)} renglones de {Path(_ruta_esc).name}')
 else:
     print('   Sin Escenario_base_RRC.csv: el escenario 1 (presupuesto) no se incluye')
 
@@ -133,6 +140,20 @@ if not MR_DESDE_BD:
         if isinstance(_d, dict) and any(v is None for v in _d.values()):
             raise SystemExit(f"config_local.MR_RRC['{_k}'] trae valores vacios: pon los parametros del margen de riesgo")
 print('   MR del RRC: ' + ('PND x FACTOR MR de la BD' if MR_DESDE_BD else 'formula de capital del area (RCS, COC, duracion, BC)'))
+if not MR_DESDE_BD and xRRC[["Pesos_dur", "Resto Monedas_dur", "Pesos_ret", "Resto Monedas_ret"]].isna().all().all():
+    raise SystemExit("MR_DESDE = 'AREA' necesita la duracion y retencion del CSV del area (CSV_DURACION_RRC): sin ellas el "
+                     "MR del RRC saldria en 0")
+_COLUMNAS_AJUSTE = ['SRamo', 'Pais', 'TipoRea', 'OfiRepPt', 'MonedaOri', 'CorrTom', 'CiaTom', 'CtoTom', 'Susc', 'Período',
+                    'CALMONTH', 'IniVig', 'FinVig', 'PrimaTomadaOri', 'PmaTom_sEROri', 'PrimaCedidaOri', 'PrimaTomadaNal',
+                    'PmaTom_sERNal', 'PrimaCedidaNal', 'REGION', 'Ramo', 'LLAVE', 'LN2', 'FRECUENCIA', 'MONTO_PI', 'CESION',
+                    'BELMEDIA', 'BELGASTO', 'BEL99', 'DURMXN', 'DUROTR', 'RETMXN', 'RETOTR', 'PORC_ND', 'CEDIDA',
+                    'TC_Valuación', 'TC_CierreAnterior', f'PMADEV_{zAño}', f'DESVIACION{zAño}', f'BELRIESGO{zAño}_TCVal',
+                    f'BELGASTO{zAño}_TCVal', f'IRR{zAño}_TCVal', f'MR{zAño}_TCVal', f'BELRIESGO{zAño}_TCAñoAnt',
+                    f'BELGASTO{zAño}_TCAñoAnt', f'IRR{zAño}_TCAñoAnt', f'MR{zAño}_TCAñoAnt']
+_ajenas = [c for c in xAjManuales.columns if c not in set(_COLUMNAS_AJUSTE)]
+if len(xAjManuales) and _ajenas:                             ### INSUMOS BD: columnas con otro ano se perderian en el concat
+    print(f'   AVISO: AjManuales.csv trae {len(_ajenas)} columna(s) que el script no usa este ano ({", ".join(map(str, _ajenas[:6]))}'
+          f'{"..." if len(_ajenas) > 6 else ""}): revisa que los montos del ajuste lleven el ano {zAño} en el nombre')
 BC_SONR = _MR.get("BC_SONR", 0) or 0
 
 
@@ -257,7 +278,7 @@ def ConsultaReal_USD(IS,IS_CAT, MES):
 
     global ConsultaTC, zMes, zFechaValuacion, xLlavesPol, xRamo
     
-    # Conexión y consulta BD Gonz
+    # Conexión y consulta a la base de valuación
     conn = pyodbc.connect(CONN_STR)
     cursor = conn.cursor()
     
@@ -526,7 +547,7 @@ def ConsultaReal(IS,IS_CAT, MES):
 
     global ConsultaTC, zMes, zFechaValuacion, xLlavesPol, xRamo
     
-    # Conexión y consulta BD Gonz
+    # Conexión y consulta a la base de valuación
     conn = pyodbc.connect(CONN_STR)
     cursor = conn.cursor()
     

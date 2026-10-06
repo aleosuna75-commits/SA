@@ -279,8 +279,8 @@ def verificar(ins: InsumosBD, g_rrc: dict, g_sonr: dict, trabajo: Path) -> list[
 
 
 def main():
-    bd = Path(sys.argv[1])
-    trabajo = Path(sys.argv[2]) if len(sys.argv) > 2 else Path(tempfile.mkdtemp(prefix="sim_area_"))
+    bd = Path(sys.argv[1]).resolve()
+    trabajo = (Path(sys.argv[2]) if len(sys.argv) > 2 else Path(tempfile.mkdtemp(prefix="sim_area_"))).resolve()
     preparar(bd, trabajo)
     ins = InsumosBD(trabajo / "BD_ BEL - IRR - MR_Proyeccion.xlsx", verbose=False)
     presupuesto(trabajo, ins.anio)
@@ -288,9 +288,14 @@ def main():
     g_rrc = correr(trabajo, "reforecastRRC_v11_insumosBD.py")
     g_sonr = correr(trabajo, "ReforecastSONR_v4_insumosBD.py")
     print("\n===== VERIFICACION")
-    for linea in verificar(ins, g_rrc, g_sonr, trabajo):
+    lineas = verificar(ins, g_rrc, g_sonr, trabajo)
+    for linea in lineas:
         print("  ", linea)
     print(f"\nCarpeta de trabajo: {trabajo}")
+    if any(l.startswith(("MAL", "FALTA", "SIN DATOS")) for l in lineas):
+        print("RESULTADO: con fallas")
+        sys.exit(1)
+    print("RESULTADO: todo OK")
 
 
 if __name__ == "__main__":

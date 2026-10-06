@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 #RESERVA SONR - version con los insumos de la BD proyectada (proyeccion_reservas.py)
 #   Cambios respecto a ReforecastSONR_v3.py (marcados con "### INSUMOS BD"):
 #   - ParamSONR (Ind Sin SONR Media / 99.5%, LAG 1 a 10 y Factor_Ret por mes y ramo) sale de la BD: HParametros Real +
@@ -91,9 +92,15 @@ xEsc_base = INS.escenario_base("SONR", zAño)
 _ruta_esc = (getattr(cfg, "ESCENARIO_BASE_CSV", None) or {}).get("SONR")
 if _ruta_esc and Path(_ruta_esc).exists():
     _csv = pd.read_csv(_ruta_esc)
-    _csv = _csv[_csv["Escenario"] == 1] if "Escenario" in _csv.columns else _csv.iloc[0:0]
-    xEsc_base = pd.concat([xEsc_base, _csv], ignore_index=True)
-    print(f'   Escenario 1 (presupuesto): {len(_csv)} renglones de {Path(_ruta_esc).name}')
+    _faltan = [c for c in ("Reserva", "Escenario", "Tipo de Monto", "Ramo", "Periodo", "Monto_USD") if c not in _csv.columns]
+    if _faltan:
+        print(f'   AVISO: {Path(_ruta_esc).name} no trae las columnas {_faltan}: el escenario 1 (presupuesto) no se incluye')
+    else:
+        _csv = _csv[_csv["Escenario"] == 1].copy()
+        _csv["Periodo"] = pd.to_numeric(_csv["Periodo"], errors="coerce")
+        _csv = _csv[_csv["Periodo"].notna()]
+        xEsc_base = pd.concat([xEsc_base, _csv], ignore_index=True)
+        print(f'   Escenario 1 (presupuesto): {len(_csv)} renglones de {Path(_ruta_esc).name}')
 else:
     print('   Sin Escenario_base_SONR.csv: el escenario 1 (presupuesto) no se incluye')
 
@@ -363,7 +370,7 @@ def ConsultaReal(MES, FECVAL, AÑOMES):
     #print(zInicio)
     #print(zFin)
     
-    # Conexión y consulta BD Gonz
+    # Conexión y consulta a la base de valuación
     conn = pyodbc.connect(CONN_STR)
     cursor = conn.cursor()
     
@@ -411,7 +418,7 @@ def ConsultaReal_USD(MES, FECVAL, AÑOMES):
     zInicio = (zAño - 10) * 100 + MES + 1
     zFin = zAño * 100 + MES
     
-    # Conexión y consulta BD Gonz
+    # Conexión y consulta a la base de valuación
     conn = pyodbc.connect(CONN_STR)
     cursor = conn.cursor()
     

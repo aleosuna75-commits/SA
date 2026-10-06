@@ -139,9 +139,27 @@ class InsumosBD:
         finally:
             wb.close()
         self.anio, self.mes = self.ultimo_real // 100, self.ultimo_real % 100
+        self._validar_valores()
         if verbose:
             for linea in self.resumen():
                 print("   " + linea, flush=True)
+
+    def _validar_valores(self):
+        """Comprueba al inicio que los montos proyectados (formulas) tengan valor guardado o diagnostico, para no fallar a
+        media corrida: prueba BEL, IRR y MR de RRC y SONR del primer y ultimo mes proyectado en todos los ramos."""
+        if self.primer_proyectado is None:
+            return
+        for p in (self.primer_proyectado, self.ultimo_proyectado):
+            if p not in self.periodos_con_montos:
+                continue
+            for reserva in ("RRC", "SONR"):
+                for conc in ("BEL", "IRR", "MR"):
+                    for clave in RAMOS_SCRIPT:
+                        if (norm(f"{reserva} {conc}"), p, self.ramo_bd(clave)) in self.montos:
+                            self.monto(f"{reserva} {conc}", p, clave)       # (levanta ValueError con el mensaje claro)
+        if self._diag and (self._diag["montos"] or self._diag["ind"]):
+            self.avisos.append(f"los montos y factores proyectados se leyeron de {self.ruta_diagnostico.name} (la BD no "
+                               "trae los valores guardados de las formulas)")
 
     # ------------------------------------------------------------------ lectura
     @staticmethod
@@ -183,9 +201,12 @@ class InsumosBD:
             periodo = int(periodo)
             d = {k: _num(r[c]) if c < len(r) else math.nan for k, c in c_par.items()}
             lags = [_num(r[c]) if c < len(r) else math.nan for c in c_lag.values()]
-            for k, v in enumerate(lags):           # un LAG en 0 despues de superar 50 % es marcador de faltante
-                if v == 0 and (k == 0 or (not math.isnan(lags[k - 1]) and lags[k - 1] >= 0.5)):
+            max_previo = 0.0                       # (como el modelo principal) un LAG en 0 despues de que el patron
+            for k, v in enumerate(lags):           # acumulado supero 50 % es marcador de faltante, en toda la corrida
+                if not math.isnan(v) and v == 0 and (k == 0 or max_previo > 0.5):
                     lags[k] = math.nan
+                elif not math.isnan(v):
+                    max_previo = max(max_previo, v)
             d.update(dict(zip(LAGS, lags)))
             self.hp[(tipo, periodo, clave)] = d
             self.tipos.setdefault(tipo, set()).add(periodo)
@@ -233,6 +254,9 @@ class InsumosBD:
                     self.bloques[(nombre, reserva, periodo, ramo_bd)] = r[c] if c < len(r) else None
         if not self.tc:
             raise ValueError(f"La columna TC de {ws.title} esta vacia")
+        if self.periodos_con_montos:               # la historia y la proyeccion son contiguas: desde el primer mes con monto
+            primero = min(self.periodos_con_montos)
+            self.periodos_con_montos = {p for p in self.periodos_montos if p >= primero}
 
     def _leer_is_fa(self, ws):
         self.is_fa: dict = {}                    # (reserva, clave, periodo) -> {"media": v, "99.5": v}
@@ -291,6 +315,13 @@ class InsumosBD:
 
     def _tipo_de(self, periodo: int) -> str:
         return self.tipo_real if periodo <= self.ultimo_real else self.tipo_proyeccion
+
+    def serie_cruda(self, param: str, clave: int) -> dict:
+        """Serie mensual del parametro sin llenar huecos: {periodo: valor o nan} (Real hasta el ultimo mes real,
+        Proyección despues)."""
+        fin = self.ultimo_proyectado or self.ultimo_real
+        periodos = rango_meses(self.primer_periodo_hp, fin)
+        return {p: self.hp.get((self._tipo_de(p), p, clave), {}).get(param, math.nan) for p in periodos}
 
     def serie(self, param: str, clave: int) -> dict:
         """Serie mensual del parametro (IS_RRC, IS_RRC_99, IS_SONR, IS_SONR_99 o 'LAG k') para el ramo, Real hasta el
@@ -385,10 +416,17 @@ class InsumosBD:
         irr = _num(self.montos.get(("SONR IRR", periodo, self.ramo_bd(clave))))
         if not math.isnan(bel) and not math.isnan(irr) and bel >= UMBRAL_CERO:
             return 1.0 - irr / bel
-        ces, fm = self.bloque("CESION", "SONR", clave, periodo), self.bloque("FACTOR MR", "SONR", clave, periodo)
-        is_b = self.indice("SONR", clave, periodo)
-        if not math.isnan(ces) and not math.isnan(fm) and not math.isnan(is_b) and is_b > 0 and periodo > self.ultimo_real:
-            return 1.0 - ces * (1.0 + fm / is_b)               # IRR / BEL = CESION x BRUTO / BEL = CESION x (1 + FM / IS)
+        if periodo > self.ultimo_real and periodo in self.periodos_con_montos:
+            try:
+                bel_p = self.monto("SONR BEL", periodo, clave)
+            except ValueError:
+                bel_p = math.nan
+            if math.isnan(bel_p) or abs(bel_p) < UMBRAL_CERO:  # la BD no proyecta IBNR en ese mes: no hay retencion que leer
+                return math.nan
+            ces, fm = self.bloque("CESION", "SONR", clave, periodo), self.bloque("FACTOR MR", "SONR", clave, periodo)
+            is_b = self.indice("SONR", clave, periodo)
+            if not math.isnan(ces) and not math.isnan(fm) and not math.isnan(is_b) and is_b > 0:
+                return 1.0 - ces * (1.0 + fm / is_b)           # IRR / BEL = CESION x BRUTO / BEL = CESION x (1 + FM / IS)
         return math.nan
 
     def factor_ret(self, clave: int, periodo: int) -> float:
@@ -401,8 +439,9 @@ class InsumosBD:
             s = _interpolar(crudo, periodos, self._huecos, f"Factor_Ret SONR ramo {clave}")
             fuera = [p for p, v in s.items() if not math.isnan(v) and not 0 <= v <= 1]
             if fuera:
-                self.avisos.append(f"Factor_Ret SONR ramo {clave}: {len(fuera)} mes(es) fuera de [0, 1] ({fuera[0]} a "
-                                   f"{fuera[-1]}) se acotaron")
+                self.avisos.append(f"Factor_Ret SONR ramo {clave}: {len(fuera)} mes(es) con IRR mayor que el BEL en la BD "
+                                   f"({fuera[0]} a {fuera[-1]}): retencion 0 (todo cedido). Revisalo; con "
+                                   f"RAMOS_FACTOR_RET_CSV = ({clave},) se toma el Factor_Ret del area")
             self._series[k] = {p: (min(max(v, 0.0), 1.0) if not math.isnan(v) else v) for p, v in s.items()}
         s = self._series[k]
         if periodo in s:
@@ -450,20 +489,34 @@ class InsumosBD:
 
     def is_cat(self, csv_is_cat=None) -> pd.DataFrame:
         """IS_Cat del RRC: 'IS Bel Media' = mes (CALMONTH), '71' y '73' = Ind Sin RRC de TEV e Hidro de ese mes. Los
-        meses anteriores a HParametros salen del CSV del area si se indica; si no, del primer mes de HParametros."""
+        meses que HParametros no trae (anteriores a la hoja o vacios en ella) salen del CSV del area si se indica; si no,
+        los anteriores llevan el primer mes de HParametros y los vacios se llenan con los meses vecinos."""
         fin = self.ultimo_proyectado or self.ultimo_real
         periodos = rango_meses(self.primer_periodo_hp, fin)
-        df = pd.DataFrame({"IS Bel Media": periodos,
-                           "71": [self.indice("RRC", 71, p) for p in periodos],
-                           "73": [self.indice("RRC", 73, p) for p in periodos]})
-        previos = None
+        csv_val: dict = {}
         if csv_is_cat and Path(csv_is_cat).exists():
             csv = pd.read_csv(csv_is_cat)
             if all(c in csv.columns for c in ("IS Bel Media", "71", "73")):
-                csv = csv[["IS Bel Media", "71", "73"]].copy()
-                csv["IS Bel Media"] = pd.to_numeric(csv["IS Bel Media"], errors="coerce")
-                previos = csv[csv["IS Bel Media"] < self.primer_periodo_hp]
-        if previos is not None and len(previos):
+                for m, a, b in zip(pd.to_numeric(csv["IS Bel Media"], errors="coerce"),
+                                   pd.to_numeric(csv["71"], errors="coerce"), pd.to_numeric(csv["73"], errors="coerce")):
+                    if not math.isnan(m):
+                        csv_val[int(m)] = {71: a, 73: b}
+        cols = {}
+        for clave in (71, 73):
+            crudo = self.serie_cruda("IS_RRC", clave)
+            del_csv = [p for p in periodos if math.isnan(crudo[p]) and not math.isnan(csv_val.get(p, {}).get(clave, math.nan))]
+            for p in del_csv:
+                crudo[p] = csv_val[p][clave]
+            if del_csv:
+                self.avisos.append(f"IS_Cat ramo {clave}: {len(del_csv)} mes(es) sin indice en HParametros ({del_csv[0]} a "
+                                   f"{del_csv[-1]}) tomados de {Path(csv_is_cat).name}")
+            lleno = _interpolar(crudo, periodos, self._huecos, f"IS_Cat ramo {clave}")
+            cols[clave] = [lleno[p] for p in periodos]
+        df = pd.DataFrame({"IS Bel Media": periodos, "71": cols[71], "73": cols[73]})
+        previos = pd.DataFrame({"IS Bel Media": [m for m in sorted(csv_val) if m < self.primer_periodo_hp]})
+        if len(previos):
+            previos["71"] = [csv_val[m][71] for m in previos["IS Bel Media"]]
+            previos["73"] = [csv_val[m][73] for m in previos["IS Bel Media"]]
             df = pd.concat([previos, df], ignore_index=True)
         else:
             inicio = mes_mas(self.primer_periodo_hp, -12 * 12)
@@ -508,8 +561,15 @@ class InsumosBD:
                     return fr_csv[(clave, m)]
             return self.factor_ret(clave, p)
         filas = []
+        primer_dato = {}
+        for clave in RAMOS_SONR:
+            cr = self.serie_cruda("IS_SONR", clave)
+            con = [p for p, v in cr.items() if not math.isnan(v)]
+            primer_dato[clave] = min(con) if con else None
         for p in rango_meses(desde, hasta):
             for clave in RAMOS_SONR:
+                if primer_dato[clave] is None or p < primer_dato[clave]:   # (antes del primer dato del ramo no hay parametro)
+                    continue
                 lags = {k: self.parametro(k, clave, p) for k in LAGS}
                 media = self.indice("SONR", clave, p, "media")
                 if math.isnan(media) and all(math.isnan(v) for v in lags.values()):
@@ -545,7 +605,8 @@ class InsumosBD:
                     concepto = f"{reserva} {CONCEPTO_BD.get(tipo, tipo)}"
                     if (norm(concepto), p, self.ramo_bd(clave)) not in self.montos:
                         continue
-                    usd = self.monto(concepto, p, clave) * SIGNO[reserva][tipo]
+                    usd = self.monto(concepto, p, clave)
+                    usd = 0.0 if math.isnan(usd) or abs(usd) < UMBRAL_CERO else usd * SIGNO[reserva][tipo]
                     filas.append({"Reserva": reserva, "Escenario": escenario, "Tipo de Monto": tipo, "Ramo": clave,
                                   "Periodo": p, "Monto_MXN": usd * tc, "Monto_USD": usd, "TC": tc})
         return pd.DataFrame(filas, columns=COLUMNAS_ESC)
@@ -596,21 +657,23 @@ class InsumosBD:
                  ramos_factor_ret_csv: tuple = ()):
         """Escribe en un xlsx las tablas que reciben los scripts (para auditar que insumo se uso)."""
         anio = anio or self.anio
+        tablas = [("ParametrosMens_RRC", self.parametros_rrc(anio, csv_duracion)),
+                  ("IS_Cat", self.is_cat(csv_is_cat)),
+                  ("ParamSONR", self.param_sonr(csv_param_sonr=csv_param_sonr, ramos_factor_ret_csv=ramos_factor_ret_csv)),
+                  ("TC_USD", self.tc_tabla()),
+                  ("Escenario_base", pd.concat([self.escenario_base("RRC", anio), self.escenario_base("SONR", anio)],
+                                               ignore_index=True)),
+                  ("Saldos_proyectados", pd.concat([self.saldos_proyectados("RRC"), self.saldos_proyectados("SONR")],
+                                                   ignore_index=True))]
+        avisos = self.avisos_texto()               # (ya con los que levantaron las tablas)
         with pd.ExcelWriter(ruta, engine="openpyxl") as xw:
-            pd.DataFrame({"Dato": ["BD", "Ultimo mes real", "Proyeccion", "IS (FA)", "Avisos"],
+            pd.DataFrame({"Dato": ["BD", "Ultimo mes real", "Proyeccion", "IS (FA)"] + [f"Aviso {i + 1}" for i in range(len(avisos))],
                           "Valor": [str(self.ruta_bd), self.ultimo_real,
                                     f"{self.primer_proyectado} a {self.ultimo_proyectado}",
-                                    "si" if self.is_fa and self.usar_is_fa else "no",
-                                    " | ".join(self.avisos_texto()) or "-"]}).to_excel(xw, sheet_name="Resumen", index=False)
-            self.parametros_rrc(anio, csv_duracion).to_excel(xw, sheet_name="ParametrosMens_RRC", index=False)
-            self.is_cat(csv_is_cat).to_excel(xw, sheet_name="IS_Cat", index=False)
-            self.param_sonr(csv_param_sonr=csv_param_sonr, ramos_factor_ret_csv=ramos_factor_ret_csv).to_excel(
-                xw, sheet_name="ParamSONR", index=False)
-            self.tc_tabla().to_excel(xw, sheet_name="TC_USD", index=False)
-            pd.concat([self.escenario_base("RRC", anio), self.escenario_base("SONR", anio)],
-                      ignore_index=True).to_excel(xw, sheet_name="Escenario_base", index=False)
-            pd.concat([self.saldos_proyectados("RRC"), self.saldos_proyectados("SONR")],
-                      ignore_index=True).to_excel(xw, sheet_name="Saldos_proyectados", index=False)
+                                    "si" if self.is_fa and self.usar_is_fa else "no"] + avisos}).to_excel(
+                xw, sheet_name="Resumen", index=False)
+            for nombre, df in tablas:
+                df.to_excel(xw, sheet_name=nombre, index=False)
 
 
 if __name__ == "__main__":          # uso: python insumos_bd.py <ruta de la BD> [xlsx de salida]
