@@ -33,7 +33,7 @@ trae el dato; donde no lo trae se queda el valor del área. No se llenan huecos 
 | `Ind. Gasto` (RRC) | `FACTOR GTO` de la BD del mes que se valúa (el área trae un solo valor por ramo). |
 | `IS_Cat` (RRC, 71 y 73, por mes del contrato) | `Ind Sin RRC` de TEV e Hidro de la BD en los meses que la BD trae. |
 | `LAG 1` a `LAG 10`, `Factor_Ret` (SONR) | LAG de HParametros; `Factor_Ret` = 1 − IRR / BEL del SONR de la BD. `RAMOS_FACTOR_RET_AREA` deja ramos con el del área. |
-| MR | RRC: `MONTO_PI × PORC_ND × FACTOR MR × TC`; SONR: `Prima Dev × (1 − LAG) × Factor_MR`. Donde la BD no trae factor (o es 0 o negativo), la fórmula de capital del script. `MR_DESDE_BD = False` vuelve a la fórmula en todo. |
+| MR | RRC: `MONTO_PI × PORC_ND × FACTOR MR × TC`; SONR: `Prima Dev × (1 − LAG) × Factor_MR`. Un 0 de la BD es dato y un MR negativo cuenta como 0, con aviso. Donde la BD no modela el ramo (sin BEL de esa reserva), la fórmula de capital del script. El MR a TC del año anterior sigue igual al de valuación, como en el script. `MR_DESDE_BD = False` vuelve a la fórmula en todo. |
 | Contratos, cesión, FND calibrado, duración, retención, TC, escenario base, catálogos | Sin cambio. |
 
 Los scripts buscan `insumos_bd.py` y la BD en `CARPETA_INDICES` (por omisión `Documents\Proyección Indices` y su

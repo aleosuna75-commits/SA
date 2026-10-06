@@ -132,24 +132,36 @@ def es_nombre_bd(nombre: str) -> bool:
 
 
 def buscar_bd(ruta=None, carpetas=()) -> Path:
-    """Ruta de la BD proyectada. La indicada (argumento o config_local.RUTA_BD) si existe; si no, la mas reciente
-    con el nombre de la BD en ``carpetas``, sus subcarpetas ``salidas`` y la ``salidas`` de la carpeta de arriba (donde
-    la deja proyeccion_reservas.py). FileNotFoundError con las carpetas revisadas si no la encuentra."""
+    """Ruta de la BD proyectada. La indicada (argumento o config_local.RUTA_BD) si existe; si no, la primera que
+    encuentra en este orden: para cada carpeta de ``carpetas``, su ``salidas`` (donde la deja proyeccion_reservas.py), la
+    carpeta misma, la ``salidas`` de la carpeta de arriba y la de arriba. Dentro de ese orden gana el nombre exacto sobre
+    las copias (" (1)", " - copia"). Si hay otras candidatas lo avisa. FileNotFoundError con las carpetas revisadas si
+    no encuentra ninguna."""
     if ruta and Path(ruta).is_file():
         return Path(ruta).resolve()
     revisar = []
+    if ruta:
+        revisar.append(Path(ruta).resolve().parent)
     for c in carpetas:
         c = Path(c).resolve()
-        for d in (c, c / "salidas", c.parent / "salidas", c.parent):
+        for d in (c / "salidas", c, c.parent / "salidas", c.parent):
             if d not in revisar:
                 revisar.append(d)
-    if ruta and Path(ruta).resolve().parent not in revisar:
-        revisar.insert(0, Path(ruta).resolve().parent)
-    hallados = [f for d in revisar if d.is_dir() for f in d.iterdir() if f.is_file() and es_nombre_bd(f.name)]
+    hallados = []
+    for d in revisar:
+        try:
+            archivos = sorted(f for f in d.iterdir() if f.is_file() and es_nombre_bd(f.name)) if d.is_dir() else []
+        except OSError:
+            archivos = []
+        hallados += archivos
     if hallados:
-        bd = max(hallados, key=lambda f: f.stat().st_mtime).resolve()
+        exactos = [f for f in hallados if _sin_acentos(f.name) == _sin_acentos(NOMBRE_BD)]
+        bd = (exactos or hallados)[0].resolve()
         if ruta:
             print(f"   AVISO: no esta la BD en {ruta}; se usa {bd}")
+        otras = [str(f) for f in hallados if f.resolve() != bd]
+        if otras:
+            print(f"   AVISO: se usa la BD {bd}; tambien hay: " + "; ".join(otras[:4]) + (" ..." if len(otras) > 4 else ""))
         return bd
     donde = "\n      ".join(str(d) for d in revisar) or "(ninguna carpeta indicada)"
     raise FileNotFoundError(("No esta la BD proyectada" + (f" en {ruta}" if ruta else "") +
@@ -182,6 +194,21 @@ def importar_o_instalar(modulo: str, nombre_pip: str | None = None):
         return importlib.import_module(modulo)
     except ImportError:
         return None
+
+
+def _ramos(x) -> tuple:
+    """Lista de ramos de la configuracion como enteros: acepta (31,), [31], 31, (31) o '31'."""
+    if x is None:
+        return ()
+    if not isinstance(x, (list, tuple, set, frozenset)):
+        x = (x,)
+    out = []
+    for v in x:
+        try:
+            out.append(int(float(v)))
+        except (TypeError, ValueError):
+            pass
+    return tuple(out)
 
 
 def _tabla_area(x, nombre: str):
@@ -281,7 +308,7 @@ class InsumosBD:
         diag.append(self.ruta_bd.with_name("Diagnostico_Proyeccion.xlsx"))  # junto a la BD
         self.ruta_diagnostico = next((d for d in diag if d.is_file()), diag[0])
         self.usar_is_fa = usar_is_fa
-        self.ramos_is_fa = ramos_is_fa if ramos_is_fa is not None else RAMOS_IS_FA
+        self.ramos_is_fa = {k: _ramos(v) for k, v in (ramos_is_fa if ramos_is_fa is not None else RAMOS_IS_FA).items()}
         self.tipo_real, self.tipo_proyeccion = norm(tipo_real), norm(tipo_proyeccion)
         self.avisos: list[str] = []
         self._huecos: list[tuple] = []          # (etiqueta, desde, hasta, n) de los meses llenados con los vecinos
@@ -289,6 +316,7 @@ class InsumosBD:
         self._diag: dict | None = None
         self.fuentes: list[dict] = []          # (tablas del area) de donde salio cada celda: BD o area
         self._ret_fuera: dict = {}             # Factor_Ret fuera de [0, 1] (IRR mayor que el BEL) por ramo
+        self._mr_negativo: dict = {}           # (reserva, ramo) -> meses con MR negativo en la BD (se usa 0)
         wb = openpyxl.load_workbook(self.ruta_bd, read_only=True, data_only=True)
         try:
             self.hoja_hp = next((n for n in wb.sheetnames if norm(n).startswith("HPARAMETROS")), None)
@@ -766,15 +794,18 @@ class InsumosBD:
         return not math.isnan(v) and abs(v) >= UMBRAL_CERO
 
     def _factor_crudo(self, tipo: str, reserva: str, clave: int, periodo: int) -> float:
-        """GTO (GTO / PND), MR (MR / PND o PD, mayor que 0) o RET (1 - IRR / BEL del SONR, acotado a [0, 1]) del ramo y
-        mes, sin llenar huecos; nan si la BD no modela la reserva en ese ramo y mes."""
+        """GTO (GTO / PND), MR (MR / PND o PD; un MR negativo cuenta como 0) o RET (1 - IRR / BEL del SONR, acotado a
+        [0, 1]) del ramo y mes, sin llenar huecos; nan solo si la BD no modela la reserva en ese ramo y mes (sin BEL).
+        Un 0 de la BD es dato: es lo que modela la BD."""
         if not self._bd_modela(reserva, clave, periodo):
             return math.nan
         if tipo == "GTO":
             v = self.factor_gasto(clave, periodo)
         elif tipo == "MR":
             v = self._factor_mr_crudo(reserva, clave, periodo)
-            v = v if not math.isnan(v) and v > 0 else math.nan
+            if not math.isnan(v) and v < 0:
+                self._mr_negativo.setdefault((reserva, clave), []).append(periodo)
+                v = 0.0
         else:
             v = self._factor_ret_crudo(clave, periodo)
             if not math.isnan(v) and not 0 <= v <= 1:
@@ -785,9 +816,14 @@ class InsumosBD:
     def _anotar(self, tabla: str, clave, periodo, columna: str, valor, fuente: str, cuenta: dict, sin: dict):
         self.fuentes.append({"Tabla": tabla, "Ramo": clave, "Mes": periodo, "Columna": columna,
                              "Valor": valor, "Fuente": fuente})
+        if fuente.startswith("Area") and (valor is None or (isinstance(valor, float) and math.isnan(valor))) \
+                and "formula" not in fuente:
+            fuente = "Sin dato (ni la BD ni el area)"
+            self.fuentes[-1]["Fuente"] = fuente
         cuenta[fuente] = cuenta.get(fuente, 0) + 1
-        if fuente.startswith("Area"):
-            sin.setdefault((clave, columna.split("-")[0].strip()), set()).add(periodo)
+        if fuente.startswith(("Area", "Sin dato")):
+            motivo = "por RAMOS_FACTOR_RET_AREA" if "RAMOS_FACTOR_RET_AREA" in fuente else "la BD no lo trae"
+            sin.setdefault((clave, columna.split("-")[0].strip(), motivo), set()).add(periodo)
 
     def _aviso_tabla(self, tabla: str, cuenta: dict, sin: dict, nota_mr: str = ""):
         """Un aviso con el conteo de celdas por fuente y uno por ramo y meses con lo que se quedo del area."""
@@ -795,13 +831,28 @@ class InsumosBD:
         partes = ", ".join(f"{n} {f}" for f, n in sorted(cuenta.items(), key=lambda x: -x[1]))
         self.avisos.append(f"{tabla}: {total} celdas; {partes}")
         grupos: dict = {}
-        for (clave, col), meses in sin.items():
-            grupos.setdefault((clave, tuple(sorted(meses))), []).append(col)
-        for (clave, meses), cols in sorted(grupos.items(), key=lambda x: (x[0][0] or 0, x[0][1])):
+        for (clave, col, motivo), meses in sin.items():
+            grupos.setdefault((clave, tuple(sorted(meses)), motivo), []).append(col)
+        sin_dato = {(f["Ramo"], f["Columna"].split("-")[0].strip()) for f in self.fuentes
+                    if f["Tabla"] == tabla and f["Fuente"].startswith("Sin dato")}
+        for (clave, meses, motivo), cols in sorted(grupos.items(), key=lambda x: (x[0][0] or 0, x[0][1], x[0][2])):
             rango = f"{meses[0]}" if len(meses) == 1 else f"{meses[0]} a {meses[-1]}"
             nota = nota_mr if any(c.upper().startswith(("FACTOR MR", "FACTOR_MR")) for c in cols) else ""
-            self.avisos.append(f"{tabla}: ramo {clave}, {len(meses)} mes(es) ({rango}): {', '.join(cols)} del area "
-                               f"(la BD no lo trae){nota}")
+            vacias = [c for c in cols if (clave, c) in sin_dato]
+            if vacias:
+                self.avisos.append(f"{tabla}: ramo {clave}, {len(meses)} mes(es) ({rango}): {', '.join(cols)} sin dato "
+                                   "en la BD ni en la tabla del area (vacio, como en el script original)")
+            else:
+                self.avisos.append(f"{tabla}: ramo {clave}, {len(meses)} mes(es) ({rango}): {', '.join(cols)} del area "
+                                   f"({motivo}){nota}")
+
+    def _aviso_mr_negativo(self, reserva: str):
+        for (res, clave), ps in sorted(self._mr_negativo.items()):
+            if res == reserva:
+                ps = sorted(set(ps))
+                self.avisos.append(f"FACTOR MR {reserva} ramo {clave}: {len(ps)} mes(es) con MR negativo en la BD "
+                                   f"({ps[0]} a {ps[-1]}): se usa 0")
+        self._mr_negativo = {k: v for k, v in self._mr_negativo.items() if k[0] != reserva}
 
     @staticmethod
     def _ramo_area(v) -> int | None:
@@ -847,6 +898,7 @@ class InsumosBD:
                 self._anotar(tabla, clave, p, f"FACTOR MR-{m}", fm,
                              "BD FACTOR MR" if not math.isnan(fm) else "Area (formula de capital)", cuenta, sin)
         self._aviso_tabla(tabla, cuenta, sin, ": su MR sale de la formula de capital del script")
+        self._aviso_mr_negativo("RRC")
         return df
 
     def is_cat_area(self, area) -> pd.DataFrame:
@@ -883,8 +935,8 @@ class InsumosBD:
                 self._anotar(tabla, clave, p, str(clave), x, fuente, cuenta, sin)
         self._aviso_tabla(tabla, cuenta, sin)
         if nuevos:
-            self.avisos.append(f"{tabla}: {len(nuevos)} mes(es) que la tabla del area no traia, agregados de la BD "
-                               f"({nuevos[0]} a {nuevos[-1]})")
+            self.avisos.append(f"{tabla}: {len(nuevos)} mes(es) que la tabla del area no traia ({nuevos[0]} a "
+                               f"{nuevos[-1]}) se agregaron con el indice de la BD; con la tabla del area salian vacios")
         return df.sort_values("IS Bel Media", kind="stable").reset_index(drop=True)
 
     def param_sonr_area(self, area, ramos_factor_ret_area: tuple = ()) -> pd.DataFrame:
@@ -902,19 +954,34 @@ class InsumosBD:
                 df[c] = math.nan
             df[c] = pd.to_numeric(df[c], errors="coerce").astype(float)
 
+        ramos_factor_ret_area = _ramos(ramos_factor_ret_area)
+
         def partes(llave):
             t = str(llave).split("-")
-            return (int(t[0]), int(float(t[1]))) if len(t) == 2 and t[0].strip().isdigit() else (None, None)
+            if len(t) != 2 or not t[0].strip().isdigit():
+                return None, None
+            r = _num(t[1])
+            return (int(t[0]), int(r)) if not math.isnan(r) and r == int(r) else (None, None)
         llaves = [partes(x) for x in df["Llave"]]
+        exactas = {(p, c) for (p, c), x in zip(llaves, df["Llave"]) if p and str(x) == f"{p}-{c}"}
+        raras = [str(x) for (p, c), x in zip(llaves, df["Llave"]) if not p or str(x) != f"{p}-{c}"]
+        if raras:
+            self.avisos.append(f"ParamSONR del area: {len(raras)} llave(s) con otro formato que AAAAMM-ramo (p. ej. "
+                               f"'{raras[0]}'); el script solo cruza las de ese formato")
         meses = sorted({p for p, _ in llaves if p}) or rango_meses(self.anio * 100 + 1, self.anio * 100 + 12)
-        hay = {(p, c) for p, c in llaves if p}
-        extra = [(p, c) for p in meses for c in RAMOS_SONR if (p, c) not in hay]
+        extra = [(p, c) for p in meses for c in RAMOS_SONR if (p, c) not in exactas
+                 and not math.isnan(self._is_crudo("SONR", c, p)[0])
+                 and (c in ramos_factor_ret_area or not math.isnan(self._factor_crudo("RET", "SONR", c, p)))]
+        self._ret_fuera = {}
         if extra:
-            df = pd.concat([df, pd.DataFrame({"Llave": [f"{p}-{c}" for p, c in extra]})], ignore_index=True)
+            parecidas = {pc: i for i, pc in zip(df.index, llaves) if pc[0]}     # (fila del area con otra llave)
+            nuevas = pd.DataFrame({"Llave": [f"{p}-{c}" for p, c in extra]})
+            for c in cols:
+                nuevas[c] = [df.at[parecidas[pc], c] if pc in parecidas else math.nan for pc in extra]
+            df = pd.concat([df, nuevas], ignore_index=True)
             llaves += extra
             for c in cols:
                 df[c] = pd.to_numeric(df[c], errors="coerce").astype(float)
-        self._ret_fuera = {}
         cuenta, sin, tabla = {}, {}, "ParamSONR"
         for i, (p, clave) in zip(df.index, llaves):
             if p is None:
@@ -935,12 +1002,16 @@ class InsumosBD:
                 df.at[i, col] = x
                 self._anotar(tabla, clave, p, col, x, fuente, cuenta, sin)
         self._aviso_tabla(tabla, cuenta, sin, ": su MR sale de la formula Desviacion / -BC x BC2 del script")
+        self._aviso_mr_negativo("SONR")
         for clave, ps in sorted(self._ret_fuera.items()):
             self.avisos.append(f"Factor_Ret SONR ramo {clave}: {len(ps)} mes(es) con IRR mayor que el BEL en la BD "
                                f"({min(ps)} a {max(ps)}): retencion 0 (todo cedido). Si no es correcto, pon {clave} en "
                                "RAMOS_FACTOR_RET_AREA para tomar el del area")
         if extra:
-            self.avisos.append(f"ParamSONR: {len(extra)} llave(s) de ramos que la tabla del area no traia, agregadas de la BD")
+            ramos_extra = sorted({c for _, c in extra})
+            self.avisos.append(f"ParamSONR: {len(extra)} llave(s) que la tabla del area no traia con el formato AAAAMM-ramo "
+                               f"(ramos {ramos_extra}) se agregaron con los parametros de la BD; con la tabla del area "
+                               "salian vacias")
         return df
 
     def exportar_tablas(self, ruta, tablas: dict):

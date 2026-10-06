@@ -249,7 +249,7 @@ def verificar_rrc(ins: InsumosBD, g: dict, capturas: dict, anio: int) -> list[st
             fm = ins._factor_crudo("MR", "RRC", ramo, p)
             esp = {"BELMEDIA": esp_media, "BEL99": v99 if not math.isnan(v99) else AREA["IS99"],
                    "BELGASTO": g_ if not math.isnan(g_) else AREA["GTO"], "FACTORMR": fm}
-            if not math.isnan(fm) and fm > 0:
+            if not math.isnan(fm):
                 esp["MR2026_TCVal"] = r["MONTO_PI"] * r["PORC_ND"] * fm * r["TC_Valuación"]
                 mr_bd += 1
             else:
@@ -265,7 +265,7 @@ def verificar_rrc(ins: InsumosBD, g: dict, capturas: dict, anio: int) -> list[st
                     res.append(f"MAL RRC {p} ramo {ramo}: no usa el IS de FA")
     res.append(f"{'OK ' if not malos else 'MAL'} RRC 12 meses: {n} contratos, {malos} indices distintos a los esperados; "
                f"IS de FA en {fa} contratos (40, 50, 80 y 90 proyectados), IS del area en {area_usada}; MR con FACTOR MR "
-               f"de la BD en {mr_bd} y con la formula de capital en {mr_formula} (71 y 73)")
+               f"de la BD en {mr_bd} y con la formula de capital en {mr_formula}")
     return res
 
 
@@ -296,7 +296,7 @@ def verificar_sonr(ins: InsumosBD, g: dict, marcos: list, texto_script: str, ani
                    "Ind Sin SONR 99.5%": v99 if not math.isnan(v99) else AREA["IS_SONR99"],
                    f"LAG {k}": lag if not math.isnan(lag) else AREA["LAG"],
                    "Factor_Ret": fr if not math.isnan(fr) else AREA["RET"], "Factor_MR": fm}
-            if not math.isnan(fm) and fm > 0:
+            if not math.isnan(fm):
                 esp["MR"] = r["Prima Dev"] * r["LAG"] * fm
                 mr_bd += 1
             else:

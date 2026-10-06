@@ -11,9 +11,11 @@ RRC  - IS Bel Media-m e IS Bel 99.5%-m: de la BD (HParametros Real hasta el ulti
        los ramos de RAMOS_IS_FA, el IS de FA en los meses proyectados).
      - Ind. Gasto: el FACTOR GTO de la BD del mes que se valua (antes un valor fijo por ramo).
      - IS_Cat (71 y 73): el Ind Sin RRC de TEV e Hidro de la BD en los meses que la BD trae.
-     - MR: PND del contrato x FACTOR MR de la BD (MR_DESDE_BD = True); sin FACTOR MR en la BD, la formula de capital.
+     - MR: PND del contrato x FACTOR MR de la BD x TC (MR_DESDE_BD = True; un 0 de la BD es dato y un MR negativo
+       cuenta como 0); donde la BD no modela el ramo, la formula de capital. El MR TCAñoAnt sigue igual al TCVal.
 SONR - Ind Sin SONR Media y 99.5%, LAG 1 a 10 y Factor_Ret: de la BD (IS de FA en RAMOS_IS_FA en los meses
-       proyectados); MR: Prima Dev x (1 - LAG) x Factor_MR de la BD, y sin Factor_MR la formula del script.
+       proyectados); MR: Prima Dev x (1 - LAG) x Factor_MR de la BD; donde la BD no modela el ramo (p. ej. sin BEL de
+       IBNR), la formula del script.
 Donde la BD no trae un dato se queda el valor de la tabla del area. Catalogos, contratos, FND calibrado, cesion,
 duracion, retencion, tipo de cambio, escenario base y rutas no cambian. Al final cada script escribe
 Parametros_usados_<reserva>.xlsx (las tablas que uso, de donde salio cada celda y los avisos) junto a su salida.
@@ -47,12 +49,13 @@ _AQUI = str(Path(__file__).resolve().parent) if "__file__" in globals() else os.
 for _c in (_AQUI, CARPETA_INDICES):          # (gana el insumos_bd.py de CARPETA_INDICES)
     if _c not in sys.path:
         sys.path.insert(0, _c)
+sys.modules.pop("insumos_bd", None)        # (con Run Cell, que lea el insumos_bd.py que hay hoy en disco)
 import insumos_bd
 if not hasattr(getattr(insumos_bd, "InsumosBD", None), "param_sonr_area"):
     raise SystemExit(f"{{insumos_bd.__file__}} es una version anterior: copia el insumos_bd.py nuevo en {{CARPETA_INDICES}}")
 from insumos_bd import InsumosBD, buscar_bd
 RAMOS_IS_FA = {{"RRC": (40, 50, 80, 90), "SONR": (40, 50, 80, 90)}}   # siniestralidad de FA en los meses proyectados
-MR_DESDE_BD = True     # True: {mr} (sin factor, la formula del area); False: la formula del area
+MR_DESDE_BD = True     # True: {mr} (donde la BD no modela el ramo, la formula del area); False: la formula del area
 {extra}INS = InsumosBD(buscar_bd(None, [CARPETA_INDICES, _AQUI]), ramos_is_fa=RAMOS_IS_FA)
 '''
 
@@ -97,16 +100,16 @@ def parchar_rrc(t: str) -> str:
     t = _en_seccion(t, ini, fin, r'("Resto Monedas_ret", "Ind\. Gasto", )(f"IS Bel Media-\{MES\}")', r'\1"FACTOR MR", \2')
     t = _en_seccion(t, ini, fin, r'^([ \t]*f"IS Bel 99\.5%-\{MES\}":"BEL99",\n)',
                     lambda m: m.group(1) + m.group(1).split('f"')[0] + f'"FACTOR MR":"FACTORMR",   {MARCA}\n')
-    for col, tc in (("TCVal", "TC_Valuación"), ("TCAñoAnt", "TC_CierreAnterior")):
+    for col, tc in (("TCVal", "TC_Valuación"), ("TCAñoAnt", "TC_Valuación")):   # (el area deja el MR TCAñoAnt igual al TCVal)
         t = _en_seccion(t, ini, fin, r"^([ \t]*ConsultaR\['MR\d{4}_" + col + r"'\] = ConsultaR\.apply\(lambda row: )(.*)(, axis = 1\))[ \t]*$",
                         lambda m, tc=tc: (f"{m.group(1)}row['MONTO_PI']*row['PORC_ND']*row['FACTORMR']*row['{tc}'] "
-                                          f"if MR_DESDE_BD and row['FACTORMR'] > 0 else {m.group(2)}{m.group(3)}   {MARCA}"))
+                                          f"if MR_DESDE_BD and pd.notna(row['FACTORMR']) else {m.group(2)}{m.group(3)}   {MARCA}"))
     t = _rep(t, r"^([ \t]*)(df_Real_IS_Real = ConsultaReal\(xRRC,\s*xIS_CAT,\s*mes_calculo\)\n)",
              lambda m: (f"{m.group(1)}xRRC['Ind. Gasto'] = xRRC[f'Ind. Gasto-{{mes_calculo}}']       {MARCA}: gasto y FACTOR MR\n"
                         f"{m.group(1)}xRRC['FACTOR MR'] = xRRC[f'FACTOR MR-{{mes_calculo}}']         # del mes que se valua\n"
                         + _aviso_tc(m.group(1)) + m.group(1) + m.group(2)))
     t = _rep(t, r"^(xRRC_saldos\.to_excel\(fileName, index=False\)\n)",
-             lambda m: m.group(1) + _final("RRC", '{"ParametrosMens_RRC": xRRC, "IS_Cat": xIS_CAT}'))
+             lambda m: m.group(1) + _final("RRC", '{"ParametrosMens_RRC": xRRC.drop(columns=["Ind. Gasto", "FACTOR MR"], errors="ignore"), "IS_Cat": xIS_CAT}'))
     return t
 
 
@@ -119,7 +122,7 @@ def parchar_sonr(t: str) -> str:
     t = _rep(t, r'^([ \t]*Tbase_mp_ = Tbase_mp_\.merge\(ParamSONR\[\["Llave","Factor_Ret",)', r'\1"Factor_MR",')
     t = _rep(t, r"^([ \t]*Tbase_mp_\['MR'\] = Tbase_mp_\.apply\(lambda row: )(\(row\['Desviacion'\] / -BC\) \* BC2)(, axis=1\))[ \t]*$",
              lambda m: (f"{m.group(1)}(row['Prima Dev'] * row['LAG'] * row['Factor_MR']) if MR_DESDE_BD and "
-                        f"row['Factor_MR'] > 0 else {m.group(2)}{m.group(3)}   {MARCA}"))
+                        f"pd.notna(row['Factor_MR']) else {m.group(2)}{m.group(3)}   {MARCA}"))
     t = _rep(t, r"^([ \t]*)(ConsultaR = ConsultaReal\(mes_calculo, zFechaValuacion, Meses\)\n)",
              lambda m: _aviso_tc(m.group(1)) + m.group(1) + m.group(2))
     t = _rep(t, r"^(df_concatenado\.to_excel\(fileName, index=False\))\s*\Z",
