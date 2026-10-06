@@ -2,7 +2,9 @@
 """Corre los dos scripts adaptados sin la base Access ni los archivos del area, con datos sinteticos, para probar el
 flujo completo y que los indices que usan sean los de la BD proyectada.
 
-Uso: python simulacion_sin_access.py "<ruta de la BD proyectada>" [carpeta de trabajo]
+Uso: python simulacion_sin_access.py ["<ruta de la BD proyectada>"] [carpeta de trabajo]
+Sin argumentos (boton Run de VS Code) busca la BD como los scripts: la de config_local.py o la mas reciente junto a los
+scripts o en salidas/.
 
 Simula pyodbc (tipo de cambio y contratos de la base de valuacion) y arma los catalogos y CSV auxiliares con pocos
 renglones inventados; la BD proyectada es la real. Al final compara, renglon por renglon, los indices que tomaron los
@@ -27,7 +29,7 @@ import pandas as pd
 AQUI = Path(__file__).resolve().parent
 SCRIPTS = AQUI.parent
 sys.path.insert(0, str(SCRIPTS))
-from insumos_bd import InsumosBD, RAMOS_SCRIPT, RAMOS_SONR, mes_mas, rango_meses   # noqa: E402
+from insumos_bd import DRIVER_ACCESS, InsumosBD, RAMOS_SCRIPT, RAMOS_SONR, buscar_bd, mes_mas, rango_meses   # noqa: E402
 
 RAMO_NOMBRE = {10: "Vida", 31: "Acc Per.", 35: "GMM", 39: "Salud", 40: "Resp. Civil", 50: "MyT", 60: "Incendio",
                71: "Terremoto", 73: "HyORH", 80: "Agropecuario", 90: "Autos", 100: "Crédito", 110: "Diversos"}
@@ -58,7 +60,7 @@ RAMOS_IS_FA = {{"RRC": (40, 50, 80, 90), "SONR": (40, 50, 80, 90)}}
 MESES_FALTANTES_ESC3 = "BD"
 ESCENARIO_BASE_CSV = {{}}
 GUARDAR_INTERMEDIOS = True
-ACCESS_DBQ = r"simulada.accdb"
+ACCESS_DBQ = str(CARPETA / "simulada.accdb")
 CATALOGOS = str(CARPETA / "Catalogos.xlsx")
 CSV_AUXILIARES_RRC = str(CARPETA / "csv")
 CSV_AUXILIARES_SONR = str(CARPETA / "csv")
@@ -169,6 +171,7 @@ def simular_access(ins: InsumosBD):
 
     falso = types.ModuleType("pyodbc")
     falso.connect = lambda conn_str: _Conn()
+    falso.drivers = lambda: [DRIVER_ACCESS]
     sys.modules["pyodbc"] = falso
 
     def read_sql(sql, conn, *a, **k):
@@ -203,8 +206,10 @@ def correr(trabajo: Path, nombre: str) -> dict:
     cwd = Path.cwd()
     try:
         import os
-        os.chdir(trabajo)
-        sys.path.insert(0, str(trabajo))
+        otra = trabajo / "cwd_ajena"                 # como el boton Run de VS Code: la carpeta actual no es la del script
+        otra.mkdir(exist_ok=True)
+        os.chdir(otra)
+        sys.argv = [str(trabajo / nombre)]           # y sin argumentos
         for m in ("config_local", "insumos_bd"):
             sys.modules.pop(m, None)
         return runpy.run_path(str(trabajo / nombre), run_name="__main__")
@@ -279,9 +284,23 @@ def verificar(ins: InsumosBD, g_rrc: dict, g_sonr: dict, trabajo: Path) -> list[
 
 
 def main():
-    bd = Path(sys.argv[1]).resolve()
+    if len(sys.argv) > 1:
+        bd = Path(sys.argv[1]).resolve()
+    else:
+        try:
+            sys.path.insert(0, str(SCRIPTS))
+            import config_local as cfg_usuario
+            ruta = getattr(cfg_usuario, "RUTA_BD", None)
+        except ImportError:
+            ruta = None
+        try:
+            bd = buscar_bd(ruta, [SCRIPTS])
+        except FileNotFoundError as e:
+            sys.exit(str(e))
+        print(f"BD: {bd}")
     trabajo = (Path(sys.argv[2]) if len(sys.argv) > 2 else Path(tempfile.mkdtemp(prefix="sim_area_"))).resolve()
     preparar(bd, trabajo)
+    (trabajo / "simulada.accdb").write_bytes(b"")     # (la revision de arranque pide que la base exista)
     ins = InsumosBD(trabajo / "BD_ BEL - IRR - MR_Proyeccion.xlsx", verbose=False)
     presupuesto(trabajo, ins.anio)
     simular_access(ins)

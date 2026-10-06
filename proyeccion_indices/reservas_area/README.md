@@ -8,7 +8,7 @@ código con `### INSUMOS BD`.
 
 | Archivo | Qué es |
 |---|---|
-| `insumos_bd.py` | Lee la BD proyectada y arma las tablas con la forma que esperan los scripts (abajo). Se puede correr solo: `python insumos_bd.py "<BD>" Parametros_usados.xlsx` escribe las tablas para revisarlas. |
+| `insumos_bd.py` | Lee la BD proyectada y arma las tablas con la forma que esperan los scripts (abajo). Se puede correr solo (con el botón Run de VS Code, sin argumentos): escribe `Parametros_usados.xlsx` en `salidas_area/` para revisar los insumos. No calcula reservas. |
 | `reforecastRRC_v11_insumosBD.py` | RRC. Mismos escenarios 0 a 5 del original. |
 | `ReforecastSONR_v4_insumosBD.py` | SONR. Mismos escenarios 0 a 4 del original. |
 | `config_local.ejemplo.py` | Plantilla de la configuración local. Cópiala como `config_local.py` y pon tus rutas y parámetros. `config_local.py` no se versiona: lleva rutas internas y los parámetros de capital del margen de riesgo. |
@@ -42,14 +42,24 @@ detiene con el mensaje de qué celda falta.
 
 1. En una carpeta local pon: los tres `.py` (`insumos_bd.py` y los dos scripts), `config_local.py` (copia de
    `config_local.ejemplo.py` con tus rutas y parámetros) y la BD proyectada ya abierta y guardada en Excel (y, si
-   quieres, su `Diagnostico_Proyeccion.xlsx`).
-2. Revisa en `config_local.py`: la base Access, los catálogos, las carpetas de CSV auxiliares de RRC y de SONR, el CSV
-   con duración y retención (`ParametrosMens` del año), el presupuesto técnico del año y los parámetros del MR.
-3. Corre `reforecastRRC_v11_insumosBD.py` y `ReforecastSONR_v4_insumosBD.py`. Escriben en `salidas_area/`:
-   `RRC_esc.xlsx`, `SONR_esc.xlsx` (la misma forma de antes) y `Parametros_usados_<reserva>.xlsx` con las tablas de
-   insumos que usaron (índices por mes, `IS_Cat`, `ParamSONR`, TC, escenario base y saldos proyectados) y los avisos.
-4. Sin Access a la mano, `python pruebas/simulacion_sin_access.py "<BD>"` prueba que el código corre y toma los índices
-   de la BD.
+   quieres, su `Diagnostico_Proyeccion.xlsx`). Si la BD no está en `RUTA_BD`, los scripts toman la más reciente que
+   encuentren junto a ellos o en `salidas/` (la carpeta donde la deja `proyeccion_reservas.py`) y lo avisan.
+2. Revisa en `config_local.py`: la base Access, los catálogos, las carpetas de CSV auxiliares de RRC y de SONR, el
+   presupuesto técnico del año y los parámetros del MR.
+3. Abre `reforecastRRC_v11_insumosBD.py` o `ReforecastSONR_v4_insumosBD.py` en VS Code y dale Run (no necesitan
+   argumentos ni importa en qué carpeta esté la terminal). Antes de empezar revisan todo lo que necesitan y, si algo
+   falta, se detienen con la lista completa: pyodbc, el controlador de Access, la base Access, los archivos del área y
+   que las salidas no estén abiertas en Excel.
+4. Escriben en `salidas_area/`: `RRC_esc.xlsx`, `SONR_esc.xlsx` (la misma forma de antes) y
+   `Parametros_usados_<reserva>.xlsx` con las tablas de insumos que usaron (índices por mes, `IS_Cat`, `ParamSONR`, TC,
+   escenario base y saldos proyectados) y los avisos.
+5. Sin Access a la mano, `pruebas/simulacion_sin_access.py` (también con Run) prueba que el código corre y toma los
+   índices de la BD.
+
+**pyodbc y el controlador de Access.** Si falta pyodbc, los scripts lo instalan con pip en el mismo Python, como el
+modelo principal (pyodbc 5.3 ya trae versión para Python 3.14 en Windows). La conexión usa el controlador
+`Microsoft Access Driver (*.mdb, *.accdb)`, que debe ser de los mismos bits que tu Python (casi siempre 64). Si la
+revisión de arranque dice que no está, instala el *Microsoft Access Database Engine 2016 Redistributable* de 64 bits.
 
 Qué cambia en los resultados respecto a correr con los CSV del área: los meses ya cerrados toman los índices `Real` de
 HParametros (los de SAP), no los del presupuesto del año; los meses por venir toman nuestra proyección (y el IS (FA) en

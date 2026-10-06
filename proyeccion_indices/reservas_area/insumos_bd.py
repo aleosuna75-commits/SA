@@ -33,6 +33,7 @@ from __future__ import annotations
 
 import math
 import re
+import unicodedata
 import warnings
 from pathlib import Path
 
@@ -112,6 +113,145 @@ def _interpolar(valores: dict, periodos: list[int], huecos_reg: list, etiqueta: 
     return dict(zip(periodos, out))
 
 
+def _sin_acentos(t: str) -> str:
+    return "".join(c for c in unicodedata.normalize("NFKD", str(t)) if not unicodedata.combining(c)).upper()
+
+
+def es_nombre_bd(nombre: str) -> bool:
+    """True si el archivo se llama como la BD proyectada (BD_ BEL - IRR - MR_Proyeccion.xlsx, con o sin acento ni
+    sufijos como "(1)"); no el BD_ RFV ni el archivo temporal ~$ que Excel deja mientras esta abierto."""
+    n = _sin_acentos(nombre)
+    return (n.startswith("BD") and n.endswith(".XLSX") and not n.startswith("~$")
+            and all(t in n for t in ("BEL", "IRR", "MR", "PROYECC")))
+
+
+def buscar_bd(ruta=None, carpetas=()) -> Path:
+    """Ruta de la BD proyectada. La indicada (argumento o config_local.RUTA_BD) si existe; si no, la mas reciente
+    con el nombre de la BD en ``carpetas``, sus subcarpetas ``salidas`` y la ``salidas`` de la carpeta de arriba (donde
+    la deja proyeccion_reservas.py). FileNotFoundError con las carpetas revisadas si no la encuentra."""
+    if ruta and Path(ruta).is_file():
+        return Path(ruta).resolve()
+    revisar = []
+    for c in carpetas:
+        c = Path(c).resolve()
+        for d in (c, c / "salidas", c.parent / "salidas", c.parent):
+            if d not in revisar:
+                revisar.append(d)
+    if ruta and Path(ruta).resolve().parent not in revisar:
+        revisar.insert(0, Path(ruta).resolve().parent)
+    hallados = [f for d in revisar if d.is_dir() for f in d.iterdir() if f.is_file() and es_nombre_bd(f.name)]
+    if hallados:
+        bd = max(hallados, key=lambda f: f.stat().st_mtime).resolve()
+        if ruta:
+            print(f"   AVISO: no esta la BD en {ruta}; se usa {bd}")
+        return bd
+    donde = "\n      ".join(str(d) for d in revisar) or "(ninguna carpeta indicada)"
+    raise FileNotFoundError(("No esta la BD proyectada" + (f" en {ruta}" if ruta else "") +
+                             ". Busque 'BD_ BEL - IRR - MR_Proyeccion.xlsx' en:\n      " + donde +
+                             "\n   Copiala a la carpeta de los scripts o pon su ruta en config_local.py (RUTA_BD)."))
+
+
+def importar_o_instalar(modulo: str, nombre_pip: str | None = None):
+    """El modulo; si falta, lo instala con pip en el mismo Python que corre el script, como proyeccion_reservas.py.
+    None si no se pudo instalar (sin internet, proxy o permisos): verificar_arranque lo reporta."""
+    import importlib
+    import os
+    import site
+    import subprocess
+    import sys
+    try:
+        return importlib.import_module(modulo)
+    except ImportError:
+        pass
+    print(f"Instalando {nombre_pip or modulo} ...", flush=True)
+    try:
+        subprocess.check_call([sys.executable, "-m", "pip", "install", "--quiet", nombre_pip or modulo])
+    except (subprocess.CalledProcessError, OSError):
+        return None
+    usuario = site.getusersitepackages()        # (pip pudo instalar en la carpeta del usuario)
+    if os.path.isdir(usuario) and usuario not in sys.path:
+        site.addsitedir(usuario)
+    importlib.invalidate_caches()
+    try:
+        return importlib.import_module(modulo)
+    except ImportError:
+        return None
+
+
+DRIVER_ACCESS = "Microsoft Access Driver (*.mdb, *.accdb)"
+ARCHIVOS_AREA = {           # reserva -> (variable de config_local, archivo dentro de esa carpeta o None si es el archivo)
+    "RRC": [("CATALOGOS", None)] + [("CSV_AUXILIARES_RRC", f) for f in (
+        "LlavesPol.csv", "AjManuales.csv", "Subramo.csv", "CesionPI.csv", "AFUN.csv", "zFrecuencias.csv",
+        "TablaCesion_Esc1.csv", "Cesion ID Esp.csv")] + [("PPTO_TECNICO_RRC", None)],
+    "SONR": [("CSV_AUXILIARES_SONR", "Subramo.csv"), ("PPTO_TECNICO_SONR", None)],
+}
+SALIDAS_AREA = {"RRC": ("RRC_esc.xlsx", "Parametros_usados_RRC.xlsx"),
+                "SONR": ("SONR_esc.xlsx", "Parametros_usados_SONR.xlsx")}
+
+
+def verificar_arranque(cfg, reserva: str, pyodbc_mod, carpeta) -> Path:
+    """Antes de empezar, revisa lo que el script necesita y la BD no trae (pyodbc, el controlador de Access, la base
+    Access, los archivos del area y que las salidas no esten abiertas en Excel) y junta todo lo que falte en un solo
+    mensaje, para no enterarse a la mitad de la corrida. Regresa la ruta de la BD proyectada."""
+    import sys
+    problemas, bd = [], None
+    try:
+        bd = buscar_bd(getattr(cfg, "RUTA_BD", None), [carpeta])
+    except FileNotFoundError as e:
+        problemas.append(str(e))
+    bits = 64 if sys.maxsize > 2 ** 32 else 32
+    if pyodbc_mod is None:
+        problemas.append("Falta pyodbc (conecta con la base Access) y no se pudo instalar solo. En la terminal de VS "
+                         f"Code corre:  \"{sys.executable}\" -m pip install pyodbc")
+    else:
+        try:
+            drivers = list(pyodbc_mod.drivers())
+        except Exception:                       # (un pyodbc sin drivers(): se deja pasar y lo dira la conexion)
+            drivers = None
+        if drivers is not None and DRIVER_ACCESS not in drivers:
+            problemas.append(f"Windows no tiene el controlador de ODBC '{DRIVER_ACCESS}' de {bits} bits (tu Python es "
+                             f"de {bits} bits y deben coincidir). Instala el 'Microsoft Access Database Engine 2016 "
+                             f"Redistributable' de {bits} bits. Controladores que hay: {', '.join(drivers) or 'ninguno'}")
+    acc = getattr(cfg, "ACCESS_DBQ", None)
+    if not acc or not Path(str(acc)).is_file():
+        problemas.append(f"No se encuentra la base Access: {acc} (ACCESS_DBQ). Revisa la ruta y la conexion a la red "
+                         "o a la VPN")
+    pendientes = list(ARCHIVOS_AREA.get(reserva, []))
+    if reserva == "SONR" and getattr(cfg, "MES", None) == 12:      # en diciembre el SONR no usa el presupuesto
+        pendientes = [x for x in pendientes if x[0] != "PPTO_TECNICO_SONR"]
+    if reserva == "RRC" and str(getattr(cfg, "MR_DESDE", "BD")).upper() != "BD":
+        pendientes.append(("CSV_DURACION_RRC", None))
+    carpetas_mal = set()
+    for var, archivo in pendientes:
+        base = getattr(cfg, var, None)
+        if not base:
+            problemas.append(f"Falta {var} en config_local.py")
+            continue
+        if archivo is None:
+            if not Path(str(base)).is_file():
+                problemas.append(f"No esta el archivo {base} ({var})")
+        elif not Path(str(base)).is_dir():
+            if var not in carpetas_mal:
+                carpetas_mal.add(var)
+                problemas.append(f"No existe la carpeta {base} ({var})")
+        elif not (Path(str(base)) / archivo).is_file():
+            problemas.append(f"No esta {archivo} en {base} ({var})")
+    salida = Path(str(getattr(cfg, "CARPETA_SALIDA", None) or carpeta))
+    for nombre in SALIDAS_AREA.get(reserva, ()):
+        r = salida / nombre
+        if r.is_file():
+            try:
+                with open(r, "r+b"):
+                    pass
+            except PermissionError:
+                problemas.append(f"{r} esta abierto (en Excel?): cierralo, el script lo va a reescribir")
+    if problemas:
+        raise SystemExit(f"\nNo se puede correr el {reserva}; antes hay que resolver esto:\n" +
+                         "\n".join(f"  {i}. {t}" for i, t in enumerate(problemas, 1)) +
+                         f"\nLas rutas se cambian en {Path(carpeta) / 'config_local.py'}")
+    return bd
+
+
 class InsumosBD:
     """Lee la BD proyectada y entrega los insumos de los scripts del area."""
 
@@ -120,7 +260,9 @@ class InsumosBD:
         self.ruta_bd = Path(ruta_bd)
         if not self.ruta_bd.exists():
             raise FileNotFoundError(f"No esta la BD proyectada: {self.ruta_bd}")
-        self.ruta_diagnostico = Path(ruta_diagnostico) if ruta_diagnostico else self.ruta_bd.with_name("Diagnostico_Proyeccion.xlsx")
+        diag = [Path(ruta_diagnostico)] if ruta_diagnostico else []      # el indicado y, si no existe, el que esta
+        diag.append(self.ruta_bd.with_name("Diagnostico_Proyeccion.xlsx"))  # junto a la BD
+        self.ruta_diagnostico = next((d for d in diag if d.is_file()), diag[0])
         self.usar_is_fa = usar_is_fa
         self.ramos_is_fa = ramos_is_fa if ramos_is_fa is not None else RAMOS_IS_FA
         self.tipo_real, self.tipo_proyeccion = norm(tipo_real), norm(tipo_proyeccion)
@@ -480,8 +622,8 @@ class InsumosBD:
                 self.avisos.append(f"{Path(csv_duracion).name} no trae las columnas {dur}: el MR del RRC no se puede "
                                    "calcular")
         else:
-            self.avisos.append("sin CSV de duracion / retencion (ParametrosMens del area): el MR del RRC no se puede "
-                               "calcular; indica csv_duracion")
+            self.avisos.append("sin CSV de duracion / retencion (ParametrosMens del area): solo hace falta para el MR "
+                               "del RRC con MR_DESDE = 'AREA' (con 'BD' no se usa)")
         for c in dur:
             if c not in df.columns:
                 df[c] = math.nan
@@ -676,11 +818,35 @@ class InsumosBD:
                 df.to_excel(xw, sheet_name=nombre, index=False)
 
 
-if __name__ == "__main__":          # uso: python insumos_bd.py <ruta de la BD> [xlsx de salida]
+if __name__ == "__main__":
+    # Uso: python insumos_bd.py [ruta de la BD] [xlsx de salida]. Sin argumentos (p. ej. con el boton Run de VS Code)
+    # toma la BD y los CSV de config_local.py, o busca la BD junto a este archivo y en salidas/, y escribe
+    # Parametros_usados.xlsx en CARPETA_SALIDA. Solo arma y revisa los insumos: las reservas se corren con
+    # reforecastRRC_v11_insumosBD.py y ReforecastSONR_v4_insumosBD.py.
     import sys
-    ins = InsumosBD(sys.argv[1])
-    if len(sys.argv) > 2:
-        ins.exportar(sys.argv[2])
-        print(f"   Tablas en {sys.argv[2]}")
+    aqui = Path(__file__).resolve().parent
+    sys.path.insert(0, str(aqui))
+    try:
+        import config_local as cfg
+    except ImportError:
+        cfg = None
+    try:
+        bd = buscar_bd(sys.argv[1] if len(sys.argv) > 1 else getattr(cfg, "RUTA_BD", None), [aqui])
+    except FileNotFoundError as e:
+        raise SystemExit(str(e))
+    salida = (Path(sys.argv[2]) if len(sys.argv) > 2 else
+              Path(getattr(cfg, "CARPETA_SALIDA", None) or aqui / "salidas_area") / "Parametros_usados.xlsx")
+    ins = InsumosBD(bd, getattr(cfg, "RUTA_DIAGNOSTICO", None), usar_is_fa=getattr(cfg, "USAR_IS_FA", True),
+                    ramos_is_fa=getattr(cfg, "RAMOS_IS_FA", None))
+    salida.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        ins.exportar(salida, getattr(cfg, "ANIO", None), csv_duracion=getattr(cfg, "CSV_DURACION_RRC", None),
+                     csv_is_cat=getattr(cfg, "CSV_IS_CAT", None), csv_param_sonr=getattr(cfg, "CSV_PARAM_SONR", None),
+                     ramos_factor_ret_csv=tuple(getattr(cfg, "RAMOS_FACTOR_RET_CSV", ()) or ()))
+    except PermissionError:
+        raise SystemExit(f"No se pudo escribir {salida}: cierralo en Excel y vuelve a correr")
+    print(f"   Tablas en {salida}")
     for a in ins.avisos_texto():
         print("   AVISO:", a)
+    print("   Listo. Este archivo solo arma los insumos; las reservas se corren con reforecastRRC_v11_insumosBD.py y "
+          "ReforecastSONR_v4_insumosBD.py")

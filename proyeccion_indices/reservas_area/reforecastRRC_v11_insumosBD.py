@@ -25,19 +25,20 @@ import openpyxl
 import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from insumos_bd import InsumosBD, mes_mas, norm            ### INSUMOS BD
+from insumos_bd import InsumosBD, importar_o_instalar, mes_mas, norm, verificar_arranque   ### INSUMOS BD
 try:
     import config_local as cfg                               ### INSUMOS BD: rutas y parametros locales
 except ImportError:
     raise SystemExit("Falta config_local.py junto al script: copia config_local.ejemplo.py como config_local.py y "
                      "pon tus rutas y parametros")
-try:
-    import pyodbc
-except ImportError:                                          # (sin Access: el TC USD sale de la BD; las consultas fallan)
-    pyodbc = None
+pyodbc = importar_o_instalar("pyodbc")                    ### INSUMOS BD: si falta, lo instala (como el modelo
+                                                             # principal); si no se puede, verificar_arranque avisa
 warnings.filterwarnings('ignore')
 start_time = time.perf_counter()
 
+RUTA_BD = verificar_arranque(cfg, "RRC", pyodbc, Path(__file__).resolve().parent)   ### INSUMOS BD: revisa
+# pyodbc, el controlador de Access, la base, los archivos del area y la BD antes de empezar (la BD: RUTA_BD o, si no
+# esta ahi, la mas reciente junto al script o en salidas/)
 CONN_STR = r'DRIVER={Microsoft Access Driver (*.mdb, *.accdb)};DBQ=' + str(cfg.ACCESS_DBQ) + ';'   ### INSUMOS BD
 Path(cfg.CARPETA_SALIDA).mkdir(parents=True, exist_ok=True)
 
@@ -60,7 +61,7 @@ def _normalizar_ppto(df):                                    ### INSUMOS BD: el 
 
 #%% INSUMOS DE LA BD PROYECTADA                              ### INSUMOS BD
 print('Leyendo la BD proyectada ...')
-INS = InsumosBD(cfg.RUTA_BD, getattr(cfg, "RUTA_DIAGNOSTICO", None), usar_is_fa=getattr(cfg, "USAR_IS_FA", True),
+INS = InsumosBD(RUTA_BD, getattr(cfg, "RUTA_DIAGNOSTICO", None), usar_is_fa=getattr(cfg, "USAR_IS_FA", True),
                 ramos_is_fa=getattr(cfg, "RAMOS_IS_FA", None))
 zAño = cfg.ANIO or INS.anio                                  # ano de valuacion = el del ultimo mes real de la BD
 zMes = cfg.MES or INS.mes                                    # ultimo mes real
