@@ -249,7 +249,9 @@ def verificar_tc(ins: InsumosBD, g_rrc: dict, g_sonr: dict, capturas: dict, marc
     for etiqueta, g in (("RRC", g_rrc), ("SONR", g_sonr)):
         pp = (g or {}).get("xTC_PPTO", {})
         malos = [k for k, v in pp.items() if int(k) >= TC_BD_DESDE and not _igual(v, ins.tc_de(int(k)))]
-        res.append(f"{'OK ' if pp and not malos and _igual(pp.get((anio - 1) * 100 + 12), 18.008) else 'MAL'} {etiqueta} xTC_PPTO: "
+        dic = (anio - 1) * 100 + 12
+        dic_ok = _igual(pp.get(dic), 18.008 if dic < TC_BD_DESDE else ins.tc_de(dic))
+        res.append(f"{'OK ' if pp and not malos and dic_ok else 'MAL'} {etiqueta} xTC_PPTO: "
                    f"{sum(1 for k in pp if int(k) >= TC_BD_DESDE)} meses con el TC de la BD, diciembre anterior sin cambio")
     malos, n = 0, 0
     for m in range(1, 13):
@@ -275,10 +277,14 @@ def verificar_tc(ins: InsumosBD, g_rrc: dict, g_sonr: dict, capturas: dict, marc
         if col is None:
             continue
         p = int(str(col)[4:])
-        for mon, v in zip(f["MonedaOri"], f["cTCAD_Mnt_x"]):
+        for mon, v, cierre in zip(f["MonedaOri"], f["cTCAD_Mnt_x"], f["cTCAD_Mnt_y"]):
             n += 1
-            malos += not _igual(v, tc_esperado(ins, mon, p, tc_hasta))
-    res.append(f"{'OK ' if not malos and n else 'MAL'} SONR TC por contrato: {n} renglones, {malos} distintos a lo esperado")
+            tc_val = tc_esperado(ins, mon, p, tc_hasta)
+            malos += not _igual(v, tc_val)
+            esp_c = tc_esperado(ins, mon, (anio - 1) * 100 + 12, tc_hasta) if not math.isnan(tc_val) else math.nan
+            malos += not _igual(cierre, esp_c)
+    res.append(f"{'OK ' if not malos and n else 'MAL'} SONR TC por contrato: {n} renglones, {malos} TC de valuacion o de cierre "
+               "anterior distintos a lo esperado")
     return res
 
 

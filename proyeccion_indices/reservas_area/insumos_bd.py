@@ -1182,11 +1182,14 @@ class InsumosBD:
         m = (mon == MONEDA_USD) & f.isin(list(nuestros))
         df.loc[m, "cTCAD_Mnt"] = [nuestros[int(x)] for x in f[m]]
         hay = {(int(a), int(b)) for a, b in zip(f, mon) if not (math.isnan(a) or math.isnan(b))}
-        pesos = df.loc[mon == MONEDA_MXN, "cTCAD_Mnt"]
-        con_pesos = len(pesos) > 0 and bool((abs(pesos - 1.0) < 1e-9).all())
+        pesos = df.loc[(mon == MONEDA_MXN) & f.notna(), ["cTCAD_FecAMD", "cTCAD_Mnt"]].dropna()
+        if len(pesos):
+            ult_mxn = float(pesos.loc[pd.to_numeric(pesos["cTCAD_FecAMD"], errors="coerce").idxmax(), "cTCAD_Mnt"])
+            if abs(ult_mxn - 1.0) > 1e-9:
+                self.avisos.append(f"TC: el peso (cMON_Id {MONEDA_MXN}) del ultimo mes de la base vale {ult_mxn}, no 1; en los "
+                                   "meses que se agregan el peso va en 1")
         nuevos = [(p, MONEDA_USD, v) for p, v in nuestros.items() if (p, MONEDA_USD) not in hay]
-        if con_pesos:
-            nuevos += [(p, MONEDA_MXN, 1.0) for p in nuestros if (p, MONEDA_MXN) not in hay]
+        nuevos += [(p, MONEDA_MXN, 1.0) for p in nuestros if (p, MONEDA_MXN) not in hay]      # (un peso es un peso)
         if nuevos:
             df = pd.concat([df, pd.DataFrame({"cTCAD_FecAMD": [p for p, _, _ in nuevos], "cMON_Id": [c for _, c, _ in nuevos],
                                               "cTCAD_Mnt": [v for _, _, v in nuevos],
