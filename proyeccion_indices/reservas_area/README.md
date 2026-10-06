@@ -34,7 +34,8 @@ trae el dato; donde no lo trae se queda el valor del área. No se llenan huecos 
 | `IS_Cat` (RRC, 71 y 73, por mes del contrato) | `Ind Sin RRC` de TEV e Hidro de la BD en los meses que la BD trae. |
 | `LAG 1` a `LAG 10`, `Factor_Ret` (SONR) | LAG de HParametros; `Factor_Ret` = 1 − IRR / BEL del SONR de la BD. `RAMOS_FACTOR_RET_AREA` deja ramos con el del área. |
 | MR | RRC: `MONTO_PI × PORC_ND × FACTOR MR × TC`; SONR: `Prima Dev × (1 − LAG) × Factor_MR`. Un 0 de la BD es dato y un MR negativo cuenta como 0, con aviso. Donde la BD no modela el ramo (sin BEL de esa reserva), la fórmula de capital del script. El MR a TC del año anterior sigue igual al de valuación, como en el script. `MR_DESDE_BD = False` vuelve a la fórmula en todo. |
-| Contratos, cesión, FND calibrado, duración, retención, TC, escenario base, catálogos | Sin cambio. |
+| FND (RRC: `PORC_ND`; SONR: el FND con que sale la prima devengada) | Los contratos de los últimos 12 meses toman el FND de la BD de su ramo y mes de valuación (bloque `FD/FND` del RRC: PND / prima de 12 meses, la misma prima sobre la que la BD calcula su BEL); los más antiguos, el del área. El FD del SONR de la BD no se usa: es PD / prima ponderada por LAG, no una fracción por contrato. `FND_DESDE_BD = False` vuelve al FND del área. |
+| Contratos, cesión, duración, retención, TC, escenario base, catálogos | Sin cambio. |
 
 Los scripts buscan `insumos_bd.py` y la BD en `CARPETA_INDICES` (por omisión `Documents\Proyección Indices` y su
 `salidas\`); la BD se reconoce por su nombre exacto, sin las variantes `_PE12`, `_PE18` ni `ProyeccionP`. Si se carga un

@@ -11,12 +11,15 @@ RRC  - IS Bel Media-m e IS Bel 99.5%-m: de la BD (HParametros Real hasta el ulti
        los ramos de RAMOS_IS_FA, el IS de FA en los meses proyectados).
      - Ind. Gasto: el FACTOR GTO de la BD del mes que se valua (antes un valor fijo por ramo).
      - IS_Cat (71 y 73): el Ind Sin RRC de TEV e Hidro de la BD en los meses que la BD trae.
+     - FND (PORC_ND): el FND de la BD (FD/FND del RRC: PND / prima de 12 meses) del ramo y mes de valuacion en los
+       contratos de los ultimos 12 meses (FND_DESDE_BD = True); los demas contratos, el del area.
      - MR: PND del contrato x FACTOR MR de la BD x TC (MR_DESDE_BD = True; un 0 de la BD es dato y un MR negativo
        cuenta como 0); donde la BD no modela el ramo, la formula de capital. El MR TCAñoAnt sigue igual al TCVal.
 SONR - Ind Sin SONR Media y 99.5%, LAG 1 a 10 y Factor_Ret: de la BD (IS de FA en RAMOS_IS_FA en los meses
        proyectados); MR: Prima Dev x (1 - LAG) x Factor_MR de la BD; donde la BD no modela el ramo (p. ej. sin BEL de
-       IBNR), la formula del script.
-Donde la BD no trae un dato se queda el valor de la tabla del area. Catalogos, contratos, FND calibrado, cesion,
+       IBNR), la formula del script. FND: el mismo FND de la BD del RRC en los contratos de los ultimos 12 meses (la prima
+       devengada es 1 - FND); el FD del SONR de la BD (PD / prima ponderada por LAG) no es una fraccion por contrato.
+Donde la BD no trae un dato se queda el valor de la tabla del area. Catalogos, contratos, cesion,
 duracion, retencion, tipo de cambio, escenario base y rutas no cambian. Al final cada script escribe
 Parametros_usados_<reserva>.xlsx (las tablas que uso, de donde salio cada celda y los avisos) junto a su salida.
 """
@@ -27,12 +30,12 @@ import sys
 from pathlib import Path
 
 MARCA = "### INDICES BD"
-VERSION_AOD = "2026-10-06b"      # la de insumos_bd.py que piden los scripts generados
+VERSION_AOD = "2026-10-06c"      # la de insumos_bd.py que piden los scripts generados
 
 
 def _bloque_inicio(reserva: str) -> str:
-    que = ("IS (media y 99.5 %), Ind. Gasto, IS_Cat (71 y 73) y FACTOR MR" if reserva == "RRC"
-           else "IS SONR (media y 99.5 %), LAG 1 a 10, Factor_Ret y Factor_MR")
+    que = ("IS (media y 99.5 %), Ind. Gasto, IS_Cat (71 y 73), FACTOR MR y FND" if reserva == "RRC"
+           else "IS SONR (media y 99.5 %), LAG 1 a 10, Factor_Ret, Factor_MR y FND")
     extra = ("" if reserva == "RRC" else
              "RAMOS_FACTOR_RET_AREA = ()   # ramos cuyo Factor_Ret se toma del ParamSONR del area y no de la BD, p. ej. (31,)\n")
     mr = ("MR = PND del contrato x FACTOR MR de la BD" if reserva == "RRC"
@@ -43,7 +46,7 @@ def _bloque_inicio(reserva: str) -> str:
 # {que} salen de nuestra BD proyectada con
 # insumos_bd.py: HParametros (Real hasta el ultimo mes real, Proyección despues) y, en los ramos de RAMOS_IS_FA, el IS
 # de FA en los meses proyectados. Donde la BD no trae un dato se queda el de la tabla del area. Lo demas (catalogos,
-# contratos, FND, cesion, duracion, retencion, TC, escenario base y rutas) se queda como estaba.
+# contratos, cesion, duracion, retencion, TC, escenario base y rutas) se queda como estaba.
 {imports}from pathlib import Path
 CARPETA_INDICES = fr"C:\\Users\\{{usuario}}\\Documents\\Proyección Indices"   # insumos_bd.py y salidas\\ con la BD
 _AQUI = str(Path(__file__).resolve().parent) if "__file__" in globals() else os.getcwd()
@@ -57,6 +60,8 @@ if getattr(insumos_bd, "VERSION_AOD", "") < "{VERSION_AOD}":
 from insumos_bd import InsumosBD, buscar_bd
 RAMOS_IS_FA = {{"RRC": (40, 50, 80, 90), "SONR": (40, 50, 80, 90)}}   # siniestralidad de FA en los meses proyectados
 MR_DESDE_BD = True     # True: {mr} (donde la BD no modela el ramo, la formula del area); False: la formula del area
+FND_DESDE_BD = True    # True: los contratos de los ultimos 12 meses toman el FND de la BD de su ramo y mes de valuacion
+                       # (PND / prima de 12 meses, bloque FD/FND del RRC); los demas, el del area. False: el FND del area
 {extra}INS = InsumosBD(buscar_bd(None, [CARPETA_INDICES, _AQUI]), ramos_is_fa=RAMOS_IS_FA)
 '''
 
@@ -108,6 +113,11 @@ def parchar_rrc(t: str) -> str:
         t = _en_seccion(t, ini, fin, r"^([ \t]*ConsultaR\['MR\d{4}_" + col + r"'\] = ConsultaR\.apply\(lambda row: )(.*)(, axis = 1\))[ \t]*$",
                         lambda m, tc=tc: (f"{m.group(1)}row['MONTO_PI']*row['PORC_ND']*row['FACTORMR']*row['{tc}'] "
                                           f"if MR_DESDE_BD and pd.notna(row['FACTORMR']) else {m.group(2)}{m.group(3)}   {MARCA}"))
+    t = _en_seccion(t, ini, fin, r"^([ \t]*)(ConsultaR\['PORC_ND'\] = ConsultaR\['PORC_ND'\]\.fillna\(0\)[ \t]*\n)",
+                    lambda m: (m.group(1) + m.group(2) +
+                               f"{m.group(1)}if FND_DESDE_BD:                                              {MARCA}: FND de la BD\n"
+                               f"{m.group(1)}    ConsultaR['PORC_ND'] = ConsultaR.apply(lambda row: INS.fnd_contrato('RRC', row['Ramo'], "
+                               "Meses, row['CALMONTH'], row['PORC_ND']), axis = 1)\n"))
     t = _rep(t, r"^([ \t]*)(df_Real_IS_Real = ConsultaReal\(xRRC,\s*xIS_CAT,\s*mes_calculo\)\n)",
              lambda m: (f"{m.group(1)}if f'Ind. Gasto-{{mes_calculo}}' not in xRRC.columns:      {MARCA}: (si se volvio a leer\n"
                         f"{m.group(1)}    xRRC = INS.parametros_rrc_area(zAño, xRRC)                   # la celda de los CSV)\n"
@@ -132,6 +142,11 @@ def parchar_sonr(t: str) -> str:
     t = _rep(t, r"^([ \t]*Tbase_mp_\['MR'\] = Tbase_mp_\.apply\(lambda row: )(\(row\['Desviacion'\] / -BC\) \* BC2)(, axis=1\))[ \t]*$",
              lambda m: (f"{m.group(1)}(row['Prima Dev'] * row['LAG'] * row['Factor_MR']) if MR_DESDE_BD and "
                         f"pd.notna(row['Factor_MR']) else {m.group(2)}{m.group(3)}   {MARCA}"))
+    t = _rep(t, r"^([ \t]*)(ConsultaR\[f'FND_\{AÑOMES\}'\] = ConsultaR\.apply\(lambda y: zFND\(.*\n)",
+             lambda m: (m.group(1) + m.group(2) +
+                        f"{m.group(1)}if FND_DESDE_BD:                                              {MARCA}: FND de la BD\n"
+                        f"{m.group(1)}    ConsultaR[f'FND_{{AÑOMES}}'] = ConsultaR.apply(lambda y: INS.fnd_contrato('SONR', "
+                        "y['Ramo_filt'], AÑOMES, y['CALMONTH'], y[f'FND_{AÑOMES}']), axis=1)\n"))
     t = _rep(t, r"^([ \t]*)(ConsultaR = ConsultaReal\(mes_calculo, zFechaValuacion, Meses\)\n)",
              lambda m: _aviso_tc(m.group(1)) + m.group(1) + m.group(2))
     t = _rep(t, r"^(df_concatenado\.to_excel\(fileName, index=False\))\s*\Z",

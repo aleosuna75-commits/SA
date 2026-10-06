@@ -40,7 +40,7 @@ from pathlib import Path
 import openpyxl
 import pandas as pd
 
-VERSION_AOD = "2026-10-06b"      # version que piden los scripts _aod_BD.py (parchar_aod.py)
+VERSION_AOD = "2026-10-06c"      # version que piden los scripts _aod_BD.py (parchar_aod.py)
 HOJA_MONTOS = "BD_Montos_RRC_SONR"
 HOJA_IS_FA = "IS_FA"
 HOJA_DIAG_INDICADORES = "Indicadores_Ramo"
@@ -318,6 +318,9 @@ class InsumosBD:
         self.fuentes: list[dict] = []          # (tablas del area) de donde salio cada celda: BD o area
         self._ret_fuera: dict = {}             # Factor_Ret fuera de [0, 1] (IRR mayor que el BEL) por ramo
         self._mr_negativo: dict = {}           # (reserva, ramo) -> meses con MR negativo en la BD (se usa 0)
+        self._fnd: dict = {}                   # (ramo, mes) -> FND de la BD o nan (fnd_contrato)
+        self._fnd_uso: dict = {}               # (reserva, ramo, mes) -> [contratos con FND de la BD, con el del area]
+        self._fnd_fuera: dict = {}             # ramo -> meses con FND de la BD fuera de [0, 1] (se acota)
         wb = openpyxl.load_workbook(self.ruta_bd, read_only=True, data_only=True)
         try:
             self.hoja_hp = next((n for n in wb.sheetnames if norm(n).startswith("HPARAMETROS")), None)
@@ -1019,6 +1022,58 @@ class InsumosBD:
                                "salian vacias")
         return df
 
+    def fnd_bd(self, clave: int, periodo: int) -> float:
+        """FND de la BD del ramo y mes: el bloque FD/FND del RRC (PND / PRIMA de los ultimos 12 meses), acotado a [0, 1];
+        nan si la BD no modela el RRC del ramo en ese mes (sin BEL) o no trae el FND."""
+        k = (clave, periodo)
+        if k not in self._fnd:
+            v = self.bloque("FD/FND", "RRC", clave, periodo) if self._bd_modela("RRC", clave, periodo) else math.nan
+            if not math.isnan(v) and not 0 <= v <= 1:
+                self._fnd_fuera.setdefault(clave, []).append(periodo)
+                v = min(max(v, 0.0), 1.0)
+            self._fnd[k] = v
+        return self._fnd[k]
+
+    def fnd_contrato(self, reserva: str, ramo, periodo, calmonth, valor_area):
+        """FND de un contrato para los scripts del area: el FND de la BD del ramo en el mes de valuacion (fnd_bd) si el
+        contrato es de los ultimos 12 meses (CALMONTH en (periodo - 12 meses, periodo]), que es la prima sobre la que la
+        BD calcula su FND; si no, o si la BD no trae el FND del ramo, el del area (valor_area). RRC: es el PORC_ND del
+        contrato; SONR: el FND con el que el script saca la prima devengada (1 - FND)."""
+        clave = self._ramo_area(ramo)
+        try:
+            periodo, cm = int(periodo), int(float(calmonth))
+        except (TypeError, ValueError):
+            cm = None
+        usa = clave is not None and cm is not None and mes_mas(periodo, -12) < cm <= periodo
+        v = self.fnd_bd(clave, periodo) if usa else math.nan
+        uso = self._fnd_uso.setdefault((reserva, clave, periodo), [0, 0])
+        if math.isnan(v):
+            uso[1] += 1
+            return valor_area
+        uso[0] += 1
+        return v
+
+    def tabla_fnd(self) -> pd.DataFrame:
+        """Uso del FND por reserva, ramo y mes de valuacion: el FND de la BD y cuantos contratos lo tomaron."""
+        filas = [{"Reserva": r, "Ramo": c, "Mes": p, "FND de la BD": self._fnd.get((c, p), math.nan),
+                  "Contratos con FND de la BD": n_bd, "Contratos con FND del area": n_area}
+                 for (r, c, p), (n_bd, n_area) in sorted(self._fnd_uso.items(), key=lambda x: (x[0][0], x[0][1] or 0, x[0][2]))]
+        return pd.DataFrame(filas)
+
+    def _avisos_fnd(self) -> list[str]:
+        out = []
+        for reserva in sorted({r for r, _, _ in self._fnd_uso}):
+            usos = {k: v for k, v in self._fnd_uso.items() if k[0] == reserva}
+            n_bd, n_area = sum(v[0] for v in usos.values()), sum(v[1] for v in usos.values())
+            sin = sorted({c for (r, c, p), v in usos.items() if v[1] and math.isnan(self._fnd.get((c, p), math.nan))
+                          and c is not None})
+            out.append(f"FND {reserva}: {n_bd} contrato(s) con el FND de la BD de su ramo y mes; {n_area} con el del area "
+                       "(contratos de mas de 12 meses" + (f" o ramos sin FND en la BD: {sin}" if sin else "") + ")")
+        for clave, ps in sorted(self._fnd_fuera.items()):
+            ps = sorted(set(ps))
+            out.append(f"FND ramo {clave}: {len(ps)} mes(es) con FND de la BD fuera de [0, 1] ({ps[0]} a {ps[-1]}): se acota")
+        return out
+
     def exportar_tablas(self, ruta, tablas: dict):
         """Escribe en un xlsx las tablas que uso un script, la hoja Fuentes (de donde salio cada celda) y los avisos."""
         avisos = self.avisos_texto()
@@ -1033,6 +1088,8 @@ class InsumosBD:
                 df.to_excel(xw, sheet_name=str(nombre)[:31], index=False)
             if self.fuentes:
                 pd.DataFrame(self.fuentes).to_excel(xw, sheet_name="Fuentes", index=False)
+            if self._fnd_uso:
+                self.tabla_fnd().to_excel(xw, sheet_name="FND", index=False)
 
     def tc_tabla(self) -> pd.DataFrame:
         """TC USD por mes como la tabla de tipo de cambio del area: cTCAD_FecAMD (AAAAMM), cTCAD_Mnt."""
@@ -1086,7 +1143,7 @@ class InsumosBD:
         grupos: dict = {}
         for etiqueta, d, h, n in self._huecos:
             grupos.setdefault((d, h, n), []).append(etiqueta)
-        out = list(self.avisos)
+        out = list(self.avisos) + self._avisos_fnd()
         for (d, h, n), etiquetas in sorted(grupos.items()):
             rango = f"{d}" if d == h else f"{d} a {h}"
             out.append(f"{n} mes(es) sin dato ({rango}) llenados con los meses vecinos en {len(etiquetas)} serie(s): "

@@ -225,7 +225,7 @@ def verificar_rrc(ins: InsumosBD, g: dict, capturas: dict, anio: int) -> list[st
     if not g:
         return ["MAL RRC: el script no termino"]
     area_cat = {71: AREA["CAT71"], 73: AREA["CAT73"]}
-    malos, n, fa, area_usada, mr_bd, mr_formula = 0, 0, 0, 0, 0, 0
+    malos, n, fa, area_usada, mr_bd, mr_formula, fnd_bd = 0, 0, 0, 0, 0, 0, 0
     for m in range(1, 13):
         df = capturas.get(f"ConsultaPPTO_RRC_{m}_tradicional.xlsx")
         if df is None or not len(df):
@@ -249,6 +249,10 @@ def verificar_rrc(ins: InsumosBD, g: dict, capturas: dict, anio: int) -> list[st
             fm = ins._factor_crudo("MR", "RRC", ramo, p)
             esp = {"BELMEDIA": esp_media, "BEL99": v99 if not math.isnan(v99) else AREA["IS99"],
                    "BELGASTO": g_ if not math.isnan(g_) else AREA["GTO"], "FACTORMR": fm}
+            fnd = ins.fnd_bd(ramo, p) if mes_mas(p, -12) < int(r["CALMONTH"]) <= p else math.nan
+            if not math.isnan(fnd):
+                esp["PORC_ND"] = fnd
+                fnd_bd += 1
             if not math.isnan(fm):
                 esp["MR2026_TCVal"] = r["MONTO_PI"] * r["PORC_ND"] * fm * r["TC_Valuación"]
                 mr_bd += 1
@@ -265,7 +269,7 @@ def verificar_rrc(ins: InsumosBD, g: dict, capturas: dict, anio: int) -> list[st
                     res.append(f"MAL RRC {p} ramo {ramo}: no usa el IS de FA")
     res.append(f"{'OK ' if not malos else 'MAL'} RRC 12 meses: {n} contratos, {malos} indices distintos a los esperados; "
                f"IS de FA en {fa} contratos (40, 50, 80 y 90 proyectados), IS del area en {area_usada}; MR con FACTOR MR "
-               f"de la BD en {mr_bd} y con la formula de capital en {mr_formula}")
+               f"de la BD en {mr_bd} y con la formula de capital en {mr_formula}; FND de la BD en {fnd_bd} contratos")
     return res
 
 
@@ -276,6 +280,17 @@ def verificar_sonr(ins: InsumosBD, g: dict, marcos: list, texto_script: str, ani
     bc = float(re.search(r"^\s*BC = (-?[\d.]+)", cuerpo, re.M).group(1))
     bc2 = float(re.search(r"^\s*BC2 = (-?[\d.]+)", cuerpo, re.M).group(1))
     meses = [f for f in marcos if "NoLAG" in f.columns and "Factor_MR" in f.columns]
+    consultas = [f for f in marcos if "Ramo_filt" in f.columns and any(str(c).startswith("FND_") for c in f.columns)]
+    fnd_bd, fnd_mal = 0, 0
+    for f in consultas:
+        col = next(c for c in f.columns if str(c).startswith("FND_"))
+        p = int(str(col)[4:])
+        for _, r in f.iterrows():
+            if mes_mas(p, -12) < int(r["CALMONTH"]) <= p:
+                v = ins.fnd_bd(int(r["Ramo_filt"]), p)
+                if not math.isnan(v):
+                    fnd_bd += 1
+                    fnd_mal += not _igual(r[col], v)
     res = []
     if len(meses) != 12:
         res.append(f"MAL SONR: {len(meses)} meses de metodo propio (se esperaban 12)")
@@ -303,6 +318,8 @@ def verificar_sonr(ins: InsumosBD, g: dict, marcos: list, texto_script: str, ani
                 esp["MR"] = (r["Desviacion"] / -bc) * bc2
                 mr_formula += 1
             malos += sum(not _igual(r[c], x) for c, x in esp.items())
+    res.append(f"{'OK ' if not fnd_mal and len(consultas) == 12 else 'MAL'} SONR FND: {fnd_bd} contratos de los ultimos 12 meses "
+               f"con el FND de la BD en {len(consultas)} meses, {fnd_mal} distintos")
     res.append(f"{'OK ' if not malos else 'MAL'} SONR 12 meses: {n} renglones (ramo x LAG x mes), {malos} parametros "
                f"distintos a los esperados; IS de FA en {fa}, {area} celdas del area; MR con Factor_MR de la BD en "
                f"{mr_bd} y con la formula del script en {mr_formula}")
