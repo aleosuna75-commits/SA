@@ -16,6 +16,12 @@ necesario para valuar 2027 sin la base de valuacion Access (marcado con "### 202
   - Lo que falte de 2027 en los archivos del area sale de los de 2026, solo como previo: en ParamSONR el mismo mes de 2026
     (ParametrosMens no trae ano: sus columnas por mes ya son las de 2026) y, con PREVIO_CON_2026 = True, el presupuesto
     2026 con los meses de 2027 en el escenario 1 (False: sin escenario 1).
+  - RRC: la cesion de los contratos es el IRR / BEL de la BD del mes que se valua (el script hace IRR = BEL x cesion y la
+    BD IRR = BRUTO x CESION), asi BEL, IRR y NETO son los de la BD. SONR_NIVEL_BD = True: el BEL del SONR de cada ramo y mes
+    se lleva al de la BD (con un contrato por ramo y mes el metodo propio pone toda la prima en la ventana del ano en que se
+    registra); el IRR y el MR siguen al BEL.
+  - TC_DESDE_BD se queda en True (sin la base el TC solo sale de la BD). Todos los contratos van en dolares: el escenario
+    5 (TC del cierre anterior) revalua toda la cartera.
   - Las salidas llevan _2027 en el nombre (RRC_esc_2027.xlsx, SONR_esc_2027.xlsx, Parametros_usados_RRC_2027.xlsx, ...).
 """
 from __future__ import annotations
@@ -50,6 +56,9 @@ def _comunes(t: str, reserva: str) -> str:
         f"PREVIO_CON_2026 = True   {M27}: si el Escenario_base del area no trae presupuesto 2027, va el de 2026 con los\n"
         "                         # meses de 2027, solo como previo; False: el escenario 1 no se incluye. Los parametros que\n"
         "                         # falten de 2027 (ParamSONR) salen del mismo mes de los archivos de 2026, tambien como previo\n"))
+    t = _rep(t, r"^TC_DESDE_BD = True[^\n]*\n[ \t]*#[^\n]*\n", lambda m: (
+        f"TC_DESDE_BD = True     {M27}: sin la base Access el TC MXN / USD solo sale de la BD (TC_Real_Esti: M en 2027,\n"
+        "                       # J en diciembre 2026) y el peso en 1; en esta version se queda en True\n"))
     t = _rep(t, r"^import pyodbc[ \t]*\n", f"try:                                   {M27}: no se usa (sin la base Access)\n"
                                             "    import pyodbc\nexcept ImportError:\n    pyodbc = None\n")
     # diccionario mes - k -> AAAAMM armado con el ano que se valua
@@ -94,6 +103,10 @@ def parchar_rrc_2027(t: str) -> str:
                         m.group(2).rstrip("\n"), m.group(2).rstrip("\n") + f"   {M27}: el ramo ya viene"))
     t = _en_seccion(t, ini, fin, r"^([ \t]*)(ConsultaR = ConsultaR\.drop\('SR', axis=1\)[ \t]*\n)",
                     lambda m: f"{m.group(1)}# {m.group(2)}")
+    # sin pais ni region, la linea de negocio no es dato: no se reparte
+    t = _en_seccion(t, ini, fin, r"^([ \t]*)(ConsultaR\['LN2'\] = ConsultaR\.apply\(lambda y: zLN\([^\n]*\n)",
+                    lambda m: f"{m.group(1)}{m.group(2)}{m.group(1)}ConsultaR['LN2'] = 'Sin LN (prima de la BD por ramo)'"
+                              f"   {M27}: sin pais ni region\n")
     t = _en_seccion(t, ini, fin, r"^([ \t]*)(ConsultaR\['Ramo'\] = ConsultaR\['Ramo'\]\.apply\(lambda x: xNoRamo\[x\]\)[ \t]*\n)",
                     lambda m: f"{m.group(1)}# {m.group(2)}")
     return t
@@ -102,6 +115,15 @@ def parchar_rrc_2027(t: str) -> str:
 def parchar_sonr_2027(t: str) -> str:
     t = parchar_sonr(t)
     t = _comunes(t, "SONR")
+    t = _rep(t, r"^([ \t]*# falten de 2027 \(ParamSONR\)[^\n]*\n)", lambda m: m.group(1) + (
+        f"SONR_NIVEL_BD = True     {M27}: el BEL de cada ramo y mes es el de la BD (FD SONR x PEACUMULADA x IS): con un\n"
+        "                         # contrato por ramo y mes toda la prima cae en la ventana del ano en que se registra y el\n"
+        "                         # metodo da un BEL mas alto; el IRR y el MR siguen al BEL. False: el metodo tal cual\n"))
+    t = _en_seccion(t, "def Metodo_propio():", "#%% FUNCIÓN MÉTODO PROPIO REFORECAST",
+                    r"^([ \t]*)(Tbase_mp_\['Prima Dev'\] = Tbase_mp_\.apply\(calcular_tbase_mp, args=\(ConsultaR,\), axis=1\)[ \t]*\n)",
+                    lambda m: (f"{m.group(1)}{m.group(2)}{m.group(1)}if SONR_NIVEL_BD:                                         "
+                               f"{M27}: BEL del mes = el de la BD\n"
+                               f"{m.group(1)}    Tbase_mp_['Prima Dev'] = INS.nivel_sonr_bd(Tbase_mp_, Meses, TC_USD)\n"))
     t = _rep(t, r"^zAñoPpto = 2026[ \t]*$", f"zAñoPpto = {ANIO}                               {M27}")
     t = _rep(t, r"^zAño= 2026[ \t]*$", f"zAño= {ANIO}                                    {M27}")
     t = _en_seccion(t, "def ConsultaMoneda():", "ConsultaTC = ConsultaMoneda()", r"^([ \t]+)(zAño = 2026[ \t]*\n)",

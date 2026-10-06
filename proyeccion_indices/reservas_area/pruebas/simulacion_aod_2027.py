@@ -2,7 +2,7 @@
 """Corre ReforecastRRC_aod_2027.py y ReforecastSONR_aod_2027.py (salida de parchar_aod_2027.py) y comprueba que valuan
 2027 sin la base de valuacion: cualquier consulta SQL hace fallar la prueba. Revisa, mes por mes y ramo por ramo, que los
 contratos son la prima de la BD (hoja PE_RAMO), que la PND del RRC es nuestro FND por esa prima, los indices, el MR, el
-tipo de cambio de la BD y que las salidas lleven _2027.
+tipo de cambio de la BD, que el escenario 2 de RRC y SONR da los montos de la BD y que las salidas lleven _2027.
 
 Uso: python simulacion_aod_2027.py <carpeta con los *_aod_2027.py> ["<BD proyectada>"] [carpeta de trabajo]
 Las tablas del area son inventadas (las de simulacion_aod.py). Los montos que salen NO son reservas.
@@ -120,6 +120,34 @@ def verificar_2027(ins: InsumosBD, capturas: dict, marcos_sonr: list, salida: Pa
             cruce["Monto_USD_area"], cruce["Monto_USD_sal"]) if pd.notna(a) and pd.notna(b)))
         res.append(f"{'OK ' if len(b1) and not malos else 'MAL'} {nombre}: escenario 1 = presupuesto {anio - 1} con los meses de "
                    f"{anio} (previo): {len(e1)} renglones de {len(b1)}, {malos} distintos")
+    # escenario 2 contra los montos de la BD, por tipo de monto, ramo y mes (RRC: cesion = IRR / BEL de la BD; SONR: con
+    # SONR_NIVEL_BD, el BEL de la BD); los ramos que la BD no modela en el mes quedan con el metodo del area. En el RRC del
+    # area BEL, BELG, IRR y MR van con signo negativo y BRUTO y NETO positivos
+    conceptos = {"RRC": {"BEL": ("BEL", -1), "BELG": ("GTO", -1), "IRR": ("IRR", -1), "MR": ("MR", -1),
+                         "BRUTO": ("BRUTO", 1), "NETO": ("NETO", 1)},
+                 "SONR": {"BEL": ("BEL", 1), "IRR": ("IRR", 1), "MR": ("MR", 1), "BRUTO": ("BRUTO", 1), "NETO": ("NETO", 1)}}
+    for reserva, mapa in conceptos.items():
+        nombre = f"{reserva}_esc_{anio}.xlsx"
+        if not (salida / nombre).exists():
+            continue
+        out = pd.read_excel(salida / nombre)
+        e2 = out[out["Escenario"] == 2].groupby(["Tipo de Monto", "Ramo", "Periodo"])["Monto_USD"].sum()
+        malos, n, fuera = {}, 0, set()
+        for (tipo, ramo, per), monto in e2.items():
+            if tipo not in mapa:
+                continue
+            if not ins._bd_modela(reserva, int(ramo), int(per)):
+                fuera.add(int(ramo))
+                continue
+            n += 1
+            esp = mapa[tipo][1] * ins.monto(f"{reserva} {mapa[tipo][0]}", int(per), int(ramo))
+            if not abs(float(monto) - esp) <= 1e-6 * (1 + abs(esp)):
+                malos.setdefault(tipo, set()).add(int(ramo))
+        n_malos = sum(1 for (tipo, ramo, per), monto in e2.items() if tipo in malos and int(ramo) in malos[tipo])
+        res.append(f"{'OK ' if n and not malos else 'MAL'} {nombre}: escenario 2 igual a los montos de la BD en "
+                   f"{n - n_malos if malos else n} de {n} (tipo x ramo x mes)"
+                   + (f"; distintos: {', '.join(f'{k} {sorted(v)}' for k, v in sorted(malos.items()))}" if malos else "")
+                   + (f"; ramos sin BEL en la BD, con el metodo del area: {sorted(fuera)}" if fuera else ""))
     # ParamSONR: lo que falta del ano sale del mismo mes del ano anterior de la tabla del area
     prueba = InsumosBD.__new__(InsumosBD)
     prueba.__dict__.update(ins.__dict__)

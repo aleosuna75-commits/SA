@@ -33,7 +33,7 @@ import sys
 from pathlib import Path
 
 MARCA = "### INDICES BD"
-VERSION_AOD = "2026-10-06g"      # la de insumos_bd.py que piden los scripts generados
+VERSION_AOD = "2026-10-06h"      # la de insumos_bd.py que piden los scripts generados
 
 
 def _bloque_inicio(reserva: str) -> str:

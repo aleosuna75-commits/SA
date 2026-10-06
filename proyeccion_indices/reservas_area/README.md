@@ -61,15 +61,19 @@ python parchar_aod_2027.py ReforecastRRC_aod.py ReforecastSONR_aod.py
 | Qué | En 2027 |
 |---|---|
 | Año | `zAño = 2027`; el diccionario de meses (`xAños`), la fecha de valuación del RRC y la consulta de monedas del SONR ya no traen 2026 fijo; las columnas `BELRIESGO2027`, `MR2027`, ... |
-| Contratos | Sin SQL: un "contrato" por ramo y mes con la prima tomada de la BD (hoja `PE_RAMO`, USD: real de PExRamo hasta el último mes real y FCST después), proporcional, de 12 meses de vigencia, en dólares, con la cesión del bloque `CESION` del RRC de su mes. En el IBNR, la historia de prima desde 2019 (los años de LAG anteriores van sin prima, con aviso). El resto del método del área no cambia: FND por antigüedad escalado a nuestro FND, IS, LAG, MR y escenarios; así la PND del RRC de cada ramo y mes es nuestro FND por nuestra prima de 12 meses. |
-| Tipo de cambio | El de la BD (M en 2027, J en 2026); el peso en 1. |
+| Contratos | Sin SQL: un "contrato" por ramo y mes con la prima tomada de la BD (hoja `PE_RAMO`, USD: real de PExRamo hasta el último mes real y FCST después), proporcional, de 12 meses de vigencia y en dólares. En el IBNR, la historia de prima desde 2019 (los años de LAG anteriores van sin prima, con aviso). El resto del método del área no cambia: FND por antigüedad escalado a nuestro FND, IS, LAG, MR y escenarios; así la PND del RRC de cada ramo y mes es nuestro FND por nuestra prima de 12 meses. Sin la base no se sabe la moneda de cada contrato: todo va en dólares y el escenario 5 (TC del cierre anterior) revalúa toda la cartera, así que su efecto cambiario no se compara con el de 2026. |
+| Cesión del RRC | La cesión de los contratos es el IRR / BEL del RRC de la BD del mes que se valúa: el script calcula IRR = BEL × cesión y la BD IRR = BRUTO × CESION (IRR / BRUTO), así que con el bloque `CESION` el IRR salía 5 a 26 % abajo. Con IRR / BEL, BEL, GTO, MR, BRUTO, IRR y NETO del escenario 2 son los de la BD. |
+| Nivel del SONR | `SONR_NIVEL_BD = True`: la Prima Dev del método propio se escala por ramo y mes para que el BEL sea el de la BD (FD SONR × PEACUMULADA × IS); el IRR y el MR siguen al BEL. Con un contrato por ramo y mes toda la prima cae en la ventana del año en que se registra y no en la de su año de suscripción, y el método daba en total 1.8 veces el BEL de la BD (0.4 a 4.5 según el ramo), con un salto de diciembre 2026, que sale de la BD, a enero 2027. Un ramo que la BD no modela en el mes, hoy el 80 en la copia de la BD sin `Res_Rvas`, queda con el método tal cual, con aviso. `False`: el método tal cual en todos los ramos. |
+| Tipo de cambio | El de la BD (M en 2027, J en 2026); el peso en 1. `TC_DESDE_BD` se queda en `True`: sin la base no hay otro tipo de cambio. |
 | Escenarios 0 y 1 | Del `Escenario_base` del área, diciembre 2026 y el presupuesto 2027 si los trae; si no trae diciembre 2026, sale de los montos de la BD (proyectados). Si no trae el presupuesto 2027 y `PREVIO_CON_2026 = True`, va el presupuesto 2026 con los meses de 2027, solo como previo y con aviso (`False`: sin escenario 1). Los renglones de otros años se quitan. |
 | Parámetros del área | Lo que la BD no tiene y los archivos del área no traen para 2027 sale de los de 2026, solo como previo: el mismo mes de 2026 en `ParamSONR` (con aviso) y en `ParametrosMens`, que no trae año. |
 | Salidas | Con `_2027`: `RRC_esc_2027.xlsx`, `SONR_esc_2027.xlsx`, `Parametros_usados_RRC_2027.xlsx`, `Parametros_usados_SONR_2027.xlsx`, `TablaTCRRC_2027.xlsx`, `TablaTCSONR_2027.xlsx`, `ConsultaPPTO_RRC_<mes>_tradicional_2027.xlsx`, `auxSONR_sum_2027.xlsx`. |
 
 `pruebas/simulacion_aod_2027.py <carpeta con los _2027.py> ["<BD>"]` los corre con una base Access que falla si se le
 consulta y revisa mes por mes que la prima de los contratos es la de la BD, que la PND del RRC es nuestro FND por esa
-prima, los índices, el MR, el tipo de cambio, los nombres de las salidas y el previo con 2026 (escenario 1 y `ParamSONR`).
+prima, los índices, el MR, el tipo de cambio, que el escenario 2 de RRC y SONR da los montos de la BD por tipo de monto, ramo y
+mes, los nombres de las salidas y el previo con 2026 (escenario 1 y `ParamSONR`). Si la BD no trae la hoja `PE_RAMO`, los
+scripts de 2027 se detienen con un mensaje: hay que volver a generar la BD.
 
 ## De dónde sale cada insumo
 

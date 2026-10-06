@@ -41,7 +41,7 @@ import numpy as np
 import openpyxl
 import pandas as pd
 
-VERSION_AOD = "2026-10-06g"      # version que piden los scripts _aod_BD.py (parchar_aod.py)
+VERSION_AOD = "2026-10-06h"      # version que piden los scripts _aod_BD.py (parchar_aod.py)
 HOJA_MONTOS = "BD_Montos_RRC_SONR"
 TC_BD_DESDE = 202601             # desde este mes el TC MXN / USD de los scripts _aod sale de la columna TC de la BD
                                  # (TC_Real_Esti.xlsx: FCST, columna J, en 2026; FCST 2027, columna M, en 2027)
@@ -330,6 +330,8 @@ class InsumosBD:
         self._fnd_detalle: dict = {}           # (reserva, ramo, mes) -> FND del area, resultante, factor y prima / PRIMA N AÑOS
         self._fnd_incompleto: dict = {}        # reserva -> {mes: ultimo CALMONTH de la base} (sin prima del mes)
         self._pe_faltan: set = set()           # meses pedidos a la hoja PE_RAMO que no trae (contratos de 2027)
+        self._sonr_nivel: dict = {}            # (ramo, mes) -> BEL del metodo sobre los contratos de la BD / BEL de la BD
+        self._sonr_sin_nivel: dict = {}        # ramo -> meses en que el SONR queda con el metodo tal cual (y por que)
         wb = openpyxl.load_workbook(self.ruta_bd, read_only=True, data_only=True)
         try:
             self.hoja_hp = next((n for n in wb.sheetnames if norm(n).startswith("HPARAMETROS")), None)
@@ -1272,6 +1274,9 @@ class InsumosBD:
     def _contratos_bd(self, meses: list[int], ramos) -> list[dict]:
         """Un "contrato" por ramo y mes con la prima tomada de la BD (hoja PE_RAMO, USD): lo que los scripts de 2027 valuan en
         lugar de los contratos de la base. Se avisa si faltan meses de prima."""
+        if not self.pe:
+            raise SystemExit(f"La BD {self.ruta_bd.name} no trae la hoja {HOJA_PE} (prima por ramo y mes): sin ella no hay "
+                             "contratos para 2027. Vuelve a generar la BD con proyeccion_reservas.py")
         out, sin = [], []
         for p in meses:
             hay = False
@@ -1291,15 +1296,15 @@ class InsumosBD:
     def contratos_rrc_bd(self, desde_excl, hasta) -> pd.DataFrame:
         """Contratos del RRC armados con la prima de la BD para CALMONTH en (desde_excl, hasta], con las columnas que deja la
         consulta de la base y el ramo ya como clave del script: prima tomada negativa (convencion de la base), en dolares
-        (MonedaOri 31), proporcional (TipoRea 1, frecuencia 1), vigencia de 12 meses desde el mes y la cesion del bloque
-        CESION del RRC de la BD del mes (PrimaCedidaOri = CESION x prima, asi el script calcula esa cesion)."""
+        (MonedaOri 31), proporcional (TipoRea 1, frecuencia 1), vigencia de 12 meses desde el mes y la cesion de
+        cesion_rrc_bd del mes que se valua (PrimaCedidaOri = cesion x prima, asi el script calcula esa cesion)."""
         meses = rango_meses(mes_mas(int(desde_excl), 1), int(hasta))
         filas = []
+        ces_ramo = {c: self.cesion_rrc_bd(c, int(hasta)) for c in RAMOS_SCRIPT}
         for d in self._contratos_bd(meses, RAMOS_SCRIPT):
             clave, p, pe = d["clave"], d["p"], d["pe"]
             tc = self.tc_de(p)
-            ces = self.bloque("CESION", "RRC", clave, p)
-            ces = 0.0 if math.isnan(ces) else ces
+            ces = ces_ramo[clave]
             ini = pd.Timestamp(year=p // 100, month=p % 100, day=1)
             filas.append({"SRamo": clave, "Pais": math.nan, "TipoRea": 1, "OfiRepPt": 1, "MonedaOri": MONEDA_USD,
                           "CorrTom": 0, "CiaTom": 0, "CtoTom": 0, "Susc": p // 100, "Período": 1, "CALMONTH": p,
@@ -1313,6 +1318,46 @@ class InsumosBD:
         df = pd.DataFrame(filas, columns=cols)
         df["Pais"] = df["Pais"].astype(float)
         return df
+
+    def cesion_rrc_bd(self, clave: int, periodo: int) -> float:
+        """Cesion de los contratos de la BD en el RRC: IRR / BEL de la BD del ramo en el mes que se valua. El script calcula
+        IRR = BEL x cesion y la BD IRR = BRUTO x CESION (IRR / BRUTO), asi el IRR del script es el de la BD; si la BD no
+        trae BEL del RRC en el mes, el bloque CESION."""
+        if self._bd_modela("RRC", clave, periodo):
+            irr = self.monto("RRC IRR", periodo, clave)
+            if not math.isnan(irr):
+                return irr / self.monto("RRC BEL", periodo, clave)
+        v = self.bloque("CESION", "RRC", clave, periodo)
+        return 0.0 if math.isnan(v) else v
+
+    def nivel_sonr_bd(self, tabla: pd.DataFrame, periodo: int, tc_usd: pd.DataFrame) -> pd.Series:
+        """Prima Dev del metodo propio del SONR escalada por ramo para que el BEL del mes sea el de la BD (FD SONR x
+        PEACUMULADA x IS). Con un contrato por ramo y mes toda la prima cae en la ventana del ano en que se registra (Susc =
+        ano del mes) y no en la de su ano de suscripcion, y el metodo da un BEL mas alto que el de la BD; el IRR (Factor_Ret)
+        y el MR (Factor_MR o formula) salen de esa Prima Dev, igual que en el script. tabla: Tbase del mes con 'Ramo',
+        'Prima Dev', 'LAG' (1 - LAG k) e 'Ind Sin SONR Media'; tc_usd: la tabla TC_USD del script (el BEL en pesos se pasa
+        a dolares con ella). Los ramos que la BD no modela en el mes (sin BEL) quedan con el metodo tal cual, con aviso."""
+        dev = pd.to_numeric(tabla["Prima Dev"], errors="coerce").astype(float)
+        bel = dev * pd.to_numeric(tabla["LAG"], errors="coerce") * pd.to_numeric(tabla["Ind Sin SONR Media"], errors="coerce")
+        fila_tc = tc_usd.loc[pd.to_numeric(tc_usd["cTCAD_FecAMD"], errors="coerce") == int(periodo), "cTCAD_Mnt"]
+        tc = _num(fila_tc.iloc[-1]) if len(fila_tc) else math.nan
+        out = dev.copy()
+        for ramo, idx in tabla.groupby("Ramo").groups.items():
+            clave = int(_num(ramo))
+            actual = float(bel.loc[idx].sum(skipna=True)) / tc if math.isfinite(tc) and tc else math.nan
+            if not self._bd_modela("SONR", clave, periodo):
+                self._sonr_sin_nivel.setdefault((clave, "la BD no trae BEL de SONR"), []).append(periodo)
+                continue
+            if not math.isfinite(tc) or not tc:
+                self._sonr_sin_nivel.setdefault((clave, "el script no trae tipo de cambio del mes"), []).append(periodo)
+                continue
+            if not math.isfinite(actual) or abs(actual) < UMBRAL_CERO:
+                self._sonr_sin_nivel.setdefault((clave, "el metodo no tiene prima ese mes"), []).append(periodo)
+                continue
+            meta = self.monto("SONR BEL", periodo, clave)
+            out.loc[idx] = dev.loc[idx] * (meta / actual)
+            self._sonr_nivel[(clave, periodo)] = actual / meta
+        return out
 
     def contratos_sonr_bd(self, desde, hasta) -> pd.DataFrame:
         """Contratos del SONR armados con la prima de la BD para CALMONTH en [desde, hasta], con las columnas de la consulta
@@ -1434,6 +1479,14 @@ class InsumosBD:
         for etiqueta, d, h, n in self._huecos:
             grupos.setdefault((d, h, n), []).append(etiqueta)
         out = list(self.avisos) + self._avisos_fnd()
+        if self._sonr_nivel:
+            r = sorted(self._sonr_nivel.values())
+            out.append(f"SONR: BEL del metodo propio llevado al de la BD en {len(r)} ramo(s) x mes (SONR_NIVEL_BD): con un "
+                       f"contrato por ramo y mes el metodo daba entre {r[0]:.2f} y {r[-1]:.2f} veces el BEL de la BD (mediana "
+                       f"{r[len(r) // 2]:.2f}); el IRR y el MR siguen al BEL")
+        for (clave, motivo), ps in sorted(self._sonr_sin_nivel.items()):
+            out.append(f"SONR ramo {clave}: {len(ps)} mes(es) ({min(ps)} a {max(ps)}) con el metodo propio tal cual sobre la "
+                       f"prima de la BD, sin llevarlo al BEL de la BD: {motivo}")
         if self._pe_faltan:
             f = sorted(self._pe_faltan)
             out.append(f"Prima de la BD: {len(f)} mes(es) sin PE en la hoja {HOJA_PE} ({f[0]} a {f[-1]}): esos meses no tienen "
