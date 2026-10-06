@@ -14,6 +14,37 @@ código con `### INSUMOS BD`.
 | `config_local.ejemplo.py` | Plantilla de la configuración local. Cópiala como `config_local.py` y pon tus rutas y parámetros. `config_local.py` no se versiona: lleva rutas internas y los parámetros de capital del margen de riesgo. |
 | `pruebas/simulacion_sin_access.py` | Corre los dos scripts sin la base Access ni los archivos del área, con contratos y catálogos inventados, y comprueba que los índices que usan son los de la BD. Sirve para probar el código en cualquier equipo; sus montos no son reservas. |
 
+## Scripts `_aod` del área: cambio mínimo para leer nuestros índices
+
+`parchar_aod.py` toma `ReforecastRRC_aod.py` y `ReforecastSONR_aod.py` tal como los usa el área y escribe
+`ReforecastRRC_aod_BD.py` y `ReforecastSONR_aod_BD.py` con lo mínimo cambiado (cada cambio marcado con `### INDICES BD`;
+se respetan rutas, fin de línea y todo lo demás):
+
+```
+python parchar_aod.py ReforecastRRC_aod.py ReforecastSONR_aod.py
+```
+
+Regla: se parte de la tabla del área (sus renglones y columnas) y cada celda se cambia por la nuestra solo donde la BD
+trae el dato; donde no lo trae se queda el valor del área. No se llenan huecos con meses vecinos.
+
+| Insumo | Ahora |
+|---|---|
+| IS media y 99.5 % (RRC: `IS Bel Media-m`, `IS Bel 99.5%-m`; SONR: `Ind Sin SONR Media`, `Ind Sin SONR 99.5%`) | HParametros de la BD (`Real` hasta el último mes real, `Proyección` después). En 40, 50, 80 y 90, en RRC y en IBNR, el IS de FA (hoja `IS_FA`) en los meses proyectados. |
+| `Ind. Gasto` (RRC) | `FACTOR GTO` de la BD del mes que se valúa (el área trae un solo valor por ramo). |
+| `IS_Cat` (RRC, 71 y 73, por mes del contrato) | `Ind Sin RRC` de TEV e Hidro de la BD en los meses que la BD trae. |
+| `LAG 1` a `LAG 10`, `Factor_Ret` (SONR) | LAG de HParametros; `Factor_Ret` = 1 − IRR / BEL del SONR de la BD. `RAMOS_FACTOR_RET_AREA` deja ramos con el del área. |
+| MR | RRC: `MONTO_PI × PORC_ND × FACTOR MR × TC`; SONR: `Prima Dev × (1 − LAG) × Factor_MR`. Donde la BD no trae factor (o es 0 o negativo), la fórmula de capital del script. `MR_DESDE_BD = False` vuelve a la fórmula en todo. |
+| Contratos, cesión, FND calibrado, duración, retención, TC, escenario base, catálogos | Sin cambio. |
+
+Los scripts buscan `insumos_bd.py` y la BD en `CARPETA_INDICES` (por omisión `Documents\Proyección Indices` y su
+`salidas\`); la BD se reconoce por su nombre exacto, sin las variantes `_PE12`, `_PE18` ni `ProyeccionP`. Si se carga un
+`insumos_bd.py` anterior se detienen con el aviso. Al final escriben `Parametros_usados_<reserva>.xlsx` junto a su
+salida: las tablas que usaron, la hoja `Fuentes` (de dónde salió cada celda) y los avisos. Si la base Access no trae
+tipo de cambio de un mes que se valúa, lo avisan (ese mes sale vacío, como antes).
+
+`pruebas/simulacion_aod.py <carpeta con los _BD.py> ["<BD>"]` los corre sin Access, con tablas del área inventadas, y
+compara contrato por contrato y mes por mes los índices y el MR contra los esperados.
+
 ## De dónde sale cada insumo
 
 | Insumo del script | Antes | Ahora (`insumos_bd.py`) |

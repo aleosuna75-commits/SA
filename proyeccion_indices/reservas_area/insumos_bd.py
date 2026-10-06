@@ -117,12 +117,18 @@ def _sin_acentos(t: str) -> str:
     return "".join(c for c in unicodedata.normalize("NFKD", str(t)) if not unicodedata.combining(c)).upper()
 
 
+NOMBRE_BD = "BD_ BEL - IRR - MR_Proyeccion.xlsx"
+
+
 def es_nombre_bd(nombre: str) -> bool:
-    """True si el archivo se llama como la BD proyectada (BD_ BEL - IRR - MR_Proyeccion.xlsx, con o sin acento ni
-    sufijos como "(1)"); no el BD_ RFV ni el archivo temporal ~$ que Excel deja mientras esta abierto."""
-    n = _sin_acentos(nombre)
-    return (n.startswith("BD") and n.endswith(".XLSX") and not n.startswith("~$")
-            and all(t in n for t in ("BEL", "IRR", "MR", "PROYECC")))
+    """True si el archivo es la BD proyectada: BD_ BEL - IRR - MR_Proyeccion.xlsx, sin importar acentos, mayusculas ni
+    una marca de copia como " (1)" o " - copia". No cuenta las variantes de escenario (_PE12, _PE18, ProyeccionP), el
+    BD_ RFV ni el archivo temporal ~$ que Excel deja mientras esta abierto."""
+    n = re.sub(r"\s+", " ", _sin_acentos(nombre).strip())
+    if n.startswith("~$") or not n.endswith(".XLSX"):
+        return False
+    base = re.sub(r"( ?\(\d+\)| - COPIA( ?\(\d+\))?)$", "", n[:-5].strip())
+    return base == re.sub(r"\s+", " ", _sin_acentos(NOMBRE_BD[:-5]))
 
 
 def buscar_bd(ruta=None, carpetas=()) -> Path:
@@ -176,6 +182,17 @@ def importar_o_instalar(modulo: str, nombre_pip: str | None = None):
         return importlib.import_module(modulo)
     except ImportError:
         return None
+
+
+def _tabla_area(x, nombre: str):
+    """(DataFrame, nombre) de una tabla del area dada ya leida (DataFrame) o como ruta de su CSV; (None, nombre) si no
+    hay o la ruta no existe."""
+    if x is None:
+        return None, nombre
+    if isinstance(x, pd.DataFrame):
+        return x, nombre
+    ruta = Path(str(x))
+    return (pd.read_csv(ruta), ruta.name) if ruta.is_file() else (None, ruta.name)
 
 
 DRIVER_ACCESS = "Microsoft Access Driver (*.mdb, *.accdb)"
@@ -270,6 +287,8 @@ class InsumosBD:
         self._huecos: list[tuple] = []          # (etiqueta, desde, hasta, n) de los meses llenados con los vecinos
         self._series: dict = {}
         self._diag: dict | None = None
+        self.fuentes: list[dict] = []          # (tablas del area) de donde salio cada celda: BD o area
+        self._ret_fuera: dict = {}             # Factor_Ret fuera de [0, 1] (IRR mayor que el BEL) por ramo
         wb = openpyxl.load_workbook(self.ruta_bd, read_only=True, data_only=True)
         try:
             self.hoja_hp = next((n for n in wb.sheetnames if norm(n).startswith("HPARAMETROS")), None)
@@ -722,6 +741,223 @@ class InsumosBD:
                               **lags, "Fuente IS": self.fuente_indice("SONR", clave, p)})
         return pd.DataFrame(filas)
 
+    # ------------------------------------------------------------------ tablas del area con nuestros indices
+    # Toman la tabla del area tal cual viene (sus renglones y columnas) y cambian cada celda por la nuestra solo donde
+    # la BD trae el dato; donde no lo trae se queda el valor del area. No se llenan huecos con meses vecinos.
+    def _hp_crudo(self, param: str, clave: int, periodo: int) -> float:
+        return _num(self.hp.get((self._tipo_de(periodo), periodo, clave), {}).get(param, math.nan))
+
+    def _is_crudo(self, reserva: str, clave: int, periodo: int, cual: str = "media"):
+        """(valor, fuente) del IS sin llenar huecos: el IS (FA) en RAMOS_IS_FA en los meses proyectados, si no el de
+        HParametros (Real hasta el ultimo mes real, Proyección despues); nan si la BD no lo trae."""
+        if self.usar_is_fa and periodo > self.ultimo_real and clave in self.ramos_is_fa.get(reserva, ()):
+            fa = self.is_fa.get((reserva, clave, periodo))
+            if fa and not math.isnan(fa.get(cual, math.nan)):
+                return fa[cual], "IS (FA)"
+        base = ("IS_RRC" if reserva == "RRC" else "IS_SONR") + ("" if cual == "media" else "_99")
+        return self._hp_crudo(base, clave, periodo), "BD " + self._tipo_de(periodo).capitalize()
+
+    def _bd_modela(self, reserva: str, clave: int, periodo: int) -> bool:
+        """True si la hoja de montos trae BEL de la reserva en el ramo y mes; si no, sus factores no son dato."""
+        try:
+            v = self.monto(f"{reserva} BEL", periodo, clave)
+        except ValueError:
+            return False
+        return not math.isnan(v) and abs(v) >= UMBRAL_CERO
+
+    def _factor_crudo(self, tipo: str, reserva: str, clave: int, periodo: int) -> float:
+        """GTO (GTO / PND), MR (MR / PND o PD, mayor que 0) o RET (1 - IRR / BEL del SONR, acotado a [0, 1]) del ramo y
+        mes, sin llenar huecos; nan si la BD no modela la reserva en ese ramo y mes."""
+        if not self._bd_modela(reserva, clave, periodo):
+            return math.nan
+        if tipo == "GTO":
+            v = self.factor_gasto(clave, periodo)
+        elif tipo == "MR":
+            v = self._factor_mr_crudo(reserva, clave, periodo)
+            v = v if not math.isnan(v) and v > 0 else math.nan
+        else:
+            v = self._factor_ret_crudo(clave, periodo)
+            if not math.isnan(v) and not 0 <= v <= 1:
+                self._ret_fuera.setdefault(clave, []).append(periodo)
+                v = min(max(v, 0.0), 1.0)
+        return v
+
+    def _anotar(self, tabla: str, clave, periodo, columna: str, valor, fuente: str, cuenta: dict, sin: dict):
+        self.fuentes.append({"Tabla": tabla, "Ramo": clave, "Mes": periodo, "Columna": columna,
+                             "Valor": valor, "Fuente": fuente})
+        cuenta[fuente] = cuenta.get(fuente, 0) + 1
+        if fuente.startswith("Area"):
+            sin.setdefault((clave, columna.split("-")[0].strip()), set()).add(periodo)
+
+    def _aviso_tabla(self, tabla: str, cuenta: dict, sin: dict, nota_mr: str = ""):
+        """Un aviso con el conteo de celdas por fuente y uno por ramo y meses con lo que se quedo del area."""
+        total = sum(cuenta.values())
+        partes = ", ".join(f"{n} {f}" for f, n in sorted(cuenta.items(), key=lambda x: -x[1]))
+        self.avisos.append(f"{tabla}: {total} celdas; {partes}")
+        grupos: dict = {}
+        for (clave, col), meses in sin.items():
+            grupos.setdefault((clave, tuple(sorted(meses))), []).append(col)
+        for (clave, meses), cols in sorted(grupos.items(), key=lambda x: (x[0][0] or 0, x[0][1])):
+            rango = f"{meses[0]}" if len(meses) == 1 else f"{meses[0]} a {meses[-1]}"
+            nota = nota_mr if any(c.upper().startswith(("FACTOR MR", "FACTOR_MR")) for c in cols) else ""
+            self.avisos.append(f"{tabla}: ramo {clave}, {len(meses)} mes(es) ({rango}): {', '.join(cols)} del area "
+                               f"(la BD no lo trae){nota}")
+
+    @staticmethod
+    def _ramo_area(v) -> int | None:
+        try:
+            return int(float(v))
+        except (TypeError, ValueError):
+            return None
+
+    def parametros_rrc_area(self, anio: int, area) -> pd.DataFrame:
+        """ParametrosMens del area (DataFrame o ruta) con nuestros indices donde la BD los trae, m = 1..12 del ano:
+        IS Bel Media-m e IS Bel 99.5%-m (IS de FA en RAMOS_IS_FA en los meses proyectados), Ind. Gasto-m (FACTOR GTO;
+        si no, el Ind. Gasto del area) y FACTOR MR-m (MR / PND; si no, vacio y el script usa su formula de capital).
+        Duracion, retencion y demas columnas quedan como vienen."""
+        df, nombre = _tabla_area(area, "ParametrosMens del area")
+        if df is None:
+            raise FileNotFoundError(f"No se pudo leer {nombre}")
+        df = df.copy()
+        for m in range(1, 13):
+            for c in (f"IS Bel Media-{m}", f"IS Bel 99.5%-{m}", f"Ind. Gasto-{m}", f"FACTOR MR-{m}"):
+                if c not in df.columns:
+                    df[c] = math.nan
+                df[c] = pd.to_numeric(df[c], errors="coerce").astype(float)
+        cuenta, sin, tabla = {}, {}, f"ParametrosMens RRC {anio}"
+        for i, v in df["Ramo"].items():
+            clave = self._ramo_area(v)
+            for m in range(1, 13):
+                p = anio * 100 + m
+                for col, cual in ((f"IS Bel Media-{m}", "media"), (f"IS Bel 99.5%-{m}", "99.5")):
+                    x, fuente = self._is_crudo("RRC", clave, p, cual) if clave else (math.nan, "")
+                    if math.isnan(x):
+                        x, fuente = df.at[i, col], "Area (la BD no lo trae)"
+                    df.at[i, col] = x
+                    self._anotar(tabla, clave, p, col, x, fuente, cuenta, sin)
+                g = self._factor_crudo("GTO", "RRC", clave, p) if clave else math.nan
+                fuente = "BD FACTOR GTO"
+                if math.isnan(g):
+                    g = _num(df.at[i, "Ind. Gasto"]) if "Ind. Gasto" in df.columns else math.nan
+                    fuente = "Area (la BD no lo trae)"
+                df.at[i, f"Ind. Gasto-{m}"] = g
+                self._anotar(tabla, clave, p, f"Ind. Gasto-{m}", g, fuente, cuenta, sin)
+                fm = self._factor_crudo("MR", "RRC", clave, p) if clave else math.nan
+                df.at[i, f"FACTOR MR-{m}"] = fm
+                self._anotar(tabla, clave, p, f"FACTOR MR-{m}", fm,
+                             "BD FACTOR MR" if not math.isnan(fm) else "Area (formula de capital)", cuenta, sin)
+        self._aviso_tabla(tabla, cuenta, sin, ": su MR sale de la formula de capital del script")
+        return df
+
+    def is_cat_area(self, area) -> pd.DataFrame:
+        """IS_Cat del area (DataFrame o ruta; 'IS Bel Media' = mes del contrato, '71' y '73') con el Ind Sin RRC de TEV
+        e Hidro de la BD en los meses que la BD trae; los demas meses quedan como vienen. Los meses que la BD trae y la
+        tabla del area no, se agregan."""
+        df, nombre = _tabla_area(area, "IS_Cat del area")
+        if df is None:
+            df = pd.DataFrame(columns=["IS Bel Media", "71", "73"])
+        df = df.copy()
+        df.columns = [str(c) for c in df.columns]
+        for c in ("71", "73"):
+            if c not in df.columns:
+                df[c] = math.nan
+            df[c] = pd.to_numeric(df[c], errors="coerce").astype(float)
+        meses = pd.to_numeric(df["IS Bel Media"], errors="coerce")
+        fin = self.ultimo_proyectado or self.ultimo_real
+        ya = set(meses.dropna().astype(int))
+        nuevos = [p for p in rango_meses(self.primer_periodo_hp, fin) if p not in ya
+                  and any(not math.isnan(self._is_crudo("RRC", c, p)[0]) for c in (71, 73))]
+        if nuevos:
+            df = pd.concat([df, pd.DataFrame({"IS Bel Media": nuevos})], ignore_index=True)
+            meses = pd.to_numeric(df["IS Bel Media"], errors="coerce")
+        cuenta, sin, tabla = {}, {}, "IS_Cat RRC (71 y 73)"
+        for i, m in meses.items():
+            if math.isnan(m):
+                continue
+            p = int(m)
+            for clave in (71, 73):
+                x, fuente = self._is_crudo("RRC", clave, p)
+                if math.isnan(x):
+                    x, fuente = df.at[i, str(clave)], "Area (la BD no lo trae)"
+                df.at[i, str(clave)] = x
+                self._anotar(tabla, clave, p, str(clave), x, fuente, cuenta, sin)
+        self._aviso_tabla(tabla, cuenta, sin)
+        if nuevos:
+            self.avisos.append(f"{tabla}: {len(nuevos)} mes(es) que la tabla del area no traia, agregados de la BD "
+                               f"({nuevos[0]} a {nuevos[-1]})")
+        return df.sort_values("IS Bel Media", kind="stable").reset_index(drop=True)
+
+    def param_sonr_area(self, area, ramos_factor_ret_area: tuple = ()) -> pd.DataFrame:
+        """ParamSONR del area (DataFrame o ruta; Llave 'AAAAMM-ramo') con nuestros parametros donde la BD los trae: Ind
+        Sin SONR Media y 99.5% (IS de FA en RAMOS_IS_FA en los meses proyectados), LAG 1 a LAG 10, Factor_Ret (1 - IRR /
+        BEL del SONR; en los ramos de ramos_factor_ret_area, el del area) y Factor_MR (MR / PD; si no, vacio y el script
+        usa su formula). Las llaves de los ramos de SONR que la tabla del area no trae en sus meses se agregan."""
+        df, nombre = _tabla_area(area, "ParamSONR del area")
+        if df is None:
+            df = pd.DataFrame(columns=["Llave"])
+        df = df.copy()
+        cols = ["Factor_Ret", "Factor_MR", "Ind Sin SONR Media", "Ind Sin SONR 99.5%"] + LAGS
+        for c in cols:
+            if c not in df.columns:
+                df[c] = math.nan
+            df[c] = pd.to_numeric(df[c], errors="coerce").astype(float)
+
+        def partes(llave):
+            t = str(llave).split("-")
+            return (int(t[0]), int(float(t[1]))) if len(t) == 2 and t[0].strip().isdigit() else (None, None)
+        llaves = [partes(x) for x in df["Llave"]]
+        meses = sorted({p for p, _ in llaves if p}) or rango_meses(self.anio * 100 + 1, self.anio * 100 + 12)
+        hay = {(p, c) for p, c in llaves if p}
+        extra = [(p, c) for p in meses for c in RAMOS_SONR if (p, c) not in hay]
+        if extra:
+            df = pd.concat([df, pd.DataFrame({"Llave": [f"{p}-{c}" for p, c in extra]})], ignore_index=True)
+            llaves += extra
+            for c in cols:
+                df[c] = pd.to_numeric(df[c], errors="coerce").astype(float)
+        self._ret_fuera = {}
+        cuenta, sin, tabla = {}, {}, "ParamSONR"
+        for i, (p, clave) in zip(df.index, llaves):
+            if p is None:
+                continue
+            valores = {"Ind Sin SONR Media": self._is_crudo("SONR", clave, p, "media"),
+                       "Ind Sin SONR 99.5%": self._is_crudo("SONR", clave, p, "99.5")}
+            for k in LAGS:
+                valores[k] = (self._hp_crudo(k, clave, p), "BD " + self._tipo_de(p).capitalize())
+            valores["Factor_Ret"] = ((math.nan, "") if clave in ramos_factor_ret_area
+                                     else (self._factor_crudo("RET", "SONR", clave, p), "BD 1 - IRR / BEL"))
+            valores["Factor_MR"] = (self._factor_crudo("MR", "SONR", clave, p), "BD FACTOR MR")
+            for col, (x, fuente) in valores.items():
+                if math.isnan(x):
+                    x = df.at[i, col]
+                    fuente = ("Area (formula de capital)" if col == "Factor_MR" else
+                              "Area (RAMOS_FACTOR_RET_AREA)" if col == "Factor_Ret" and clave in ramos_factor_ret_area
+                              else "Area (la BD no lo trae)")
+                df.at[i, col] = x
+                self._anotar(tabla, clave, p, col, x, fuente, cuenta, sin)
+        self._aviso_tabla(tabla, cuenta, sin, ": su MR sale de la formula Desviacion / -BC x BC2 del script")
+        for clave, ps in sorted(self._ret_fuera.items()):
+            self.avisos.append(f"Factor_Ret SONR ramo {clave}: {len(ps)} mes(es) con IRR mayor que el BEL en la BD "
+                               f"({min(ps)} a {max(ps)}): retencion 0 (todo cedido). Si no es correcto, pon {clave} en "
+                               "RAMOS_FACTOR_RET_AREA para tomar el del area")
+        if extra:
+            self.avisos.append(f"ParamSONR: {len(extra)} llave(s) de ramos que la tabla del area no traia, agregadas de la BD")
+        return df
+
+    def exportar_tablas(self, ruta, tablas: dict):
+        """Escribe en un xlsx las tablas que uso un script, la hoja Fuentes (de donde salio cada celda) y los avisos."""
+        avisos = self.avisos_texto()
+        with pd.ExcelWriter(ruta, engine="openpyxl") as xw:
+            pd.DataFrame({"Dato": ["BD", "Ultimo mes real", "Proyeccion", "IS (FA)"] + [f"Aviso {i + 1}" for i in range(len(avisos))],
+                          "Valor": [str(self.ruta_bd), self.ultimo_real,
+                                    f"{self.primer_proyectado} a {self.ultimo_proyectado}",
+                                    f"RRC {self.ramos_is_fa.get('RRC')}, SONR {self.ramos_is_fa.get('SONR')}"
+                                    if self.is_fa and self.usar_is_fa else "no"] + avisos}).to_excel(
+                xw, sheet_name="Resumen", index=False)
+            for nombre, df in tablas.items():
+                df.to_excel(xw, sheet_name=str(nombre)[:31], index=False)
+            if self.fuentes:
+                pd.DataFrame(self.fuentes).to_excel(xw, sheet_name="Fuentes", index=False)
+
     def tc_tabla(self) -> pd.DataFrame:
         """TC USD por mes como la tabla de tipo de cambio del area: cTCAD_FecAMD (AAAAMM), cTCAD_Mnt."""
         return pd.DataFrame({"cTCAD_FecAMD": sorted(self.tc), "cTCAD_Mnt": [self.tc[p] for p in sorted(self.tc)]})
@@ -783,7 +1019,7 @@ class InsumosBD:
 
     def resumen(self) -> list[str]:
         n_fa = len({(r, c) for (r, c, _) in self.is_fa})
-        lineas = [f"Insumos de {self.ruta_bd.name}: HParametros '{self.hoja_hp}' con {len(self.hp)} renglones; tipos "
+        lineas = [f"Insumos de {self.ruta_bd}: HParametros '{self.hoja_hp}' con {len(self.hp)} renglones; tipos "
                   f"{', '.join(sorted(self.tipos))}; ultimo mes real {self.ultimo_real}; proyeccion "
                   f"{self.primer_proyectado} a {self.ultimo_proyectado}",
                   f"Hoja de montos: {len(self.periodos_montos)} meses ({min(self.periodos_montos)} a "
