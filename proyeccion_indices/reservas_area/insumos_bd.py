@@ -37,11 +37,15 @@ import unicodedata
 import warnings
 from pathlib import Path
 
+import numpy as np
 import openpyxl
 import pandas as pd
 
-VERSION_AOD = "2026-10-06c"      # version que piden los scripts _aod_BD.py (parchar_aod.py)
+VERSION_AOD = "2026-10-06d"      # version que piden los scripts _aod_BD.py (parchar_aod.py)
 HOJA_MONTOS = "BD_Montos_RRC_SONR"
+TC_BD_DESDE = 202601             # desde este mes el TC MXN / USD de los scripts _aod sale de la columna TC de la BD
+                                 # (TC_Real_Esti.xlsx: FCST, columna J, en 2026; FCST 2027, columna M, en 2027)
+MONEDA_USD, MONEDA_MXN = 31, 1   # cMON_Id / MonedaOri de la base de valuacion
 HOJA_IS_FA = "IS_FA"
 HOJA_DIAG_INDICADORES = "Indicadores_Ramo"
 HOJA_DIAG_MONTOS = "Montos_Proyectados"
@@ -1073,6 +1077,64 @@ class InsumosBD:
             ps = sorted(set(ps))
             out.append(f"FND ramo {clave}: {len(ps)} mes(es) con FND de la BD fuera de [0, 1] ({ps[0]} a {ps[-1]}): se acota")
         return out
+
+    # ------------------------------------------------------------------ tipo de cambio para los scripts _aod
+    def tc_bd_meses(self, desde: int = TC_BD_DESDE) -> dict:
+        """{mes: TC MXN / USD de la BD} desde el mes indicado."""
+        return {p: float(v) for p, v in sorted(self.tc.items()) if p >= desde and not math.isnan(_num(v))}
+
+    def tc_usd_area(self, tabla: pd.DataFrame, desde: int = TC_BD_DESDE) -> pd.DataFrame:
+        """TC_USD de los scripts (cTCAD_FecAMD, cTCAD_Mnt = MXN por USD de la base Access) con el TC de la BD desde
+        `desde`: reemplaza los meses que la base trae y agrega los que no; los anteriores quedan como vienen. Ordenada por
+        mes."""
+        df = tabla.copy()
+        nuestros = self.tc_bd_meses(desde)
+        f = pd.to_numeric(df["cTCAD_FecAMD"], errors="coerce")
+        df["cTCAD_Mnt"] = pd.to_numeric(df["cTCAD_Mnt"], errors="coerce").astype(float)
+        m = f.isin(list(nuestros))
+        df.loc[m, "cTCAD_Mnt"] = [nuestros[int(x)] for x in f[m]]
+        ya = set(f[m].astype(int))
+        nuevos = [p for p in nuestros if p not in ya]
+        if nuevos:
+            df = pd.concat([df, pd.DataFrame({"cTCAD_FecAMD": nuevos, "cTCAD_Mnt": [nuestros[p] for p in nuevos]})],
+                           ignore_index=True)
+        orden = pd.to_numeric(df["cTCAD_FecAMD"], errors="coerce").to_numpy()
+        df = df.iloc[np.argsort(orden, kind="stable")].reset_index(drop=True)
+        if nuestros:
+            self.avisos.append(f"TC USD: {len(nuestros)} mes(es) de la BD ({min(nuestros)} a {max(nuestros)}); "
+                               f"{len(ya)} reemplazan los de la base Access y {len(nuevos)} se agregan. Los meses "
+                               f"anteriores a {desde}, de la base")
+        return df
+
+    def tc_monedas_area(self, tabla: pd.DataFrame, desde: int = TC_BD_DESDE, hasta: int | None = None) -> pd.DataFrame:
+        """Tabla de tipos de cambio de todas las monedas de la base Access (cTCAD_FecAMD, cMON_Id, cTCAD_Mnt, Llave) con
+        el TC de la BD en el dolar desde `desde` (reemplaza o agrega el renglon del mes) y el peso en 1 en los meses que se
+        agregan. Las demas monedas quedan como vienen: en los meses que la base no trae no tienen tipo de cambio."""
+        df = tabla.copy()
+        nuestros = self.tc_bd_meses(desde)
+        f = pd.to_numeric(df["cTCAD_FecAMD"], errors="coerce")
+        mon = pd.to_numeric(df["cMON_Id"], errors="coerce")
+        df["cTCAD_Mnt"] = pd.to_numeric(df["cTCAD_Mnt"], errors="coerce").astype(float)
+        m = (mon == MONEDA_USD) & f.isin(list(nuestros))
+        df.loc[m, "cTCAD_Mnt"] = [nuestros[int(x)] for x in f[m]]
+        hay = {(int(a), int(b)) for a, b in zip(f, mon) if not (math.isnan(a) or math.isnan(b))}
+        pesos = df.loc[mon == MONEDA_MXN, "cTCAD_Mnt"]
+        con_pesos = len(pesos) > 0 and bool((abs(pesos - 1.0) < 1e-9).all())
+        nuevos = [(p, MONEDA_USD, v) for p, v in nuestros.items() if (p, MONEDA_USD) not in hay]
+        if con_pesos:
+            nuevos += [(p, MONEDA_MXN, 1.0) for p in nuestros if (p, MONEDA_MXN) not in hay]
+        if nuevos:
+            df = pd.concat([df, pd.DataFrame({"cTCAD_FecAMD": [p for p, _, _ in nuevos], "cMON_Id": [c for _, c, _ in nuevos],
+                                              "cTCAD_Mnt": [v for _, _, v in nuevos],
+                                              "Llave": [f"{p}-{c}" for p, c, _ in nuevos]})], ignore_index=True)
+        ultimo = int(f.max()) if f.notna().any() else None
+        otras = sorted({int(b) for a, b in zip(f, mon) if ultimo is not None and a == ultimo and not math.isnan(b)}
+                       - {MONEDA_USD, MONEDA_MXN})
+        sin = [p for p in nuestros if ultimo is not None and p > ultimo and (hasta is None or p <= hasta)]
+        if otras and sin:
+            self.avisos.append(f"TC de otras monedas: la base Access no trae {len(otras)} moneda(s) ({otras}) de {sin[0]} a "
+                               f"{sin[-1]}; la BD solo trae el dolar, asi que esos contratos salen vacios en esos meses")
+        return df
 
     def exportar_tablas(self, ruta, tablas: dict):
         """Escribe en un xlsx las tablas que uso un script, la hoja Fuentes (de donde salio cada celda) y los avisos."""

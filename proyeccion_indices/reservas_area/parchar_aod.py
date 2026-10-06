@@ -19,8 +19,10 @@ SONR - Ind Sin SONR Media y 99.5%, LAG 1 a 10 y Factor_Ret: de la BD (IS de FA e
        proyectados); MR: Prima Dev x (1 - LAG) x Factor_MR de la BD; donde la BD no modela el ramo (p. ej. sin BEL de
        IBNR), la formula del script. FND: el mismo FND de la BD del RRC en los contratos de los ultimos 12 meses (la prima
        devengada es 1 - FND); el FD del SONR de la BD (PD / prima ponderada por LAG) no es una fraccion por contrato.
-Donde la BD no trae un dato se queda el valor de la tabla del area. Catalogos, contratos, cesion,
-duracion, retencion, tipo de cambio, escenario base y rutas no cambian. Al final cada script escribe
+TC (TC_DESDE_BD = True): el MXN / USD de la columna TC de la BD desde 202601 (TC_Real_Esti: J en 2026, M en 2027) en el
+TC de la base, en la tabla de todas las monedas (el peso en 1) y en xTC_PPTO; las demas monedas y los meses anteriores,
+de la base. Donde la BD no trae un dato se queda el valor de la tabla del area. Catalogos, contratos, cesion,
+duracion, retencion, escenario base y rutas no cambian. Al final cada script escribe
 Parametros_usados_<reserva>.xlsx (las tablas que uso, de donde salio cada celda y los avisos) junto a su salida.
 """
 from __future__ import annotations
@@ -30,7 +32,7 @@ import sys
 from pathlib import Path
 
 MARCA = "### INDICES BD"
-VERSION_AOD = "2026-10-06c"      # la de insumos_bd.py que piden los scripts generados
+VERSION_AOD = "2026-10-06d"      # la de insumos_bd.py que piden los scripts generados
 
 
 def _bloque_inicio(reserva: str) -> str:
@@ -46,7 +48,7 @@ def _bloque_inicio(reserva: str) -> str:
 # {que} salen de nuestra BD proyectada con
 # insumos_bd.py: HParametros (Real hasta el ultimo mes real, Proyección despues) y, en los ramos de RAMOS_IS_FA, el IS
 # de FA en los meses proyectados. Donde la BD no trae un dato se queda el de la tabla del area. Lo demas (catalogos,
-# contratos, cesion, duracion, retencion, TC, escenario base y rutas) se queda como estaba.
+# contratos, cesion, duracion, retencion, TC de otras monedas, escenario base y rutas) se queda como estaba.
 {imports}from pathlib import Path
 CARPETA_INDICES = fr"C:\\Users\\{{usuario}}\\Documents\\Proyección Indices"   # insumos_bd.py y salidas\\ con la BD
 _AQUI = str(Path(__file__).resolve().parent) if "__file__" in globals() else os.getcwd()
@@ -62,14 +64,18 @@ RAMOS_IS_FA = {{"RRC": (40, 50, 80, 90), "SONR": (40, 50, 80, 90)}}   # siniestr
 MR_DESDE_BD = True     # True: {mr} (donde la BD no modela el ramo, la formula del area); False: la formula del area
 FND_DESDE_BD = True    # True: los contratos de los ultimos 12 meses toman el FND de la BD de su ramo y mes de valuacion
                        # (PND / prima de 12 meses, bloque FD/FND del RRC); los demas, el del area. False: el FND del area
+TC_DESDE_BD = True     # True: el TC MXN / USD sale de la BD desde 2026 (TC_Real_Esti: J en 2026, M en 2027) en el TC de
+                       # la base, en la tabla de monedas y en xTC_PPTO; el peso en 1; las demas monedas, de la base
 {extra}INS = InsumosBD(buscar_bd(None, [CARPETA_INDICES, _AQUI]), ramos_is_fa=RAMOS_IS_FA)
 '''
 
 
-def _aviso_tc(sangria: str = "    ") -> str:
-    return (f"{sangria}if not (pd.to_numeric(ConsultaTC['cTCAD_FecAMD'], errors='coerce') == Meses).any():   {MARCA}: aviso\n"
-            f"{sangria}    print(f'   AVISO: la base Access no trae tipo de cambio de {{Meses}}: ese mes no se puede valuar y sale en 0 o '\n"
-            f"{sangria}          'vacio (no es la reserva); carga el TC en la base o no uses ese mes')\n")
+def _aviso_tc(sangria: str, tabla: str, columna: str) -> str:
+    """Despues de valuar el mes: aviso si quedaron contratos sin tipo de cambio (moneda sin TC en la base ese mes)."""
+    return (f"{sangria}_sin_tc = {tabla}.loc[pd.to_numeric({tabla}['{columna}'], errors='coerce').isna(), 'MonedaOri']   {MARCA}: aviso\n"
+            f"{sangria}if len(_sin_tc):\n"
+            f"{sangria}    print(f'   AVISO: {{Meses}}: {{len(_sin_tc)}} contrato(s) sin tipo de cambio (moneda(s) '\n"
+            f"{sangria}          f'{{sorted(set(_sin_tc.astype(str)))}}): salen en 0 o vacios, no son reserva')\n")
 
 
 def _final(reserva: str, tablas: str) -> str:
@@ -96,9 +102,26 @@ def _en_seccion(texto: str, inicio: str, fin: str, patron: str, nuevo, n: int = 
     return texto[:i] + _rep(texto[i:j], patron, nuevo, n) + texto[j:]
 
 
+def _tc(t: str) -> str:
+    """TC MXN / USD de la BD desde TC_BD_DESDE en los tres lugares donde el script toma tipo de cambio."""
+    t = _rep(t, r"^(xTC_PPTO = \{[^}]*\}[ \t]*\n)", lambda m: m.group(1) + (
+        f"if TC_DESDE_BD:                                                  {MARCA}: TC de la BD desde 2026 (J y M de\n"
+        "    xTC_PPTO = {**xTC_PPTO, **INS.tc_bd_meses()}                  # TC_Real_Esti); 202512 queda como esta\n"))
+    t = _rep(t, r"^(TC_USD = ConsultaMoneda_usd\(\)[ \t]*\n)", lambda m: m.group(1) + (
+        f"if TC_DESDE_BD:                                                  {MARCA}: TC USD de la BD desde 2026\n"
+        "    TC_USD = INS.tc_usd_area(TC_USD)\n"))
+    t = _rep(t, r"^([ \t]*)(ConsultaTC = pd\.read_sql\(xSQL, conn\)[ \t]*\n)", lambda m: (
+        m.group(1) + m.group(2) +
+        f"{m.group(1)}if TC_DESDE_BD:                                              {MARCA}: el dolar con el TC de la BD\n"
+        f"{m.group(1)}    ConsultaTC = INS.tc_monedas_area(ConsultaTC, hasta=zAño * 100 + 12)   # desde 2026; las demas\n"
+        f"{m.group(1)}                                                            # monedas igual\n"))
+    return t
+
+
 def parchar_rrc(t: str) -> str:
     t = _rep(t, r"\A(.*\n)", r"\1# Version con los indices de la BD proyectada: cambios marcados con " + MARCA + "\n")
     t = _rep(t, r"^(start_time = time\.perf_counter\(\)\n)", lambda m: m.group(1) + _bloque_inicio("RRC"))
+    t = _tc(t)
     t = _rep(t, r"^(Nomeses = .*\n)", lambda m: m.group(1) + (
         f"_xRRC_area, _xIS_CAT_area = xRRC, xIS_CAT                    {MARCA}: las tablas del area solo dan lo\n"
         "xRRC = INS.parametros_rrc_area(zAño, _xRRC_area)             # que la BD no trae (duracion, retencion, huecos)\n"
@@ -124,7 +147,7 @@ def parchar_rrc(t: str) -> str:
                         f"{m.group(1)}    xIS_CAT = INS.is_cat_area(xIS_CAT)\n"
                         f"{m.group(1)}xRRC['Ind. Gasto'] = xRRC[f'Ind. Gasto-{{mes_calculo}}']       {MARCA}: gasto y FACTOR MR\n"
                         f"{m.group(1)}xRRC['FACTOR MR'] = xRRC[f'FACTOR MR-{{mes_calculo}}']         # del mes que se valua\n"
-                        + _aviso_tc(m.group(1)) + m.group(1) + m.group(2)))
+                        + m.group(1) + m.group(2) + _aviso_tc(m.group(1), "df_Real_IS_Real", "TC_Valuación")))
     t = _rep(t, r"^(xRRC_saldos\.to_excel\(fileName, index=False\)\n)",
              lambda m: m.group(1) + _final("RRC", '{"ParametrosMens_RRC": xRRC.drop(columns=["Ind. Gasto", "FACTOR MR"], errors="ignore"), "IS_Cat": xIS_CAT}'))
     return t
@@ -133,6 +156,7 @@ def parchar_rrc(t: str) -> str:
 def parchar_sonr(t: str) -> str:
     t = _rep(t, r"\A(.*\n)", r"\1# Version con los indices de la BD proyectada: cambios marcados con " + MARCA + "\n")
     t = _rep(t, r"^(warnings\.filterwarnings\('ignore'\)\n)", lambda m: m.group(1) + _bloque_inicio("SONR"))
+    t = _tc(t)
     t = _rep(t, r"^(ParamSONR_inc = pd\.read_csv\(.*\)[ \t]*\n)", lambda m: m.group(1) + (
         f"_ParamSONR_area = ParamSONR                                   {MARCA}: el ParamSONR del area solo da\n"
         "ParamSONR = INS.param_sonr_area(_ParamSONR_area, RAMOS_FACTOR_RET_AREA)   # lo que la BD no trae\n"
@@ -148,7 +172,7 @@ def parchar_sonr(t: str) -> str:
                         f"{m.group(1)}    ConsultaR[f'FND_{{AÑOMES}}'] = ConsultaR.apply(lambda y: INS.fnd_contrato('SONR', "
                         "y['Ramo_filt'], AÑOMES, y['CALMONTH'], y[f'FND_{AÑOMES}']), axis=1)\n"))
     t = _rep(t, r"^([ \t]*)(ConsultaR = ConsultaReal\(mes_calculo, zFechaValuacion, Meses\)\n)",
-             lambda m: _aviso_tc(m.group(1)) + m.group(1) + m.group(2))
+             lambda m: m.group(1) + m.group(2) + _aviso_tc(m.group(1), "ConsultaR", "cTCAD_Mnt_x"))
     t = _rep(t, r"^(df_concatenado\.to_excel\(fileName, index=False\))\s*\Z",
              lambda m: m.group(1) + "\n" + _final("SONR", '{"ParamSONR": ParamSONR}'))
     return t

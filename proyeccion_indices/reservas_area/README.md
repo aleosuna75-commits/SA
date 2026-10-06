@@ -35,14 +35,15 @@ trae el dato; donde no lo trae se queda el valor del área. No se llenan huecos 
 | `LAG 1` a `LAG 10`, `Factor_Ret` (SONR) | LAG de HParametros; `Factor_Ret` = 1 − IRR / BEL del SONR de la BD. `RAMOS_FACTOR_RET_AREA` deja ramos con el del área. |
 | MR | RRC: `MONTO_PI × PORC_ND × FACTOR MR × TC`; SONR: `Prima Dev × (1 − LAG) × Factor_MR`. Un 0 de la BD es dato y un MR negativo cuenta como 0, con aviso. Donde la BD no modela el ramo (sin BEL de esa reserva), la fórmula de capital del script. El MR a TC del año anterior sigue igual al de valuación, como en el script. `MR_DESDE_BD = False` vuelve a la fórmula en todo. |
 | FND (RRC: `PORC_ND`; SONR: el FND con que sale la prima devengada) | Los contratos de los últimos 12 meses toman el FND de la BD de su ramo y mes de valuación (bloque `FD/FND` del RRC: PND / prima de 12 meses, la misma prima sobre la que la BD calcula su BEL); los más antiguos, el del área. El FD del SONR de la BD no se usa: es PD / prima ponderada por LAG, no una fracción por contrato. `FND_DESDE_BD = False` vuelve al FND del área. |
-| Contratos, cesión, duración, retención, TC, escenario base, catálogos | Sin cambio. |
+| Tipo de cambio | `TC_DESDE_BD = True`: el MXN / USD de la columna TC de la BD desde 202601 (`TC_Real_Esti.xlsx`: FCST, columna J, en 2026; FCST 2027, columna M, en 2027) en el TC USD de la base, en la tabla de todas las monedas (el peso en 1 en los meses que se agregan) y en `xTC_PPTO` (escenarios 0 y 1; diciembre anterior sin cambio). Los meses anteriores a 2026 y las demás monedas, de la base Access; un contrato en otra moneda en un mes que la base no trae sale vacío, con aviso. |
+| Contratos, cesión, duración, retención, escenario base, catálogos | Sin cambio. |
 
 Los scripts buscan `insumos_bd.py` y la BD en `CARPETA_INDICES` (por omisión `Documents\Proyección Indices` y su
 `salidas\`); la BD se reconoce por su nombre exacto, sin las variantes `_PE12`, `_PE18` ni `ProyeccionP`. Si se carga un
 `insumos_bd.py` anterior (sin `VERSION_AOD` vigente) se detienen con el aviso. Los avisos de qué celdas salieron de la BD y cuáles del área
 se imprimen al armar las tablas, antes del ciclo. Al final escriben `Parametros_usados_<reserva>.xlsx` junto a su
-salida: las tablas que usaron, la hoja `Fuentes` (de dónde salió cada celda) y los avisos. Si la base Access no trae
-tipo de cambio de un mes que se valúa, lo avisan: ese mes sale en 0 o vacío (no es la reserva), como ya pasaba.
+salida: las tablas que usaron, la hoja `Fuentes` (de dónde salió cada celda) y los avisos. Después de valuar cada mes avisan si
+quedaron contratos sin tipo de cambio (una moneda que la BD no trae en un mes que la base Access no tiene): salen en 0 o vacíos.
 
 `pruebas/simulacion_aod.py <carpeta con los _BD.py> ["<BD>"]` los corre sin Access, con tablas del área inventadas, y
 compara contrato por contrato y mes por mes los índices y el MR contra los esperados.

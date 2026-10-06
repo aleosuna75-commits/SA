@@ -32,9 +32,12 @@ AQUI = Path(__file__).resolve().parent
 SCRIPTS = AQUI.parent
 sys.path.insert(0, str(SCRIPTS))
 sys.path.insert(0, str(AQUI))
-from insumos_bd import InsumosBD, LAGS, NOMBRE_BD, RAMOS_SCRIPT, RAMOS_SONR, buscar_bd, mes_mas, rango_meses  # noqa: E402
+from insumos_bd import (InsumosBD, LAGS, MONEDA_MXN, MONEDA_USD, NOMBRE_BD, RAMOS_SCRIPT, RAMOS_SONR, TC_BD_DESDE,  # noqa: E402
+                        buscar_bd, mes_mas, rango_meses)
 from simulacion_sin_access import RAMO_NOMBRE, SUBRAMOS, contratos  # noqa: E402
 
+TC_ACCESS = 1.01                 # la base Access inventada trae el TC de la BD x 1.01, para distinguir de donde sale
+MONEDA_EUR, ACCESS_EUR = 2, 1.08 # contratos en otra moneda (ramo 60, facultativos), TC = USD de la base x 1.08
 AREA = {"IS": 0.111, "IS99": 0.222, "GTO": 0.0777, "CAT71": 0.333, "CAT73": 0.444, "IS_SONR": 0.666,
         "IS_SONR99": 0.777, "LAG": 0.0888, "RET": 0.555}            # valores del area inventados (reconocibles)
 ORIG = {"read_csv": pd.read_csv, "read_excel": pd.read_excel, "to_excel": pd.DataFrame.to_excel,
@@ -144,11 +147,12 @@ def restaurar():
 def simular_access(ins: InsumosBD, tc_hasta: int):
     tc_filas = []
     for p in rango_meses(mes_mas(ins.primer_periodo_hp, -12), tc_hasta):
-        usd = ins.tc_de(p)
-        for mon, v in ((1, 1.0), (31, usd), (2, usd * 1.08)):
+        usd = ins.tc_de(p) * TC_ACCESS
+        for mon, v in ((MONEDA_MXN, 1.0), (MONEDA_USD, usd), (MONEDA_EUR, usd * ACCESS_EUR)):
             tc_filas.append({"cTCAD_FecAMD": p, "cMON_Id": mon, "cTCAD_Mnt": v, "Llave": f"{p}-{mon}"})
     tc = pd.DataFrame(tc_filas)
     gonz = contratos(ins.anio, rango_meses(mes_mas(ins.ultimo_real, -11 * 12), ins.ultimo_real))
+    gonz.loc[(gonz["Ramo_filt"] == 60) & (gonz["TipoRea"] == 2), "MonedaOri"] = MONEDA_EUR
 
     class _Conn:
         def cursor(self):
@@ -218,6 +222,64 @@ def _igual(a, b) -> bool:
     except (TypeError, ValueError):
         return False
     return (math.isnan(a) and math.isnan(b)) or abs(a - b) <= 1e-9 * (1 + abs(b))
+
+
+def tc_esperado(ins: InsumosBD, moneda, p: int, tc_hasta: int) -> float:
+    """TC de la moneda en el mes con TC_DESDE_BD: el dolar de la BD desde TC_BD_DESDE (antes, el de la base Access), el
+    peso en 1 y las demas monedas de la base Access (nan en los meses que la base no trae)."""
+    moneda = int(moneda)
+    if moneda == MONEDA_MXN:
+        return 1.0
+    if moneda == MONEDA_USD:
+        return ins.tc_de(p) if p >= TC_BD_DESDE else (ins.tc_de(p) * TC_ACCESS if p <= tc_hasta else math.nan)
+    return ins.tc_de(p) * TC_ACCESS * ACCESS_EUR if p <= tc_hasta else math.nan
+
+
+def verificar_tc(ins: InsumosBD, g_rrc: dict, g_sonr: dict, capturas: dict, marcos_sonr: list, anio: int, tc_hasta: int) -> list[str]:
+    res = []
+    for nombre in ("TablaTCRRC.xlsx", "TablaTCSONR.xlsx"):
+        df = capturas.get(nombre)
+        if df is None:
+            res.append(f"MAL {nombre}: no se escribio")
+            continue
+        malos = sum(not _igual(v, tc_esperado(ins, MONEDA_USD, int(p), tc_hasta)) for p, v in zip(df["cTCAD_FecAMD"], df["cTCAD_Mnt"]))
+        faltan = [p for p in rango_meses(TC_BD_DESDE, anio * 100 + 12) if p not in set(pd.to_numeric(df["cTCAD_FecAMD"]).astype(int))]
+        res.append(f"{'OK ' if not malos and not faltan else 'MAL'} {nombre}: {len(df)} meses de TC USD, {malos} distintos a lo "
+                   f"esperado (BD desde {TC_BD_DESDE}, base antes), {len(faltan)} meses faltantes")
+    for etiqueta, g in (("RRC", g_rrc), ("SONR", g_sonr)):
+        pp = (g or {}).get("xTC_PPTO", {})
+        malos = [k for k, v in pp.items() if int(k) >= TC_BD_DESDE and not _igual(v, ins.tc_de(int(k)))]
+        res.append(f"{'OK ' if pp and not malos and _igual(pp.get((anio - 1) * 100 + 12), 18.008) else 'MAL'} {etiqueta} xTC_PPTO: "
+                   f"{sum(1 for k in pp if int(k) >= TC_BD_DESDE)} meses con el TC de la BD, diciembre anterior sin cambio")
+    malos, n = 0, 0
+    for m in range(1, 13):
+        df = capturas.get(f"ConsultaPPTO_RRC_{m}_tradicional.xlsx")
+        if df is None:
+            continue
+        p = anio * 100 + m
+        for _, r in df.iterrows():
+            n += 1
+            tc_val = tc_esperado(ins, r["MonedaOri"], p, tc_hasta)
+            malos += not _igual(r["TC_Valuación"], tc_val)
+            # (el script trae el cierre anterior en el mismo renglon de la tabla de monedas que el TC del mes: sin TC del
+            # mes, tampoco hay cierre anterior)
+            cierre = tc_esperado(ins, r["MonedaOri"], (anio - 1) * 100 + 12, tc_hasta) if not math.isnan(tc_val) else math.nan
+            malos += not _igual(r["TC_CierreAnterior"], cierre)
+    res.append(f"{'OK ' if not malos else 'MAL'} RRC TC por contrato: {n} contratos, {malos} TC de valuacion o de cierre "
+               "anterior distintos a lo esperado")
+    malos, n = 0, 0
+    for f in marcos_sonr:
+        if "Ramo_filt" not in f.columns or "cTCAD_Mnt_x" not in f.columns:
+            continue
+        col = next((c for c in f.columns if str(c).startswith("FND_")), None)
+        if col is None:
+            continue
+        p = int(str(col)[4:])
+        for mon, v in zip(f["MonedaOri"], f["cTCAD_Mnt_x"]):
+            n += 1
+            malos += not _igual(v, tc_esperado(ins, mon, p, tc_hasta))
+    res.append(f"{'OK ' if not malos and n else 'MAL'} SONR TC por contrato: {n} renglones, {malos} distintos a lo esperado")
+    return res
 
 
 def verificar_rrc(ins: InsumosBD, g: dict, capturas: dict, anio: int) -> list[str]:
@@ -357,12 +419,13 @@ def main():
         res = [f"{etiqueta}:"]
         res += verificar_rrc(ins, g_rrc, capturas, anio)
         res += verificar_sonr(ins, g_sonr, marcos[marcos_rrc:], (trabajo / sonr.name).read_text(encoding="utf-8"), anio)
+        res += verificar_tc(ins, g_rrc, g_sonr, capturas, marcos[marcos_rrc:], anio, tc_hasta)
         for nombre in ("RRC_esc.xlsx", "SONR_esc.xlsx", "Parametros_usados_RRC.xlsx", "Parametros_usados_SONR.xlsx"):
             res.append(f"{'OK ' if (trabajo / f'salida_{tc_hasta}' / nombre).exists() else 'MAL'} {nombre}")
-        sin_tc = sorted({int(t.split("cambio de ")[1].split(":")[0]) for t in textos if "no trae tipo de cambio" in t})
+        sin_tc = sorted({int(t.split("AVISO: ")[1].split(":")[0]) for t in textos if "sin tipo de cambio (moneda" in t})
         esperado = [p for p in rango_meses(anio * 100 + 1, anio * 100 + 12) if p > tc_hasta]
-        res.append(f"{'OK ' if sorted(set(sin_tc)) == esperado else 'MAL'} aviso de meses sin tipo de cambio en la base: "
-                   f"{sin_tc or 'ninguno'}")
+        res.append(f"{'OK ' if sorted(set(sin_tc)) == esperado else 'MAL'} aviso de contratos sin tipo de cambio (solo la "
+                   f"moneda que la BD no trae): {sin_tc or 'ninguno'}")
         lineas += res
         ok = ok and not any(x.startswith("MAL") for x in res)
     print("\n===== VERIFICACION")
