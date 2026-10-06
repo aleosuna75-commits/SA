@@ -58,7 +58,9 @@ def _comunes(t: str, reserva: str) -> str:
         "                         # falten de 2027 (ParamSONR) salen del mismo mes de los archivos de 2026, tambien como previo\n"))
     t = _rep(t, r"^TC_DESDE_BD = True[^\n]*\n[ \t]*#[^\n]*\n", lambda m: (
         f"TC_DESDE_BD = True     {M27}: sin la base Access el TC MXN / USD solo sale de la BD (TC_Real_Esti: M en 2027,\n"
-        "                       # J en diciembre 2026) y el peso en 1; en esta version se queda en True\n"))
+        "                       # J en diciembre 2026) y el peso en 1; en esta version se queda en True\n"
+        f"if not TC_DESDE_BD:                                       {M27}\n"
+        "    raise SystemExit('Sin la base Access el tipo de cambio solo sale de la BD: deja TC_DESDE_BD = True')\n"))
     t = _rep(t, r"^import pyodbc[ \t]*\n", f"try:                                   {M27}: no se usa (sin la base Access)\n"
                                             "    import pyodbc\nexcept ImportError:\n    pyodbc = None\n")
     # diccionario mes - k -> AAAAMM armado con el ano que se valua
