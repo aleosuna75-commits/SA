@@ -29,7 +29,7 @@ b) Modelo (MODELO_POR_TIPO):
        - montos (BEL, BRUTO), indices de HParametros y LAGs -> linea de TENDENCIA HISTORICA: regresion
          lineal (en logaritmos cuando la serie es positiva, es decir crecimiento % constante) sobre los
          ultimos MESES_TENDENCIA meses (36), continuada desde el ultimo dato real sin amortiguar
-         (AMORTIGUACION_TENDENCIA = 1). En montos e indices se suma LA ESTACIONALIDAD MENSUAL: el patron
+         (AMORTIGUACION_TENDENCIA = 1). En los montos se suma LA ESTACIONALIDAD MENSUAL: el patron
          por mes del ano (promedio, por mes, de la serie menos su media movil de 12 meses, sobre los
          mismos 36 meses) ponderado por su credibilidad (Buhlmann, Z = n/(n+K): 1 = el patron se
          repite igual cada ano, 0 = ruido). Los LAGs (patron de desarrollo) van solo con la recta.
@@ -252,15 +252,20 @@ CREDIBILIDAD_ESTACIONAL = "buhlmann"  # cuanto del patron observado se aplica (1
 P_ESTACIONALIDAD = 0.10          # umbral de la prueba F para la opcion "completa"
 TIPOS_CON_ESTACIONALIDAD = ("nivel",)   # solo los montos (BEL y BRUTO: Fianzas y los ramos sin BEL por FND) llevan el patron.
                                  # Indices, FND y factores del BEL por FND van sin patron del mes (2026-10-07, revision del
-                                 # area: la reserva proyectada liberaba y constituia de mas de un mes a otro). El patron del
-                                 # FND es en buena parte el espejo de cuando crecio la prima de 12 meses en la historia (el
-                                 # FND es PND / PRIMA N AÑOS); aplicado sobre la prima del FCST, que tiene otro calendario,
-                                 # metia dientes de sierra en el BEL. En backtest del BEL (IS y PEACUMULADA reales, 85
-                                 # cortes de 22 series) la precision no cambia (error 14.3 % con patron y 14.5 % sin el) y la
-                                 # dispersion de los cambios mensuales proyectados baja a la mitad. En los indices, sin
-                                 # patron el backtest mejora (error mediano 12.4 % contra 14.2 %; el modelo gana al ultimo
-                                 # valor en 69 % de las series contra 56 %). Los LAGs (patron de desarrollo) no tienen mes
-                                 # del ano. Para volver al patron: ("nivel", "indice", "fnd", "factor_log", "factor").
+                                 # area: la reserva proyectada liberaba y constituia de mas de un mes a otro). En la historia
+                                 # el patron del FND (PND / PRIMA N AÑOS) se compensaba con el movimiento de la prima: en
+                                 # SONR es en buena parte el espejo de cuando crecio la prima de 12 meses (correlacion del
+                                 # patron del FND con el de la prima, con signo cambiado, de 0.7 a 0.9 por ramo); en RRC no
+                                 # es estable de un ano a otro (el FND dic / ago de RRC 50: +15 %, -1 %, -15 % y -22 % en
+                                 # 2022 a 2025) y el pico de agosto que restaba el ancla no ocurrio en 2026. Aplicado sobre
+                                 # la prima del FCST, que tiene otro calendario, metia dientes de sierra en el BEL. En
+                                 # backtest del BEL (IS y PEACUMULADA reales, 17 series con 36 meses de FND, 85 cortes) la
+                                 # precision no cambia (error 14.3 % con patron y 14.5 % sin el) y la dispersion de los
+                                 # cambios mensuales proyectados baja a la mitad. En los indices, sin patron el backtest
+                                 # mejora (error mediano 12.4 % contra 14.2 %; el modelo gana al ultimo valor en 69 % de las
+                                 # series contra 56 %). Los LAGs (patron de desarrollo) no tienen mes del ano. El factor de
+                                 # prima (ajustar_factor) tiene su propio camino y conserva su patron. Para volver al
+                                 # patron: ("nivel", "indice", "fnd", "factor_log", "factor").
 DESCRIPCION_CREDIBILIDAD = {
     "buhlmann": "credibilidad de Buhlmann Z = n/(n+K), K = varianza dentro del mes / varianza entre meses",
     "ajustada": "R2 ajustado del mes del ano sobre la serie sin tendencia",
@@ -278,8 +283,8 @@ DESCRIPCION_CREDIBILIDAD = {
 #       con tendencia o con cambios de nivel recientes (el FACTOR MR de Acc. Personales bajo de 10 % a 2.5 % en un ano; el
 #       FACTOR GTO cambia por escalones anuales): si la desviacion se desvaneciera hacia el nivel del ultimo ano, la
 #       proyeccion arrancaria con una curva de regreso hacia donde estaba la serie hace meses, en contra de su tendencia.
-#       Anclada, la proyeccion arranca del ultimo real y sigue su tendencia (pendiente combinada, PENDIENTE_COMBINADA)
-#       con el patron del mes.
+#       Anclada, la proyeccion arranca del ultimo real y sigue su tendencia (pendiente combinada, PENDIENTE_COMBINADA),
+#       sin patron del mes desde 2026-10-07 (TIPOS_CON_ESTACIONALIDAD).
 PERSISTENCIA_DESVIACION = {"nivel": 1.0, "indice": 0.8, "lag": 1.0, "fnd": 1.0, "factor_log": 1.0, "factor": 1.0}
 # Con la desviacion conservada (phi = 1), de donde arranca la proyeccion: la desviacion del ultimo mes (1) o el promedio
 # de las desviaciones de los ultimos k meses respecto a la recta (k > 1: arranca del nivel reciente de la serie, no de un
@@ -324,7 +329,7 @@ CREDIBILIDAD_PENDIENTE = {"nivel": 1.0, "indice": "r2", "lag": 1.0, "fnd": "comb
 #      36. En el GTO (series_gto_meseta) el plano solo se queda en el promedio.
 #   4. Salto del ultimo mes (FND y CESION): si el ultimo cambio mensual supera k_salto veces la mediana de las
 #      desviaciones absolutas (MAD) de los cambios de 24 meses, no se extrapola tendencia desde el nuevo nivel
-#      (pendiente 0; se conserva el patron del mes).
+#      (pendiente 0; se conserva el patron del mes si el tipo lo lleva).
 #   5. La pendiente se amortigua (amortiguacion 0.95 por mes: a 16 meses recorre 66 % de la recta; nunca da la vuelta,
 #      asi que no hay curvas de regreso) y se reduce, sin cambiar de signo, si a meses_tope meses sacaria la razon del
 #      rango de los ultimos 36 meses reales ampliado tope_rango veces ese rango (salvaguarda de plausibilidad).
@@ -347,7 +352,8 @@ CREDIBILIDAD_PENDIENTE = {"nivel": 1.0, "indice": "r2", "lag": 1.0, "fnd": "comb
 #     ser el ultimo mes); si el salto es el ultimo mes, no se proyecta tendencia desde el nuevo nivel
 #     (salto_ultimo_sin_tendencia, como la regla de la pendiente combinada);
 #   - tope de plausibilidad: la tendencia se reduce, sin invertirse, si a meses_tope meses sacaria el FND del rango de los
-#     ultimos 36 meses reales ampliado tope_rango veces el rango; encima va el patron del mes del ano.
+#     ultimos 36 meses reales ampliado tope_rango veces el rango; encima iria el patron del mes del ano, que el FND
+#     ya no lleva (TIPOS_CON_ESTACIONALIDAD, 2026-10-07).
 # beta, phi, k_salto y el tope son supuestos de modelacion declarados, no estimados: toda estimacion por verosimilitud o
 # AICc (ETS, SARIMA) lleva la tendencia a cero y aplana (una deriva de 1 % mensual contra un ruido de 10 % no la paga la
 # verosimilitud a un mes). Elegido en el banco de pruebas de los 22 FND contra ETS por maxima verosimilitud, SARIMA con
@@ -3326,7 +3332,7 @@ def _nota_cesion_area() -> str:
     if CESION_OBJETIVO:
         mes = CESION_OBJETIVO_MES or PERIODO_FIN
         partes.append("en linea recta desde el ultimo real hasta " + ", ".join(
-            f"{pr} {r}: {v:.0%}" for (pr, r), v in sorted(CESION_OBJETIVO.items(), key=lambda kv: (kv[0][0], int(kv[0][1]))))
+            f"{pr} {r}: {v * 100:g}%" for (pr, r), v in sorted(CESION_OBJETIVO.items(), key=lambda kv: (kv[0][0], int(kv[0][1]))))
                       + f" en {mes} (CESION_OBJETIVO)")
     if CESION_TENDENCIA:
         partes.append(", ".join(f"{pr} {r}: la tendencia de sus ultimos {n} meses (Theil-Sen, frenada "
@@ -3356,7 +3362,10 @@ def _cesion_area(pref: str, ramo, per: list[int], vals: list[float], f_modelo, p
     if clave in CESION_OBJETIVO:
         objetivo = float(CESION_OBJETIVO[clave])
         mes_obj = int(CESION_OBJETIVO_MES or periodos_proy[-1])
-        n = periodos_proy.index(mes_obj) + 1 if mes_obj in periodos_proy else h
+        if mes_obj not in periodos_proy:
+            raise ValueError(f"CESION_OBJETIVO_MES = {mes_obj} no es un mes proyectado ({periodos_proy[0]} a "
+                             f"{periodos_proy[-1]}): pon un mes del horizonte o None (el ultimo)")
+        n = periodos_proy.index(mes_obj) + 1
         f = u + (objetivo - u) * np.minimum(np.arange(1, h + 1), n) / n
         cambio = (objetivo - u) / n
         texto = (f"indicacion del area: de {u:.1%} ({ultimo}) a {objetivo:.1%} en {mes_obj}, en linea recta "
@@ -3365,7 +3374,11 @@ def _cesion_area(pref: str, ramo, per: list[int], vals: list[float], f_modelo, p
                                     "alerta": texto}
     n = max(2, int(CESION_TENDENCIA[clave]))
     w = y[ok[-n:]]                                            # los ultimos n meses con dato
+    if len(w) < 3:                                            # (sin historia suficiente: se queda el modelo, con aviso)
+        return f_modelo, None
     b, _ = _recta_robusta(w, "theil")                         # puntos por mes
+    if not np.isfinite(b):
+        return f_modelo, None
     phi = PENDIENTE_COMBINADA["amortiguacion"]
     f = np.clip(u + b * np.cumsum(phi ** np.arange(1, h + 1)), lo, hi)
     texto = (f"indicacion del area: sigue la tendencia de sus ultimos {len(w)} meses reales ({b * 100:+.2f} pts por mes, "
@@ -3396,7 +3409,7 @@ def calcular_bel_fnd(bd: BDMontos, hp, resultados: dict, proy: dict, pe: dict, p
     p12 = _suma_12(pe)
     out = {"proy": dict(proy), "aplica": set(), "fnd": {}, "razones": {}, "series": [], "resumen": [], "estado": "",
            "p12": p12, "alertas": [], "neto_fijo": {}, "is_fa_bel": set(), "bel_area": {}, "estado_area": {},
-           "sin_area": []}
+           "sin_area": [], "cesion_area": set()}
     is_fa_val = is_fa_val or {}
     bel_area, motivo_area = bel_area or {}, motivo_area or {}
     config_area = _bel_metodo_area()
@@ -3520,6 +3533,9 @@ def calcular_bel_fnd(bd: BDMontos, hp, resultados: dict, proy: dict, pe: dict, p
                                 modelo_txt, regla_p = area_ces["modelo"], area_ces["regla"]
                                 cambio_txt = area_ces["cambio_mensual"]
                                 out["alertas"].append(("DANOS", clave_al, area_ces["alerta"]))
+                                out["cesion_area"].add((pref, str(r)))
+                            if len(f) != h or not np.all(np.isfinite(f)):
+                                f = np.full(h, vals[ok_p[-1]])      # (por si la indicacion no dio un camino finito)
                         fila.update({f"{nombre} modelo": modelo_txt,
                                      f"{nombre} regla de la pendiente": regla_p,
                                      f"{nombre} cambio mensual de la tendencia": cambio_txt,
@@ -3631,6 +3647,11 @@ def calcular_bel_fnd(bd: BDMontos, hp, resultados: dict, proy: dict, pe: dict, p
                     if (pref, p, r) in out["aplica"] else math.nan
                 fila[f"NETO con factores fijos en {ultimo} {p}"] = out["neto_fijo"].get((pref, p, r), math.nan)
             out["resumen"].append(fila)
+    for pr_, r_ in sorted((set(CESION_OBJETIVO) | set(CESION_TENDENCIA)) - out["cesion_area"]):
+        out["alertas"].append(("DANOS", f"{pr_} | CESION | ramo {r_}",
+                               "indicacion del area (CESION_OBJETIVO / CESION_TENDENCIA) sin aplicar: la serie no lleva BEL "
+                               "por FND, el ramo no esta en la BD o no tiene al menos 3 meses reales de cesion; su cesion "
+                               "sigue con el modelo aunque la nota de la columna CESION y el Resumen la mencionen"))
     n = len({(a, c) for a, _, c in out["aplica"]})
     out["estado"] = (f"{n} series (reserva x ramo) con BEL = IS x PEACUMULADA x FND desde {periodos_proy[0]}; "
                      f"{len(out['aplica'])} de {2 * len(bd.cols_ramo) * h} meses") if n else \
@@ -4957,7 +4978,8 @@ def escribir_diagnostico(resultados: dict, periodos_proy: list[int], alertas_gen
         ("2. Modelo", "Montos, indices y LAGs: linea de tendencia historica (regresion lineal, en logaritmos cuando "
                       f"la serie es positiva) sobre los ultimos {MESES_TENDENCIA or 'N/A'} meses, continuada desde el "
                       "ultimo dato real: la proyeccion sale paralela a la linea de tendencia de Excel y arranca del "
-                      "ultimo real. En montos e indices se suma ademas el patron por mes del ano (estacionalidad "
+                      "ultimo real. En " + ("los montos" if tuple(TIPOS_CON_ESTACIONALIDAD) == ("nivel",) else
+                                             " e ".join(TIPOS_CON_ESTACIONALIDAD)) + " se suma ademas el patron por mes del ano (estacionalidad "
                       "mensual: promedio, por mes del ano, de la serie menos su media movil centrada de 12 meses, sobre "
                       f"{'toda la historia' if MESES_ESTACIONALIDAD is None else 'los ultimos ' + str(MESES_ESTACIONALIDAD) + ' meses'}, "
                       f"ponderado por su credibilidad: {DESCRIPCION_CREDIBILIDAD[CREDIBILIDAD_ESTACIONAL]}; con menos de "
@@ -4972,8 +4994,11 @@ def escribir_diagnostico(resultados: dict, periodos_proy: list[int], alertas_gen
                       "tendencia). BEL por FND (Danos): FND con Holt amortiguado con guardia de saltos (serie de tiempo: "
                       f"nivel = ultimo real, tendencia = promedio exponencial de los cambios mensuales, beta {HOLT_FND['beta']}, "
                       f"amortiguada {HOLT_FND['phi']} por mes; un salto de mas de {HOLT_FND['k_salto']:.0f} MAD mueve el nivel "
-                      "y no la tendencia; tope al rango de 36 meses; con el patron del mes), FACTOR GTO y FACTOR MR con la "
-                      "pendiente combinada (ver 'Pendiente proyectada') y CESION con SES. RCONT: "
+                      "y no la tendencia; tope al rango de 36 meses; " + ("con" if "fnd" in TIPOS_CON_ESTACIONALIDAD else "sin")
+                      + " el patron del mes), FACTOR GTO y FACTOR MR con la pendiente combinada (ver 'Pendiente proyectada'), "
+                      + ("con" if "factor_log" in TIPOS_CON_ESTACIONALIDAD else "sin") + " patron del mes, y CESION con SES"
+                      + (" salvo los ramos con indicacion del area (ver 'Cesion por indicacion del area')" if CESION_OBJETIVO or CESION_TENDENCIA else "")
+                      + ". RCONT: "
                       f"{MODELO_TRIMESTRAL} (estacionalidad por mes del trimestre) si hay al menos "
                       f"{MIN_OBS_TRIMESTRAL} meses; con menos, SES (nivel). Series cortas: SES (< 6 obs para la tendencia) o ultimo valor (< 4). "
                       "Los conceptos derivados (NETO, BRUTO de Danos, IRR, GTO, MR) y los totales por ramo no siguen "
