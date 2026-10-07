@@ -89,6 +89,7 @@ SALIDA_DASHBOARD = SALIDAS / "Dashboard_Indices_Reservas.xlsx"
 
 HOJA_PARAMETROS = "HParametros_2026"
 HOJA_MONTOS = "BD_Montos_RRC_SONR"
+ETIQUETA_BACKTESTING = "BACKTESTING"     # renglones de backtesting de la BD (BACKTESTING_ETIQUETA del modelo)
 INDICES = ["Ind Sin RRC", "Ind sin RRC 99.5%", "Ind Sin SONR Media", "Ind Sin SONR 99.5%"]
 LAGS = [f"LAG {i}" for i in range(1, 11)]
 PRIMER_PERIODO_INDICES = 202101
@@ -224,6 +225,8 @@ def leer_montos(ultimo: int):
             if per < PRIMER_PERIODO_MONTOS:
                 continue
             concepto = norm(f[c_conc])
+            if concepto.startswith(norm(ETIQUETA_BACKTESTING) + " "):   # (renglones de backtesting: no son real ni proyeccion)
+                continue
             reserva, conc = ("RFV", "RCONT") if concepto == "RCONT" else concepto.split(" ", 1)
             ramos.setdefault(reserva, list(c_ramos))
             t = numero(f[c_tc])

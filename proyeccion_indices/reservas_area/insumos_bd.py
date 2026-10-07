@@ -441,7 +441,7 @@ class InsumosBD:
         for r in ws.iter_rows(min_row=fila + 1, values_only=True):
             concepto = norm(r[c_con]) if c_con < len(r) else ""
             periodo = _num(r[c_per]) if c_per < len(r) else math.nan
-            if not concepto or math.isnan(periodo):
+            if not concepto or math.isnan(periodo) or concepto.startswith("BACKTESTING "):   # (backtesting: no es dato)
                 continue
             periodo = int(periodo)
             self.periodos_montos.add(periodo)

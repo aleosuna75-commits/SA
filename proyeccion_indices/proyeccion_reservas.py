@@ -161,7 +161,7 @@ except Exception as _e:  # noqa: BLE001
 # =============================================================================
 CARPETA = Path(__file__).resolve().parent
 ENTRADAS = CARPETA / "entradas"
-VERSION_CODIGO = "2026-10-07a"   # version de los scripts: sale en la consola, en la hoja Resumen del diagnostico, en el pie
+VERSION_CODIGO = "2026-10-07b"   # version de los scripts: sale en la consola, en la hoja Resumen del diagnostico, en el pie
                                  # del tablero HTML y en la hoja Dashboard Razones del Excel, para saber con que version se corrio
 SALIDAS = CARPETA / "salidas"
 
@@ -654,6 +654,22 @@ CESION_TENDENCIA = {("RRC", "50"): 12}
                                  # reales de la cesion (puntos por mes), frenada como la pendiente combinada
                                  # (PENDIENTE_COMBINADA["amortiguacion"] por mes) y acotada a DOMINIO_CESION ("que tome la
                                  # tendencia del ultimo ano, poco a poco")
+# Backtesting (Danos, 2026-10-07): el mismo calculo de la proyeccion (modelo de las series, IS y LAG de HParametros
+# proyectados, BEL = IS x PEACUMULADA x FND, factores y cesion), pero con la historia cortada en el mes anterior a
+# BACKTESTING_DESDE, para los meses BACKTESTING_DESDE a BACKTESTING_HASTA. Va al final de BD_Montos_RRC_SONR, despues de
+# todos los conceptos, con CONCEPTO "<BACKTESTING_ETIQUETA> <concepto>" (p. ej. "BACKTESTING RRC BEL"), un bloque de meses por
+# concepto, en valores (sus parametros son los de la fecha de corte, no los de la hoja), con los bloques de indicadores del
+# mes; y en las hojas Backtesting_Resumen y Backtesting_Mensual del diagnostico contra lo real (y contra la proyeccion
+# vigente en los meses que todavia no son reales). No cambia la proyeccion. La PE es la misma de la proyeccion (la real
+# en los meses reales): el backtesting mide el metodo dada la prima. No lleva las indicaciones del area de la cesion
+# (CESION_OBJETIVO, CESION_TENDENCIA: se fijaron con la historia a 202608 y para el horizonte de la proyeccion) ni el
+# factor de prima. El IS (FA) entra en los meses que trae el archivo, como en la proyeccion.
+BACKTESTING = True
+BACKTESTING_DESDE = 202601       # primer mes del backtesting (la historia llega al mes anterior)
+BACKTESTING_HASTA = 202612       # ultimo mes del backtesting
+BACKTESTING_ETIQUETA = "BACKTESTING"
+MIN_REAL_BACKTESTING = 1e5       # USD: con un real menor a esto (promedio por mes, o en el mes) no se calcula el error % (p. ej.
+                                 # SONR 80, que SAP registra en 0 y el backtesting saca del metodo del area)
 CUENTA_PE_FCST = "61"            # cuenta de prima tomada en CtaMens (la que suma ER_ram)
 RAMO_FCST_A_BD = {"10": "10", "31": "30", "35": "34", "39": "37", "40": "40", "46": "40", "50": "50", "60": "60",
                   "71": "71", "73": "73", "80": "80", "90": "90", "100": "100", "110": "110"}
@@ -1474,6 +1490,8 @@ class BDMontos:
     filas_prima: dict = field(default_factory=dict)   # (concepto, periodo) -> fila de los meses de prima anteriores al
                                                       # primer mes con montos (AGREGAR_MESES_PRIMA): sin montos, no son
                                                       # historia del modelo
+    filas_backtest: dict = field(default_factory=dict)   # (concepto, periodo) -> fila "BACKTESTING <concepto>" (BACKTESTING):
+                                                         # no son historia; se reutilizan al volver a escribir
 
 
 def leer_bd_montos(ruta: Path) -> BDMontos:
@@ -1482,12 +1500,16 @@ def leer_bd_montos(ruta: Path) -> BDMontos:
     enc = {norm(ws.cell(3, c).value): c for c in range(1, ws.max_column + 1) if ws.cell(3, c).value}
     cols_ramo = {h.split("_", 1)[1]: c for h, c in enc.items() if h.startswith("RAM_")}
     filas, valores, tc, conceptos, vacias = {}, {}, {}, [], set()
+    filas_bt, etiqueta_bt = {}, norm(BACKTESTING_ETIQUETA) + " "
     for r in range(4, ws.max_row + 1):
         concepto = ws.cell(r, enc["CONCEPTO"]).value
         periodo = ws.cell(r, enc["PERIODO"]).value
         if not concepto or not isinstance(periodo, (int, float)):
             continue
         concepto, periodo = norm(concepto), int(periodo)
+        if concepto.startswith(etiqueta_bt):          # (renglones de backtesting de una corrida anterior: no son historia)
+            filas_bt[(concepto[len(etiqueta_bt):], periodo)] = r
+            continue
         if concepto not in conceptos:
             conceptos.append(concepto)
         filas[(concepto, periodo)] = r
@@ -1508,7 +1530,7 @@ def leer_bd_montos(ruta: Path) -> BDMontos:
         for ramo in cols_ramo:
             valores.pop((c, p, ramo), None)
     return BDMontos(ruta, wb, ws, enc["CONCEPTO"], enc["PERIODO"], enc["TC"], cols_ramo, filas, valores, tc,
-                    conceptos, set(filas.values()) | set(filas_prima.values()), filas_prima)
+                    conceptos, set(filas.values()) | set(filas_prima.values()), filas_prima, filas_bt)
 
 
 def tc_para_periodo(bd: BDMontos, p: int) -> float:
@@ -3390,7 +3412,7 @@ def _cesion_area(pref: str, ramo, per: list[int], vals: list[float], f_modelo, p
 
 def calcular_bel_fnd(bd: BDMontos, hp, resultados: dict, proy: dict, pe: dict, periodos_proy: list[int],
                      ultimo: int, is_fa_val: dict | None = None, bel_area: dict | None = None,
-                     motivo_area: dict | None = None) -> dict:
+                     motivo_area: dict | None = None, indicaciones_area: bool = True) -> dict:
     """BEL por FND: FND = PND / PEACUMULADA en la historia (PND = BEL / IS), proyectado con la tendencia desde el primer
     mes proyectado; BEL = IS x PEACUMULADA x FND; GTO = PND x FACTOR GTO y MR = PND x FACTOR MR (PND = BEL / IS), con los
     factores reales proyectados con el modelo del FND (TIPO_MODELO_FACTORES); BRUTO = BEL + GTO + MR; IRR = BRUTO x CESION (IRR /
@@ -3526,7 +3548,7 @@ def calcular_bel_fnd(bd: BDMontos, hp, resultados: dict, proy: dict, pe: dict, p
                             regla_p = f"nivel suavizado (SES, alpha {prm.get('alpha', math.nan):.2f}), sin tendencia"
                         modelo_txt, cambio_txt = res_f.regla or res_f.modelo, _cambio_mensual(res_f, vals[ok_p[-1]])
                         area_ces = None
-                        if nombre == "CESION":                 # cesion por indicacion del area (CESION_OBJETIVO, CESION_TENDENCIA)
+                        if nombre == "CESION" and indicaciones_area:   # cesion por indicacion del area (CESION_OBJETIVO, CESION_TENDENCIA)
                             f, area_ces = _cesion_area(pref, r, per_f, [vals.get(q, math.nan) for q in per_f], f,
                                                        periodos_proy, dom)
                             if area_ces:
@@ -3647,7 +3669,7 @@ def calcular_bel_fnd(bd: BDMontos, hp, resultados: dict, proy: dict, pe: dict, p
                     if (pref, p, r) in out["aplica"] else math.nan
                 fila[f"NETO con factores fijos en {ultimo} {p}"] = out["neto_fijo"].get((pref, p, r), math.nan)
             out["resumen"].append(fila)
-    for pr_, r_ in sorted((set(CESION_OBJETIVO) | set(CESION_TENDENCIA)) - out["cesion_area"]):
+    for pr_, r_ in sorted((set(CESION_OBJETIVO) | set(CESION_TENDENCIA)) - out["cesion_area"] if indicaciones_area else ()):
         out["alertas"].append(("DANOS", f"{pr_} | CESION | ramo {r_}",
                                "indicacion del area (CESION_OBJETIVO / CESION_TENDENCIA) sin aplicar: la serie no lleva BEL "
                                "por FND, el ramo no esta en la BD o no tiene al menos 3 meses reales de cesion; su cesion "
@@ -3657,6 +3679,206 @@ def calcular_bel_fnd(bd: BDMontos, hp, resultados: dict, proy: dict, pe: dict, p
                      f"{len(out['aplica'])} de {2 * len(bd.cols_ramo) * h} meses") if n else \
         "ninguna serie con PE, IS y LAG suficientes: el BEL sigue con el modelo"
     return out
+
+
+def calcular_backtesting(bd: BDMontos, hp: HParam, pe: dict, is_fa_val: dict | None, ultimo: int) -> dict:
+    """BACKTESTING: la proyeccion de Danos con la historia cortada en el mes anterior a BACKTESTING_DESDE (BD de montos y
+    HParametros), para los meses BACKTESTING_DESDE a BACKTESTING_HASTA: las mismas series y modelos (correr_series), las
+    mismas identidades (derivar_montos) y el mismo BEL por FND (calcular_bel_fnd, sin las indicaciones del area de la
+    cesion), con la PE de la proyeccion y el IS (FA) donde el archivo lo trae. Regresa {"estado", "corte", "periodos",
+    "proy": {(concepto, periodo, ramo): USD}, "indicadores": {(reserva, periodo, ramo): {bloque: valor}}, "aplica",
+    "metodo": {(reserva, ramo): texto}, "alertas": [textos]}; "proy" vacio si no se calcula."""
+    out = {"estado": "", "corte": None, "periodos": [], "proy": {}, "indicadores": {}, "aplica": set(), "metodo": {},
+           "alertas": []}
+    if not BACKTESTING:
+        out["estado"] = "apagado (BACKTESTING = False)"
+        return out
+    desde, hasta = int(BACKTESTING_DESDE), int(BACKTESTING_HASTA)
+    corte = _mes_menos(desde, 1)
+    primero = min((p for (_, p) in bd.filas), default=None)
+    if primero is None or hasta < desde or corte >= ultimo or corte < _mes_menos(primero, -MIN_MESES_FND):
+        out["estado"] = (f"no se calcula: BACKTESTING_DESDE ({desde}) a BACKTESTING_HASTA ({hasta}) debe empezar despues de "
+                         f"{MIN_MESES_FND} meses de historia y antes del ultimo mes real ({ultimo})")
+        return out
+    per = rango_periodos(desde, hasta)
+    h = len(per)
+    bd_bt = replace(bd, filas={k: v for k, v in bd.filas.items() if k[1] <= corte},
+                    valores={k: v for k, v in bd.valores.items() if k[1] <= corte}, filas_prima={}, filas_backtest={})
+    filas_hp = {k: r for k, r in hp.filas.items() if k[1] <= corte}
+    if not filas_hp:
+        out["estado"] = f"no se calcula: {HOJA_PARAMETROS} no trae renglones '{TIPO_INDICE_BASE}' hasta {corte}"
+        return out
+    hp_bt = replace(hp, historia={k: {f: v for f, v in d.items() if f <= corte} for k, d in hp.historia.items()},
+                    filas=filas_hp, ultimo=max(f for (_, f) in filas_hp), lags_cero=[])
+    tc_hist = leer_tc_real(bd_bt, corte, "DANOS") if MODELAR_EN_MXN.get("DANOS") else None
+    series = (series_montos(bd_bt, "DANOS", ESTRUCTURA["DANOS"], corte, h, tc_hist)
+              + series_hparametros(hp_bt, h, corte))
+    print(f"   Backtesting: historia hasta {corte}, {len(series)} series, meses {per[0]} a {per[-1]} ...", flush=True)
+    res = correr_series(series)
+    ajustar_orden_indices(hp_bt, res, [])
+    proy = derivar_montos(bd_bt, "DANOS", ESTRUCTURA["DANOS"], res, per, en_mxn=tc_hist is not None)
+    info = {"proy": proy, "aplica": set(), "series": [], "resumen": [], "estado": "sin BEL por FND"}
+    if USAR_BEL_POR_FND:
+        info_area, basura = {}, []
+        try:
+            bel_area = leer_bel_metodo_area(corte, basura, info_area)
+        except Exception as e:  # noqa: BLE001
+            bel_area = {}
+            out["alertas"].append(f"no se pudo leer el BEL del metodo del area ({type(e).__name__}: {e})")
+        info = calcular_bel_fnd(bd_bt, hp_bt, res, proy, pe, per, corte, is_fa_val, bel_area,
+                                info_area.get("motivos"), indicaciones_area=False)
+    validar(info["proy"], {})
+    out.update({"corte": corte, "periodos": per, "proy": {k: v for k, v in info["proy"].items() if k[1] in per},
+                "aplica": set(info.get("aplica") or ()), "estado_fnd": info.get("estado", "")})
+    for f in info.get("resumen") or []:
+        out["metodo"][(f["Reserva"], str(f["Ramo"]))] = (
+            "BEL por FND" if f.get("Meses con BEL por FND") else f"modelo ({f.get('Motivo') or 'sin BEL por FND'})")
+    # indicadores del mes como los bloques de la hoja (en valores): IS, PEACUMULADA, FND, PND/PD, factores y cesion
+    pos = {p: i for i, p in enumerate(per)}
+    serie = {(s["Reserva"], s["Periodo"], s["Ramo"]): s for s in info.get("series") or []}
+    p12 = _suma_12(pe)
+    for pref, (nombre_is, _) in INDICE_BASE_PND.items():
+        anios = ANIOS_LAG_PEACUMULADA.get(pref, 0)
+        for r in bd.cols_ramo:
+            r_hp = MAPA_RAMO_LAG.get(str(r))
+            for p in per:
+                def m(c):
+                    return out["proy"].get((norm(f"{pref} {c}"), p, r), math.nan)
+                bel, mr, bruto, irr = m("BEL"), m("MR"), m("BRUTO"), m("IRR")
+                gto = m("GTO") if pref == "RRC" else 0.0
+                is_rl = _hp_fuente(hp_bt, res, r_hp, nombre_is, p, pos)[0]
+                lags = {k: _hp_fuente(hp_bt, res, r_hp, f"LAG {k}", p, pos)[0] for k in range(1, max(1, anios) + 1)}
+                s = serie.get((pref, p, r)) if (pref, p, r) in out["aplica"] else None
+                is_u = float(s["IS"]) if s else is_rl
+                pnd = bel / is_u if np.isfinite(bel) and np.isfinite(is_u) and is_u != 0 else math.nan
+                peac = float(s["PEACUMULADA"]) if s else _peacumulada(pref, r, p, p12, lags)
+                fnd = float(s["FND"]) if s else (pnd / peac if np.isfinite(pnd) and np.isfinite(peac) and peac else math.nan)
+                pe_v = pe.get((r, p))
+                fa = (is_fa_val or {}).get((pref, str(r), p))
+                ok_pnd = np.isfinite(pnd) and pnd != 0
+                out["indicadores"][(pref, p, r)] = {
+                    "PND/PD": pnd,
+                    "FA": pnd / p12[(r, p)] if np.isfinite(pnd) and p12.get((r, p)) else math.nan,
+                    "FACTOR GTO": (gto / pnd if ok_pnd and np.isfinite(gto) else math.nan) if pref == "RRC"
+                    else (0.0 if np.isfinite(pnd) else math.nan),
+                    "FACTOR MR": mr / pnd if ok_pnd and np.isfinite(mr) else math.nan,
+                    "CESION": irr / bruto if np.isfinite(irr) and np.isfinite(bruto) and bruto else
+                    (0.0 if np.isfinite(bruto) else math.nan),
+                    "IS (RL)": is_rl, "IS (FA)": float(fa) if fa is not None and np.isfinite(fa) else math.nan,
+                    "LAG (RL)": lags.get(1, math.nan),
+                    "PE FCST": float(pe_v[0]) if isinstance(pe_v, tuple) else (float(pe_v) if pe_v is not None else math.nan),
+                    "PRIMA N AÑOS": p12.get((r, p), math.nan), "PEACUMULADA": peac, "FD/FND": fnd}
+    n_fnd = len({(a, c) for a, _, c in out["aplica"]})
+    out["estado"] = (f"historia hasta {corte}; {per[0]} a {per[-1]} ({h} meses); {n_fnd} series (reserva x ramo) con BEL por "
+                     "FND; misma PE que la proyeccion; sin las indicaciones del area de la cesion")
+    return out
+
+
+def comparar_backtesting(bt: dict, bd: BDMontos, proy_final: dict, ultimo: int) -> dict:
+    """Backtesting contra lo real (meses hasta ultimo) y contra la proyeccion vigente (meses despues), por concepto, ramo y
+    mes, con el total de ramos: {"mensual": [...], "resumen": [...]} para el diagnostico."""
+    proy, per = bt.get("proy") or {}, bt.get("periodos") or []
+    if not proy:
+        return {"mensual": [], "resumen": []}
+    conceptos = [c for c in bd.conceptos if any((c, p, r) in proy for p in per for r in bd.cols_ramo)]
+    ramos = list(bd.cols_ramo)
+    mensual, resumen = [], []
+    for c in conceptos:
+        pref = c.split()[0]
+        for r in ramos + ["TOTAL"]:
+            rs = ramos if r == "TOTAL" else [r]
+            filas = []
+            for p in per:
+                b = sum(proy.get((c, p, x), 0.0) for x in rs)
+                es_real = p <= ultimo
+                ref = sum((bd.valores.get((c, p, x), 0.0) if es_real else proy_final.get((c, p, x), 0.0)) for x in rs)
+                filas.append((p, b, ref, es_real))
+                mensual.append({"Concepto": c, "Ramo": r, "Periodo": p, "Backtesting": b,
+                                "Referencia": ref, "Referencia es": "real" if es_real else "proyeccion vigente",
+                                "Diferencia": b - ref,
+                                "Diferencia %": (b / ref - 1) if abs(ref) >= MIN_REAL_BACKTESTING else None})
+            reales = [(b, ref) for _, b, ref, es in filas if es]
+            den = sum(abs(ref) for _, ref in reales)
+            comparable = bool(reales) and den >= MIN_REAL_BACKTESTING * len(reales)
+            fin = filas[-1]
+            ult = next(((b, ref) for p, b, ref, es in filas if p == ultimo), None)
+            resumen.append({
+                "Concepto": c, "Ramo": r,
+                "Como se proyecto": ("varios" if r == "TOTAL" else bt.get("metodo", {}).get((pref, r), "modelo")),
+                "Meses reales comparados": len(reales),
+                "Error % (suma |dif| / suma |real|)": (sum(abs(b - ref) for b, ref in reales) / den) if comparable else None,
+                "Sesgo % (suma dif / suma |real|)": (sum(b - ref for b, ref in reales) / den) if comparable else None,
+                f"Real {ultimo}": ult[1] if ult else None, f"Backtesting {ultimo}": ult[0] if ult else None,
+                f"Dif % {ultimo}": (ult[0] / ult[1] - 1) if ult and abs(ult[1]) >= MIN_REAL_BACKTESTING else None,
+                f"Proyeccion vigente {fin[0]}" if not fin[3] else f"Real {fin[0]}": fin[2],
+                f"Backtesting {fin[0]}": fin[1],
+                f"Dif % {fin[0]}": (fin[1] / fin[2] - 1) if abs(fin[2]) >= MIN_REAL_BACKTESTING else None,
+                "Nota": ("" if comparable or not reales else
+                         f"real menor a {MIN_REAL_BACKTESTING:,.0f} USD al mes en promedio: sin error % "
+                         "(SAP en cero o casi; el backtesting puede salir de otra fuente, p. ej. el metodo del area)")})
+    return {"mensual": mensual, "resumen": resumen}
+
+
+def escribir_backtesting(bd: BDMontos, bt: dict, cols_ind: dict | None) -> int:
+    """Renglones BACKTESTING al final de la hoja de montos: un bloque de meses por concepto (en el orden de los conceptos
+    del ano), CONCEPTO "<BACKTESTING_ETIQUETA> <concepto>", el TC del mes, los montos del backtesting en valores, RVATOT y
+    RVA_SEXC con su formula y los bloques de indicadores con los del backtesting en valores (N/A sin dato). Reutiliza
+    los renglones que ya traia la BD de entrada y vacia los que sobran. Regresa cuantos renglones escribio."""
+    ws = bd.ws
+    proy, per = bt.get("proy") or {}, bt.get("periodos") or []
+    ultima_col = ws.max_column
+    usadas = set()
+    if proy and per:
+        conceptos = [c for c in bd.conceptos if any((c, p, r) in proy for p in per for r in bd.cols_ramo)]
+        anio_ref = per[0] // 100
+        primera = {c: min((r for (cc, p), r in bd.filas.items() if cc == c and p // 100 == anio_ref), default=10 ** 9)
+                   for c in conceptos}
+        orden = sorted(conceptos, key=lambda c: primera[c])
+        cols_bloque = set((cols_ind or {}).values())
+        for col in range(1, ultima_col + 1):              # (bloques de una corrida anterior aunque hoy no se escriban)
+            m = re.match(r"^(.*\S)\s+(\d+)$", str(ws.cell(3, col).value or "").strip())
+            if m and not m.group(1).upper().startswith("RAM") and m.group(2) in bd.cols_ramo:
+                cols_bloque.add(col)
+        base = {bd.col_concepto, bd.col_periodo, bd.col_tc, *bd.cols_ramo.values()}
+        fila_nueva = ws.max_row + 1
+        for c in orden:
+            pref = c.split()[0]
+            for p in per:
+                plantilla = bd.filas.get((c, p)) or _fila_plantilla(bd, c, p)
+                r = bd.filas_backtest.get((c, p))
+                if r is None:
+                    r, fila_nueva = fila_nueva, fila_nueva + 1
+                usadas.add(r)
+                for col in range(1, ultima_col + 1):
+                    src, dst = ws.cell(plantilla, col), ws.cell(r, col)
+                    _copiar_estilo(src, dst)
+                    if col in base:
+                        continue
+                    v = src.value
+                    dst.value = (Translator(v, origin=src.coordinate).translate_formula(dst.coordinate)
+                                 if col not in cols_bloque and isinstance(v, str) and v.startswith("=") else None)
+                if ws.row_dimensions[plantilla].height:
+                    ws.row_dimensions[r].height = ws.row_dimensions[plantilla].height
+                ws.cell(r, bd.col_concepto).value = f"{BACKTESTING_ETIQUETA} {ws.cell(plantilla, bd.col_concepto).value}"
+                ws.cell(r, bd.col_periodo).value = p
+                ws.cell(r, bd.col_tc).value = tc_para_periodo(bd, p)
+                for ramo, col in bd.cols_ramo.items():
+                    v = proy.get((c, p, ramo))
+                    ws.cell(r, col).value = float(v) if v is not None and np.isfinite(v) else None
+                ind_mes = bt.get("indicadores") or {}
+                for (ind, ramo), col in (cols_ind or {}).items():
+                    x = (ind_mes.get((pref, p, ramo)) or {}).get(ind, math.nan)
+                    ws.cell(r, col).value = float(x) if isinstance(x, (int, float)) and np.isfinite(x) else TEXTO_SIN_DATO
+                bd.filas_backtest[(c, p)] = r
+    for k, r in list(bd.filas_backtest.items()):          # renglones de una corrida anterior que ya no van: se vacian
+        if r not in usadas:
+            for col in range(1, ultima_col + 1):
+                ws.cell(r, col).value = None
+            del bd.filas_backtest[k]
+    if ws.auto_filter and ws.auto_filter.ref:
+        ini, fin = ws.auto_filter.ref.split(":")
+        ws.auto_filter.ref = f"{ini}:{re.match(r'[A-Z]+', fin).group()}{ws.max_row}"
+    return len(usadas)
 
 
 def _diag_pnd_bd_final(diag: dict, proy_modelo: dict, proy_final: dict, ramos: list, periodos_proy: list[int]):
@@ -4966,6 +5188,9 @@ def escribir_diagnostico(resultados: dict, periodos_proy: list[int], alertas_gen
             f"{f['Escenario']} {f['Reserva']}: " + ", ".join(f"{k[5:]} {v / 1e6:,.1f}" for k, v in f.items()
                                                            if k.startswith("Proy ") and v is not None)
             for f in (resumen.get("comparativo") or {}).get("filas", [])) or "-"),
+        ("Backtesting", (((resumen.get("pnd") or {}).get("backtesting") or {}).get("estado") or "-")
+         + (f"; renglones '{BACKTESTING_ETIQUETA} <concepto>' al final de {HOJA_MONTOS}; hojas Backtesting_Resumen y "
+            "Backtesting_Mensual" if ((resumen.get("pnd") or {}).get("backtesting") or {}).get("proy") else "")),
         ("BEL del metodo del area", (resumen.get("pnd") or {}).get("sin_metodo_area")
          or (resumen.get("pnd") or {}).get("metodo_area") or "-"),
         ("Tiempo de ejecucion (s)", f"{resumen.get('segundos', 0):,.0f}"),
@@ -5407,6 +5632,13 @@ def _hojas_pnd(wb, diag: dict, negrita, encab):
                          "BEL": "#,##0"})
             _hoja_filas(wb, "BEL_FND_Mensual", fnd.get("series") or [], negrita, encab,
                         {"IS": "0.0000", "FND": "0.0000", "PEACUMULADA": "#,##0", "BEL": "#,##0"})
+        bt_ = (diag or {}).get("backtesting") or {}
+        if bt_.get("resumen"):
+            _hoja_filas(wb, "Backtesting_Resumen", bt_["resumen"], negrita, encab,
+                        {"Error": "0.0%", "Sesgo": "0.0%", "Dif": "0.0%", "Real": "#,##0", "Backtesting": "#,##0",
+                         "Proyeccion": "#,##0"})
+            _hoja_filas(wb, "Backtesting_Mensual", bt_.get("mensual") or [], negrita, encab,
+                        {"Backtesting": "#,##0", "Referencia": "#,##0", "Diferencia %": "0.0%", "Diferencia": "#,##0"})
     if not diag or not (diag.get("mensual") or diag.get("resumen")):
         hojas_fnd()
         return
@@ -6030,12 +6262,33 @@ def main():
             _diag_pnd_bd_final(diag_pnd, proy_modelo, proy_danos, list(bd_danos.cols_ramo), periodos_proy)
     diag_pnd["bel_fnd"] = info_fnd
     diag_pnd["proy_modelo"] = proy_modelo
+    bt = {"estado": "apagado (BACKTESTING = False)", "proy": {}}
+    if BACKTESTING:
+        print("Backtesting (Danos) ...", flush=True)
+        n0 = len(alertas)
+        try:
+            bt = calcular_backtesting(bd_danos, hp, pe_mes, is_fa["val"] if is_fa is not None else None, ultimo)
+            bt.update(comparar_backtesting(bt, bd_danos, proy_danos, ultimo))
+        except Exception as e:  # noqa: BLE001
+            del alertas[n0:]
+            bt = {"estado": f"error en el backtesting ({type(e).__name__}: {e}); no se agrega", "proy": {}}
+            alertas.append(("PND", "Backtesting", bt["estado"]))
+        print(f"   {bt['estado']}", flush=True)
+        for f in bt.get("resumen") or []:
+            if f["Ramo"] == "TOTAL" and f["Concepto"] in (norm("RRC BEL"), norm("RRC NETO"), norm("SONR BEL"),
+                                                           norm("SONR NETO")):
+                e_ = f["Error % (suma |dif| / suma |real|)"]
+                s_ = f["Sesgo % (suma dif / suma |real|)"]
+                print(f"      {f['Concepto']:<10} error {e_:.1%} y sesgo {s_:+.1%} en {f['Meses reales comparados']} meses reales"
+                      if e_ is not None else f"      {f['Concepto']}: sin meses reales", flush=True)
+    diag_pnd["backtesting"] = bt
 
     info_danos = escribir_bd_montos(bd_danos, proy_danos, periodos_proy, SALIDA_BD_DANOS)
     escribir_correccion_moneda(bd_danos, correcciones["DANOS"])
     n_hp = escribir_hparametros(hp, resultados, periodos_proy)
     meses_bd = ESCENARIOS_PND.get(BD_CON_ESCENARIO_PND) or next(iter(ESCENARIOS_PND.values()), None)
     hoja_pe = hoja_pe_ramo = None
+    cols_ind = {}                          # (bloque, ramo) -> columna de los bloques de indicadores
     ctx_is_fa = None                       # IS (FA): valores y celdas de la hoja HOJA_IS_FA
     avisos_ind = []
 
@@ -6081,6 +6334,9 @@ def main():
         for a in avisos_ind:
             alertas.append(("PND", "Indicadores de la BD", a))
             print(f"   AVISO: {a}", flush=True)
+    n_bt = escribir_backtesting(bd_danos, bt, cols_ind)
+    if n_bt:
+        print(f"   Backtesting: {n_bt} renglones '{BACKTESTING_ETIQUETA} <concepto>' al final de {HOJA_MONTOS}", flush=True)
     guardar_libro(bd_danos.wb, SALIDA_BD_DANOS, original=ARCHIVO_BD_DANOS)
     info_rfv = escribir_bd_montos(bd_rfv, proy_rfv, periodos_proy, SALIDA_BD_RFV)
     escribir_correccion_moneda(bd_rfv, correcciones["FIANZAS"])
