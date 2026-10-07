@@ -161,7 +161,7 @@ except Exception as _e:  # noqa: BLE001
 # =============================================================================
 CARPETA = Path(__file__).resolve().parent
 ENTRADAS = CARPETA / "entradas"
-VERSION_CODIGO = "2026-10-07h"   # version de los scripts: sale en la consola, en la hoja Resumen del diagnostico, en el pie
+VERSION_CODIGO = "2026-10-07i"   # version de los scripts: sale en la consola, en la hoja Resumen del diagnostico, en el pie
                                  # del tablero HTML y en la hoja Dashboard Razones del Excel, para saber con que version se corrio
 SALIDAS = CARPETA / "salidas"
 
@@ -707,11 +707,28 @@ MESES_PRIMA_RFV = 24             # meses de prima tomada de la PRIMA 24M (si cam
 TIPO_MODELO_FRV = "razon"        # "razon" = nivel suavizado sin tendencia (SES); "fnd" = Holt amortiguado con guardia
 MIN_MESES_FRV = 12               # meses minimos de FRV real para proyectarlo
 HOJA_PT_RAMO = "PT_RAMO"         # hoja de la BD de RFV con la prima tomada del mes por ramo (MXN) y su suma de 24 meses
+# Factores de la metodologia del area (RFV = (PR + GA) x permanencia; PR = PT - CAT - CRT - GAT - MUT; GA = PR x alfa;
+# IRR = RFV x RC x FCR, FCR = 1 - PD) como bloques de la BD de RFV. RFV BRUTO = PRIMA 24M x FPR x (1 + %GA) x FV / TC,
+# con FPR = 1 - %COM - %CARGAS; IRR = RFV BRUTO x RC x FCR. FV (permanencia) y RC son los que se proyectan (con los
+# modelos del FRV y de la cesion); los demas son de los datos o del area. Con %COM, %CARGAS y %GA fijos la RFV proyectada
+# es la misma que sin los bloques: los factores la explican y, si se cambian en la hoja, la mueven.
+FACTORES_RFV = True
+CARGAS_RFV = 0.171903149570019   # %CARGAS: costos de cobertura, gastos de administracion y margen de utilidad sobre la
+                                 # prima tomada (CRT + GAT + MUT; %CargasPma del script de FCST de Fianzas del area)
+GASTO_ADMON_RFV = 0.0426831495700193
+                                 # %GA: gastos de administracion sobre la prima de reserva (GA = PR x alfa; %GastoAdmon del
+                                 # mismo script, el del reafianzamiento extranjero proporcional y no proporcional)
+COMISION_RFV = None              # %COM por ramo, p. ej. {"160": 0.40}; None = comisiones / prima tomada de la base del real
+                                 # por contrato (comisiones_fianzas: hoy BDReal26, de enero al ultimo mes que trae)
+PD_FIANZAS = {}                  # probabilidad de incumplimiento del reasegurador por ramo (Anexo 8.20.2 de la CUSF; el area
+                                 # la toma por poliza de su archivo de default), p. ej. {"160": 0.003}. Sin dato (hoy
+                                 # ninguna base la trae) el bloque PD va en N/A y FCR = 1: RC = CESION
 RAMO_FCST_FIANZAS = {"130": "130", "140": "140", "150": "150", "160": "160", "170": "170"}
                                  # Ramo2 de CtaMens del FCST -> ramo de la BD de RFV (la prima del ano siguiente)
 RAMO_RFCST_FIANZAS = "130"       # RAMO del reforecast por mes (RCST_FA) con toda la prima de Fianzas: se reparte entre los
                                  # ramos de la BD de RFV con la mezcla de PExRamo de los ultimos 12 meses
 CUENTA_PE_FCST = "61"            # cuenta de prima tomada en CtaMens (la que suma ER_ram)
+CUENTA_COM_FCST = "53"           # cuenta de comisiones en CtaMens (hoja Valores del FCST: Comisiones 5310...); Fianzas
 RAMO_FCST_A_BD = {"10": "10", "31": "30", "35": "34", "39": "37", "40": "40", "46": "40", "50": "50", "60": "60",
                   "71": "71", "73": "73", "80": "80", "90": "90", "100": "100", "110": "110"}
                                  # Ramo2 de CtaMens -> ramo de la BD (Resp. Civil trae 40 y 46; Fianzas, 140 a 170,
@@ -2734,7 +2751,8 @@ def leer_pe_fcst(ruta: Path | None = None) -> dict | None:
     {"ruta", "mensual": {(ramo, periodo): prima del mes}, "acumulada": {(ramo, periodo): acumulado del ano},
     "nombres": {ramo: "Incendio"...}, "periodos", "renglones", "usados", "fuera": {ramo del FCST: prima},
     "fuera_mensual": {(Ramo2, periodo): prima del mes} de los ramos fuera de la BD (Fianzas: RFV por prima),
-    "control": texto de la verificacion contra lo que muestra ER_ram, "avisos": [...]}; None si no hay archivo."""
+    "fuera_cedida_mensual" (la columna CEDIDA de esa prima) y "fuera_com_mensual" (cuenta CUENTA_COM_FCST) de esos
+    ramos, "control": texto de la verificacion contra lo que muestra ER_ram, "avisos": [...]}; None si no hay archivo."""
     ruta = Path(ruta or ARCHIVO_PE_FCST)
     if not ruta.exists():
         return None
@@ -2752,6 +2770,8 @@ def leer_pe_fcst(ruta: Path | None = None) -> dict | None:
         raise ValueError(f"{ruta.name} › CtaMens: no se encontro el encabezado (CALMONTH, GL_ACCT, AMOUNT, RamoN, Ramo2)")
     enc = filas[i_enc]
     j = {n: enc.index(n) for n in ("CALMONTH", "GL_ACCT", "AMOUNT", "RamoN", "Ramo2")}
+    j_ced = enc.index("CEDIDA") if "CEDIDA" in enc else None
+    ced_fuera, com_fuera = {}, {}          # (Ramo2 fuera de la BD, periodo) -> prima cedida / comisiones (Fianzas)
 
     def codigo(v):
         return str(int(v)) if isinstance(v, (int, float)) and not isinstance(v, bool) and np.isfinite(v) \
@@ -2763,7 +2783,14 @@ def leer_pe_fcst(ruta: Path | None = None) -> dict | None:
         if not isinstance(mes, (int, float)) or isinstance(mes, bool) or not 190001 <= mes <= 299912:
             continue                                   # (renglon de totales o encabezado repetido)
         renglones += 1
-        if codigo(f[j["GL_ACCT"]]) != CUENTA_PE_FCST:
+        cta = codigo(f[j["GL_ACCT"]])
+        if cta == CUENTA_COM_FCST and RAMO_FCST_A_BD.get(codigo(f[j["Ramo2"]])) is None:
+            c_, _ = a_numero(f[j["AMOUNT"]])
+            if np.isfinite(c_):
+                k_ = (codigo(f[j["Ramo2"]]), int(mes))
+                com_fuera[k_] = com_fuera.get(k_, 0.0) + c_
+            continue
+        if cta != CUENTA_PE_FCST:
             continue
         monto, _ = a_numero(f[j["AMOUNT"]])
         if not np.isfinite(monto):
@@ -2774,6 +2801,10 @@ def leer_pe_fcst(ruta: Path | None = None) -> dict | None:
         if ramo is None:
             fuera[f"{r2} {nombre}"] = fuera.get(f"{r2} {nombre}", 0.0) - monto
             fuera_mes[(r2, p)] = fuera_mes.get((r2, p), 0.0) - monto
+            if j_ced is not None and len(f) > j_ced:
+                c_, _ = a_numero(f[j_ced])
+                if np.isfinite(c_):
+                    ced_fuera[(r2, p)] = ced_fuera.get((r2, p), 0.0) - c_
             continue
         usados += 1
         mensual[(ramo, p)] = mensual.get((ramo, p), 0.0) - monto
@@ -2823,7 +2854,8 @@ def leer_pe_fcst(ruta: Path | None = None) -> dict | None:
                 avisos.append(f"PE FCST no cuadra con ER_ram en {sel} (diferencia maxima {dif:,.0f} USD)")
     return {"ruta": ruta, "mensual": mensual, "acumulada": acumulada,
             "nombres": {r: ", ".join(sorted(v)) for r, v in nombres.items()}, "periodos": periodos,
-            "renglones": renglones, "usados": usados, "fuera": fuera, "fuera_mensual": fuera_mes, "control": control,
+            "renglones": renglones, "usados": usados, "fuera": fuera, "fuera_mensual": fuera_mes,
+            "fuera_cedida_mensual": ced_fuera, "fuera_com_mensual": com_fuera, "control": control,
             "avisos": avisos}
 
 
@@ -2882,8 +2914,9 @@ def leer_pe_ramo(tc: dict, ruta: Path | None = None) -> dict | None:
     los demas del ramo en proporcion a su prima del mes (sin pesos negativos). Un mes sin renglones de un ramo, desde
     su primer mes en la base, es prima 0 (la base omite las combinaciones sin movimiento). Regresa {"ruta", "mensual":
     {(ramo, periodo): USD}, "periodos", "renglones", "fuera": {ramo: USD}, "fuera_mensual": {(ramo, periodo): monto en
-    MONEDA_PE_RAMO} de los ramos fuera de la BD de Danos (Fianzas: RFV por prima), "sin_mapa": {ramo/subramo: USD},
-    "repartidos": USD, "avisos"} o None si no hay archivo."""
+    MONEDA_PE_RAMO} de los ramos fuera de la BD de Danos (Fianzas: RFV por prima), "fuera_cedida_mensual": lo mismo con
+    la prima cedida (PmaCed, si la base la trae), "sin_mapa": {ramo/subramo: USD}, "repartidos": USD, "avisos"} o None si
+    no hay archivo."""
     candidatos = [Path(ruta)] if ruta else sorted((c for c in ENTRADAS.glob(PATRON_PE_RAMO) if not c.name.startswith("~$")),
                                                   key=lambda c: c.stat().st_size, reverse=True)
     if not candidatos or not candidatos[0].exists():
@@ -2902,6 +2935,8 @@ def leer_pe_ramo(tc: dict, ruta: Path | None = None) -> dict | None:
         raise ValueError(f"{ruta.name}: faltan las columnas {faltan + ([] if j_per is not None else ['PERIODO'])} "
                          f"(trae {enc})")
     j_r, j_s, j_p = enc.index("RAMO"), enc.index("SRAMO"), enc.index("PMATOM")
+    j_c = enc.index("PMACED") if "PMACED" in enc else None
+    cedida_fuera = {}                      # (ramo fuera de la BD, periodo) -> PmaCed en la moneda del archivo (Fianzas)
     if MONEDA_PE_RAMO == "MXN" and not tc:
         raise ValueError("sin TC para pasar PExRamo de pesos a USD")
     bruto, renglones, omitidos = {}, 0, []      # (ramo PExRamo, subramo, periodo) -> monto en la moneda del archivo
@@ -2919,6 +2954,10 @@ def leer_pe_ramo(tc: dict, ruta: Path | None = None) -> dict | None:
         renglones += 1
         clave = (str(int(r_num)), str(int(s_num)), int(per))
         bruto[clave] = bruto.get(clave, 0.0) + monto
+        if j_c is not None and len(f) > j_c and clave[0] not in MAPA_RAMO_LAG and clave[0] not in SUBRAMO_A_BD:
+            ced = a_numero(f[j_c])[0]
+            if np.isfinite(ced):
+                cedida_fuera[(clave[0], clave[2])] = cedida_fuera.get((clave[0], clave[2]), 0.0) + ced
     if not renglones:
         raise ValueError(f"{ruta.name}: ningun renglon con periodo AAAAMM, Ramo, Sramo y PmaTom validos")
     ramos_bd = set(MAPA_RAMO_LAG)
@@ -2991,7 +3030,7 @@ def leer_pe_ramo(tc: dict, ruta: Path | None = None) -> dict | None:
         avisos.append(f"{len(omitidos)} renglones con Ramo, Sramo o PmaTom no numerico omitidos (primero: renglon "
                       f"{omitidos[0]})")
     return {"ruta": ruta, "mensual": mensual, "renglones": renglones, "fuera": fuera, "fuera_mensual": fuera_mes,
-            "sin_mapa": sin_mapa, "repartidos": repartidos, "avisos": avisos,
+            "fuera_cedida_mensual": cedida_fuera, "sin_mapa": sin_mapa, "repartidos": repartidos, "avisos": avisos,
             "periodos": sorted({p for _, p in mensual})}
 
 
@@ -3002,8 +3041,9 @@ def leer_pe_rfcst_fa(tc: dict, ruta: Path | None = None) -> dict | None:
     del proyecto (tc; si no lo trae, TC_PROYECCION); con "USD", Primas Tomadas USD. RAMO_RFCST_FA_A_BD lleva el RAMO al
     ramo de la BD; un ramo de la BD sin renglones en un mes del archivo es prima 0. Regresa {"ruta", "hoja", "mensual": {(ramo, periodo): USD},
     "usd_archivo": {(ramo, periodo): USD del archivo}, "tc_archivo": {periodo: TC del archivo}, "tc_usado": {periodo:
-    TC}, "periodos", "renglones", "por_tipo": {Tipo Rea: renglones}, "fuera": {(ramo, periodo): USD}, "control",
-    "avisos"} o None si no hay archivo."""
+    TC}, "periodos", "renglones", "por_tipo": {Tipo Rea: renglones}, "fuera": {(ramo, periodo): USD}, "otros_mxn":
+    {"cedida" / "comisiones": {(RAMO, periodo): Primas Cedidas / Comisiones Tomadas MXN del archivo}} (si las trae; la RFV
+    de Fianzas los usa como referencia), "control", "avisos"} o None si no hay archivo."""
     candidatos = [Path(ruta)] if ruta else _archivos_entrada(PATRON_PE_RFCST_FA)
     if not candidatos or not candidatos[0].exists():
         return None
@@ -3019,6 +3059,9 @@ def leer_pe_rfcst_fa(tc: dict, ruta: Path | None = None) -> dict | None:
                 enc = [norm(x) for x in f]
                 if all(n in enc for n in nombres.values()):
                     j = {k: enc.index(n) for k, n in nombres.items()}      # (el primer bloque de la hoja)
+                    for k_, n_ in (("cedida", "PRIMAS CEDIDAS MXN"), ("comisiones", "COMISIONES TOMADAS MXN")):
+                        if n_ in enc:
+                            j[k_] = enc.index(n_)
                     hoja, i_enc = ws.title, i
                     break
             if hoja:
@@ -3028,6 +3071,7 @@ def leer_pe_rfcst_fa(tc: dict, ruta: Path | None = None) -> dict | None:
     if hoja is None:
         raise ValueError(f"{ruta.name}: ninguna hoja trae el encabezado {', '.join(sorted(set(nombres.values())))}")
     usd_archivo, mxn, tc_archivo, por_tipo, desvio_tc = {}, {}, {}, {}, 0.0
+    otros = {k: {} for k in ("cedida", "comisiones") if k in j}
     renglones, omitidos = 0, []
     for i, f in enumerate(filas[i_enc + 1:], start=i_enc + 2):
         if not f:
@@ -3045,6 +3089,10 @@ def leer_pe_rfcst_fa(tc: dict, ruta: Path | None = None) -> dict | None:
         por_tipo[f[j["tipo"]]] = por_tipo.get(f[j["tipo"]], 0) + 1
         usd_archivo[(r, p)] = usd_archivo.get((r, p), 0.0) + u
         mxn[(r, p)] = mxn.get((r, p), 0.0) + m
+        for k_, d_ in otros.items():
+            x_ = a_numero(f[j[k_]])[0]
+            if np.isfinite(x_):
+                d_[(r, p)] = d_.get((r, p), 0.0) + x_
         if np.isfinite(t) and t > 0:
             tc_archivo.setdefault(p, t)
             desvio_tc = max(desvio_tc, abs(u * t - m))
@@ -3085,7 +3133,7 @@ def leer_pe_rfcst_fa(tc: dict, ruta: Path | None = None) -> dict | None:
                       f"{omitidos[0]})")
     return {"ruta": ruta, "hoja": hoja, "mensual": mensual, "usd_archivo": usd_archivo, "tc_archivo": tc_archivo,
             "tc_usado": tc_usado, "periodos": periodos, "renglones": renglones, "por_tipo": por_tipo, "fuera": fuera,
-            "control": control, "avisos": avisos}
+            "otros_mxn": otros, "control": control, "avisos": avisos}
 
 
 def _archivos_entrada(patron: str) -> list:
@@ -4144,12 +4192,24 @@ def escribir_backtesting(bd: BDMontos, bt: dict, cols_ind: dict | None, pe_tab: 
 # RFV POR PRIMA (FIANZAS): RFV BRUTO = PRIMA 24M x FRV / TC; IRR = BRUTO x CESION; NETO = BRUTO - IRR
 # =============================================================================
 BLOQUES_RFV = ("PT", "PRIMA", "FRV", "CESION")     # bloques de la BD de RFV, en este orden (claves internas)
-FORMATO_BLOQUES_RFV = {"PT": "#,##0", "PRIMA": "#,##0", "FRV": "0.0000", "CESION": "0.00%"}
+BLOQUES_RFV_FACTORES = ("PT", "PRIMA", "PCOM", "PCARGAS", "FPR", "PR", "PGA", "GA", "FV", "FRV", "RCP", "PD", "FCR",
+                        "RC", "CESION")            # con FACTORES_RFV: los de la metodologia del area
+FORMATO_BLOQUES_RFV = {"PT": "#,##0", "PRIMA": "#,##0", "FRV": "0.0000", "CESION": "0.00%", "PCOM": "0.00%",
+                       "PCARGAS": "0.00%", "FPR": "0.00%", "PR": "#,##0", "PGA": "0.00%", "GA": "#,##0", "FV": "0.0000",
+                       "RCP": "0.00%", "PD": "0.00%", "FCR": "0.00%", "RC": "0.00%"}
+
+
+def bloques_rfv() -> tuple:
+    """Bloques de la BD de RFV que se escriben (con FACTORES_RFV, los de la metodologia del area)."""
+    return BLOQUES_RFV_FACTORES if FACTORES_RFV else BLOQUES_RFV
 
 
 def nombre_bloque_rfv(clave: str) -> str:
-    """Encabezado del bloque (sin el ramo): PT, PRIMA 24M, FRV, CESION."""
-    return f"PRIMA {MESES_PRIMA_RFV}M" if clave == "PRIMA" else clave
+    """Encabezado del bloque (sin el ramo): PT, PRIMA 24M, %COM, %CARGAS, FPR, PR 24M, %GA, GA 24M, FV, FRV, RC PRIMA,
+    PD, FCR, RC, CESION."""
+    n = MESES_PRIMA_RFV
+    return {"PRIMA": f"PRIMA {n}M", "PCOM": "%COM", "PCARGAS": "%CARGAS", "PR": f"PR {n}M", "PGA": "%GA",
+            "GA": f"GA {n}M", "RCP": "RC PRIMA"}.get(clave, clave)
 
 
 def _tc_cercano(tc: dict, p: int) -> float:
@@ -4170,9 +4230,13 @@ def pt_fianzas(pe_ramo: dict | None, pe_rfa: dict | None, pef: dict | None, bd: 
        PERFIL_REFORECAST = "FCST", llevado a la forma mensual de los mismos meses del FCST del ano siguiente (como en Danos);
     3) el FCST (CtaMens, cuenta CUENTA_PE_FCST, Ramo2 de RAMO_FCST_FIANZAS, en USD) por el TC del mes del proyecto.
     En un mes que traigan varias fuentes manda la primera (real, reforecast, FCST). tc: TC por mes (para PExRamo si
-    viniera en USD). Regresa {"mensual": {(ramo, periodo): MXN}, "fuente": {periodo: texto}, "texto", "avisos"}."""
+    viniera en USD). La prima cedida del mes (PC, para RC PRIMA) sale de las mismas fuentes: PmaCed de PExRamo, la
+    cesion del reforecast (Primas Cedidas / Primas Tomadas del RAMO de Fianzas en esos meses, aplicada a la PT de cada
+    ramo: el archivo no trae el ramo de Fianzas) y la columna CEDIDA de la cuenta de prima del FCST. Regresa {"mensual":
+    {(ramo, periodo): MXN}, "fuente": {periodo: texto}, "cedida": {(ramo, periodo): MXN}, "texto", "texto_cedida",
+    "referencia": {"rfcst": {"cesion", "comisiones"}, "fcst": {ramo: {"cesion", "comisiones"}}}, "avisos"}."""
     ramos = list(bd.cols_ramo)
-    out = {"mensual": {}, "fuente": {}, "texto": "", "avisos": []}
+    out = {"mensual": {}, "fuente": {}, "cedida": {}, "texto": "", "texto_cedida": "", "referencia": {}, "avisos": []}
     partes = []
     hist = {}
     for (r, p), v in ((pe_ramo or {}).get("fuera_mensual") or {}).items():
@@ -4209,6 +4273,14 @@ def pt_fianzas(pe_ramo: dict | None, pe_rfa: dict | None, pef: dict | None, bd: 
                 tot[p] = tot.get(p, 0.0) + float(v) * t        # (MXN del archivo, o USD por el TC del proyecto)
         if tot:
             meses = sorted(tot)
+            otros = pe_rfa.get("otros_mxn") or {}
+            ref_r = {}                                 # (cesion y comisiones del reforecast, sobre la prima en MXN)
+            for k_ in ("cedida", "comisiones"):
+                if k_ in otros and sum(tot.values()):
+                    ref_r[{"cedida": "cesion", "comisiones": "comisiones"}[k_]] = (
+                        sum(v for (r, q), v in otros[k_].items() if str(r) == RAMO_RFCST_FIANZAS and q in tot)
+                        / sum(tot.values()))
+            out["referencia"]["rfcst"] = {**ref_r, "meses": (meses[0], meses[-1])}
             w = _mezcla(hist, ramos)
             fa = {(r, p): tot[p] * w[r] for p in meses for r in ramos}
             perfilados = []
@@ -4251,6 +4323,123 @@ def pt_fianzas(pe_ramo: dict | None, pe_rfa: dict | None, pef: dict | None, bd: 
                              f"van en 0 en {HOJA_PT_RAMO} y la RFV de los meses cuya PRIMA {MESES_PRIMA_RFV}M los incluye "
                              "sigue con el modelo")
     out["texto"] = "; ".join(partes)
+    # prima cedida del mes (RC PRIMA): PmaCed de PExRamo, la cesion del reforecast y la columna CEDIDA del FCST
+    ced = {(r, p): float(v) if MONEDA_PE_RAMO == "MXN" else float(v) * _tc_cercano(tc, p)
+           for (r, p), v in ((pe_ramo or {}).get("fuera_cedida_mensual") or {}).items() if r in ramos and np.isfinite(v)}
+    if ced:
+        partes_c = [f"{p0} a {p1}: PmaCed de {pe_ramo['ruta'].name}"]
+        for p in rango_periodos(p0, p1):
+            for r in ramos:
+                ced.setdefault((r, p), 0.0)
+        ces_rf = (out["referencia"].get("rfcst") or {}).get("cesion")
+        meses_rf = [p for p in sorted(out["fuente"]) if p > p1 and pe_rfa and str(out["fuente"][p]).startswith(
+            pe_rfa["ruta"].name)]
+        if meses_rf and ces_rf is not None and np.isfinite(ces_rf):
+            for p in meses_rf:
+                for r in ramos:
+                    ced[(r, p)] = out["mensual"].get((r, p), 0.0) * ces_rf
+            partes_c.append(f"{meses_rf[0]} a {meses_rf[-1]}: PT x {ces_rf:.1%} (Primas Cedidas / Primas Tomadas del "
+                            f"RAMO {RAMO_RFCST_FIANZAS} del reforecast en esos meses; el archivo no trae el ramo)")
+        ced_f = {}
+        for (r2, p), v in ((pef or {}).get("fuera_cedida_mensual") or {}).items():
+            r = RAMO_FCST_FIANZAS.get(str(r2))
+            if r in ramos and np.isfinite(v):
+                ced_f[(r, p)] = ced_f.get((r, p), 0.0) + float(v)
+        meses_f = [p for p in per_fcst if str(out["fuente"].get(p, "")).startswith(pef["ruta"].name)] if pef else []
+        if meses_f and ced_f:
+            for p in meses_f:
+                t = tc_para_periodo(bd, p)
+                for r in ramos:
+                    ced[(r, p)] = ced_f.get((r, p), 0.0) * t
+            partes_c.append(f"{meses_f[0]} a {meses_f[-1]}: columna CEDIDA de la cuenta {CUENTA_PE_FCST} del FCST "
+                            "(USD x TC del proyecto)")
+        out["cedida"] = ced
+        out["texto_cedida"] = "; ".join(partes_c)
+    com_f = {}
+    for (r2, p), v in ((pef or {}).get("fuera_com_mensual") or {}).items():
+        r = RAMO_FCST_FIANZAS.get(str(r2))
+        if r in ramos and np.isfinite(v):
+            com_f[r] = com_f.get(r, 0.0) + float(v)
+    pt_f = {r: sum(v for (x, q), v in fcst.items() if x == r) for r in ramos}
+    ced_t = {r: sum(v for (x, q), v in ced_f.items() if x == r) for r in ramos} if ced else {}
+    out["referencia"]["fcst"] = {r: {"comisiones": com_f.get(r, math.nan) / pt_f[r] if pt_f.get(r) else math.nan,
+                                     "cesion": ced_t.get(r, math.nan) / pt_f[r] if pt_f.get(r) else math.nan}
+                                 for r in ramos}
+    return out
+
+
+def _rc_prima(pt: dict | None, r, p: int) -> float:
+    """RC PRIMA del ramo al mes p: prima cedida / prima tomada de los ultimos MESES_PRIMA_RFV meses (nan si falta algun
+    mes de la PT o de la cedida, o si la prima es 0)."""
+    if not pt or not pt.get("cedida"):
+        return math.nan
+    qs = [_mes_menos(p, k) for k in range(MESES_PRIMA_RFV)]
+    if not all(q in pt["fuente"] and (r, q) in pt["cedida"] for q in qs):
+        return math.nan
+    s_ = sum(pt["mensual"].get((r, q), 0.0) for q in qs)
+    return float(sum(pt["cedida"][(r, q)] for q in qs) / s_) if s_ > 0 else math.nan
+
+
+def _texto_factores_rfv(info: dict) -> str:
+    """Linea del Resumen con los factores de la metodologia del area en la RFV (FACTORES_RFV)."""
+    if not FACTORES_RFV:
+        return "no (FACTORES_RFV = False)"
+    fac = info.get("factores") or {}
+    if not fac:
+        return "sin RFV por prima: no se separan"
+    com = info.get("com") or {}
+    return ("RFV BRUTO = PRIMA 24M x FPR x (1 + %GA) x FV / TC, FPR = 1 - %COM - %CARGAS; IRR = RFV BRUTO x RC x FCR, "
+            "FCR = 1 - PD. Se proyectan FV (permanencia) y RC con los modelos del FRV y de la cesion; %COM: "
+            + ("COMISION_RFV" if COMISION_RFV else (com.get("texto") or "sin dato"))
+            + f"; %CARGAS {CARGAS_RFV:.2%} y %GA {GASTO_ADMON_RFV:.2%} (parametros del area); PD: "
+            + (", ".join(f"{r}: {v:.2%}" for r, v in PD_FIANZAS.items()) if PD_FIANZAS else
+               "sin dato en las bases (N/A; FCR = 1 y RC = CESION)")
+            + "; RC PRIMA (prima cedida / prima tomada de 24 meses) es informativa. Por ramo: "
+            + "; ".join(f"{r}: FPR {f['FPR']:.1%}" + (f", FV {v:.2f}" if np.isfinite(v := next(
+                (x for (p, q), x in sorted(info.get("fv", {}).items()) if q == r), math.nan)) else "")
+                        for r, f in fac.items() if np.isfinite(f["FPR"])))
+
+
+def comisiones_fianzas(ramos: list, ultimo: int) -> dict:
+    """%COM de Fianzas por ramo = comisiones / prima tomada de las bases del real por contrato que lee primas.py
+    (BD_Real*.xlsx y BDReal{aa}*.xlsx, hoja BD: Primas USD y Comisiones USD por periodo y Ramo2), en los meses hasta
+    ultimo; de cada patron, el archivo mas grande que no este recortado, y el del ano manda en sus meses. Hoy solo
+    BDReal26 trae Fianzas (BD_Real viene recortada y sin renglones de Fianzas), asi que el %COM es el de sus meses.
+    Regresa {"pcom": {ramo: razon}, "prima": {ramo: USD}, "com": {ramo: USD}, "meses": [periodos], "texto", "avisos"}."""
+    out = {"pcom": {}, "prima": {}, "com": {}, "meses": [], "texto": "", "avisos": []}
+    if primas is None:
+        out["texto"] = "sin primas.py: no se leen las comisiones"
+        return out
+    a = ultimo // 100
+    nombres = {"aa": f"{a % 100:02d}", "aaaa": str(a), "sig": str(a + 1)}
+    datos, usados = {}, []
+    for patron in (primas.PATRON_REAL_HIST, primas.PATRON_REAL_ANIO):     # (el del ano, al final, manda en sus meses)
+        for ruta in primas._buscar(patron.format(**nombres)):
+            try:
+                (agg, _, ctl), _ = primas._con_cache(ruta, "real", primas._agregar_real)
+            except Exception as e:  # noqa: BLE001
+                out["avisos"].append(f"{ruta.name}: no se pudo leer para las comisiones de Fianzas ({type(e).__name__})")
+                continue
+            if primas._recortado(ctl):
+                continue                               # (recortado: el siguiente del patron)
+            t = agg[agg["ramo"].isin([str(r) for r in ramos]) & (agg["periodo"] <= ultimo)]
+            t = t.groupby(["periodo", "ramo"], as_index=False)[["prima", "comisiones"]].sum()
+            if len(t):
+                meses_t = set(int(x) for x in t["periodo"])
+                datos = {k: v for k, v in datos.items() if k[0] not in meses_t}
+                for f in t.itertuples(index=False):
+                    datos[(int(f.periodo), str(f.ramo))] = (float(f.prima), float(f.comisiones))
+                usados.append(f"{ruta.name} ({min(meses_t)} a {max(meses_t)})")
+            break
+    for r in ramos:
+        pr_ = sum(v[0] for (p, x), v in datos.items() if x == str(r))
+        co_ = sum(v[1] for (p, x), v in datos.items() if x == str(r))
+        if pr_ > 0:
+            out["pcom"][str(r)], out["prima"][str(r)], out["com"][str(r)] = co_ / pr_, pr_, co_
+    out["meses"] = sorted({p for p, _ in datos})
+    out["texto"] = (f"comisiones / prima tomada de {', '.join(usados)}, por ramo: "
+                    + ", ".join(f"{r}: {v:.1%}" for r, v in out["pcom"].items())) if out["pcom"] else \
+        "ninguna base del real trae comisiones de Fianzas"
     return out
 
 
@@ -4261,8 +4450,25 @@ def _prima_ventana(pt: dict, r, p: int) -> tuple[float, bool]:
     return (float(sum(pt["mensual"].get((r, q), 0.0) for q in qs)), all(q in pt["fuente"] for q in qs))
 
 
+def factores_rfv_ramo(r, com: dict | None) -> dict | None:
+    """Factores de la metodologia del area para el ramo (FACTORES_RFV): %COM (COMISION_RFV o el de com, de
+    comisiones_fianzas), %CARGAS, FPR = 1 - %COM - %CARGAS, %GA, PD (PD_FIANZAS, nan sin dato) y FCR = 1 - PD (1 sin
+    PD). None si FACTORES_RFV esta apagado, si no hay %COM del ramo o si FPR no queda positivo."""
+    if not FACTORES_RFV:
+        return None
+    pcom = (COMISION_RFV or {}).get(str(r)) if COMISION_RFV else (com or {}).get("pcom", {}).get(str(r))
+    pd_ = PD_FIANZAS.get(str(r)) if PD_FIANZAS else None
+    fcr = 1.0 - float(pd_) if pd_ is not None and np.isfinite(pd_) else 1.0
+    if pcom is None or not np.isfinite(pcom):
+        return {"PCOM": math.nan, "PCARGAS": CARGAS_RFV, "FPR": math.nan, "PGA": GASTO_ADMON_RFV,
+                "PD": float(pd_) if pd_ is not None else math.nan, "FCR": fcr, "completo": False}
+    fpr = 1.0 - float(pcom) - CARGAS_RFV
+    return {"PCOM": float(pcom), "PCARGAS": CARGAS_RFV, "FPR": fpr, "PGA": GASTO_ADMON_RFV,
+            "PD": float(pd_) if pd_ is not None else math.nan, "FCR": fcr, "completo": fpr > 0}
+
+
 def calcular_rfv_prima(bd: BDMontos, proy: dict, pt: dict | None, periodos_proy: list[int], ultimo: int,
-                       tc_hist: dict | None = None, tc_pt: dict | None = None) -> dict:
+                       tc_hist: dict | None = None, tc_pt: dict | None = None, com: dict | None = None) -> dict:
     """RFV por prima (Fianzas): FRV = RFV BRUTO x TC / PRIMA 24M en la historia, proyectado con TIPO_MODELO_FRV desde el
     ultimo mes real; CESION = RFV IRR / RFV BRUTO real proyectada con el modelo de la cesion de Danos
     (TIPO_MODELO_FACTORES["CESION"]); RFV BRUTO = PRIMA 24M x FRV / TC (el del mes proyectado), RFV IRR = BRUTO x CESION,
@@ -4270,13 +4476,16 @@ def calcular_rfv_prima(bd: BDMontos, proy: dict, pt: dict | None, periodos_proy:
     cada mes, y en los meses que la BD traia en pesos el de esa correccion, como el modelo) y, sin el, el de la columna
     TC (tc_para_periodo). Un mes cuya PRIMA 24M no esta completa (algun mes sin fuente) y los ramos fuera de
     RAMOS_RFV_POR_PRIMA siguen con el modelo. Con tc_pt (TC por mes de la prima) se calcula ademas la sensibilidad en
-    dolares: la misma descomposicion con la prima y la RFV en USD (la reserva como si fuera en dolares). Regresa
-    {"proy": montos con la RFV nueva, "aplica": {(periodo, ramo)}, "frv": {(periodo, ramo): FRV}, "cesion": {...},
+    dolares: la misma descomposicion con la prima y la RFV en USD (la reserva como si fuera en dolares). Con
+    FACTORES_RFV y el %COM del ramo (com, de comisiones_fianzas), el FRV se separa en FPR x (1 + %GA) x FV y la cesion
+    en RC x FCR (factores_rfv_ramo): FV = FRV / (FPR x (1 + %GA)) y RC = CESION / FCR, los dos de los modelos del FRV y
+    de la cesion. Regresa {"proy": montos con la RFV nueva, "aplica": {(periodo, ramo)}, "frv": {(periodo, ramo): FRV},
+    "cesion": {...}, "factores": {ramo: factores_rfv_ramo}, "fv": {(periodo, ramo): FV}, "rc": {(periodo, ramo): RC},
     "tc_hist": {periodo: TC usado en la historia}, "usd": {(periodo, ramo): RFV BRUTO en dolares}, "series", "resumen",
     "alertas", "estado"}."""
     h = len(periodos_proy)
     out = {"proy": dict(proy), "aplica": set(), "frv": {}, "cesion": {}, "tc_hist": {}, "usd": {}, "series": [],
-           "resumen": [], "alertas": [], "estado": ""}
+           "resumen": [], "alertas": [], "estado": "", "factores": {}, "fv": {}, "rc": {}, "com": com or {}, "pt": pt}
     if not pt or not pt.get("mensual"):
         out["estado"] = "sin prima tomada de Fianzas por ramo: la RFV sigue con el modelo"
         return out
@@ -4301,6 +4510,9 @@ def calcular_rfv_prima(bd: BDMontos, proy: dict, pt: dict | None, periodos_proy:
             ces_h[p] = i_ / b if np.isfinite(i_) and np.isfinite(b) and b > UMBRAL_CERO_MONTOS else math.nan
         ok_p = [p for p in per_hist if np.isfinite(frv_h[p])]
         b_u = bd.valores.get((c_b, ultimo, r), math.nan)
+        fac = factores_rfv_ramo(r, com)
+        if fac is not None:
+            out["factores"][r] = fac
         fila = {"Ramo": r, "Meses de FRV real": len(ok_p), "Desde": ok_p[0] if ok_p else None,
                 "Hasta": ok_p[-1] if ok_p else None}
         motivo = ""
@@ -4365,10 +4577,15 @@ def calcular_rfv_prima(bd: BDMontos, proy: dict, pt: dict | None, periodos_proy:
             s, completa = _prima_ventana(pt, r, p)
             fz, cz = float(frv_f[j]), float(ces_f[j])
             bruto = s * fz / tc[p] if completa and tc[p] else math.nan
+            dec = fac is not None and fac["completo"]
+            fv_ = fz / (fac["FPR"] * (1 + fac["PGA"])) if dec else math.nan
+            rc_ = cz / fac["FCR"] if fac is not None and fac["FCR"] > 0 else cz
             out["series"].append({"Ramo": r, "Periodo": p, "PT del mes (MXN)": pt["mensual"].get((r, p), 0.0),
                                   f"PRIMA {MESES_PRIMA_RFV}M (MXN)": s, "Prima completa": "si" if completa else "no",
                                   "Fuente de la PT": pt["fuente"].get(p, "sin prima (0)"), "FRV": fz, "CESION": cz,
-                                  "TC": tc[p], "RFV BRUTO por prima": bruto,
+                                  "TC": tc[p], **({"%COM": fac["PCOM"], "FPR": fac["FPR"], "%GA": fac["PGA"], "FV": fv_,
+                                                   "PD": fac["PD"], "FCR": fac["FCR"], "RC": rc_} if fac else {}),
+                                  "RC PRIMA": _rc_prima(pt, r, p), "RFV BRUTO por prima": bruto,
                                   "RFV BRUTO del modelo": proy.get((c_b, p, r), math.nan),
                                   "RFV NETO por prima": bruto * (1 - cz) if np.isfinite(bruto) else math.nan,
                                   "RFV NETO del modelo": proy.get((c_n, p, r), math.nan)})
@@ -4380,10 +4597,36 @@ def calcular_rfv_prima(bd: BDMontos, proy: dict, pt: dict | None, periodos_proy:
             out["proy"][(c_n, p, r)] = float(bruto - irr)
             out["aplica"].add((p, r))
             out["frv"][(p, r)], out["cesion"][(p, r)] = fz, cz
+            if dec:
+                out["fv"][(p, r)] = fv_
+            if fac is not None:
+                out["rc"][(p, r)] = rc_
             if usd_f is not None:
                 out["usd"][(p, r)] = prima_usd(r, p) * float(usd_f[j])
             n_ap += 1
         fila["Meses con RFV por prima"] = n_ap
+        if fac is not None:                            # factores de la metodologia del area (FACTORES_RFV)
+            ref_f = (((pt or {}).get("referencia") or {}).get("fcst") or {}).get(str(r)) or {}
+            fila.update({"%COM": fac["PCOM"], "%COM del FCST": ref_f.get("comisiones", math.nan),
+                         "%CARGAS": fac["PCARGAS"], "FPR": fac["FPR"], "%GA": fac["PGA"],
+                         f"FV {ultimo}": (frv_h.get(ultimo, math.nan) / (fac["FPR"] * (1 + fac["PGA"]))
+                                          if fac["completo"] else math.nan),
+                         f"FV {periodos_proy[-1]}": out["fv"].get((periodos_proy[-1], r), math.nan),
+                         f"RC PRIMA {ultimo}": _rc_prima(pt, r, ultimo),
+                         f"RC PRIMA {periodos_proy[-1]}": _rc_prima(pt, r, periodos_proy[-1]),
+                         "Cesion de prima del FCST": ref_f.get("cesion", math.nan),
+                         "PD": fac["PD"], "FCR": fac["FCR"]})
+            if n_ap and np.isfinite(fac["PCOM"]) and np.isfinite(ref_f.get("comisiones", math.nan)) \
+                    and abs(ref_f["comisiones"] - fac["PCOM"]) > 0.05:
+                out["alertas"].append(("FIANZAS", f"RFV | %COM | ramo {r}",
+                                       f"el FCST trae comisiones de {ref_f['comisiones']:.1%} de la prima y el real "
+                                       f"{fac['PCOM']:.1%}: la proyeccion usa el real (COMISION_RFV para cambiarlo)"))
+            rcp_u, ces_f_ = _rc_prima(pt, r, ultimo), ref_f.get("cesion", math.nan)
+            if n_ap and np.isfinite(rcp_u) and np.isfinite(ces_f_) and abs(ces_f_ - rcp_u) > 0.05:
+                out["alertas"].append(("FIANZAS", f"RFV | RC PRIMA | ramo {r}",
+                                       f"el FCST cede {ces_f_:.1%} de la prima y en los {MESES_PRIMA_RFV} meses a "
+                                       f"{ultimo} se cedio {rcp_u:.1%}: la RC PRIMA de la BD baja con eso, pero es "
+                                       "informativa; la CESION de la reserva sigue con su modelo"))
         fila["Motivo"] = motivo or ("" if n_ap == h else f"{h - n_ap} mes(es) sin PRIMA {MESES_PRIMA_RFV}M completa "
                                                          "(quedan con el modelo)")
         for p in marcas:
@@ -4400,7 +4643,11 @@ def calcular_rfv_prima(bd: BDMontos, proy: dict, pt: dict | None, periodos_proy:
     ramos_ap = sorted({r for _, r in out["aplica"]}, key=int)
     out["estado"] = (f"ramos {', '.join(ramos_ap)} con RFV BRUTO = PRIMA {MESES_PRIMA_RFV}M x FRV / TC desde "
                      f"{periodos_proy[0]} ({len(out['aplica'])} de {len(bd.cols_ramo) * h} meses); IRR = BRUTO x "
-                     "CESION; NETO = BRUTO - IRR; RCONT con su modelo") if ramos_ap else \
+                     "CESION; NETO = BRUTO - IRR; RCONT con su modelo"
+                     + ((f"; FRV = FPR x (1 + %GA) x FV y CESION = RC x FCR en {', '.join(rs_f)} (FPR = 1 - %COM - %CARGAS, "
+                         f"%CARGAS {CARGAS_RFV:.2%}, %GA {GASTO_ADMON_RFV:.2%}; "
+                         + (f"PD de PD_FIANZAS" if PD_FIANZAS else "PD sin dato: FCR = 1") + ")")
+                        if (rs_f := sorted({r for _, r in out["fv"]}, key=int)) else "")) if ramos_ap else \
         ("ningun ramo aplica, la RFV sigue con el modelo: " + "; ".join(f"{f['Ramo']}: {f['Motivo']}"
                                                                       for f in out["resumen"] if f.get("Motivo")))
     if out["usd"]:                                     # sensibilidad a la moneda (total de los ramos con prima)
@@ -4467,6 +4714,11 @@ def calcular_backtesting_rfv(bd: BDMontos, pt: dict | None, ultimo: int, tc_hist
                    "FRV": info["frv"].get((p, r), b * t / s if np.isfinite(b) and np.isfinite(s) and s else math.nan),
                    "CESION": info["cesion"].get((p, r), i_ / b if np.isfinite(i_) and np.isfinite(b) and b else
                                                 (0.0 if np.isfinite(b) else math.nan))}
+            f_r = (info.get("factores") or {}).get(r)
+            if f_r is not None:                        # (sin comisiones al corte: %COM, FPR, PR, GA y FV van en N/A)
+                ind.update({"PCARGAS": f_r["PCARGAS"], "PGA": f_r["PGA"], "PD": f_r["PD"], "FCR": f_r["FCR"],
+                            "RC": ind["CESION"] / f_r["FCR"] if np.isfinite(ind["CESION"]) and f_r["FCR"] else math.nan,
+                            "RCP": _rc_prima(pt, r, p)})
             for pref in ("RFV", "RCONT"):
                 out["indicadores"][(pref, p, r)] = ind
     n = len({r for _, r in out["aplica"]})
@@ -4482,8 +4734,9 @@ def calcular_backtesting_rfv(bd: BDMontos, pt: dict | None, ultimo: int, tc_hist
 
 def escribir_pt_ramo(wb, pt: dict | None, ramos: list, periodos_bd=()) -> dict | None:
     """Hoja HOJA_PT_RAMO de la BD de RFV: prima tomada del mes por ramo (MXN, valores, con su fuente) y PRIMA 24M (suma
-    de los ultimos MESES_PRIMA_RFV meses) como formula, de todos los meses de la prima y de la BD. Regresa {"fila":
-    {periodo: renglon}, "pt": {ramo: letra}, "suma": {ramo: letra}} o None sin prima."""
+    de los ultimos MESES_PRIMA_RFV meses) como formula, de todos los meses de la prima y de la BD; si hay prima cedida
+    (pt["cedida"]), tambien PC del mes y PRIMA CEDIDA 24M. Regresa {"fila": {periodo: renglon}, "pt": {ramo: letra},
+    "suma": {ramo: letra}, "pc": {ramo: letra}, "suma_pc": {ramo: letra}} o None sin prima."""
     if HOJA_PT_RAMO in wb.sheetnames:
         del wb[HOJA_PT_RAMO]
     if not pt or not pt.get("mensual"):
@@ -4495,14 +4748,19 @@ def escribir_pt_ramo(wb, pt: dict | None, ramos: list, periodos_bd=()) -> dict |
     per = rango_periodos(min(todos), max(todos))
     ws.cell(1, 1, f"Prima tomada (PT) de Fianzas del mes por ramo (MXN) y PRIMA {n}M = suma de los ultimos {n} meses. "
                   f"Fuentes: {pt.get('texto', '')}").font = negrita
+    ced = pt.get("cedida") or {}
     ws.cell(2, 1, f"Un mes que ninguna fuente trae va en 0 (FUENTE: sin prima). En los primeros {n - 1} meses de la hoja "
                   f"la suma lleva solo los meses que hay. La RFV por prima solo usa las sumas con sus {n} meses en alguna "
-                  "fuente")
-    cab = ["PERIODO", "FUENTE"] + [f"PT {r}" for r in ramos] + [f"PRIMA {n}M {r}" for r in ramos]
+                  "fuente" + (f". PC = prima cedida del mes (MXN; {pt.get('texto_cedida', '')}); un mes sin dato de "
+                              "cedida va en blanco y RC PRIMA solo usa las sumas con sus meses completos" if ced else ""))
+    cab = (["PERIODO", "FUENTE"] + [f"PT {r}" for r in ramos] + [f"PRIMA {n}M {r}" for r in ramos]
+           + ([f"PC {r}" for r in ramos] + [f"PRIMA CEDIDA {n}M {r}" for r in ramos] if ced else []))
     for k, t in enumerate(cab, start=1):
         ws.cell(3, k, t).font = negrita
     c_pt = {r: 3 + i for i, r in enumerate(ramos)}
     c_sm = {r: 3 + len(ramos) + i for i, r in enumerate(ramos)}
+    c_pc = {r: 3 + 2 * len(ramos) + i for i, r in enumerate(ramos)} if ced else {}
+    c_spc = {r: 3 + 3 * len(ramos) + i for i, r in enumerate(ramos)} if ced else {}
     filas = {}
     for i, p in enumerate(per):
         fila = 4 + i
@@ -4513,25 +4771,40 @@ def escribir_pt_ramo(wb, pt: dict | None, ramos: list, periodos_bd=()) -> dict |
             ws.cell(fila, c_pt[r], float(pt["mensual"].get((r, p), 0.0))).number_format = "#,##0"
             le = get_column_letter(c_pt[r])
             ws.cell(fila, c_sm[r], f"=SUM({le}{max(4, fila - n + 1)}:{le}{fila})").number_format = "#,##0"
+            if ced:
+                v_ = ced.get((r, p))
+                ws.cell(fila, c_pc[r], float(v_) if v_ is not None and np.isfinite(v_) else None).number_format = "#,##0"
+                lc = get_column_letter(c_pc[r])
+                ws.cell(fila, c_spc[r], f"=SUM({lc}{max(4, fila - n + 1)}:{lc}{fila})").number_format = "#,##0"
     ws.freeze_panes = "C4"
     for k in range(1, len(cab) + 1):
         ws.column_dimensions[get_column_letter(k)].width = 16 if k > 2 else 12
-    _agrupar(ws, [list(c_pt.values()), list(c_sm.values())])
+    _agrupar(ws, [list(c_pt.values()), list(c_sm.values())] + ([list(c_pc.values()), list(c_spc.values())] if ced else []))
     return {"fila": filas, "pt": {r: get_column_letter(c) for r, c in c_pt.items()},
-            "suma": {r: get_column_letter(c) for r, c in c_sm.items()}}
+            "suma": {r: get_column_letter(c) for r, c in c_sm.items()},
+            "pc": {r: get_column_letter(c) for r, c in c_pc.items()},
+            "suma_pc": {r: get_column_letter(c) for r, c in c_spc.items()}}
 
 
 def escribir_bloques_rfv(bd: BDMontos, info: dict, hoja_pt: dict | None, periodos_proy: list[int],
                          solo_limpiar: bool = False) -> dict:
     """Bloques de la RFV por prima a la derecha de la hoja de montos de la BD de RFV, una columna por ramo, en todos los
-    renglones (historia y proyeccion, de todos los conceptos): PT y PRIMA 24M (de la hoja HOJA_PT_RAMO), FRV y CESION.
-    FRV = RFV BRUTO del mes x TC / PRIMA 24M y CESION = RFV IRR / RFV BRUTO del mes como formulas (el monto del mes con
-    SUMAR.SI.CONJUNTO por CONCEPTO y PERIODO fuera de su renglon); en los meses con RFV por prima, el FRV y la CESION
-    proyectados en valores. Los bloques de una corrida anterior se limpian (con solo_limpiar, solo eso: sin prima de
-    Fianzas no se escriben). Regresa {(bloque, ramo): columna}."""
+    renglones (historia y proyeccion, de todos los conceptos), en el orden de bloques_rfv(): PT y PRIMA 24M (de la hoja
+    HOJA_PT_RAMO), FRV y CESION y, con FACTORES_RFV, los factores de la metodologia del area: %COM, %CARGAS, FPR, PR 24M,
+    %GA, GA 24M, FV, RC PRIMA, PD, FCR y RC. En la historia (y en los meses sin RFV por prima): FRV = RFV BRUTO del mes x
+    TC / PRIMA 24M, CESION = RFV IRR / RFV BRUTO, FV = RFV BRUTO x TC / (PR 24M + GA 24M) y RC = CESION / FCR como
+    formulas (el monto del mes con SUMAR.SI.CONJUNTO por CONCEPTO y PERIODO fuera de su renglon). En los meses con RFV por
+    prima: FV y RC proyectados en valores y FRV = FPR x (1 + %GA) x FV y CESION = RC x FCR como formulas (sin el %COM
+    del ramo, FRV y CESION proyectados en valores, como antes). %COM, %CARGAS, %GA y PD van en valores (N/A sin dato;
+    %COM solo desde el primer mes con comisiones); FPR = 1 - %COM - %CARGAS, PR 24M = PRIMA 24M x FPR, GA 24M = PR 24M x
+    %GA, RC PRIMA = PRIMA CEDIDA 24M / PRIMA 24M (hoja HOJA_PT_RAMO) y FCR = 1 - PD (1 sin PD) como formulas. Los bloques
+    de una corrida anterior se limpian (con solo_limpiar, solo eso: sin prima de Fianzas no se escriben). Regresa
+    {(bloque, ramo): columna}."""
     ws = bd.ws
     ramos = list(bd.cols_ramo)
-    patron = re.compile(r"^(PT|PRIMA \d+M|FRV|CESION) (\S+)$")
+    bloques = bloques_rfv()
+    nombres_todos = sorted({nombre_bloque_rfv(k) for k in BLOQUES_RFV_FACTORES}, key=len, reverse=True)
+    patron = re.compile(r"^(" + "|".join(re.escape(x) for x in nombres_todos) + r"|PRIMA \d+M|PR \d+M|GA \d+M) (\S+)$")
     enc = {c: norm(ws.cell(3, c).value) for c in range(1, ws.max_column + 1) if ws.cell(3, c).value is not None}
     viejas = sorted(c for c, t in enc.items() if (m := patron.match(t)) and m.group(2) in ramos)
     fijas = [c for c in enc if c not in viejas]
@@ -4550,23 +4823,54 @@ def escribir_bloques_rfv(bd: BDMontos, info: dict, hoja_pt: dict | None, periodo
     desde = f"; desde {periodos_proy[0]}, en los ramos con RFV por prima, " if periodos_proy else ""
     si_error = " (SI.ERROR: 0 si divide entre 0)"
     n = MESES_PRIMA_RFV
+    fac = info.get("factores") or {}
+    com = info.get("com") or {}
+    p_com = min(com.get("meses") or [10 ** 6]) if not COMISION_RFV else 0      # primer mes con %COM en la historia
+    con_fv = bool(info.get("fv"))
     descripcion = {
         "PT": f"PT = prima tomada de Fianzas del mes en MXN (hoja {HOJA_PT_RAMO}: PExRamo, reforecast y FCST; 0 si "
               "ninguna fuente la trae)",
         "PRIMA": f"PRIMA {n}M = suma de los ultimos {n} meses de PT en MXN (hoja {HOJA_PT_RAMO}): la prima que sostiene "
                  "la reserva en vigor",
+        "PCOM": ("%COM = comisiones / prima tomada (costo de adquisicion, CAT): "
+                 + (f"COMISION_RFV, por indicacion" if COMISION_RFV else
+                    f"{com.get('texto') or 'sin comisiones de Fianzas en las bases'}")
+                 + (f"; N/A antes de {p_com} (ninguna base trae comisiones de Fianzas de esos meses)"
+                    if not COMISION_RFV and p_com < 10 ** 6 else "") + "; en la proyeccion, el mismo (valor)"),
+        "PCARGAS": (f"%CARGAS = costos de cobertura, gastos de administracion y margen de utilidad sobre la prima tomada "
+                    f"(CRT + GAT + MUT): {CARGAS_RFV:.4%}, parametro del area (CARGAS_RFV) (valor)"),
+        "FPR": "FPR = PR / PT = 1 - %COM - %CARGAS: la prima de reserva por cada peso de prima tomada (N/A sin %COM)",
+        "PR": f"PR {n}M = PRIMA {n}M x FPR: prima de reserva de los ultimos {n} meses en MXN",
+        "PGA": (f"%GA = GA / PR: gastos de administracion sobre la prima de reserva, {GASTO_ADMON_RFV:.4%}, parametro del "
+                "area (GASTO_ADMON_RFV; el del reafianzamiento extranjero proporcional y no proporcional; el nacional y "
+                "el facultativo usan el monto afianzado, que no esta en las bases) (valor)"),
+        "GA": f"GA {n}M = PR {n}M x %GA: gastos de administracion de los ultimos {n} meses en MXN",
+        "FV": (f"FV = RFV BRUTO del mes x TC / (PR {n}M + GA {n}M): permanencia, cuantas veces la reserva en vigor cubre "
+               f"la PR + GA de {n} meses (vigencia, devengamiento y anos que se mantiene constituida)" + si_error
+               + (desde + f"el FV proyectado (FRV del modelo / (FPR x (1 + %GA)): {modelo_frv}) (valor)" if con_fv else "")),
         "FRV": (f"FRV = RFV BRUTO del mes x TC / PRIMA {n}M: factor de reserva, lo que queda constituido por cada peso de "
                 f"prima de los ultimos {n} meses (en el renglon RFV BRUTO, su monto; en los demas, con "
                 "SUMAR.SI.CONJUNTO)" + si_error
-                + (desde + f"el FRV proyectado ({modelo_frv}, {TIPO_MODELO_FRV}) (valor) en todos los renglones del mes. "
-                   f"RFV BRUTO = PRIMA {n}M x FRV / TC" if periodos_proy else "")),
+                + ((desde + "FRV = FPR x (1 + %GA) x FV (formula; sin %COM del ramo, el FRV proyectado en valor). "
+                    f"RFV BRUTO = PRIMA {n}M x FRV / TC") if periodos_proy and con_fv else
+                   (desde + f"el FRV proyectado ({modelo_frv}, {TIPO_MODELO_FRV}) (valor) en todos los renglones del "
+                    f"mes. RFV BRUTO = PRIMA {n}M x FRV / TC" if periodos_proy else ""))),
+        "RCP": (f"RC PRIMA = PRIMA CEDIDA {n}M / PRIMA {n}M (hoja {HOJA_PT_RAMO}): proporcion cedida de la prima; "
+                "informativa (la cesion de la reserva del ramo no es la de su prima: pesa la mezcla de contratos)" + si_error),
+        "PD": ("PD = probabilidad de incumplimiento del reasegurador (Anexo 8.20.2 de la CUSF; PD_FIANZAS): "
+               + ("capturada por el area (valor)" if PD_FIANZAS else "sin dato en las bases (N/A)")),
+        "FCR": "FCR = 1 - PD: factor de calidad del reaseguro (1 sin PD)",
+        "RC": ("RC = CESION / FCR: proporcion cedida de la reserva con transferencia cierta" + si_error
+               + (desde + f"la RC proyectada (CESION del modelo / FCR: {modelo_ces}) (valor)" if con_fv else "")),
         "CESION": ("CESION = RFV IRR del mes / RFV BRUTO del mes (en el renglon IRR o BRUTO, su monto; en los demas, con "
                    "SUMAR.SI.CONJUNTO)" + si_error
-                   + (desde + f"la cesion proyectada ({modelo_ces}) (valor). RFV IRR = RFV BRUTO x CESION y RFV NETO = "
-                      "RFV BRUTO x (1 - CESION)" if periodos_proy else "")),
+                   + ((desde + "CESION = RC x FCR (formula). RFV IRR = RFV BRUTO x CESION y RFV NETO = RFV BRUTO x "
+                       "(1 - CESION)") if periodos_proy and info.get("rc") else
+                      (desde + f"la cesion proyectada ({modelo_ces}) (valor). RFV IRR = RFV BRUTO x CESION y RFV NETO = "
+                       "RFV BRUTO x (1 - CESION)" if periodos_proy else ""))),
     }
     cols, c = {}, max(fijas) + 1
-    for clave in BLOQUES_RFV:
+    for clave in bloques:
         for r in ramos:
             cols[(clave, r)] = c
             _copiar_estilo(ws.cell(3, col_estilo), ws.cell(3, c))
@@ -4579,6 +4883,7 @@ def escribir_bloques_rfv(bd: BDMontos, info: dict, hoja_pt: dict | None, periodo
         ws.cell(2, c0).font = Font(bold=True)
     c_conc, c_per, c_tc = (get_column_letter(x) for x in (bd.col_concepto, bd.col_periodo, bd.col_tc))
     ref_pt = _ref_hoja(HOJA_PT_RAMO)
+    pt_info = info.get("pt") or {}
     for (conc, p), fila in bd.filas.items():
         for r in ramos:
             ram = get_column_letter(bd.cols_ramo[r])
@@ -4591,28 +4896,55 @@ def escribir_bloques_rfv(bd: BDMontos, info: dict, hoja_pt: dict | None, periodo
                     return f"{_r}{_f}"
                 texto = str(ws.cell(f_obj, bd.col_concepto).value).strip().replace('"', '""')
                 return f'SUMIFS(${_r}:${_r},${c_conc}:${c_conc},"{texto}",${c_per}:${c_per},${c_per}{_f})'
-            L = {k: f"{get_column_letter(cols[(k, r)])}{fila}" for k in BLOQUES_RFV}
-            celdas = {k: ws.cell(fila, cols[(k, r)]) for k in BLOQUES_RFV}
+            L = {k: f"{get_column_letter(cols[(k, r)])}{fila}" for k in bloques}
+            celdas = {k: ws.cell(fila, cols[(k, r)]) for k in bloques}
+            vals = {}
             for k, celda in celdas.items():
                 celda.number_format = FORMATO_BLOQUES_RFV[k]
-            if hoja_pt and p in hoja_pt["fila"]:
-                celdas["PT"].value = f"={ref_pt}!${hoja_pt['pt'][r]}${hoja_pt['fila'][p]}"
-                celdas["PRIMA"].value = f"={ref_pt}!${hoja_pt['suma'][r]}${hoja_pt['fila'][p]}"
-            else:
-                for k in ("PT", "PRIMA"):
-                    celdas[k].value = TEXTO_SIN_DATO
-                    celdas[k].alignment = Alignment(horizontal="right")
-            if (p, r) in info.get("aplica", ()):
-                celdas["FRV"].value = float(info["frv"][(p, r)])
-                celdas["CESION"].value = float(info["cesion"][(p, r)])
-                continue
+            con_pt = bool(hoja_pt and p in hoja_pt["fila"])
+            if con_pt:
+                vals["PT"] = f"={ref_pt}!${hoja_pt['pt'][r]}${hoja_pt['fila'][p]}"
+                vals["PRIMA"] = f"={ref_pt}!${hoja_pt['suma'][r]}${hoja_pt['fila'][p]}"
+            aplica = (p, r) in info.get("aplica", ())
             b, i_ = del_mes("RFV BRUTO"), del_mes("RFV IRR")
-            celdas["FRV"].value = (f"=IFERROR({b}*${c_tc}{fila}/{L['PRIMA']},0)" if b and hoja_pt and p in hoja_pt["fila"]
-                                   else TEXTO_SIN_DATO)
-            celdas["CESION"].value = f"=IFERROR({i_}/{b},0)" if b and i_ else TEXTO_SIN_DATO
-            for k in ("FRV", "CESION"):
-                if celdas[k].value == TEXTO_SIN_DATO:
-                    celdas[k].alignment = Alignment(horizontal="right")
+            f_r = fac.get(r)
+            if "PCOM" in bloques:
+                pcom_ok = f_r is not None and np.isfinite(f_r["PCOM"]) and (p >= p_com or aplica)
+                vals["PCOM"] = f_r["PCOM"] if pcom_ok else None
+                vals["PCARGAS"] = CARGAS_RFV
+                vals["PGA"] = GASTO_ADMON_RFV
+                vals["FPR"] = f"=1-{L['PCOM']}-{L['PCARGAS']}" if pcom_ok else None
+                vals["PR"] = f"={L['PRIMA']}*{L['FPR']}" if pcom_ok and con_pt else None
+                vals["GA"] = f"={L['PR']}*{L['PGA']}" if vals["PR"] else None
+                pd_ = (PD_FIANZAS or {}).get(str(r))
+                vals["PD"] = float(pd_) if pd_ is not None and np.isfinite(pd_) else None
+                vals["FCR"] = f"=IF(ISNUMBER({L['PD']}),1-{L['PD']},1)"
+                rcp = _rc_prima(pt_info, r, p)
+                vals["RCP"] = (f"=IFERROR({ref_pt}!${hoja_pt['suma_pc'][r]}${hoja_pt['fila'][p]}/{L['PRIMA']},0)"
+                               if con_pt and hoja_pt.get("suma_pc") and np.isfinite(rcp) else None)
+                if aplica and (p, r) in info.get("fv", {}):
+                    vals["FV"] = float(info["fv"][(p, r)])
+                    vals["FRV"] = f"={L['FPR']}*(1+{L['PGA']})*{L['FV']}"
+                else:
+                    vals["FV"] = (f"=IFERROR({b}*${c_tc}{fila}/({L['PR']}+{L['GA']}),0)" if b and vals["PR"] else None)
+                if aplica and (p, r) in info.get("rc", {}):
+                    vals["RC"] = float(info["rc"][(p, r)])
+                    vals["CESION"] = f"={L['RC']}*{L['FCR']}"
+                else:
+                    vals["RC"] = f"=IFERROR({L['CESION']}/{L['FCR']},0)" if b and i_ else None
+            if aplica:
+                vals.setdefault("FRV", float(info["frv"][(p, r)]))
+                vals.setdefault("CESION", float(info["cesion"][(p, r)]))
+            else:
+                vals.setdefault("FRV", f"=IFERROR({b}*${c_tc}{fila}/{L['PRIMA']},0)" if b and con_pt else None)
+                vals.setdefault("CESION", f"=IFERROR({i_}/{b},0)" if b and i_ else None)
+            for k, celda in celdas.items():
+                v = vals.get(k)
+                if v is None:
+                    celda.value = TEXTO_SIN_DATO
+                    celda.alignment = Alignment(horizontal="right")
+                else:
+                    celda.value = v
     fin = max(cols.values())
     if ws.auto_filter and ws.auto_filter.ref:
         ini, fin_ref = ws.auto_filter.ref.split(":")
@@ -4621,7 +4953,7 @@ def escribir_bloques_rfv(bd: BDMontos, info: dict, hoja_pt: dict | None, periodo
     for c in viejas:
         if c > fin:
             ws.cell(3, c).value = None
-    _agrupar(ws, [[bd.cols_ramo[r] for r in ramos]] + [[cols[(k, r)] for r in ramos] for k in BLOQUES_RFV])
+    _agrupar(ws, [[bd.cols_ramo[r] for r in ramos]] + [[cols[(k, r)] for r in ramos] for k in bloques])
     return cols
 
 
@@ -5990,9 +6322,10 @@ def escribir_diagnostico(resultados: dict, periodos_proy: list[int], alertas_gen
             if ((resumen.get("pnd") or {}).get("rfv_prima") or {}).get("sensibilidad") else "")
          + (f"; prima: {(resumen.get('pnd') or {}).get('pt_fianzas')}" if (resumen.get("pnd") or {}).get("pt_fianzas")
             else "")
-         + (f"; hojas RFV_Prima_Resumen y RFV_Prima_Mensual; en la BD de RFV, hoja {HOJA_PT_RAMO} y bloques PT, "
-            f"PRIMA {MESES_PRIMA_RFV}M, FRV y CESION" if ((resumen.get("pnd") or {}).get("rfv_prima") or {}).get("aplica")
-            else "")),
+         + (f"; hojas RFV_Prima_Resumen y RFV_Prima_Mensual; en la BD de RFV, hoja {HOJA_PT_RAMO} y bloques "
+            + ", ".join(nombre_bloque_rfv(k) for k in bloques_rfv())
+            if ((resumen.get("pnd") or {}).get("rfv_prima") or {}).get("aplica") else "")),
+        ("Factores de la RFV (metodologia del area)", _texto_factores_rfv((resumen.get("pnd") or {}).get("rfv_prima") or {})),
         ("Backtesting Fianzas", (((resumen.get("pnd") or {}).get("backtesting_rfv") or {}).get("estado") or "-")
          + (f"; renglones '{BACKTESTING_ETIQUETA} <concepto>' al final de {HOJA_MONTOS} de la BD de RFV; hojas "
             "Backtesting_Resumen y Backtesting_Mensual (Libro FIANZAS)"
@@ -7134,7 +7467,10 @@ def main():
             pt_fz = pt_fianzas(pe_ramo, pe_rfa, pef, bd_rfv, tc_primas, periodos_proy)
             for a in pt_fz["avisos"]:
                 alertas.append(("FIANZAS", "Prima de Fianzas", a))
-            info_rfvp = calcular_rfv_prima(bd_rfv, proy_rfv, pt_fz, periodos_proy, ultimo, tc_frv, tc_primas)
+            com_fz = comisiones_fianzas(list(bd_rfv.cols_ramo), ultimo) if FACTORES_RFV else None
+            for a in (com_fz or {}).get("avisos") or []:
+                alertas.append(("FIANZAS", "Comisiones de Fianzas", a))
+            info_rfvp = calcular_rfv_prima(bd_rfv, proy_rfv, pt_fz, periodos_proy, ultimo, tc_frv, tc_primas, com_fz)
             validar(proy_danos, info_rfvp["proy"])
             alertas.extend(info_rfvp["alertas"])
             proy_rfv = info_rfvp["proy"]
@@ -7144,6 +7480,10 @@ def main():
                          "aplica": set(), "frv": {}, "cesion": {}, "series": [], "resumen": []}
             alertas.append(("FIANZAS", "RFV por prima", info_rfvp["estado"]))
         print(f"   Prima de Fianzas: {(pt_fz or {}).get('texto') or '-'}", flush=True)
+        if (pt_fz or {}).get("texto_cedida"):
+            print(f"   Prima cedida de Fianzas: {pt_fz['texto_cedida']}", flush=True)
+        if FACTORES_RFV and (info_rfvp.get("com") or {}).get("texto"):
+            print(f"   Comisiones de Fianzas (%COM): {info_rfvp['com']['texto']}", flush=True)
         print(f"   {info_rfvp['estado']}", flush=True)
         if info_rfvp.get("sensibilidad"):
             print(f"   Sensibilidad a la moneda: {info_rfvp['sensibilidad']}", flush=True)

@@ -285,6 +285,7 @@ def preparar_datos() -> dict:
         "estatutarios": leer_estatutarios(),
         "nota_rangos": nota_rangos,
         "rfv_prima": nota_rfv_prima(resumen),
+        "rfv_factores": "FRV = FPR x (1 + %GA) x FV" in str(resumen.get("RFV por prima (Fianzas)") or ""),
         "factores_fijos": factores_fijos(resumen),
         "suavizado": notas_suavizado(resumen),
         "ppto": leer_contraste_presupuesto(),
@@ -1062,7 +1063,7 @@ function pintarReservas() {
   const { reserva, concepto, moneda } = E; const ramoRes = E.ramoRes;
   const conceptos = D.conceptos[reserva] || [], ramos = D.ramos_m[reserva] || [];
   const aviso = document.getElementById('nota-res');
-  aviso.textContent = `Cifras en millones de ${moneda}${moneda === 'MXN' ? ' (USD × TC del mes)' : ''} · real hasta ${eti(D.ultimo)} · montos: ${D.modelo_por_tipo.nivel || 'n/d'}; razones: ${D.modelo_por_tipo.razon || 'n/d'}${reserva === 'RFV' ? ' · Fianzas se modela en pesos y se convierte con el TC de Inversiones' + (D.rfv_prima ? ' · RFV por prima en ' + D.rfv_prima + '; IRR = BRUTO × CESION y NETO = BRUTO − IRR; RCONT con su modelo' : '') + (D.nota_rangos ? ' · ' + D.nota_rangos : '') : ''}`;
+  aviso.textContent = `Cifras en millones de ${moneda}${moneda === 'MXN' ? ' (USD × TC del mes)' : ''} · real hasta ${eti(D.ultimo)} · montos: ${D.modelo_por_tipo.nivel || 'n/d'}; razones: ${D.modelo_por_tipo.razon || 'n/d'}${reserva === 'RFV' ? ' · Fianzas se modela en pesos y se convierte con el TC de Inversiones' + (D.rfv_prima ? ' · RFV por prima en ' + D.rfv_prima + '; IRR = BRUTO × CESION y NETO = BRUTO − IRR; RCONT con su modelo' + (D.rfv_factores ? '; en la BD, FRV = FPR × (1 + %GA) × FV y CESION = RC × FCR, con los factores de la metodología del área (prima de reserva, gastos, permanencia, cesión y PD)' : '') : '') + (D.nota_rangos ? ' · ' + D.nota_rangos : '') : ''}`;
   const vals = montoSerie(reserva, concepto, ramoRes);
   const u = vals[jUlt], pd = vals[jDic], pf = vals[jFin], v12 = vals[j12], p12 = vals[jUlt + 12];
   const f1 = v => fmt(v, 1);
