@@ -225,7 +225,7 @@ def leer_montos(ultimo: int):
             if per < PRIMER_PERIODO_MONTOS:
                 continue
             concepto = norm(f[c_conc])
-            if concepto.startswith(norm(ETIQUETA_BACKTESTING) + " "):   # (renglones de backtesting: no son real ni proyeccion)
+            if concepto == norm(ETIQUETA_BACKTESTING) or concepto.startswith(norm(ETIQUETA_BACKTESTING) + " "):   # (backtesting)
                 continue
             reserva, conc = ("RFV", "RCONT") if concepto == "RCONT" else concepto.split(" ", 1)
             ramos.setdefault(reserva, list(c_ramos))

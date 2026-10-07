@@ -1507,8 +1507,9 @@ def leer_bd_montos(ruta: Path) -> BDMontos:
         if not concepto or not isinstance(periodo, (int, float)):
             continue
         concepto, periodo = norm(concepto), int(periodo)
-        if concepto.startswith(etiqueta_bt):          # (renglones de backtesting de una corrida anterior: no son historia)
-            filas_bt[(concepto[len(etiqueta_bt):], periodo)] = r
+        if concepto.startswith(etiqueta_bt) or concepto == etiqueta_bt.strip():   # (backtesting de una corrida anterior o
+            base = concepto[len(etiqueta_bt):] if concepto.startswith(etiqueta_bt) else f"#{r}"   # escrito a mano: no
+            filas_bt[(base, periodo)] = r                                                     # son historia)
             continue
         if concepto not in conceptos:
             conceptos.append(concepto)
@@ -1529,6 +1530,12 @@ def leer_bd_montos(ruta: Path) -> BDMontos:
     for (c, p) in filas_prima:
         for ramo in cols_ramo:
             valores.pop((c, p, ramo), None)
+    # si los renglones de backtesting son los ultimos de la hoja se borran: se vuelven a escribir al final, despues de lo
+    # que se agregue (meses nuevos, meses de prima); si hay otros renglones abajo, se reutilizan en su lugar
+    if filas_bt and min(filas_bt.values()) > max(list(filas.values()) + list(filas_prima.values()) + [3]):
+        ini_bt = min(filas_bt.values())
+        ws.delete_rows(ini_bt, ws.max_row - ini_bt + 1)
+        filas_bt = {}
     return BDMontos(ruta, wb, ws, enc["CONCEPTO"], enc["PERIODO"], enc["TC"], cols_ramo, filas, valores, tc,
                     conceptos, set(filas.values()) | set(filas_prima.values()), filas_prima, filas_bt)
 
@@ -3708,8 +3715,11 @@ def calcular_backtesting(bd: BDMontos, hp: HParam, pe: dict, is_fa_val: dict | N
     if not filas_hp:
         out["estado"] = f"no se calcula: {HOJA_PARAMETROS} no trae renglones '{TIPO_INDICE_BASE}' hasta {corte}"
         return out
+    u_hp = max(f for (_, f) in filas_hp)
+    activos = sorted(((hp.ws.cell(f, hp.cols["Ramo"]).value, f) for (_, q), f in filas_hp.items() if q == u_hp),
+                     key=lambda x: x[1]) or list(hp.ramos_activos)
     hp_bt = replace(hp, historia={k: {f: v for f, v in d.items() if f <= corte} for k, d in hp.historia.items()},
-                    filas=filas_hp, ultimo=max(f for (_, f) in filas_hp), lags_cero=[])
+                    filas=filas_hp, ultimo=u_hp, lags_cero=[], ramos_activos=activos)
     tc_hist = leer_tc_real(bd_bt, corte, "DANOS") if MODELAR_EN_MXN.get("DANOS") else None
     series = (series_montos(bd_bt, "DANOS", ESTRUCTURA["DANOS"], corte, h, tc_hist)
               + series_hparametros(hp_bt, h, corte))
@@ -3774,32 +3784,54 @@ def calcular_backtesting(bd: BDMontos, hp: HParam, pe: dict, is_fa_val: dict | N
     return out
 
 
-def comparar_backtesting(bt: dict, bd: BDMontos, proy_final: dict, ultimo: int) -> dict:
+def comparar_backtesting(bt: dict, bd: BDMontos, proy_final: dict, ultimo: int, bel_area: dict | None = None) -> dict:
     """Backtesting contra lo real (meses hasta ultimo) y contra la proyeccion vigente (meses despues), por concepto, ramo y
-    mes, con el total de ramos: {"mensual": [...], "resumen": [...]} para el diagnostico."""
+    mes, con el total de ramos: {"mensual": [...], "resumen": [...]} para el diagnostico. En las series de BEL_METODO_AREA
+    que SAP registra en cero (SONR 80), lo real es el del metodo del area (bel_area, Res_Rvas), de donde sale su BEL; el
+    TOTAL suma los ramos con real comparable (MIN_REAL_BACKTESTING) y dice cuales deja fuera."""
     proy, per = bt.get("proy") or {}, bt.get("periodos") or []
     if not proy:
         return {"mensual": [], "resumen": []}
     conceptos = [c for c in bd.conceptos if any((c, p, r) in proy for p in per for r in bd.cols_ramo)]
     ramos = list(bd.cols_ramo)
+    bel_area = bel_area or {}
+
+    def referencia(c, p, x):
+        """(valor, etiqueta) de la referencia del mes."""
+        if p > ultimo:
+            return proy_final.get((c, p, x), 0.0), "proyeccion vigente"
+        pref, conc = c.split(" ", 1)
+        a = bel_area.get((pref, str(x)))
+        if a and p in (a.get("meses") or []) and abs(bd.valores.get((norm(f"{pref} BEL"), p, x), 0.0)) < UMBRAL_CERO_MONTOS:
+            v = a["valores"]
+            y = (v.get(("BRUTO", p), math.nan) - v.get(("IRR", p), math.nan)) if conc == "NETO" else v.get((conc, p), math.nan)
+            if np.isfinite(y):
+                return float(y), "real (metodo del area)"
+        return bd.valores.get((c, p, x), 0.0), "real"
+
     mensual, resumen = [], []
     for c in conceptos:
         pref = c.split()[0]
+        comparables, fuera = [], []
         for r in ramos + ["TOTAL"]:
-            rs = ramos if r == "TOTAL" else [r]
+            rs = (comparables or ramos) if r == "TOTAL" else [r]
             filas = []
             for p in per:
                 b = sum(proy.get((c, p, x), 0.0) for x in rs)
+                refs = [referencia(c, p, x) for x in rs]
+                ref = sum(v for v, _ in refs)
                 es_real = p <= ultimo
-                ref = sum((bd.valores.get((c, p, x), 0.0) if es_real else proy_final.get((c, p, x), 0.0)) for x in rs)
+                etiquetas = sorted({e for _, e in refs})
                 filas.append((p, b, ref, es_real))
                 mensual.append({"Concepto": c, "Ramo": r, "Periodo": p, "Backtesting": b,
-                                "Referencia": ref, "Referencia es": "real" if es_real else "proyeccion vigente",
+                                "Referencia": ref, "Referencia es": " y ".join(etiquetas),
                                 "Diferencia": b - ref,
                                 "Diferencia %": (b / ref - 1) if abs(ref) >= MIN_REAL_BACKTESTING else None})
             reales = [(b, ref) for _, b, ref, es in filas if es]
             den = sum(abs(ref) for _, ref in reales)
             comparable = bool(reales) and den >= MIN_REAL_BACKTESTING * len(reales)
+            if r != "TOTAL":
+                (comparables if comparable else fuera).append(r)
             fin = filas[-1]
             ult = next(((b, ref) for p, b, ref, es in filas if p == ultimo), None)
             resumen.append({
@@ -3813,17 +3845,24 @@ def comparar_backtesting(bt: dict, bd: BDMontos, proy_final: dict, ultimo: int) 
                 f"Proyeccion vigente {fin[0]}" if not fin[3] else f"Real {fin[0]}": fin[2],
                 f"Backtesting {fin[0]}": fin[1],
                 f"Dif % {fin[0]}": (fin[1] / fin[2] - 1) if abs(fin[2]) >= MIN_REAL_BACKTESTING else None,
-                "Nota": ("" if comparable or not reales else
-                         f"real menor a {MIN_REAL_BACKTESTING:,.0f} USD al mes en promedio: sin error % "
-                         "(SAP en cero o casi; el backtesting puede salir de otra fuente, p. ej. el metodo del area)")})
+                "Nota": "; ".join(x for x in (
+                    (f"TOTAL sin los ramos {', '.join(fuera)} (real casi cero)" if r == "TOTAL" and fuera and comparables
+                     else "" if comparable or not reales or r == "TOTAL" else
+                     f"real menor a {MIN_REAL_BACKTESTING:,.0f} USD al mes en promedio: sin error % (SAP en cero o casi)"),
+                    (("ramo " + ", ".join(x_ for x_ in rs if any(referencia(c, q, x_)[1] == "real (metodo del area)"
+                                                                 for q in per if q <= ultimo))
+                      + ": real del metodo del area (Res_Rvas), SAP lo registra en cero")
+                     if any(referencia(c, q, x_)[1] == "real (metodo del area)" for x_ in rs for q in per if q <= ultimo)
+                     else "")) if x)})
     return {"mensual": mensual, "resumen": resumen}
 
 
-def escribir_backtesting(bd: BDMontos, bt: dict, cols_ind: dict | None) -> int:
+def escribir_backtesting(bd: BDMontos, bt: dict, cols_ind: dict | None, pe_tab: dict | None = None) -> int:
     """Renglones BACKTESTING al final de la hoja de montos: un bloque de meses por concepto (en el orden de los conceptos
     del ano), CONCEPTO "<BACKTESTING_ETIQUETA> <concepto>", el TC del mes, los montos del backtesting en valores, RVATOT y
-    RVA_SEXC con su formula y los bloques de indicadores con los del backtesting en valores (N/A sin dato). Reutiliza
-    los renglones que ya traia la BD de entrada y vacia los que sobran. Regresa cuantos renglones escribio."""
+    RVA_SEXC con su formula y los bloques de indicadores con los del backtesting en valores (N/A sin dato; el FA contra la
+    PE del grupo, pe_tab, si la hoja la usa, como los demas renglones). Reutiliza los renglones que ya traia la BD de
+    entrada (si no estaban al final) y vacia los que sobran. Regresa cuantos renglones escribio."""
     ws = bd.ws
     proy, per = bt.get("proy") or {}, bt.get("periodos") or []
     ultima_col = ws.max_column
@@ -3868,6 +3907,12 @@ def escribir_backtesting(bd: BDMontos, bt: dict, cols_ind: dict | None) -> int:
                 ind_mes = bt.get("indicadores") or {}
                 for (ind, ramo), col in (cols_ind or {}).items():
                     x = (ind_mes.get((pref, p, ramo)) or {}).get(ind, math.nan)
+                    if ind == "FA" and pe_tab:                   # (FA = PND/PD / PE del grupo, como la hoja)
+                        g = primas.GRUPO_DE_RAMO_RESERVA.get(str(ramo)) if primas is not None else None
+                        pe_g = pe_tab.get(g)
+                        pe_g = float(pe_g.get(p, math.nan)) if pe_g is not None else math.nan
+                        pnd = (ind_mes.get((pref, p, ramo)) or {}).get("PND/PD", math.nan)
+                        x = pnd / pe_g if np.isfinite(pnd) and np.isfinite(pe_g) and pe_g else math.nan
                     ws.cell(r, col).value = float(x) if isinstance(x, (int, float)) and np.isfinite(x) else TEXTO_SIN_DATO
                 bd.filas_backtest[(c, p)] = r
     for k, r in list(bd.filas_backtest.items()):          # renglones de una corrida anterior que ya no van: se vacian
@@ -6217,6 +6262,7 @@ def main():
         print(f"   IS de la funcion actuarial: {diag_pnd['is_fa']}", flush=True)
     info_fnd = {"estado": "apagado (USAR_BEL_POR_FND = False)", "aplica": set(), "fnd": {}, "series": [], "resumen": []}
     proy_modelo = proy_danos
+    bel_area = {}
     if USAR_BEL_POR_FND:
         print("BEL por FND (Danos) ...", flush=True)
         info_area = {}
@@ -6268,7 +6314,8 @@ def main():
         n0 = len(alertas)
         try:
             bt = calcular_backtesting(bd_danos, hp, pe_mes, is_fa["val"] if is_fa is not None else None, ultimo)
-            bt.update(comparar_backtesting(bt, bd_danos, proy_danos, ultimo))
+            bt.update(comparar_backtesting(bt, bd_danos, proy_danos, ultimo, bel_area))
+            alertas.extend(("PND", "Backtesting", a) for a in bt.get("alertas") or [])
         except Exception as e:  # noqa: BLE001
             del alertas[n0:]
             bt = {"estado": f"error en el backtesting ({type(e).__name__}: {e}); no se agrega", "proy": {}}
@@ -6334,9 +6381,14 @@ def main():
         for a in avisos_ind:
             alertas.append(("PND", "Indicadores de la BD", a))
             print(f"   AVISO: {a}", flush=True)
-    n_bt = escribir_backtesting(bd_danos, bt, cols_ind)
+    pe_tab_bd = ctx_indices(proy_danos, meses_bd, None)["pe_tab"] if INDICES_PND_EN_BD else {}
+    n_bt = escribir_backtesting(bd_danos, bt, cols_ind, pe_tab_bd)
     if n_bt:
-        print(f"   Backtesting: {n_bt} renglones '{BACKTESTING_ETIQUETA} <concepto>' al final de {HOJA_MONTOS}", flush=True)
+        al_final = min(bd_danos.filas_backtest.values()) > max(list(bd_danos.filas.values())
+                                                               + list(bd_danos.filas_prima.values()))
+        print(f"   Backtesting: {n_bt} renglones '{BACKTESTING_ETIQUETA} <concepto>' "
+              + (f"al final de {HOJA_MONTOS}" if al_final else f"en {HOJA_MONTOS} (en los renglones que ya traia la BD de "
+                 "entrada, que no estaban al final)"), flush=True)
     guardar_libro(bd_danos.wb, SALIDA_BD_DANOS, original=ARCHIVO_BD_DANOS)
     info_rfv = escribir_bd_montos(bd_rfv, proy_rfv, periodos_proy, SALIDA_BD_RFV)
     escribir_correccion_moneda(bd_rfv, correcciones["FIANZAS"])
@@ -6347,7 +6399,9 @@ def main():
         ruta = ruta_escenario_pnd(esc)
         escribir_bd_montos(bd_danos, proy_esc, periodos_proy, ruta)
         if INDICES_PND_EN_BD:
-            escribir_indices_pnd(bd_danos, ctx_indices(proy_esc, ESCENARIOS_PND[esc], None))
+            ctx_esc = ctx_indices(proy_esc, ESCENARIOS_PND[esc], None)
+            cols_esc = escribir_indices_pnd(bd_danos, ctx_esc)
+            escribir_backtesting(bd_danos, bt, cols_esc, ctx_esc["pe_tab"])   # (los bloques se reescriben en cada renglon)
         guardar_libro(bd_danos.wb, ruta, original=ARCHIVO_BD_DANOS)
         archivos_pnd.append(ruta.name)
     viejos = [ruta_escenario_pnd(e).name for e in ESCENARIOS_PND
@@ -6385,6 +6439,7 @@ def main():
             import dashboard  # noqa: WPS433
             # los dashboards leen las salidas de ESTA corrida (y no la carpeta salidas/ fija) si se redirigieron
             dashboard.SALIDAS, dashboard.ARCHIVO_DANOS = SALIDAS, SALIDA_BD_DANOS
+            dashboard.ETIQUETA_BACKTESTING = BACKTESTING_ETIQUETA
             dashboard.ARCHIVO_RFV, dashboard.ARCHIVO_DIAGNOSTICO = SALIDA_BD_RFV, SALIDA_DIAGNOSTICO
             dashboard.MONTOS_CALCULADOS = {("DANOS", c, p, r): v for (c, p, r), v in proy_danos.items()}
             dashboard.generar(SALIDA_DASHBOARD)
@@ -6395,6 +6450,7 @@ def main():
             import dashboard as _dx  # noqa: WPS433
             import dashboard_html  # noqa: WPS433
             _dx.SALIDAS, _dx.ARCHIVO_DANOS = SALIDAS, SALIDA_BD_DANOS
+            _dx.ETIQUETA_BACKTESTING = BACKTESTING_ETIQUETA
             _dx.ARCHIVO_RFV, _dx.ARCHIVO_DIAGNOSTICO = SALIDA_BD_RFV, SALIDA_DIAGNOSTICO
             _dx.MONTOS_CALCULADOS = {("DANOS", c, p, r): v for (c, p, r), v in proy_danos.items()}
             dashboard_html.generar(SALIDA_DASHBOARD_HTML)
