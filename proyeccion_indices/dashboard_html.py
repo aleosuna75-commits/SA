@@ -66,6 +66,16 @@ def leer_resumen() -> dict:
 MESES_CORTOS = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"]
 
 
+def notas_suavizado(resumen: dict) -> dict:
+    """{"SONR|50": texto} de la linea "Suavizado del BEL entre diciembres" de la hoja Resumen ({} si no hay)."""
+    out = {}
+    for parte in str(resumen.get("Suavizado del BEL entre diciembres") or "").split(" | "):
+        m = re.match(r"^(RRC|SONR) (\d+): (.+)$", parte.strip())
+        if m:
+            out[f"{m.group(1)}|{m.group(2)}"] = m.group(3)
+    return out
+
+
 def nota_rfv_prima(resumen: dict) -> str:
     """Nota de la RFV por prima (linea "RFV por prima (Fianzas)" de la hoja Resumen del diagnostico): "ramos 140, 150,
     160 y 170: RFV BRUTO = PRIMA 24M × FRV / TC desde 202609" o "" si no aplico (o con un diagnostico anterior)."""
@@ -266,6 +276,8 @@ def preparar_datos() -> dict:
         "estatutarios": leer_estatutarios(),
         "nota_rangos": nota_rangos,
         "rfv_prima": nota_rfv_prima(resumen),
+        "factores_fijos": str(resumen.get("Margenes GTO y MR del BEL por FND") or "").startswith("fijos"),
+        "suavizado": notas_suavizado(resumen),
         "ppto": leer_contraste_presupuesto(),
         "tend": leer_tendencias(),
         "pnd": pnd,
@@ -1134,7 +1146,10 @@ function explicaPnd(col, res, ramo) {
   const desde = {                                      // como se proyecta desde el primer mes proyectado
     monto: todos ? `desde ${ini}, suma de los ramos (PEACUMULADA × ${fd} en los que llevan BEL por FND, el modelo en los demás)`
       : conFnd ? `desde ${ini}, PEACUMULADA × ${fd}` : `desde ${ini}, el BEL del modelo entre el IS (este ramo no lleva BEL por FND)`,
-    factor: todos ? `desde ${ini}, desde el último real, su tendencia de 24 y 36 meses frenada 5 % por mes, sin patrón del mes, en los ramos con BEL por FND y el modelo de reservas en los demás`
+    factor: D.factores_fijos
+      ? (todos ? `desde ${ini}, el último real (${eti(D.ultimo)}) fijo, por indicación del área, en los ramos con BEL por FND y el modelo de reservas en los demás`
+        : conFnd ? `desde ${ini}, el último real (${eti(D.ultimo)}) fijo, por indicación del área` : `desde ${ini}, la razón del modelo (este ramo no lleva BEL por FND)`)
+      : todos ? `desde ${ini}, desde el último real, su tendencia de 24 y 36 meses frenada 5 % por mes, sin patrón del mes, en los ramos con BEL por FND y el modelo de reservas en los demás`
       : conFnd ? `desde ${ini}, desde el último real, su tendencia de 24 y 36 meses frenada 5 % por mes, sin patrón del mes` : `desde ${ini}, la razón del modelo (este ramo no lleva BEL por FND)`,
     fnd: todos ? `desde ${ini}, con el ${fd} proyectado en los ramos con BEL por FND`
       : conFnd ? `desde ${ini}, el ${fd} proyectado` : `desde ${ini}, ${nb} del modelo / PEACUMULADA (este ramo no lleva BEL por FND)`,
@@ -1146,7 +1161,7 @@ function explicaPnd(col, res, ramo) {
     'FACTOR GTO': `GTO / PND, en %; ${desde.factor}`,
     'FACTOR MR': `MR / ${nb}, en %; ${desde.factor}${conFnd ? ' (arranca del nivel de los últimos 3 meses: tiene picos de un mes)' : ''}`,
     'CESION': `Razón de cesión IRR / BRUTO, en %; ${todos ? `desde ${ini}, el nivel suavizado de los últimos meses (SES, sin tendencia: depende de los contratos de reaseguro) en los ramos con BEL por FND y el modelo de reservas en los demás${D.cesion_area_texto && D.cesion_area_texto !== 'no' ? '; por indicación del área, ' + D.cesion_area_texto : ''}` : conFnd ? ((D.cesion_area || {})[res + '|' + ramo] ? `desde ${ini}, ${D.cesion_area[res + '|' + ramo]}` : `desde ${ini}, el nivel suavizado de los últimos meses (SES), sin tendencia: depende de los contratos de reaseguro`) : `desde ${ini}, la razón del modelo (este ramo no lleva BEL por FND)`}`,
-    'FD/FND': `${nb} / PEACUMULADA (razón); ${desde.fnd}${conFnd ? ' con Holt amortiguado (serie de tiempo): arranca del último real y sigue el promedio de los cambios mensuales recientes, frenado 5 % por mes, sin patrón del mes; un salto de un mes mueve el nivel pero no la tendencia' : ''}`,
+    'FD/FND': `${nb} / PEACUMULADA (razón); ${desde.fnd}${conFnd ? ' con Holt amortiguado (serie de tiempo): arranca del último real y sigue el promedio de los cambios mensuales recientes, frenado 5 % por mes, sin patrón del mes; un salto de un mes mueve el nivel pero no la tendencia' : ''}${(D.suavizado || {})[res + '|' + ramo] ? '. Por indicación del área, entre diciembres el FND se ajusta para suavizar el BEL: ' + D.suavizado[res + '|' + ramo] : ''}`,
     'IS (RL)': `${res === 'RRC' ? 'Ind Sin RRC' : 'Ind Sin SONR Media'} de HParametros, en %; misma escala que IS (FA)`
       + (todos ? '; incluye ramos que FA no manda (como TEV e Hidro, con IS bajo): para comparar con FA, ve la línea gris en IS (FA)' : ''),
     'IS (FA)': `Real: ${res === 'RRC' ? 'Ind Sin RRC' : 'Ind Sin SONR Media'} de HParametros hasta ${eti(D.ultimo)}; proyección: ${res === 'RRC' ? 'IS RRC' : 'IS SONR'} de la función actuarial, en %; misma escala que IS (RL)`

@@ -161,7 +161,7 @@ except Exception as _e:  # noqa: BLE001
 # =============================================================================
 CARPETA = Path(__file__).resolve().parent
 ENTRADAS = CARPETA / "entradas"
-VERSION_CODIGO = "2026-10-07e"   # version de los scripts: sale en la consola, en la hoja Resumen del diagnostico, en el pie
+VERSION_CODIGO = "2026-10-07f"   # version de los scripts: sale en la consola, en la hoja Resumen del diagnostico, en el pie
                                  # del tablero HTML y en la hoja Dashboard Razones del Excel, para saber con que version se corrio
 SALIDAS = CARPETA / "salidas"
 
@@ -654,6 +654,18 @@ CESION_TENDENCIA = {("RRC", "50"): 12}
                                  # reales de la cesion (puntos por mes), frenada como la pendiente combinada
                                  # (PENDIENTE_COMBINADA["amortiguacion"] por mes) y acotada a DOMINIO_CESION ("que tome la
                                  # tendencia del ultimo ano, poco a poco")
+# Margenes del BEL por FND fijos (indicacion del area, 2026-10-07): FACTOR GTO (GTO / PND) y FACTOR MR (MR / PND o PD) se
+# quedan desde el primer mes proyectado en su ultimo real (202608) en todas las series con BEL por FND, en lugar de
+# proyectarse con la pendiente combinada. Tambien en el backtesting (en su ultimo real, 202512). () = se proyectan.
+FACTORES_BEL_FIJOS = ("FACTOR GTO", "FACTOR MR")
+# Suavizado del BEL entre diciembres (indicacion del area, 2026-10-07): en estas series (reserva, ramo) el BEL de cada
+# diciembre proyectado (y del ultimo mes proyectado) se queda como lo da IS x PEACUMULADA x FND, y los meses de en medio
+# siguen una linea en logaritmos entre el ultimo real y esos diciembres (crecimiento parejo) mas el patron del mes de la
+# historia del BEL (ultimos MESES_ESTACIONALIDAD meses), puesto en cero en los meses ancla. El FND de esos meses se
+# ajusta para que IS x PEACUMULADA x FND de el BEL suavizado (la formula de la BD no cambia) y MR, BRUTO, IRR y NETO lo
+# siguen. Patron: "credibilidad" = ponderado por su credibilidad (Buhlmann, como el patron de los montos del modelo);
+# "observada" = el promedio por mes tal como se observo, sin ponderar; "ninguna" = solo la linea. No va en el backtesting.
+SUAVIZAR_BEL = {("SONR", "50"): "credibilidad"}
 # Backtesting (Danos, 2026-10-07): el mismo calculo de la proyeccion (modelo de las series, IS y LAG de HParametros
 # proyectados, BEL = IS x PEACUMULADA x FND, factores y cesion), pero con la historia cortada en el mes anterior a
 # BACKTESTING_DESDE, para los meses BACKTESTING_DESDE a BACKTESTING_HASTA. Va al final de BD_Montos_RRC_SONR, despues de
@@ -3450,6 +3462,87 @@ def _cesion_area(pref: str, ramo, per: list[int], vals: list[float], f_modelo, p
                "alerta": texto}
 
 
+def _patron_mes(per: list, vals: list, modo: str) -> tuple[np.ndarray, str]:
+    """Patron por mes del ano (12 valores en logaritmos, centrados en cero) de una serie positiva, sobre los ultimos
+    MESES_ESTACIONALIDAD meses: con modo "credibilidad", el de factores_estacionales (ponderado por su credibilidad);
+    con "observada", el promedio por mes de la serie menos su media movil centrada de 12 meses, sin ponderar; con
+    "ninguna" (o sin historia suficiente), ceros. Regresa (patron, texto)."""
+    ok = [(p, v) for p, v in zip(per, vals) if np.isfinite(v) and v > 0]
+    if modo == "ninguna" or len(ok) < MIN_OBS_ESTACIONALIDAD:
+        return np.zeros(12), ("sin patron del mes" if modo == "ninguna" else
+                              f"sin patron del mes (menos de {MIN_OBS_ESTACIONALIDAD} meses de historia)")
+    z = np.log([v for _, v in ok])
+    meses = np.array([p % 100 for p, _ in ok])
+    fe = factores_estacionales(z, meses)
+    if fe is None:
+        return np.zeros(12), "sin patron del mes (historia insuficiente)"
+    if modo == "observada":
+        zz, mm_ = z[-MESES_ESTACIONALIDAD:], meses[-MESES_ESTACIONALIDAD:]
+        pesos = np.r_[0.5, np.ones(11), 0.5] / 12.0
+        det = zz[6:len(zz) - 6] - np.convolve(zz, pesos, mode="valid")
+        mm = mm_[6:len(zz) - 6]
+        s = np.array([det[mm == k].mean() if np.any(mm == k) else 0.0 for k in range(1, 13)])
+        s -= s.mean()
+        return s, (f"patron del mes observado (sin ponderar; credibilidad {fe['credibilidad']:.0%}, amplitud "
+                   f"{s.max() - s.min():.1%})")
+    s = fe["factores"]
+    return s, f"patron del mes con credibilidad {fe['credibilidad']:.0%} (amplitud {s.max() - s.min():.1%})"
+
+
+def _suavizar_bel(out: dict, pref: str, r, periodos_proy: list[int], ultimo: int, bel_u: float, modo: str,
+                  hist: dict, fila: dict):
+    """SUAVIZAR_BEL: deja el BEL de cada diciembre proyectado (y del ultimo mes proyectado) y lleva los meses de en medio
+    a una linea en logaritmos entre anclas (el ultimo real y esos meses) mas el patron del mes de la historia (_patron_mes),
+    puesto en cero en las anclas. Ajusta el FND del mes para que IS x PEACUMULADA x FND de ese BEL y recalcula GTO, MR,
+    BRUTO, IRR y NETO con los mismos factores. Escribe en out (proy, fnd, series, neto_fijo, suavizado, alertas) y fila."""
+    c_bel = norm(f"{pref} BEL")
+    bel = {p: out["proy"][(c_bel, p, r)] for p in periodos_proy}
+    anclas = {ultimo: bel_u, **{p: bel[p] for p in periodos_proy if p % 100 == 12 or p == periodos_proy[-1]}}
+    per_h = sorted(hist)
+    s, texto = _patron_mes(per_h, [hist[p] for p in per_h], modo)
+    sf = lambda p: float(s[(p % 100) - 1])        # noqa: E731
+    todos = [ultimo] + list(periodos_proy)
+    pos = {p: i for i, p in enumerate(todos)}
+    ka = sorted(anclas)
+    objetivo = {}
+    for a, b in zip(ka, ka[1:]):
+        for p in todos[pos[a]: pos[b] + 1]:
+            w = (pos[p] - pos[a]) / (pos[b] - pos[a])
+            objetivo[p] = math.exp((1 - w) * math.log(anclas[a]) + w * math.log(anclas[b])
+                                   + sf(p) - ((1 - w) * sf(a) + w * sf(b)))
+    filas_serie = {x["Periodo"]: x for x in out["series"] if x["Reserva"] == pref and x["Ramo"] == r}
+    for p in periodos_proy:
+        k = objetivo[p] / bel[p] if bel[p] else 1.0
+        raz = out["razones"][(pref, p, r)]
+        fnd0 = out["fnd"][(pref, p, r)]
+        out["fnd"][(pref, p, r)] = fnd0 * k
+        b_n = bel[p] * k
+        x = filas_serie[p]
+        pnd = float(x["PEACUMULADA"]) * fnd0 * k        # PND = BEL / IS = PEACUMULADA x FND
+        gto, mr = pnd * raz.get("FACTOR GTO", 0.0), pnd * raz.get("FACTOR MR", 0.0)
+        bruto = b_n + gto + mr
+        irr = bruto * raz.get("CESION", 0.0)
+        nuevos = {"BEL": b_n, "MR": mr, "BRUTO": bruto, "IRR": irr, "NETO": bruto - irr}
+        if pref == "RRC":
+            nuevos["GTO"] = gto
+        for c, v in nuevos.items():
+            out["proy"][(norm(f"{pref} {c}"), p, r)] = float(v)
+        if (pref, p, r) in out["neto_fijo"]:
+            out["neto_fijo"][(pref, p, r)] *= k
+        x.update({"BEL antes del suavizado": bel[p], "FND antes del suavizado": fnd0, "FND": fnd0 * k,
+                  "BEL IS x PEACUMULADA x FND": b_n})
+    cambios = lambda d: np.diff(np.log([d[p] for p in todos]))          # noqa: E731
+    antes = cambios({ultimo: bel_u, **bel})
+    despues = cambios({ultimo: bel_u, **{p: objetivo[p] for p in periodos_proy}})
+    resumen = (f"BEL de {', '.join(str(a) for a in ka[1:])} fijo y los meses de en medio en linea entre anclas con el "
+               f"{texto}; cambio mensual: desviacion estandar {np.std(antes):.1%} -> {np.std(despues):.1%}, mayor "
+               f"{np.max(np.abs(antes)):.1%} -> {np.max(np.abs(despues)):.1%}")
+    fila["Suavizado entre diciembres"] = resumen
+    out.setdefault("suavizado", {})[(pref, str(r))] = {"texto": resumen, "modo": modo, "anclas": ka[1:]}
+    out["alertas"].append(("DANOS", f"{pref} | BEL | ramo {r}", f"SUAVIZAR_BEL: {resumen} (el FND de esos meses se ajusta "
+                           "para dar el BEL suavizado)"))
+
+
 def calcular_bel_fnd(bd: BDMontos, hp, resultados: dict, proy: dict, pe: dict, periodos_proy: list[int],
                      ultimo: int, is_fa_val: dict | None = None, bel_area: dict | None = None,
                      motivo_area: dict | None = None, indicaciones_area: bool = True) -> dict:
@@ -3598,13 +3691,24 @@ def calcular_bel_fnd(bd: BDMontos, hp, resultados: dict, proy: dict, pe: dict, p
                                 out["cesion_area"].add((pref, str(r)))
                             if len(f) != h or not np.all(np.isfinite(f)):
                                 f = np.full(h, vals[ok_p[-1]])      # (por si la indicacion no dio un camino finito)
+                        fijo = nombre in FACTORES_BEL_FIJOS
+                        if fijo:                               # margen fijo en su ultimo real (indicacion del area)
+                            u_f = vals[ok_p[-1]]
+                            u_f = max(u_f, dom[0]) if dom[0] is not None else u_f
+                            u_f = min(u_f, dom[1]) if dom[1] is not None else u_f
+                            f = np.full(h, float(u_f))
+                            modelo_txt = f"fijo en el ultimo real ({ok_p[-1]}; FACTORES_BEL_FIJOS)"
+                            regla_p, cambio_txt = "sin pendiente: el ultimo real", 0.0
+                            if ok_p[-1] != ultimo:
+                                out["alertas"].append(("DANOS", clave_al, f"sin {nombre} real en {ultimo}: se fija el de "
+                                                       f"{ok_p[-1]} ({u_f:.2%})"))
                         fila.update({f"{nombre} modelo": modelo_txt,
                                      f"{nombre} regla de la pendiente": regla_p,
                                      f"{nombre} cambio mensual de la tendencia": cambio_txt,
                                      f"{nombre} error % backtest (modelo)": res_f.error_modelo,
                                      f"{nombre} error % backtest (ultimo valor)": res_f.error_ultimo_valor})
                         out["alertas"] += [("DANOS", clave_al, a) for a in res_f.alertas
-                                           if not str(a).startswith("Se usa")]
+                                           if not str(a).startswith("Se usa") and not fijo]
                         u = vals[ok_p[-1]]
                         fuera = [q for q in per_f[-MESES_TENDENCIA:] if np.isfinite(vals.get(q, math.nan))
                                  and ((dom[0] is not None and vals[q] < dom[0]) or (dom[1] is not None and vals[q] > dom[1]))]
@@ -3666,6 +3770,10 @@ def calcular_bel_fnd(bd: BDMontos, hp, resultados: dict, proy: dict, pe: dict, p
                 out["razones"][(pref, p, r)] = raz
                 out["aplica"].add((pref, p, r))
                 n_ap += 1
+            modo_s = SUAVIZAR_BEL.get((pref, str(r))) if indicaciones_area else None
+            if modo_s and n_ap == h and np.isfinite(bel_u) and bel_u > 0:
+                _suavizar_bel(out, pref, r, periodos_proy, ultimo, bel_u, modo_s,
+                              {p: val("BEL", p) for p in per_hist}, fila)
             fila["Meses con BEL por FND"] = n_ap
             if usa_area and not n_ap:                      # (no se pudo usar: la serie queda con el modelo, en 0)
                 fila["Historia del BEL"] = f"no se pudo usar el metodo del area: {motivo or 'sin meses con BEL por FND'}"
@@ -4671,6 +4779,9 @@ def escribir_indices_pnd(bd: BDMontos, ctx: dict, avisos: list | None = None) ->
     def _proy_fac(nombre):
         if not (razones and periodos_proy):
             return ""
+        if nombre in FACTORES_BEL_FIJOS:
+            return (f"; desde {min(periodos_proy)}, en las series con BEL por FND, el ultimo real ({ultimo}) fijo "
+                    "(FACTORES_BEL_FIJOS, indicacion del area) (valor) en todos los renglones del mes")
         modelo_f = MODELO_POR_TIPO.get(TIPO_MODELO_FACTORES.get(nombre, ""), "")
         como = ("el nivel suavizado de los ultimos meses (SES), sin tendencia" if modelo_f == "SES" else
                 "la pendiente combinada en logaritmos" + (" con el patron del mes" if TIPO_MODELO_FACTORES.get(nombre) in
@@ -4731,7 +4842,9 @@ def escribir_indices_pnd(bd: BDMontos, ctx: dict, avisos: list | None = None) ->
             f"; desde {min(periodos_proy)}, en las series con BEL por FND, el FND proyectado (valor) en todos los renglones "
             "del mes"
             if fnd and periodos_proy else "") + f"; {TEXTO_SIN_DATO} si PND/PD o PEACUMULADA son {TEXTO_SIN_DATO}"
-                  + nota_area,
+                  + nota_area
+                  + "".join(f"; {pr_} {r_}: el FND de los meses entre diciembres se ajusta para suavizar el BEL "
+                            f"(SUAVIZAR_BEL: {d_['texto']})" for (pr_, r_), d_ in sorted((ctx.get("suavizado") or {}).items())),
     }
     col_estilo = max(fijas)
     col_ramo = next(iter(bd.cols_ramo.values()))
@@ -5743,6 +5856,14 @@ def escribir_diagnostico(resultados: dict, periodos_proy: list[int], alertas_gen
                                     f"estimado sobre {'toda la historia' if MESES_ESTACIONALIDAD is None else 'los ultimos ' + str(MESES_ESTACIONALIDAD) + ' meses'} "
                                     f"(minimo {MIN_OBS_ESTACIONALIDAD} meses)") if ESTACIONALIDAD_MENSUAL else "no"),
         ("Cesion por indicacion del area", _nota_cesion_area().replace("; por indicacion del area, ", "", 1) or "no"),
+        ("Margenes GTO y MR del BEL por FND", (f"fijos en el ultimo real ({resumen.get('ultimo')}) desde "
+                                               f"{periodos_proy[0]}: " + ", ".join(FACTORES_BEL_FIJOS)
+                                               + " (FACTORES_BEL_FIJOS, indicacion del area; tambien en el backtesting)")
+         if FACTORES_BEL_FIJOS else "proyectados con la pendiente combinada"),
+        ("Suavizado del BEL entre diciembres", " | ".join(
+            f"{pr_} {r_}: {d_['texto']}" for (pr_, r_), d_ in sorted(
+                (((resumen.get("pnd") or {}).get("bel_fnd") or {}).get("suavizado") or {}).items()))
+         or ("no aplico" if SUAVIZAR_BEL else "no")),
         ("Moneda del modelo", ", ".join(f"{lib}: {'MXN (convertido con el TC de Inversiones)' if v else 'USD'}"
                                          for lib, v in MODELAR_EN_MXN.items())),
         ("Rango esperado", "; ".join(f"{lib} {c} (total de ramos): {texto_rango(a, b)}"
@@ -7004,6 +7125,7 @@ def main():
                 "razones": razones, "is_fa": ctx_is_fa,
                 "is_fa_bel": (info_fnd.get("is_fa_bel") or set()) if fnd is not None else set(),
                 "bel_area": (info_fnd.get("bel_area") or {}) if fnd is not None else {},
+                "suavizado": (info_fnd.get("suavizado") or {}) if fnd is not None else {},
                 "pe_tab": {g: x for (e, g), x in (diag_pnd.get("_pe") or {}).items() if e == esc}}
     if INDICES_PND_EN_BD:
         if INDICES_PND_FORMULAS and diag_pnd.get("_pe") and primas is not None:   # solo con prima completa y verificada
