@@ -434,9 +434,13 @@ def nota_modelo() -> str:
     filas = {str(a).strip(): b for a, b, *_ in wb["Resumen"].iter_rows(values_only=True) if a} if "Resumen" in wb.sheetnames else {}
     wb.close()
     ventana = filas.get("Ventana de tendencia (meses)")
-    estacional = str(filas.get("Estacionalidad mensual", "")).lower().startswith("si")
+    texto_est = str(filas.get("Estacionalidad mensual", "")).lower()
+    estacional = texto_est.startswith("si")
+    tipos = texto_est.split(":")[0].replace("si, en ", "").strip() if estacional else ""
     recta = f"recta de {ventana} meses" if ventana and str(ventana).isdigit() else "recta de toda la historia"
-    return f"({recta}" + (" + patrón del año en índices)" if estacional else ")")
+    etiqueta = {"nivel": "montos", "indice": "índices"}
+    donde = " e ".join(etiqueta.get(x.strip(), x.strip()) for x in tipos.split(" e ") if x.strip()) if tipos else ""
+    return f"({recta}" + (f" + patrón del año en {donde})" if estacional and donde else ")")
 
 
 def leer_metodo() -> list:
