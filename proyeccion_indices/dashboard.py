@@ -203,14 +203,42 @@ def leer_intervalos() -> dict:
     return out
 
 
-# Montos que calcula el script de proyeccion para las celdas de la BD que van como formula (BEL por FND y sus
-# derivados): la BD se guarda sin recalcular, asi que esas celdas no traen valor. {(libro, concepto, periodo, ramo): v}
+# Montos que calcula el script de proyeccion para las celdas de la BD que van como formula (BEL por FND de Danos, RFV por
+# prima de Fianzas y sus derivados): la BD se guarda sin recalcular, asi que esas celdas no traen valor.
+# {(libro, concepto, periodo, ramo): v}. Si el tablero se corre solo (sin la proyeccion), esos montos salen de la hoja
+# Montos_Proyectados del diagnostico de la misma corrida (lo que el script escribio en las BD).
 MONTOS_CALCULADOS: dict = {}
+HOJA_DIAG_MONTOS = "Montos_Proyectados"
+
+
+def montos_diagnostico() -> dict:
+    """{(libro, concepto, periodo, ramo): USD} de la hoja Montos_Proyectados del diagnostico ({} si no esta)."""
+    if not ARCHIVO_DIAGNOSTICO.exists():
+        return {}
+    wb = openpyxl.load_workbook(ARCHIVO_DIAGNOSTICO, read_only=True, data_only=True)
+    try:
+        if HOJA_DIAG_MONTOS not in wb.sheetnames:
+            return {}
+        filas = wb[HOJA_DIAG_MONTOS].iter_rows(values_only=True)
+        enc = [norm(x) for x in next(filas, ())]
+        if not all(c in enc for c in ("LIBRO", "CONCEPTO", "PERIODO", "RAMO", "VALOR USD")):
+            return {}
+        j = {c: enc.index(c) for c in ("LIBRO", "CONCEPTO", "PERIODO", "RAMO", "VALOR USD")}
+        out = {}
+        for f in filas:
+            v, per = numero(f[j["VALOR USD"]]), numero(f[j["PERIODO"]])
+            if v is None or per is None:
+                continue
+            out[(str(f[j["LIBRO"]]).strip(), norm(f[j["CONCEPTO"]]), int(per), str(f[j["RAMO"]]).strip())] = v
+        return out
+    finally:
+        wb.close()
 
 
 def leer_montos(ultimo: int):
     registros, tc = [], {}
     ramos = {}
+    respaldo = None                      # Montos_Proyectados del diagnostico (solo si hace falta)
     for libro, ruta in (("DANOS", ARCHIVO_DANOS), ("FIANZAS", ARCHIVO_RFV)):
         wb = openpyxl.load_workbook(ruta, read_only=True, data_only=True)
         ws = wb[HOJA_MONTOS]
@@ -237,6 +265,10 @@ def leer_montos(ultimo: int):
                 v = numero(f[k])
                 if v is None:                    # formula sin valor guardado: el monto que calculo la proyeccion
                     v = MONTOS_CALCULADOS.get((libro, concepto, per, ramo))
+                if v is None and per > ultimo:   # (tablero corrido solo: lo que el script escribio en la BD)
+                    if respaldo is None:
+                        respaldo = montos_diagnostico()
+                    v = respaldo.get((libro, concepto, per, ramo))
                 if v is None:                    # celda vacia (mes sin captura): sin dato, no un cero real
                     continue
                 registros.append((libro, reserva, conc, ramo, per, tipo, v))
