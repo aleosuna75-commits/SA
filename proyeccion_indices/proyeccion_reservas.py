@@ -161,7 +161,7 @@ except Exception as _e:  # noqa: BLE001
 # =============================================================================
 CARPETA = Path(__file__).resolve().parent
 ENTRADAS = CARPETA / "entradas"
-VERSION_CODIGO = "2026-10-07b"   # version de los scripts: sale en la consola, en la hoja Resumen del diagnostico, en el pie
+VERSION_CODIGO = "2026-10-07c"   # version de los scripts: sale en la consola, en la hoja Resumen del diagnostico, en el pie
                                  # del tablero HTML y en la hoja Dashboard Razones del Excel, para saber con que version se corrio
 SALIDAS = CARPETA / "salidas"
 
@@ -670,6 +670,28 @@ BACKTESTING_HASTA = 202612       # ultimo mes del backtesting
 BACKTESTING_ETIQUETA = "BACKTESTING"
 MIN_REAL_BACKTESTING = 1e5       # USD: con un real menor a esto (promedio por mes, o en el mes) no se calcula el error % (p. ej.
                                  # SONR 80, que SAP registra en 0 y el backtesting saca del metodo del area)
+# RFV por prima (Fianzas, 2026-10-07): la RFV se descompone como la reserva de Danos (BEL = IS x PEACUMULADA x FND). La
+# metodologia vigente constituye la reserva de cada contrato en vigor sobre su prima de reserva (prima tomada menos
+# cargas, comisiones y gastos, mas el gasto de administracion) o sobre su monto afianzado por (omega + alfa), y la mantiene
+# mientras el contrato sigue en vigor; con los montos de la BD (por ramo, sin contratos) eso se resume en:
+#   PRIMA 24M = prima tomada de Fianzas de los ultimos MESES_PRIMA_RFV meses (MXN; hoja HOJA_PT_RAMO)
+#   FRV       = RFV BRUTO (MXN) / PRIMA 24M: factor de reserva (lo que queda constituido por peso de prima reciente:
+#               carga, comisiones, gasto de administracion, omega + alfa y permanencia), real hasta el ultimo mes y
+#               proyectado con TIPO_MODELO_FRV
+#   RFV BRUTO = PRIMA 24M x FRV / TC ; RFV IRR = RFV BRUTO x CESION (IRR / BRUTO, proyectada como la de Danos) ;
+#   RFV NETO  = RFV BRUTO - RFV IRR. La RCONT se queda con su modelo (no guarda una relacion estable con la prima).
+# 24 meses y SES (sin tendencia) porque en el backtesting con la historia a 202512 (meses 202601 a 202608 reales, la prima
+# real) fue lo que menos fallo en la RFV BRUTO total: 1.8 % de error medio con 24 meses contra 3.5 % con 12, 3.9 % con 36,
+# 3.8 % con 48 y 4.2 % con 60, y 10.4 % repitiendo el ultimo valor; con la historia a 202602, 3.0 % contra 5.4 % o mas.
+USAR_RFV_POR_PRIMA = True
+MESES_PRIMA_RFV = 24             # meses de prima tomada de la PRIMA 24M (si cambia, cambia el encabezado del bloque)
+TIPO_MODELO_FRV = "razon"        # "razon" = nivel suavizado sin tendencia (SES); "fnd" = Holt amortiguado con guardia
+MIN_MESES_FRV = 12               # meses minimos de FRV real para proyectarlo
+HOJA_PT_RAMO = "PT_RAMO"         # hoja de la BD de RFV con la prima tomada del mes por ramo (MXN) y su suma de 24 meses
+RAMO_FCST_FIANZAS = {"130": "130", "140": "140", "150": "150", "160": "160", "170": "170"}
+                                 # Ramo2 de CtaMens del FCST -> ramo de la BD de RFV (la prima del ano siguiente)
+RAMO_RFCST_FIANZAS = "130"       # RAMO del reforecast por mes (RCST_FA) con toda la prima de Fianzas: se reparte entre los
+                                 # ramos de la BD de RFV con la mezcla de PExRamo de los ultimos 12 meses
 CUENTA_PE_FCST = "61"            # cuenta de prima tomada en CtaMens (la que suma ER_ram)
 RAMO_FCST_A_BD = {"10": "10", "31": "30", "35": "34", "39": "37", "40": "40", "46": "40", "50": "50", "60": "60",
                   "71": "71", "73": "73", "80": "80", "90": "90", "100": "100", "110": "110"}
@@ -2692,6 +2714,7 @@ def leer_pe_fcst(ruta: Path | None = None) -> dict | None:
     -suma de AMOUNT de CtaMens con GL_ACCT = CUENTA_PE_FCST y el ramo (Ramo2 via RAMO_FCST_A_BD). Regresa
     {"ruta", "mensual": {(ramo, periodo): prima del mes}, "acumulada": {(ramo, periodo): acumulado del ano},
     "nombres": {ramo: "Incendio"...}, "periodos", "renglones", "usados", "fuera": {ramo del FCST: prima},
+    "fuera_mensual": {(Ramo2, periodo): prima del mes} de los ramos fuera de la BD (Fianzas: RFV por prima),
     "control": texto de la verificacion contra lo que muestra ER_ram, "avisos": [...]}; None si no hay archivo."""
     ruta = Path(ruta or ARCHIVO_PE_FCST)
     if not ruta.exists():
@@ -2714,7 +2737,7 @@ def leer_pe_fcst(ruta: Path | None = None) -> dict | None:
     def codigo(v):
         return str(int(v)) if isinstance(v, (int, float)) and not isinstance(v, bool) and np.isfinite(v) \
             else str(v or "").strip()
-    mensual, por_nombre, nombres, fuera = {}, {}, {}, {}
+    mensual, por_nombre, nombres, fuera, fuera_mes = {}, {}, {}, {}, {}
     renglones = usados = 0
     for f in filas[i_enc + 1:]:
         mes = f[j["CALMONTH"]] if len(f) > j["CALMONTH"] else None
@@ -2731,6 +2754,7 @@ def leer_pe_fcst(ruta: Path | None = None) -> dict | None:
         ramo = RAMO_FCST_A_BD.get(r2)
         if ramo is None:
             fuera[f"{r2} {nombre}"] = fuera.get(f"{r2} {nombre}", 0.0) - monto
+            fuera_mes[(r2, p)] = fuera_mes.get((r2, p), 0.0) - monto
             continue
         usados += 1
         mensual[(ramo, p)] = mensual.get((ramo, p), 0.0) - monto
@@ -2780,7 +2804,8 @@ def leer_pe_fcst(ruta: Path | None = None) -> dict | None:
                 avisos.append(f"PE FCST no cuadra con ER_ram en {sel} (diferencia maxima {dif:,.0f} USD)")
     return {"ruta": ruta, "mensual": mensual, "acumulada": acumulada,
             "nombres": {r: ", ".join(sorted(v)) for r, v in nombres.items()}, "periodos": periodos,
-            "renglones": renglones, "usados": usados, "fuera": fuera, "control": control, "avisos": avisos}
+            "renglones": renglones, "usados": usados, "fuera": fuera, "fuera_mensual": fuera_mes, "control": control,
+            "avisos": avisos}
 
 
 def escribir_primas_pe(wb, pr, grupos: list) -> dict | None:
@@ -2837,7 +2862,8 @@ def leer_pe_ramo(tc: dict, ruta: Path | None = None) -> dict | None:
     anterior). Los ramos de SUBRAMO_A_BD se abren por subramo; los subramos sin ramo de la BD (None) se reparten entre
     los demas del ramo en proporcion a su prima del mes (sin pesos negativos). Un mes sin renglones de un ramo, desde
     su primer mes en la base, es prima 0 (la base omite las combinaciones sin movimiento). Regresa {"ruta", "mensual":
-    {(ramo, periodo): USD}, "periodos", "renglones", "fuera": {ramo: USD}, "sin_mapa": {ramo/subramo: USD},
+    {(ramo, periodo): USD}, "periodos", "renglones", "fuera": {ramo: USD}, "fuera_mensual": {(ramo, periodo): monto en
+    MONEDA_PE_RAMO} de los ramos fuera de la BD de Danos (Fianzas: RFV por prima), "sin_mapa": {ramo/subramo: USD},
     "repartidos": USD, "avisos"} o None si no hay archivo."""
     candidatos = [Path(ruta)] if ruta else sorted((c for c in ENTRADAS.glob(PATRON_PE_RAMO) if not c.name.startswith("~$")),
                                                   key=lambda c: c.stat().st_size, reverse=True)
@@ -2879,6 +2905,7 @@ def leer_pe_ramo(tc: dict, ruta: Path | None = None) -> dict | None:
     ramos_bd = set(MAPA_RAMO_LAG)
     tc_ini = min(tc) if tc else None
     mensual, fuera, sin_mapa, repartidos, antes_tc, hueco_tc, negativos = {}, {}, {}, 0.0, set(), set(), set()
+    fuera_mes = {}                         # (ramo fuera de la BD, periodo) -> monto en la moneda del archivo (Fianzas)
 
     def usd(p, v):
         if MONEDA_PE_RAMO != "MXN":
@@ -2897,6 +2924,7 @@ def leer_pe_ramo(tc: dict, ruta: Path | None = None) -> dict | None:
                 mensual[(r, p)] = mensual.get((r, p), 0.0) + usd(p, v)
             else:
                 fuera[r] = fuera.get(r, 0.0) + usd(p, v)
+                fuera_mes[(r, p)] = fuera_mes.get((r, p), 0.0) + v
             continue
         destino = mapa.get(s_, "sin mapa")
         if destino == "sin mapa":
@@ -2943,8 +2971,9 @@ def leer_pe_ramo(tc: dict, ruta: Path | None = None) -> dict | None:
     if omitidos:
         avisos.append(f"{len(omitidos)} renglones con Ramo, Sramo o PmaTom no numerico omitidos (primero: renglon "
                       f"{omitidos[0]})")
-    return {"ruta": ruta, "mensual": mensual, "renglones": renglones, "fuera": fuera, "sin_mapa": sin_mapa,
-            "repartidos": repartidos, "avisos": avisos, "periodos": sorted({p for _, p in mensual})}
+    return {"ruta": ruta, "mensual": mensual, "renglones": renglones, "fuera": fuera, "fuera_mensual": fuera_mes,
+            "sin_mapa": sin_mapa, "repartidos": repartidos, "avisos": avisos,
+            "periodos": sorted({p for _, p in mensual})}
 
 
 def leer_pe_rfcst_fa(tc: dict, ruta: Path | None = None) -> dict | None:
@@ -3800,7 +3829,7 @@ def comparar_backtesting(bt: dict, bd: BDMontos, proy_final: dict, ultimo: int, 
         """(valor, etiqueta) de la referencia del mes."""
         if p > ultimo:
             return proy_final.get((c, p, x), 0.0), "proyeccion vigente"
-        pref, conc = c.split(" ", 1)
+        pref, conc = (c.split(" ", 1) + [""])[:2]            # (RCONT no lleva concepto)
         a = bel_area.get((pref, str(x)))
         if a and p in (a.get("meses") or []) and abs(bd.valores.get((norm(f"{pref} BEL"), p, x), 0.0)) < UMBRAL_CERO_MONTOS:
             v = a["valores"]
@@ -3924,6 +3953,451 @@ def escribir_backtesting(bd: BDMontos, bt: dict, cols_ind: dict | None, pe_tab: 
         ini, fin = ws.auto_filter.ref.split(":")
         ws.auto_filter.ref = f"{ini}:{re.match(r'[A-Z]+', fin).group()}{ws.max_row}"
     return len(usadas)
+
+
+# =============================================================================
+# RFV POR PRIMA (FIANZAS): RFV BRUTO = PRIMA 24M x FRV / TC; IRR = BRUTO x CESION; NETO = BRUTO - IRR
+# =============================================================================
+BLOQUES_RFV = ("PT", "PRIMA", "FRV", "CESION")     # bloques de la BD de RFV, en este orden (claves internas)
+FORMATO_BLOQUES_RFV = {"PT": "#,##0", "PRIMA": "#,##0", "FRV": "0.0000", "CESION": "0.00%"}
+
+
+def nombre_bloque_rfv(clave: str) -> str:
+    """Encabezado del bloque (sin el ramo): PT, PRIMA 24M, FRV, CESION."""
+    return f"PRIMA {MESES_PRIMA_RFV}M" if clave == "PRIMA" else clave
+
+
+def _tc_cercano(tc: dict, p: int) -> float:
+    """TC del mes; sin el, el del ultimo mes anterior con TC o, antes del primero, el primero."""
+    if p in tc:
+        return tc[p]
+    antes = [q for q in tc if q < p]
+    return tc[max(antes)] if antes else tc[min(tc)]
+
+
+def pt_fianzas(pe_ramo: dict | None, pe_rfa: dict | None, pef: dict | None, bd: BDMontos, tc: dict,
+               periodos_proy: list[int]) -> dict:
+    """Prima tomada del mes por ramo de la BD de RFV, en MXN (la RFV se modela en pesos), para la RFV por prima:
+    1) PExRamo (los ramos de Fianzas, que no estan en la BD de Danos) en todos sus meses; desde el primer mes de Fianzas
+       en la base, un mes sin renglones de un ramo es prima 0 (la base omite los meses sin movimiento);
+    2) despues de PExRamo y hasta el mes anterior al FCST, el reforecast por mes (RCST_FA: RAMO_RFCST_FIANZAS trae toda la
+       prima de Fianzas) repartido entre los ramos con la mezcla de PExRamo de los ultimos 12 meses y, con
+       PERFIL_REFORECAST = "FCST", llevado a la forma mensual de los mismos meses del FCST del ano siguiente (como en Danos);
+    3) el FCST (CtaMens, cuenta CUENTA_PE_FCST, Ramo2 de RAMO_FCST_FIANZAS, en USD) por el TC del mes del proyecto.
+    En un mes que traigan varias fuentes manda la primera (real, reforecast, FCST). tc: TC por mes (para PExRamo si
+    viniera en USD). Regresa {"mensual": {(ramo, periodo): MXN}, "fuente": {periodo: texto}, "texto", "avisos"}."""
+    ramos = list(bd.cols_ramo)
+    out = {"mensual": {}, "fuente": {}, "texto": "", "avisos": []}
+    partes = []
+    hist = {}
+    for (r, p), v in ((pe_ramo or {}).get("fuera_mensual") or {}).items():
+        if r in ramos and np.isfinite(v):
+            hist[(r, p)] = float(v) if MONEDA_PE_RAMO == "MXN" else float(v) * _tc_cercano(tc, p)
+    if not hist:
+        out["texto"] = ("PExRamo no trae prima de los ramos de Fianzas " + ", ".join(ramos)
+                        + (" (no se leyo la base)" if not pe_ramo else ""))
+        out["avisos"].append(out["texto"] + ": sin historia de prima, la RFV sigue con el modelo")
+        return out
+    p0, p1 = min(p for _, p in hist), max(p for _, p in hist)
+    for p in rango_periodos(p0, p1):
+        for r in ramos:
+            hist.setdefault((r, p), 0.0)
+        out["fuente"][p] = pe_ramo["ruta"].name
+    out["mensual"].update(hist)
+    con_prima = [r for r in ramos if any(hist.get((r, q)) for q in rango_periodos(p0, p1))]
+    partes.append(f"{p0} a {p1}: {pe_ramo['ruta'].name} (PmaTom en {MONEDA_PE_RAMO}; ramos con prima: "
+                  f"{', '.join(con_prima)})")
+    fcst = {}
+    for (r2, p), v in ((pef or {}).get("fuera_mensual") or {}).items():
+        r = RAMO_FCST_FIANZAS.get(str(r2))
+        if r in ramos and np.isfinite(v):
+            fcst[(r, p)] = fcst.get((r, p), 0.0) + float(v)
+    per_fcst = sorted({p for _, p in fcst})
+    desde = _mes_menos(p1, -1)
+    hasta = _mes_menos(per_fcst[0], 1) if per_fcst else periodos_proy[-1]
+    if pe_rfa and desde <= hasta:
+        tcs, tot = pe_rfa.get("tc_usado") or {}, {}
+        for (r, p), v in (pe_rfa.get("fuera") or {}).items():
+            if str(r) == RAMO_RFCST_FIANZAS and desde <= p <= hasta:
+                t = tcs.get(p) if MONEDA_PE_RFCST_FA == "MXN" and tcs.get(p) else tc_para_periodo(bd, p)
+                tot[p] = tot.get(p, 0.0) + float(v) * t        # (MXN del archivo, o USD por el TC del proyecto)
+        if tot:
+            meses = sorted(tot)
+            w = _mezcla(hist, ramos)
+            fa = {(r, p): tot[p] * w[r] for p in meses for r in ramos}
+            perfilados = []
+            if PERFIL_REFORECAST == "FCST" and fcst:
+                fa, perfilados = perfilar_reforecast(fa, meses, fcst, {})
+            out["mensual"].update(fa)
+            for p in meses:
+                out["fuente"][p] = (f"{pe_rfa['ruta'].name} (RAMO {RAMO_RFCST_FIANZAS} repartido con la mezcla de "
+                                    "PExRamo" + ("; forma mensual del FCST" if perfilados else "") + ")")
+            partes.append(f"{meses[0]} a {meses[-1]}: {pe_rfa['ruta'].name} › {pe_rfa.get('hoja', '')}, RAMO "
+                          f"{RAMO_RFCST_FIANZAS} ({sum(tot.values()) / 1e6:,.1f} M MXN; "
+                          + ", ".join(f"{p} {tot[p] / 1e6:,.1f}" for p in meses)
+                          + ") repartido con la mezcla de PExRamo de los ultimos 12 meses ("
+                          + ", ".join(f"{r}: {w[r]:.1%}" for r in ramos if w[r]) + ")"
+                          + (f"; total de esos meses de cada ramo con la forma mensual de los mismos meses del FCST "
+                             f"(ramos {', '.join(perfilados)})" if perfilados else ""))
+    for p in per_fcst:
+        if p in out["fuente"]:
+            continue
+        t = tc_para_periodo(bd, p)
+        for r in ramos:
+            out["mensual"][(r, p)] = fcst.get((r, p), 0.0) * t
+        out["fuente"][p] = f"{pef['ruta'].name} (CtaMens, cuenta {CUENTA_PE_FCST}, USD x TC del proyecto)"
+    if per_fcst:
+        tot_f = {r: sum(v for (x, q), v in fcst.items() if x == r) for r in ramos}
+        partes.append(f"{per_fcst[0]} a {per_fcst[-1]}: {pef['ruta'].name} › CtaMens, cuenta {CUENTA_PE_FCST}, Ramo2 "
+                      + ", ".join(f"{r} ({v / 1e6:,.1f} M USD)" for r, v in tot_f.items() if v)
+                      + ", por el TC del mes del proyecto")
+    falta = [p for p in rango_periodos(p0, periodos_proy[-1]) if p not in out["fuente"]]
+    if falta:
+        out["avisos"].append(f"{len(falta)} mes(es) sin prima de Fianzas en ninguna fuente ({falta[0]} a {falta[-1]}): "
+                             f"van en 0 en {HOJA_PT_RAMO} y la RFV de los meses cuya PRIMA {MESES_PRIMA_RFV}M los incluye "
+                             "sigue con el modelo")
+    out["texto"] = "; ".join(partes)
+    return out
+
+
+def _prima_ventana(pt: dict, r, p: int) -> tuple[float, bool]:
+    """(PRIMA 24M del ramo al mes p: suma de los ultimos MESES_PRIMA_RFV meses de PT, si todos sus meses vienen de
+    alguna fuente)."""
+    qs = [_mes_menos(p, k) for k in range(MESES_PRIMA_RFV)]
+    return (float(sum(pt["mensual"].get((r, q), 0.0) for q in qs)), all(q in pt["fuente"] for q in qs))
+
+
+def calcular_rfv_prima(bd: BDMontos, proy: dict, pt: dict | None, periodos_proy: list[int], ultimo: int) -> dict:
+    """RFV por prima (Fianzas): FRV = RFV BRUTO x TC / PRIMA 24M en la historia (TC de la BD del mes, el de la columna
+    TC), proyectado con TIPO_MODELO_FRV desde el ultimo mes real; CESION = RFV IRR / RFV BRUTO real proyectada con el
+    modelo de la cesion de Danos (TIPO_MODELO_FACTORES["CESION"]); RFV BRUTO = PRIMA 24M x FRV / TC (el del mes
+    proyectado), RFV IRR = BRUTO x CESION, RFV NETO = BRUTO - IRR. La RCONT no cambia. Un mes cuya PRIMA 24M no esta
+    completa (algun mes sin fuente) sigue con el modelo. Regresa {"proy": montos con la RFV nueva, "aplica":
+    {(periodo, ramo)}, "frv": {(periodo, ramo): FRV}, "cesion": {...}, "series", "resumen", "alertas", "estado"}."""
+    h = len(periodos_proy)
+    out = {"proy": dict(proy), "aplica": set(), "frv": {}, "cesion": {}, "series": [], "resumen": [], "alertas": [],
+           "estado": ""}
+    if not pt or not pt.get("mensual"):
+        out["estado"] = "sin prima tomada de Fianzas por ramo: la RFV sigue con el modelo"
+        return out
+    c_b, c_i, c_n = norm("RFV BRUTO"), norm("RFV IRR"), norm("RFV NETO")
+    per_hist = sorted({p for (c, p) in bd.filas if c == c_b and p <= ultimo})
+    tc = {p: tc_para_periodo(bd, p) for p in per_hist + list(periodos_proy)}
+    marcas = sorted({p for p in periodos_proy if p % 100 == 12} | {periodos_proy[-1]})
+    for r in bd.cols_ramo:
+        frv_h, ces_h = {}, {}
+        for p in per_hist:
+            b, i_ = bd.valores.get((c_b, p, r), math.nan), bd.valores.get((c_i, p, r), math.nan)
+            s, completa = _prima_ventana(pt, r, p)
+            frv_h[p] = b * tc[p] / s if completa and s > 0 and np.isfinite(b) else math.nan
+            ces_h[p] = i_ / b if np.isfinite(i_) and np.isfinite(b) and b > UMBRAL_CERO_MONTOS else math.nan
+        ok_p = [p for p in per_hist if np.isfinite(frv_h[p])]
+        b_u = bd.valores.get((c_b, ultimo, r), math.nan)
+        fila = {"Ramo": r, "Meses de FRV real": len(ok_p), "Desde": ok_p[0] if ok_p else None,
+                "Hasta": ok_p[-1] if ok_p else None}
+        motivo = ""
+        if not (np.isfinite(b_u) and b_u > UMBRAL_CERO_MONTOS):
+            motivo = "RFV BRUTO real en cero al ultimo mes"
+        elif len(ok_p) < MIN_MESES_FRV:
+            motivo = f"menos de {MIN_MESES_FRV} meses de FRV real (falta prima de {MESES_PRIMA_RFV} meses)"
+        elif ultimo not in ok_p:
+            motivo = f"sin PRIMA {MESES_PRIMA_RFV}M completa al ultimo mes"
+        frv_f = ces_f = None
+        if not motivo:
+            per = rango_periodos(ok_p[0], ultimo)
+            res = pronosticar(Serie(("FIANZAS", "RFV", "FRV", r), TIPO_MODELO_FRV, per,
+                                    [frv_h.get(q, math.nan) for q in per], ultimo, h, dominio=(0.0, None)))
+            frv_f = np.asarray(res.pronostico, dtype=float)
+            if len(frv_f) != h or not np.all(np.isfinite(frv_f)):
+                motivo, frv_f = "no se pudo proyectar el FRV", None
+            else:
+                prm = res.parametros or {}
+                fila.update({"FRV modelo": res.regla or res.modelo,
+                             "FRV alpha": prm.get("alpha", math.nan),
+                             "FRV error % backtest (modelo)": res.error_modelo,
+                             "FRV error % backtest (ultimo valor)": res.error_ultimo_valor,
+                             f"FRV {ultimo}": frv_h[ultimo], f"FRV {periodos_proy[-1]}": float(frv_f[-1])})
+                out["alertas"] += [("FIANZAS", f"RFV | FRV | ramo {r}", a) for a in res.alertas
+                                   if not str(a).startswith("Se usa")]
+        if frv_f is not None:
+            ok_c = [p for p in per_hist if np.isfinite(ces_h[p])]
+            ces_f = np.full(h, ces_h[ok_c[-1]]) if ok_c else np.zeros(h)
+            if ok_c:
+                per_c = rango_periodos(ok_c[0], ultimo)
+                res_c = pronosticar(Serie(("FIANZAS", "RFV", "CESION", r), TIPO_MODELO_FACTORES["CESION"], per_c,
+                                          [ces_h.get(q, math.nan) for q in per_c], ultimo, h, dominio=DOMINIO_CESION))
+                x = np.asarray(res_c.pronostico, dtype=float)
+                if len(x) == h and np.all(np.isfinite(x)):
+                    ces_f = x
+                u = ces_h[ok_c[-1]]
+                fila.update({"CESION modelo": res_c.regla or res_c.modelo,
+                             "CESION error % backtest (modelo)": res_c.error_modelo,
+                             "CESION error % backtest (ultimo valor)": res_c.error_ultimo_valor,
+                             f"CESION {ultimo}": u, f"CESION {periodos_proy[-1]}": float(ces_f[-1])})
+                if abs(ces_f[-1] - u) > 0.10:
+                    out["alertas"].append(("FIANZAS", f"RFV | CESION | ramo {r}",
+                                           f"la proyeccion lleva la cesion de {u:.1%} ({ultimo}) a {ces_f[-1]:.1%} "
+                                           f"({periodos_proy[-1]}); revisar si sigue"))
+        n_ap = 0
+        for j, p in enumerate(periodos_proy):
+            if frv_f is None:
+                break
+            s, completa = _prima_ventana(pt, r, p)
+            fz, cz = float(frv_f[j]), float(ces_f[j])
+            bruto = s * fz / tc[p] if completa and tc[p] else math.nan
+            out["series"].append({"Ramo": r, "Periodo": p, "PT del mes (MXN)": pt["mensual"].get((r, p), 0.0),
+                                  f"PRIMA {MESES_PRIMA_RFV}M (MXN)": s, "Prima completa": "si" if completa else "no",
+                                  "Fuente de la PT": pt["fuente"].get(p, "sin prima (0)"), "FRV": fz, "CESION": cz,
+                                  "TC": tc[p], "RFV BRUTO por prima": bruto,
+                                  "RFV BRUTO del modelo": proy.get((c_b, p, r), math.nan),
+                                  "RFV NETO por prima": bruto * (1 - cz) if np.isfinite(bruto) else math.nan,
+                                  "RFV NETO del modelo": proy.get((c_n, p, r), math.nan)})
+            if not np.isfinite(bruto) or bruto < 0:
+                continue
+            irr = bruto * cz
+            out["proy"][(c_b, p, r)] = float(bruto)
+            out["proy"][(c_i, p, r)] = float(irr)
+            out["proy"][(c_n, p, r)] = float(bruto - irr)
+            out["aplica"].add((p, r))
+            out["frv"][(p, r)], out["cesion"][(p, r)] = fz, cz
+            n_ap += 1
+        fila["Meses con RFV por prima"] = n_ap
+        fila["Motivo"] = motivo or ("" if n_ap == h else f"{h - n_ap} mes(es) sin PRIMA {MESES_PRIMA_RFV}M completa "
+                                                         "(quedan con el modelo)")
+        for p in marcas:
+            fila[f"RFV BRUTO modelo {p}"] = proy.get((c_b, p, r), math.nan)
+            fila[f"RFV BRUTO por prima {p}"] = out["proy"][(c_b, p, r)] if (p, r) in out["aplica"] else math.nan
+            fila[f"RFV NETO por prima {p}"] = out["proy"][(c_n, p, r)] if (p, r) in out["aplica"] else math.nan
+        bm, bf = fila.get(f"RFV BRUTO modelo {periodos_proy[-1]}"), fila.get(f"RFV BRUTO por prima {periodos_proy[-1]}")
+        if bm and np.isfinite(bf) and bm > 1e6 and abs(bf / bm - 1) > 0.5:
+            out["alertas"].append(("FIANZAS", f"RFV | BRUTO | ramo {r}",
+                                   f"{periodos_proy[-1]}: {bf / 1e6:,.1f} M USD por prima contra {bm / 1e6:,.1f} M del "
+                                   "modelo"))
+        out["resumen"].append(fila)
+    ramos_ap = sorted({r for _, r in out["aplica"]}, key=int)
+    out["estado"] = (f"ramos {', '.join(ramos_ap)} con RFV BRUTO = PRIMA {MESES_PRIMA_RFV}M x FRV / TC desde "
+                     f"{periodos_proy[0]} ({len(out['aplica'])} de {len(bd.cols_ramo) * h} meses); IRR = BRUTO x "
+                     "CESION; NETO = BRUTO - IRR; RCONT con su modelo") if ramos_ap else \
+        "ningun ramo con prima y RFV suficientes: la RFV sigue con el modelo"
+    return out
+
+
+def calcular_backtesting_rfv(bd: BDMontos, pt: dict | None, ultimo: int) -> dict:
+    """BACKTESTING de Fianzas: la proyeccion de la BD de RFV con la historia cortada en el mes anterior a
+    BACKTESTING_DESDE (mismas series y modelos, mismas identidades y la misma RFV por prima, con la misma prima de la
+    proyeccion: la real en los meses reales), para los meses BACKTESTING_DESDE a BACKTESTING_HASTA. Regresa lo mismo que
+    calcular_backtesting: {"estado", "corte", "periodos", "proy", "indicadores": {(reserva, periodo, ramo): {bloque:
+    valor}}, "aplica", "metodo", "alertas"}."""
+    out = {"estado": "", "corte": None, "periodos": [], "proy": {}, "indicadores": {}, "aplica": set(), "metodo": {},
+           "alertas": []}
+    if not BACKTESTING:
+        out["estado"] = "apagado (BACKTESTING = False)"
+        return out
+    desde, hasta = int(BACKTESTING_DESDE), int(BACKTESTING_HASTA)
+    corte = _mes_menos(desde, 1)
+    primero = min((p for (_, p) in bd.filas), default=None)
+    if primero is None or hasta < desde or corte >= ultimo or corte < _mes_menos(primero, -(MIN_MESES_FRV - 1)):
+        out["estado"] = (f"no se calcula: BACKTESTING_DESDE ({desde}) a BACKTESTING_HASTA ({hasta}) debe empezar despues de "
+                         f"{MIN_MESES_FRV} meses de historia de la BD de RFV y antes del ultimo mes real ({ultimo})")
+        return out
+    per = rango_periodos(desde, hasta)
+    h = len(per)
+    bd_bt = replace(bd, filas={k: v for k, v in bd.filas.items() if k[1] <= corte},
+                    valores={k: v for k, v in bd.valores.items() if k[1] <= corte}, filas_prima={}, filas_backtest={})
+    tc_hist = leer_tc_real(bd_bt, corte, "FIANZAS") if MODELAR_EN_MXN.get("FIANZAS") else None
+    series = series_montos(bd_bt, "FIANZAS", ESTRUCTURA["FIANZAS"], corte, h, tc_hist)
+    n_hist = len({p for (_, p) in bd_bt.filas})
+    print(f"   Backtesting Fianzas: historia hasta {corte} ({n_hist} meses), {len(series)} series, meses {per[0]} a "
+          f"{per[-1]} ...", flush=True)
+    res = correr_series(series)
+    proy = derivar_montos(bd_bt, "FIANZAS", ESTRUCTURA["FIANZAS"], res, per, en_mxn=tc_hist is not None)
+    info = calcular_rfv_prima(bd_bt, proy, pt, per, corte) if USAR_RFV_POR_PRIMA else \
+        {"proy": proy, "aplica": set(), "frv": {}, "cesion": {}, "resumen": []}
+    validar({}, info["proy"])
+    out.update({"corte": corte, "periodos": per, "proy": {k: v for k, v in info["proy"].items() if k[1] in per},
+                "aplica": set(info.get("aplica") or ())})
+    motivos = {str(f["Ramo"]): f.get("Motivo") or "" for f in info.get("resumen") or []}
+    c_b, c_i = norm("RFV BRUTO"), norm("RFV IRR")
+    for r in bd.cols_ramo:
+        out["metodo"][("RFV", r)] = ("RFV por prima" if any(x == r for _, x in out["aplica"])
+                                     else f"modelo ({motivos.get(r) or 'sin RFV por prima'})")
+        out["metodo"][("RCONT", r)] = "modelo (RCONT total repartido con la mezcla)"
+        for p in per:
+            s, _ = _prima_ventana(pt, r, p) if pt and pt.get("mensual") else (math.nan, False)
+            b, i_ = out["proy"].get((c_b, p, r), math.nan), out["proy"].get((c_i, p, r), math.nan)
+            t = tc_para_periodo(bd, p)
+            ind = {"PT": (pt or {}).get("mensual", {}).get((r, p), math.nan), "PRIMA": s,
+                   "FRV": info["frv"].get((p, r), b * t / s if np.isfinite(b) and np.isfinite(s) and s else math.nan),
+                   "CESION": info["cesion"].get((p, r), i_ / b if np.isfinite(i_) and np.isfinite(b) and b else
+                                                (0.0 if np.isfinite(b) else math.nan))}
+            for pref in ("RFV", "RCONT"):
+                out["indicadores"][(pref, p, r)] = ind
+    n = len({r for _, r in out["aplica"]})
+    out["estado"] = (f"historia hasta {corte} ({n_hist} meses: indicativo); {per[0]} a {per[-1]} ({h} meses); {n} ramos con "
+                     "RFV por prima; misma prima que la proyeccion (la real en los meses reales); RCONT con su modelo")
+    return out
+
+
+def escribir_pt_ramo(wb, pt: dict | None, ramos: list, periodos_bd=()) -> dict | None:
+    """Hoja HOJA_PT_RAMO de la BD de RFV: prima tomada del mes por ramo (MXN, valores, con su fuente) y PRIMA 24M (suma
+    de los ultimos MESES_PRIMA_RFV meses) como formula, de todos los meses de la prima y de la BD. Regresa {"fila":
+    {periodo: renglon}, "pt": {ramo: letra}, "suma": {ramo: letra}} o None sin prima."""
+    if HOJA_PT_RAMO in wb.sheetnames:
+        del wb[HOJA_PT_RAMO]
+    if not pt or not pt.get("mensual"):
+        return None
+    ws = wb.create_sheet(HOJA_PT_RAMO)
+    negrita = Font(bold=True)
+    n = MESES_PRIMA_RFV
+    todos = {p for _, p in pt["mensual"]} | set(periodos_bd)
+    per = rango_periodos(min(todos), max(todos))
+    ws.cell(1, 1, f"Prima tomada (PT) de Fianzas del mes por ramo (MXN) y PRIMA {n}M = suma de los ultimos {n} meses. "
+                  f"Fuentes: {pt.get('texto', '')}").font = negrita
+    ws.cell(2, 1, f"Un mes que ninguna fuente trae va en 0 (FUENTE: sin prima). En los primeros {n - 1} meses de la hoja "
+                  f"la suma lleva solo los meses que hay. La RFV por prima solo usa las sumas con sus {n} meses en alguna "
+                  "fuente")
+    cab = ["PERIODO", "FUENTE"] + [f"PT {r}" for r in ramos] + [f"PRIMA {n}M {r}" for r in ramos]
+    for k, t in enumerate(cab, start=1):
+        ws.cell(3, k, t).font = negrita
+    c_pt = {r: 3 + i for i, r in enumerate(ramos)}
+    c_sm = {r: 3 + len(ramos) + i for i, r in enumerate(ramos)}
+    filas = {}
+    for i, p in enumerate(per):
+        fila = 4 + i
+        filas[p] = fila
+        ws.cell(fila, 1, p)
+        ws.cell(fila, 2, pt["fuente"].get(p, "sin prima (0)"))
+        for r in ramos:
+            ws.cell(fila, c_pt[r], float(pt["mensual"].get((r, p), 0.0))).number_format = "#,##0"
+            le = get_column_letter(c_pt[r])
+            ws.cell(fila, c_sm[r], f"=SUM({le}{max(4, fila - n + 1)}:{le}{fila})").number_format = "#,##0"
+    ws.freeze_panes = "C4"
+    for k in range(1, len(cab) + 1):
+        ws.column_dimensions[get_column_letter(k)].width = 16 if k > 2 else 12
+    _agrupar(ws, [list(c_pt.values()), list(c_sm.values())])
+    return {"fila": filas, "pt": {r: get_column_letter(c) for r, c in c_pt.items()},
+            "suma": {r: get_column_letter(c) for r, c in c_sm.items()}}
+
+
+def escribir_bloques_rfv(bd: BDMontos, info: dict, hoja_pt: dict | None, periodos_proy: list[int],
+                         solo_limpiar: bool = False) -> dict:
+    """Bloques de la RFV por prima a la derecha de la hoja de montos de la BD de RFV, una columna por ramo, en todos los
+    renglones (historia y proyeccion, de todos los conceptos): PT y PRIMA 24M (de la hoja HOJA_PT_RAMO), FRV y CESION.
+    FRV = RFV BRUTO del mes x TC / PRIMA 24M y CESION = RFV IRR / RFV BRUTO del mes como formulas (el monto del mes con
+    SUMAR.SI.CONJUNTO por CONCEPTO y PERIODO fuera de su renglon); en los meses con RFV por prima, el FRV y la CESION
+    proyectados en valores. Los bloques de una corrida anterior se limpian (con solo_limpiar, solo eso: sin prima de
+    Fianzas no se escriben). Regresa {(bloque, ramo): columna}."""
+    ws = bd.ws
+    ramos = list(bd.cols_ramo)
+    patron = re.compile(r"^(PT|PRIMA \d+M|FRV|CESION) (\S+)$")
+    enc = {c: norm(ws.cell(3, c).value) for c in range(1, ws.max_column + 1) if ws.cell(3, c).value is not None}
+    viejas = sorted(c for c, t in enc.items() if (m := patron.match(t)) and m.group(2) in ramos)
+    fijas = [c for c in enc if c not in viejas]
+    for c in viejas:
+        for f in range(1, ws.max_row + 1):
+            ws.cell(f, c).value = None
+        if solo_limpiar:
+            ws.cell(3, c).value = None
+    if solo_limpiar:
+        return {}
+    col_estilo = max(fijas)
+    ancho = ws.column_dimensions[get_column_letter(next(iter(bd.cols_ramo.values())))].width
+    modelo_frv = MODELO_POR_TIPO.get(TIPO_MODELO_FRV, TIPO_MODELO_FRV)
+    modelo_ces = MODELO_POR_TIPO.get(TIPO_MODELO_FACTORES["CESION"], "")
+    desde = f"; desde {periodos_proy[0]}, en los ramos con RFV por prima, " if periodos_proy else ""
+    si_error = " (SI.ERROR: 0 si divide entre 0)"
+    n = MESES_PRIMA_RFV
+    descripcion = {
+        "PT": f"PT = prima tomada de Fianzas del mes en MXN (hoja {HOJA_PT_RAMO}: PExRamo, reforecast y FCST; 0 si "
+              "ninguna fuente la trae)",
+        "PRIMA": f"PRIMA {n}M = suma de los ultimos {n} meses de PT en MXN (hoja {HOJA_PT_RAMO}): la prima que sostiene "
+                 "la reserva en vigor",
+        "FRV": (f"FRV = RFV BRUTO del mes x TC / PRIMA {n}M: factor de reserva, lo que queda constituido por cada peso de "
+                f"prima de los ultimos {n} meses (en el renglon RFV BRUTO, su monto; en los demas, con "
+                "SUMAR.SI.CONJUNTO)" + si_error
+                + (desde + f"el FRV proyectado ({modelo_frv}, {TIPO_MODELO_FRV}) (valor) en todos los renglones del mes. "
+                   f"RFV BRUTO = PRIMA {n}M x FRV / TC" if periodos_proy else "")),
+        "CESION": ("CESION = RFV IRR del mes / RFV BRUTO del mes (en el renglon IRR o BRUTO, su monto; en los demas, con "
+                   "SUMAR.SI.CONJUNTO)" + si_error
+                   + (desde + f"la cesion proyectada ({modelo_ces}) (valor). RFV IRR = RFV BRUTO x CESION y RFV NETO = "
+                      "RFV BRUTO x (1 - CESION)" if periodos_proy else "")),
+    }
+    cols, c = {}, max(fijas) + 1
+    for clave in BLOQUES_RFV:
+        for r in ramos:
+            cols[(clave, r)] = c
+            _copiar_estilo(ws.cell(3, col_estilo), ws.cell(3, c))
+            ws.cell(3, c).value = f"{nombre_bloque_rfv(clave)} {r}"
+            if ancho:
+                ws.column_dimensions[get_column_letter(c)].width = ancho
+            c += 1
+        c0 = cols[(clave, ramos[0])]
+        ws.cell(2, c0).value = descripcion[clave]
+        ws.cell(2, c0).font = Font(bold=True)
+    c_conc, c_per, c_tc = (get_column_letter(x) for x in (bd.col_concepto, bd.col_periodo, bd.col_tc))
+    ref_pt = _ref_hoja(HOJA_PT_RAMO)
+    for (conc, p), fila in bd.filas.items():
+        for r in ramos:
+            ram = get_column_letter(bd.cols_ramo[r])
+
+            def del_mes(concepto, _r=ram, _p=p, _f=fila):
+                f_obj = bd.filas.get((norm(concepto), _p))
+                if f_obj is None:
+                    return None
+                if f_obj == _f:
+                    return f"{_r}{_f}"
+                texto = str(ws.cell(f_obj, bd.col_concepto).value).strip().replace('"', '""')
+                return f'SUMIFS(${_r}:${_r},${c_conc}:${c_conc},"{texto}",${c_per}:${c_per},${c_per}{_f})'
+            L = {k: f"{get_column_letter(cols[(k, r)])}{fila}" for k in BLOQUES_RFV}
+            celdas = {k: ws.cell(fila, cols[(k, r)]) for k in BLOQUES_RFV}
+            for k, celda in celdas.items():
+                celda.number_format = FORMATO_BLOQUES_RFV[k]
+            if hoja_pt and p in hoja_pt["fila"]:
+                celdas["PT"].value = f"={ref_pt}!${hoja_pt['pt'][r]}${hoja_pt['fila'][p]}"
+                celdas["PRIMA"].value = f"={ref_pt}!${hoja_pt['suma'][r]}${hoja_pt['fila'][p]}"
+            else:
+                for k in ("PT", "PRIMA"):
+                    celdas[k].value = TEXTO_SIN_DATO
+                    celdas[k].alignment = Alignment(horizontal="right")
+            if (p, r) in info.get("aplica", ()):
+                celdas["FRV"].value = float(info["frv"][(p, r)])
+                celdas["CESION"].value = float(info["cesion"][(p, r)])
+                continue
+            b, i_ = del_mes("RFV BRUTO"), del_mes("RFV IRR")
+            celdas["FRV"].value = (f"=IFERROR({b}*${c_tc}{fila}/{L['PRIMA']},0)" if b and hoja_pt and p in hoja_pt["fila"]
+                                   else TEXTO_SIN_DATO)
+            celdas["CESION"].value = f"=IFERROR({i_}/{b},0)" if b and i_ else TEXTO_SIN_DATO
+            for k in ("FRV", "CESION"):
+                if celdas[k].value == TEXTO_SIN_DATO:
+                    celdas[k].alignment = Alignment(horizontal="right")
+    fin = max(cols.values())
+    if ws.auto_filter and ws.auto_filter.ref:
+        ini, fin_ref = ws.auto_filter.ref.split(":")
+        fila_fin = re.match(r"[A-Z]+(\d+)", fin_ref).group(1)
+        ws.auto_filter.ref = f"{ini}:{get_column_letter(fin)}{fila_fin}"
+    for c in viejas:
+        if c > fin:
+            ws.cell(3, c).value = None
+    _agrupar(ws, [[bd.cols_ramo[r] for r in ramos]] + [[cols[(k, r)] for r in ramos] for k in BLOQUES_RFV])
+    return cols
+
+
+def escribir_rfv_prima(bd: BDMontos, info: dict, cols: dict):
+    """En los meses con RFV por prima, las celdas RAM_ de RFV BRUTO, RFV IRR y RFV NETO van como formulas que solo usan
+    celdas de su propio renglon (PRIMA 24M, FRV, CESION y TC), para que la hoja se pueda ordenar y filtrar:
+    RFV BRUTO = PRIMA 24M x FRV / TC; RFV IRR = RFV BRUTO x CESION; RFV NETO = RFV BRUTO x (1 - CESION)."""
+    ws = bd.ws
+    c_tc = get_column_letter(bd.col_tc)
+    for (p, r) in sorted(info.get("aplica") or ()):
+        ram = get_column_letter(bd.cols_ramo[r])
+        for conc in ("RFV BRUTO", "RFV IRR", "RFV NETO"):
+            f = bd.filas.get((norm(conc), p))
+            if not f:
+                continue
+            L = {k: f"{get_column_letter(cols[(k, r)])}{f}" for k in ("PRIMA", "FRV", "CESION")}
+            bruto = f"{L['PRIMA']}*{L['FRV']}/${c_tc}{f}"
+            ws[f"{ram}{f}"] = "=" + {"RFV BRUTO": bruto, "RFV IRR": f"{bruto}*{L['CESION']}",
+                                     "RFV NETO": f"{bruto}*(1-{L['CESION']})"}[conc]
 
 
 def _diag_pnd_bd_final(diag: dict, proy_modelo: dict, proy_final: dict, ramos: list, periodos_proy: list[int]):
@@ -5236,6 +5710,16 @@ def escribir_diagnostico(resultados: dict, periodos_proy: list[int], alertas_gen
         ("Backtesting", (((resumen.get("pnd") or {}).get("backtesting") or {}).get("estado") or "-")
          + (f"; renglones '{BACKTESTING_ETIQUETA} <concepto>' al final de {HOJA_MONTOS}; hojas Backtesting_Resumen y "
             "Backtesting_Mensual" if ((resumen.get("pnd") or {}).get("backtesting") or {}).get("proy") else "")),
+        ("RFV por prima (Fianzas)", (((resumen.get("pnd") or {}).get("rfv_prima") or {}).get("estado") or "-")
+         + (f"; prima: {(resumen.get('pnd') or {}).get('pt_fianzas')}" if (resumen.get("pnd") or {}).get("pt_fianzas")
+            else "")
+         + (f"; hojas RFV_Prima_Resumen y RFV_Prima_Mensual; en la BD de RFV, hoja {HOJA_PT_RAMO} y bloques PT, "
+            f"PRIMA {MESES_PRIMA_RFV}M, FRV y CESION" if ((resumen.get("pnd") or {}).get("rfv_prima") or {}).get("aplica")
+            else "")),
+        ("Backtesting Fianzas", (((resumen.get("pnd") or {}).get("backtesting_rfv") or {}).get("estado") or "-")
+         + (f"; renglones '{BACKTESTING_ETIQUETA} <concepto>' al final de {HOJA_MONTOS} de la BD de RFV; hojas "
+            "Backtesting_Resumen y Backtesting_Mensual (Libro FIANZAS)"
+            if ((resumen.get("pnd") or {}).get("backtesting_rfv") or {}).get("proy") else "")),
         ("BEL del metodo del area", (resumen.get("pnd") or {}).get("sin_metodo_area")
          or (resumen.get("pnd") or {}).get("metodo_area") or "-"),
         ("Tiempo de ejecucion (s)", f"{resumen.get('segundos', 0):,.0f}"),
@@ -5243,8 +5727,9 @@ def escribir_diagnostico(resultados: dict, periodos_proy: list[int], alertas_gen
         ("METODOLOGIA", ""),
         ("1. Coherencia contable", "Se proyectan drivers (BEL / BRUTO y razones) y se derivan las demas lineas: "
                                    "RRC: BRUTO = BEL+GTO+MR, IRR = %ces*BRUTO, NETO = BRUTO-IRR; SONR: BRUTO = BEL+MR; "
-                                   "RFV: NETO = BRUTO-IRR; RCONT: total repartido por ramo con la mezcla de los "
-                                   "ultimos 8 meses."),
+                                   f"RFV: BRUTO = PRIMA {MESES_PRIMA_RFV}M x FRV / TC (RFV por prima), IRR = "
+                                   "BRUTO x CESION, NETO = BRUTO-IRR; RCONT: total repartido por ramo con la mezcla de "
+                                   "los ultimos 8 meses."),
         ("2. Modelo", "Montos, indices y LAGs: linea de tendencia historica (regresion lineal, en logaritmos cuando "
                       f"la serie es positiva) sobre los ultimos {MESES_TENDENCIA or 'N/A'} meses, continuada desde el "
                       "ultimo dato real: la proyeccion sale paralela a la linea de tendencia de Excel y arranca del "
@@ -5677,12 +6162,23 @@ def _hojas_pnd(wb, diag: dict, negrita, encab):
                          "BEL": "#,##0"})
             _hoja_filas(wb, "BEL_FND_Mensual", fnd.get("series") or [], negrita, encab,
                         {"IS": "0.0000", "FND": "0.0000", "PEACUMULADA": "#,##0", "BEL": "#,##0"})
+        rfv_ = (diag or {}).get("rfv_prima") or {}
+        if rfv_.get("resumen") or rfv_.get("series"):
+            _hoja_filas(wb, "RFV_Prima_Resumen", rfv_.get("resumen") or [], negrita, encab,
+                        {"FRV": "0.0000", "CESION": "0.00%", "RFV": "#,##0", "Error": "0.0"})
+            _hoja_filas(wb, "RFV_Prima_Mensual", rfv_.get("series") or [], negrita, encab,
+                        {"PT": "#,##0", "PRIMA": "#,##0", "FRV": "0.0000", "CESION": "0.00%", "TC": "0.0000",
+                         "RFV": "#,##0"})
         bt_ = (diag or {}).get("backtesting") or {}
-        if bt_.get("resumen"):
-            _hoja_filas(wb, "Backtesting_Resumen", bt_["resumen"], negrita, encab,
+        bt_f = (diag or {}).get("backtesting_rfv") or {}
+        if bt_.get("resumen") or bt_f.get("resumen"):
+            libros = [("DANOS", bt_), ("FIANZAS", bt_f)]
+            _hoja_filas(wb, "Backtesting_Resumen", [{"Libro": lib, **f} for lib, b_ in libros
+                                                    for f in b_.get("resumen") or []], negrita, encab,
                         {"Error": "0.0%", "Sesgo": "0.0%", "Dif": "0.0%", "Real": "#,##0", "Backtesting": "#,##0",
                          "Proyeccion": "#,##0"})
-            _hoja_filas(wb, "Backtesting_Mensual", bt_.get("mensual") or [], negrita, encab,
+            _hoja_filas(wb, "Backtesting_Mensual", [{"Libro": lib, **f} for lib, b_ in libros
+                                                    for f in b_.get("mensual") or []], negrita, encab,
                         {"Backtesting": "#,##0", "Referencia": "#,##0", "Diferencia %": "0.0%", "Diferencia": "#,##0"})
     if not diag or not (diag.get("mensual") or diag.get("resumen")):
         hojas_fnd()
@@ -6329,6 +6825,57 @@ def main():
                 print(f"      {f['Concepto']:<10} error {e_:.1%} y sesgo {s_:+.1%} en {f['Meses reales comparados']} meses reales"
                       if e_ is not None else f"      {f['Concepto']}: sin meses reales", flush=True)
     diag_pnd["backtesting"] = bt
+    # RFV por prima (Fianzas): RFV BRUTO = PRIMA 24M x FRV / TC; RFV IRR = BRUTO x CESION; RFV NETO = BRUTO - IRR
+    info_rfvp = {"estado": "apagado (USAR_RFV_POR_PRIMA = False)", "aplica": set(), "frv": {}, "cesion": {},
+                 "series": [], "resumen": []}
+    pt_fz, bt_rfv = None, {"estado": "apagado (BACKTESTING = False)", "proy": {}}
+    if USAR_RFV_POR_PRIMA:
+        print("RFV por prima (Fianzas) ...", flush=True)
+        n0 = len(alertas)
+        try:
+            pt_fz = pt_fianzas(pe_ramo, pe_rfa, pef, bd_rfv, tc_primas, periodos_proy)
+            for a in pt_fz["avisos"]:
+                alertas.append(("FIANZAS", "Prima de Fianzas", a))
+            info_rfvp = calcular_rfv_prima(bd_rfv, proy_rfv, pt_fz, periodos_proy, ultimo)
+            validar(proy_danos, info_rfvp["proy"])
+            alertas.extend(info_rfvp["alertas"])
+            proy_rfv = info_rfvp["proy"]
+        except Exception as e:  # noqa: BLE001
+            del alertas[n0:]
+            info_rfvp = {"estado": f"error en la RFV por prima ({type(e).__name__}: {e}); la RFV sigue con el modelo",
+                         "aplica": set(), "frv": {}, "cesion": {}, "series": [], "resumen": []}
+            alertas.append(("FIANZAS", "RFV por prima", info_rfvp["estado"]))
+        print(f"   Prima de Fianzas: {(pt_fz or {}).get('texto') or '-'}", flush=True)
+        print(f"   {info_rfvp['estado']}", flush=True)
+        for (lib, conc), (inf, sup) in RANGO_ESPERADO.items():   # (con la RFV por prima, el rango solo se avisa)
+            if lib != "FIANZAS" or not info_rfvp.get("aplica"):
+                continue
+            tot = {p: sum(proy_rfv.get((norm(conc), p, r), 0.0) for r in bd_rfv.cols_ramo) for p in periodos_proy}
+            fuera = [p for p, v in tot.items() if (inf is not None and v < inf) or (sup is not None and v > sup)]
+            if fuera:
+                alertas.append(("FIANZAS", f"{conc} total", f"con la RFV por prima, {len(fuera)} mes(es) fuera del rango "
+                                f"esperado ({texto_rango(inf, sup)}): {fuera[0]} a {fuera[-1]}; no se ajusta"))
+    if BACKTESTING and pt_fz and pt_fz.get("mensual"):
+        print("Backtesting (Fianzas) ...", flush=True)
+        n0 = len(alertas)
+        try:
+            bt_rfv = calcular_backtesting_rfv(bd_rfv, pt_fz, ultimo)
+            bt_rfv.update(comparar_backtesting(bt_rfv, bd_rfv, proy_rfv, ultimo))
+            alertas.extend(("FIANZAS", "Backtesting", a) for a in bt_rfv.get("alertas") or [])
+        except Exception as e:  # noqa: BLE001
+            del alertas[n0:]
+            bt_rfv = {"estado": f"error en el backtesting de Fianzas ({type(e).__name__}: {e}); no se agrega", "proy": {}}
+            alertas.append(("FIANZAS", "Backtesting", bt_rfv["estado"]))
+        print(f"   {bt_rfv['estado']}", flush=True)
+        for f in bt_rfv.get("resumen") or []:
+            if f["Ramo"] == "TOTAL" and f["Concepto"] in (norm("RFV BRUTO"), norm("RFV NETO"), norm("RCONT")):
+                e_ = f["Error % (suma |dif| / suma |real|)"]
+                s_ = f["Sesgo % (suma dif / suma |real|)"]
+                print(f"      {f['Concepto']:<10} error {e_:.1%} y sesgo {s_:+.1%} en {f['Meses reales comparados']} meses reales"
+                      if e_ is not None else f"      {f['Concepto']}: sin meses reales", flush=True)
+    diag_pnd["rfv_prima"] = info_rfvp
+    diag_pnd["pt_fianzas"] = (pt_fz or {}).get("texto") or ""
+    diag_pnd["backtesting_rfv"] = bt_rfv
 
     info_danos = escribir_bd_montos(bd_danos, proy_danos, periodos_proy, SALIDA_BD_DANOS)
     escribir_correccion_moneda(bd_danos, correcciones["DANOS"])
@@ -6392,6 +6939,19 @@ def main():
     guardar_libro(bd_danos.wb, SALIDA_BD_DANOS, original=ARCHIVO_BD_DANOS)
     info_rfv = escribir_bd_montos(bd_rfv, proy_rfv, periodos_proy, SALIDA_BD_RFV)
     escribir_correccion_moneda(bd_rfv, correcciones["FIANZAS"])
+    cols_rfv = {}
+    if pt_fz and pt_fz.get("mensual"):                 # RFV por prima: hoja PT_RAMO, bloques y formulas de la RFV
+        hoja_pt = escribir_pt_ramo(bd_rfv.wb, pt_fz, list(bd_rfv.cols_ramo), sorted({p for _, p in bd_rfv.filas}))
+        cols_rfv = escribir_bloques_rfv(bd_rfv, info_rfvp, hoja_pt, periodos_proy)
+        if info_rfvp.get("aplica"):
+            escribir_rfv_prima(bd_rfv, info_rfvp, cols_rfv)
+    else:                                              # (sin prima de Fianzas: se quitan los de una corrida anterior)
+        escribir_pt_ramo(bd_rfv.wb, None, [])
+        escribir_bloques_rfv(bd_rfv, info_rfvp, None, periodos_proy, solo_limpiar=True)
+    n_bt_rfv = escribir_backtesting(bd_rfv, bt_rfv, cols_rfv)
+    if n_bt_rfv:
+        print(f"   Backtesting Fianzas: {n_bt_rfv} renglones '{BACKTESTING_ETIQUETA} <concepto>' en {HOJA_MONTOS} de "
+              f"{SALIDA_BD_RFV.name}", flush=True)
     guardar_libro(bd_rfv.wb, SALIDA_BD_RFV, original=ARCHIVO_BD_RFV)
     # una BD de Danos por escenario (mismo libro, con HParametros ya proyectado; solo cambian RRC y SONR)
     archivos_pnd = []
@@ -6441,7 +7001,8 @@ def main():
             dashboard.SALIDAS, dashboard.ARCHIVO_DANOS = SALIDAS, SALIDA_BD_DANOS
             dashboard.ETIQUETA_BACKTESTING = BACKTESTING_ETIQUETA
             dashboard.ARCHIVO_RFV, dashboard.ARCHIVO_DIAGNOSTICO = SALIDA_BD_RFV, SALIDA_DIAGNOSTICO
-            dashboard.MONTOS_CALCULADOS = {("DANOS", c, p, r): v for (c, p, r), v in proy_danos.items()}
+            dashboard.MONTOS_CALCULADOS = {**{("DANOS", c, p, r): v for (c, p, r), v in proy_danos.items()},
+                                           **{("FIANZAS", c, p, r): v for (c, p, r), v in proy_rfv.items()}}
             dashboard.generar(SALIDA_DASHBOARD)
             dashboard_ok = True
         except Exception as e:  # noqa: BLE001
@@ -6452,7 +7013,8 @@ def main():
             _dx.SALIDAS, _dx.ARCHIVO_DANOS = SALIDAS, SALIDA_BD_DANOS
             _dx.ETIQUETA_BACKTESTING = BACKTESTING_ETIQUETA
             _dx.ARCHIVO_RFV, _dx.ARCHIVO_DIAGNOSTICO = SALIDA_BD_RFV, SALIDA_DIAGNOSTICO
-            _dx.MONTOS_CALCULADOS = {("DANOS", c, p, r): v for (c, p, r), v in proy_danos.items()}
+            _dx.MONTOS_CALCULADOS = {**{("DANOS", c, p, r): v for (c, p, r), v in proy_danos.items()},
+                                     **{("FIANZAS", c, p, r): v for (c, p, r), v in proy_rfv.items()}}
             dashboard_html.generar(SALIDA_DASHBOARD_HTML)
             html_ok = True
         except Exception as e:  # noqa: BLE001

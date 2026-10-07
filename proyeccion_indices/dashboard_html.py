@@ -66,6 +66,15 @@ def leer_resumen() -> dict:
 MESES_CORTOS = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"]
 
 
+def nota_rfv_prima(resumen: dict) -> str:
+    """Nota de la RFV por prima (linea "RFV por prima (Fianzas)" de la hoja Resumen del diagnostico): "ramos 140, 150,
+    160 y 170: RFV BRUTO = PRIMA 24M × FRV / TC desde 202609" o "" si no aplico (o con un diagnostico anterior)."""
+    texto = str(resumen.get("RFV por prima (Fianzas)") or "").strip()
+    if not texto.startswith("ramos "):
+        return ""
+    return texto.split(" (")[0].replace(" con RFV BRUTO", ": RFV BRUTO").replace(" x ", " × ")
+
+
 def notas_cesion_area(resumen: dict) -> dict:
     """Texto por "reserva|ramo" de la cesion por indicacion del area, leido de la linea "Cesion por indicacion del area" de
     la hoja Resumen del diagnostico (CESION_OBJETIVO y CESION_TENDENCIA del modelo), para la nota de la columna CESION del
@@ -256,6 +265,7 @@ def preparar_datos() -> dict:
         "persistencia_indices": persistencia,
         "estatutarios": leer_estatutarios(),
         "nota_rangos": nota_rangos,
+        "rfv_prima": nota_rfv_prima(resumen),
         "ppto": leer_contraste_presupuesto(),
         "tend": leer_tendencias(),
         "pnd": pnd,
@@ -1031,7 +1041,7 @@ function pintarReservas() {
   const { reserva, concepto, moneda } = E; const ramoRes = E.ramoRes;
   const conceptos = D.conceptos[reserva] || [], ramos = D.ramos_m[reserva] || [];
   const aviso = document.getElementById('nota-res');
-  aviso.textContent = `Cifras en millones de ${moneda}${moneda === 'MXN' ? ' (USD × TC del mes)' : ''} · real hasta ${eti(D.ultimo)} · montos: ${D.modelo_por_tipo.nivel || 'n/d'}; razones: ${D.modelo_por_tipo.razon || 'n/d'}${reserva === 'RFV' ? ' · Fianzas se modela en pesos y se convierte con el TC de Inversiones' + (D.nota_rangos ? ' · ' + D.nota_rangos : '') : ''}`;
+  aviso.textContent = `Cifras en millones de ${moneda}${moneda === 'MXN' ? ' (USD × TC del mes)' : ''} · real hasta ${eti(D.ultimo)} · montos: ${D.modelo_por_tipo.nivel || 'n/d'}; razones: ${D.modelo_por_tipo.razon || 'n/d'}${reserva === 'RFV' ? ' · Fianzas se modela en pesos y se convierte con el TC de Inversiones' + (D.rfv_prima ? ' · RFV por prima en ' + D.rfv_prima + '; IRR = BRUTO × CESION y NETO = BRUTO − IRR; RCONT con su modelo' : '') + (D.nota_rangos ? ' · ' + D.nota_rangos : '') : ''}`;
   const vals = montoSerie(reserva, concepto, ramoRes);
   const u = vals[jUlt], pd = vals[jDic], pf = vals[jFin], v12 = vals[j12], p12 = vals[jUlt + 12];
   const f1 = v => fmt(v, 1);
