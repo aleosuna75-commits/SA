@@ -161,7 +161,7 @@ except Exception as _e:  # noqa: BLE001
 # =============================================================================
 CARPETA = Path(__file__).resolve().parent
 ENTRADAS = CARPETA / "entradas"
-VERSION_CODIGO = "2026-10-08a"   # version de los scripts: sale en la consola, en la hoja Resumen del diagnostico, en el pie
+VERSION_CODIGO = "2026-10-08b"   # version de los scripts: sale en la consola, en la hoja Resumen del diagnostico, en el pie
                                  # del tablero HTML y en la hoja Dashboard Razones del Excel, para saber con que version se corrio
 SALIDAS = CARPETA / "salidas"
 
@@ -743,9 +743,6 @@ OMEGA_FIANZAS = {"130": 0.0147, "140": 0.0147, "150": 0.0079, "160": 0.0023, "17
                                  # omega: indice de reclamaciones del mercado (Omega del script del area)
 ALFA_FIANZAS = {"130": 0.0103, "140": 0.0103, "150": 0.003, "160": 0.0009, "170": 0.0018}
                                  # alfa_k: indice de gastos de administracion (FactorGastos del script del area)
-FACTOR_MA_FIANZAS = {"130": 16.34, "140": 16.34, "150": 35.05, "160": 80.13, "170": 41.8}
-                                 # Factor MA del script del area: constante fija; el script no la usa en ningun calculo y
-                                 # aqui tampoco (va en PT_RAMO y en la BD tal cual)
 PATRON_XDEFAULT = "xDefault*.csv"            # PD por poliza del area (referencia; la PD de la IRR sigue siendo la del castigo)
 MESES_PD_XDEFAULT = (24, 121)    # ventanas de aPOG_MesProc de la PD de referencia (121 = 10 anos como el area: del mismo
                                  # mes de hace 10 anos al mes de valuacion)
@@ -4241,11 +4238,12 @@ def escribir_backtesting(bd: BDMontos, bt: dict, cols_ind: dict | None, pe_tab: 
 # =============================================================================
 BLOQUES_RFV = ("PT", "PRIMA", "FRV", "CESION")     # bloques de la BD de RFV, en este orden (claves internas)
 BLOQUES_RFV_FACTORES = ("PT", "PRIMA", "RCP", "SEG", "PCOM", "PCARGAS", "FPR", "PR", "PGA", "GA", "MA", "OMEGA", "ALFA",
-                        "RMA", "FMA", "FV", "FRV", "PD", "FCR", "RC", "CESION")   # con FACTORES_RFV: los del area
+                        "RMA", "FV", "FRV", "PD", "FCR", "RC", "CESION")   # con FACTORES_RFV: los del area
+BLOQUES_RFV_RETIRADOS = ("FACTOR MA",)   # encabezados de versiones anteriores: se limpian si la BD los trae
 FORMATO_BLOQUES_RFV = {"PT": "#,##0", "PRIMA": "#,##0", "FRV": "0.0000", "CESION": "0.00%", "SEG": "0.00%",
                        "PCOM": "0.00%", "PCARGAS": "0.00%", "FPR": "0.00%", "PR": "#,##0", "PGA": "0.00%", "GA": "#,##0",
                        "FV": "0.0000", "RCP": "0.00%", "PD": "0.000%", "FCR": "0.000%", "RC": "0.00%", "MA": "#,##0",
-                       "OMEGA": "0.00%", "ALFA": "0.00%", "RMA": "#,##0", "FMA": "0.00"}
+                       "OMEGA": "0.00%", "ALFA": "0.00%", "RMA": "#,##0"}
 assert set(BLOQUES_RFV_FACTORES) <= set(FORMATO_BLOQUES_RFV), "bloque de la RFV sin formato"
 
 
@@ -4256,10 +4254,10 @@ def bloques_rfv() -> tuple:
 
 def nombre_bloque_rfv(clave: str) -> str:
     """Encabezado del bloque (sin el ramo): PT, PRIMA 24M, RC PRIMA, %SEG PR, %COM PR, %CARGAS, FPR, PR 24M, %GA,
-    GA 24M, MA, OMEGA, ALFA, RFV MA, FACTOR MA, FV, FRV, PD, FCR, RC, CESION."""
+    GA 24M, MA, OMEGA, ALFA, RFV MA, FV, FRV, PD, FCR, RC, CESION."""
     n = MESES_PRIMA_RFV
     return {"PRIMA": f"PRIMA {n}M", "SEG": "%SEG PR", "PCOM": "%COM PR", "PCARGAS": "%CARGAS", "PR": f"PR {n}M",
-            "PGA": "%GA", "GA": f"GA {n}M", "RCP": "RC PRIMA", "RMA": "RFV MA", "FMA": "FACTOR MA"}.get(clave, clave)
+            "PGA": "%GA", "GA": f"GA {n}M", "RCP": "RC PRIMA", "RMA": "RFV MA"}.get(clave, clave)
 
 
 def _tc_cercano(tc: dict, p: int) -> float:
@@ -4460,7 +4458,7 @@ def _texto_factores_rfv(info: dict) -> str:
 
 def _texto_insumos_fianzas(info: dict) -> str:
     """Linea del Resumen con los insumos del area de Fianzas: monto afianzado, PD de referencia, comision sobre
-    utilidades, cobertura del CSV y FACTOR MA."""
+    utilidades y cobertura del CSV."""
     if not FACTORES_RFV:
         return "no (FACTORES_RFV = False)"
     if not MA_RFV:
@@ -4486,8 +4484,6 @@ def _texto_insumos_fianzas(info: dict) -> str:
     if cob:
         partes.append("Proporcional de Mexico sin MA en el CSV: " + "; ".join(
             f"{c['Ramo']}: {c['% sin MA']:.0%} de su prima ({c['Cedentes sin MA']})" for c in cob))
-    partes.append("FACTOR MA: " + ", ".join(f"{r}: {v}" for r, v in FACTOR_MA_FIANZAS.items())
-                  + " (constante del area, fija como esta; no entra a ningun calculo)")
     return ". ".join(partes)
 
 
@@ -5232,8 +5228,7 @@ def calcular_rfv_prima(bd: BDMontos, proy: dict, pt: dict | None, periodos_proy:
                      f"MA {periodos_proy[-1]} (MXN)": (out["ma"].get((periodos_proy[-1], r)) or (math.nan,))[0],
                      f"Origen del MA {periodos_proy[-1]}": (out["ma"].get((periodos_proy[-1], r)) or (None, "sin dato"))[1],
                      f"FRV residual {ultimo}": res_h.get(ultimo, math.nan) if split else math.nan,
-                     "Meses de FRV residual": len(ok_r) if split else 0,
-                     "FACTOR MA (constante del area, no se usa)": FACTOR_MA_FIANZAS.get(str(r), math.nan)})
+                     "Meses de FRV residual": len(ok_r) if split else 0})
         if split and n_ap:
             out["split"].add(r)
         if fac is not None:                            # factores de la metodologia del area (FACTORES_RFV)
@@ -5317,7 +5312,7 @@ def calcular_rfv_prima(bd: BDMontos, proy: dict, pt: dict | None, periodos_proy:
 
 def insumos_area_fianzas(info: dict, bd: BDMontos, ramos: list, per_hist: list[int], periodos_proy: list[int]):
     """Diagnostico de los insumos del area de Fianzas (info de calcular_rfv_prima, que se completa): por ramo y mes, el
-    MA y su origen, OMEGA, ALFA, RFV MA, la RFV BRUTO de SAP en MXN y su parte de MA, el FACTOR MA, la PD del castigo
+    MA y su origen, OMEGA, ALFA, RFV MA, la RFV BRUTO de SAP en MXN y su parte de MA, la PD del castigo
     y la PD de referencia de xDefault (pd_xdefault); la comision sobre utilidades (csu_fianzas) y la prima del
     proporcional de Mexico sin monto afianzado en el CSV (cobertura_ma). Agrega a info "insumos", "csu", "cobertura",
     "pdx", "texto_ma", "texto_pdx", "texto_csu" e "insumos_avisos"."""
@@ -5343,7 +5338,6 @@ def insumos_area_fianzas(info: dict, bd: BDMontos, ramos: list, per_hist: list[i
                           "RFV MA = MA x (OMEGA + ALFA) (MXN)": rma, "RFV BRUTO SAP (MXN)": b,
                           "RFV MA / RFV BRUTO": rma / b if np.isfinite(b) and b and np.isfinite(rma) else math.nan,
                           "MA aparte": "si" if r in (info.get("split") or ()) else "no (informativa)",
-                          "FACTOR MA (constante del area, no se usa)": FACTOR_MA_FIANZAS.get(str(r), math.nan),
                           "PD del castigo (Res_Rvas)": pd_h.get((r, p), math.nan) if medido.get((r, p)) else math.nan,
                           **{f"PD xDefault {n} meses": (pdx.get("pd") or {}).get((n, str(r), p), math.nan)
                              for n in MESES_PD_XDEFAULT}})
@@ -5428,8 +5422,7 @@ def calcular_backtesting_rfv(bd: BDMontos, pt: dict | None, ultimo: int, tc_hist
                                                 (0.0 if np.isfinite(b) else math.nan))}
             ma_p = (info.get("ma") or {}).get((p, r))
             ind.update({"MA": ma_p[0] if ma_p else math.nan, "RMA": (info.get("rfv_ma") or {}).get((p, r), math.nan),
-                        "OMEGA": OMEGA_FIANZAS.get(str(r), math.nan), "ALFA": ALFA_FIANZAS.get(str(r), math.nan),
-                        "FMA": FACTOR_MA_FIANZAS.get(str(r), math.nan)})
+                        "OMEGA": OMEGA_FIANZAS.get(str(r), math.nan), "ALFA": ALFA_FIANZAS.get(str(r), math.nan)})
             f_r = (info.get("factores") or {}).get(r)
             if f_r is not None:                        # (sin comisiones al corte: %SEG PR, %COM PR, FPR, PR, GA y FV
                 ind.update({"PCARGAS": f_r["PCARGAS"], "PGA": f_r["PGA"], "PD": f_r["PD_P"],   # van en N/A)
@@ -5460,10 +5453,10 @@ def escribir_pt_ramo(wb, pt: dict | None, ramos: list, periodos_bd=(), info: dic
     (de calcular_rfv_prima), los insumos editables de los factores, una celda por mes (y ramo): %SEG PR y %COM PR (los
     medidos desde su primer mes; en los meses despues de ultimo, los de la proyeccion), PD (medida o la ultima medida; en
     la proyeccion, la de la proyeccion), FV y RC proyectados (solo en los meses con RFV por prima), MA (monto
-    afianzado del CSV del area; despues de su ultimo mes, ese ultimo), OMEGA, ALFA y FACTOR MA (constantes del area),
-    %CARGAS, %GA y el origen del MA del mes. Los bloques de la BD los referencian. Regresa {"fila": {periodo: renglon},
-    "pt", "suma", "pc", "pt_acum", "pc_acum", "seg", "com", "pd", "fv", "rc", "ma", "omega", "alfa", "fma": {ramo:
-    letra}, "cargas", "ga": letra, "valor": {(clave, ramo, periodo): valor escrito}} o None sin prima."""
+    afianzado del CSV del area; despues de su ultimo mes, ese ultimo), OMEGA y ALFA (constantes del area), %CARGAS, %GA
+    y el origen del MA del mes. Los bloques de la BD los referencian. Regresa {"fila": {periodo: renglon}, "pt", "suma",
+    "pc", "pt_acum", "pc_acum", "seg", "com", "pd", "fv", "rc", "ma", "omega", "alfa": {ramo: letra}, "cargas", "ga":
+    letra, "valor": {(clave, ramo, periodo): valor escrito}} o None sin prima."""
     if HOJA_PT_RAMO in wb.sheetnames:
         del wb[HOJA_PT_RAMO]
     if not pt or not pt.get("mensual"):
@@ -5493,15 +5486,14 @@ def escribir_pt_ramo(wb, pt: dict | None, ramos: list, periodos_bd=(), info: dic
                      "FRV y de la cesion), MA (monto afianzado del proporcional de Mexico, MXN: "
                      + (((info.get("ma_info") or {}).get("texto") or "sin CSV del area") + "; despues de su ultimo mes, "
                         "ese ultimo, fijo; cambiarlo aqui es una sensibilidad: la hoja se rehace con el CSV en cada "
-                        "corrida") + "), OMEGA y ALFA (indices del Anexo 5.15.3 del script del area), FACTOR MA "
-                     "(constante del script del area, fija; no entra a ningun calculo), %CARGAS y %GA (parametros del "
-                     "area)" if fac else ""))
+                        "corrida") + "), OMEGA y ALFA (indices del Anexo 5.15.3 del script del area), %CARGAS y %GA "
+                     "(parametros del area)" if fac else ""))
     grupos = {"pt": "PT", "suma": f"PRIMA {n}M"}
     if ced:
         grupos.update({"pc": "PC", "pt_acum": f"PT DESDE {ini}", "pc_acum": f"PC DESDE {ini}"})
     if fac:
         grupos.update({"seg": "%SEG PR", "com": "%COM PR", "pd": "PD", "fv": "FV", "rc": "RC", "ma": "MA",
-                       "omega": "OMEGA", "alfa": "ALFA", "fma": "FACTOR MA"})
+                       "omega": "OMEGA", "alfa": "ALFA"})
     cols, c = {}, 3
     for g in grupos:
         cols[g] = {r: c + i for i, r in enumerate(ramos)}
@@ -5515,7 +5507,7 @@ def escribir_pt_ramo(wb, pt: dict | None, ramos: list, periodos_bd=(), info: dic
         ws.cell(3, k, t).font = negrita
     fmt = {"pt": "#,##0", "suma": "#,##0", "pc": "#,##0", "pt_acum": "#,##0", "pc_acum": "#,##0", "seg": "0.00%",
            "com": "0.00%", "pd": "0.000%", "fv": "0.0000", "rc": "0.00%", "ma": "#,##0", "omega": "0.00%",
-           "alfa": "0.00%", "fma": "0.00"}
+           "alfa": "0.00%"}
     ma_mes = info.get("ma") or {}
     filas, valor = {}, {}
     for i, p in enumerate(per):
@@ -5552,7 +5544,7 @@ def escribir_pt_ramo(wb, pt: dict | None, ramos: list, periodos_bd=(), info: dic
                 poner("rc", float(rc_) if rc_ is not None and (p, r) in info.get("aplica", ()) else None)
                 v_ma = (ma_mes.get((p, r)) or (math.nan,))[0]
                 poner("ma", float(v_ma) if np.isfinite(v_ma) else TEXTO_SIN_DATO)
-                for g_, dic_ in (("omega", OMEGA_FIANZAS), ("alfa", ALFA_FIANZAS), ("fma", FACTOR_MA_FIANZAS)):
+                for g_, dic_ in (("omega", OMEGA_FIANZAS), ("alfa", ALFA_FIANZAS)):
                     v_ = dic_.get(str(r))
                     poner(g_, float(v_) if isinstance(v_, (int, float)) else TEXTO_SIN_DATO)
         if fac:
@@ -5571,14 +5563,14 @@ def escribir_pt_ramo(wb, pt: dict | None, ramos: list, periodos_bd=(), info: dic
                                   error="En fraccion entre 0 y 1 (0.40 = 40 %)")
         positivo = DataValidation(type="decimal", operator="greaterThanOrEqual", formula1="0", allow_blank=True,
                                   showErrorMessage=True, errorTitle="Factor de la RFV",
-                                  error="FV, MA y FACTOR MA no pueden ser negativos")
+                                  error="FV y MA no pueden ser negativos")
         for g in ("seg", "com", "pd", "rc", "omega", "alfa"):
             for r in ramos:
                 le = get_column_letter(cols[g][r])
                 fraccion.add(f"{le}4:{le}{ult}")
         for c_ in (c_cargas, c_ga):
             fraccion.add(f"{get_column_letter(c_)}4:{get_column_letter(c_)}{ult}")
-        for g in ("fv", "ma", "fma"):
+        for g in ("fv", "ma"):
             for r in ramos:
                 le = get_column_letter(cols[g][r])
                 positivo.add(f"{le}4:{le}{ult}")
@@ -5587,7 +5579,7 @@ def escribir_pt_ramo(wb, pt: dict | None, ramos: list, periodos_bd=(), info: dic
     _agrupar(ws, [list(v.values()) for v in cols.values()])
     out = {"fila": filas, "valor": valor, "cargas": get_column_letter(c_cargas) if fac else None,
            "ga": get_column_letter(c_ga) if fac else None}
-    for g in ("pt", "suma", "pc", "pt_acum", "pc_acum", "seg", "com", "pd", "fv", "rc", "ma", "omega", "alfa", "fma"):
+    for g in ("pt", "suma", "pc", "pt_acum", "pc_acum", "seg", "com", "pd", "fv", "rc", "ma", "omega", "alfa"):
         out[g] = {r: get_column_letter(x) for r, x in cols.get(g, {}).items()}
     return out
 
@@ -5604,7 +5596,7 @@ def escribir_bloques_rfv(bd: BDMontos, info: dict, hoja_pt: dict | None, periodo
     mes con SUMAR.SI.CONJUNTO por CONCEPTO y PERIODO fuera de su renglon). En los meses con RFV por prima: FRV = FPR x
     (1 + %GA) x FV y CESION = RC x FCR (sin el segmento del ramo, FRV y CESION proyectados en valores, como antes).
     FPR = %SEG PR x (1 - %COM PR - %CARGAS), PR 24M = PRIMA 24M x FPR, GA 24M = PR 24M x %GA, RC PRIMA = PC / PT desde el
-    primer mes de la hoja y FCR = 1 - PD (1 sin PD) como formulas; N/A sin dato. MA, OMEGA, ALFA y FACTOR MA tambien son
+    primer mes de la hoja y FCR = 1 - PD (1 sin PD) como formulas; N/A sin dato. MA, OMEGA y ALFA tambien son
     referencias a HOJA_PT_RAMO y RFV MA = MA x (OMEGA + ALFA); en los ramos con el monto afianzado aparte (info["split"]),
     FV = (RFV BRUTO x TC - RFV MA) / (PR 24M + GA 24M) en la historia y FRV = FPR x (1 + %GA) x FV + RFV MA / PRIMA 24M
     en la proyeccion. Cada referencia a la hoja va como SI(ESNUMERO(celda), celda, "N/A"): una celda borrada en PT_RAMO
@@ -5613,7 +5605,8 @@ def escribir_bloques_rfv(bd: BDMontos, info: dict, hoja_pt: dict | None, periodo
     ws = bd.ws
     ramos = list(bd.cols_ramo)
     bloques = bloques_rfv()
-    nombres_todos = sorted({nombre_bloque_rfv(k) for k in BLOQUES_RFV_FACTORES} | {"%COM"}, key=len, reverse=True)
+    nombres_todos = sorted({nombre_bloque_rfv(k) for k in BLOQUES_RFV_FACTORES} | {"%COM"} | set(BLOQUES_RFV_RETIRADOS),
+                           key=len, reverse=True)
     patron = re.compile(r"^(" + "|".join(re.escape(x) for x in nombres_todos) + r"|PRIMA \d+M|PR \d+M|GA \d+M) (\S+)$")
     enc = {c: norm(ws.cell(3, c).value) for c in range(1, ws.max_column + 1) if ws.cell(3, c).value is not None}
     viejas = sorted(c for c, t in enc.items() if (m := patron.match(t)) and m.group(2) in ramos)
@@ -5673,8 +5666,6 @@ def escribir_bloques_rfv(bd: BDMontos, info: dict, hoja_pt: dict | None, periodo
         "RMA": ("RFV MA = MA x (OMEGA + ALFA) en MXN: la reserva del segmento de monto afianzado como la calcula el area"
                 + (f"; en {t_split} va aparte (FV es el residual y FRV la suma); en los demas ramos es informativa y "
                    "queda dentro de FV" if split else "; informativa (queda dentro de FV)")),
-        "FMA": (f"FACTOR MA = constante del script del area por ramo ({hoja}); fija como esta: el script no la usa en ningun "
-                "calculo y aqui tampoco entra"),
         "FV": (f"FV = RFV BRUTO del mes x TC / (PR {n}M + GA {n}M): factor residual; reune la permanencia de la PR + GA "
                "(el area la mantiene mientras el contrato sigue en vigor), la reserva por monto afianzado del resto del "
                "ramo y el TC de valuacion de los contratos en otras monedas"
@@ -5775,7 +5766,6 @@ def escribir_bloques_rfv(bd: BDMontos, info: dict, hoja_pt: dict | None, periodo
                 vals["PD"] = gref("pd", r)
                 vals["FCR"] = f"=IF(ISNUMBER({L['PD']}),1-{L['PD']},1)"
                 vals["MA"], vals["OMEGA"], vals["ALFA"] = gref("ma", r), gref("omega", r), gref("alfa", r)
-                vals["FMA"] = gref("fma", r)
                 vals["RMA"] = (f"=IF(AND(ISNUMBER({L['MA']}),ISNUMBER({L['OMEGA']}),ISNUMBER({L['ALFA']})),"
                                f"{L['MA']}*({L['OMEGA']}+{L['ALFA']}),\"{TEXTO_SIN_DATO}\")")
                 if aplica and numero("fv", r) and con_seg:
@@ -7661,7 +7651,7 @@ def _hojas_pnd(wb, diag: dict, negrita, encab):
             if FACTORES_RFV and rfv_.get("insumos"):
                 _hoja_filas(wb, "RFV_Insumos_Area", rfv_["insumos"], negrita, encab,
                             {"MA (MXN)": "#,##0", "OMEGA": "0.00%", "ALFA": "0.00%", "RFV MA =": "#,##0",
-                             "RFV BRUTO": "#,##0", "RFV MA /": "0.0%", "FACTOR MA": "0.00", "PD": "0.000%"})
+                             "RFV BRUTO": "#,##0", "RFV MA /": "0.0%", "PD": "0.000%"})
             if FACTORES_RFV and ((rfv_.get("csu") or {}).get("detalle") or rfv_.get("cobertura")):
                 _hoja_filas(wb, "RFV_CSU_Cobertura",
                             [{"Tabla": "Comision sobre utilidades (no entra al FPR)", **d}
