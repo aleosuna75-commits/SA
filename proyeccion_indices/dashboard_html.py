@@ -12,6 +12,9 @@ Genera salidas/Dashboard_Indices_Reservas.html a partir de las mismas salidas qu
   * pestaña "Razones"  : filtros (ramo, con "Todos", y reserva); PND / PD y sus indicadores por ramo (FACTOR GTO,
                           FACTOR MR, CESION, FD / FND, IS (RL), IS (FA), PE FCST, PRIMA N AÑOS y PEACUMULADA), real y
                           proyeccion, de la hoja Indicadores_Ramo del diagnostico (los valores de la BD de Danos).
+  * pestaña "Razones RFV": filtro de ramo (con "Todos"); las razones de la RFV de Fianzas por ramo (FRV, PRIMA 24M,
+                          CESION, RC, FV, PD, monto afianzado y su parte de la RFV) y los factores constantes, real y
+                          proyeccion, de la hoja RFV_Razones del diagnostico (los valores de la BD de RFV).
   * pestaña "Analisis"  : tablas con mapa de calor (indices por ramo, totales por concepto) y modelo por tipo.
 Cada grafica tiene tooltip (en las de lineas tambien con las flechas del teclado; en barras, con Tab) y una vista
 de tabla equivalente.
@@ -267,6 +270,18 @@ def preparar_datos() -> dict:
                "datos": {res: {ramo: {c: [_redondear(x, 0 if unidad[c] == "monto" else 6) for x in v[c]]
                                       for c in unidad if c in v} for ramo, v in por_ramo.items()}
                          for res, por_ramo in pnd["datos"].items()}}
+    rz = dx.leer_razones_rfv()                       # pestaña Razones RFV (None sin la hoja RFV_Razones)
+    if rz:
+        unid_rz = {c: u for c, _, u, _ in dx.INDICADORES_RFV}
+        unid_rz.update({g: unid_rz[c] for c, _, _, g in dx.INDICADORES_RFV if g})
+        rz = {"periodos": rz["periodos"], "ramos": rz["ramos"], "split": rz["split"], "ultimo_real": rz["ultimo_real"],
+              "pd_medida": rz.get("pd_medida") or {},
+              "ramos_todos": rz["ramos_todos"], "origen_ma": rz["origen_ma"],
+              "indicadores": [[c, t, u, g] for c, t, u, g in dx.INDICADORES_RFV],
+              "factores": {r: {f: {k: _redondear(x, 8) for k, x in v.items()} for f, v in fs.items()}
+                           for r, fs in rz["factores"].items()},
+              "datos": {ramo: {c: [_redondear(x, 0 if unid_rz.get(c) == "mxn" else 8) for x in v[c]]
+                               for c in unid_rz if c in v} for ramo, v in rz["datos"].items()}}
     sin_tc = [p for p in periodos_m if not tc.get(p)]
     if sin_tc:
         print(f"   Aviso: sin tipo de cambio en la BD para {sin_tc}; en MXN esos meses se muestran como s/d")
@@ -295,6 +310,7 @@ def preparar_datos() -> dict:
         "ppto": leer_contraste_presupuesto(),
         "tend": leer_tendencias(),
         "pnd": pnd,
+        "rfv_raz": rz,
         "generado": datetime.now().strftime("%Y-%m-%d %H:%M"),
         "version": dx.version_codigo(),
     }
@@ -492,6 +508,7 @@ table.datos tbody tr:hover { background: var(--surface-2); }
       <button role="tab" id="tab-indices" aria-selected="true" aria-controls="vista-indices">Índices</button>
       <button role="tab" id="tab-reservas" aria-selected="false" aria-controls="vista-reservas">Reservas</button>
       <button role="tab" id="tab-pnd" aria-selected="false" aria-controls="vista-pnd">Razones</button>
+      <button role="tab" id="tab-rfv" aria-selected="false" aria-controls="vista-rfv">Razones RFV</button>
       <button role="tab" id="tab-analisis" aria-selected="false" aria-controls="vista-analisis">Análisis</button>
     </div>
     <button class="btn" id="tema" type="button" title="Cambiar tema">Tema: sistema</button>
@@ -529,6 +546,14 @@ table.datos tbody tr:hover { background: var(--surface-2); }
     <p class="aviso" id="aviso-pnd" role="status" hidden></p>
     <div class="kpis" id="kpis-pnd"></div>
     <div class="rejilla" id="rejilla-pnd"></div>
+  </section>
+  <section class="vista" id="vista-rfv" role="tabpanel" aria-labelledby="tab-rfv" hidden>
+    <div class="filtros">
+      <div class="filtro"><label for="f-ramo-rfv">Ramo</label><select id="f-ramo-rfv"></select></div>
+      <div class="nota" id="nota-rfv"></div>
+    </div>
+    <div class="kpis" id="kpis-rfv"></div>
+    <div class="rejilla" id="rejilla-rfv"></div>
   </section>
   <section class="vista analisis" id="vista-analisis" role="tabpanel" aria-labelledby="tab-analisis" hidden></section>
 </main>
@@ -753,8 +778,14 @@ function graficaLineas(cuerpo, W, o) {
       d += (abierto ? 'L' : 'M') + X(i) + ',' + Y(v) + ' '; abierto = true;
     }
     if (d) s.append(svg('path', { class: 'linea', d, stroke: se.color, 'stroke-width': se.fino ? 1.25 : null, 'stroke-dasharray': se.dash ? '6 4' : null }));
-    if (se.marcadores) for (let i = 0; i < n; i++) if (se.valores[i] != null)
-      s.append(svg('circle', { class: 'marcador', cx: X(i), cy: Y(se.valores[i]), r: 4, fill: se.color }));
+    if (se.marcadores) {
+      for (let i = 0; i < n; i++) if (se.valores[i] != null)
+        s.append(svg('circle', { class: 'marcador', cx: X(i), cy: Y(se.valores[i]), r: 4, fill: se.color }));
+    } else {                                         // un mes suelto entre huecos: punto, para que no desaparezca
+      for (let i = 0; i < n; i++)
+        if (se.valores[i] != null && (i === 0 || se.valores[i - 1] == null) && (i === n - 1 || se.valores[i + 1] == null))
+          s.append(svg('circle', { cx: X(i), cy: Y(se.valores[i]), r: se.fino ? 2.5 : 3.5, fill: se.color }));
+    }
   }
   if (o.etiquetasFin) {
     const puestas = [];
@@ -934,7 +965,7 @@ function colorDivergente(v, lim) {
 // ---------------------------------------------------------------- estado
 const E = {
   ramo: D.ramos_i.includes('10') ? '10' : D.ramos_i[0], serie: D.indices[0], periodo: D.fin,
-  reserva: 'RRC', concepto: 'NETO', ramoRes: 'Todos', moneda: 'USD', vista: 'indices', ramoPnd: 'Todos', reservaPnd: 'RRC',
+  reserva: 'RRC', concepto: 'NETO', ramoRes: 'Todos', moneda: 'USD', vista: 'indices', ramoPnd: 'Todos', reservaPnd: 'RRC', ramoRfv: 'Todos',
 };
 const tarjetasVivas = [];
 function redibujarTodo() {
@@ -1273,6 +1304,126 @@ function pintarPnd() {
   redibujarTodo();
 }
 
+// ---------------------------------------------------------------- vista: Razones RFV (Fianzas)
+// Razones de la RFV por ramo de la BD de RFV (hoja RFV_Razones del diagnostico, los mismos valores de sus bloques).
+// "Todos" = razon de las sumas de los ramos con RFV por prima. Montos en millones de MXN: la RFV se descompone en pesos.
+const RZ = D.rfv_raz;
+const P_Z = RZ ? RZ.periodos : [], zUlt = RZ ? idx(P_Z, D.ultimo) : -1, zDic = RZ ? idx(P_Z, D.p_dic) : -1;
+const zFin = P_Z.length - 1;
+const UNIDAD_RFV = {
+  mxn: { esc: 1e-6, dec: 1, suf: '', eje: 'millones de MXN' },
+  pct: { esc: 100, dec: 1, suf: ' %', eje: 'en %' },
+  pct3: { esc: 100, dec: 3, suf: ' %', eje: 'en %' },
+  razon: { esc: 1, dec: 3, suf: '', eje: 'razón' },
+};
+const NOMBRE_REF_RFV = {
+  'FRV residual (sin RFV MA)': 'FRV residual (sin RFV MA)',
+  'RC PRIMA': 'RC PRIMA (prima cedida / tomada)',
+  'PD xDefault 24 meses': 'PD de xDefault, 24 meses',
+};
+function serieRfv(ramo, col, unidad) {
+  const u = UNIDAD_RFV[unidad];
+  return (((RZ.datos[ramo] || {})[col]) || new Array(P_Z.length).fill(null)).map(v => v == null ? null : v * u.esc);
+}
+function explicaRfv(col, ramo) {
+  const todos = ramo === 'Todos', ini = eti(P_Z[zUlt + 1]), split = !todos && (RZ.split || []).includes(ramo);
+  const hasta = D.rfv_ma_hasta ? eti(D.rfv_ma_hasta) : 'el último mes del CSV';
+  const suma = todos ? '; Todos = razón de las sumas de los ramos' : '';
+  return {
+    'FRV': `RFV BRUTO en pesos / PRIMA 24M: lo que queda constituido por cada peso de prima de los últimos 24 meses${suma}. `
+      + (todos ? `Desde ${ini}, la de cada ramo con su modelo (SES, sin tendencia)` : split
+        ? `Desde ${ini}, FRV residual del modelo (SES) + RFV MA / PRIMA 24M; gris: el residual, sin la reserva por monto afianzado`
+        : `Desde ${ini}, el nivel suavizado de los últimos meses (SES, sin tendencia)`),
+    'PRIMA 24M (MXN)': `Suma de los últimos 24 meses de prima tomada (PExRamo, reforecast y FCST), millones de MXN${todos ? '; suma de los ramos' : ''}`,
+    'CESION': `IRR / BRUTO, en %${suma}; desde ${ini}, RC × FCR, con la RC del modelo de la cesión (SES)`,
+    'RC': `Proporción cedida con transferencia cierta = CESIÓN / FCR, en %${suma}; gris: RC PRIMA, prima cedida / tomada desde ene-19 (informativa: el área la aplica contrato por contrato; sin dato desde sep-26 porque el reforecast no trae la cedida)`,
+    'FV': `RFV / (PR 24M + GA 24M), con PR = PRIMA 24M × FPR y GA = PR × %GA: factor residual (permanencia, facultativo y TC`
+      + (todos ? '' : split ? ', sin la reserva por monto afianzado' : ', con la reserva por monto afianzado') + `)${suma}; sin dato antes de 2026 (no hay comisiones de Fianzas)`,
+    'PD': `Probabilidad de incumplimiento del reasegurador: CASTIGO / (IRR + CASTIGO) del cálculo del área (Res_Rvas) en los meses que coinciden con SAP; después, la última medida, fija${todos ? '; Todos = 1 − suma de IRR / suma de la reserva cedida' : '; gris: PD de xDefault ponderada por prima cedida, 24 meses (referencia; no entra a la IRR)'}, en %`,
+    'MA (MXN)': `Monto afianzado del proporcional de México (CSV del área: real y estimado hasta ${hasta}; después, fijo), millones de MXN${todos ? '; suma de los ramos' : split ? '' : '; en este ramo es informativo'}`,
+    'RFV MA / RFV BRUTO': `RFV MA = MA × (ω + α) entre la RFV BRUTO en pesos, en %${todos ? '; suma de RFV MA / suma de RFV BRUTO' : split ? '; en este ramo va aparte' : '; en este ramo es informativa (queda dentro de FV)'}`,
+  }[col] || '';
+}
+const FACTORES_RFV_TXT = {
+  '%SEG PR': 'Prima del segmento de prima de reserva (extranjero proporcional y no proporcional) / prima del ramo (BDReal, ene a jul-26)',
+  '%COM PR': 'Comisiones / prima tomada del segmento de prima de reserva (BDReal, ene a jul-26)',
+  '%CARGAS': 'Cargas sobre la prima tomada (parámetro del área)',
+  'FPR': 'Prima de reserva por peso de prima tomada = %SEG PR × (1 − %COM PR − %CARGAS)',
+  '%GA': 'Gasto de administración sobre la prima de reserva (parámetro del área)',
+  'OMEGA': 'Índice de reclamaciones del Anexo 5.15.3 (script del área)',
+  'ALFA': 'Índice de gastos de administración del Anexo 5.15.3 (script del área)',
+  'FCR': 'Factor de calidad del reaseguro = 1 − PD',
+};
+function pintarRfv() {
+  const ramo = E.ramoRfv, todos = ramo === 'Todos';
+  const etiqRamo = todos ? 'todos los ramos' : `ramo ${ramo}`;
+  const split = (RZ.split || []);
+  document.getElementById('nota-rfv').textContent = `Real hasta ${eti(D.ultimo)} · proyección ${eti(P_Z[zUlt + 1])} a ${eti(P_Z[zFin])} · `
+    + 'valores de los bloques de la BD de RFV (Fianzas) · montos en millones de MXN (la RFV se descompone en pesos)'
+    + (split.length ? ` · monto afianzado aparte en ${split.join(', ')}` : '')
+    + (todos ? ` · Todos: razón de las sumas de ${RZ.ramos.length} ramos` : '');
+  const frv = serieRfv(ramo, 'FRV', 'razon'), part = serieRfv(ramo, 'RFV MA / RFV BRUTO', 'pct');
+  const f3 = v => fmt(v, 3), u = frv[zUlt], d = frv[zDic], f = frv[zFin];
+  document.getElementById('kpis-rfv').replaceChildren(
+    kpi(`FRV real ${eti(D.ultimo)}`, f3(u)),
+    kpi(`FRV proyección ${eti(D.p_dic)}`, f3(d), varPct(u, d) == null ? null : fmtPct(varPct(u, d)) + ' vs último real'),
+    kpi(`FRV proyección ${eti(P_Z[zFin])}`, f3(f), varPct(u, f) == null ? null : fmtPct(varPct(u, f)) + ' vs último real'),
+    kpi(`RFV por monto afianzado ${eti(D.ultimo)}`, part[zUlt] == null ? 's/d' : fmt(part[zUlt], 1) + ' %',
+      todos ? 'RFV MA / RFV BRUTO de los ramos' : split.includes(ramo) ? 'va aparte en este ramo' : 'informativa en este ramo'),
+  );
+  const rejilla = document.getElementById('rejilla-rfv'); rejilla.replaceChildren(); tarjetasVivas.length = 0;
+  RZ.indicadores.forEach(([col, titulo, unidad, ref], k) => {
+    const un = UNIDAD_RFV[unidad], vals = serieRfv(ramo, col, unidad);
+    const fv = v => v == null ? 's/d' : fmt(v, un.dec) + un.suf;
+    let real = vals.map((v, i) => i <= zUlt ? v : null), proy = vals.map((v, i) => i >= zUlt ? v : null);
+    const esPd = col === 'PD', med = (RZ.pd_medida || {})[ramo] || [];
+    if (esPd) {                                      // azul = medida en Res_Rvas; naranja = la ultima medida, fija
+      real = vals.map((v, i) => med[i] ? v : null);
+      proy = vals.map((v, i) => !med[i] || (i < vals.length - 1 && !med[i + 1]) ? v : null);
+    }
+    const nomReal = esPd ? 'Medida (Res_Rvas)' : 'Real', nomProy = esPd ? 'Última medida, fija' : 'Proyección';
+    const gris = ref ? serieRfv(ramo, ref, unidad) : null;
+    const hayGris = !!gris && gris.some(v => v != null);
+    const hayReal = real.some(v => v != null), hayProy = proy.some((v, i) => v != null && (esPd || i > zUlt));
+    const vacio = !hayReal && !hayProy ? `Sin datos para esta selección${col === 'MA (MXN)' ? ' (el CSV de montos afianzados no trae este ramo)' : ''}.` : null;
+    const origen = col === 'MA (MXN)' ? ((RZ.origen_ma || {})[ramo] || []) : null;
+    const c = tarjeta(`${titulo} · ${etiqRamo}`, explicaRfv(col, ramo),
+      (cuerpo, W) => {
+        if (vacio) { cuerpo.append(el('p', { class: 'sub', style: 'margin:24px 0;color:var(--ink-2)', text: vacio })); return; }
+        const series = [...(hayGris ? [{ nombre: NOMBRE_REF_RFV[ref] || ref, valores: gris, color: cssVar('--deemph-ink'), fino: true }] : []),
+                        ...(hayReal ? [{ nombre: nomReal, valores: real, color: cssVar('--real'), etiquetaFin: true }] : []),
+                        ...(hayProy ? [{ nombre: nomProy, valores: proy, color: cssVar('--proy'), dash: true, etiquetaFin: true }] : [])];
+        graficaLineas(cuerpo, W, {
+          labels: P_Z.map(eti), tituloX: i => etiLarga(P_Z[i]) + (i <= zUlt ? ' (real)' : ' (proyección)'), fmt: fv, cadaX: 3, etiquetasFin: true,
+          incluirCero: unidad === 'mxn', fmtTick: unidad === 'pct' || unidad === 'pct3' ? (t, d) => fmt(t, d) + ' %' : null,
+          aria: `${titulo} de ${etiqRamo}, real y proyección`, series,
+        });
+        if (series.length === 1) cuerpo.append(leyenda([{ nombre: series[0].nombre, color: series[0].color, dash: series[0].dash }]));
+      },
+      () => vacio ? el('p', { class: 'sub', style: 'margin:12px 8px', text: vacio })
+        : tablaDatos(['Mes', 'Tipo', `${titulo} (${un.eje})`, ...(hayGris ? [`${NOMBRE_REF_RFV[ref] || ref} (${un.eje})`] : []), ...(origen ? ['Origen del MA'] : [])],
+          P_Z.map((p, i) => [etiLarga(p), esPd ? (med[i] ? 'Medida' : i <= zUlt ? 'Real (última medida, fija)' : 'Proyección (fija)') : i <= zUlt ? 'Real' : 'Proyección', fv(vals[i]), ...(hayGris ? [fv(gris[i])] : []), ...(origen ? [origen[i] || 's/d'] : [])])),
+      k === 0 || k === RZ.indicadores.length - 1);
+    rejilla.append(c); tarjetasVivas.push(c);
+  });
+  // factores constantes: el del ultimo mes real y el del ultimo proyectado
+  const fz = (RZ.factores || {})[ramo] || {};
+  const fmtF = (fac, v) => v == null ? 's/d' : fmt(v * 100, fac === 'FCR' ? 3 : 2) + ' %';
+  const filasF = Object.keys(FACTORES_RFV_TXT).map(fac => [fac, fmtF(fac, (fz[fac] || {}).real), fmtF(fac, (fz[fac] || {}).proy), FACTORES_RFV_TXT[fac]]);
+  const tabla = () => {
+    const t = tablaDatos(['Factor', `Real ${eti(D.ultimo)}`, `Proyección ${eti(P_Z[zFin])}`, 'Qué es'], filasF);
+    for (const c of t.querySelectorAll('tr > :last-child')) c.style.textAlign = 'left';
+    return t;
+  };
+  const cF = el('article', { class: 'tarjeta ancha' },
+    el('header', {}, el('div', {}, el('h2', { text: `Factores constantes · ${etiqRamo}` }),
+      el('p', { class: 'sub', text: todos ? 'Todos: FPR = suma de PR / suma de PRIMA 24M y FCR de la suma de la reserva cedida; los demás factores son por ramo (elige un ramo)'
+        : 'Los mismos en todos los meses desde ene-26 (los medidos de BDReal se aplican fijos); en la BD se pueden cambiar en la hoja PT_RAMO' }))),
+    el('div', { class: 'cuerpo' }, el('div', { class: 'tabla-envoltura', style: 'max-height:none' }, tabla())));
+  rejilla.append(cF);
+  redibujarTodo();
+}
+
 // ---------------------------------------------------------------- vista: analisis
 function pintarAnalisis() {
   const v = document.getElementById('vista-analisis'); v.replaceChildren();
@@ -1380,13 +1531,20 @@ function iniciar() {
   } else {
     document.getElementById('tab-pnd').hidden = true;     // diagnostico de una version anterior: sin la pestaña
   }
+  if (RZ) {
+    const fRZ = document.getElementById('f-ramo-rfv');
+    llenarSelect(fRZ, ['Todos', ...RZ.ramos].map(r => ({ v: r, t: r === 'Todos' ? 'Todos los ramos' : r })), E.ramoRfv);
+    fRZ.addEventListener('change', () => { E.ramoRfv = fRZ.value; pintarRfv(); });
+  } else {
+    document.getElementById('tab-rfv').hidden = true;     // sin la hoja RFV_Razones en el diagnostico: sin la pestaña
+  }
   const tabs = document.querySelectorAll('.tabs [role=tab]:not([hidden])');
   const mostrarVista = nombre => {
     E.vista = nombre;
     for (const t of tabs) { const on = t.id === 'tab-' + nombre; t.setAttribute('aria-selected', String(on)); document.getElementById('vista-' + nombre.replace('tab-', '')).hidden = false; }
     for (const v of document.querySelectorAll('.vista')) v.hidden = v.id !== 'vista-' + nombre;
     if (nombre === 'indices') pintarIndices(); else if (nombre === 'reservas') pintarReservas();
-    else if (nombre === 'pnd') pintarPnd(); else pintarAnalisis();
+    else if (nombre === 'pnd') pintarPnd(); else if (nombre === 'rfv') pintarRfv(); else pintarAnalisis();
     try { localStorage.setItem('vista', nombre); } catch (e) { /* sin almacenamiento */ }
   };
   for (const t of tabs) t.addEventListener('click', () => mostrarVista(t.id.replace('tab-', '')));
@@ -1399,7 +1557,7 @@ function iniciar() {
   });
   let vistaInicial = 'indices';
   try { vistaInicial = localStorage.getItem('vista') || 'indices'; } catch (e) { /* sin almacenamiento */ }
-  if (!['indices', 'reservas', 'analisis', ...(PN ? ['pnd'] : [])].includes(vistaInicial)) vistaInicial = 'indices';
+  if (!['indices', 'reservas', 'analisis', ...(PN ? ['pnd'] : []), ...(RZ ? ['rfv'] : [])].includes(vistaInicial)) vistaInicial = 'indices';
   aplicarTema();
   mostrarVista(vistaInicial);
 }
