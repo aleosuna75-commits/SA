@@ -11,7 +11,7 @@ Genera salidas/Dashboard_Indices_Reservas.xlsx a partir de las salidas de proyec
   * "Dashboard Razones"  : selectores de ramo (con "Todos") y reserva; indicadores; PND / PD, FACTOR GTO, FACTOR MR,
                            CESION, FD / FND, IS (RL), IS (FA), PE FCST, PRIMA N AÑOS y PEACUMULADA, real y proyeccion
                            (hoja Indicadores_Ramo del diagnostico: los valores de los bloques de la BD de Danos).
-  * "Dashboard Razones RFV": selector de ramo (con "Todos"); indicadores; FRV, PRIMA 24M, CESION, RC, FV, PD, monto
+  * "Dashboard Razones RFV": selector de ramo (con "Todos"); indicadores; FRV, PRIMA 24M, CESION, FV, RC, PD, monto
                            afianzado y su parte de la RFV (real, proyeccion y una serie de referencia en gris) y los
                            factores constantes del ramo (hoja RFV_Razones del diagnostico: los valores de la BD de RFV).
   * "Análisis"           : tablas con mapas de calor (indices por ramo y totales de reservas) y metodo.
@@ -439,16 +439,20 @@ def leer_indicadores_ramo() -> dict | None:
 HOJA_RAZONES_RFV = "RFV_Razones"                 # hoja del diagnostico con las razones de la RFV de Fianzas
 HOJA_DASH_RFV = "Dashboard Razones RFV"          # seccion de las razones de la RFV (en el HTML, la pestaña "Razones RFV")
 # (columna de la hoja, titulo, unidad, serie de referencia en gris o None)
+# (titulos cortos: en Excel los paneles de media hoja caben unos 55 caracteres con " · todos los ramos" y la unidad;
+# el orden fija la rejilla: el primero y el ultimo a todo lo ancho, los demas por pares)
 INDICADORES_RFV = [
     ("FRV", "FRV: RFV BRUTO × TC / PRIMA 24M", "razon", "FRV residual (sin RFV MA)"),
-    ("PRIMA 24M (MXN)", "PRIMA 24M: prima tomada de los últimos 24 meses", "mxn", None),
+    ("PRIMA 24M (MXN)", "PRIMA 24M (prima tomada)", "mxn", None),
     ("CESION", "CESIÓN: IRR / BRUTO", "pct", None),
+    ("FV", "FV: (RFV − RFV MA aparte) / (PR + GA)", "razon", None),
     ("RC", "RC: CESIÓN / FCR", "pct", "RC PRIMA"),
-    ("FV", "FV: factor residual, RFV / (PR + GA)", "razon", None),
-    ("PD", "PD del reasegurador (castigo de Res_Rvas)", "pct3", "PD xDefault 24 meses"),
-    ("MA (MXN)", "MA: monto afianzado del proporcional de México", "mxn", None),
-    ("RFV MA / RFV BRUTO", "Parte de la RFV por monto afianzado: RFV MA / RFV BRUTO", "pct", None),
+    ("PD", "PD del reasegurador (Res_Rvas)", "pct3", "PD xDefault 24 meses"),
+    ("MA (MXN)", "MA: monto afianzado", "mxn", None),
+    ("RFV MA / RFV BRUTO", "RFV por MA: RFV MA / RFV BRUTO", "pct", None),
 ]
+COL_BDREAL_RFV = "Meses de BDReal (%SEG PR y %COM PR)"
+ESCALA_REF_RFV = 3      # la serie gris sale de la grafica (queda en la tabla) si su rango es mas de 3 veces el de la serie
 FACTORES_RFV_TABLA = ("%SEG PR", "%COM PR", "%CARGAS", "FPR", "%GA", "OMEGA", "ALFA", "FCR")
 
 
@@ -493,10 +497,77 @@ def leer_razones_rfv() -> dict | None:
     p_ult = max((int(r["Periodo"]) for r in crudos if str(r.get("Real o proyeccion")) == "real"), default=periodos[0])
     for ramo, d in datos.items():
         factores[ramo] = {c: {"real": d[c][pos[p_ult]], "proy": d[c][-1]} for c in FACTORES_RFV_TABLA}
+    # meses del CSV del area: con MA real, estimado (en "Todos", si algun ramo lo trae estimado) y huecos (meses sin MA
+    # entre el primero y el ultimo con MA, en algun ramo)
+    ma_est = {r: [o == "Estimado" for o in v] for r, v in origen.items() if r != "Todos"}
+    if ma_est:
+        ma_est["Todos"] = [any(v[i] for v in ma_est.values()) for i in range(len(periodos))]
+    ma_real = [p for i, p in enumerate(periodos) if any(v[i] == "Real" for r, v in origen.items() if r != "Todos")]
+    huecos = set()
+    for ramo, d in datos.items():
+        con = [i for i, v in enumerate(d["MA (MXN)"]) if v is not None]
+        if con:
+            huecos |= {periodos[i] for i in range(con[0], con[-1]) if d["MA (MXN)"][i] is None}
+    con_xd = [i for d in datos.values() for i, v in enumerate(d["PD xDefault 24 meses"]) if v is not None]
+    bdreal = next((str(r.get(COL_BDREAL_RFV)) for r in crudos if str(r.get(COL_BDREAL_RFV) or "-") != "-"), "")
+    bdreal = re.sub(r"\b(\d{6})\b", lambda m: etiqueta(int(m.group(1))), bdreal)     # "202601 a 202607" -> "ene-26 a jul-26"
     return {"periodos": periodos, "ramos": ramos, "datos": datos, "origen_ma": origen, "split": sorted(split),
             "pd_medida": pd_medida,
             "factores": factores, "ramos_todos": ramos_todos, "ultimo_real": p_ult, "renglones": len(crudos),
-            "hay_real": any(real)}
+            "hay_real": any(real), "ma_estimado": ma_est, "ma_real_hasta": max(ma_real, default=0),
+            "ma_huecos": sorted(huecos), "xdefault_hasta": periodos[max(con_xd)] if con_xd else 0, "bdreal": bdreal,
+            "escala_ref": ESCALA_REF_RFV}
+
+
+def texto_meses(meses: list) -> str:
+    """"nov-25 a ene-26 y mar-26" para una lista de AAAAMM."""
+    t = [etiqueta(a) if a == b else f"{etiqueta(a)} a {etiqueta(b)}" for a, b in _rangos_meses(sorted(meses))]
+    return (", ".join(t[:-1]) + " y " + t[-1]) if len(t) > 1 else (t[0] if t else "")
+
+
+def ramos_ma_informativa(rz: dict) -> list:
+    """Ramos con monto afianzado que no lo llevan aparte (su RFV MA es informativa: queda dentro de FV)."""
+    return [r for r in rz["ramos"] if r not in rz["split"] and any(v is not None for v in rz["datos"][r]["MA (MXN)"])]
+
+
+def parte_ma_aparte(rz: dict, p: int):
+    """Suma de la RFV MA de los ramos con el monto afianzado aparte / suma de la RFV BRUTO de "Todos", en el mes p."""
+    i = rz["periodos"].index(p)
+    tot = rz["datos"].get("Todos", {}).get("RFV BRUTO (MXN)", [None] * (i + 1))[i]
+    ma = [rz["datos"][r]["RFV MA (MXN)"][i] for r in rz["split"]]
+    return sum(ma) / tot if tot and ma and all(v is not None for v in ma) else None
+
+
+def ref_en_escala(rz: dict, ramo: str, col: str = "PD", ref: str = "PD xDefault 24 meses") -> bool:
+    """La serie de referencia cabe en la grafica de col: su rango no pasa de ESCALA_REF_RFV veces el de la serie (la
+    misma regla que el HTML; fuera de escala aplanaria la serie, y va solo en la tabla)."""
+    a = [v for v in rz["datos"].get(ramo, {}).get(col, []) if v is not None and v > 0]
+    b = [v for v in rz["datos"].get(ramo, {}).get(ref, []) if v is not None and v > 0]
+    return not a or not b or (max(b) <= ESCALA_REF_RFV * max(a) and min(b) >= min(a) / ESCALA_REF_RFV)
+
+
+def notas_ramo_rfv(rz: dict, ultimo: int) -> dict:
+    """{ramo o "Todos": texto} sobre el monto afianzado del ramo en el ultimo mes real (lo lee el renglon 9 de la hoja
+    de Razones RFV con el ramo elegido)."""
+    split, info, i = rz["split"], ramos_ma_informativa(rz), rz["periodos"].index(ultimo)
+    out = {}
+    for ramo in ["Todos"] + rz["ramos"]:
+        if ramo == "Todos":
+            x = parte_ma_aparte(rz, ultimo)
+            t = (f"Todos: la RFV por MA suma la que va aparte ({', '.join(split) or 'ninguno'}) y la informativa "
+                 f"({', '.join(info) or 'ninguno'}; queda dentro de FV)"
+                 + (f"; la que va aparte es {x * 100:.1f} % de la RFV en {etiqueta(ultimo)}." if x is not None else "."))
+        elif ramo in split:
+            t = f"Ramo {ramo}: la RFV MA va aparte (FRV = FRV residual + RFV MA / PRIMA 24M)."
+        elif ramo in info:
+            t = f"Ramo {ramo}: la RFV MA es informativa (queda dentro de FV)."
+        else:
+            t = f"Ramo {ramo}: sin monto afianzado en el CSV del área."
+        if (rz.get("ma_estimado") or {}).get(ramo, [False] * (i + 1))[i]:
+            t += (f" El MA de {etiqueta(ultimo)} es estimado del área (real hasta {etiqueta(rz['ma_real_hasta'])})."
+                  if rz.get("ma_real_hasta") else f" El MA de {etiqueta(ultimo)} es estimado del área.")
+        out[ramo] = t
+    return out
 
 
 def etiquetas_modelo(metodo: list) -> dict:
@@ -643,12 +714,17 @@ def estilo_grafica(ch, formato_y="General", leyenda=True):
     return ch
 
 
-def linea(serie, color, ancho_pt=2.0, punteada=False):
+def linea(serie, color, ancho_pt=2.0, punteada=False, marcador=False):
     serie.graphicalProperties.line.solidFill = color
     serie.graphicalProperties.line.width = int(ancho_pt * 12700)
     if punteada:
         serie.graphicalProperties.line.dashStyle = "dash"
-    serie.marker.symbol = "none"
+    if marcador:                                     # punto chico en cada mes con dato: se ve un mes suelto entre #N/D
+        serie.marker.symbol = "circle"
+        serie.marker.size = 4
+        serie.marker.graphicalProperties = GraphicalProperties(solidFill=color, ln=LineProperties(solidFill=color))
+    else:
+        serie.marker.symbol = "none"
     serie.smooth = False
 
 
@@ -737,7 +813,9 @@ def generar(ruta_salida: Path = SALIDA_DASHBOARD) -> Path:
         **{f"RamosSin_{k}": ramos_m.get(k, []) for k in conceptos},
         **({"L_RamosPnd": ["Todos"] + pnd["ramos"], "L_ResPnd": list(pnd["datos"]), "L_RamosFA": pnd["con_fa"] or ["-"]}
            if pnd else {}),
-        **({"L_RamosRfv": ["Todos"] + rz["ramos"]} if rz else {}),
+        **({"L_RamosRfv": ["Todos"] + rz["ramos"],
+            "L_NotaRfv": [notas_ramo_rfv(rz, ultimo)[r] for r in ["Todos"] + rz["ramos"]],
+            "L_XdefEscala": [ref_en_escala(rz, r) for r in ["Todos"] + rz["ramos"]]} if rz else {}),
     }
     for j, (n_, valores) in enumerate(listas.items(), start=1):
         letra = get_column_letter(j)
@@ -804,15 +882,15 @@ def generar(ruta_salida: Path = SALIDA_DASHBOARD) -> Path:
         return c
 
     ramo_ini = "10" if "10" in ramos_i else ramos_i[0]
-    selector(ws, 11, "RAMO", ramo_ini, "=L_RamosInd", "SelRamoInd")
-    selector(ws, 14, "ÍNDICE / LAG", INDICES[0], "=L_SeriesInd", "SelIndice")
-    selector(ws, 17, "PERIODO (COMPARATIVO POR RAMO)", fin, "=L_PeriodosInd", "SelPeriodoInd", "0")
+    selector(ws, 12, "RAMO", ramo_ini, "=L_RamosInd", "SelRamoInd")       # (renglon 11 libre: el menu llega al 10)
+    selector(ws, 15, "ÍNDICE / LAG", INDICES[0], "=L_SeriesInd", "SelIndice")
+    selector(ws, 18, "PERIODO (COMPARATIVO POR RAMO)", fin, "=L_PeriodosInd", "SelPeriodoInd", "0")
     notas = [f"Real hasta {etiqueta(ultimo)}", f"Proyección {etiqueta(mover(ultimo, 1))} a {etiqueta(fin)}",
              "", "Cambia los selectores (listas", "desplegables) y las gráficas", "se actualizan solas.", "",
              f"Índices: {proc.get('indice', 'n/d')}", f"LAGs: {proc.get('lag', 'n/d')}",
              nota_modelo()]
     for k, t in enumerate(notas):
-        ws.cell(21 + k, 2, t).font = fuente(9, k < 2, TEXTO_2, k >= 3)
+        ws.cell(22 + k, 2, t).font = fuente(9, k < 2, TEXTO_2, k >= 3)
 
     ws["D2"] = "Dashboard de Índices de Reservas"
     ws["D2"].font = fuente(18, True)
@@ -984,22 +1062,22 @@ def generar(ruta_salida: Path = SALIDA_DASHBOARD) -> Path:
     ws["B3"] = "◆ ÍNDICES Y RESERVAS"
     ws["B3"].font = fuente(13, True)
     navegacion(ws, "Dashboard Reservas")
-    selector(ws, 11, "RESERVA", "RRC", "=L_Reservas", "SelReserva")
-    selector(ws, 14, "CONCEPTO", "NETO", '=INDIRECT("Conceptos_"&SelReserva)', "SelConcepto")
-    selector(ws, 17, "RAMO", "Todos", '=INDIRECT("Ramos_"&SelReserva)', "SelRamoRes")
-    selector(ws, 20, "MONEDA", "USD", "=L_Unidades", "SelUnidad")
-    ws["B22"] = ('=IF(AND(ISNUMBER(MATCH(SelConcepto,INDIRECT("Conceptos_"&SelReserva),0)),'
+    selector(ws, 12, "RESERVA", "RRC", "=L_Reservas", "SelReserva")      # (renglon 11 libre: el menu llega al 10)
+    selector(ws, 15, "CONCEPTO", "NETO", '=INDIRECT("Conceptos_"&SelReserva)', "SelConcepto")
+    selector(ws, 18, "RAMO", "Todos", '=INDIRECT("Ramos_"&SelReserva)', "SelRamoRes")
+    selector(ws, 21, "MONEDA", "USD", "=L_Unidades", "SelUnidad")
+    ws["B23"] = ('=IF(AND(ISNUMBER(MATCH(SelConcepto,INDIRECT("Conceptos_"&SelReserva),0)),'
                  'ISNUMBER(MATCH(SelRamoRes,INDIRECT("Ramos_"&SelReserva),0))),"",'
                  '"⚠ Concepto o ramo no existe en "&SelReserva&": elígelo de nuevo")')
-    ws["B22"].font = fuente(9, True, "B4541F")
-    ws["B22"].alignment = Alignment(wrap_text=True, vertical="top")
-    ws.row_dimensions[22].height = 26
+    ws["B23"].font = fuente(9, True, "B4541F")
+    ws["B23"].alignment = Alignment(wrap_text=True, vertical="top")
+    ws.row_dimensions[23].height = 26
     notas = [f"Real hasta {etiqueta(ultimo)}", f"Proyección {etiqueta(mover(ultimo, 1))} a {etiqueta(fin_m)}",
              "Cifras en millones.", "MXN = USD × TC del mes", "(TC FCST de Inversiones).", "",
              f"Montos: {proc.get('nivel', 'n/d')}", f"Razones: {proc.get('razon', 'n/d')}",
              "NETO = BRUTO - IRR"]
     for k, t in enumerate(notas):
-        ws.cell(24 + k, 2, t).font = fuente(9, k < 2, TEXTO_2, k >= 3)
+        ws.cell(25 + k, 2, t).font = fuente(9, k < 2, TEXTO_2, k >= 3)
     ws["D2"] = "Dashboard de Reservas: Real y Proyección"
     ws["D2"].font = fuente(18, True)
     ws["D3"] = (f"RRC y SONR (Daños) y RFV (Fianzas) por concepto y ramo · real {etiqueta(PRIMER_PERIODO_MONTOS)} "
@@ -1158,11 +1236,12 @@ def generar(ruta_salida: Path = SALIDA_DASHBOARD) -> Path:
         hoja.page_margins.top = hoja.page_margins.bottom = 0.4
         if area:
             hoja.print_area = area
-    if wd_p is not None:                       # Razones: tres hojas carta con cortes entre paneles (sin partir graficas)
-        wd_p.sheet_properties.pageSetUpPr.fitToPage = False
-        wd_p.page_setup.scale = 62
-        for fila in (46, 84):
-            wd_p.row_breaks.append(Break(id=fila))
+    for hoja in (wd_p, wd_rz):                 # Razones y Razones RFV: tres hojas carta con cortes entre paneles
+        if hoja is not None:                   # (sin partir graficas)
+            hoja.sheet_properties.pageSetUpPr.fitToPage = False
+            hoja.page_setup.scale = 62
+            for fila in (46, 84):
+                hoja.row_breaks.append(Break(id=fila))
     wd_i.sheet_view.tabSelected = True
     wb.active = 0
     wb.calculation.fullCalcOnLoad = True
@@ -1388,22 +1467,37 @@ def construir_razones_rfv(ws, wbd, wcr, rz: dict, ultimo: int, p_dic: int, nombr
     navegacion(ws, HOJA_DASH_RFV)
     selector(ws, 12, "RAMO", "Todos", "=L_RamosRfv", "SelRamoRfv")
     split = ", ".join(rz.get("split") or []) or "ninguno"
+    info = ", ".join(ramos_ma_informativa(rz)) or "ninguno"
+    est = [p for i, p in enumerate(periodos) if (rz.get("ma_estimado") or {}).get("Todos", [False] * len(periodos))[i]]
+    huecos = texto_meses(rz.get("ma_huecos") or [])
+    con_fv = [i for d in rz["datos"].values() for i, v in enumerate(d["FV"]) if v is not None]
+    fv_h = [p for p in (rz.get("ma_huecos") or []) if con_fv and p >= periodos[min(con_fv)]]   # meses de FV sin MA
     notas = [f"Real hasta {etiqueta(ultimo)}", f"Proyección {etiqueta(mover(ultimo, 1))} a {etiqueta(periodos[-1])}", "",
-             "Mismos valores que los bloques de la BD de RFV (Fianzas). Montos en millones de MXN: la RFV se "
-             "descompone en pesos.",
-             f"Monto afianzado aparte en: {split} (FRV = FRV residual + RFV MA / PRIMA 24M); en los demás, la RFV MA "
-             "es informativa.",
-             "Todos los ramos: razón de las sumas de los ramos con RFV por prima.", "",
-             "Gris: FRV residual (sin la reserva por monto afianzado), RC PRIMA (prima cedida / tomada desde ene-19) y "
-             "PD de xDefault (24 meses, referencia). En PD, azul = medida en Res_Rvas y naranja = la última medida, "
-             "fija.", "",
-             "#N/D = sin dato: FV antes de 2026 (sin comisiones de Fianzas), PD antes del primer mes medido, RC PRIMA "
-             "sin la cedida del reforecast, MA en meses que el CSV del área no trae."]
-    fila = 16
+             "Valores de los bloques de la BD de RFV. Montos en M MXN.",
+             f"MA aparte en {split}; en {info}, la RFV MA es informativa.",
+             "Todos: razón de las sumas. Su PD pondera la de cada ramo por su reserva cedida.",
+             *([f"MA estimado por el área: {texto_meses(est)}."] if est else []), "",
+             "Gris: FRV residual, RC PRIMA y PD de xDefault (fuera de la gráfica si su escala es más de "
+             f"{ESCALA_REF_RFV} veces la de la PD). PD de un ramo: azul = medida en Res_Rvas, naranja = la última "
+             "medida, fija.", "",
+             "#N/D = sin dato: FV antes de 2026"
+             + (f"; MA, RFV MA y FRV residual en {huecos} (el CSV no los trae" + (f"; por eso tampoco hay FV de {split} ni de "
+                f"Todos en {texto_meses(fv_h)})" if fv_h else ")") if huecos else "")
+             + (f"; PD de xDefault después de {etiqueta(rz['xdefault_hasta'])}" if rz.get("xdefault_hasta") else "")
+             + "; RC PRIMA sin la cedida del reforecast."]
+    fila = 15
     for k, t in enumerate(notas):
         for linea_ in textwrap.wrap(t, 31) or [""]:
             ws.cell(fila, 2, linea_).font = fuente(9, k < 2, TEXTO_2, k >= 3)
             fila += 1
+    if fila > 47:
+        print(f"   Aviso: las notas de {HOJA_DASH_RFV} llegan al renglón {fila - 1} (el panel lateral termina en el 46)",
+              flush=True)
+    ws.merge_cells("D9:AG9")                         # el monto afianzado del ramo elegido (texto de L_NotaRfv)
+    ws["D9"] = '=IFERROR(INDEX(L_NotaRfv,MATCH(SelRamoRfv,L_RamosRfv,0)),"")'
+    ws["D9"].font = fuente(9.5, True, TEXTO_2)
+    ws["D9"].alignment = Alignment(wrap_text=True, vertical="center", indent=1)
+    ws.row_dimensions[9].height = 26
     ws["D2"] = "Dashboard de Razones RFV: factores de la reserva de Fianzas en Vigor por ramo"
     ws["D2"].font = fuente(18, True)
     ws["D3"] = (f"Real {etiqueta(periodos[0])} a {etiqueta(ultimo)} y proyección {etiqueta(mover(ultimo, 1))} a "
@@ -1421,40 +1515,57 @@ def construir_razones_rfv(ws, wbd, wcr, rz: dict, ultimo: int, p_dic: int, nombr
         wcr.cell(k, 3, f'=IFERROR(MATCH(SelRamoRfv&"|"&$A{k},RF_Clave,0),0)')
     col_real, col_ref = {}, {}
     cc = 4
+    n_c = len(periodos) + 1
     fmt_c = {"mxn": "#,##0.0", "pct": "0.0%", "pct3": "0.000%", "razon": "0.000"}
+    todos_sel = 'SelRamoRfv="Todos"'
+    L = get_column_letter
     for c_, _, u, g in INDICADORES_RFV:
         col_real[c_] = cc
-        wcr.cell(1, cc, "Real")
-        wcr.cell(1, cc + 1, "Proyección")
-        if g:
-            wcr.cell(1, cc + 2, g)
-            col_ref[c_] = cc + 2
+        es_pd = c_ == "PD"
+        # un ramo: azul = PD medida en Res_Rvas, naranja = la ultima medida, fija; Todos: real y proyeccion por mes (su
+        # PD pondera la de cada ramo por su reserva cedida y cambia con la mezcla)
+        wcr.cell(1, cc, f'=IF({todos_sel},"Real","Medida (Res_Rvas)")' if es_pd else "Real")
+        wcr.cell(1, cc + 1, f'=IF({todos_sel},"Proyección","Última medida, fija")' if es_pd else "Proyección")
         div = "/1000000" if u == "mxn" else ""
         for k, p in enumerate(periodos, start=2):
             def v(rng, _k=k, _div=div):
                 return f'IF($C{_k}=0,NA(),IF(INDEX({rng},$C{_k})="",NA(),INDEX({rng},$C{_k}){_div}))'
-            if c_ == "PD":                             # medida en azul; la ultima medida, fija, en naranja
+            real = f"IF($A{k}>{ultimo},NA(),{v(rango_de[c_])})"
+            proy = f"IF($A{k}<{ultimo},NA(),{v(rango_de[c_])})"
+            if es_pd:
                 med = f'IFERROR(INDEX(RF_PDM,$C{k})="si",FALSE)'
-                sig = f'IFERROR(INDEX(RF_PDM,$C{k + 1})="si",TRUE)' if k < len(periodos) + 1 else "TRUE"
-                wcr.cell(k, cc, f"=IF({med},{v(rango_de[c_])},NA())").number_format = fmt_c[u]
-                wcr.cell(k, cc + 1, f"=IF(OR(NOT({med}),NOT({sig})),{v(rango_de[c_])},NA())").number_format = fmt_c[u]
+                sig = f'IFERROR(INDEX(RF_PDM,$C{k + 1})="si",TRUE)' if k < n_c else "TRUE"
+                real = f"IF({todos_sel},{real},IF({med},{v(rango_de[c_])},NA()))"
+                proy = f"IF({todos_sel},{proy},IF(OR(NOT({med}),NOT({sig})),{v(rango_de[c_])},NA()))"
+            wcr.cell(k, cc, f"={real}").number_format = fmt_c[u]
+            wcr.cell(k, cc + 1, f"={proy}").number_format = fmt_c[u]
+        if g:
+            col_ref[c_] = cc + 2
+            gr = f"{L(cc + 2)}2:{L(cc + 2)}{n_c}"
+            if es_pd:                                # columna cc + 3: la PD de xDefault de todos los meses
+                cruda = f"{L(cc + 3)}2:{L(cc + 3)}{n_c}"
+                wcr.cell(1, cc + 3, f"{g} (todos los meses)")
+                wcr.cell(n_c + 2, cc + 2, "En escala")   # (ref_en_escala por ramo, en Listas)
+                wcr.cell(n_c + 2, cc + 3, "=IFERROR(INDEX(L_XdefEscala,MATCH(SelRamoRfv,L_RamosRfv,0)),FALSE)")
+                for k in range(2, n_c + 1):
+                    wcr.cell(k, cc + 3, f"={v(rango_de[g], k)}").number_format = fmt_c[u]
+                    wcr.cell(k, cc + 2, f"=IF(${L(cc + 3)}${n_c + 2},{L(cc + 3)}{k},NA())").number_format = fmt_c[u]
+                wcr.cell(1, cc + 2, f'=IF(COUNT({gr})>0,"{g}",IF(COUNT({cruda})=0,"{g} (sin dato en esta selección)",'
+                                    f'"{g} (fuera de escala: ver BD_RFV_Razones)"))')
             else:
-                wcr.cell(k, cc, f"=IF($A{k}>{ultimo},NA(),{v(rango_de[c_])})").number_format = fmt_c[u]
-                wcr.cell(k, cc + 1, f"=IF($A{k}<{ultimo},NA(),{v(rango_de[c_])})").number_format = fmt_c[u]
-            if g:
-                wcr.cell(k, cc + 2, f"={v(rango_de[g])}").number_format = fmt_c[u]
-        cc += 3 if g else 2
-    n_c = len(periodos) + 1
+                for k in range(2, n_c + 1):
+                    wcr.cell(k, cc + 2, f"={v(rango_de[g], k)}").number_format = fmt_c[u]
+                wcr.cell(1, cc + 2, f'=IF(COUNT({gr})>0,"{g}","{g} (sin dato en esta selección)")')
+        cc += (4 if es_pd else 3) if g else 2
     wcr.sheet_state = "hidden"
 
     # ---- indicadores
-    L = get_column_letter
     cf, cm = col_real["FRV"], col_real["RFV MA / RFV BRUTO"]
     kpis = [
         (f"FRV real {etiqueta(ultimo)}", f"=CalcRFV!{L(cf)}{fila_de[ultimo]}", "0.000"),
         (f"FRV proyección {etiqueta(p_dic)}", f"=CalcRFV!{L(cf + 1)}{fila_de.get(p_dic, n_c)}", "0.000"),
         (f"FRV proyección {etiqueta(periodos[-1])}", f"=CalcRFV!{L(cf + 1)}{n_c}", "0.000"),
-        (f"RFV por monto afianzado {etiqueta(ultimo)}", f"=CalcRFV!{L(cm)}{fila_de[ultimo]}", "0.0%"),
+        (f"RFV por MA {etiqueta(ultimo)}", f"=CalcRFV!{L(cm)}{fila_de[ultimo]}", "0.0%"),   # (renglon 9: que incluye)
     ]
     pintar(ws, "D5:AG8", BANDA_KPI)
     for k, (tit, form, fmt) in enumerate(kpis):
@@ -1471,7 +1582,7 @@ def construir_razones_rfv(ws, wbd, wcr, rz: dict, ultimo: int, p_dic: int, nombr
 
     # ---- paneles y graficas
     ramo_txt = 'IF(SelRamoRfv="Todos","todos los ramos","ramo "&SelRamoRfv)'
-    eje = {"mxn": " · M MXN", "pct": " · %", "pct3": " · %", "razon": " · razón"}
+    eje = {"mxn": " · M MXN", "pct": " · %", "pct3": " · %", "razon": ""}
     for j, (c_, tit, u, g) in enumerate(INDICADORES_RFV):
         fila0 = 10 + 19 * ((j + 1) // 2) if 0 < j < len(cols) - 1 else (10 if j == 0 else 10 + 19 * ((len(cols) - 1) // 2 + 1))
         ancha = j in (0, len(cols) - 1)
@@ -1486,10 +1597,10 @@ def construir_razones_rfv(ws, wbd, wcr, rz: dict, ultimo: int, p_dic: int, nombr
         ch = LineChart()
         ch.add_data(Reference(wcr, min_col=cr, max_col=cr + (2 if g else 1), min_row=1, max_row=n_c), titles_from_data=True)
         ch.set_categories(Reference(wcr, min_col=2, min_row=2, max_row=n_c))
-        linea(ch.series[0], AZUL, 2.0)
-        linea(ch.series[1], NARANJA, 2.0, punteada=True)
+        linea(ch.series[0], AZUL, 2.0, marcador=True)
+        linea(ch.series[1], NARANJA, 2.0, punteada=True, marcador=True)
         if g:
-            linea(ch.series[2], GRIS_BANDA, 1.25)
+            linea(ch.series[2], GRIS_BANDA, 1.25, marcador=True)
         estilo_grafica(ch, {"mxn": "#,##0", "pct": "0%", "pct3": "0.00%", "razon": "0.00"}[u])
         ch.x_axis.tickLblSkip = 6
         ch.x_axis.tickMarkSkip = 6
@@ -1501,17 +1612,24 @@ def construir_razones_rfv(ws, wbd, wcr, rz: dict, ultimo: int, p_dic: int, nombr
     ws[f"D{f0}"] = f'="Factores constantes · "&{ramo_txt}'
     ws[f"D{f0}"].font = fuente(11.5, True)
     ws[f"D{f0}"].alignment = Alignment(indent=1, vertical="center")
+    # (cada valor en un bloque combinado de 5 columnas: en una sola columna de la rejilla el numero sale como ###)
     for k, t in enumerate(("Factor", f"Real {etiqueta(ultimo)}", f"Proyección {etiqueta(periodos[-1])}")):
+        ws.merge_cells(start_row=f0 + 1, start_column=4 + 5 * k, end_row=f0 + 1, end_column=8 + 5 * k)
         c = ws.cell(f0 + 1, 4 + 5 * k, t)
         c.font = fuente(9.5, True, TEXTO_2)
+        c.alignment = Alignment(horizontal="left" if k == 0 else "right", indent=1)
     for i, fac in enumerate(FACTORES_RFV_TABLA, start=f0 + 2):
+        ws.merge_cells(start_row=i, start_column=4, end_row=i, end_column=8)
         ws.cell(i, 4, fac).font = fuente(10)
+        ws.cell(i, 4).alignment = Alignment(indent=1)
         rng = rango_de[fac]
         for k, p in ((1, ultimo), (2, periodos[-1])):
+            ws.merge_cells(start_row=i, start_column=4 + 5 * k, end_row=i, end_column=8 + 5 * k)
             x = f'INDEX({rng},MATCH(SelRamoRfv&"|"&{p},RF_Clave,0))'
             c = ws.cell(i, 4 + 5 * k, f'=IFERROR(IF({x}="","s/d",{x}),"s/d")')
             c.number_format = "0.000%" if fac == "FCR" else "0.00%"
             c.font = fuente(10)
+            c.alignment = Alignment(horizontal="right", indent=1)
 
 
 def clasificar(wb) -> None:

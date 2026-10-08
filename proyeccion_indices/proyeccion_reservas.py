@@ -162,7 +162,7 @@ except Exception as _e:  # noqa: BLE001
 # =============================================================================
 CARPETA = Path(__file__).resolve().parent
 ENTRADAS = CARPETA / "entradas"
-VERSION_CODIGO = "2026-10-08e"   # version de los scripts: sale en la consola, en la hoja Resumen del diagnostico, en el pie
+VERSION_CODIGO = "2026-10-08f"   # version de los scripts: sale en la consola, en la hoja Resumen del diagnostico, en el pie
                                  # del tablero HTML y en la hoja Dashboard Razones del Excel, para saber con que version se corrio
 SALIDAS = CARPETA / "salidas"
 
@@ -5364,8 +5364,9 @@ def razones_rfv(info: dict, bd: BDMontos, ramos: list, per_hist: list[int], peri
     de la BD de RFV (las formulas de la historia se calculan aqui igual; en la proyeccion, los valores proyectados), para
     la hoja HOJA_RAZONES_RFV del diagnostico y la pestaña "Razones RFV" del dashboard. Solo los ramos con RFV por prima.
     "Todos" = razon de las sumas de esos ramos en cada mes: FRV = suma de RFV BRUTO x TC / suma de PRIMA 24M; CESION =
-    suma de IRR / suma de BRUTO; FV = suma de (RFV BRUTO x TC - RFV MA de los ramos con el MA aparte) / suma de (PR + GA);
-    RC = suma de IRR / suma de BRUTO x FCR; PD = 1 - suma de IRR / suma de IRR / FCR; FPR = suma de PR / suma de PRIMA;
+    suma de IRR / suma de BRUTO; FV = suma de (RFV BRUTO x TC - RFV MA de los ramos con el MA aparte) / suma de (PR + GA)
+    (sin dato si a algun ramo con PR le falta su FV, p. ej. un mes sin MA en 140 o 170); RC = suma de IRR / suma de
+    (BRUTO x FCR); PD = 1 - suma de IRR / suma de (IRR / FCR); FPR = suma de PR / suma de PRIMA;
     RC PRIMA = suma de la prima cedida / suma de la tomada desde el primer mes de PExRamo; MA y RFV MA sumados. Montos en
     MXN."""
     pt = info.get("pt") or {}
@@ -5383,6 +5384,7 @@ def razones_rfv(info: dict, bd: BDMontos, ramos: list, per_hist: list[int], peri
     ultimo = per_hist[-1]
     ramos_ap = [r for r in ramos if any(x == r for _, x in aplica)]
     nan = math.nan
+    texto_seg = _rangos_meses((info.get("com") or {}).get("meses") or [])
 
     def fin(v):
         return float(v) if isinstance(v, (int, float)) and np.isfinite(v) else nan
@@ -5438,7 +5440,8 @@ def razones_rfv(info: dict, bd: BDMontos, ramos: list, per_hist: list[int], peri
                           "PD": pd_, "PD medida": "si" if real and pdm.get((r, p)) else "no",
                           "FCR": fcr, "RC": rc, "RC PRIMA": _rc_prima(pt, r, p),
                           **{f"PD xDefault {n} meses": fin(pdx.get((n, str(r), p))) for n in MESES_PD_XDEFAULT},
-                          "MA aparte": "si" if r in split else "no", "TC": t})
+                          "MA aparte": "si" if r in split else "no", "TC": t,
+                          "Meses de BDReal (%SEG PR y %COM PR)": texto_seg})
             if np.isfinite(rfv) and rfv > 0 and np.isfinite(prima):
                 d = partes.setdefault(p, {"rfv": 0.0, "irr": 0.0, "prima": 0.0, "fv_n": 0.0, "fv_d": 0.0, "bf": 0.0,
                                           "ced": 0.0, "pr": 0.0, "pr_d": 0.0, "ma": 0.0, "rma": 0.0, "ptac": 0.0,
@@ -5451,6 +5454,8 @@ def razones_rfv(info: dict, bd: BDMontos, ramos: list, per_hist: list[int], peri
                 if np.isfinite(fv) and (pr + ga):
                     d["fv_n"] += fv * (pr + ga)
                     d["fv_d"] += pr + ga
+                elif np.isfinite(pr + ga) and (pr + ga):   # (un ramo con PR sin FV: Todos sin dato, no a medias)
+                    d["fv_falta"] = True
                 if np.isfinite(fpr):
                     d["pr"] += pr
                     d["pr_d"] += prima
@@ -5478,8 +5483,10 @@ def razones_rfv(info: dict, bd: BDMontos, ramos: list, per_hist: list[int], peri
                       "CESION": ces_t, "%SEG PR": nan, "%COM PR": nan, "%CARGAS": CARGAS_RFV,
                       "FPR": d["pr"] / d["pr_d"] if d["pr_d"] else nan, f"PR {MESES_PRIMA_RFV}M (MXN)": d["pr"] or nan,
                       "%GA": GASTO_ADMON_RFV, f"GA {MESES_PRIMA_RFV}M (MXN)": d["pr"] * GASTO_ADMON_RFV or nan,
-                      "FV": d["fv_n"] / d["fv_d"] if d["fv_d"] else nan, "OMEGA": nan, "ALFA": nan,
-                      "MA (MXN)": d["ma"] if d["ma_ok"] else nan, "Origen del MA": "suma de los ramos",
+                      "FV": d["fv_n"] / d["fv_d"] if d["fv_d"] and not d.get("fv_falta") else nan,
+                      "OMEGA": nan, "ALFA": nan,
+                      "MA (MXN)": d["ma"] if d["ma_ok"] else nan,
+                      "Origen del MA": "suma de los ramos" if d["ma_ok"] else "sin dato",
                       "RFV MA (MXN)": d["rma"] if d["ma_ok"] else nan,
                       "RFV MA / RFV BRUTO": d["rma"] / d["rfv"] if d["ma_ok"] and d["rfv"] else nan,
                       "PD": 1 - d["irr"] / d["ced"] if d["ced"] else nan, "PD medida": "si" if d.get("pdm") else "no",
@@ -5487,7 +5494,8 @@ def razones_rfv(info: dict, bd: BDMontos, ramos: list, per_hist: list[int], peri
                       "RC": d["irr"] / d["bf"] if d["bf"] else nan,
                       "RC PRIMA": d["pcac"] / d["ptac"] if d["rcp_ok"] and d["ptac"] else nan,
                       **{f"PD xDefault {n} meses": nan for n in MESES_PD_XDEFAULT},
-                      "MA aparte": "", "Ramos en Todos": f"{d['n']} de {n_ramos}", "TC": nan})
+                      "MA aparte": "", "Ramos en Todos": f"{d['n']} de {n_ramos}", "TC": nan,
+                      "Meses de BDReal (%SEG PR y %COM PR)": texto_seg})
     return filas
 
 
