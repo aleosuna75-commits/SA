@@ -715,7 +715,8 @@ HOJA_PT_RAMO = "PT_RAMO"         # hoja de la BD de RFV con la prima tomada del 
 # RFV BRUTO = PRIMA 24M x FPR x (1 + %GA) x FV / TC, FPR = %SEG PR x (1 - %COM PR - %CARGAS), y FV el factor residual
 # (permanencia, segmento de monto afianzado y TC); IRR = RFV BRUTO x RC x FCR. FV y RC se proyectan con los modelos del
 # FRV y de la cesion; los demas factores salen de los datos o del area. Con los factores medidos, la RFV proyectada es
-# la misma que sin los bloques; COMISION_RFV y PD_FIANZAS la mueven (y lo mismo cambiarlos en la hoja PT_RAMO).
+# la misma que sin los bloques, salvo 140 y 170 con MA_RFV (el monto afianzado aparte, abajo); COMISION_RFV y
+# PD_FIANZAS la mueven (y lo mismo cambiarlos en la hoja PT_RAMO).
 FACTORES_RFV = True
 CARGAS_RFV = 0.171903149570019   # %CARGAS sobre la prima tomada (%CargasPma del script de FCST de Fianzas del area):
                                  # 4.268 % de gasto de administracion (GAT, el mismo alfa) + 12.922 % de costos de
@@ -4816,7 +4817,7 @@ def ma_hasta(ma_info: dict | None, corte: int, solo_real: bool = True) -> dict:
         return {}
     esc = ma_info.get("escenario") or {}
     keep = {k for k in (ma_info.get("ma") or {}) if k[1] <= corte and (not solo_real or esc.get(k) == "Real")}
-    return {**ma_info, "ma": {k: v for k, v in ma_info["ma"].items() if k in keep},
+    return {**ma_info, "ma": {k: v for k, v in (ma_info.get("ma") or {}).items() if k in keep},
             "escenario": {k: v for k, v in esc.items() if k in keep}}
 
 
@@ -5529,8 +5530,8 @@ def escribir_pt_ramo(wb, pt: dict | None, ramos: list, periodos_bd=(), info: dic
     ws.cell(1, 1, f"Prima tomada (PT) de Fianzas del mes por ramo (MXN) y PRIMA {n}M = suma de los ultimos {n} meses. "
                   f"Fuentes: {pt.get('texto', '')}").font = negrita
     ws.cell(2, 1, f"Un mes que ninguna fuente trae va en 0 (FUENTE: sin prima). En los primeros {n - 1} meses de la hoja "
-                  f"la suma lleva solo los meses que hay. La RFV por prima solo usa las sumas con sus {n} meses en alguna "
-                  "fuente"
+                  f"la suma lleva solo los meses que hay; una PT borrada deja la suma en N/A (no se toma como 0). La RFV por "
+                  f"prima solo usa las sumas con sus {n} meses en alguna fuente"
                   + (f". PC = prima cedida del mes (MXN; {pt.get('texto_cedida', '')}); un mes sin dato de cedida va en "
                      f"blanco y RC PRIMA solo usa las sumas desde {ini} con todos sus meses" if ced else "")
                   + (". Insumos de los factores de la RFV (se pueden cambiar; la BD los toma de aqui): %SEG PR y %COM PR "
@@ -5578,13 +5579,16 @@ def escribir_pt_ramo(wb, pt: dict | None, ramos: list, periodos_bd=(), info: dic
                 valor[(g, _r, p)] = v
             poner("pt", float(pt["mensual"].get((r, p), 0.0)))
             le = get_column_letter(cols["pt"][r])
-            poner("suma", f"=SUM({le}{max(4, fila - n + 1)}:{le}{fila})")
+            rango = f"{le}{max(4, fila - n + 1)}:{le}{fila}"   # (una PT borrada no se suma como 0: N/A)
+            poner("suma", f'=IF(COUNT({rango})=ROWS({rango}),SUM({rango}),"{TEXTO_SIN_DATO}")')
             if ced:
                 v_ = ced.get((r, p))
                 poner("pc", float(v_) if v_ is not None and np.isfinite(v_) else None)
-                poner("pt_acum", f"=SUM({le}$4:{le}{fila})")
+                poner("pt_acum", f'=IF(COUNT({le}$4:{le}{fila})=ROWS({le}$4:{le}{fila}),SUM({le}$4:{le}{fila}),'
+                                 f'"{TEXTO_SIN_DATO}")')
                 lc = get_column_letter(cols["pc"][r])
-                poner("pc_acum", f"=SUM({lc}$4:{lc}{fila})")
+                poner("pc_acum", f'=IF(COUNT({lc}$4:{lc}{fila})=ROWS({lc}$4:{lc}{fila}),SUM({lc}$4:{lc}{fila}),'
+                                 f'"{TEXTO_SIN_DATO}")')
             if fac:
                 f_r = fac.get(r) or {}
                 sp, pc_ = f_r.get("SEG", math.nan), f_r.get("PCOM_P" if proy_mes else "PCOM", math.nan)
@@ -5810,8 +5814,10 @@ def escribir_bloques_rfv(bd: BDMontos, info: dict, hoja_pt: dict | None, periodo
             aplica = (p, r) in info.get("aplica", ())
             b, i_ = del_mes("RFV BRUTO"), del_mes("RFV IRR")
             if "SEG" in bloques and con_pt and hoja_pt.get("cargas"):
-                vals["RCP"] = (f"=IFERROR({ref_pt}!${hoja_pt['pc_acum'][r]}${fpt}/{ref_pt}!${hoja_pt['pt_acum'][r]}${fpt},0)"
-                               if hoja_pt.get("pc_acum") and np.isfinite(_rc_prima(pt_info, r, p)) else None)
+                pc_c = f"{ref_pt}!${hoja_pt['pc_acum'][r]}${fpt}" if hoja_pt.get("pc_acum") else ""
+                pt_c = f"{ref_pt}!${hoja_pt['pt_acum'][r]}${fpt}" if hoja_pt.get("pt_acum") else ""
+                vals["RCP"] = (f"=IF(AND(ISNUMBER({pc_c}),ISNUMBER({pt_c})),IFERROR({pc_c}/{pt_c},0),"
+                               f"\"{TEXTO_SIN_DATO}\")" if pc_c and np.isfinite(_rc_prima(pt_info, r, p)) else None)
                 con_seg = numero("seg", r) and numero("com", r)
                 # (los insumos siempre referencian PT_RAMO, aunque ahi digan N/A: si el area los llena, la BD los toma;
                 # FPR, PR, GA y FV quedan en N/A mientras falte alguno)
@@ -8415,8 +8421,9 @@ def main():
             try:
                 ma_fz = leer_montos_afianzados(list(bd_rfv.cols_ramo)) if FACTORES_RFV and MA_RFV else {}
             except Exception as e_ma:  # noqa: BLE001  (el MA no puede tumbar la RFV por prima)
-                ma_fz = {"avisos": [f"{PATRON_MONTOS_AFIANZADOS}: no se pudo leer ({type(e_ma).__name__}: {e_ma}); la "
-                                    "reserva por monto afianzado queda dentro de FV"]}
+                txt_ma = (f"{PATRON_MONTOS_AFIANZADOS}: no se pudo leer ({type(e_ma).__name__}: {e_ma}); la reserva por "
+                          "monto afianzado queda dentro de FV")
+                ma_fz = {"ma": {}, "escenario": {}, "claves": {}, "ultimo": None, "texto": txt_ma, "avisos": [txt_ma]}
             for a in (indices_ma()[3] if FACTORES_RFV and MA_RFV else []):
                 alertas.append(("FIANZAS", "Indices del monto afianzado", a))
                 print(f"   AVISO FIANZAS: {a}", flush=True)
