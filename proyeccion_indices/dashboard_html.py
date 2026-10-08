@@ -288,6 +288,8 @@ def preparar_datos() -> dict:
         "rfv_factores": "FRV = FPR x (1 + %GA) x FV" in str(resumen.get("RFV por prima (Fianzas)") or ""),
         "rfv_ma": (re.search(r"monto afianzado aparte en ([0-9, ]+?):", str(resumen.get("RFV por prima (Fianzas)") or ""))
                    or [None, ""])[1],
+        "rfv_ma_hasta": int((re.search(r"MA del CSV del area hasta (\d{6}) y fijo",
+                                       str(resumen.get("RFV por prima (Fianzas)") or "")) or [None, 0])[1]),
         "factores_fijos": factores_fijos(resumen),
         "suavizado": notas_suavizado(resumen),
         "ppto": leer_contraste_presupuesto(),
@@ -1065,7 +1067,7 @@ function pintarReservas() {
   const { reserva, concepto, moneda } = E; const ramoRes = E.ramoRes;
   const conceptos = D.conceptos[reserva] || [], ramos = D.ramos_m[reserva] || [];
   const aviso = document.getElementById('nota-res');
-  aviso.textContent = `Cifras en millones de ${moneda}${moneda === 'MXN' ? ' (USD × TC del mes)' : ''} · real hasta ${eti(D.ultimo)} · montos: ${D.modelo_por_tipo.nivel || 'n/d'}; razones: ${D.modelo_por_tipo.razon || 'n/d'}${reserva === 'RFV' ? ' · Fianzas se modela en pesos y se convierte con el TC de Inversiones' + (D.rfv_prima ? ' · RFV por prima en ' + D.rfv_prima + '; IRR = BRUTO × CESION y NETO = BRUTO − IRR; RCONT con su modelo' + (D.rfv_factores ? '; en la BD, FRV = FPR × (1 + %GA) × FV y CESION = RC × FCR, con los factores de la metodología del área (segmento y prima de reserva, comisiones, cargas, gastos, factor residual FV, cesión y PD)' + (D.rfv_ma ? '; en ' + D.rfv_ma + ' la reserva por monto afianzado va aparte: FRV = FPR × (1 + %GA) × FV + RFV MA / PRIMA 24M, RFV MA = MA × (ω + α), con el MA del área hasta dic-26 y fijo después' : '') : '') : '') + (D.nota_rangos ? ' · ' + D.nota_rangos : '') : ''}`;
+  aviso.textContent = `Cifras en millones de ${moneda}${moneda === 'MXN' ? ' (USD × TC del mes)' : ''} · real hasta ${eti(D.ultimo)} · montos: ${D.modelo_por_tipo.nivel || 'n/d'}; razones: ${D.modelo_por_tipo.razon || 'n/d'}${reserva === 'RFV' ? ' · Fianzas se modela en pesos y se convierte con el TC de Inversiones' + (D.rfv_prima ? ' · RFV por prima en ' + D.rfv_prima + '; IRR = BRUTO × CESION y NETO = BRUTO − IRR; RCONT con su modelo' + (D.rfv_factores ? '; en la BD, FRV = FPR × (1 + %GA) × FV y CESION = RC × FCR, con los factores de la metodología del área (segmento y prima de reserva, comisiones, cargas, gastos, factor residual FV, cesión y PD)' + (D.rfv_ma ? '; en ' + D.rfv_ma + ' la reserva por monto afianzado va aparte: FRV = FPR × (1 + %GA) × FV + RFV MA / PRIMA 24M, RFV MA = MA × (ω + α), con el MA del área' + (D.rfv_ma_hasta ? ' hasta ' + eti(D.rfv_ma_hasta) + ' y fijo después' : '') : '') : '') : '') + (D.nota_rangos ? ' · ' + D.nota_rangos : '') : ''}`;
   const vals = montoSerie(reserva, concepto, ramoRes);
   const u = vals[jUlt], pd = vals[jDic], pf = vals[jFin], v12 = vals[j12], p12 = vals[jUlt + 12];
   const f1 = v => fmt(v, 1);
