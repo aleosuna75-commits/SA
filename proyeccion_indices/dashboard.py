@@ -552,11 +552,11 @@ def notas_ramo_rfv(rz: dict, ultimo: int) -> dict:
     split, info, i = rz["split"], ramos_ma_informativa(rz), rz["periodos"].index(ultimo)
     out = {}
     for ramo in ["Todos"] + rz["ramos"]:
-        if ramo == "Todos":
+        if ramo == "Todos":                          # (textos de un renglon: caben en D9:AG9)
             x = parte_ma_aparte(rz, ultimo)
-            t = (f"Todos: la RFV por MA suma la que va aparte ({', '.join(split) or 'ninguno'}) y la informativa "
-                 f"({', '.join(info) or 'ninguno'}; queda dentro de FV)"
-                 + (f"; la que va aparte es {x * 100:.1f} % de la RFV en {etiqueta(ultimo)}." if x is not None else "."))
+            t = (f"Todos: RFV por MA = aparte ({', '.join(split) or 'ninguno'}) + informativa "
+                 f"({', '.join(info) or 'ninguno'}, dentro de FV)"
+                 + (f"; la aparte es {x * 100:.1f} % de la RFV en {etiqueta(ultimo)}." if x is not None else "."))
         elif ramo in split:
             t = f"Ramo {ramo}: la RFV MA va aparte (FRV = FRV residual + RFV MA / PRIMA 24M)."
         elif ramo in info:
@@ -564,8 +564,8 @@ def notas_ramo_rfv(rz: dict, ultimo: int) -> dict:
         else:
             t = f"Ramo {ramo}: sin monto afianzado en el CSV del área."
         if (rz.get("ma_estimado") or {}).get(ramo, [False] * (i + 1))[i]:
-            t += (f" El MA de {etiqueta(ultimo)} es estimado del área (real hasta {etiqueta(rz['ma_real_hasta'])})."
-                  if rz.get("ma_real_hasta") else f" El MA de {etiqueta(ultimo)} es estimado del área.")
+            t += (f" MA de {etiqueta(ultimo)} estimado por el área (real hasta {etiqueta(rz['ma_real_hasta'])})."
+                  if rz.get("ma_real_hasta") and ramo != "Todos" else f" MA de {etiqueta(ultimo)} estimado por el área.")
         out[ramo] = t
     return out
 
@@ -855,6 +855,7 @@ def generar(ruta_salida: Path = SALIDA_DASHBOARD) -> Path:
             c = hoja.cell(4 + k, 2, ("▸ " if texto == activo else "   ") + texto)
             c.hyperlink = Hyperlink(ref=c.coordinate, location=destino)
             c.font = fuente(10.5, texto == activo, TEXTO if texto == activo else TEXTO_2)
+            c.alignment = Alignment(vertical="top")  # (una fila mas alta por un panel no separa las opciones)
             c.fill = relleno(NAV_ACTIVO if texto == activo else PANEL)
             if k == 0:
                 c.border = Border(left=LADO, right=LADO, top=LADO)
@@ -1477,8 +1478,8 @@ def construir_razones_rfv(ws, wbd, wcr, rz: dict, ultimo: int, p_dic: int, nombr
              f"MA aparte en {split}; en {info}, la RFV MA es informativa.",
              "Todos: razón de las sumas. Su PD pondera la de cada ramo por su reserva cedida.",
              *([f"MA estimado por el área: {texto_meses(est)}."] if est else []), "",
-             "Gris: FRV residual, RC PRIMA y PD de xDefault (fuera de la gráfica si su escala es más de "
-             f"{ESCALA_REF_RFV} veces la de la PD). PD de un ramo: azul = medida en Res_Rvas, naranja = la última "
+             "Gris: FRV residual, RC PRIMA y PD de xDefault (fuera de la gráfica si es más de "
+             f"{ESCALA_REF_RFV} veces mayor o menor que la PD). PD de un ramo: azul = medida en Res_Rvas, naranja = la última "
              "medida, fija.", "",
              "#N/D = sin dato: FV antes de 2026"
              + (f"; MA, RFV MA y FRV residual en {huecos} (el CSV no los trae" + (f"; por eso tampoco hay FV de {split} ni de "
@@ -1493,11 +1494,10 @@ def construir_razones_rfv(ws, wbd, wcr, rz: dict, ultimo: int, p_dic: int, nombr
     if fila > 47:
         print(f"   Aviso: las notas de {HOJA_DASH_RFV} llegan al renglón {fila - 1} (el panel lateral termina en el 46)",
               flush=True)
-    ws.merge_cells("D9:AG9")                         # el monto afianzado del ramo elegido (texto de L_NotaRfv)
-    ws["D9"] = '=IFERROR(INDEX(L_NotaRfv,MATCH(SelRamoRfv,L_RamosRfv,0)),"")'
-    ws["D9"].font = fuente(9.5, True, TEXTO_2)
-    ws["D9"].alignment = Alignment(wrap_text=True, vertical="center", indent=1)
-    ws.row_dimensions[9].height = 26
+    ws.merge_cells("D9:AG9")                         # el monto afianzado del ramo elegido (texto de L_NotaRfv; un
+    ws["D9"] = '=IFERROR(INDEX(L_NotaRfv,MATCH(SelRamoRfv,L_RamosRfv,0)),"")'   # renglon: la fila 9 es del menu)
+    ws["D9"].font = fuente(9, True, TEXTO_2)
+    ws["D9"].alignment = Alignment(vertical="center", indent=1)
     ws["D2"] = "Dashboard de Razones RFV: factores de la reserva de Fianzas en Vigor por ramo"
     ws["D2"].font = fuente(18, True)
     ws["D3"] = (f"Real {etiqueta(periodos[0])} a {etiqueta(ultimo)} y proyección {etiqueta(mover(ultimo, 1))} a "

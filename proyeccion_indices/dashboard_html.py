@@ -473,7 +473,11 @@ table.datos tbody tr:hover { background: var(--surface-2); }
 .pie { max-width: 1320px; margin: 28px auto 0; color: var(--ink-2); font-size: 12.5px; border-top: 1px solid var(--grid);
   padding-top: 12px; display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px 16px; }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+.desc-movil { display: none; }
 @media (max-width: 600px) {
+  table.datos .que-es { display: none; }
+  table.datos .desc-movil { display: block; white-space: normal; font-weight: 400; color: var(--ink-2); font-size: 11.5px;
+    margin-top: 2px; min-width: 14ch; }
   .kpi .val { font-size: 24px; }
   table.datos { font-size: 12px; }
   table.datos th, table.datos td { padding: 4px 6px; }
@@ -1348,11 +1352,11 @@ const INI_FV = RZ ? Math.min(...Object.values(RZ.datos).map(d => (d.FV || []).fi
 function sueltosRfv(vals) {                          // meses con dato entre dos huecos (se dibujan como punto)
   return P_Z.filter((p, i) => vals[i] != null && i > 0 && i < vals.length - 1 && vals[i - 1] == null && vals[i + 1] == null);
 }
-function fueraDeEscala(serie, ref) {                 // la referencia gris aplanaria la serie: rango mas de K veces el suyo
+function fueraDeEscala(serie, ref) {                 // la referencia gris aplanaria la serie: 'mayor' si pasa de K veces
   const a = serie.filter(v => v != null && isFinite(v) && v > 0), b = ref.filter(v => v != null && isFinite(v) && v > 0);
-  if (!a.length || !b.length) return false;
+  if (!a.length || !b.length) return '';             // su maximo, 'menor' si baja de 1/K de su minimo; '' si cabe
   const K = RZ.escala_ref || 3;
-  return Math.max(...b) > K * Math.max(...a) || Math.min(...b) < Math.min(...a) / K;
+  return Math.max(...b) > K * Math.max(...a) ? 'mayor' : Math.min(...b) < Math.min(...a) / K ? 'menor' : '';
 }
 function maAparteTodos(i) {                          // suma de la RFV MA de los ramos con el MA aparte / RFV BRUTO de Todos
   const tot = ((RZ.datos.Todos || {})['RFV BRUTO (MXN)'] || [])[i];
@@ -1388,7 +1392,8 @@ function explicaRfv(col, ramo, o = {}) {
       ? 'Probabilidad de incumplimiento del reasegurador; Todos = 1 − suma de IRR / suma de la reserva cedida (IRR / FCR): la PD de cada ramo (medida en Res_Rvas o, después, la última medida, fija) ponderada por su reserva cedida, así que se mueve mes a mes con la mezcla de cesión, en %'
       : 'Probabilidad de incumplimiento del reasegurador: CASTIGO / (IRR + CASTIGO) del cálculo del área (Res_Rvas) en los meses que coinciden con SAP; después, la última medida, fija, en %'
         + (o.hayGris ? `; PD de xDefault ponderada por prima cedida, 24 meses (referencia; no entra a la IRR${RZ.xdefault_hasta ? `; llega hasta ${eti(RZ.xdefault_hasta)}` : ''})`
-          + (o.fueraEscala ? `: va solo en la vista de tabla, porque su escala es más de ${RZ.escala_ref || 3} veces la de la PD del área y aplanaría la gráfica` : ', en gris') : ''),
+          + (o.fueraEscala === 'mayor' ? `: va solo en la vista de tabla, porque llega a más de ${RZ.escala_ref || 3} veces la PD del área y aplanaría la gráfica`
+            : o.fueraEscala === 'menor' ? `: va solo en la vista de tabla, porque baja a menos de un tercio de la PD del área y aplanaría la gráfica` : ', en gris') : ''),
     'MA (MXN)': `Monto afianzado del proporcional de México (CSV del área: ${maReal}${est ? `, estimado del área ${est}` : ''}; después, fijo en el último mes del CSV), millones de MXN${todos ? '; suma de los ramos' : split ? '' : '; en este ramo es informativo'}${sinCsv}`,
     'RFV MA / RFV BRUTO': `RFV MA = MA × (ω + α) entre la RFV BRUTO en pesos, en %`
       + (todos ? `; suma de RFV MA / suma de RFV BRUTO: incluye la que va aparte (${lista(RZ.split || [])}) y la informativa (${lista(RAMOS_MA_INFO)}), que queda dentro de FV`
@@ -1442,12 +1447,15 @@ function pintarRfv() {
     const nomReal = esPd ? 'Medida (Res_Rvas)' : 'Real', nomProy = esPd ? 'Última medida, fija' : 'Proyección';
     const gris = ref ? serieRfv(ramo, ref, unidad) : null;
     const hayGris = !!gris && gris.some(v => v != null);
-    const fueraEscala = hayGris && col === 'PD' && fueraDeEscala(vals, gris);   // gris solo en la tabla
+    const fueraEscala = hayGris && col === 'PD' ? fueraDeEscala(vals, gris) : '';   // gris solo en la tabla
     const grisEnGrafica = hayGris && !fueraEscala;
     // meses reales con el MA estimado del area (los valores que dependen del MA lo dicen en el tooltip y la tabla)
-    const usaMa = col === 'MA (MXN)' || col === 'RFV MA / RFV BRUTO' || (col === 'FV' && (todos || split.includes(ramo)));
+    // (en FRV, solo el residual gris de los ramos con el MA aparte depende del MA)
+    const soloResid = col === 'FRV' && split.includes(ramo);
+    const usaMa = col === 'MA (MXN)' || col === 'RFV MA / RFV BRUTO' || (col === 'FV' && (todos || split.includes(ramo))) || soloResid;
     const maEst = usaMa ? ((RZ.ma_estimado || {})[ramo] || []) : [];
-    const tipoReal = i => maEst[i] ? 'Real (MA estimado del área)' : 'Real';
+    const notaEst = soloResid ? 'residual con MA estimado del área' : 'MA estimado del área';
+    const tipoReal = i => maEst[i] ? `Real (${notaEst})` : 'Real';
     const hayReal = real.some(v => v != null), hayProy = proy.some((v, i) => v != null && (esPd || i > zUlt));
     const vacio = !hayReal && !hayProy ? `Sin datos para esta selección${col === 'MA (MXN)' ? ' (el CSV de montos afianzados no trae este ramo)' : ''}.` : null;
     const origen = col === 'MA (MXN)' ? ((RZ.origen_ma || {})[ramo] || []) : null;
@@ -1458,7 +1466,7 @@ function pintarRfv() {
                         ...(hayReal ? [{ nombre: nomReal, valores: real, color: cssVar('--real'), etiquetaFin: true }] : []),
                         ...(hayProy ? [{ nombre: nomProy, valores: proy, color: cssVar('--proy'), dash: true, etiquetaFin: true }] : [])];
         graficaLineas(cuerpo, W, {
-          labels: P_Z.map(eti), tituloX: i => etiLarga(P_Z[i]) + (i <= zUlt ? (maEst[i] ? ' (real; MA estimado del área)' : ' (real)') : ' (proyección)'), fmt: fv, cadaX: 3, etiquetasFin: true,
+          labels: P_Z.map(eti), tituloX: i => etiLarga(P_Z[i]) + (i <= zUlt ? (maEst[i] ? ` (real; ${notaEst})` : ' (real)') : ' (proyección)'), fmt: fv, cadaX: 3, etiquetasFin: true,
           incluirCero: unidad === 'mxn', fmtTick: unidad === 'pct' || unidad === 'pct3' ? (t, d) => fmt(t, d) + ' %' : null,
           aria: `${titulo} de ${etiqRamo}, real y proyección`, series,
         });
@@ -1477,8 +1485,10 @@ function pintarRfv() {
   const tabla = () => {
     const t = tablaDatos(['Factor', `Real ${eti(D.ultimo)}`, `Proyección ${eti(P_Z[zFin])}`, 'Qué es'], filasF);
     for (const c of t.querySelectorAll('tr > :last-child')) {   // el texto largo salta de renglon (tambien al imprimir)
-      c.style.textAlign = 'left'; c.style.whiteSpace = 'normal'; c.style.minWidth = '22ch';
+      c.classList.add('que-es'); c.style.textAlign = 'left'; c.style.whiteSpace = 'normal'; c.style.minWidth = '22ch';
     }
+    for (const tr of t.querySelectorAll('tbody tr'))   // en celular, la descripcion va bajo el nombre del factor
+      tr.firstChild.append(el('span', { class: 'desc-movil', text: tr.lastChild.textContent }));
     return t;
   };
   const cF = el('article', { class: 'tarjeta ancha' },
