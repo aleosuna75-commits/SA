@@ -163,7 +163,7 @@ except Exception as _e:  # noqa: BLE001
 # =============================================================================
 CARPETA = Path(__file__).resolve().parent
 ENTRADAS = CARPETA / "entradas"
-VERSION_CODIGO = "2026-10-08g"   # version de los scripts: sale en la consola, en la hoja Resumen del diagnostico, en el pie
+VERSION_CODIGO = "2026-10-08h"   # version de los scripts: sale en la consola, en la hoja Resumen del diagnostico, en el pie
                                  # del tablero HTML y en la hoja Dashboard Razones del Excel, para saber con que version se corrio
 SALIDAS = CARPETA / "salidas"
 
@@ -401,7 +401,9 @@ PENDIENTE_COMBINADA = {
 #      Clara y confirmada: la pendiente completa. Si no (meseta, o sin tendencia clara): la mitad (como el promedio de
 #      plano y recta de Danos).
 #   4. Desde el ultimo real, amortiguada (amortiguacion por mes: a 16 meses recorre 10.6 meses de pendiente) y con tope
-#      (rango historico ampliado tope_rango veces a meses_tope meses); min_obs meses o menos: sin pendiente.
+#      (rango historico ampliado tope_rango veces a meses_tope meses); con menos de min_obs meses: sin pendiente. Con
+#      ventana_meseta meses o menos, la recta larga y la de confirmacion son la misma: no hay confirmacion
+#      independiente y va la mitad.
 # TENDENCIA_RFV cambia parametros por serie ("FRV", "CESION") o por serie y ramo ("FRV|150"), p. ej.
 # {"FRV|150": {"k_salto": None}} (sin guardia de saltos en el 150) o {"CESION": {"ventana": 12}}. Con "metodo": "recta"
 # y "credibilidad" ("t": min(1, |t| / t_clara); un numero: esa proporcion) se proyecta una sola recta.
@@ -749,9 +751,9 @@ TIPO_MODELO_CESION_RFV = "rfv"   # CESION (IRR / BRUTO) de la RFV, solo Fianzas:
 TIPO_MODELO_FRV_USD = "razon"    # serie del FRV en dolares de la sensibilidad a la moneda: sin tendencia (con tendencia
                                  # extrapolaria la apreciacion del peso de 2025-26, que no es un factor de la reserva)
                                  # Backtest de origen movil de "rfv" (cortes 202512 a 202605, meses de prueba hasta 202608,
-                                 # prima y TC reales; 132 ramo-mes por metodo): error de la RFV BRUTO total 3.3 % (sesgo
-                                 # -3.2 %) contra 1.9 % con SES y 2.0 % repitiendo el ultimo real; por ramo, 140 3.6 % (SES
-                                 # 2.9), 150 10.0 % (10.9), 160 2.9 % (2.2), 170 1.4 % (1.4); IRR total 3.3 % (2.1) y NETO
+                                 # prima y TC reales; 132 ramo-mes por metodo): error de la RFV BRUTO total 3.2 % (sesgo
+                                 # -3.1 %) contra 1.9 % con SES y 2.0 % repitiendo el ultimo real; por ramo, 140 3.6 % (SES
+                                 # 2.9), 150 10.0 % (10.9), 160 2.8 % (2.2), 170 1.4 % (1.4); IRR total 3.2 % (2.1) y NETO
                                  # 3.3 % (2.0). La tendencia no mejora el backtest: la baja del FRV del 160 de 2025 (0.66 a
                                  # 0.60) se detuvo en 2026 (recta de 12 meses t -0.9), y el backtest solo prueba 2026. Se
                                  # usa porque el area pide seguir las tendencias; "razon" o "ultimo" las quitan
@@ -1272,9 +1274,12 @@ def pendiente_rfv(d, z, nombre: str = "") -> tuple[float, dict]:
         regla = f"recta de {len(w)} meses por credibilidad {z_:.2f}"
     else:
         clara = abs(t_l) >= P["t_clara"]
-        confirmada = t_c * np.sign(b_l) >= P["t_meseta"]
+        independiente = len(w) > int(P["ventana_meseta"])   # (con 12 meses o menos, las dos rectas son la misma)
+        confirmada = independiente and t_c * np.sign(b_l) >= P["t_meseta"]
         z_ = 1.0 if clara and confirmada else 0.5
         regla = ("tendencia clara y confirmada en los ultimos 12 meses: completa" if z_ == 1 else
+                 f"tendencia clara, pero con {len(w)} meses no hay confirmacion independiente: la mitad"
+                 if clara and not independiente else
                  "meseta (los ultimos 12 meses no confirman la recta): la mitad" if clara else
                  "sin tendencia clara: la mitad")
     if reciente:
@@ -1825,13 +1830,14 @@ def tc_para_periodo(bd: BDMontos, p: int) -> float:
 def archivos_res_rvas(subcarpetas: bool = False) -> list:
     """Res_Rvas de entradas/ (PATRON_RES_RVAS), sin los temporales de Office (~$), por ano del nombre y nombre, con los de
     nombre exacto (Res_Rvas_AAAA) al final: el ultimo gana en un mes que traigan dos archivos. Con subcarpetas, los de
-    las subcarpetas de entradas/ (no los de entradas/ mismo), en el mismo orden (solo la Base FIANZAS los usa, y solo si
-    en entradas/ ninguno trae la hoja)."""
+    las subcarpetas de entradas/ (no los de entradas/ mismo ni los de carpetas de respaldo), en el mismo orden: no se
+    leen, solo se reportan para que se muevan a entradas/ (leer_fianzas_area)."""
     if not ENTRADAS.exists():
         return []
     pat = re.compile(PATRON_RES_RVAS, re.I)
     exacto = re.compile(r"res[\s_\-.]*rvas[\s_\-.]*\d{4}\.(xlsx|xlsm)", re.I)
-    fuente = (c for c in ENTRADAS.rglob("*") if c.parent != ENTRADAS) if subcarpetas else ENTRADAS.iterdir()
+    fuente = (c for c in ENTRADAS.rglob("*") if c.parent != ENTRADAS and not any(
+        _carpeta_respaldo(x) for x in c.relative_to(ENTRADAS).parts[:-1])) if subcarpetas else ENTRADAS.iterdir()
     return sorted((c for c in fuente if c.is_file() and not c.name.startswith("~$") and pat.search(c.name)),
                   key=lambda c: (bool(exacto.fullmatch(c.name)),
                                  int(m.group(1)) if (m := re.search(r"(20\d\d)", c.name)) else 0, c.name.lower()))
@@ -4460,7 +4466,9 @@ def pt_fianzas(pe_ramo: dict | None, pe_rfa: dict | None, pef: dict | None, bd: 
     1) PExRamo (los ramos de Fianzas, que no estan en la BD de Danos) en todos sus meses; desde el primer mes de Fianzas
        en la base, un mes sin renglones de un ramo es prima 0 (la base omite los meses sin movimiento);
     2) despues de PExRamo y hasta el mes anterior al FCST, el reforecast por mes (RCST_FA: RAMO_RFCST_FIANZAS trae toda la
-       prima de Fianzas) repartido entre los ramos con la mezcla de PExRamo de los ultimos 12 meses y, con
+       prima de Fianzas) repartido entre los ramos con la mezcla de PExRamo de los mismos meses de hasta
+       MEZCLA_REFORECAST_ANIOS anos anteriores (MEZCLA_REFORECAST_FIANZAS = "mismos meses"; "12 meses": la de los
+       ultimos 12 meses) y, con
        PERFIL_REFORECAST = "FCST", llevado a la forma mensual de los mismos meses del FCST del ano siguiente (como en Danos);
     3) el FCST (CtaMens, cuenta CUENTA_PE_FCST, Ramo2 de RAMO_FCST_FIANZAS, en USD) por el TC del mes del proyecto.
     En un mes que traigan varias fuentes manda la primera (real, reforecast, FCST). tc: TC por mes (para PExRamo si
@@ -4516,8 +4524,12 @@ def pt_fianzas(pe_ramo: dict | None, pe_rfa: dict | None, pef: dict | None, bd: 
                 s_prev = {r: max(sum(hist.get((r, q), 0.0) for q in prev), 0.0) for r in ramos}
                 if sum(s_prev.values()) > 0 and all((ramos[0], q) in hist for q in prev):
                     w = {r: s_prev[r] / sum(s_prev.values()) for r in ramos}
-                    txt_w = (f"de los mismos meses de los {n_a} anos anteriores ({min(prev)} a {max(prev)})" if n_a > 1
-                             else f"de los mismos meses del ano anterior ({min(prev)} a {max(prev)})")
+                    ms, an = sorted({q % 100 for q in prev}), sorted({q // 100 for q in prev})
+                    m_txt = (f"meses {ms[0]:02d} a {ms[-1]:02d}" if ms == list(range(ms[0], ms[-1] + 1)) else
+                             "meses " + ", ".join(f"{m:02d}" for m in ms))
+                    a_txt = f"de {an[0]} a {an[-1]}" if len(an) > 1 else f"de {an[0]}"
+                    txt_w = (f"de los mismos meses de los {n_a} anos anteriores" if n_a > 1 else
+                             "de los mismos meses del ano anterior") + f" ({m_txt} {a_txt}; {len(prev)} meses)"
             out["mezcla_reforecast"] = {"pesos": dict(w), "texto": txt_w, "meses": list(meses), "total": dict(tot),
                                         "usd_archivo": sum(float(v) for (r_, p_), v in
                                                            (pe_rfa.get("usd_archivo") or {}).items()
@@ -4564,6 +4576,7 @@ def pt_fianzas(pe_ramo: dict | None, pe_rfa: dict | None, pef: dict | None, bd: 
                              f"van en 0 en {HOJA_PT_RAMO} y la RFV de los meses cuya PRIMA {MESES_PRIMA_RFV}M los incluye "
                              "sigue con el modelo")
     _referencia_y_ajustes_pt(out, ramos, p1, tc, partes)
+    out["ultimo_real"] = p1                            # (corte de la prima real: el ultimo mes de PExRamo)
     out["texto"] = "; ".join(partes)
     # prima cedida del mes (RC PRIMA): PmaCed de PExRamo y la columna CEDIDA del FCST (el reforecast no la trae)
     ced = {(r, p): float(v) if MONEDA_PE_RAMO == "MXN" else float(v) * _tc_cercano(tc, p)
@@ -4700,9 +4713,11 @@ def _referencia_y_ajustes_pt(out: dict, ramos: list, p1: int, tc: dict, partes: 
                     f"{min(hist_g)} a {max(hist_g)} ({lo:+.1%} a {hi:+.1%}). El bloque es "
                     f"{fila[f'Peso del bloque en la PRIMA {MESES_PRIMA_RFV}M del ramo']:.0%} de la PRIMA "
                     f"{MESES_PRIMA_RFV}M del ramo al {fin} y el ramo "
-                    f"{fila[f'Peso del ramo en la PRIMA {MESES_PRIMA_RFV}M total']:.1%} de la total: la RFV del ramo se "
-                    f"mueve casi en la misma proporcion que su PRIMA {MESES_PRIMA_RFV}M (AJUSTE_PRIMA_FIANZAS para "
-                    "cambiarla; hoja RFV_Prima_Bloques)")
+                    f"{fila[f'Peso del ramo en la PRIMA {MESES_PRIMA_RFV}M total']:.1%} de la total: "
+                    + (f"la RFV del ramo, sin la RFV MA (que no depende de la prima), se mueve casi en la misma "
+                       f"proporcion que su PRIMA {MESES_PRIMA_RFV}M" if MA_RFV and r in MA_RFV_RAMOS else
+                       f"la RFV del ramo se mueve casi en la misma proporcion que su PRIMA {MESES_PRIMA_RFV}M")
+                    + " (AJUSTE_PRIMA_FIANZAS para cambiarla; hoja RFV_Prima_Bloques)")
 
 
 def _texto_prima_base(info: dict) -> str:
@@ -4776,6 +4791,7 @@ def filas_prima_base(pt: dict | None, ramos: list, tc: dict, ultimo: int, contro
     fin = max(p for _, p in pt["mensual"])
     desde = desde or _mes_menos(ultimo, 32)
     real_bd = (control or {}).get("real") or {}
+    corte = pt.get("ultimo_real") or ultimo            # (real: hasta el ultimo mes de PExRamo, como en pt_fianzas)
     con_prima = [x for x in ramos if any(pt["mensual"].get((x, q)) for q in rango_periodos(desde, fin))]
     filas = []
     for r in con_prima + (["Todos"] if con_prima else []):
@@ -4787,10 +4803,10 @@ def filas_prima_base(pt: dict | None, ramos: list, tc: dict, ultimo: int, contro
             qs = [_mes_menos(p, k) for k in range(n)]
             usada = s(pt["mensual"], [p])
             p24 = s(pt["mensual"], qs)
-            no_real = sum(pt["mensual"].get((x, q), 0.0) for x in rs for q in qs if q > ultimo)
+            no_real = sum(pt["mensual"].get((x, q), 0.0) for x in rs for q in qs if q > corte)
             ant = s(pt["mensual"], [_mes_menos(p, 12)])
             bd_ = s(real_bd, [p]) if all((x, p) in real_bd for x in rs) else math.nan
-            filas.append({"Ramo": r, "Periodo": p, "Real o proyeccion": "real" if p <= ultimo else "proyeccion",
+            filas.append({"Ramo": r, "Periodo": p, "Real o proyeccion": "real" if p <= corte else "proyeccion",
                           "Fuente": str(pt["fuente"].get(p, "sin prima (0)")).split(" (")[0].split(" ›")[0],
                           "PT usada (MXN)": usada,
                           "PT de la fuente (MXN)": s({**pt["mensual"], **(pt.get("archivo") or {})}, [p]),
@@ -4822,8 +4838,9 @@ def sensibilidad_prima_rfv(bd: BDMontos, proy: dict, pt: dict | None, periodos_p
     def tot(info, c, p):
         return sum(info["proy"].get((c, p, r), 0.0) for r in ramos)
     fuente = pt.get("fuente") or {}
-    bloques = {"PT del reforecast": [p for p in fuente if p > ultimo and "RCST" in str(fuente[p]).upper()],
-               "PT del FCST": [p for p in fuente if p > ultimo and "RCST" not in str(fuente[p]).upper()]}
+    corte = pt.get("ultimo_real") or ultimo            # (la prima no real: despues del ultimo mes de PExRamo)
+    bloques = {"PT del reforecast": sorted(p for p in fuente if p > corte and "RCST" in str(fuente[p]).upper()),
+               "PT del FCST": sorted(p for p in fuente if p > corte and "RCST" not in str(fuente[p]).upper())}
     bloques["PT del reforecast y del FCST"] = bloques["PT del reforecast"] + bloques["PT del FCST"]
     corridas = []
     for nombre, ps in bloques.items():
@@ -5072,6 +5089,9 @@ def _hoja_base_fianzas(nombres: list):
     return next((h for h in nombres if _clave(h).startswith("base") and "fianza" in _clave(h)), None)
 
 
+_FECHA_ISO = r"(\d{4})[-/.](\d{1,2})[-/.]\d{1,2}(?:[ T][\d:.]*)?"   # 2024-12-01, 2024/12/01 o 2024-12-01 00:00:00
+
+
 def _periodo_celda(v):
     """Periodo AAAAMM de una celda: numero (202501), texto ("202501") o fecha (1-ene-2025, "01/01/2025"); None si no."""
     if isinstance(v, datetime):
@@ -5080,6 +5100,8 @@ def _periodo_celda(v):
     if np.isfinite(x) and 190001 <= x <= 299912 and 1 <= int(x) % 100 <= 12:
         return int(x)
     if isinstance(v, str) and v.strip():
+        if mm := re.fullmatch(_FECHA_ISO, v.strip()):     # ("2025-01-03": ano-mes-dia; dayfirst lo leeria 1-mar)
+            return int(mm.group(1)) * 100 + int(mm.group(2)) if 1 <= int(mm.group(2)) <= 12 else None
         f = pd.to_datetime(v.strip(), errors="coerce", dayfirst=True)
         if not pd.isna(f):
             return f.year * 100 + f.month
@@ -5097,8 +5119,8 @@ def _entero_celda(v) -> float:
 def leer_fianzas_area(ramos: list, ultimo: int, info: dict | None = None) -> dict:
     """Calculo del area de la RFV de Fianzas por ramo y mes: hoja Base FIANZAS de los Res_Rvas de entradas/ (Reserva
     FIANZAS, escenarios ESCENARIOS_FIANZAS_AREA en orden de preferencia por mes; el ultimo archivo gana), con PRIMA (de
-    los contratos vigentes), RVABRUTA, IRR, CASTIGO, RVACONT y RVNETA en MXN, hasta ultimo. Tolerante: si ningun
-    Res_Rvas de entradas/ trae la hoja, se buscan en sus subcarpetas (SUBCARPETAS_ENTRADAS); la hoja
+    los contratos vigentes), RVABRUTA, IRR, CASTIGO, RVACONT y RVNETA en MXN, hasta ultimo. Solo de entradas/ mismo,
+    como en Danos: los Res_Rvas de una subcarpeta (que no sea de respaldo) no se leen, solo se avisan. Tolerante: la hoja
     (_hoja_base_fianzas) y los encabezados (COLUMNAS_BASE_FIANZAS, en los primeros 50 renglones) se comparan sin
     mayusculas, acentos, espacios ni signos; el Periodo puede venir como fecha y el tipo de monto con espacios ("RVA
     BRUTA"). Regresa {(ramo, periodo): {tipo: monto}} (vacio sin archivos o sin la hoja). Con info, la llena con lo que
@@ -5202,8 +5224,9 @@ def leer_fianzas_area(ramos: list, ultimo: int, info: dict | None = None) -> dic
                                  f"Res_Rvas_{ultimo // 100}.xlsx, con la hoja Base FIANZAS)"))
         else:
             info["motivo"] = "; ".join(f"{a['archivo']}: {a['motivo']}" for a in info["archivos"] if a["motivo"]) + mover
-    elif mover:
-        info["aviso"] = mover[2:]
+    elif mover:                                        # (la Base FIANZAS si se leyo de entradas/)
+        info["aviso"] = (f"hay {', '.join(info['en_subcarpetas'])} en una subcarpeta de entradas/, que no se lee (la "
+                         "Base FIANZAS se tomo de entradas/); si trae meses mas recientes, muevelo a entradas/")
     return out
 
 
@@ -5276,9 +5299,6 @@ def reporte_insumos_fianzas(ma: dict | None, area_info: dict | None, pdinfo: dic
         out.append(("PD de Fianzas", f"PD de Fianzas: N/A: {motivo}. Sin PD, FCR = 1: la RC que se muestra queda igual "
                     "a la CESION; los montos no cambian (la IRR sale de la CESION del modelo: con o sin PD es la misma; "
                     "solo con PD_FIANZAS la PD mueve la IRR)", True))
-    for i, (ins_, txt_, na_) in enumerate(out):           # (en los N/A, la carpeta exacta que se reviso)
-        if na_:
-            out[i] = (ins_, f"{txt_} [carpeta de entradas: {ENTRADAS}]", na_)
     if (area_info or {}).get("aviso"):
         out.append(("Base FIANZAS", f"Res_Rvas: {area_info['aviso']}", True))
     return out
@@ -5307,6 +5327,14 @@ def _clave(t) -> str:
     return re.sub(r"[^a-z0-9]", "", t.lower())
 
 
+def _carpeta_respaldo(nombre) -> bool:
+    """Carpeta de respaldo (CARPETAS_RESPALDO): alguna de sus palabras empieza con una de ellas ("Respaldos", "old",
+    "Datos historicos", "BackupFianzas"), por palabra completa: "New folder", "Golden" u "Holdings" no lo son."""
+    t = unicodedata.normalize("NFKD", "" if nombre is None else str(nombre)).encode("ascii", "ignore").decode()
+    return any(w.lower().startswith(CARPETAS_RESPALDO)
+               for w in re.findall(r"[A-Z]+(?![a-z])|[A-Z]?[a-z]+|\d+", t))
+
+
 EXT_INSUMO_AREA = (".csv", ".txt", ".xlsx", ".xlsm")   # insumos del area: CSV (o .txt) o Excel (su primera hoja)
 
 
@@ -5322,7 +5350,7 @@ def buscar_insumo(patron: str, alias: tuple = ()) -> dict:
     bases = [b for b in [_clave(Path(patron).stem.replace("*", ""))] + [_clave(a) for a in alias] if b]
     out = {"ruta": None, "donde": "", "otros": [], "parecidos": [], "motivo": ""}
     if not ENTRADAS.is_dir():
-        out["motivo"] = f"no existe la carpeta {ENTRADAS}"
+        out["motivo"] = "no existe la carpeta entradas/ junto al script"
         return out
     todos = ENTRADAS.rglob("*") if SUBCARPETAS_ENTRADAS else ENTRADAS.iterdir()
     cand = []
@@ -5336,7 +5364,7 @@ def buscar_insumo(patron: str, alias: tuple = ()) -> dict:
         elif any(b in k for b in bases):
             out["parecidos"].append(x.relative_to(ENTRADAS).as_posix())
     def respaldo(x):                                   # (subcarpetas o nombres de respaldo: no se toman)
-        return any(any(w in _clave(parte) for w in CARPETAS_RESPALDO) for parte in x.relative_to(ENTRADAS).parts[:-1]) \
+        return any(_carpeta_respaldo(parte) for parte in x.relative_to(ENTRADAS).parts[:-1]) \
             or any(w in _clave(x.stem) for w in ("copia", "respaldo", "backup", "anterior"))
     out["respaldo"] = [x.relative_to(ENTRADAS).as_posix() for x in cand if respaldo(x)]
     cand = [x for x in cand if not respaldo(x)]
@@ -5359,18 +5387,13 @@ def buscar_insumo(patron: str, alias: tuple = ()) -> dict:
     return out
 
 
-def _csv_entrada(patron: str):
-    """El archivo del insumo del patron en entradas/ o en una subcarpeta (buscar_insumo), o None."""
-    return buscar_insumo(patron)["ruta"]
-
-
 _SEPARADORES_CSV = {",": "con comas", ";": "con punto y coma", "\t": "con tabuladores", "|": "con barras"}
 _NUM_COMA_DECIMAL = r"[-+]?(\d{1,3}(\.\d{3})+|\d+)(,\d+)?"
 
 
 def _coma_decimal(df: pd.DataFrame) -> list:
     """CSV con ";" o tabulador (Excel con configuracion regional de coma decimal): las columnas cuyos valores son todos
-    numeros (o vacios) y alguno trae coma ("8855774,47", "8.855.774,47", "0,125") pasan a punto decimal ("8855774.47",
+    numeros (o vacios) y alguno trae coma ("1234567,89", "1.234.567,89", "0,125") pasan a punto decimal ("1234567.89",
     "0.125"); una columna sin ninguna coma se deja como viene (su punto es decimal). Regresa las columnas convertidas."""
     hechas = []
     for c in df.columns:
@@ -5432,17 +5455,25 @@ def _col_csv(df: pd.DataFrame, *nombres):
 
 
 def _periodo_csv(s: pd.Series) -> pd.Series:
-    """Periodo AAAAMM de una columna de CSV: el numero (202412) o, si viene como fecha ("01/12/2024", "2024-12-01"), su
-    ano y mes (dia primero, como lo guarda Excel en espanol)."""
+    """Periodo AAAAMM de una columna de CSV: el numero (202412) o, si viene como fecha, su ano y mes. Una fecha que empieza
+    con el ano ("2024-12-01", "2024-12-01 00:00:00" de una celda de fecha de Excel) es ano-mes-dia; las demas
+    ("01/12/2024") van con el dia primero, como las guarda Excel en espanol."""
     p = _num_csv(s)
     malos = ~p.between(190001, 299912) & s.astype(str).str.strip().ne("")
     if malos.any():
         t = s[malos].astype(str).str.strip()
-        try:
-            f = pd.to_datetime(t, errors="coerce", dayfirst=True, format="mixed")
-        except (TypeError, ValueError):                # (pandas anterior a 2.0, sin format="mixed")
-            f = pd.to_datetime(t, errors="coerce", dayfirst=True)
-        p = p.where(~malos, f.dt.year * 100 + f.dt.month)
+        iso = t.str.extract(f"^{_FECHA_ISO}$")
+        a_, m_ = pd.to_numeric(iso[0], errors="coerce"), pd.to_numeric(iso[1], errors="coerce")
+        f_iso = (a_ * 100 + m_).where(m_.between(1, 12))
+        resto = t[iso[0].isna()]
+        f_resto = pd.Series(np.nan, index=t.index)
+        if not resto.empty:
+            try:
+                f = pd.to_datetime(resto, errors="coerce", dayfirst=True, format="mixed")
+            except (TypeError, ValueError):            # (pandas anterior a 2.0, sin format="mixed")
+                f = pd.to_datetime(resto, errors="coerce", dayfirst=True)
+            f_resto.loc[resto.index] = f.dt.year * 100 + f.dt.month
+        p = p.where(~malos, f_iso.where(iso[0].notna(), f_resto))
     return p
 
 
@@ -5468,7 +5499,7 @@ def _donde(b: dict) -> str:
 
 def _num_csv(s: pd.Series) -> pd.Series:
     """Numeros de un CSV (texto vacio = sin dato). Una coma seguida de grupos de 3 digitos es separador de miles
-    (1,234,567); cualquier otra coma sola es punto decimal (8855774,47 de un CSV con ';')."""
+    (1,234,567); cualquier otra coma sola es punto decimal (1234567,89 de un CSV con ';')."""
     t = s.astype(str).str.strip()
     dec = t.str.fullmatch(r"-?\d+,\d+") & ~t.str.fullmatch(r"-?\d{1,3}(,\d{3})+")
     t = t.where(~dec, t.str.replace(",", ".", regex=False)).str.replace(",", "", regex=False).replace("", np.nan)
@@ -5695,7 +5726,8 @@ def csu_fianzas(seg: dict | None, ramos: list) -> dict:
     "texto", "avisos"}."""
     out = {"pcsu": {}, "detalle": [], "texto": "", "avisos": [], "renglones": 0}
     tab = (seg or {}).get("contratos")
-    rv, rc = _csv_entrada(PATRON_VIGMAX_PROP), _csv_entrada(PATRON_COM_UTIL)
+    bv, bc = buscar_insumo(PATRON_VIGMAX_PROP), buscar_insumo(PATRON_COM_UTIL)
+    rv, rc = bv["ruta"], bc["ruta"]
     if tab is None or tab.empty or rv is None or rc is None or not (tab["llave"] != "").any():
         out["texto"] = ("N/A: sin " + " ni ".join(x for x, f in ((PATRON_VIGMAX_PROP, rv), (PATRON_COM_UTIL, rc))
                                                   if f is None)
@@ -5707,11 +5739,11 @@ def csu_fianzas(seg: dict | None, ramos: list) -> dict:
     try:
         vp, cu = _leer_csv_area(rv), _leer_csv_area(rc)
     except Exception as e:  # noqa: BLE001
-        out["texto"] = f"no se pudieron leer {rv.name} o {rc.name} ({type(e).__name__})"
+        out["texto"] = f"no se pudieron leer {bv['donde']} o {bc['donde']} ({type(e).__name__})"
         return out
     c_lv, c_iu, c_lc, c_ic = _col_csv(vp, "Llave"), _col_csv(vp, "Id Uti"), _col_csv(cu, "Llave"), _col_csv(cu, "IdCom")
     if None in (c_lv, c_iu, c_lc, c_ic):
-        out["texto"] = f"faltan Llave e Id Uti en {rv.name} o Llave e IdCom en {rc.name}"
+        out["texto"] = f"faltan Llave e Id Uti en {bv['donde']} o Llave e IdCom en {bc['donde']}"
         return out
     iu = pd.DataFrame({"llave": vp[c_lv].astype(str).str.strip(), "iu": _num_csv(vp[c_iu])})
     conflicto = int((iu.dropna().groupby("llave")["iu"].nunique() > 1).sum())
@@ -5743,15 +5775,15 @@ def csu_fianzas(seg: dict | None, ramos: list) -> dict:
             "%ComUti del area": pcu, "Comision sobre utilidades no pagada (MXN)": csu, "%CSU = CSU / prima PR": csu / p_pr})
         out["renglones"] = out.get("renglones", 0) + int(x["n"].sum())
         out["renglones_t1"] = out.get("renglones_t1", 0) + int(t1["n"].sum())
-    out["texto"] = (f"{rv.name} ({len(vp):,} renglones, {iu['llave'].nunique():,} llaves, "
-                    f"{int(iu['iu'].isna().sum())} sin Id Uti) y {rc.name} ({len(cu):,} renglones) cruzados con "
+    out["texto"] = (f"{_donde(bv)} ({len(vp):,} renglones, {iu['llave'].nunique():,} llaves, "
+                    f"{int(iu['iu'].isna().sum())} sin Id Uti) y {_donde(bc)} ({len(cu):,} renglones) cruzados con "
                     f"los {out.get('renglones_t1', 0):,} renglones Tipo Rea 1 de los {out['renglones']:,} del segmento "
                     "PR de la base del real por contrato: "
                     + "; ".join(f"{d['Ramo']}: {d['%CSU = CSU / prima PR']:.2%}" for d in out["detalle"])
                     + " de la prima PR (un piso: la prima Tipo Rea 1 con llave sin Id Uti, contratos nuevos, va sin "
                     "comision)")
     if conflicto:
-        out["avisos"].append(f"{rv.name}: {conflicto} llave(s) con Id Uti distinto en varios renglones")
+        out["avisos"].append(f"{bv['donde']}: {conflicto} llave(s) con Id Uti distinto en varios renglones")
     return out
 
 
@@ -5994,7 +6026,7 @@ def calcular_rfv_prima(bd: BDMontos, proy: dict, pt: dict | None, periodos_proy:
                 prm = res.parametros or {}
                 fila.update({"El modelo proyecta": "FRV residual (sin RFV MA)" if split else "FRV",
                              "FRV modelo": texto_modelo_rfv(TIPO_MODELO_FRV) if TIPO_MODELO_FRV in ("rfv", "rfv_log")
-                             else (res.regla or res.modelo),
+                             else (res.regla or texto_modelo_rfv(TIPO_MODELO_FRV)),
                              "FRV tendencia aplicada": prm.get("regla_pendiente", ""),
                              "FRV pendiente aplicada (por mes)": prm.get("pendiente_aplicada", math.nan),
                              "FRV saltos quitados": ", ".join(str(per[-1 - k]) for k in prm.get("saltos_hace") or []
@@ -6020,7 +6052,8 @@ def calcular_rfv_prima(bd: BDMontos, proy: dict, pt: dict | None, periodos_proy:
                                    if not str(a).startswith("Se usa")]
                 prc = res_c.parametros or {}
                 fila.update({"CESION modelo": texto_modelo_rfv(TIPO_MODELO_CESION_RFV)
-                             if TIPO_MODELO_CESION_RFV in ("rfv", "rfv_log") else (res_c.regla or res_c.modelo),
+                             if TIPO_MODELO_CESION_RFV in ("rfv", "rfv_log")
+                             else (res_c.regla or texto_modelo_rfv(TIPO_MODELO_CESION_RFV)),
                              "CESION tendencia aplicada": prc.get("regla_pendiente", ""),
                              "CESION pendiente aplicada (por mes)": prc.get("pendiente_aplicada", math.nan),
                              "CESION saltos quitados": ", ".join(str(per_c[-1 - k]) for k in prc.get("saltos_hace") or []
@@ -6278,6 +6311,7 @@ def razones_rfv(info: dict, bd: BDMontos, ramos: list, per_hist: list[int], peri
                                           "pcac": 0.0, "rcp_ok": True, "ma_ok": True, "n": 0})
                 d["n"] += 1
                 d["pdm"] = d.get("pdm", True) and bool(real and pdm.get((r, p)))
+                d["pd_ok"] = d.get("pd_ok", False) or bool(np.isfinite(pd_))   # (sin PD en ningun ramo: Todos sin PD)
                 d["rfv"] += rfv
                 d["irr"] += irr if np.isfinite(irr) else 0.0
                 d["prima"] += prima
@@ -6319,7 +6353,8 @@ def razones_rfv(info: dict, bd: BDMontos, ramos: list, per_hist: list[int], peri
                       "Origen del MA": "suma de los ramos" if d["ma_ok"] else "sin dato",
                       "RFV MA (MXN)": d["rma"] if d["ma_ok"] else nan,
                       "RFV MA / RFV BRUTO": d["rma"] / d["rfv"] if d["ma_ok"] and d["rfv"] else nan,
-                      "PD": 1 - d["irr"] / d["ced"] if d["ced"] else nan, "PD medida": "si" if d.get("pdm") else "no",
+                      "PD": 1 - d["irr"] / d["ced"] if d["ced"] and d.get("pd_ok") else nan,
+                      "PD medida": "si" if d.get("pdm") else "no",
                       "FCR": d["irr"] / d["ced"] if d["ced"] else nan,
                       "RC": d["irr"] / d["bf"] if d["bf"] else nan,
                       "RC PRIMA": d["pcac"] / d["ptac"] if d["rcp_ok"] and d["ptac"] else nan,
@@ -9422,9 +9457,10 @@ def main():
                 print(f"   AVISO FIANZAS: {a}", flush=True)
             if FACTORES_RFV:                           # una linea por insumo: archivo, hoja, renglones, ramos y
                 for ins_, txt_, na_ in reporte_insumos_fianzas(ma_fz if MA_RFV else None, info_area_fz, pd_fz):
-                    print(f"   {'AVISO FIANZAS: ' if na_ else ''}{txt_}", flush=True)   # meses, o el motivo del N/A
-                    if na_:
-                        alertas.append(("FIANZAS", ins_, txt_))
+                    print(f"   {'AVISO FIANZAS: ' if na_ else ''}{txt_}"     # meses, o el motivo del N/A con la
+                          + (f" [carpeta de entradas: {ENTRADAS}]" if na_ else ""), flush=True)   # carpeta exacta
+                    if na_:                            # (solo en la consola: la ruta local no va al diagnostico
+                        alertas.append(("FIANZAS", ins_, txt_))   # ni a los tableros, que se comparten)
             info_rfvp = calcular_rfv_prima(bd_rfv, proy_rfv, pt_fz, periodos_proy, ultimo, tc_frv, tc_primas, com_fz,
                                            pd_fz, ma_info=ma_fz)
             try:                                       # prima base: control, sensibilidad y saltos (diagnostico)
@@ -9474,7 +9510,7 @@ def main():
             print(f"   Segmento de prima de reserva de Fianzas: {info_rfvp['com']['texto']}", flush=True)
         for t_ in ("pdx", "csu"):                     # (MA, Base FIANZAS y PD ya salieron arriba, una linea cada uno)
             if (info_rfvp.get(f"texto_{t_}") or ""):
-                na_ = info_rfvp[f"texto_{t_}"].startswith("N/A")
+                na_ = info_rfvp[f"texto_{t_}"].startswith("N/A") or "tomado de una subcarpeta" in info_rfvp[f"texto_{t_}"]
                 ins_ = dict(pdx="PD de referencia (xDefault)", csu="Comision sobre utilidades")[t_]
                 print(f"   {'AVISO FIANZAS: ' if na_ else ''}{ins_}: {info_rfvp[f'texto_{t_}']}", flush=True)
                 if na_:

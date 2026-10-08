@@ -1364,9 +1364,23 @@ function maAparteTodos(i) {                          // suma de la RFV MA de los
   return tot && ma.length && ma.every(v => v != null) ? ma.reduce((a, b) => a + b, 0) / tot : null;
 }
 const RAMOS_MA_INFO = RZ ? RZ.ramos.filter(r => !(RZ.split || []).includes(r) && ((RZ.datos[r] || {})['MA (MXN)'] || []).some(v => v != null)) : [];
-function tendRfv(ramo, k) {                          // la tendencia aplicada en el ramo (RFV_Prima_Resumen)
-  const t = ((RZ.tendencia || {})[ramo] || {})[k] || '';
-  return t ? t.replace(/; /, ': ') : 'sin tendencia';
+function tendRfv(ramo, k) {                          // como se proyecta el factor del ramo (RFV_Prima_Resumen): la
+  const d = (RZ.tendencia || {})[ramo] || {};         // tendencia aplicada o, si no hay, el modelo de esta corrida
+  const t = d[k] || '', m = d[k === 'frv' ? 'modelo_frv' : 'modelo_ces'] || '';
+  if (t) return `desde el último real con su tendencia: ${t.replace(/; /, ': ')}`;
+  if (/^tendencia/.test(m)) return 'desde el último real, sin pendiente en esta corrida';
+  return m ? `con ${m}` : 'con su modelo';
+}
+function conTendRfv(k) {                              // Todos: "con la tendencia" solo si algún ramo la tiene
+  return Object.values(RZ.tendencia || {}).some(d => d[k]) ? 'con su tendencia' : 'con su modelo';
+}
+function proporcionRfv(ramo) {                       // cuanto de la RFV se mueve con su PRIMA 24M
+  const sp = RZ.split || [], lista = rs => rs.length > 1 ? rs.slice(0, -1).join(', ') + ' y ' + rs[rs.length - 1] : rs[0];
+  if (ramo !== 'Todos') return sp.includes(ramo)
+    ? 'solo la parte residual de la RFV se mueve con ella: la RFV MA (monto afianzado) no depende de la prima'
+    : 'la RFV se mueve casi en la misma proporción';
+  return sp.length ? `la RFV se mueve casi en la misma proporción, salvo en ${lista(sp)}, donde la RFV MA (monto afianzado) no depende de la prima`
+    : 'la RFV se mueve casi en la misma proporción';
 }
 function explicaRfv(col, ramo, o = {}) {
   const todos = ramo === 'Todos', ini = eti(P_Z[zUlt + 1]), split = !todos && (RZ.split || []).includes(ramo);
@@ -1382,14 +1396,14 @@ function explicaRfv(col, ramo, o = {}) {
   const hRes = textoMeses(huecosRfv(resid));
   return {
     'FRV': `RFV BRUTO en pesos / PRIMA 24M: lo que queda constituido por cada peso de prima de los últimos 24 meses${suma}. `
-      + (todos ? `Desde ${ini}, la de cada ramo con su tendencia (elige un ramo para verla)` : split
-        ? `Desde ${ini}, FRV residual con su tendencia (${tendRfv(ramo, 'frv')}) + RFV MA / PRIMA 24M; gris: el residual, sin la reserva por monto afianzado${hRes ? ` (sin dato en ${hRes}: el CSV del área no trae el monto afianzado de esos meses)` : ''}`
-        : `Desde ${ini}, desde el último real con su tendencia: ${tendRfv(ramo, 'frv')}`),
+      + (todos ? `Desde ${ini}, la de cada ramo ${conTendRfv('frv')} (elige un ramo para verla)` : split
+        ? `Desde ${ini}, FRV residual (${tendRfv(ramo, 'frv')}) + RFV MA / PRIMA 24M; gris: el residual, sin la reserva por monto afianzado${hRes ? ` (sin dato en ${hRes}: el CSV del área no trae el monto afianzado de esos meses)` : ''}`
+        : `Desde ${ini}, ${tendRfv(ramo, 'frv')}`),
     'PRIMA 24M (MXN)': `Suma de los últimos 24 meses de prima tomada (PExRamo, reforecast y FCST), millones de MXN${todos ? '; suma de los ramos' : ''}`,
-    'CESION': `IRR / BRUTO, en %${suma}; desde ${ini}, RC × FCR` + (todos ? ', con la tendencia de la cesión de cada ramo' : `, desde el último real con su tendencia: ${tendRfv(ramo, 'ces')}`),
+    'CESION': `IRR / BRUTO, en %${suma}; desde ${ini}, RC × FCR` + (todos ? `, con la cesión de cada ramo ${conTendRfv('ces')}` : `, ${tendRfv(ramo, 'ces')}`),
     'RC': `Proporción cedida con transferencia cierta = CESIÓN / FCR, en %${todos ? '; Todos = suma de IRR / suma de (BRUTO × FCR)' : ''}; gris: RC PRIMA, prima cedida / tomada desde ene-19 (informativa: el área la aplica contrato por contrato; sin dato desde sep-26 porque el reforecast no trae la cedida)`,
     'FV': `(RFV − RFV MA aparte) / (PR 24M + GA 24M), con PR = PRIMA 24M × FPR y GA = PR × %GA: factor residual (permanencia, facultativo y TC`
-      + (todos ? `; la RFV MA se resta en ${lista(RZ.split || [])}` : split ? ', sin la reserva por monto afianzado, que va aparte' : ', con la reserva por monto afianzado, que aquí es informativa')
+      + (todos ? ((RZ.split || []).length ? `; la RFV MA se resta en ${lista(RZ.split)}` : '') : split ? ', sin la reserva por monto afianzado, que va aparte' : ', con la reserva por monto afianzado, que aquí es informativa')
       + `)${todos ? '; Todos = suma de los numeradores / suma de (PR + GA), sin dato si a un ramo le falta su FV' : ''}; sin dato antes de ${isFinite(INI_FV) ? eti(P_Z[INI_FV]) : 'ene-26'} (no hay comisiones de Fianzas antes)`
       + (huecos ? `; en ${huecos}, sin dato porque el CSV del área no trae el monto afianzado de ${todos ? lista(RZ.split || []) : 'esos meses'}` + (sueltos ? ` (${sueltos} queda como punto suelto)` : '') : ''),
     'PD': todos
@@ -1400,7 +1414,7 @@ function explicaRfv(col, ramo, o = {}) {
             : o.fueraEscala === 'menor' ? `: va solo en la vista de tabla, porque baja a menos de un tercio de la PD del área y aplanaría la gráfica` : ', en gris') : ''),
     'MA (MXN)': `Monto afianzado del proporcional de México (CSV del área: ${maReal}${est ? `, estimado del área ${est}` : ''}; después, fijo en el último mes del CSV), millones de MXN${todos ? '; suma de los ramos' : split ? '' : '; en este ramo es informativo'}${sinCsv}`,
     'RFV MA / RFV BRUTO': `RFV MA = MA × (ω + α) entre la RFV BRUTO en pesos, en %`
-      + (todos ? `; suma de RFV MA / suma de RFV BRUTO: incluye la que va aparte (${lista(RZ.split || [])}) y la informativa (${lista(RAMOS_MA_INFO)}), que queda dentro de FV`
+      + (todos ? ((RZ.na || {}).MA && !(RZ.split || []).length && !RAMOS_MA_INFO.length ? '; suma de RFV MA / suma de RFV BRUTO' : `; suma de RFV MA / suma de RFV BRUTO: incluye la que va aparte (${lista(RZ.split || [])}) y la informativa (${lista(RAMOS_MA_INFO)}), que queda dentro de FV`)
         : split ? '; en este ramo va aparte' : '; en este ramo es informativa (queda dentro de FV)')
       + (est ? `; con el MA estimado del área ${est}` : '') + sinCsv,
   }[col] || '';
@@ -1429,8 +1443,8 @@ function tarjetasPrimaRfv(ramo, etiqRamo) {
     const serie = k => base.map(f => tipo(f) === k ? m(f['PT usada (MXN)']) : null);
     const noReal = ult['Parte no real de la PRIMA 24M'];
     out.push(tarjeta(`Prima tomada del mes (PT) por fuente · ${etiqRamo}`,
-      `Millones de MXN. Real de PExRamo hasta ${eti(D.ultimo)}; después, reforecast (el total de Fianzas del archivo repartido entre ramos) y FCST. `
-      + `La PRIMA 24M suma 24 meses de esta prima y la RFV se mueve casi en la misma proporción: a ${eti(ult.Periodo)}, ${noReal == null ? 's/d' : fmt(noReal * 100, 0) + ' %'} de la PRIMA 24M no es real`,
+      `Millones de MXN. Real de PExRamo hasta ${eti(base.filter(f => f['Real o proyeccion'] === 'real').map(f => f.Periodo).pop() || D.ultimo)}; después, reforecast (el total de Fianzas del archivo repartido entre ramos) y FCST. `
+      + `La PRIMA 24M suma 24 meses de esta prima y ${proporcionRfv(ramo)}: a ${eti(ult.Periodo)}, ${noReal == null ? 's/d' : fmt(noReal * 100, 0) + ' %'} de la PRIMA 24M no es real`,
       (cuerpo, W) => graficaColumnas(cuerpo, W, {
         categorias: per.map(eti), compartido: true, fmt: fm, cadaX: 3, tituloX: i => etiLarga(per[i]),
         aria: `Prima tomada del mes por fuente, ${etiqRamo}`,
@@ -1466,7 +1480,7 @@ function tarjetasPrimaRfv(ramo, etiqRamo) {
     const b0 = marcas.map(p => `${eti(p)}: ${fm(m((sens.find(f => f.Periodo === p) || {})['RFV BRUTO base (USD)']))} M USD`).join(', ');
     out.push(el('article', { class: 'tarjeta ancha' },
       el('header', {}, el('div', {}, el('h2', { text: 'Sensibilidad de la RFV a la prima · todos los ramos' }),
-        el('p', { class: 'sub', text: `RFV BRUTO de los ramos con RFV por prima si la prima que no es real cambia, o si la base fuera de otra ventana de meses (los mismos factores y tendencias). Base: ${b0}` }))),
+        el('p', { class: 'sub', text: `RFV BRUTO de los ramos con RFV por prima si la prima que no es real cambia (con los mismos factores y tendencias), o si la base fuera de otra ventana de meses (el FRV se vuelve a medir con esa prima y su tendencia se vuelve a ajustar; la cesión no cambia). Base: ${b0}` }))),
       el('div', { class: 'cuerpo' }, el('div', { class: 'tabla-envoltura', style: 'max-height:none' }, t))));
   }
   return out;
@@ -1486,9 +1500,10 @@ function pintarRfv() {
     kpi(`FRV proyección ${eti(D.p_dic)}`, f3(d), varPct(u, d) == null ? null : fmtPct(varPct(u, d)) + ' vs último real'),
     kpi(`FRV proyección ${eti(P_Z[zFin])}`, f3(f), varPct(u, f) == null ? null : fmtPct(varPct(u, f)) + ' vs último real'),
     kpi(`RFV por MA ${eti(D.ultimo)}`, part[zUlt] == null ? 's/d' : fmt(part[zUlt], 1) + ' %',
-      (todos ? (maAparteTodos(zUlt) == null ? `incluye la informativa de ${RAMOS_MA_INFO.join(' y ')}`
-        : `incluye la informativa de ${RAMOS_MA_INFO.join(' y ')}; aparte (${split.join(' y ')}): ${fmt(maAparteTodos(zUlt) * 100, 1)} %`)
-        : split.includes(ramo) ? 'va aparte en este ramo' : 'informativa en este ramo')
+      (todos ? (part[zUlt] == null && (RZ.na || {}).MA ? 'sin monto afianzado en esta corrida'
+        : [RAMOS_MA_INFO.length ? `incluye la informativa de ${RAMOS_MA_INFO.join(' y ')}` : '',
+           maAparteTodos(zUlt) == null ? '' : `aparte (${split.join(' y ')}): ${fmt(maAparteTodos(zUlt) * 100, 1)} %`].filter(Boolean).join('; '))
+        : (RZ.na || {}).MA && part[zUlt] == null ? 'sin monto afianzado en esta corrida' : split.includes(ramo) ? 'va aparte en este ramo' : 'informativa en este ramo')
       + (((RZ.ma_estimado || {})[ramo] || [])[zUlt] ? ' · MA estimado del área' : '')),
   );
   const rejilla = document.getElementById('rejilla-rfv'); rejilla.replaceChildren(); tarjetasVivas.length = 0;

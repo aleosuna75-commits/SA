@@ -482,7 +482,8 @@ def _leer_extra_rfv() -> dict:
     tend = {}
     for f in res:
         r = str(f.get("Ramo") or "")
-        if r and (f.get("FRV tendencia aplicada") or f.get("CESION tendencia aplicada")):
+        if r and any(f.get(c) for c in ("FRV tendencia aplicada", "CESION tendencia aplicada", "FRV modelo",
+                                         "CESION modelo")):
             tend[r] = {k: str(f.get(c) or "") for k, c in (("frv", "FRV tendencia aplicada"),
                                                             ("ces", "CESION tendencia aplicada"),
                                                             ("modelo_frv", "FRV modelo"), ("modelo_ces", "CESION modelo"),
@@ -493,6 +494,7 @@ def _leer_extra_rfv() -> dict:
         txt = next((v for v in vals if "N/A" in v), "")
         if not txt:
             continue
+        txt = re.sub(r"\s*\[carpeta de entradas: [^\]]*\]", "", txt)   # (la ruta local no va a los tableros)
         if any(v == "Monto afianzado" for v in vals) and "MA" not in na:
             na["MA"] = txt
         elif any(v in ("PD de Fianzas", "Base FIANZAS") for v in vals) and "PD" not in na:
@@ -599,13 +601,22 @@ def ref_en_escala(rz: dict, ramo: str, col: str = "PD", ref: str = "PD xDefault 
     return not a or not b or (max(b) <= ESCALA_REF_RFV * max(a) and min(b) >= min(a) / ESCALA_REF_RFV)
 
 
+def _motivo_corto(txt: str, n: int = 70) -> str:
+    """El motivo de un N/A de la consola (Alertas), corto para un renglon: lo que sigue a "N/A:" hasta el primer ";" o ":"."""
+    m = re.split(r"N/A:\s*", str(txt), maxsplit=1)[-1].split(";")[0].split(": ")[0].split(" [carpeta")[0].strip().rstrip(".")
+    return m if len(m) <= n else m[:n - 1].rstrip() + "…"
+
+
 def notas_ramo_rfv(rz: dict, ultimo: int) -> dict:
     """{ramo o "Todos": texto} sobre el monto afianzado del ramo en el ultimo mes real (lo lee el renglon 9 de la hoja
     de Razones RFV con el ramo elegido)."""
     split, info, i = rz["split"], ramos_ma_informativa(rz), rz["periodos"].index(ultimo)
+    na = rz.get("na") or {}
     out = {}
     for ramo in ["Todos"] + rz["ramos"]:
-        if ramo == "Todos":                          # (textos de un renglon: caben en D9:AG9)
+        if na.get("MA"):                             # (MA en N/A: el motivo corto; completo en Alertas y la consola)
+            t = f"{'Todos' if ramo == 'Todos' else f'Ramo {ramo}'}: MA en N/A ({_motivo_corto(na['MA'])}; ver Alertas)."
+        elif ramo == "Todos":                        # (textos de un renglon: caben en D9:AG9)
             x = parte_ma_aparte(rz, ultimo)
             t = (f"Todos: RFV por MA = aparte ({', '.join(split) or 'ninguno'}) + informativa "
                  f"({', '.join(info) or 'ninguno'}, dentro de FV)"
@@ -616,6 +627,8 @@ def notas_ramo_rfv(rz: dict, ultimo: int) -> dict:
             t = f"Ramo {ramo}: la RFV MA es informativa (queda dentro de FV)."
         else:
             t = f"Ramo {ramo}: sin monto afianzado en el CSV del área."
+        if na.get("PD"):
+            t += " PD en N/A (FCR = 1)."
         if (rz.get("ma_estimado") or {}).get(ramo, [False] * (i + 1))[i]:
             t += (f" MA de {etiqueta(ultimo)} estimado por el área (real hasta {etiqueta(rz['ma_real_hasta'])})."
                   if rz.get("ma_real_hasta") and ramo != "Todos" else f" MA de {etiqueta(ultimo)} estimado por el área.")
@@ -1706,8 +1719,10 @@ def _tablas_prima_rfv(ws, rz: dict, r0: int) -> None:
     num = (int, float)
     if bloques:
         caja(ws, f"D{r0}:AG{r0 + len(bloques) + 2}")
+        sp = list(rz.get("split") or [])
         ws.cell(r0, 4, "Prima no real contra su historia · todos los ramos (la RFV se mueve casi en la misma proporción "
-                       "que su PRIMA 24M)").font = fuente(11.5, True)
+                       "que su PRIMA 24M" + (f"; en {' y '.join(sp)}, solo la parte sin RFV MA" if sp else "")
+                       + ")").font = fuente(11.5, True)
         cols = ((4, 6, "Ramo"), (7, 11, "Bloque"), (12, 15, "PT (M MXN)"), (16, 19, "Contra año anterior"),
                 (20, 26, "Rango de esos meses en su historia"), (27, 29, "Fuera"), (30, 33, "Peso en la PRIMA 24M"))
         for c1, c2, t in cols:
