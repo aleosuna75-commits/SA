@@ -438,6 +438,7 @@ def leer_indicadores_ramo() -> dict | None:
 
 HOJA_RAZONES_RFV = "RFV_Razones"                 # hoja del diagnostico con las razones de la RFV de Fianzas
 HOJA_DASH_RFV = "Dashboard Razones RFV"          # seccion de las razones de la RFV (en el HTML, la pestaña "Razones RFV")
+FILAS_HOJA_RFV = 150                             # renglones de esa hoja (graficas, factores y prima base)
 # (columna de la hoja, titulo, unidad, serie de referencia en gris o None)
 # (titulos cortos: en Excel los paneles de media hoja caben unos 55 caracteres con " · todos los ramos" y la unidad;
 # el orden fija la rejilla: el primero y el ultimo a todo lo ancho, los demas por pares)
@@ -454,6 +455,57 @@ INDICADORES_RFV = [
 COL_BDREAL_RFV = "Meses de BDReal (%SEG PR y %COM PR)"
 ESCALA_REF_RFV = 3      # la serie gris sale de la grafica (queda en la tabla) si su rango es mas de 3 veces el de la serie
 FACTORES_RFV_TABLA = ("%SEG PR", "%COM PR", "%CARGAS", "FPR", "%GA", "OMEGA", "ALFA", "FCR")
+
+
+def _filas_hoja(wb, hoja: str) -> list:
+    """Renglones de una hoja del diagnostico como dicts (encabezado en el renglon 1); [] si no esta."""
+    if hoja not in wb.sheetnames:
+        return []
+    filas = wb[hoja].iter_rows(values_only=True)
+    enc = [str(h) if h is not None else "" for h in next(filas, ())]
+    return [dict(zip(enc, f)) for f in filas if f and any(v is not None for v in f)]
+
+
+def _leer_extra_rfv() -> dict:
+    """Del diagnostico, para la seccion de Razones RFV: la tendencia que se aplico al FRV y a la CESION de cada ramo
+    (RFV_Prima_Resumen), el motivo de un N/A del monto afianzado o de la PD (Alertas) y la prima base (RFV_Prima_Base,
+    RFV_Prima_Bloques y RFV_Prima_Sensibilidad)."""
+    wb = openpyxl.load_workbook(ARCHIVO_DIAGNOSTICO, read_only=True, data_only=True)
+    try:
+        res = _filas_hoja(wb, "RFV_Prima_Resumen")
+        alertas = [f for f in _filas_hoja(wb, "Alertas")]
+        base = _filas_hoja(wb, "RFV_Prima_Base")
+        bloques = _filas_hoja(wb, "RFV_Prima_Bloques")
+        sens = _filas_hoja(wb, "RFV_Prima_Sensibilidad")
+    finally:
+        wb.close()
+    tend = {}
+    for f in res:
+        r = str(f.get("Ramo") or "")
+        if r and (f.get("FRV tendencia aplicada") or f.get("CESION tendencia aplicada")):
+            tend[r] = {k: str(f.get(c) or "") for k, c in (("frv", "FRV tendencia aplicada"),
+                                                            ("ces", "CESION tendencia aplicada"),
+                                                            ("modelo_frv", "FRV modelo"), ("modelo_ces", "CESION modelo"),
+                                                            ("proyecta", "El modelo proyecta"))}
+    na = {}
+    for f in alertas:
+        vals = [str(v) for v in f.values() if v is not None]
+        txt = next((v for v in vals if "N/A" in v), "")
+        if not txt:
+            continue
+        if any(v == "Monto afianzado" for v in vals) and "MA" not in na:
+            na["MA"] = txt
+        elif any(v in ("PD de Fianzas", "Base FIANZAS") for v in vals) and "PD" not in na:
+            na["PD"] = txt
+    num = (int, float)
+    prima = {"base": [{k: (round(v, 6) if isinstance(v, float) else v) for k, v in f.items()
+                       if k in ("Ramo", "Periodo", "Real o proyeccion", "Fuente", "PT usada (MXN)",
+                                "PT mismo mes ano anterior (MXN)", "Crecimiento contra el mismo mes", "PRIMA 24M (MXN)",
+                                "Parte no real de la PRIMA 24M")} for f in base],
+             "bloques": [{k: v for k, v in f.items() if isinstance(v, num + (str,))} for f in bloques],
+             "sens": [{k: v for k, v in f.items() if isinstance(v, num + (str,)) and not k.startswith("RFV BRUTO 1")}
+                      for f in sens]}
+    return {"tendencia": tend, "na": na, "prima": prima}
 
 
 def leer_razones_rfv() -> dict | None:
@@ -511,8 +563,9 @@ def leer_razones_rfv() -> dict | None:
     con_xd = [i for d in datos.values() for i, v in enumerate(d["PD xDefault 24 meses"]) if v is not None]
     bdreal = next((str(r.get(COL_BDREAL_RFV)) for r in crudos if str(r.get(COL_BDREAL_RFV) or "-") != "-"), "")
     bdreal = re.sub(r"\b(\d{6})\b", lambda m: etiqueta(int(m.group(1))), bdreal)     # "202601 a 202607" -> "ene-26 a jul-26"
+    extra = _leer_extra_rfv()
     return {"periodos": periodos, "ramos": ramos, "datos": datos, "origen_ma": origen, "split": sorted(split),
-            "pd_medida": pd_medida,
+            "pd_medida": pd_medida, **extra,
             "factores": factores, "ramos_todos": ramos_todos, "ultimo_real": p_ult, "renglones": len(crudos),
             "hay_real": any(real), "ma_estimado": ma_est, "ma_real_hasta": max(ma_real, default=0),
             "ma_huecos": sorted(huecos), "xdefault_hasta": periodos[max(con_xd)] if con_xd else 0, "bdreal": bdreal,
@@ -1225,7 +1278,7 @@ def generar(ruta_salida: Path = SALIDA_DASHBOARD) -> Path:
     # ------------------------------------------------------------ analisis (valores)
     construir_analisis(wa, registros_i, ramos_i, registros_m, ultimo, p_dic_actual, fin, fin_m, p_12, metodo)
     for hoja, area in ((wd_i, "A1:AH47"), (wd_r, "A1:AH47"), *([(wd_p, "A1:AH124")] if wd_p else []),
-                       *([(wd_rz, "A1:AH124")] if wd_rz else []), (wa, None)):
+                       *([(wd_rz, f"A1:AH{FILAS_HOJA_RFV}")] if wd_rz else []), (wa, None)):
         hoja.sheet_properties.tabColor = "8EA9DB"
         hoja.page_setup.orientation = "landscape"
         hoja.page_setup.paperSize = hoja.PAPERSIZE_LETTER
@@ -1237,11 +1290,11 @@ def generar(ruta_salida: Path = SALIDA_DASHBOARD) -> Path:
         hoja.page_margins.top = hoja.page_margins.bottom = 0.4
         if area:
             hoja.print_area = area
-    for hoja in (wd_p, wd_rz):                 # Razones y Razones RFV: tres hojas carta con cortes entre paneles
-        if hoja is not None:                   # (sin partir graficas)
+    for hoja in (wd_p, wd_rz):                 # Razones y Razones RFV: hojas carta con cortes entre paneles
+        if hoja is not None:                   # (sin partir graficas; la RFV con una cuarta de prima base)
             hoja.sheet_properties.pageSetUpPr.fitToPage = False
             hoja.page_setup.scale = 62
-            for fila in (46, 84):
+            for fila in (46, 84) + ((116,) if hoja is wd_rz else ()):
                 hoja.row_breaks.append(Break(id=fila))
     wd_i.sheet_view.tabSelected = True
     wb.active = 0
@@ -1461,7 +1514,7 @@ def construir_razones_rfv(ws, wbd, wcr, rz: dict, ultimo: int, p_dic: int, nombr
     rango_de = {c_: f"RF_{col_bd[c_] - 4}" for c_ in todas}
 
     # ---- hoja
-    preparar_hoja(ws, filas=124)
+    preparar_hoja(ws, filas=FILAS_HOJA_RFV)
     caja(ws, "B2:B46")
     ws["B3"] = "◆ ÍNDICES Y RESERVAS"
     ws["B3"].font = fuente(13, True)
@@ -1481,7 +1534,7 @@ def construir_razones_rfv(ws, wbd, wcr, rz: dict, ultimo: int, p_dic: int, nombr
              "Gris: FRV residual, RC PRIMA y PD de xDefault (fuera de la gráfica si es más de "
              f"{ESCALA_REF_RFV} veces mayor o menor que la PD). PD de un ramo: azul = medida en Res_Rvas, naranja = la última "
              "medida, fija.", "",
-             "#N/D = sin dato: FV antes de 2026"
+             f"#N/D = sin dato: FV antes de {etiqueta(periodos[min(con_fv)]) if con_fv else 'ene-26'}"
              + (f"; MA, RFV MA y FRV residual en {huecos} (el CSV no los trae" + (f"; por eso tampoco hay FV de {split} ni de "
                 f"Todos en {texto_meses(fv_h)})" if fv_h else ")") if huecos else "")
              + (f"; PD de xDefault después de {etiqueta(rz['xdefault_hasta'])}" if rz.get("xdefault_hasta") else "")
@@ -1630,6 +1683,73 @@ def construir_razones_rfv(ws, wbd, wcr, rz: dict, ultimo: int, p_dic: int, nombr
             c.number_format = "0.000%" if fac == "FCR" else "0.00%"
             c.font = fuente(10)
             c.alignment = Alignment(horizontal="right", indent=1)
+    _tablas_prima_rfv(ws, rz, f0 + len(FACTORES_RFV_TABLA) + 5)
+
+
+def _celda_bloque(ws, fila: int, c1: int, c2: int, valor, fmt=None, negrita=False, derecha=False, color=TEXTO):
+    """Valor en un bloque combinado de columnas (la rejilla es angosta: un numero en una sola columna sale ###)."""
+    if c2 > c1:
+        ws.merge_cells(start_row=fila, start_column=c1, end_row=fila, end_column=c2)
+    c = ws.cell(fila, c1, valor)
+    c.font = fuente(9.5 if negrita else 10, negrita, color)
+    c.alignment = Alignment(horizontal="right" if derecha else "left", indent=1, vertical="center", wrap_text=False)
+    if fmt:
+        c.number_format = fmt
+    return c
+
+
+def _tablas_prima_rfv(ws, rz: dict, r0: int) -> None:
+    """Hoja HOJA_DASH_RFV, debajo de los factores: la prima no real contra su historia (RFV_Prima_Bloques) y la
+    sensibilidad de la RFV a la prima (RFV_Prima_Sensibilidad), para todos los ramos (no dependen del selector)."""
+    pr = rz.get("prima") or {}
+    bloques, sens = pr.get("bloques") or [], pr.get("sens") or []
+    num = (int, float)
+    if bloques:
+        caja(ws, f"D{r0}:AG{r0 + len(bloques) + 2}")
+        ws.cell(r0, 4, "Prima no real contra su historia · todos los ramos (la RFV se mueve casi en la misma proporción "
+                       "que su PRIMA 24M)").font = fuente(11.5, True)
+        cols = ((4, 6, "Ramo"), (7, 11, "Bloque"), (12, 15, "PT (M MXN)"), (16, 19, "Contra año anterior"),
+                (20, 26, "Rango de esos meses en su historia"), (27, 29, "Fuera"), (30, 33, "Peso en la PRIMA 24M"))
+        for c1, c2, t in cols:
+            _celda_bloque(ws, r0 + 1, c1, c2, t, negrita=True, color=TEXTO_2, derecha=c1 >= 12)
+        for i, f in enumerate(bloques, start=r0 + 2):
+            g, lo, hi = (f.get(k) for k in ("Crecimiento contra el ano anterior", "Crecimiento minimo de esos meses (historia)",
+                                            "Crecimiento maximo de esos meses (historia)"))
+            rango = (f"{lo:+.1%} a {hi:+.1%} ({f.get('Anos de historia')} años)"
+                     if isinstance(lo, num) and isinstance(hi, num) else "s/d")
+            _celda_bloque(ws, i, 4, 6, str(f.get("Ramo")))
+            _celda_bloque(ws, i, 7, 11, f.get("Bloque"))
+            _celda_bloque(ws, i, 12, 15, (f.get("PT usada (MXN)") or 0) / 1e6, "#,##0.0", derecha=True)
+            _celda_bloque(ws, i, 16, 19, g if isinstance(g, num) else "s/d", "+0.0%;-0.0%;0.0%", derecha=True)
+            _celda_bloque(ws, i, 20, 26, rango, derecha=True)
+            fuera = f.get("Fuera del rango historico") == "si"
+            _celda_bloque(ws, i, 27, 29, "sí" if fuera else "no", derecha=True, negrita=fuera,
+                          color="B4541F" if fuera else TEXTO)
+            pz = f.get("Peso del bloque en la PRIMA 24M del ramo")
+            _celda_bloque(ws, i, 30, 33, pz if isinstance(pz, num) else "s/d", "0%", derecha=True)
+        r0 += len(bloques) + 4
+    if sens:
+        marcas = sorted({f["Periodo"] for f in sens})[-2:]
+        claves = list(dict.fromkeys((f["Cambio"], f["Valor"]) for f in sens))
+        caja(ws, f"D{r0}:AG{r0 + len(claves) + 2}")
+        b0 = ", ".join(f"{etiqueta(p)}: {next(f['RFV BRUTO base (USD)'] for f in sens if f['Periodo'] == p) / 1e6:,.1f} "
+                       "M USD" for p in marcas)
+        ws.cell(r0, 4, f"Sensibilidad de la RFV BRUTO a la prima · todos los ramos (base {b0})").font = fuente(11.5, True)
+        _celda_bloque(ws, r0 + 1, 4, 13, "Cambio", negrita=True, color=TEXTO_2)
+        _celda_bloque(ws, r0 + 1, 14, 16, "Valor", negrita=True, color=TEXTO_2, derecha=True)
+        for k, p in enumerate(marcas):
+            _celda_bloque(ws, r0 + 1, 17 + 8 * k, 21 + 8 * k, f"RFV BRUTO {etiqueta(p)} (M USD)", negrita=True,
+                          color=TEXTO_2, derecha=True)
+            _celda_bloque(ws, r0 + 1, 22 + 8 * k, 24 + 8 * k, "Cambio", negrita=True, color=TEXTO_2, derecha=True)
+        for i, (cb, v) in enumerate(claves, start=r0 + 2):
+            _celda_bloque(ws, i, 4, 13, cb)
+            _celda_bloque(ws, i, 14, 16, v, derecha=True)
+            for k, p in enumerate(marcas):
+                f = next((x for x in sens if (x["Cambio"], x["Valor"], x["Periodo"]) == (cb, v, p)), {})
+                _celda_bloque(ws, i, 17 + 8 * k, 21 + 8 * k, (f.get("RFV BRUTO con el cambio (USD)") or 0) / 1e6,
+                              "#,##0.0", derecha=True)
+                _celda_bloque(ws, i, 22 + 8 * k, 24 + 8 * k, f.get("Cambio % RFV BRUTO"), "+0.0%;-0.0%;0.0%",
+                              derecha=True)
 
 
 def clasificar(wb) -> None:

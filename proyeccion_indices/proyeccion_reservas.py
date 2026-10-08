@@ -124,6 +124,7 @@ import itertools  # noqa: E402
 import json  # noqa: E402
 import re  # noqa: E402
 import time  # noqa: E402
+import unicodedata  # noqa: E402
 import warnings  # noqa: E402
 from concurrent.futures import ProcessPoolExecutor  # noqa: E402
 from copy import copy  # noqa: E402
@@ -162,7 +163,7 @@ except Exception as _e:  # noqa: BLE001
 # =============================================================================
 CARPETA = Path(__file__).resolve().parent
 ENTRADAS = CARPETA / "entradas"
-VERSION_CODIGO = "2026-10-08f"   # version de los scripts: sale en la consola, en la hoja Resumen del diagnostico, en el pie
+VERSION_CODIGO = "2026-10-08g"   # version de los scripts: sale en la consola, en la hoja Resumen del diagnostico, en el pie
                                  # del tablero HTML y en la hoja Dashboard Razones del Excel, para saber con que version se corrio
 SALIDAS = CARPETA / "salidas"
 
@@ -221,6 +222,9 @@ MODELO_POR_TIPO = {
                                       # anclado al ultimo real; "Tendencia historica" = la pendiente combinada
     "factor_log": "Tendencia historica",   # FACTOR GTO y FACTOR MR del BEL por FND: igual que el FND (en logaritmos)
     "factor": "Tendencia historica",  # (sin uso hoy) pendiente combinada en niveles, puntos por mes; p. ej. la CESION
+    "rfv": "Tendencia historica",     # factores de la RFV por prima (FRV, FRV residual y CESION): TENDENCIA_RFV, en niveles
+    "rfv_log": "Tendencia historica", # idem en logaritmos (crecimiento % mensual)
+    "ultimo": "Ultimo valor",         # repetir el ultimo real (referencia del backtest de la RFV)
 }
 MESES_TENDENCIA = 36             # ventana de la tendencia historica (None = toda la historia). Con toda la historia
                                  # entran arranques desde cero y cambios de regimen (ramo 80 SONR, Hidro) que
@@ -315,7 +319,7 @@ ANCLAR_SERIES = set()            # series (Serie, Ramo) de indices que se dejan 
 #       quedaban planas 31 de 75 series: cuando una razon dio la vuelta dentro de la ventana (cesion RRC 40: 21 % -> 41 %
 #       en ene-25 -> 28.6 % en ago-26) el R2 vale casi 0 y la proyeccion era una linea recta en el ultimo real.
 CREDIBILIDAD_PENDIENTE = {"nivel": 1.0, "indice": "r2", "lag": 1.0, "fnd": "combinada", "factor_log": "combinada",
-                          "factor": "combinada"}
+                          "factor": "combinada", "rfv": "rfv", "rfv_log": "rfv"}
 # Pendiente "combinada" del FND, FACTOR GTO, FACTOR MR y CESION (sobre la serie sin el patron del mes, en la escala del
 # modelo: logaritmos en FND, GTO y MR, puntos en la CESION):
 #   1. Rectas de los ultimos 24 y 36 meses con Theil-Sen (mediana de las pendientes entre todos los pares de meses: un
@@ -384,6 +388,29 @@ PENDIENTE_COMBINADA = {
     "meses_tope": 16,
     "min_obs": 6,                       # menos observaciones: sin pendiente
 }
+# Tendencia de los factores de la RFV por prima (solo Fianzas: tipos "rfv" y "rfv_log"; Danos no la usa): la misma regla
+# de la pendiente combinada que usan los factores de Danos (PENDIENTE_COMBINADA), ajustada a la historia corta de la RFV
+# (unos 20 meses) y con los saltos tratados como cambios de nivel:
+#   1. Saltos: un cambio mensual de mas de k_salto veces la MAD de los cambios de la ventana es un cambio de nivel (un
+#      contrato que entra o sale, un mes atipico), no tendencia: se quita del calculo de la pendiente (la serie se
+#      "pega" en ese mes). Si un salto cae en los ultimos meses_salto_reciente meses, el nuevo nivel no esta confirmado:
+#      la pendiente se proyecta por credibilidad_salto_reciente (la mitad) y hay alerta.
+#   2. Recta larga: Theil-Sen de los ultimos `ventana` meses (hasta 24; la RFV trae menos), con su t corregida por la
+#      autocorrelacion (AR(1)). Clara si |t| >= t_clara.
+#   3. Confirmacion: la recta de los ultimos ventana_meseta (12) meses en la misma direccion con t >= t_meseta.
+#      Clara y confirmada: la pendiente completa. Si no (meseta, o sin tendencia clara): la mitad (como el promedio de
+#      plano y recta de Danos).
+#   4. Desde el ultimo real, amortiguada (amortiguacion por mes: a 16 meses recorre 10.6 meses de pendiente) y con tope
+#      (rango historico ampliado tope_rango veces a meses_tope meses); min_obs meses o menos: sin pendiente.
+# TENDENCIA_RFV cambia parametros por serie ("FRV", "CESION") o por serie y ramo ("FRV|150"), p. ej.
+# {"FRV|150": {"k_salto": None}} (sin guardia de saltos en el 150) o {"CESION": {"ventana": 12}}. Con "metodo": "recta"
+# y "credibilidad" ("t": min(1, |t| / t_clara); un numero: esa proporcion) se proyecta una sola recta.
+TENDENCIA_RFV_BASE = {
+    "metodo": "combinada", "ventana": 24, "ventana_meseta": 12, "estimador": "theil", "t_clara": 2.5, "t_meseta": 1.0,
+    "credibilidad": "t", "k_salto": 5.0, "meses_salto_reciente": 3, "credibilidad_salto_reciente": 0.5,
+    "amortiguacion": 0.95, "tope_rango": 0.5, "meses_tope": 16, "min_obs": 12,
+}
+TENDENCIA_RFV = {}
 # Cotas de los modelos de suavizamiento exponencial (si se eligen), estimadas por maxima verosimilitud dentro de
 # ellas: alpha ~ 1 (arranca del ultimo dato real), beta <= 0.15 (tendencia de los ultimos anos, no del ultimo mes),
 # phi entre 0.80 y 0.98. RCONT (Holt-Winters trimestral) suaviza el nivel (alpha >= 0.2) para separar la
@@ -700,12 +727,34 @@ MIN_REAL_BACKTESTING = 1e5       # USD: con un real menor a esto (promedio por m
 # SAP) fue la ventana que menos fallo en la RFV BRUTO total: 1.5 % de error medio con 24 meses contra 3.0 % con 12,
 # 3.6 % con 36, 3.4 % con 48 y 3.9 % con 60 (repetir la RFV BRUTO sin prima: 10.3 %); con la historia a 202602, 2.4 %
 # contra 4.9 % o mas. SES y repetir el ultimo FRV quedan parejos (1.5 % contra 1.4 %; 2.4 % contra 2.7 %); la tendencia
-# (Holt amortiguado) falla mas (2.1 % y 3.6 %).
+# (Holt amortiguado) falla mas (2.1 % y 3.6 %). Verificado de nuevo (2026-10-08, con los factores y el MA aparte en 140
+# y 170, seis cortes de 202512 a 202605 y los meses hasta 202608): 24 meses 1.9 % en la RFV BRUTO total contra 4.3 % con
+# 12, 3.3 % con 18, 2.6 % con 30, 4.4 % con 36, 4.2 % con 48 y 4.5 % con 60; pesos triangulares (24 a 72 meses) 2.8 a
+# 3.9 %, exponenciales (tau 6 a 36 meses) 3.1 a 3.6 %, la ventana de 24 desfasada 1 a 6 meses 2.1 a 2.9 %; por ramo, 24
+# meses es la mejor en 160 (2.2 %); en 140 y 170 ninguna gana por mas de 0.2 puntos y en 150 (chico y de prima irregular)
+# alguna gana hasta 2.5 puntos (30 meses desfasada 3: 8.4 % contra 10.9 %) pero empeora el 160. La PRIMA vigente del
+# area (Res_Rvas, 202501 a 202509) es 2.0 a 2.1 veces la PRIMA 24M en 160 (en nivel, unos 54 meses de prima) y su forma
+# no distingue entre ventanas de 24 a 72 meses; pesos libres por bloque de 12 meses (minimos cuadrados no negativos al
+# corte) dan 1.6 % con dos bloques pero pesos inestables (0.29 al ano reciente y 1.04 al anterior en 160) y peor con mas.
 USAR_RFV_POR_PRIMA = True
 RAMOS_RFV_POR_PRIMA = None       # None = todos los ramos con prima y RFV; o una tupla, p. ej. ("140", "160", "170"): los demas
                                  # siguen con el modelo de la serie (sin formula)
 MESES_PRIMA_RFV = 24             # meses de prima tomada de la PRIMA 24M (si cambia, cambia el encabezado del bloque)
-TIPO_MODELO_FRV = "razon"        # "razon" = nivel suavizado sin tendencia (SES); "fnd" = Holt amortiguado con guardia
+TIPO_MODELO_FRV = "rfv"          # FRV (y FRV residual de 140 y 170): "rfv" = la tendencia de los factores de la RFV
+                                 # (TENDENCIA_RFV_BASE: pendiente combinada sin los saltos, desde el ultimo real); "razon"
+                                 # = nivel suavizado sin tendencia (SES, hasta la version 2026-10-08f); "ultimo" = repetir
+                                 # el ultimo real; "fnd" = Holt amortiguado con guardia
+TIPO_MODELO_CESION_RFV = "rfv"   # CESION (IRR / BRUTO) de la RFV, solo Fianzas: la misma tendencia; Danos sigue con
+                                 # TIPO_MODELO_FACTORES["CESION"] ("razon")
+TIPO_MODELO_FRV_USD = "razon"    # serie del FRV en dolares de la sensibilidad a la moneda: sin tendencia (con tendencia
+                                 # extrapolaria la apreciacion del peso de 2025-26, que no es un factor de la reserva)
+                                 # Backtest de origen movil de "rfv" (cortes 202512 a 202605, meses de prueba hasta 202608,
+                                 # prima y TC reales; 132 ramo-mes por metodo): error de la RFV BRUTO total 3.3 % (sesgo
+                                 # -3.2 %) contra 1.9 % con SES y 2.0 % repitiendo el ultimo real; por ramo, 140 3.6 % (SES
+                                 # 2.9), 150 10.0 % (10.9), 160 2.9 % (2.2), 170 1.4 % (1.4); IRR total 3.3 % (2.1) y NETO
+                                 # 3.3 % (2.0). La tendencia no mejora el backtest: la baja del FRV del 160 de 2025 (0.66 a
+                                 # 0.60) se detuvo en 2026 (recta de 12 meses t -0.9), y el backtest solo prueba 2026. Se
+                                 # usa porque el area pide seguir las tendencias; "razon" o "ultimo" las quitan
 MIN_MESES_FRV = 12               # meses minimos de FRV real para proyectarlo
 HOJA_PT_RAMO = "PT_RAMO"         # hoja de la BD de RFV con la prima tomada del mes por ramo (MXN) y su suma de 24 meses
 # Factores de la metodologia del area (Resumen de la metodologia de Reservas de Fianzas en Vigor y script de FCST de
@@ -741,7 +790,15 @@ PD_FIANZAS = {}                  # PD de la proyeccion por ramo (Anexo 8.20.2 de
 # (ningun insumo trae MA de 2027; supuesto declarado; en PT_RAMO esos meses van ligados al ultimo, como sensibilidad).
 MA_RFV = True
 MA_RFV_RAMOS = ("140", "170")
-PATRON_MONTOS_AFIANZADOS = "MontosAfianzados*.csv"   # en entradas/ (no toma Proy_MontosAfianzados.csv)
+PATRON_MONTOS_AFIANZADOS = "MontosAfianzados*.csv"   # en entradas/ (no toma Proy_MontosAfianzados.csv); el nombre se
+                                 # compara sin mayusculas, espacios ni signos (buscar_insumo)
+SUBCARPETAS_ENTRADAS = True      # los CSV del area de Fianzas (MontosAfianzados, xDefault, xVigMaxProp, xComUtil) se
+                                 # buscan tambien en las subcarpetas de entradas/ (p. ej. entradas/Inputs/) cuando en
+                                 # entradas/ mismo no hay ninguno, con un AVISO para moverlos (sin carpetas de respaldo:
+                                 # CARPETAS_RESPALDO). Los Res_Rvas NO: Danos (SONR 80, TC real) solo los busca en
+                                 # entradas/, y la PD de Fianzas usa los mismos; si estan en una subcarpeta, AVISO
+CARPETAS_RESPALDO = ("anterior", "respaldo", "backup", "old", "copia", "bak", "viejo", "historico")
+                                 # subcarpetas (o nombres) de entradas/ que no se toman como insumo de Fianzas
 OMEGA_FIANZAS = {"130": 0.0147, "140": 0.0147, "150": 0.0079, "160": 0.0023, "170": 0.0081}
                                  # omega: indice de reclamaciones del mercado (Omega del script del area)
 ALFA_FIANZAS = {"130": 0.0103, "140": 0.0103, "150": 0.003, "160": 0.0009, "170": 0.0018}
@@ -755,12 +812,40 @@ COM_UTILIDAD_FIANZAS = {"160": 0.0668602076612849, "170": 0.0359763798998371}
                                  # %ComUti del script del area (Id Uti = 1 y sin pagar): se mide y se reporta; no entra
                                  # al FPR (40 % de la prima del 160 son contratos nuevos sin bandera: el medido es un piso)
 ESCENARIOS_FIANZAS_AREA = (2,)   # escenarios de la hoja Base FIANZAS de los Res_Rvas (2 = metodo del area)
+COLUMNAS_BASE_FIANZAS = {"Reserva": ("Reserva",), "Escenario": ("Escenario",),
+                         "Tipo Monto": ("Tipo Monto", "Tipo de Monto"), "Ramo": ("Ramo",), "Periodo": ("Periodo",),
+                         "Monto": ("Monto", "Monto MXN")}
+                                 # encabezados de la hoja Base FIANZAS de los Res_Rvas y sus alias (se comparan sin
+                                 # mayusculas, acentos, espacios ni signos: "PERIODO", "Período", "Tipo_Monto")
 TOLERANCIA_AREA_SAP = 0.10       # la PD de un mes solo se mide si la RVABRUTA del area queda a menos de 10 % de la RFV
                                  # BRUTO de SAP (en ago y sep-25 el area se aparta de SAP)
 RAMO_FCST_FIANZAS = {"130": "130", "140": "140", "150": "150", "160": "160", "170": "170"}
                                  # Ramo2 de CtaMens del FCST -> ramo de la BD de RFV (la prima del ano siguiente)
 RAMO_RFCST_FIANZAS = "130"       # RAMO del reforecast por mes (RCST_FA) con toda la prima de Fianzas: se reparte entre los
-                                 # ramos de la BD de RFV con la mezcla de PExRamo de los ultimos 12 meses
+                                 # ramos de la BD de RFV con la mezcla de PExRamo (MEZCLA_REFORECAST_FIANZAS)
+MEZCLA_REFORECAST_FIANZAS = "mismos meses"
+                                 # reparto del RAMO 130 del reforecast entre los ramos: "mismos meses" = la mezcla de PExRamo
+                                 # de los mismos meses de los MEZCLA_REFORECAST_ANIOS anos anteriores (sep-dic de 2023 a 2025
+                                 # para sep-dic 2026); "12 meses" = la de los ultimos 12 meses (hasta la version 2026-10-08f).
+                                 # Contra lo real de sep-dic de 2022 a 2025 (los mismos 4 anos para todas), el error medio del
+                                 # reparto fue (M MXN, 150 / 160): 12 meses 9.6 / 9.9 (siempre de menos en el 150 y de mas en
+                                 # el 160); mismos meses de 1 ano 5.4 / 5.3; de 2 anos 4.3 / 4.9; de 3 anos 3.7 / 3.8
+MEZCLA_REFORECAST_ANIOS = 3      # anos de los mismos meses para la mezcla del reforecast (los que haya, hasta este numero)
+ANIOS_RANGO_PRIMA = 5            # control de la prima de Fianzas de los meses sin real: el crecimiento de cada bloque
+                                 # (reforecast o un ano del FCST) por ramo contra los mismos meses del ano anterior se compara
+                                 # con el rango de crecimientos de esos mismos meses en los ANIOS_RANGO_PRIMA anos anteriores
+                                 # con dato real; fuera del rango hay AVISO (la RFV del ramo se mueve casi en la misma
+                                 # proporcion que su PRIMA 24M)
+AJUSTE_PRIMA_FIANZAS = {}        # factor sobre la PT de Fianzas de los meses sin real (sensibilidad o indicacion del area):
+                                 # {ano: factor} o {(ramo, ano): factor}, p. ej. {("160", 2027): 1.10}; el de (ramo, ano)
+                                 # manda; la cedida se ajusta con la misma razon
+SENSIBILIDAD_PRIMA_RFV = (0.8, 0.9, 1.1, 1.2)   # factores sobre la PT del reforecast y del FCST para la sensibilidad
+                                 # de la RFV (hoja RFV_Prima_Sensibilidad; el presupuesto 2026 del area quedo 26 % abajo de
+                                 # lo real de ene-ago 2026)
+SENSIBILIDAD_VENTANA_RFV = (36, 48)   # ventanas de prima (meses) para la sensibilidad: la reserva sigue a la prima de los
+                                 # contratos vigentes, que el area mide en unos 2 veces la PRIMA 24M
+TOLERANCIA_PT_BDREAL = 0.005     # aviso si la PT de PExRamo se aparta mas de 0.5 % de PrimasNal de la base del real por
+                                 # contrato (BD_Real / BDReal) en un mes y ramo que traigan las dos
 CUENTA_PE_FCST = "61"            # cuenta de prima tomada en CtaMens (la que suma ER_ram)
 CUENTA_COM_FCST = "53"           # cuenta de comisiones en CtaMens (hoja Valores del FCST: Comisiones 5310...); Fianzas
 RAMO_FCST_A_BD = {"10": "10", "31": "30", "35": "34", "39": "37", "40": "40", "46": "40", "50": "50", "60": "60",
@@ -969,11 +1054,11 @@ def _recta_robusta(w, estimador: str = "theil"):
     return b, float(t_est)
 
 
-def pendiente_combinada(d, z, nombre: str = ""):
+def pendiente_combinada(d, z, nombre: str = "", P: dict | None = None):
     """Pendiente mensual (escala del modelo, sin amortiguar ni topar) del FND y los factores del BEL por FND
     (PENDIENTE_COMBINADA) y el detalle: d = serie sin el patron del mes, z = serie en la escala del modelo con el patron
-    (para la regla de salto: un mes que solo se aparta del patron no es salto)."""
-    P = PENDIENTE_COMBINADA
+    (para la regla de salto: un mes que solo se aparta del patron no es salto). P: otros parametros (TENDENCIA_RFV)."""
+    P = PENDIENTE_COMBINADA if P is None else P
     d = np.asarray(d, dtype=float)
     det = {"regla_pendiente": "", "clara": False, "meseta": False, "salto": False}
     if len(d) < P["min_obs"]:
@@ -1134,6 +1219,94 @@ def _tendencia_combinada(z, d, h: int, estacional_fut, est, ancla_meses: int, no
     return pron, pron - ancho, pron + ancho, params, float(b)
 
 
+def texto_modelo_rfv(tipo: str) -> str:
+    """Texto del modelo de un factor de la RFV por prima (FRV, CESION) para la BD, el diagnostico y los tableros."""
+    if tipo in ("rfv", "rfv_log"):
+        P = TENDENCIA_RFV_BASE
+        if P["metodo"] == "combinada":
+            t = ("tendencia" + (" en logaritmos" if tipo == "rfv_log" else "") + " desde el ultimo real: recta "
+                 f"Theil-Sen de hasta {P['ventana']} meses sin los saltos (cambios de mas de {P['k_salto']:g} MAD), "
+                 f"completa si es clara (|t| >= {P['t_clara']:g}) y la confirman los ultimos {P['ventana_meseta']} meses, "
+                 f"la mitad si no; la mitad otra vez tras un salto en los ultimos {P['meses_salto_reciente']} meses; "
+                 f"amortiguada {P['amortiguacion']:g} por mes y con tope de rango")
+        else:
+            t = f"tendencia desde el ultimo real: recta Theil-Sen de {P['ventana']} meses por su credibilidad"
+        return t + (" (TENDENCIA_RFV cambia parametros por serie o ramo)" if TENDENCIA_RFV else "")
+    return {"razon": "nivel suavizado sin tendencia (SES)", "ultimo": "ultimo real, sin tendencia"}.get(
+        tipo, MODELO_POR_TIPO.get(tipo, tipo))
+
+
+def _param_rfv(nombre: str) -> dict:
+    """Parametros de la tendencia de un factor de la RFV: TENDENCIA_RFV_BASE, encima los de la serie ("FRV", "CESION")
+    y encima los de la serie y el ramo ("FRV|150"). nombre = "serie|ramo" (la serie FRV USD toma los del FRV)."""
+    serie, _, ramo = nombre.replace(" USD", "").partition("|")
+    return {**TENDENCIA_RFV_BASE, **(TENDENCIA_RFV.get(serie) or {}), **(TENDENCIA_RFV.get(f"{serie}|{ramo}") or {})}
+
+
+def pendiente_rfv(d, z, nombre: str = "") -> tuple[float, dict]:
+    """Pendiente mensual (escala del modelo, sin amortiguar ni topar) de un factor de la RFV por prima (TENDENCIA_RFV) y
+    su detalle (regla aplicada, rectas, saltos como meses hacia atras desde el ultimo: "saltos_hace")."""
+    P = _param_rfv(nombre)
+    d = np.asarray(d, dtype=float)
+    det = {"regla_pendiente": "", "salto": False, "metodo_rfv": P["metodo"], "saltos_hace": []}
+    if len(d) < P["min_obs"]:
+        det["regla_pendiente"] = f"menos de {P['min_obs']} meses: sin pendiente"
+        return 0.0, det
+    w = d[-int(P["ventana"]):] if P.get("ventana") else d.copy()
+    w = w.astype(float).copy()
+    dif = np.diff(w)
+    if P.get("k_salto") and len(dif) >= 6:             # saltos: cambios de nivel, fuera de la pendiente
+        med = float(np.median(dif))
+        mad = float(np.median(np.abs(dif - med)))
+        if mad > 0:
+            for j in np.flatnonzero(np.abs(dif - med) > P["k_salto"] * mad):
+                w[j + 1:] -= dif[j] - med                # (la serie se pega en el salto)
+                det["saltos_hace"].append(int(len(dif) - 1 - j))
+    reciente = any(k < P["meses_salto_reciente"] for k in det["saltos_hace"])
+    det["salto"] = reciente
+    b_l, t_l = _recta_robusta(w, P["estimador"])
+    b_c, t_c = _recta_robusta(w[-int(P["ventana_meseta"]):], P["estimador"])
+    det.update({"pendiente_larga": b_l, "t_larga": t_l, "ventana_larga": len(w), "pendiente_12": b_c, "t_12": t_c})
+    if P["metodo"] == "recta":
+        z_ = min(1.0, abs(t_l) / P["t_clara"]) if P["credibilidad"] == "t" else float(P["credibilidad"])
+        regla = f"recta de {len(w)} meses por credibilidad {z_:.2f}"
+    else:
+        clara = abs(t_l) >= P["t_clara"]
+        confirmada = t_c * np.sign(b_l) >= P["t_meseta"]
+        z_ = 1.0 if clara and confirmada else 0.5
+        regla = ("tendencia clara y confirmada en los ultimos 12 meses: completa" if z_ == 1 else
+                 "meseta (los ultimos 12 meses no confirman la recta): la mitad" if clara else
+                 "sin tendencia clara: la mitad")
+    if reciente:
+        z_ *= P["credibilidad_salto_reciente"]
+        regla += f"; salto reciente sin confirmar: x{P['credibilidad_salto_reciente']:g}"
+    det.update({"credibilidad_pendiente": z_,
+                "regla_pendiente": f"recta Theil-Sen de {len(w)} meses {b_l:+.4g}/mes (t {t_l:+.1f}), ultimos 12 "
+                                   f"meses t {t_c:+.1f}" + (f", {len(det['saltos_hace'])} salto(s) quitado(s)"
+                                                            if det["saltos_hace"] else "") + f"; {regla}"})
+    return float(b_l * z_), det
+
+
+def _tendencia_rfv(z, d, h: int, estacional_fut, nombre: str, escala_log: bool):
+    """Proyeccion de un factor de la RFV por prima: arranca del ultimo real, suma la pendiente de pendiente_rfv amortiguada
+    y topada al rango (TENDENCIA_RFV). Regresa lo mismo que ajustar_tendencia."""
+    P = _param_rfv(nombre)
+    b, det = pendiente_rfv(d, z, nombre)
+    a0 = float(d[-1])
+    b_sin_tope = b
+    if P["tope_rango"] is not None and b != 0:
+        b = _tope_rango(b, a0, np.exp(z) if escala_log else z, escala_log, P["amortiguacion"], P["tope_rango"],
+                        P["meses_tope"])
+    hh = np.arange(1, h + 1)
+    pron = a0 + b * np.cumsum(P["amortiguacion"] ** hh) + estacional_fut
+    sd = float(np.std(np.diff(d) - b, ddof=1)) if len(d) > 2 else 0.0
+    ancho = _cuantil_normal() * sd * np.sqrt(hh)
+    params = {"pendiente": float(b), "pendiente_aplicada": float(b), "pendiente_sin_tope": float(b_sin_tope),
+              "tope": bool(b != b_sin_tope), "ventana": int(len(d)), "r2": math.nan,
+              "amortiguacion": float(P["amortiguacion"]), "phi_desviacion": 1.0, "ancla": a0, "sd_residual": sd, **det}
+    return pron, pron - ancho, pron + ancho, params, float(b)
+
+
 def ajustar_tendencia(z, h: int, meses=None, phi_desv: float = 1.0, cred_pend=1.0, media_aritmetica: bool = False,
                       ancla_meses: int = 1, nombre: str = "", escala_log: bool = False):
     """Linea de tendencia (regresion lineal sobre los ultimos MESES_TENDENCIA valores de z, en la escala del modelo)
@@ -1159,6 +1332,8 @@ def ajustar_tendencia(z, h: int, meses=None, phi_desv: float = 1.0, cred_pend=1.
         d, estacional_fut = z, 0.0
     if cred_pend == "combinada":                                       # FND y factores del BEL por FND
         return _tendencia_combinada(z, d, h, estacional_fut, est, ancla_meses, nombre, escala_log)
+    if cred_pend == "rfv":                                             # factores de la RFV por prima (TENDENCIA_RFV)
+        return _tendencia_rfv(z, d, h, estacional_fut, nombre, escala_log)
     w = d if MESES_TENDENCIA is None or len(d) <= MESES_TENDENCIA else d[-MESES_TENDENCIA:]
     t = np.arange(len(w), dtype=float)
     pendiente, ordenada = np.polyfit(t, w, 1)
@@ -1349,7 +1524,7 @@ def _pronosticar(serie: Serie) -> Resultado:
     hh = h + brecha                       # si el ultimo dato es anterior al ultimo mes real
 
     res.moneda = serie.moneda
-    usar_log = tipo in ("nivel", "indice", "lag", "fnd", "factor_log") and np.all(y > 0)   # LAGs positivos: tendencia en %
+    usar_log = tipo in ("nivel", "indice", "lag", "fnd", "factor_log", "rfv_log") and np.all(y > 0)   # LAGs positivos: tendencia en %
     res.transformacion = "log" if usar_log else "ninguna"
     z = np.log(y) if usar_log else y.copy()
     meses = (np.array([p % 100 for p in per], dtype=int)              # mes del ano de cada observacion
@@ -1361,6 +1536,8 @@ def _pronosticar(serie: Serie) -> Resultado:
     cred_pend = CREDIBILIDAD_PENDIENTE.get(tipo, 1.0)                  # indices: pendiente ponderada por su R2
     ancla = int(ANCLA_MESES_SERIE.get(str(serie.clave[2]), ANCLA_MESES.get(tipo, 1)))   # con phi = 1: de donde arranca
     nombre_serie = str(serie.clave[2])                                 # FND, FACTOR GTO, ... (pendiente combinada)
+    if cred_pend == "rfv":                                             # (RFV: "FRV|160", para TENDENCIA_RFV por ramo)
+        nombre_serie = f"{serie.clave[2]}|{serie.clave[3]}"
     media_arit = bool(MEDIA_ARITMETICA_INDICES and usar_log and phi_desv < 1)   # converger al promedio aritmetico
 
     def inv(v):
@@ -1415,10 +1592,13 @@ def _pronosticar(serie: Serie) -> Resultado:
                                f"{res.parametros['ventana']} meses; revisar antes de usar la pendiente")
         pe = res.parametros
         if pe.get("salto"):
-            res.alertas.append(f"Pendiente combinada: {pe['regla_pendiente']}; revisar si el nuevo nivel se sostiene")
+            res.alertas.append(f"{'Tendencia de la RFV' if cred_pend == 'rfv' else 'Pendiente combinada'}: "
+                               f"{pe['regla_pendiente']}; revisar si el nuevo nivel se sostiene")
         if pe.get("tope"):
-            res.alertas.append(f"Pendiente combinada: la tendencia se redujo para quedar a {PENDIENTE_COMBINADA['meses_tope']} "
-                               f"meses dentro del rango de 36 meses ampliado {PENDIENTE_COMBINADA['tope_rango']:.0%}")
+            P_t = TENDENCIA_RFV_BASE if cred_pend == "rfv" else PENDIENTE_COMBINADA
+            res.alertas.append(f"{'Tendencia de la RFV' if cred_pend == 'rfv' else 'Pendiente combinada'}: la tendencia se "
+                               f"redujo para quedar a {P_t['meses_tope']} meses dentro del rango de 36 meses ampliado "
+                               f"{P_t['tope_rango']:.0%}")
         if pe.get("phi_desviacion", 1.0) < 1 and pe.get("sd_residual", 0) > 0:
             brecha_nivel = pe["desviacion_ultimo"] - pe["nivel_local"]
             if abs(brecha_nivel) > 2 * pe["sd_residual"]:
@@ -1642,14 +1822,17 @@ def tc_para_periodo(bd: BDMontos, p: int) -> float:
     return bd.tc[max(bd.tc)]
 
 
-def archivos_res_rvas() -> list:
+def archivos_res_rvas(subcarpetas: bool = False) -> list:
     """Res_Rvas de entradas/ (PATRON_RES_RVAS), sin los temporales de Office (~$), por ano del nombre y nombre, con los de
-    nombre exacto (Res_Rvas_AAAA) al final: el ultimo gana en un mes que traigan dos archivos."""
+    nombre exacto (Res_Rvas_AAAA) al final: el ultimo gana en un mes que traigan dos archivos. Con subcarpetas, los de
+    las subcarpetas de entradas/ (no los de entradas/ mismo), en el mismo orden (solo la Base FIANZAS los usa, y solo si
+    en entradas/ ninguno trae la hoja)."""
     if not ENTRADAS.exists():
         return []
     pat = re.compile(PATRON_RES_RVAS, re.I)
     exacto = re.compile(r"res[\s_\-.]*rvas[\s_\-.]*\d{4}\.(xlsx|xlsm)", re.I)
-    return sorted((c for c in ENTRADAS.iterdir() if c.is_file() and not c.name.startswith("~$") and pat.search(c.name)),
+    fuente = (c for c in ENTRADAS.rglob("*") if c.parent != ENTRADAS) if subcarpetas else ENTRADAS.iterdir()
+    return sorted((c for c in fuente if c.is_file() and not c.name.startswith("~$") and pat.search(c.name)),
                   key=lambda c: (bool(exacto.fullmatch(c.name)),
                                  int(m.group(1)) if (m := re.search(r"(20\d\d)", c.name)) else 0, c.name.lower()))
 
@@ -4324,7 +4507,22 @@ def pt_fianzas(pe_ramo: dict | None, pe_rfa: dict | None, pef: dict | None, bd: 
                 tot[p] = tot.get(p, 0.0) + float(v) * t        # (MXN del archivo, o USD por el TC del proyecto)
         if tot:
             meses = sorted(tot)
-            w = _mezcla(hist, ramos)
+            w, txt_w = _mezcla(hist, ramos), "de los ultimos 12 meses"
+            if MEZCLA_REFORECAST_FIANZAS == "mismos meses":   # mismos meses de los MEZCLA_REFORECAST_ANIOS anos anteriores
+                for n_a in range(max(int(MEZCLA_REFORECAST_ANIOS), 1), 0, -1):    # (los que haya en PExRamo)
+                    prev = [_mes_menos(p, 12 * a) for a in range(1, n_a + 1) for p in meses]
+                    if all((ramos[0], q) in hist for q in prev):
+                        break
+                s_prev = {r: max(sum(hist.get((r, q), 0.0) for q in prev), 0.0) for r in ramos}
+                if sum(s_prev.values()) > 0 and all((ramos[0], q) in hist for q in prev):
+                    w = {r: s_prev[r] / sum(s_prev.values()) for r in ramos}
+                    txt_w = (f"de los mismos meses de los {n_a} anos anteriores ({min(prev)} a {max(prev)})" if n_a > 1
+                             else f"de los mismos meses del ano anterior ({min(prev)} a {max(prev)})")
+            out["mezcla_reforecast"] = {"pesos": dict(w), "texto": txt_w, "meses": list(meses), "total": dict(tot),
+                                        "usd_archivo": sum(float(v) for (r_, p_), v in
+                                                           (pe_rfa.get("usd_archivo") or {}).items()
+                                                           if str(r_) == RAMO_RFCST_FIANZAS and p_ in tot),
+                                        "tc_archivo": {p: (pe_rfa.get("tc_archivo") or {}).get(p) for p in meses}}
             fa = {(r, p): tot[p] * w[r] for p in meses for r in ramos}
             perfilados = []
             if PERFIL_REFORECAST == "FCST" and fcst:
@@ -4336,7 +4534,7 @@ def pt_fianzas(pe_ramo: dict | None, pe_rfa: dict | None, pef: dict | None, bd: 
             partes.append(f"{meses[0]} a {meses[-1]}: {pe_rfa['ruta'].name} › {pe_rfa.get('hoja', '')}, RAMO "
                           f"{RAMO_RFCST_FIANZAS} ({sum(tot.values()) / 1e6:,.1f} M MXN; "
                           + ", ".join(f"{p} {tot[p] / 1e6:,.1f}" for p in meses)
-                          + ") repartido con la mezcla de PExRamo de los ultimos 12 meses ("
+                          + f") repartido con la mezcla de PExRamo {txt_w} ("
                           + ", ".join(f"{r}: {w[r]:.1%}" for r in ramos if w[r]) + ")"
                           + (f"; total de esos meses de cada ramo con la forma mensual de los mismos meses del FCST "
                              f"(ramos {', '.join(perfilados)})" if perfilados else ""))
@@ -4365,6 +4563,7 @@ def pt_fianzas(pe_ramo: dict | None, pe_rfa: dict | None, pef: dict | None, bd: 
         out["avisos"].append(f"{len(falta)} mes(es) sin prima de Fianzas en ninguna fuente ({falta[0]} a {falta[-1]}): "
                              f"van en 0 en {HOJA_PT_RAMO} y la RFV de los meses cuya PRIMA {MESES_PRIMA_RFV}M los incluye "
                              "sigue con el modelo")
+    _referencia_y_ajustes_pt(out, ramos, p1, tc, partes)
     out["texto"] = "; ".join(partes)
     # prima cedida del mes (RC PRIMA): PmaCed de PExRamo y la columna CEDIDA del FCST (el reforecast no la trae)
     ced = {(r, p): float(v) if MONEDA_PE_RAMO == "MXN" else float(v) * _tc_cercano(tc, p)
@@ -4408,6 +4607,274 @@ def pt_fianzas(pe_ramo: dict | None, pe_rfa: dict | None, pef: dict | None, bd: 
                                      "com_pr": (seg_r[r][("PR", "com")] / seg_r[r][("PR", "prima")]
                                                 if seg and seg_r[r][("PR", "prima")] else math.nan)}
                                  for r in ramos}
+    for k_, f_ in (out.get("factor_pt") or {}).items():   # (FUENTE / AJUSTE_PRIMA_FIANZAS: la cedida con la misma razon)
+        if k_ in out["cedida"]:
+            out["cedida"][k_] *= f_
+    return out
+
+
+def _clave_anio_ramo(d: dict, r: str, anio: int):
+    """Valor de AJUSTE_PRIMA_FIANZAS para el ramo y ano: (ramo, ano) manda sobre ano."""
+    for k in ((r, anio), (int(r), anio) if str(r).isdigit() else None, anio, str(anio)):
+        if k is not None and k in (d or {}):
+            return d[k]
+    return None
+
+
+def _referencia_y_ajustes_pt(out: dict, ramos: list, p1: int, tc: dict, partes: list):
+    """Prima de Fianzas de los meses sin real (despues de p1, el ultimo de PExRamo): AJUSTE_PRIMA_FIANZAS y el control
+    por bloque (reforecast y cada ano del FCST) y ramo: crecimiento del bloque contra los mismos meses del ano anterior
+    comparado con el rango de crecimientos de esos mismos meses en los ANIOS_RANGO_PRIMA anos anteriores con dato real
+    (PExRamo); fuera del rango, AVISO. Deja en out: "archivo" (la PT de la fuente, antes del ajuste), "factor_pt"
+    {(ramo, periodo): PT usada / PT de la fuente} (solo si cambia) y "bloques" (filas para el diagnostico)."""
+    mensual = out["mensual"]
+    fut = sorted({p for _, p in mensual if p > p1})
+    out["archivo"] = {k: v for k, v in mensual.items() if k[1] > p1}
+    out["bloques"], out["factor_pt"] = [], {}
+    if not fut:
+        return
+    cambios = []
+    for r in ramos:
+        for p in fut:                                  # AJUSTE_PRIMA_FIANZAS
+            v0 = mensual.get((r, p), 0.0)
+            f_aj = _clave_anio_ramo(AJUSTE_PRIMA_FIANZAS, r, p // 100)
+            if isinstance(f_aj, (int, float)) and not isinstance(f_aj, bool) and np.isfinite(f_aj) and f_aj >= 0 \
+                    and abs(v0 * float(f_aj) - v0) > 0.5:
+                mensual[(r, p)] = v0 * float(f_aj)
+                out["factor_pt"][(r, p)] = float(f_aj)
+                cambios.append((r, p))
+    if cambios:
+        rs_, ps_ = sorted({r for r, _ in cambios}, key=int), sorted({p for _, p in cambios})
+        txt = (f"PT de Fianzas cambiada por AJUSTE_PRIMA_FIANZAS en ramos {', '.join(rs_)}, {ps_[0]} a {ps_[-1]}: "
+               + "; ".join(f"{r}: {sum(out['archivo'][(r, p)] for x, p in cambios if x == r) / 1e6:,.1f} -> "
+                           f"{sum(mensual[(r, p)] for x, p in cambios if x == r) / 1e6:,.1f} M MXN" for r in rs_))
+        out["avisos"].append(txt)
+        partes.append(txt)
+    real = {k: v for k, v in mensual.items() if k[1] <= p1}
+
+    def bloque(p):                                     # reforecast (sus meses) o el ano del FCST
+        f_ = str(out["fuente"].get(p, ""))
+        return ("reforecast" if "RCST" in f_.upper() or "RFCST" in f_.upper() else "FCST") + f" {p // 100}"
+    por_b = {}
+    for p in fut:
+        por_b.setdefault(bloque(p), []).append(p)
+    tot_p24 = {}
+    for r in ramos:
+        if not any(mensual.get((r, q)) for q in rango_periodos(_mes_menos(p1, 23), fut[-1])):
+            continue                                   # (ramo sin prima: p. ej. el 130)
+        for b, ps in por_b.items():
+            x = sum(mensual.get((r, p), 0.0) for p in ps)
+            ant = sum(mensual.get((r, _mes_menos(p, 12)), 0.0) for p in ps)
+            hist_g = {}                                # crecimiento de los mismos meses en anos con dato real
+            for a in range(1, ANIOS_RANGO_PRIMA + 1):
+                qs, qs0 = [_mes_menos(p, 12 * a) for p in ps], [_mes_menos(p, 12 * (a + 1)) for p in ps]
+                if all((r, q) in real for q in qs + qs0):
+                    s1, s0 = sum(real[(r, q)] for q in qs), sum(real[(r, q)] for q in qs0)
+                    if s0 > 0:
+                        hist_g[qs[-1] // 100] = s1 / s0 - 1
+            g = x / ant - 1 if ant > 0 else math.nan
+            lo, hi = (min(hist_g.values()), max(hist_g.values())) if hist_g else (math.nan, math.nan)
+            fin = ps[-1]
+            if fin not in tot_p24:
+                tot_p24[fin] = sum(sum(mensual.get((x_, _mes_menos(fin, k)), 0.0) for k in range(MESES_PRIMA_RFV))
+                                   for x_ in ramos)
+            p24 = sum(mensual.get((r, _mes_menos(fin, k)), 0.0) for k in range(MESES_PRIMA_RFV))
+            fuera = bool(np.isfinite(g) and hist_g and not (lo <= g <= hi))
+            fila = {"Ramo": r, "Bloque": b, "Desde": ps[0], "Hasta": fin,
+                    "PT de la fuente (MXN)": sum(out["archivo"].get((r, p), 0.0) for p in ps), "PT usada (MXN)": x,
+                    "PT usada (USD)": sum(mensual.get((r, p), 0.0) / _tc_cercano(tc, p) for p in ps),
+                    "Mismos meses del ano anterior (MXN)": ant, "Crecimiento contra el ano anterior": g,
+                    "Crecimiento minimo de esos meses (historia)": lo,
+                    "Crecimiento maximo de esos meses (historia)": hi,
+                    "Anos de historia": len(hist_g),
+                    "Crecimientos historicos (ano: crecimiento)": ", ".join(f"{a}: {v:+.1%}" for a, v in sorted(hist_g.items())),
+                    "Fuera del rango historico": "si" if fuera else "no",
+                    f"PRIMA {MESES_PRIMA_RFV}M del ramo al final del bloque (MXN)": p24,
+                    f"Peso del ramo en la PRIMA {MESES_PRIMA_RFV}M total": p24 / tot_p24[fin] if tot_p24[fin] else math.nan,
+                    f"Peso del bloque en la PRIMA {MESES_PRIMA_RFV}M del ramo": x / p24 if p24 else math.nan}
+            out["bloques"].append(fila)
+            if fuera:
+                out["avisos"].append(
+                    f"PRIMA DE FIANZAS {r} {b} ({ps[0]} a {fin}): trae {x / 1e6:,.1f} M MXN, {g:+.1%} contra los mismos "
+                    f"meses del ano anterior ({ant / 1e6:,.1f} M), fuera del rango de crecimiento de esos meses en "
+                    f"{min(hist_g)} a {max(hist_g)} ({lo:+.1%} a {hi:+.1%}). El bloque es "
+                    f"{fila[f'Peso del bloque en la PRIMA {MESES_PRIMA_RFV}M del ramo']:.0%} de la PRIMA "
+                    f"{MESES_PRIMA_RFV}M del ramo al {fin} y el ramo "
+                    f"{fila[f'Peso del ramo en la PRIMA {MESES_PRIMA_RFV}M total']:.1%} de la total: la RFV del ramo se "
+                    f"mueve casi en la misma proporcion que su PRIMA {MESES_PRIMA_RFV}M (AJUSTE_PRIMA_FIANZAS para "
+                    "cambiarla; hoja RFV_Prima_Bloques)")
+
+
+def _texto_prima_base(info: dict) -> str:
+    """Linea del Resumen con la prima base de la RFV: reparto del reforecast, referencia estadistica, control contra la
+    base del real y sensibilidad."""
+    pt = info.get("pt") or {}
+    if not pt.get("mensual"):
+        return "-"
+    partes = []
+    mz = pt.get("mezcla_reforecast")
+    if mz:
+        partes.append(f"reforecast repartido con la mezcla de PExRamo {mz['texto']} ("
+                      + ", ".join(f"{r}: {w:.1%}" for r, w in mz["pesos"].items() if w) + ")"
+                      + (f"; el archivo trae {mz['usd_archivo'] / 1e6:,.1f} M USD (a su TC) y la PT usada "
+                         f"{sum(mz['total'].values()) / 1e6:,.1f} M MXN" if mz.get("usd_archivo") else ""))
+    fuera = [b for b in pt.get("bloques") or [] if b.get("Fuera del rango historico") == "si"]
+    if pt.get("bloques"):
+        partes.append("prima no real contra su historia (crecimiento del bloque contra los mismos meses del ano anterior "
+                      f"y el rango de esos meses en hasta {ANIOS_RANGO_PRIMA} anos): " + (
+                          "; ".join(f"{b['Ramo']} {b['Bloque']} {b['Crecimiento contra el ano anterior']:+.1%} (rango "
+                                    f"{b['Crecimiento minimo de esos meses (historia)']:+.1%} a "
+                                    f"{b['Crecimiento maximo de esos meses (historia)']:+.1%})" for b in fuera)
+                          + " fuera del rango" if fuera else "todos los bloques dentro del rango"))
+    no_real = [f for f in info.get("prima_base") or [] if f["Ramo"] == "Todos" and f["Real o proyeccion"] == "proyeccion"]
+    if no_real:
+        partes.append(f"parte no real de la PRIMA {MESES_PRIMA_RFV}M total: " + ", ".join(
+            f"{f['Periodo']} {f[f'Parte no real de la PRIMA {MESES_PRIMA_RFV}M']:.0%}" for f in no_real
+            if f["Periodo"] % 100 == 12 or f is no_real[-1]))
+    if info.get("control_pt"):
+        partes.append(info["control_pt"])
+    sens = [f for f in info.get("prima_sens") or [] if f["Cambio"] == "PT del reforecast y del FCST"]
+    if sens:
+        partes.append("sensibilidad de la RFV BRUTO a la PT del reforecast y del FCST: " + "; ".join(
+            f"{f['Valor']} en {f['Periodo']}: {f['Cambio % RFV BRUTO']:+.1%}" for f in sens))
+    ven = [f for f in info.get("prima_sens") or [] if f["Cambio"] == "ventana de la prima"]
+    if ven:
+        partes.append("con otra ventana de prima: " + "; ".join(
+            f"{f['Valor']} en {f['Periodo']}: {f['Cambio % RFV BRUTO']:+.1%}" for f in ven))
+    return "; ".join(partes) + "; hojas RFV_Prima_Base, RFV_Prima_Bloques y RFV_Prima_Sensibilidad"
+
+
+def control_pt_bdreal(pt: dict | None, com: dict | None, ramos: list) -> tuple[dict, list]:
+    """PT de Fianzas (PExRamo) contra PrimasNal de la base del real por contrato (com["contratos"], de
+    segmento_pr_fianzas) en los meses y ramos que traen las dos: ({(ramo, periodo): PrimasNal}, avisos)."""
+    t = (com or {}).get("contratos")
+    if not pt or t is None or not len(t):
+        return {}, []
+    g = t.groupby(["ramo", "periodo"])["prima"].sum()
+    real = {(str(r), int(p)): float(v) for (r, p), v in g.items() if str(r) in [str(x) for x in ramos]}
+    malos = []
+    for (r, p), v in real.items():
+        x = pt["mensual"].get((r, p))
+        if x is not None and str(pt["fuente"].get(p, "")).startswith("PExRamo") and abs(x - v) > TOLERANCIA_PT_BDREAL * max(abs(v), 1e6):
+            malos.append(f"{r} {p}: PExRamo {x / 1e6:,.2f} contra {v / 1e6:,.2f} M MXN")
+    meses = sorted({p for _, p in real})
+    avisos = ([f"PT de Fianzas: PExRamo se aparta mas de {TOLERANCIA_PT_BDREAL:.1%} de PrimasNal de la base del real por "
+               f"contrato en {len(malos)} mes(es) y ramo(s): " + "; ".join(malos[:6])] if malos else [])
+    return {"real": real, "texto": (f"PExRamo contra PrimasNal de la base del real ({meses[0]} a {meses[-1]}, "
+                                    f"{len(real)} pares ramo-mes): " + (f"{len(malos)} con diferencia" if malos else
+                                                                        "iguales") if meses else "")}, avisos
+
+
+def filas_prima_base(pt: dict | None, ramos: list, tc: dict, ultimo: int, control: dict | None = None,
+                     desde: int | None = None) -> list:
+    """Hoja RFV_Prima_Base del diagnostico: por ramo (y Todos: los ramos con prima) y mes, la PT usada y su fuente, la de
+    la fuente antes de AJUSTE_PRIMA_FIANZAS, la del mismo mes del ano anterior y su crecimiento, la PT en USD y el TC,
+    la PRIMA 24M, la parte de la PRIMA 24M que no es real y el control contra la base del real por contrato."""
+    if not pt or not pt.get("mensual"):
+        return []
+    n = MESES_PRIMA_RFV
+    fin = max(p for _, p in pt["mensual"])
+    desde = desde or _mes_menos(ultimo, 32)
+    real_bd = (control or {}).get("real") or {}
+    con_prima = [x for x in ramos if any(pt["mensual"].get((x, q)) for q in rango_periodos(desde, fin))]
+    filas = []
+    for r in con_prima + (["Todos"] if con_prima else []):
+        rs = con_prima if r == "Todos" else [r]
+        for p in rango_periodos(desde, fin):
+            def s(d, ps, _rs=rs):
+                vals = [d.get((x, q), 0.0 if (x, q) not in d and q in pt["fuente"] else None) for x in _rs for q in ps]
+                return math.nan if any(v is None or not np.isfinite(v) for v in vals) else float(sum(vals))
+            qs = [_mes_menos(p, k) for k in range(n)]
+            usada = s(pt["mensual"], [p])
+            p24 = s(pt["mensual"], qs)
+            no_real = sum(pt["mensual"].get((x, q), 0.0) for x in rs for q in qs if q > ultimo)
+            ant = s(pt["mensual"], [_mes_menos(p, 12)])
+            bd_ = s(real_bd, [p]) if all((x, p) in real_bd for x in rs) else math.nan
+            filas.append({"Ramo": r, "Periodo": p, "Real o proyeccion": "real" if p <= ultimo else "proyeccion",
+                          "Fuente": str(pt["fuente"].get(p, "sin prima (0)")).split(" (")[0].split(" ›")[0],
+                          "PT usada (MXN)": usada,
+                          "PT de la fuente (MXN)": s({**pt["mensual"], **(pt.get("archivo") or {})}, [p]),
+                          "PT mismo mes ano anterior (MXN)": ant,
+                          "Crecimiento contra el mismo mes": usada / ant - 1 if ant and np.isfinite(ant) and ant > 0 else math.nan,
+                          "PT usada (USD)": usada / _tc_cercano(tc, p) if np.isfinite(usada) else math.nan,
+                          "TC": _tc_cercano(tc, p),
+                          f"PRIMA {n}M (MXN)": p24,
+                          f"Parte no real de la PRIMA {n}M": no_real / p24 if p24 and np.isfinite(p24) else math.nan,
+                          "PrimasNal base del real (MXN)": bd_,
+                          "PExRamo - base del real (MXN)": usada - bd_ if np.isfinite(bd_) else math.nan})
+    return filas
+
+
+def sensibilidad_prima_rfv(bd: BDMontos, proy: dict, pt: dict | None, periodos_proy: list[int], ultimo: int,
+                           tc_hist: dict | None, com: dict | None, pdinfo: dict | None, ma_info: dict | None,
+                           base: dict) -> list:
+    """RFV BRUTO y NETO (USD, ramos con RFV por prima) con la PT del reforecast, del FCST o de los dos por los factores de
+    SENSIBILIDAD_PRIMA_RFV, y con otra ventana de prima (SENSIBILIDAD_VENTANA_RFV): los mismos modelos y factores; solo
+    cambia la prima (o su ventana, y con ella el FRV medido). Filas por cambio, valor y mes de corte (diciembres y el
+    ultimo proyectado)."""
+    global MESES_PRIMA_RFV
+    if not pt or not pt.get("mensual") or not base.get("aplica"):
+        return []
+    c_b, c_n = norm("RFV BRUTO"), norm("RFV NETO")
+    marcas = sorted({p for p in periodos_proy if p % 100 == 12} | {periodos_proy[-1]})
+    ramos = sorted({r for _, r in base["aplica"]}, key=int)
+
+    def tot(info, c, p):
+        return sum(info["proy"].get((c, p, r), 0.0) for r in ramos)
+    fuente = pt.get("fuente") or {}
+    bloques = {"PT del reforecast": [p for p in fuente if p > ultimo and "RCST" in str(fuente[p]).upper()],
+               "PT del FCST": [p for p in fuente if p > ultimo and "RCST" not in str(fuente[p]).upper()]}
+    bloques["PT del reforecast y del FCST"] = bloques["PT del reforecast"] + bloques["PT del FCST"]
+    corridas = []
+    for nombre, ps in bloques.items():
+        for f in (SENSIBILIDAD_PRIMA_RFV if ps else ()):
+            if nombre == "PT del reforecast y del FCST" or f in (0.9, 1.1):
+                ptx = dict(pt)
+                ptx["mensual"] = {k: (v * f if k[1] in ps else v) for k, v in pt["mensual"].items()}
+                corridas.append((nombre, f"{min(ps)} a {max(ps)}", f"x{f:.2f}", ptx, MESES_PRIMA_RFV))
+    for v in SENSIBILIDAD_VENTANA_RFV:
+        corridas.append(("ventana de la prima", "", f"{v} meses", pt, int(v)))
+    filas, n0 = [], MESES_PRIMA_RFV
+    for nombre, meses_txt, valor, ptx, ventana in corridas:
+        try:
+            MESES_PRIMA_RFV = ventana
+            info = calcular_rfv_prima(bd, proy, ptx, periodos_proy, ultimo, tc_hist, None, com, pdinfo, True, ma_info)
+        finally:
+            MESES_PRIMA_RFV = n0
+        for p in marcas:
+            b0, nn0 = tot(base, c_b, p), tot(base, c_n, p)
+            filas.append({"Cambio": nombre, "Meses": meses_txt, "Valor": valor, "Periodo": p,
+                          "RFV BRUTO base (USD)": b0, "RFV BRUTO con el cambio (USD)": tot(info, c_b, p),
+                          "Cambio % RFV BRUTO": tot(info, c_b, p) / b0 - 1 if b0 else math.nan,
+                          "RFV NETO base (USD)": nn0, "RFV NETO con el cambio (USD)": tot(info, c_n, p),
+                          "Cambio % RFV NETO": tot(info, c_n, p) / nn0 - 1 if nn0 else math.nan,
+                          **{f"RFV BRUTO {r} con el cambio (USD)": info["proy"].get((c_b, p, r), math.nan)
+                             for r in ramos}})
+    return filas
+
+
+def alertas_dientes_rfv(bd: BDMontos, info: dict, ultimo: int) -> list:
+    """Avisos de la RFV por prima cuyo cambio mensual proyectado (RFV BRUTO en USD) supera el mayor cambio mensual de
+    su historia (en valor absoluto): una prima mensual grande que entra o sale de la ventana de la PRIMA 24M mueve la
+    reserva en escalon (dientes de sierra)."""
+    c_b = norm("RFV BRUTO")
+    out = []
+    for r in sorted({r for _, r in info.get("aplica") or ()}, key=int):
+        hist = [bd.valores.get((c_b, p, r)) for p in sorted({p for (c, p) in bd.filas if c == c_b and p <= ultimo})]
+        hist = [v for v in hist if v is not None and np.isfinite(v) and v > 0]
+        cambios_h = [abs(b / a - 1) for a, b in zip(hist, hist[1:]) if a > 0]
+        proy = sorted((p, v) for (c, p, x), v in info["proy"].items() if c == c_b and x == r and p > ultimo)
+        serie = [(ultimo, hist[-1] if hist else math.nan)] + proy
+        if not cambios_h or len(serie) < 2:
+            continue
+        tope = max(cambios_h)
+        malos = [(p1, v1 / v0 - 1) for (p0, v0), (p1, v1) in zip(serie, serie[1:])
+                 if v0 and np.isfinite(v0) and np.isfinite(v1) and abs(v1 / v0 - 1) > tope]
+        if malos:
+            out.append(f"RFV {r}: la proyeccion cambia mas en un mes que en cualquier mes de su historia (maximo "
+                       f"historico {tope:.1%}) en " + ", ".join(f"{p} ({g:+.1%})" for p, g in malos[:6])
+                       + f": revisar la PT de los meses que entran y salen de la PRIMA {MESES_PRIMA_RFV}M (hoja "
+                       "RFV_Prima_Base)")
     return out
 
 
@@ -4595,43 +5062,225 @@ def segmento_pr_fianzas(ramos: list, ultimo: int) -> dict:
     return out
 
 
-def leer_fianzas_area(ramos: list, ultimo: int) -> dict:
+def _hoja_base_fianzas(nombres: list):
+    """La hoja Base FIANZAS de un Res_Rvas con nombre tolerante: igual sin mayusculas, espacios ni signos ("Base
+    Fianzas", "BASE_FIANZAS", "Base FIANZAS "); si no hay, la primera que empiece con "base" y traiga "fianza" (no toma
+    TD_FIANZAS ni BacktestingFIANZAS). None si no hay."""
+    iguales = [h for h in nombres if _clave(h) == "basefianzas"]
+    if iguales:
+        return "Base FIANZAS" if "Base FIANZAS" in iguales else iguales[0]
+    return next((h for h in nombres if _clave(h).startswith("base") and "fianza" in _clave(h)), None)
+
+
+def _periodo_celda(v):
+    """Periodo AAAAMM de una celda: numero (202501), texto ("202501") o fecha (1-ene-2025, "01/01/2025"); None si no."""
+    if isinstance(v, datetime):
+        return v.year * 100 + v.month
+    x = a_numero(v)[0]
+    if np.isfinite(x) and 190001 <= x <= 299912 and 1 <= int(x) % 100 <= 12:
+        return int(x)
+    if isinstance(v, str) and v.strip():
+        f = pd.to_datetime(v.strip(), errors="coerce", dayfirst=True)
+        if not pd.isna(f):
+            return f.year * 100 + f.month
+    return None
+
+
+def _entero_celda(v) -> float:
+    """Numero de una celda (a_numero) o, en un texto, su primer entero ("Esc 2" -> 2, "R140" -> 140); nan si no hay."""
+    x = a_numero(v)[0]
+    if not np.isfinite(x) and isinstance(v, str) and (mm := re.search(r"\d+", v)):
+        x = float(mm.group())
+    return x
+
+
+def leer_fianzas_area(ramos: list, ultimo: int, info: dict | None = None) -> dict:
     """Calculo del area de la RFV de Fianzas por ramo y mes: hoja Base FIANZAS de los Res_Rvas de entradas/ (Reserva
     FIANZAS, escenarios ESCENARIOS_FIANZAS_AREA en orden de preferencia por mes; el ultimo archivo gana), con PRIMA (de
-    los contratos vigentes), RVABRUTA, IRR, CASTIGO, RVACONT y RVNETA en MXN, hasta ultimo. Regresa {(ramo, periodo):
-    {tipo: monto}} (vacio sin archivos o sin la hoja)."""
+    los contratos vigentes), RVABRUTA, IRR, CASTIGO, RVACONT y RVNETA en MXN, hasta ultimo. Tolerante: si ningun
+    Res_Rvas de entradas/ trae la hoja, se buscan en sus subcarpetas (SUBCARPETAS_ENTRADAS); la hoja
+    (_hoja_base_fianzas) y los encabezados (COLUMNAS_BASE_FIANZAS, en los primeros 50 renglones) se comparan sin
+    mayusculas, acentos, espacios ni signos; el Periodo puede venir como fecha y el tipo de monto con espacios ("RVA
+    BRUTA"). Regresa {(ramo, periodo): {tipo: monto}} (vacio sin archivos o sin la hoja). Con info, la llena con lo que
+    se leyo: "archivos" [{"archivo", "hoja", "renglones" (con dato), "fianzas" (Reserva FIANZAS), "usados", "meses":
+    {ramo: {periodos}}, "escenarios": {escenario: renglones}, "descartes": {motivo: renglones}, "motivo"}], "parecidos"
+    (Res_Rvas que no son .xlsx ni .xlsm) y "motivo" (por que quedo vacio y que hacer)."""
+    info = info if info is not None else {}
+    info.update({"archivos": [], "parecidos": _parecidos_res_rvas(), "motivo": ""})
     out, escogido = {}, {}
-    for ruta in archivos_res_rvas():
+    req = {k: {_clave(a) for a in v} for k, v in COLUMNAS_BASE_FIANZAS.items()}
+
+    def leer(ruta):
+        reg = {"archivo": ruta.relative_to(ENTRADAS).as_posix(), "hoja": None, "renglones": 0, "fianzas": 0,
+               "usados": 0, "meses": {}, "escenarios": {}, "descartes": {}, "motivo": ""}
+        info["archivos"].append(reg)
         try:
             wb = openpyxl.load_workbook(ruta, read_only=True, data_only=True)
-            if "Base FIANZAS" not in wb.sheetnames:
-                wb.close()
-                continue
-            filas = list(wb["Base FIANZAS"].iter_rows(values_only=True))
+        except Exception as e:  # noqa: BLE001
+            reg["motivo"] = (f"no se pudo abrir ({type(e).__name__}): " + (
+                "cierralo en Excel (o en otro programa) y vuelve a correr" if isinstance(e, PermissionError) else
+                "revisa que no este danado ni protegido con contrasena o con una etiqueta de confidencialidad"))
+            return
+        try:
+            hoja = _hoja_base_fianzas(wb.sheetnames)
+            if hoja is None:
+                reg["motivo"] = f"no trae la hoja Base FIANZAS (trae: {', '.join(wb.sheetnames)})"
+                return
+            reg["hoja"] = hoja
+            filas = list(wb[hoja].iter_rows(values_only=True))
+        except Exception as e:  # noqa: BLE001
+            reg["motivo"] = f"no se pudo leer la hoja ({type(e).__name__}: {e})"
+            return
+        finally:
             wb.close()
-        except Exception:  # noqa: BLE001
-            continue
-        i_enc = next((i for i, f in enumerate(filas[:20]) if f and "Tipo Monto" in f and "Periodo" in f), None)
-        if i_enc is None:
-            continue
-        enc = list(filas[i_enc])
-        j = {n: enc.index(n) for n in ("Reserva", "Escenario", "Tipo Monto", "Ramo", "Periodo", "Monto") if n in enc}
-        if len(j) < 6:
-            continue
+        j, i_enc, mejor = None, None, (set(), [])
+        for i, f in enumerate(filas[:50]):
+            claves = [_clave(x) if isinstance(x, str) else "" for x in (f or ())]
+            jj = {k: next((n for n, c in enumerate(claves) if c in alias), None) for k, alias in req.items()}
+            if all(v is not None for v in jj.values()):
+                j, i_enc = jj, i
+                break
+            vistos = {k for k, v in jj.items() if v is not None}
+            if len(vistos) > len(mejor[0]):
+                mejor = (vistos, claves)
+        if j is None:
+            faltan = [k for k in COLUMNAS_BASE_FIANZAS if k not in mejor[0]]
+            usd = "Monto" in faltan and "montousd" in mejor[1]
+            reg["motivo"] = (f"la hoja {hoja} no trae en sus primeros 50 renglones los encabezados "
+                             f"{', '.join(COLUMNAS_BASE_FIANZAS)} (faltan: {', '.join(faltan)}"
+                             + ("; trae Monto_USD, pero la PD se mide contra la RFV de SAP en pesos y necesita Monto "
+                                "en MXN" if usd else "") + ")")
+            return
         for f in filas[i_enc + 1:]:
-            if not f or norm(f[j["Reserva"]]) != "FIANZAS":
+            if not f or all(v is None or (isinstance(v, str) and not v.strip()) for v in f):
                 continue
-            esc, r, per, v = (a_numero(f[j[k]])[0] for k in ("Escenario", "Ramo", "Periodo", "Monto"))
-            if not (np.isfinite(esc) and np.isfinite(r) and np.isfinite(per)) or int(esc) not in ESCENARIOS_FIANZAS_AREA \
-                    or str(int(r)) not in ramos or int(per) > ultimo:
+            reg["renglones"] += 1
+            if not _clave(f[j["Reserva"]]).startswith("fianza"):
                 continue
-            k = (str(int(r)), int(per))
+            reg["fianzas"] += 1
+            esc, r, per = _entero_celda(f[j["Escenario"]]), _entero_celda(f[j["Ramo"]]), _periodo_celda(f[j["Periodo"]])
+            v = a_numero(f[j["Monto"]])[0]
+            if np.isfinite(esc):
+                reg["escenarios"][int(esc)] = reg["escenarios"].get(int(esc), 0) + 1
+            motivo = ("Escenario sin numero" if not np.isfinite(esc) else
+                      f"escenario distinto de {', '.join(str(e) for e in ESCENARIOS_FIANZAS_AREA)}"
+                      if int(esc) not in ESCENARIOS_FIANZAS_AREA else
+                      "Ramo sin numero" if not np.isfinite(r) else "ramo que no esta en la BD de RFV"
+                      if str(int(r)) not in ramos else "Periodo que no es AAAAMM ni fecha" if per is None else
+                      f"Periodo posterior a {ultimo}" if per > ultimo else "")
+            if motivo:
+                reg["descartes"][motivo] = reg["descartes"].get(motivo, 0) + 1
+                continue
+            k = (str(int(r)), per)
             pref = ESCENARIOS_FIANZAS_AREA.index(int(esc))
             if k in escogido and escogido[k] < pref:
                 continue
             if escogido.get(k) != pref:
                 out[k], escogido[k] = {}, pref
-            out[k][norm(f[j["Tipo Monto"]])] = float(v) if np.isfinite(v) else 0.0
+            out[k][_clave(f[j["Tipo Monto"]]).upper()] = float(v) if np.isfinite(v) else 0.0
+            reg["usados"] += 1
+            reg["meses"].setdefault(k[0], set()).add(per)
+        if not reg["usados"]:
+            reg["motivo"] = (f"la hoja {hoja} no trae renglones de Reserva FIANZAS" if not reg["fianzas"] else
+                             f"ninguno de sus {reg['fianzas']} renglones de FIANZAS sirve ("
+                             + ", ".join(f"{n} con {m_}" for m_, n in reg["descartes"].items()) + ")"
+                             + (f"; escenarios que trae: {', '.join(f'{e} ({n})' for e, n in sorted(reg['escenarios'].items()))}"
+                                if any(m_.startswith("escenario") for m_ in reg["descartes"]) else ""))
+
+    for ruta in archivos_res_rvas():
+        leer(ruta)
+    # (los Res_Rvas solo se leen de entradas/ mismo, como en Danos; los de una subcarpeta solo se avisan para moverlos)
+    info["en_subcarpetas"] = [c.relative_to(ENTRADAS).as_posix() for c in archivos_res_rvas(subcarpetas=True)]
+    mover = (f"; hay {', '.join(info['en_subcarpetas'])} en una subcarpeta: muevelos a entradas/ (el SONR 80 de Danos "
+             "y el TC real tampoco los buscan en subcarpetas)" if info["en_subcarpetas"] else "")
+    if not out:
+        if not info["archivos"]:
+            info["motivo"] = ("no hay ningun Res_Rvas (.xlsx o .xlsm) en entradas/" + mover
+                              + (f"; hay {', '.join(info['parecidos'])}, pero deben ser .xlsx o .xlsm: guardalos como "
+                                 ".xlsx" if info["parecidos"] else "" if mover else
+                                 f": copia ahi los Res_Rvas del area (Res_Rvas_{ultimo // 100 - 1}.xlsx y "
+                                 f"Res_Rvas_{ultimo // 100}.xlsx, con la hoja Base FIANZAS)"))
+        else:
+            info["motivo"] = "; ".join(f"{a['archivo']}: {a['motivo']}" for a in info["archivos"] if a["motivo"]) + mover
+    elif mover:
+        info["aviso"] = mover[2:]
+    return out
+
+
+def _agrupar_meses(meses: dict) -> dict:
+    """{ramo: periodos} -> {"202501 a 202509": [ramos con esos meses]} (los ramos con los mismos meses, juntos)."""
+    out = {}
+    for r in sorted(meses, key=lambda x: int(x) if str(x).isdigit() else 0):
+        out.setdefault(_rangos_meses(meses[r]), []).append(str(r))
+    return out
+
+
+def reporte_insumos_fianzas(ma: dict | None, area_info: dict | None, pdinfo: dict | None) -> list:
+    """Una linea de consola por insumo de Fianzas que se lee antes de la RFV por prima: el monto afianzado (MA), la hoja
+    Base FIANZAS de los Res_Rvas y la PD medida con ella. Cada una dice el archivo que se tomo (con su subcarpeta de
+    entradas/, si es de una), la hoja, los renglones leidos y usados, los ramos y los meses; o "N/A", el motivo exacto y
+    que hacer. Regresa [(insumo, texto, es_na)]: main imprime las de N/A como AVISO FIANZAS y las lleva a Alertas."""
+    out = []
+    if ma is not None:
+        sin = not (ma.get("ma") or {})
+        out.append(("Monto afianzado", "Monto afianzado (MA): " + (ma.get("texto") or "-")
+                    + (". Sin el, MA y RFV MA van en N/A y en 140 y 170 la reserva por monto afianzado queda dentro de "
+                       "FV" if sin else ""), sin or "subcarpeta" in (ma.get("texto") or "")))
+    a = area_info or {}
+    partes = []
+    for x in a.get("archivos") or []:
+        if x["usados"]:
+            partes.append(f"{x['archivo']} [hoja {x['hoja']}]: {x['usados']:,} de {x['renglones']:,} renglones (Reserva "
+                          f"FIANZAS, escenario {', '.join(str(e) for e in ESCENARIOS_FIANZAS_AREA)}, ramos de la BD "
+                          f"hasta {max(max(v) for v in x['meses'].values())}); " + "; ".join(
+                              f"{', '.join(rs)}: {txt}" for txt, rs in _agrupar_meses(x["meses"]).items()))
+        else:
+            partes.append(f"{x['archivo']}: {x['motivo']}")
+    usados = any(x["usados"] for x in a.get("archivos") or [])
+    if usados:
+        out.append(("Base FIANZAS", "Res_Rvas (Base FIANZAS): " + " | ".join(partes), False))
+    else:
+        out.append(("Base FIANZAS", "Res_Rvas (Base FIANZAS): N/A: " + (a.get("motivo") or " | ".join(partes) or "-"),
+                    True))
+    p = pdinfo or {}
+    diag = p.get("diag") or []
+    if p.get("ultimo"):
+        med = {}
+        for (r, q), v in (p.get("medido") or {}).items():
+            if v:
+                med.setdefault(r, []).append(q)
+        no = {}
+        for d in diag:
+            if d["PD medida"] != "si" and d["Ramo"] in p["ultimo"]:
+                no[d["PD medida"]] = no.get(d["PD medida"], 0) + 1
+        out.append(("PD de Fianzas", "PD de Fianzas (CASTIGO / (IRR + CASTIGO) de Base FIANZAS, en los meses en que la "
+                    f"RVABRUTA del area queda a menos de {TOLERANCIA_AREA_SAP:.0%} de la RFV BRUTO de SAP): "
+                    + ", ".join(f"{r}: {v:.3%} ({q}; medida en {len(med.get(r, []))} meses: "
+                                f"{_rangos_meses(med.get(r, []))})" for r, (q, v) in p["ultimo"].items())
+                    + ("; fija desde su ultimo mes medido; meses no medidos: " + ", ".join(
+                        f"{n} " + ("que se apartan de SAP" if "aparta" in m_ else "sin prima o sin cesion"
+                                   if "completo" in m_ else m_) for m_, n in no.items()) if no else ""), False))
+    else:
+        if not usados:
+            motivo = "no hay Base FIANZAS que leer (ver la linea anterior)"
+        else:
+            completos = [d for d in diag if not str(d["PD medida"]).startswith("no: sin dato completo")]
+            difs = [d["Diferencia %"] for d in completos if np.isfinite(d["Diferencia %"])]
+            motivo = (f"Base FIANZAS trae {len(diag)} ramo-mes de los ramos de la BD hasta el ultimo real ("
+                      f"{_rangos_meses({d['Periodo'] for d in diag})}), pero "
+                      + ("en ninguno trae PRIMA y cesion (IRR + CASTIGO)" if not completos else
+                         f"en ninguno la RVABRUTA del area queda a menos de {TOLERANCIA_AREA_SAP:.0%} de la RFV BRUTO "
+                         f"de SAP en pesos (diferencias de {min(difs):+.0%} a {max(difs):+.0%}): revisa que Base "
+                         "FIANZAS venga en pesos (MXN), del escenario del area, y la hoja RFV_Metodo_Area del "
+                         "diagnostico" if difs else "sin RFV BRUTO de SAP en esos meses"))
+        out.append(("PD de Fianzas", f"PD de Fianzas: N/A: {motivo}. Sin PD, FCR = 1: la RC que se muestra queda igual "
+                    "a la CESION; los montos no cambian (la IRR sale de la CESION del modelo: con o sin PD es la misma; "
+                    "solo con PD_FIANZAS la PD mueve la IRR)", True))
+    for i, (ins_, txt_, na_) in enumerate(out):           # (en los N/A, la carpeta exacta que se reviso)
+        if na_:
+            out[i] = (ins_, f"{txt_} [carpeta de entradas: {ENTRADAS}]", na_)
+    if (area_info or {}).get("aviso"):
+        out.append(("Base FIANZAS", f"Res_Rvas: {area_info['aviso']}", True))
     return out
 
 
@@ -4651,21 +5300,107 @@ def _rangos_meses(periodos) -> str:
     return ", ".join(tramos)
 
 
+def _clave(t) -> str:
+    """Texto para comparar nombres de archivo, de hoja o de columna: sin acentos, en minusculas y sin espacios ni signos
+    ("Período" -> "periodo"; "Monto_Afianzado Tot" -> "montoafianzadotot"; "Base FIANZAS " -> "basefianzas")."""
+    t = unicodedata.normalize("NFKD", "" if t is None else str(t)).encode("ascii", "ignore").decode()
+    return re.sub(r"[^a-z0-9]", "", t.lower())
+
+
+EXT_INSUMO_AREA = (".csv", ".txt", ".xlsx", ".xlsm")   # insumos del area: CSV (o .txt) o Excel (su primera hoja)
+
+
+def buscar_insumo(patron: str, alias: tuple = ()) -> dict:
+    """Archivo de un insumo del area para Fianzas (MontosAfianzados, xDefault, xVigMaxProp, xComUtil). El nombre se
+    compara sin acentos, mayusculas, espacios ni signos (_clave) y debe EMPEZAR con el del patron o con un alias:
+    "MontosAfianzados*.csv" toma "Montos Afianzados.csv", "montos_afianzados (1).csv" o "MontosAfianzados.xlsx", pero no
+    "Proy_MontosAfianzados.csv", "Copia de MontosAfianzados.csv" ni uno con "proy" despues del nombre: esos se reportan
+    como parecidos. Extensiones EXT_INSUMO_AREA. Primero entradas/ y, solo si ahi no hay ninguno, sus subcarpetas
+    (SUBCARPETAS_ENTRADAS); en cada nivel, el CSV antes que el Excel y luego el mas reciente (como antes). Regresa
+    {"ruta": Path o None, "donde": ruta relativa a entradas/, "otros": candidatos que no se tomaron, "parecidos":
+    nombres que traen el del patron pero no se toman, "motivo": por que no hay archivo}."""
+    bases = [b for b in [_clave(Path(patron).stem.replace("*", ""))] + [_clave(a) for a in alias] if b]
+    out = {"ruta": None, "donde": "", "otros": [], "parecidos": [], "motivo": ""}
+    if not ENTRADAS.is_dir():
+        out["motivo"] = f"no existe la carpeta {ENTRADAS}"
+        return out
+    todos = ENTRADAS.rglob("*") if SUBCARPETAS_ENTRADAS else ENTRADAS.iterdir()
+    cand = []
+    for x in todos:
+        if not x.is_file() or x.name.startswith(("~$", ".")):
+            continue
+        k = _clave(x.stem)
+        b = next((b for b in bases if k.startswith(b)), None)
+        if b is not None and x.suffix.lower() in EXT_INSUMO_AREA and "proy" not in k[len(b):]:
+            cand.append(x)
+        elif any(b in k for b in bases):
+            out["parecidos"].append(x.relative_to(ENTRADAS).as_posix())
+    def respaldo(x):                                   # (subcarpetas o nombres de respaldo: no se toman)
+        return any(any(w in _clave(parte) for w in CARPETAS_RESPALDO) for parte in x.relative_to(ENTRADAS).parts[:-1]) \
+            or any(w in _clave(x.stem) for w in ("copia", "respaldo", "backup", "anterior"))
+    out["respaldo"] = [x.relative_to(ENTRADAS).as_posix() for x in cand if respaldo(x)]
+    cand = [x for x in cand if not respaldo(x)]
+    # orden: entradas/ antes que subcarpetas (y la menos profunda), el nombre exacto antes que un alias, el CSV antes
+    # que el Excel y, al final, el mas reciente; con la ruta como desempate (determinista)
+    cand.sort(key=lambda x: (x.parent != ENTRADAS, len(x.relative_to(ENTRADAS).parts),
+                             not _clave(x.stem).startswith(bases[0]), x.suffix.lower() not in (".csv", ".txt"),
+                             -x.stat().st_mtime, x.relative_to(ENTRADAS).as_posix().lower()))
+    if cand:
+        out["ruta"] = cand[0]
+        out["donde"] = cand[0].relative_to(ENTRADAS).as_posix()
+        out["otros"] = [x.relative_to(ENTRADAS).as_posix() for x in cand[1:]]
+    else:
+        out["motivo"] = (f"no hay {patron} en entradas/" + (" ni en sus subcarpetas" if SUBCARPETAS_ENTRADAS else "")
+                         + (f" (hay {', '.join(sorted(out['parecidos']))}, pero no se toman: el nombre debe empezar con "
+                            f"{Path(patron).stem.replace('*', '')} y ser .csv, .txt, .xlsx o .xlsm)"
+                            if out["parecidos"] else "")
+                         + (f" (en carpetas o con nombre de respaldo, que no se toman: {', '.join(out['respaldo'])})"
+                            if out["respaldo"] else ""))
+    return out
+
+
 def _csv_entrada(patron: str):
-    """El CSV mas reciente de entradas/ cuyo nombre completo cumple el patron (sin distinguir mayusculas; sin los
-    temporales ~$): "MontosAfianzados*.csv" no toma "Proy_MontosAfianzados.csv"."""
-    if not ENTRADAS.exists():
-        return None
-    c = [x for x in ENTRADAS.iterdir() if x.is_file() and not x.name.startswith("~$")
-         and fnmatch.fnmatch(x.name.lower(), patron.lower())]
-    return max(c, key=lambda x: x.stat().st_mtime) if c else None
+    """El archivo del insumo del patron en entradas/ o en una subcarpeta (buscar_insumo), o None."""
+    return buscar_insumo(patron)["ruta"]
+
+
+_SEPARADORES_CSV = {",": "con comas", ";": "con punto y coma", "\t": "con tabuladores", "|": "con barras"}
+_NUM_COMA_DECIMAL = r"[-+]?(\d{1,3}(\.\d{3})+|\d+)(,\d+)?"
+
+
+def _coma_decimal(df: pd.DataFrame) -> list:
+    """CSV con ";" o tabulador (Excel con configuracion regional de coma decimal): las columnas cuyos valores son todos
+    numeros (o vacios) y alguno trae coma ("8855774,47", "8.855.774,47", "0,125") pasan a punto decimal ("8855774.47",
+    "0.125"); una columna sin ninguna coma se deja como viene (su punto es decimal). Regresa las columnas convertidas."""
+    hechas = []
+    for c in df.columns:
+        t = df[c].astype(str).str.strip()
+        llenos = t[t != ""]
+        if llenos.empty or not llenos.str.contains(",", regex=False).any() \
+                or not llenos.str.fullmatch(_NUM_COMA_DECIMAL).all():
+            continue
+        df[c] = t.str.replace(".", "", regex=False).str.replace(",", ".", regex=False)
+        hechas.append(c)
+    return hechas
 
 
 def _leer_csv_area(ruta) -> pd.DataFrame:
-    """CSV de los insumos del area (separador detectado; UTF-8 con o sin BOM, o latin-1), todo como texto y con los
-    encabezados sin espacios de mas."""
+    """Tabla de un insumo del area, todo como texto y con los encabezados sin espacios de mas. Un .xlsx o .xlsm: su
+    primera hoja. Un CSV (o .txt): separador detectado; UTF-8 con o sin BOM, UTF-16 ("Texto Unicode" de Excel),
+    Windows-1252 o latin-1; con ";" o tabulador, las columnas numericas con coma decimal pasan a punto decimal
+    (_coma_decimal). df.attrs["formato"] dice como se leyo (para la consola)."""
+    ruta = Path(ruta)
+    if ruta.suffix.lower() in (".xlsx", ".xlsm"):
+        df = pd.read_excel(ruta, sheet_name=0, dtype=str, keep_default_na=False)
+        df.columns = [str(c).strip() for c in df.columns]
+        df = df.loc[:, ~pd.Index(df.columns).duplicated()]
+        df.attrs["formato"] = "Excel, primera hoja"
+        return df
+    with open(ruta, "rb") as fh:
+        bom = fh.read(2)
+    encs = ("utf-16",) if bom in (b"\xff\xfe", b"\xfe\xff") else ("utf-8-sig", "cp1252", "latin-1")
     ultimo_error = None
-    for enc in ("utf-8-sig", "latin-1"):
+    for enc in encs:
         try:
             df = pd.read_csv(ruta, sep=None, engine="python", encoding=enc, dtype=str, keep_default_na=False)
             break
@@ -4673,14 +5408,62 @@ def _leer_csv_area(ruta) -> pd.DataFrame:
             ultimo_error = e
     else:
         raise ultimo_error
-    df.columns = [str(c).replace("\ufeff", "").strip() for c in df.columns]
-    return df.loc[:, ~pd.Index(df.columns).duplicated()]   # (dos encabezados iguales sin espacios: el primero)
+    with open(ruta, encoding=enc, errors="replace") as fh:
+        primera = fh.readline()
+    sep = max(_SEPARADORES_CSV, key=primera.count)
+    df.columns = [str(c).replace("﻿", "").strip() for c in df.columns]
+    df = df.loc[:, ~pd.Index(df.columns).duplicated()]   # (dos encabezados iguales sin espacios: el primero)
+    coma = _coma_decimal(df) if sep in (";", "\t") else []
+    df.attrs["formato"] = f"CSV {_SEPARADORES_CSV[sep]}, {enc}" + (", coma decimal" if coma else "")
+    return df
 
 
 def _col_csv(df: pd.DataFrame, *nombres):
-    """La columna de df con alguno de los nombres (sin distinguir mayusculas ni espacios), o None."""
+    """La columna de df con alguno de los nombres: primero igual sin distinguir mayusculas ni espacios (como antes);
+    si no, igual sin acentos, espacios ni signos ("Período", "Monto_Afianzado_Tot"). None si no esta."""
     enc = {norm(c): c for c in df.columns}
-    return next((enc[norm(n)] for n in nombres if norm(n) in enc), None)
+    c = next((enc[norm(n)] for n in nombres if norm(n) in enc), None)
+    if c is not None:
+        return c
+    enc2 = {}
+    for col in df.columns:
+        enc2.setdefault(_clave(col), col)
+    return next((enc2[_clave(n)] for n in nombres if _clave(n) in enc2), None)
+
+
+def _periodo_csv(s: pd.Series) -> pd.Series:
+    """Periodo AAAAMM de una columna de CSV: el numero (202412) o, si viene como fecha ("01/12/2024", "2024-12-01"), su
+    ano y mes (dia primero, como lo guarda Excel en espanol)."""
+    p = _num_csv(s)
+    malos = ~p.between(190001, 299912) & s.astype(str).str.strip().ne("")
+    if malos.any():
+        t = s[malos].astype(str).str.strip()
+        try:
+            f = pd.to_datetime(t, errors="coerce", dayfirst=True, format="mixed")
+        except (TypeError, ValueError):                # (pandas anterior a 2.0, sin format="mixed")
+            f = pd.to_datetime(t, errors="coerce", dayfirst=True)
+        p = p.where(~malos, f.dt.year * 100 + f.dt.month)
+    return p
+
+
+def _lista_columnas(df: pd.DataFrame, n: int = 12) -> str:
+    cols = [str(c) for c in df.columns]
+    return ", ".join(cols[:n]) + (f" y {len(cols) - n} mas" if len(cols) > n else "")
+
+
+def _ejemplos(s: pd.Series, n: int = 3) -> str:
+    v = [x for x in s.astype(str).str.strip().unique() if x][:n]
+    return ", ".join(f'"{x}"' for x in v) if v else "vacios"
+
+
+def _donde(b: dict) -> str:
+    """Nombre del archivo tomado (con su subcarpeta de entradas/, si es de una) y los demas candidatos."""
+    t = b["donde"]
+    if b.get("otros"):
+        t += f" (no se usan {', '.join(b['otros'])})"
+    if "/" in t.split(" (")[0]:
+        t += " (tomado de una subcarpeta: muevelo a entradas/)"
+    return t
 
 
 def _num_csv(s: pd.Series) -> pd.Series:
@@ -4698,31 +5481,39 @@ def _texto_ramo(v) -> str:
 
 def leer_montos_afianzados(ramos: list) -> dict:
     """Monto afianzado (MA) del segmento nacional proporcional por ramo y mes, en MXN, del CSV del area
-    (PATRON_MONTOS_AFIANZADOS en entradas/): suma de "Monto Afianzado Tot" de todas las cedentes, con su Escenario (Real
-    o Estimado del area; un mes con algun renglon Estimado cuenta como Estimado). Un ramo-mes sin dato o en 0 no lleva
-    MA. Revisa la calidad: renglones negativos, meses que repiten al anterior y el salto del ultimo real al primer
-    estimado. Regresa {"ma": {(ramo, periodo): MXN}, "escenario": {(ramo, periodo): "Real" | "Estimado"}, "claves":
-    {ramo: claves de cedente}, "ruta", "renglones", "usados", "ultimo", "texto", "avisos"}."""
-    ruta = _csv_entrada(PATRON_MONTOS_AFIANZADOS)
+    (PATRON_MONTOS_AFIANZADOS en entradas/ o en una subcarpeta, buscar_insumo): suma de "Monto Afianzado Tot" de todas
+    las cedentes, con su Escenario (Real o Estimado del area; un mes con algun renglon Estimado cuenta como Estimado). Un
+    ramo-mes sin dato o en 0 no lleva MA. Revisa la calidad: renglones negativos, meses que repiten al anterior y el
+    salto del ultimo real al primer estimado. Regresa {"ma": {(ramo, periodo): MXN}, "escenario": {(ramo, periodo):
+    "Real" | "Estimado"}, "claves": {ramo: claves de cedente}, "ruta", "renglones", "usados", "ultimo", "texto" (de
+    donde salio o, sin MA, "N/A: " y el motivo con lo que hay que hacer), "avisos" (calidad del dato)}."""
+    b = buscar_insumo(PATRON_MONTOS_AFIANZADOS, alias=("Monto Afianzado",))
+    ruta = b["ruta"]
     out = {"ma": {}, "escenario": {}, "claves": {}, "ruta": ruta, "renglones": 0, "usados": 0, "ultimo": None,
            "texto": "", "avisos": []}
+    que_hacer = ("copia a entradas/ el CSV del monto afianzado del area (el MontosAfianzados.csv de la carpeta Inputs "
+                 "de sus scripts, con las columnas Periodo, Ramo, Monto Afianzado Tot y Escenario)")
     if ruta is None:
-        out["texto"] = f"sin {PATRON_MONTOS_AFIANZADOS} en entradas/"
+        out["texto"] = f"N/A: {b['motivo']}: {que_hacer}"
         return out
+    nombre = _donde(b)
     try:
         df = _leer_csv_area(ruta)
     except Exception as e:  # noqa: BLE001
-        out["avisos"].append(f"{ruta.name}: no se pudo leer ({type(e).__name__}); sin monto afianzado")
-        out["texto"] = out["avisos"][-1]
+        out["texto"] = (f"N/A: {nombre}: no se pudo leer ({type(e).__name__}: {e}): "
+                        + ("cierralo en Excel y vuelve a correr" if isinstance(e, PermissionError) else que_hacer))
         return out
     out["renglones"] = len(df)
-    c_p, c_r, c_t = _col_csv(df, "Periodo"), _col_csv(df, "Ramo"), _col_csv(df, "Monto Afianzado Tot")
+    c_p, c_r = _col_csv(df, "Periodo"), _col_csv(df, "Ramo")
+    c_t = _col_csv(df, "Monto Afianzado Tot", "Monto Afianzado Total", "Monto Afianzado")
     c_e, c_k = _col_csv(df, "Escenario"), _col_csv(df, "Clave")
-    if c_p is None or c_r is None or c_t is None:
-        out["avisos"].append(f"{ruta.name}: faltan las columnas Periodo, Ramo o Monto Afianzado Tot; sin monto afianzado")
-        out["texto"] = out["avisos"][-1]
+    faltan = [n for n, c in (("Periodo", c_p), ("Ramo", c_r), ("Monto Afianzado Tot", c_t)) if c is None]
+    if faltan:
+        out["texto"] = (f"N/A: {nombre} ({df.attrs.get('formato', 'CSV')}) no trae la(s) columna(s) "
+                        f"{', '.join(faltan)} (trae: {_lista_columnas(df)}): renombra los encabezados como en el CSV "
+                        "del area (Periodo, Ramo, Monto Afianzado Tot y Escenario)")
         return out
-    per, m = _num_csv(df[c_p]), _num_csv(df[c_t])
+    per, m = _periodo_csv(df[c_p]), _num_csv(df[c_t])
     ram = _num_csv(df[c_r]).map(_texto_ramo)
     esc = df[c_e].astype(str).str.strip() if c_e else pd.Series("Real", index=df.index)
     cla = df[c_k].astype(str).str.strip() if c_k else pd.Series("", index=df.index)
@@ -4744,9 +5535,23 @@ def leer_montos_afianzados(ramos: list) -> dict:
     reales = sorted({p for (r, p), e in out["escenario"].items() if e == "Real"})
     est = sorted({p for (r, p), e in out["escenario"].items() if e != "Real"})
     out["ultimo"] = max(p for _, p in out["ma"]) if out["ma"] else None
-    out["texto"] = (f"{ruta.name}: {out['usados']:,} de {out['renglones']:,} renglones (filtros: ramos de la BD de RFV y "
-                    f"Monto Afianzado Tot con dato; {t['k'].nunique()} cedentes); real {_rangos_meses(reales)}"
-                    + (f"; estimado del area {_rangos_meses(est)}" if est else ""))
+    formato = df.attrs.get("formato", "")
+    if not out["ma"]:
+        sin_per = int((~per.between(190001, 299912)).sum())
+        fuera = sorted(set(ram[per.between(190001, 299912)]) - {str(r) for r in ramos} - {""})
+        out["texto"] = (f"N/A: {nombre} ({formato}): ninguno de sus {len(df):,} renglones trae monto afianzado de los "
+                        f"ramos de la BD de RFV ({', '.join(str(r) for r in ramos)})"
+                        + (f"; {sin_per:,} con Periodo que no es AAAAMM ni fecha (p. ej. {_ejemplos(df[c_p][~per.between(190001, 299912)])})"
+                           if sin_per else "")
+                        + (f"; ramos que trae: {', '.join(fuera)}" if fuera else "")
+                        + (f"; {vacios:,} sin numero en {c_t} (p. ej. {_ejemplos(df[c_t][ok & m.isna()])})" if vacios else "")
+                        + f": revisa el archivo o {que_hacer}")
+        return out
+    out["texto"] = (f"{nombre}: {out['usados']:,} de {out['renglones']:,} renglones (filtros: ramos de la BD de RFV y "
+                    f"Monto Afianzado Tot con dato; {t['k'].nunique()} cedentes); ramos "
+                    f"{', '.join(sorted(out['claves'], key=int))}; real {_rangos_meses(reales)}"
+                    + (f"; estimado del area {_rangos_meses(est)}" if est else "")
+                    + (f" ({formato})" if formato and not formato.startswith("CSV con comas") else ""))
     if vacios:
         out["avisos"].append(f"{ruta.name}: {vacios} renglon(es) sin Monto Afianzado Tot (no se usan)")
     if en_cero:
@@ -4757,11 +5562,11 @@ def leer_montos_afianzados(ramos: list) -> dict:
                              + ", ".join(f"{n} {'estimado' if e else 'real'}" for e, n in neg.groupby("est").size().items())
                              + f"; suman {neg['m'].sum() / 1e6:,.2f} M MXN); se usan tal cual")
     meses = sorted(t["p"].unique())
-    for a, b in zip(meses, meses[1:]):                 # un mes que repite al anterior renglon por renglon (copia)
+    for a, b_ in zip(meses, meses[1:]):                # un mes que repite al anterior renglon por renglon (copia)
         va = t[t["p"] == a].groupby(["r", "k"])["m"].sum()
-        vb = t[t["p"] == b].groupby(["r", "k"])["m"].sum()
+        vb = t[t["p"] == b_].groupby(["r", "k"])["m"].sum()
         if len(va) >= 5 and len(va) == len(vb) and va.index.equals(vb.index) and np.allclose(va.values, vb.values):
-            out["avisos"].append(f"{ruta.name}: {b} es igual a {a} en los {len(vb)} pares ramo-cedente (parece copia "
+            out["avisos"].append(f"{ruta.name}: {b_} es igual a {a} en los {len(vb)} pares ramo-cedente (parece copia "
                                  "del mes anterior); se usa tal cual")
     if reales and est:
         u, e1 = reales[-1], est[0]
@@ -4771,8 +5576,6 @@ def leer_montos_afianzados(ramos: list) -> dict:
         if grandes:
             out["avisos"].append(f"{ruta.name}: el estimado del area de {e1} se aparta del real de {u} en "
                                  + ", ".join(grandes) + " (el estimado no arranca en el ultimo real)")
-    if not out["ma"]:
-        out["avisos"].append(f"{ruta.name}: ningun renglon de los ramos de la BD de RFV con monto afianzado")
     return out
 
 
@@ -4822,34 +5625,42 @@ def ma_hasta(ma_info: dict | None, corte: int, solo_real: bool = True) -> dict:
 
 
 def pd_xdefault(ramos: list, periodos: list[int]) -> dict:
-    """PD de referencia por ramo y mes con el CSV de default por poliza del area (PATRON_XDEFAULT): suma de
-    PrimaCedidaOriginal x Default_Total / suma de PrimaCedidaOriginal de las polizas con aPOG_MesProc en los ultimos N
-    meses (MESES_PD_XDEFAULT, contando el mes), en moneda original como viene. No entra a la IRR (el area pondera cada
-    contrato por su reserva cedida vigente y esa liga esta en su base Access): se compara con la PD del castigo. Regresa
-    {"pd": {(meses, ramo, periodo): PD}, "renglones", "usados", "texto", "avisos"}."""
-    ruta = _csv_entrada(PATRON_XDEFAULT)
+    """PD de referencia por ramo y mes con el CSV de default por poliza del area (PATRON_XDEFAULT, en entradas/ o en una
+    subcarpeta): suma de PrimaCedidaOriginal x Default_Total / suma de PrimaCedidaOriginal de las polizas con
+    aPOG_MesProc en los ultimos N meses (MESES_PD_XDEFAULT, contando el mes), en moneda original como viene. No entra a
+    la IRR (el area pondera cada contrato por su reserva cedida vigente y esa liga esta en su base Access): se compara
+    con la PD del castigo. Regresa {"pd": {(meses, ramo, periodo): PD}, "renglones", "usados", "texto" (sin PD, "N/A: "
+    y el motivo), "avisos"}."""
+    b = buscar_insumo(PATRON_XDEFAULT)
+    ruta = b["ruta"]
     out = {"pd": {}, "renglones": 0, "usados": 0, "texto": "", "avisos": [], "ruta": ruta}
+    que_hacer = ("copia a entradas/ el xDefault.csv de la carpeta Inputs de los scripts del area (columnas aPOG_MesProc, "
+                 "Ramo, PrimaCedidaOriginal y Default_Total); es solo la referencia de la PD, no cambia la IRR")
     if ruta is None:
-        out["texto"] = f"sin {PATRON_XDEFAULT} en entradas/"
+        out["texto"] = f"N/A: {b['motivo']}: {que_hacer}"
         return out
+    nombre = _donde(b)
     try:
         df = _leer_csv_area(ruta)
     except Exception as e:  # noqa: BLE001
-        out["texto"] = f"{ruta.name}: no se pudo leer ({type(e).__name__})"
+        out["texto"] = (f"N/A: {nombre}: no se pudo leer ({type(e).__name__}): "
+                        + ("cierralo en Excel y vuelve a correr" if isinstance(e, PermissionError) else que_hacer))
         return out
     out["renglones"] = len(df)
     c = {k: _col_csv(df, n) for k, n in (("p", "aPOG_MesProc"), ("r", "Ramo"), ("c", "PrimaCedidaOriginal"),
                                          ("d", "Default_Total"))}
     if any(v is None for v in c.values()):
-        out["texto"] = f"{ruta.name}: faltan aPOG_MesProc, Ramo, PrimaCedidaOriginal o Default_Total"
+        faltan = [n for k, n in (("p", "aPOG_MesProc"), ("r", "Ramo"), ("c", "PrimaCedidaOriginal"),
+                                 ("d", "Default_Total")) if c[k] is None]
+        out["texto"] = f"N/A: {nombre}: no trae la(s) columna(s) {', '.join(faltan)} (trae: {_lista_columnas(df)})"
         return out
-    t = pd.DataFrame({"p": _num_csv(df[c["p"]]), "r": _num_csv(df[c["r"]]).map(_texto_ramo),
+    t = pd.DataFrame({"p": _periodo_csv(df[c["p"]]), "r": _num_csv(df[c["r"]]).map(_texto_ramo),
                       "c": _num_csv(df[c["c"]]), "d": _num_csv(df[c["d"]])})
     sin_pd = int(t["d"].isna().sum())
     t = t[t["p"].between(190001, 299912) & t["r"].isin([str(r) for r in ramos]) & t["d"].notna() & t["c"].notna()]
     out["usados"] = len(t)
     if t.empty:
-        out["texto"] = f"{ruta.name}: sin polizas de los ramos de la BD de RFV con PD"
+        out["texto"] = f"N/A: {nombre}: sin polizas de los ramos de la BD de RFV con PD ({len(df):,} renglones)"
         return out
     t = t.assign(p=t["p"].astype(int), w=t["c"] * t["d"])
     p_max = int(t["p"].max())
@@ -4866,10 +5677,13 @@ def pd_xdefault(ramos: list, periodos: list[int]) -> dict:
                 if cs:
                     out["pd"][(n, r, p)] = float(agg["w"].values[sel].sum()) / cs
     altos, unos = int((t["d"] >= 0.5).sum()), int((t["d"] >= 1).sum())
-    out["texto"] = (f"{ruta.name}: {out['usados']:,} de {out['renglones']:,} renglones (filtros: ramos de la BD de RFV y "
-                    f"Default_Total con dato; {sin_pd:,} sin PD), polizas de {int(t['p'].min())} a {p_max}; "
+    formato = df.attrs.get("formato", "")
+    out["texto"] = (f"{nombre}: {out['usados']:,} de {out['renglones']:,} renglones (filtros: ramos de la BD de RFV y "
+                    f"Default_Total con dato; {sin_pd:,} sin PD), ramos {', '.join(sorted(t['r'].unique(), key=int))}, "
+                    f"polizas de {int(t['p'].min())} a {p_max}; "
                     f"{altos} con PD de 0.5 o mas ({unos} con PD = 1); PD ponderada por la prima cedida en moneda "
-                    "original, ventanas de " + " y ".join(f"{n} meses" for n in MESES_PD_XDEFAULT))
+                    "original, ventanas de " + " y ".join(f"{n} meses" for n in MESES_PD_XDEFAULT)
+                    + (f" ({formato})" if formato and not formato.startswith("CSV con comas") else ""))
     return out
 
 
@@ -4883,8 +5697,11 @@ def csu_fianzas(seg: dict | None, ramos: list) -> dict:
     tab = (seg or {}).get("contratos")
     rv, rc = _csv_entrada(PATRON_VIGMAX_PROP), _csv_entrada(PATRON_COM_UTIL)
     if tab is None or tab.empty or rv is None or rc is None or not (tab["llave"] != "").any():
-        out["texto"] = ("sin " + " ni ".join(x for x, f in ((PATRON_VIGMAX_PROP, rv), (PATRON_COM_UTIL, rc)) if f is None)
-                        + " en entradas/" if rv is None or rc is None else
+        out["texto"] = ("N/A: sin " + " ni ".join(x for x, f in ((PATRON_VIGMAX_PROP, rv), (PATRON_COM_UTIL, rc))
+                                                  if f is None)
+                        + " en entradas/" + (" ni en sus subcarpetas" if SUBCARPETAS_ENTRADAS else "")
+                        + ": copialos de la carpeta Inputs de los scripts del area (solo es referencia)"
+                        if rv is None or rc is None else
                         "la base del real no trae la llave del contrato (Corredor, Compania, Num Contrato, Ano Susc.)")
         return out
     try:
@@ -5075,8 +5892,8 @@ def calcular_rfv_prima(bd: BDMontos, proy: dict, pt: dict | None, periodos_proy:
                        tc_hist: dict | None = None, tc_pt: dict | None = None, com: dict | None = None,
                        pdinfo: dict | None = None, indicaciones: bool = True, ma_info: dict | None = None) -> dict:
     """RFV por prima (Fianzas): FRV = RFV BRUTO x TC / PRIMA 24M en la historia, proyectado con TIPO_MODELO_FRV desde el
-    ultimo mes real; CESION = RFV IRR / RFV BRUTO real proyectada con el modelo de la cesion de Danos
-    (TIPO_MODELO_FACTORES["CESION"]); RFV BRUTO = PRIMA 24M x FRV / TC (el del mes proyectado), RFV IRR = BRUTO x CESION,
+    ultimo mes real; CESION = RFV IRR / RFV BRUTO real proyectada con TIPO_MODELO_CESION_RFV (solo Fianzas;
+    la de Danos sigue con TIPO_MODELO_FACTORES["CESION"]); RFV BRUTO = PRIMA 24M x FRV / TC (el del mes proyectado), RFV IRR = BRUTO x CESION,
     RFV NETO = BRUTO - IRR. La RCONT no cambia. El TC de la historia es el de tc_hist (el real con que SAP convirtio
     cada mes, y en los meses que la BD traia en pesos el de esa correccion, como el modelo) y, sin el, el de la columna
     TC (tc_para_periodo). Un mes cuya PRIMA 24M no esta completa (algun mes sin fuente) y los ramos fuera de
@@ -5176,7 +5993,12 @@ def calcular_rfv_prima(bd: BDMontos, proy: dict, pt: dict | None, periodos_proy:
             else:
                 prm = res.parametros or {}
                 fila.update({"El modelo proyecta": "FRV residual (sin RFV MA)" if split else "FRV",
-                             "FRV modelo": res.regla or res.modelo,
+                             "FRV modelo": texto_modelo_rfv(TIPO_MODELO_FRV) if TIPO_MODELO_FRV in ("rfv", "rfv_log")
+                             else (res.regla or res.modelo),
+                             "FRV tendencia aplicada": prm.get("regla_pendiente", ""),
+                             "FRV pendiente aplicada (por mes)": prm.get("pendiente_aplicada", math.nan),
+                             "FRV saltos quitados": ", ".join(str(per[-1 - k]) for k in prm.get("saltos_hace") or []
+                                                             if k < len(per)),
                              "FRV alpha": prm.get("alpha", math.nan),
                              "FRV error % backtest (modelo)": res.error_modelo,
                              "FRV error % backtest (ultimo valor)": res.error_ultimo_valor,
@@ -5188,13 +6010,21 @@ def calcular_rfv_prima(bd: BDMontos, proy: dict, pt: dict | None, periodos_proy:
             ces_f = np.full(h, ces_h[ok_c[-1]]) if ok_c else np.zeros(h)
             if ok_c:
                 per_c = rango_periodos(ok_c[0], ultimo)
-                res_c = pronosticar(Serie(("FIANZAS", "RFV", "CESION", r), TIPO_MODELO_FACTORES["CESION"], per_c,
+                res_c = pronosticar(Serie(("FIANZAS", "RFV", "CESION", r), TIPO_MODELO_CESION_RFV, per_c,
                                           [ces_h.get(q, math.nan) for q in per_c], ultimo, h, dominio=DOMINIO_CESION))
                 x = np.asarray(res_c.pronostico, dtype=float)
                 if len(x) == h and np.all(np.isfinite(x)):
                     ces_f = x
                 u = ces_h[ok_c[-1]]
-                fila.update({"CESION modelo": res_c.regla or res_c.modelo,
+                out["alertas"] += [("FIANZAS", f"RFV | CESION | ramo {r}", a) for a in res_c.alertas
+                                   if not str(a).startswith("Se usa")]
+                prc = res_c.parametros or {}
+                fila.update({"CESION modelo": texto_modelo_rfv(TIPO_MODELO_CESION_RFV)
+                             if TIPO_MODELO_CESION_RFV in ("rfv", "rfv_log") else (res_c.regla or res_c.modelo),
+                             "CESION tendencia aplicada": prc.get("regla_pendiente", ""),
+                             "CESION pendiente aplicada (por mes)": prc.get("pendiente_aplicada", math.nan),
+                             "CESION saltos quitados": ", ".join(str(per_c[-1 - k]) for k in prc.get("saltos_hace") or []
+                                                                if k < len(per_c)),
                              "CESION error % backtest (modelo)": res_c.error_modelo,
                              "CESION error % backtest (ultimo valor)": res_c.error_ultimo_valor,
                              f"CESION {ultimo}": u, f"CESION {periodos_proy[-1]}": float(ces_f[-1])})
@@ -5207,7 +6037,7 @@ def calcular_rfv_prima(bd: BDMontos, proy: dict, pt: dict | None, periodos_proy:
             per_u = rango_periodos(ok_p[0], ultimo)
             v_u = [bd.valores.get((c_b, q, r), math.nan) / prima_usd(r, q) if prima_usd(r, q) > 0 else math.nan
                    for q in per_u]
-            res_u = pronosticar(Serie(("FIANZAS", "RFV", "FRV USD", r), TIPO_MODELO_FRV, per_u, v_u, ultimo, h,
+            res_u = pronosticar(Serie(("FIANZAS", "RFV", "FRV USD", r), TIPO_MODELO_FRV_USD, per_u, v_u, ultimo, h,
                                       dominio=(0.0, None)))
             x = np.asarray(res_u.pronostico, dtype=float)
             if len(x) == h and np.all(np.isfinite(x)):
@@ -5826,8 +6656,8 @@ def escribir_bloques_rfv(bd: BDMontos, info: dict, hoja_pt: dict | None, periodo
     _partir_columnas(ws)                               # (la BD de entrada trae rangos <col> de varias columnas)
     col_estilo = max(fijas)
     ancho = ws.column_dimensions[get_column_letter(next(iter(bd.cols_ramo.values())))].width
-    modelo_frv = MODELO_POR_TIPO.get(TIPO_MODELO_FRV, TIPO_MODELO_FRV)
-    modelo_ces = MODELO_POR_TIPO.get(TIPO_MODELO_FACTORES["CESION"], "")
+    modelo_frv = texto_modelo_rfv(TIPO_MODELO_FRV)
+    modelo_ces = texto_modelo_rfv(TIPO_MODELO_CESION_RFV)
     desde = f"; desde {periodos_proy[0]}, en los ramos con RFV por prima, " if periodos_proy else ""
     si_error = " (SI.ERROR: 0 si divide entre 0)"
     n = MESES_PRIMA_RFV
@@ -7388,6 +8218,7 @@ def escribir_diagnostico(resultados: dict, periodos_proy: list[int], alertas_gen
          + (f"; hojas RFV_Prima_Resumen y RFV_Prima_Mensual; en la BD de RFV, hoja {HOJA_PT_RAMO} y bloques "
             + ", ".join(nombre_bloque_rfv(k) for k in bloques_rfv())
             if ((resumen.get("pnd") or {}).get("rfv_prima") or {}).get("aplica") else "")),
+        ("Prima base de la RFV (Fianzas)", _texto_prima_base((resumen.get("pnd") or {}).get("rfv_prima") or {})),
         ("Factores de la RFV (metodologia del area)", _texto_factores_rfv((resumen.get("pnd") or {}).get("rfv_prima") or {})),
         ("Insumos del area (Fianzas)", _texto_insumos_fianzas((resumen.get("pnd") or {}).get("rfv_prima") or {})),
         ("Backtesting Fianzas", (((resumen.get("pnd") or {}).get("backtesting_rfv") or {}).get("estado") or "-")
@@ -7855,6 +8686,15 @@ def _hojas_pnd(wb, diag: dict, negrita, encab):
             _hoja_filas(wb, "RFV_Prima_Mensual", rfv_.get("series") or [], negrita, encab,
                         {"PT": "#,##0", "PRIMA": "#,##0", "FRV": "0.0000", "CESION": "0.00%", "TC": "0.0000",
                          "RFV": "#,##0", **fmt_fac})
+            if rfv_.get("prima_base"):                 # prima base de la RFV: mensual, por bloque y sensibilidad
+                _hoja_filas(wb, "RFV_Prima_Base", rfv_["prima_base"], negrita, encab,
+                            {"PT": "#,##0", "Referencia": "#,##0", "PRIMA": "#,##0", "PrimasNal": "#,##0",
+                             "PExRamo -": "#,##0", "Crecimiento": "0.0%", "Parte": "0.0%", "TC": "0.0000"})
+                _hoja_filas(wb, "RFV_Prima_Bloques", rfv_.get("prima_bloques") or [], negrita, encab,
+                            {"PT": "#,##0", "Mismos": "#,##0", "Referencia": "#,##0", "PRIMA": "#,##0",
+                             "Crecimiento": "0.0%", "Fuente /": "0.0%", "Peso": "0.0%"})
+                _hoja_filas(wb, "RFV_Prima_Sensibilidad", rfv_.get("prima_sens") or [], negrita, encab,
+                            {"RFV": "#,##0", "Cambio": "0.00%", "Factor": "0.00"})
             if FACTORES_RFV and (rfv_.get("pdinfo") or {}).get("diag"):
                 _hoja_filas(wb, "RFV_Metodo_Area", rfv_["pdinfo"]["diag"], negrita, encab,
                             {"RVABRUTA": "#,##0", "RFV BRUTO": "#,##0", "Diferencia": "0.0%", "PRIMA": "#,##0",
@@ -8544,7 +9384,7 @@ def main():
     info_rfvp = {"estado": "apagado (USAR_RFV_POR_PRIMA = False)", "aplica": set(), "frv": {}, "cesion": {},
                  "series": [], "resumen": []}
     pt_fz, bt_rfv = None, {"estado": "apagado (BACKTESTING = False)", "proy": {}}
-    area_fz, ma_fz = {}, {}
+    area_fz, ma_fz, info_area_fz = {}, {}, {}
     # TC de la historia de la RFV: el real con que SAP convirtio cada mes y, en los meses que la BD traia en pesos, el de
     # esa correccion (los pesos originales); el mismo con que el modelo regresa la historia a pesos
     tc_frv = {p: t for p, t in (tc_hist.get("FIANZAS") or leer_tc_real(bd_rfv, ultimo)).items() if p <= ultimo}
@@ -8556,10 +9396,12 @@ def main():
             pt_fz = pt_fianzas(pe_ramo, pe_rfa, pef, bd_rfv, tc_primas, periodos_proy)
             for a in pt_fz["avisos"]:
                 alertas.append(("FIANZAS", "Prima de Fianzas", a))
+                if a.startswith(("PRIMA DE FIANZAS", "PT de Fianzas cambiada")):   # (la prima es el pilar: a consola)
+                    print(f"   AVISO FIANZAS: {a}", flush=True)
             com_fz = segmento_pr_fianzas(list(bd_rfv.cols_ramo), ultimo) if FACTORES_RFV else None
             for a in (com_fz or {}).get("avisos") or []:
                 alertas.append(("FIANZAS", "Comisiones de Fianzas", a))
-            area_fz = leer_fianzas_area(list(bd_rfv.cols_ramo), ultimo) if FACTORES_RFV else {}
+            area_fz = leer_fianzas_area(list(bd_rfv.cols_ramo), ultimo, info_area_fz) if FACTORES_RFV else {}
             for a in (indicaciones_rfv(list(bd_rfv.cols_ramo))[2] if FACTORES_RFV else []):
                 alertas.append(("FIANZAS", "Indicaciones de la RFV", a))
                 print(f"   AVISO FIANZAS: {a}", flush=True)
@@ -8569,23 +9411,35 @@ def main():
             try:
                 ma_fz = leer_montos_afianzados(list(bd_rfv.cols_ramo)) if FACTORES_RFV and MA_RFV else {}
             except Exception as e_ma:  # noqa: BLE001  (el MA no puede tumbar la RFV por prima)
-                txt_ma = (f"{PATRON_MONTOS_AFIANZADOS}: no se pudo leer ({type(e_ma).__name__}: {e_ma}); la reserva por "
-                          "monto afianzado queda dentro de FV")
-                ma_fz = {"ma": {}, "escenario": {}, "claves": {}, "ultimo": None, "texto": txt_ma, "avisos": [txt_ma]}
+                txt_ma = (f"N/A: {PATRON_MONTOS_AFIANZADOS}: no se pudo leer ({type(e_ma).__name__}: {e_ma}); la "
+                          "reserva por monto afianzado queda dentro de FV")
+                ma_fz = {"ma": {}, "escenario": {}, "claves": {}, "ultimo": None, "texto": txt_ma, "avisos": []}
             for a in (indices_ma()[3] if FACTORES_RFV and MA_RFV else []):
                 alertas.append(("FIANZAS", "Indices del monto afianzado", a))
                 print(f"   AVISO FIANZAS: {a}", flush=True)
             for a in (ma_fz or {}).get("avisos") or []:
                 alertas.append(("FIANZAS", "Monto afianzado", a))
                 print(f"   AVISO FIANZAS: {a}", flush=True)
-            if FACTORES_RFV and MA_RFV and not (ma_fz or {}).get("ma"):
-                alertas.append(("FIANZAS", "Monto afianzado", f"sin {PATRON_MONTOS_AFIANZADOS} en entradas/ (o sin "
-                                "renglones utiles): la reserva por monto afianzado queda dentro de FV, como antes"))
-            if FACTORES_RFV and not (pd_fz or {}).get("ultimo"):
-                alertas.append(("FIANZAS", "PD de Fianzas", "ningun Res_Rvas de entradas/ trae la hoja Base FIANZAS con "
-                                "castigo en meses que coincidan con SAP: la PD va en N/A y FCR = 1"))
+            if FACTORES_RFV:                           # una linea por insumo: archivo, hoja, renglones, ramos y
+                for ins_, txt_, na_ in reporte_insumos_fianzas(ma_fz if MA_RFV else None, info_area_fz, pd_fz):
+                    print(f"   {'AVISO FIANZAS: ' if na_ else ''}{txt_}", flush=True)   # meses, o el motivo del N/A
+                    if na_:
+                        alertas.append(("FIANZAS", ins_, txt_))
             info_rfvp = calcular_rfv_prima(bd_rfv, proy_rfv, pt_fz, periodos_proy, ultimo, tc_frv, tc_primas, com_fz,
                                            pd_fz, ma_info=ma_fz)
+            try:                                       # prima base: control, sensibilidad y saltos (diagnostico)
+                ctl_pt, av_pt = control_pt_bdreal(pt_fz, com_fz, list(bd_rfv.cols_ramo))
+                for a in av_pt + alertas_dientes_rfv(bd_rfv, info_rfvp, ultimo):
+                    alertas.append(("FIANZAS", "Prima de Fianzas", a))
+                    print(f"   AVISO FIANZAS: {a}", flush=True)
+                info_rfvp["control_pt"] = ctl_pt.get("texto", "") if ctl_pt else ""
+                info_rfvp["prima_base"] = filas_prima_base(pt_fz, list(bd_rfv.cols_ramo), tc_primas, ultimo, ctl_pt)
+                info_rfvp["prima_bloques"] = (pt_fz or {}).get("bloques") or []
+                info_rfvp["prima_sens"] = sensibilidad_prima_rfv(bd_rfv, proy_rfv, pt_fz, periodos_proy, ultimo, tc_frv,
+                                                                 com_fz, pd_fz, ma_fz, info_rfvp)
+            except Exception as e_pb:  # noqa: BLE001  (diagnostico: no cambia montos)
+                alertas.append(("FIANZAS", "Prima de Fianzas", f"no se pudo armar el diagnostico de la prima base "
+                                                               f"({type(e_pb).__name__}: {e_pb})"))
             if FACTORES_RFV:
                 try:
                     insumos_area_fianzas(info_rfvp, bd_rfv, list(bd_rfv.cols_ramo),
@@ -8614,16 +9468,24 @@ def main():
         print(f"   Prima de Fianzas: {(pt_fz or {}).get('texto') or '-'}", flush=True)
         if (pt_fz or {}).get("texto_cedida"):
             print(f"   Prima cedida de Fianzas: {pt_fz['texto_cedida']}", flush=True)
+        if info_rfvp.get("prima_base") or info_rfvp.get("prima_sens"):
+            print(f"   Prima base de la RFV: {_texto_prima_base(info_rfvp)}", flush=True)
         if FACTORES_RFV and (info_rfvp.get("com") or {}).get("texto"):
             print(f"   Segmento de prima de reserva de Fianzas: {info_rfvp['com']['texto']}", flush=True)
-        for t_ in ("ma", "pdx", "csu"):
+        for t_ in ("pdx", "csu"):                     # (MA, Base FIANZAS y PD ya salieron arriba, una linea cada uno)
             if (info_rfvp.get(f"texto_{t_}") or ""):
-                print(f"   {dict(ma='Monto afianzado', pdx='PD de referencia (xDefault)', csu='Comision sobre utilidades')[t_]}"
-                      f": {info_rfvp[f'texto_{t_}']}", flush=True)
-        if FACTORES_RFV and (info_rfvp.get("pdinfo") or {}).get("ultimo"):
-            print("   PD de Fianzas (Res_Rvas, CASTIGO / (IRR + CASTIGO), ultimo mes medido): " + ", ".join(
-                f"{r_}: {v_:.3%} ({q_})" for r_, (q_, v_) in info_rfvp["pdinfo"]["ultimo"].items()), flush=True)
+                na_ = info_rfvp[f"texto_{t_}"].startswith("N/A")
+                ins_ = dict(pdx="PD de referencia (xDefault)", csu="Comision sobre utilidades")[t_]
+                print(f"   {'AVISO FIANZAS: ' if na_ else ''}{ins_}: {info_rfvp[f'texto_{t_}']}", flush=True)
+                if na_:
+                    alertas.append(("FIANZAS", ins_, info_rfvp[f"texto_{t_}"]))
         print(f"   {info_rfvp['estado']}", flush=True)
+        for f_ in info_rfvp.get("resumen") or []:     # la tendencia que se aplico a los factores de cada ramo
+            if f_.get("FRV tendencia aplicada") or f_.get("CESION tendencia aplicada"):
+                print(f"   Tendencia de la RFV, ramo {f_['Ramo']}: " + "; ".join(
+                    f"{x_} {f_.get(f'{x_} pendiente aplicada (por mes)', math.nan):+.4f}/mes ("
+                    + str(f_.get(f"{x_} tendencia aplicada") or "").split("; ", 1)[-1] + ")"
+                    for x_ in ("FRV", "CESION") if f_.get(f"{x_} tendencia aplicada")), flush=True)
         if info_rfvp.get("sensibilidad"):
             print(f"   Sensibilidad a la moneda: {info_rfvp['sensibilidad']}", flush=True)
         if info_rfvp.get("aplica"):                    # con la RFV por prima el rango esperado solo se avisa: no se
