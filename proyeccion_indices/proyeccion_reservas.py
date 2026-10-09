@@ -163,7 +163,7 @@ except Exception as _e:  # noqa: BLE001
 # =============================================================================
 CARPETA = Path(__file__).resolve().parent
 ENTRADAS = CARPETA / "entradas"
-VERSION_CODIGO = "2026-10-09b"   # version de los scripts: sale en la consola, en la hoja Resumen del diagnostico, en el pie
+VERSION_CODIGO = "2026-10-09c"   # version de los scripts: sale en la consola, en la hoja Resumen del diagnostico, en el pie
                                  # del tablero HTML y en la hoja Dashboard Razones del Excel, para saber con que version se corrio
 SALIDAS = CARPETA / "salidas"
 
@@ -388,29 +388,34 @@ PENDIENTE_COMBINADA = {
     "meses_tope": 16,
     "min_obs": 6,                       # menos observaciones: sin pendiente
 }
-# Tendencia de los factores de la RFV por prima (solo Fianzas: tipos "rfv" y "rfv_log"; Danos no la usa): la misma regla
-# de la pendiente combinada que usan los factores de Danos (PENDIENTE_COMBINADA), ajustada a la historia corta de la RFV
-# (unos 20 meses) y con los saltos tratados como cambios de nivel:
+# Tendencia de los factores de la RFV por prima (solo Fianzas: tipos "rfv" y "rfv_log"; Danos no la usa). Desde la
+# version 2026-10-09c, por indicacion del area ("que agarren la tendencia del historico"), la tendencia historica completa:
 #   1. Saltos: un cambio mensual de mas de k_salto veces la MAD de los cambios de la ventana es un cambio de nivel (un
 #      contrato que entra o sale, un mes atipico), no tendencia: se quita del calculo de la pendiente (la serie se
-#      "pega" en ese mes). Si un salto cae en los ultimos meses_salto_reciente meses, el nuevo nivel no esta confirmado:
-#      la pendiente se proyecta por credibilidad_salto_reciente (la mitad) y hay alerta.
-#   2. Recta larga: Theil-Sen de los ultimos `ventana` meses (hasta 24; la RFV trae menos), con su t corregida por la
-#      autocorrelacion (AR(1)). Clara si |t| >= t_clara.
-#   3. Confirmacion: la recta de los ultimos ventana_meseta (12) meses en la misma direccion con t >= t_meseta.
-#      Clara y confirmada: la pendiente completa. Si no (meseta, o sin tendencia clara): la mitad (como el promedio de
-#      plano y recta de Danos).
-#   4. Desde el ultimo real, amortiguada (amortiguacion por mes: a 16 meses recorre 10.6 meses de pendiente) y con tope
-#      (rango historico ampliado tope_rango veces a meses_tope meses); con menos de min_obs meses: sin pendiente. Con
-#      ventana_meseta meses o menos, la recta larga y la de confirmacion son la misma: no hay confirmacion
-#      independiente y va la mitad.
+#      "pega" en ese mes). Si un salto cae en los ultimos meses_salto_reciente meses hay alerta (el nuevo nivel no esta
+#      confirmado), pero la pendiente va completa (credibilidad_salto_reciente 1).
+#   2. Una recta Theil-Sen de los ultimos `ventana` meses reales (hasta 24; hoy 20), con su t corregida por la
+#      autocorrelacion (AR(1)), que solo se reporta.
+#   3. La pendiente se aplica completa ("metodo": "recta", "credibilidad": 1), desde el ultimo real y sin amortiguar
+#      (amortiguacion 1): la proyeccion es una recta con la pendiente de la historia.
+#   4. Tope de plausibilidad: si a meses_tope meses la recta sacaria la razon del rango de los ultimos 36 meses reales
+#      ampliado tope_rango veces ese rango, la pendiente se reduce lo justo (sin cambiar de signo); con menos de min_obs
+#      meses, sin pendiente.
+# Antes (version 2026-10-09b) la regla era la "combinada": la mitad de la pendiente si no era clara (|t| < 2.5) o si los
+# ultimos 12 meses no la confirmaban, otra mitad tras un salto reciente, y amortiguada 0.95 por mes (a 16 meses, 10.6
+# meses de pendiente): proyectaba un tercio de la tendencia historica y se veia plana. Banco de pruebas (2026-10-09; 6
+# cortes de 202512 a 202605, meses reales hasta 202608, prima y TC reales, 132 ramo-mes): error de la RFV BRUTO total
+# 2.91 % (sesgo -2.73 %) con esta regla, contra 3.23 % con la combinada; gana en los 6 cortes. Sin tope sube a 4.41 %,
+# con amortiguacion 0.95 a 3.25 %; sin quitar saltos la CESION del 150 llega a 32 % y la del 140 a 45 %. Repetir el
+# ultimo real erra menos (1.97 %): seguir la tendencia es decision del area, no ganancia de precision.
 # TENDENCIA_RFV cambia parametros por serie ("FRV", "CESION") o por serie y ramo ("FRV|150"), p. ej.
-# {"FRV|150": {"k_salto": None}} (sin guardia de saltos en el 150) o {"CESION": {"ventana": 12}}. Con "metodo": "recta"
-# y "credibilidad" ("t": min(1, |t| / t_clara); un numero: esa proporcion) se proyecta una sola recta.
+# {"FRV|160": {"credibilidad": 0.5}} (la mitad de la pendiente en el 160) o {"CESION": {"k_salto": None}}. Con
+# "metodo": "combinada" regresa la regla anterior (mitades por t y confirmacion); "credibilidad": "t" pondera la
+# pendiente por min(1, |t| / t_clara).
 TENDENCIA_RFV_BASE = {
-    "metodo": "combinada", "ventana": 24, "ventana_meseta": 12, "estimador": "theil", "t_clara": 2.5, "t_meseta": 1.0,
-    "credibilidad": "t", "k_salto": 5.0, "meses_salto_reciente": 3, "credibilidad_salto_reciente": 0.5,
-    "amortiguacion": 0.95, "tope_rango": 0.5, "meses_tope": 16, "min_obs": 12,
+    "metodo": "recta", "ventana": 24, "ventana_meseta": 12, "estimador": "theil", "t_clara": 2.5, "t_meseta": 1.0,
+    "credibilidad": 1.0, "k_salto": 5.0, "meses_salto_reciente": 3, "credibilidad_salto_reciente": 1.0,
+    "amortiguacion": 1.0, "tope_rango": 0.5, "meses_tope": 16, "min_obs": 12,
 }
 TENDENCIA_RFV = {}
 # Cotas de los modelos de suavizamiento exponencial (si se eligen), estimadas por maxima verosimilitud dentro de
@@ -743,7 +748,8 @@ RAMOS_RFV_POR_PRIMA = None       # None = todos los ramos con prima y RFV; o una
                                  # siguen con el modelo de la serie (sin formula)
 MESES_PRIMA_RFV = 24             # meses de prima tomada de la PRIMA 24M (si cambia, cambia el encabezado del bloque)
 TIPO_MODELO_FRV = "rfv"          # FRV (y FRV residual de 140 y 170): "rfv" = la tendencia de los factores de la RFV
-                                 # (TENDENCIA_RFV_BASE: pendiente combinada sin los saltos, desde el ultimo real); "razon"
+                                 # (TENDENCIA_RFV_BASE: la pendiente historica completa sin los saltos, desde el ultimo
+                                 # real, con tope de rango); "razon"
                                  # = nivel suavizado sin tendencia (SES, hasta la version 2026-10-08f); "ultimo" = repetir
                                  # el ultimo real; "fnd" = Holt amortiguado con guardia
 TIPO_MODELO_CESION_RFV = "rfv"   # CESION (IRR / BRUTO) de la RFV, solo Fianzas: la misma tendencia; Danos sigue con
@@ -751,12 +757,13 @@ TIPO_MODELO_CESION_RFV = "rfv"   # CESION (IRR / BRUTO) de la RFV, solo Fianzas:
 TIPO_MODELO_FRV_USD = "razon"    # serie del FRV en dolares de la sensibilidad a la moneda: sin tendencia (con tendencia
                                  # extrapolaria la apreciacion del peso de 2025-26, que no es un factor de la reserva)
                                  # Backtest de origen movil de "rfv" (cortes 202512 a 202605, meses de prueba hasta 202608,
-                                 # prima y TC reales; 132 ramo-mes por metodo): error de la RFV BRUTO total 3.2 % (sesgo
-                                 # -3.1 %) contra 1.9 % con SES y 2.0 % repitiendo el ultimo real; por ramo, 140 3.6 % (SES
-                                 # 2.9), 150 10.0 % (10.9), 160 2.8 % (2.2), 170 1.4 % (1.4); IRR total 3.2 % (2.1) y NETO
-                                 # 3.3 % (2.0). La tendencia no mejora el backtest: la baja del FRV del 160 de 2025 (0.66 a
-                                 # 0.60) se detuvo en 2026 (recta de 12 meses t -0.9), y el backtest solo prueba 2026. Se
-                                 # usa porque el area pide seguir las tendencias; "razon" o "ultimo" las quitan
+                                 # prima y TC reales; 132 ramo-mes por metodo): error de la RFV BRUTO total 2.91 % (sesgo
+                                 # -2.73 %) con la tendencia completa (2026-10-09c) contra 3.23 % con la combinada anterior,
+                                 # 1.9 % con SES y 1.97 % repitiendo el ultimo real; por ramo, 140 4.7 %, 150 9.6 %, 160
+                                 # 2.6 %, 170 1.7 %; IRR total 2.9 % y NETO 3.0 %. La tendencia no le gana a repetir el
+                                 # ultimo real: la baja del FRV del 160 de 2025 (0.66 a 0.60) se detuvo en 2026 (recta de 12
+                                 # meses t -0.9). Se usa porque el area pide seguir las tendencias del historico; "razon" o
+                                 # "ultimo" las quitan
 MIN_MESES_FRV = 12               # meses minimos de FRV real para proyectarlo
 HOJA_PT_RAMO = "PT_RAMO"         # hoja de la BD de RFV con la prima tomada del mes por ramo (MXN) y su suma de 24 meses
 # Factores de la metodologia del area (Resumen de la metodologia de Reservas de Fianzas en Vigor y script de FCST de
@@ -822,14 +829,18 @@ MAX_HUECO_MA = 6                 # meses "fantasma" del CSV del monto afianzado 
                                  # contra 3.5 % en 170; se interpola porque los reales traen tendencia (160 +7.6 % y 150
                                  # +50.8 % de 202510 a 202602) y repetir deja ese salto en 202602
 PROYECCION_MA = "tendencia"      # MA despues del ultimo mes del CSV (2027): "tendencia" = recta Theil-Sen de los ultimos
-                                 # meses reales e interpolados del ramo (TENDENCIA_MA), aplicada solo si es clara
-                                 # (|t| >= t_clara), amortiguada por mes y con tope de rango, anclada al ultimo MA del CSV;
-                                 # si no es clara, fijo en ese ultimo MA; "prima" = el MA sigue a la PRIMA 24M del ramo
-                                 # (MA_p = MA_u x PRIMA 24M_p / PRIMA 24M_u); "fijo" = el ultimo MA del CSV (lo de las
-                                 # versiones anteriores). Sensibilidad de los tres en RFV_Prima_Sensibilidad
-TENDENCIA_MA = {"ventana": 24, "t_clara": 2.5, "amortiguacion": 0.95, "tope_rango": 0.5, "min_obs": 12}
-                                 # (misma logica que TENDENCIA_RFV_BASE: credibilidad 0 o 1 segun |t|, pendiente
-                                 # amortiguada 5 % por mes, tope = rango del CSV ampliado tope_rango veces)
+                                 # meses reales e interpolados del ramo (TENDENCIA_MA; sin los estimados del area), con la
+                                 # pendiente completa y sin amortiguar, anclada al ultimo MA del CSV, como los factores;
+                                 # "prima" = el MA sigue a la PRIMA 24M del ramo (MA_p = MA_u x PRIMA 24M_p / PRIMA 24M_u);
+                                 # "fijo" = el ultimo MA del CSV. Sensibilidad de los tres en RFV_Prima_Sensibilidad
+TENDENCIA_MA = {"ventana": 24, "t_clara": 0.0, "amortiguacion": 1.0, "tope_rango": 0.5, "meses_tope": 12, "min_obs": 12}
+                                 # (t_clara: |t| minima para aplicar la pendiente, 0 = siempre; amortiguacion por mes, 1 =
+                                 # sin amortiguar; tope: la pendiente se reduce lo justo para que a meses_tope meses del
+                                 # ultimo mes del CSV el MA quede en el rango del CSV ampliado tope_rango veces). En el MA
+                                 # no se quitan saltos: es una serie en escalones y la regla de saltos inventa pendientes.
+                                 # Hoy (CSV hasta dic-26): 140 +0.1, 150 +20.2, 160 +319.5 (topada desde +364.6) y 170
+                                 # 0 M MXN por mes. El efecto en la RFV es casi nulo: en 150 y 160 la RFV MA es
+                                 # informativa y en 140 y 170 la pendiente es casi 0
 SUBCARPETAS_ENTRADAS = True      # los CSV del area de Fianzas (MontosAfianzados, xDefault, xVigMaxProp, xComUtil) se
                                  # buscan tambien en las subcarpetas de entradas/ (p. ej. entradas/Inputs/) cuando en
                                  # entradas/ mismo no hay ninguno, con un AVISO para moverlos (sin carpetas de respaldo:
@@ -1286,14 +1297,22 @@ def texto_modelo_rfv(tipo: str) -> str:
     """Texto del modelo de un factor de la RFV por prima (FRV, CESION) para la BD, el diagnostico y los tableros."""
     if tipo in ("rfv", "rfv_log"):
         P = TENDENCIA_RFV_BASE
+        amort = ("sin amortiguar" if P["amortiguacion"] == 1 else f"amortiguada {P['amortiguacion']:g} por mes")
+        tope = (f"tope de rango (a {P['meses_tope']} meses, dentro del rango de 36 meses ampliado "
+                f"{P['tope_rango']:.0%})" if P.get("tope_rango") is not None else "sin tope")
+        saltos = (f"sin los saltos (cambios de mas de {P['k_salto']:g} MAD)" if P.get("k_salto") else "con los saltos")
         if P["metodo"] == "combinada":
             t = ("tendencia" + (" en logaritmos" if tipo == "rfv_log" else "") + " desde el ultimo real: recta "
-                 f"Theil-Sen de hasta {P['ventana']} meses sin los saltos (cambios de mas de {P['k_salto']:g} MAD), "
+                 f"Theil-Sen de hasta {P['ventana']} meses {saltos}, "
                  f"completa si es clara (|t| >= {P['t_clara']:g}) y la confirman los ultimos {P['ventana_meseta']} meses, "
-                 f"la mitad si no; la mitad otra vez tras un salto en los ultimos {P['meses_salto_reciente']} meses; "
-                 f"amortiguada {P['amortiguacion']:g} por mes y con tope de rango")
+                 f"la mitad si no; por {P['credibilidad_salto_reciente']:g} tras un salto en los ultimos "
+                 f"{P['meses_salto_reciente']} meses; {amort} y con {tope}")
         else:
-            t = f"tendencia desde el ultimo real: recta Theil-Sen de {P['ventana']} meses por su credibilidad"
+            cred = P["credibilidad"]
+            peso = ("completa" if not isinstance(cred, str) and float(cred) == 1 else
+                    f"por su credibilidad min(1, |t| / {P['t_clara']:g})" if cred == "t" else f"por {float(cred):g}")
+            t = ("tendencia historica" + (" en logaritmos" if tipo == "rfv_log" else "") + " desde el ultimo real: "
+                 f"recta Theil-Sen de hasta {P['ventana']} meses {saltos}, {peso}, {amort} y con {tope}")
         return t + (" (TENDENCIA_RFV cambia parametros por serie o ramo)" if TENDENCIA_RFV else "")
     return {"razon": "nivel suavizado sin tendencia (SES)", "ultimo": "ultimo real, sin tendencia"}.get(
         tipo, MODELO_POR_TIPO.get(tipo, tipo))
@@ -1332,7 +1351,7 @@ def pendiente_rfv(d, z, nombre: str = "") -> tuple[float, dict]:
     det.update({"pendiente_larga": b_l, "t_larga": t_l, "ventana_larga": len(w), "pendiente_12": b_c, "t_12": t_c})
     if P["metodo"] == "recta":
         z_ = min(1.0, abs(t_l) / P["t_clara"]) if P["credibilidad"] == "t" else float(P["credibilidad"])
-        regla = f"recta de {len(w)} meses por credibilidad {z_:.2f}"
+        regla = "pendiente completa" if z_ == 1 else f"por credibilidad {z_:.2f}"
     else:
         clara = abs(t_l) >= P["t_clara"]
         independiente = len(w) > int(P["ventana_meseta"])   # (con 12 meses o menos, las dos rectas son la misma)
@@ -1345,7 +1364,8 @@ def pendiente_rfv(d, z, nombre: str = "") -> tuple[float, dict]:
                  "sin tendencia clara: la mitad")
     if reciente:
         z_ *= P["credibilidad_salto_reciente"]
-        regla += f"; salto reciente sin confirmar: x{P['credibilidad_salto_reciente']:g}"
+        regla += ("; salto en los ultimos meses: el nuevo nivel no esta confirmado"
+                  + (f" (x{P['credibilidad_salto_reciente']:g})" if P["credibilidad_salto_reciente"] != 1 else ""))
     det.update({"credibilidad_pendiente": z_,
                 "regla_pendiente": f"recta Theil-Sen de {len(w)} meses {b_l:+.4g}/mes (t {t_l:+.1f}), ultimos 12 "
                                    f"meses t {t_c:+.1f}" + (f", {len(det['saltos_hace'])} salto(s) quitado(s)"
@@ -5965,9 +5985,10 @@ def _recta_robusta_x(x, y) -> tuple[float, float]:
 def proyectar_ma(ma_info: dict | None, periodos: list[int], pt: dict | None = None, metodo: str | None = None) -> dict:
     """MA de los meses de periodos posteriores al ultimo mes del CSV, por ramo, con PROYECCION_MA (o metodo):
     "tendencia": recta Theil-Sen de los ultimos TENDENCIA_MA["ventana"] meses reales e interpolados del ramo (sin los
-    estimados del area, para no reforzar su extrapolacion), aplicada solo si es clara (|t| >= t_clara), amortiguada por
-    mes y con tope (rango del CSV ampliado tope_rango veces), anclada al ultimo MA del CSV; si no es clara, o con menos
-    de min_obs meses, fijo en ese ultimo MA. "prima": MA_p = MA_u x PRIMA 24M_p / PRIMA 24M_u (pt); sin PRIMA 24M
+    estimados del area, para no reforzar su extrapolacion), si |t| >= t_clara (0 = siempre), amortiguada por mes
+    (amortiguacion 1 = sin amortiguar) y anclada al ultimo MA del CSV; la pendiente se reduce lo justo (sin cambiar de
+    signo) para que a meses_tope meses el MA quede en el rango del CSV ampliado tope_rango veces (_tope_rango, como los
+    factores), asi que la linea sale recta; con menos de min_obs meses, con t chica o pendiente 0, fijo en ese ultimo MA. "prima": MA_p = MA_u x PRIMA 24M_p / PRIMA 24M_u (pt); sin PRIMA 24M
     completa, fijo. "fijo": nada (ma_del_mes repite el ultimo). Regresa ma_info con "proy" {(ramo, periodo): MXN},
     "origen_proy" {(ramo, periodo): texto}, "regla_ma" {ramo: texto largo}, "regla_ma_corta" {ramo: texto corto, sin
     comas ni punto y coma} y "metodo_ma"."""
@@ -6015,30 +6036,34 @@ def proyectar_ma(ma_info: dict | None, periodos: list[int], pt: dict | None = No
             out["regla_ma_corta"][r] = f"{r} fijo con {len(w)} meses"
             continue
         b, t = _recta_robusta_x([periodo_a_indice(p) for p in w], [ma[(r, p)] for p in w])
-        clara = abs(t) >= float(P["t_clara"])
+        t_min = float(P.get("t_clara") or 0.0)
         texto_recta = (f"recta Theil-Sen de {len(w)} meses reales e interpolados ({w[0]} a {w[-1]}): "
                        f"{b / 1e6:+,.1f} M MXN por mes (t {t:+.1f})")
-        if not clara or b == 0:
-            out["regla_ma"][r] = (f"fijo en el MA de {u}: {texto_recta}; sin tendencia clara (|t| < {P['t_clara']}), "
-                                  "no se extrapola (PROYECCION_MA = 'tendencia')")
-            out["regla_ma_corta"][r] = f"{r} fijo t {t:+.1f}"
+        if b == 0 or abs(t) < t_min:
+            out["regla_ma"][r] = (f"fijo en el MA de {u}: {texto_recta}; "
+                                  + ("pendiente 0" if b == 0 else f"|t| < {t_min:g} (TENDENCIA_MA['t_clara']), no se extrapola")
+                                  + " (PROYECCION_MA = 'tendencia')")
+            out["regla_ma_corta"][r] = f"{r} fijo" + (" pendiente 0" if b == 0 else f" t {t:+.1f}")
             continue
         vals = [ma[(r, p)] for p in meses]
-        lo, hi = min(vals), max(vals)
-        amp = (hi - lo) * float(P["tope_rango"])
-        phi = float(P["amortiguacion"])
-        acum, tope = 0.0, False
+        phi = float(P.get("amortiguacion", 1.0))
+        b_sin_tope = b
+        if P.get("tope_rango") is not None:            # (tope sobre la pendiente, como los factores: la linea sale recta)
+            b = _tope_rango(b, v_u, vals, False, phi, float(P["tope_rango"]), int(P.get("meses_tope") or 12))
+        tope = b != b_sin_tope
+        acum = 0.0
         for q in rango_periodos(_mes_menos(u, -1), max(futuros)):   # (mes a mes desde u, aunque periodos empiece despues)
             acum += phi ** (periodo_a_indice(q) - periodo_a_indice(u))
-            v = v_u + b * acum
-            v_t = min(max(v, lo - amp), hi + amp)
-            tope = tope or v_t != v
-            out["proy"][(r, q)] = max(v_t, 0.0)
+            out["proy"][(r, q)] = max(v_u + b * acum, 0.0)
             out["origen_proy"][(r, q)] = "Proyectado (tendencia del MA)"
-        out["regla_ma"][r] = (f"tendencia desde el MA de {u}: {texto_recta}; clara (|t| >= {P['t_clara']}), aplicada "
-                              f"amortiguada {1 - phi:.0%} por mes" + (" y topada al rango del CSV ampliado "
-                              f"{P['tope_rango']:.0%}" if tope else "") + " (PROYECCION_MA = 'tendencia')")
-        out["regla_ma_corta"][r] = f"{r} tendencia {b / 1e6:+,.0f} M MXN por mes t {t:+.1f}" + (" topada" if tope else "")
+        out["regla_ma"][r] = (f"tendencia desde el MA de {u}: {texto_recta}; "
+                              + (f"reducida a {b / 1e6:+,.1f} M MXN por mes para quedar a {int(P.get('meses_tope') or 12)} "
+                                 f"meses dentro del rango del CSV ampliado {float(P['tope_rango']):.0%}; " if tope else
+                                 "completa; ")
+                              + ("sin amortiguar" if phi == 1 else f"amortiguada {1 - phi:.0%} por mes")
+                              + " (PROYECCION_MA = 'tendencia')")
+        out["regla_ma_corta"][r] = (f"{r} tendencia {b / 1e6:+,.0f} M MXN por mes" + (" topada" if tope else "")
+                                    + f" t {t:+.1f}")
     return out
 
 
@@ -6999,6 +7024,13 @@ def calcular_rfv_prima(bd: BDMontos, proy: dict, pt: dict | None, periodos_proy:
                              f"FRV {ultimo}": frv_h[ultimo]})
                 out["alertas"] += [("FIANZAS", f"RFV | FRV | ramo {r}", a) for a in res.alertas
                                    if not str(a).startswith("Se usa")]
+                hist_f = [base_m[q] for q in per if np.isfinite(base_m.get(q, math.nan))]
+                if hist_f and not (min(hist_f) <= frv_f[-1] <= max(hist_f)):   # (la tendencia sale de su historia)
+                    out["alertas"].append(("FIANZAS", f"RFV | FRV | ramo {r}",
+                                           f"con la tendencia del historico el FRV{' residual' if split else ''} pasa de "
+                                           f"{base_m[ultimo]:.4f} ({ultimo}) a {frv_f[-1]:.4f} ({periodos_proy[-1]}), "
+                                           f"fuera del rango de su historia ({min(hist_f):.4f} a {max(hist_f):.4f}); "
+                                           "revisar si la tendencia sigue (TENDENCIA_RFV la cambia por ramo)"))
         if frv_f is not None:
             ok_c = [p for p in per_hist if np.isfinite(ces_h[p])]
             ces_f = np.full(h, ces_h[ok_c[-1]]) if ok_c else np.zeros(h)
@@ -7027,6 +7059,13 @@ def calcular_rfv_prima(bd: BDMontos, proy: dict, pt: dict | None, periodos_proy:
                     out["alertas"].append(("FIANZAS", f"RFV | CESION | ramo {r}",
                                            f"la proyeccion lleva la cesion de {u:.1%} ({ultimo}) a {ces_f[-1]:.1%} "
                                            f"({periodos_proy[-1]}); revisar si sigue"))
+                hist_c = [ces_h[q] for q in ok_c]
+                if not (min(hist_c) <= ces_f[-1] <= max(hist_c)):
+                    out["alertas"].append(("FIANZAS", f"RFV | CESION | ramo {r}",
+                                           f"con la tendencia del historico la cesion pasa de {u:.1%} ({ultimo}) a "
+                                           f"{ces_f[-1]:.1%} ({periodos_proy[-1]}), fuera del rango de su historia "
+                                           f"({min(hist_c):.1%} a {max(hist_c):.1%}); la tendencia no ve renovaciones de "
+                                           "contratos de reaseguro: revisar con el area"))
         usd_f = None
         if frv_f is not None and tc_pt:                # sensibilidad: la reserva como si fuera en dolares
             per_u = rango_periodos(ok_p[0], ultimo)

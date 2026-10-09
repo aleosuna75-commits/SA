@@ -1399,7 +1399,7 @@ function explicaRfv(col, ramo, o = {}) {
   const orgMa = (RZ.origen_ma || {})[ramo] || [];
   const interp = textoMeses(P_Z.filter((p, i) => (orgMa[i] || '').startsWith('Interpolado')));
   const oProy = orgMa.find(o => (o || '').startsWith('Proyectado')) || '';
-  const proyMa = oProy ? oProy.replace('Proyectado (', 'proyectado: ').replace(/\)$/, '') + (oProy.includes('tendencia') ? ' (recta Theil-Sen de los meses reales e interpolados, solo si es clara, amortiguada 5 % por mes)' : '')
+  const proyMa = oProy ? oProy.replace('Proyectado (', 'proyectado: ').replace(/\)$/, '') + (oProy.includes('tendencia') ? ' (recta Theil-Sen de los meses reales e interpolados, con la pendiente completa y sin amortiguar, anclada al último mes del CSV)' : '')
     : (D.rfv_ma_regla ? `fijo en el último mes del CSV (regla por ramo: ${D.rfv_ma_regla})` : 'fijo en el último mes del CSV');
   const orgPd = (RZ.pd_origen || {})[ramo] || [], pdMed = ((RZ.pd_medida || {})[ramo] || []).some(Boolean), pdRef = orgPd.some(o => /referencia/i.test(o || ''));
   const txtPd = !pdMed && pdRef ? 'Probabilidad de incumplimiento del reasegurador. Este ramo no tiene castigo medido en Res_Rvas (Base FIANZAS que coincida con SAP): se muestra la referencia de xDefault del área (la PD por póliza que el área arma con la tabla del Anexo 8.20.2 de la CUSF y sus criterios), ponderada por prima cedida de 24 meses, al último mes del CSV y fija después; no es la PD por reserva cedida del castigo y no entra a la IRR (solo separa RC de FCR), en %'
