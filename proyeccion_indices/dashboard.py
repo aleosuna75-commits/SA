@@ -1568,7 +1568,10 @@ def construir_razones_rfv(ws, wbd, wcr, rz: dict, ultimo: int, p_dic: int, nombr
     con_fv = [i for d in rz["datos"].values() for i, v in enumerate(d["FV"]) if v is not None]
     fv_h = [p for p in (rz.get("ma_huecos") or []) if con_fv and p >= periodos[min(con_fv)]]   # meses de FV sin MA
     notas = [f"Real hasta {etiqueta(ultimo)}", f"Proyección {etiqueta(mover(ultimo, 1))} a {etiqueta(periodos[-1])}", "",
-             "Valores de los bloques de la BD de RFV. Montos en M MXN.",
+             "Valores de los bloques de la BD de RFV. Montos en M MXN."
+             + (" Proyección como saldo: reserva anterior − liberación + la de la prima nueva."
+                if any(str(d.get("modelo_frv") or "").startswith("saldo") for d in (rz.get("tendencia") or {}).values())
+                else ""),
              f"MA aparte en {split}; en {info}, la RFV MA es informativa.",
              "Todos: razón de las sumas. Su PD pondera la de cada ramo por su reserva cedida.",
              *([f"MA: {nota_ma}."] if nota_ma else []),
@@ -1754,9 +1757,11 @@ def _tablas_prima_rfv(ws, rz: dict, r0: int) -> None:
     if bloques:
         caja(ws, f"D{r0}:AG{r0 + len(bloques) + 2}")
         sp = list(rz.get("split") or [])
-        ws.cell(r0, 4, "Prima no real contra su historia · todos los ramos (la RFV se mueve casi en la misma proporción "
-                       "que su PRIMA 24M" + (f"; en {' y '.join(sp)}, solo la parte sin RFV MA" if sp else "")
-                       + ")").font = fuente(11.5, True)
+        con_saldo = any(str(d.get("modelo_frv") or "").startswith("saldo") for d in (rz.get("tendencia") or {}).values())
+        ws.cell(r0, 4, "Prima no real contra su historia · todos los ramos (" + (
+            "la RFV sube con la reserva de cada prima nueva y se libera poco a poco" if con_saldo else
+            "la RFV se mueve casi en la misma proporción que su PRIMA 24M"
+            + (f"; en {' y '.join(sp)}, solo la parte sin RFV MA" if sp else "")) + ")").font = fuente(11.5, True)
         cols = ((4, 6, "Ramo"), (7, 11, "Bloque"), (12, 15, "PT (M MXN)"), (16, 19, "Contra año anterior"),
                 (20, 26, "Rango de esos meses en su historia"), (27, 29, "Fuera"), (30, 33, "Peso en la PRIMA 24M"))
         for c1, c2, t in cols:
