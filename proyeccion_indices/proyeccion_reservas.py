@@ -801,7 +801,7 @@ PD_FIANZAS = {}                  # PD de la proyeccion por ramo (Anexo 8.20.2 de
 FD_FIANZAS = {}                  # FD de la proyeccion por ramo, p. ej. {"140": 0.5} = polizas anuales devengadas de manera
                                  # uniforme (la mitad de la PR por transcurrir); solo en RAMOS_FD_FIANZAS; sin el ramo, 1.
                                  # Multiplica todo el FV residual, es decir la parte de la RFV BRUTO que no es RFV MA (en
-                                 # 140, 40 % a dic-26 y 52 % a dic-27): FD 0.5 baja la RFV BRUTO del 140 20 % y 26 %. El 16 %
+                                 # 140, 38 % a dic-26 y 39 % a dic-27): FD 0.5 baja la RFV BRUTO del 140 19 %. El 16 %
                                  # del 140 es la parte de su prima en el segmento de prima de reserva, no la de su reserva
 RAMOS_FD_FIANZAS = ("140",)      # ramos donde la CUSF devenga: 140 fidelidad (141 individual y 142 colectiva); el 153
                                  # (judiciales que amparan a conductores) no tiene cartera. Otro ramo en FD_FIANZAS se
