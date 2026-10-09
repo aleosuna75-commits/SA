@@ -1508,8 +1508,10 @@ function tarjetasPrimaRfv(ramo, etiqRamo) {
       el('header', {}, el('div', {}, el('h2', { text: 'Sensibilidad de la RFV a la prima · todos los ramos' }),
         el('p', { class: 'sub', text: (SALDO_RFV
           ? 'RFV BRUTO de los ramos con RFV por prima si la prima que no es real cambia (solo cambia la reserva que constituye la prima nueva; la cartera en vigor no)'
-            + (sens.some(f => f.Cambio === 'moneda del saldo') ? ', con el saldo en otra moneda o con la parte medida en la historia' : '')
-            + (sens.some(f => f.Cambio === 'liberacion del saldo') ? ', y sin crecimiento propio del saldo (liberación con piso 0)' : '') + '. '
+            + (sens.some(f => f.Cambio === 'moneda del saldo') ? ', con toda la reserva en pesos o toda en dólares' : '')
+            + (sens.some(f => f.Cambio === 'liberacion del saldo' && /ajustada/.test(f.Valor || '')) ? ', con la liberación ajustada en la historia en lugar de la vigencia de la cartera'
+               : sens.some(f => f.Cambio === 'liberacion del saldo') ? ', y sin crecimiento propio del saldo (liberación con piso 0)' : '')
+            + (sens.some(f => f.Cambio === 'liberacion y moneda del saldo') ? ', y como la versión 2026-10-09d' : '') + '. '
           : 'RFV BRUTO de los ramos con RFV por prima si la prima que no es real cambia (con los mismos factores y tendencias), o si la base fuera de otra ventana de meses (el FRV se vuelve a medir con esa prima y su tendencia se vuelve a ajustar; la cesión no cambia). ') + `Base: ${b0}` }))),
       el('div', { class: 'cuerpo' }, el('div', { class: 'tabla-envoltura', style: 'max-height:none' }, t))));
   }
