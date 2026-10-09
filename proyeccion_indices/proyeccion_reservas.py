@@ -163,7 +163,7 @@ except Exception as _e:  # noqa: BLE001
 # =============================================================================
 CARPETA = Path(__file__).resolve().parent
 ENTRADAS = CARPETA / "entradas"
-VERSION_CODIGO = "2026-10-08h"   # version de los scripts: sale en la consola, en la hoja Resumen del diagnostico, en el pie
+VERSION_CODIGO = "2026-10-09a"   # version de los scripts: sale en la consola, en la hoja Resumen del diagnostico, en el pie
                                  # del tablero HTML y en la hoja Dashboard Razones del Excel, para saber con que version se corrio
 SALIDAS = CARPETA / "salidas"
 
@@ -5090,6 +5090,34 @@ def _hoja_base_fianzas(nombres: list):
 
 
 _FECHA_ISO = r"(\d{4})[-/.](\d{1,2})[-/.]\d{1,2}(?:[ T][\d:.]*)?"   # 2024-12-01, 2024/12/01 o 2024-12-01 00:00:00
+_MESES_TEXTO = {"ene": 1, "jan": 1, "feb": 2, "mar": 3, "abr": 4, "apr": 4, "may": 5, "jun": 6, "jul": 7, "ago": 8,
+                "aug": 8, "sep": 9, "set": 9, "oct": 10, "nov": 11, "dic": 12, "dec": 12}
+
+
+def _periodo_texto(t) -> int | None:
+    """Periodo AAAAMM de un texto que no es AAAAMM, igual con cualquier version de pandas: fecha con el ano primero
+    ("2024-12-01", "2024-12-01 00:00:00": ano-mes-dia), ano y mes ("2024.12", "2024-12"), mes y ano ("12/2024"), mes
+    con nombre ("dic-24", "1-dic-2024", "diciembre de 2024") o, al final, fecha con el dia primero ("01/12/2024", como la
+    guarda Excel en espanol). None si no se reconoce o si el ano no esta entre 1900 y 2999."""
+    t = str(t).strip().lower()
+    if not t:
+        return None
+    a = m = None
+    if mm := re.fullmatch(_FECHA_ISO, t):
+        a, m = int(mm.group(1)), int(mm.group(2))
+    elif mm := re.fullmatch(r"(\d{4})[-/.](\d{1,2})", t):
+        a, m = int(mm.group(1)), int(mm.group(2))
+    elif mm := re.fullmatch(r"(\d{1,2})[-/.](\d{4})", t):
+        a, m = int(mm.group(2)), int(mm.group(1))
+    elif (mm := re.fullmatch(r"(?:\d{1,2}[\s\-/.]+)?([a-z]{3})[a-z.]*[\s\-/.]+(?:de[\s]+)?(\d{2}|\d{4})", t)) \
+            and mm.group(1) in _MESES_TEXTO:                # ("dic-24", "1-ene-2025", "diciembre de 2024")
+        a, m = int(mm.group(2)), _MESES_TEXTO[mm.group(1)]
+        a += 2000 if a < 100 else 0
+    else:
+        f = pd.to_datetime(t, errors="coerce", dayfirst=True)
+        if not pd.isna(f):
+            a, m = f.year, f.month
+    return a * 100 + m if a is not None and 1900 <= a <= 2999 and 1 <= m <= 12 else None
 
 
 def _periodo_celda(v):
@@ -5100,11 +5128,7 @@ def _periodo_celda(v):
     if np.isfinite(x) and 190001 <= x <= 299912 and 1 <= int(x) % 100 <= 12:
         return int(x)
     if isinstance(v, str) and v.strip():
-        if mm := re.fullmatch(_FECHA_ISO, v.strip()):     # ("2025-01-03": ano-mes-dia; dayfirst lo leeria 1-mar)
-            return int(mm.group(1)) * 100 + int(mm.group(2)) if 1 <= int(mm.group(2)) <= 12 else None
-        f = pd.to_datetime(v.strip(), errors="coerce", dayfirst=True)
-        if not pd.isna(f):
-            return f.year * 100 + f.month
+        return _periodo_texto(v)
     return None
 
 
@@ -5455,25 +5479,16 @@ def _col_csv(df: pd.DataFrame, *nombres):
 
 
 def _periodo_csv(s: pd.Series) -> pd.Series:
-    """Periodo AAAAMM de una columna de CSV: el numero (202412) o, si viene como fecha, su ano y mes. Una fecha que empieza
-    con el ano ("2024-12-01", "2024-12-01 00:00:00" de una celda de fecha de Excel) es ano-mes-dia; las demas
-    ("01/12/2024") van con el dia primero, como las guarda Excel en espanol."""
+    """Periodo AAAAMM de una columna de CSV: el numero (202412) o, si viene como texto, lo que lea _periodo_texto (una
+    fecha que empieza con el ano, "2024-12-01" o "2024-12-01 00:00:00" de una celda de fecha de Excel, es ano-mes-dia;
+    "2024.12", "12/2024" y "dic-24" son ano y mes; "01/12/2024" va con el dia primero, como la guarda Excel en
+    espanol)."""
     p = _num_csv(s)
     malos = ~p.between(190001, 299912) & s.astype(str).str.strip().ne("")
     if malos.any():
         t = s[malos].astype(str).str.strip()
-        iso = t.str.extract(f"^{_FECHA_ISO}$")
-        a_, m_ = pd.to_numeric(iso[0], errors="coerce"), pd.to_numeric(iso[1], errors="coerce")
-        f_iso = (a_ * 100 + m_).where(m_.between(1, 12))
-        resto = t[iso[0].isna()]
-        f_resto = pd.Series(np.nan, index=t.index)
-        if not resto.empty:
-            try:
-                f = pd.to_datetime(resto, errors="coerce", dayfirst=True, format="mixed")
-            except (TypeError, ValueError):            # (pandas anterior a 2.0, sin format="mixed")
-                f = pd.to_datetime(resto, errors="coerce", dayfirst=True)
-            f_resto.loc[resto.index] = f.dt.year * 100 + f.dt.month
-        p = p.where(~malos, f_iso.where(iso[0].notna(), f_resto))
+        lect = {x: _periodo_texto(x) for x in t.unique()}   # (_periodo_texto: igual con pandas 2 y 3)
+        p = p.where(~malos, t.map(lambda x: np.nan if lect[x] is None else float(lect[x])))
     return p
 
 
@@ -8656,7 +8671,9 @@ def _hojas_primas(wb, resumen: dict, negrita, encab):
                    ("Decision por tipo de reserva (error % del backtest agrupado)", diag.get("decision")),
                    ("Rejilla de configuraciones (error % del factor con la prima real, mismos casos)", diag.get("rejilla")),
                    ("Reservas NETO totales (USD): modelo final (con el ajuste por RANGO_ESPERADO) contra el mismo "
-                    "sin ese ajuste, la recta y la sensibilidad a la prima del ano siguiente (estas tres sin el ajuste)",
+                    "sin ese ajuste, la recta y la sensibilidad a la prima del ano siguiente (estas tres sin el ajuste); "
+                    "del modelo de las series, antes del BEL por FND de Danos y de la RFV por prima de Fianzas (la BD "
+                    "lleva esos)",
                     comp.get("filas")),
                    ("Detalle por serie", diag.get("series"))]
         for titulo, filas in bloques:
@@ -9496,6 +9513,15 @@ def main():
             validar(proy_danos, info_rfvp["proy"])
             alertas.extend(info_rfvp["alertas"])
             proy_rfv = info_rfvp["proy"]
+            nota_fz = "; en la BD, la RFV BRUTO de los meses con RFV por prima sale de PRIMA 24M x FRV / TC"
+            for r_ in sorted({r_ for _, r_ in info_rfvp.get("aplica") or ()}):   # (el factor de prima de la RFV
+                res_ = resultados.get(("FIANZAS", "RFV", "BRUTO", r_))            # queda como referencia)
+                if res_ is not None:
+                    res_.alertas = [f"Factor de prima, como referencia: {a[len('Modelo final: '):]}{nota_fz}"
+                                    if str(a).startswith("Modelo final: ") else a for a in res_.alertas]
+                for f_ in diag_factor.get("series") or []:
+                    if f_.get("Libro") == "FIANZAS" and str(f_.get("Ramo")) == r_ and f_.get("Elegible"):
+                        f_["Motivo"] = f"{f_.get('Motivo') or ''}{nota_fz}".lstrip("; ")
         except Exception as e:  # noqa: BLE001
             del alertas[n0:]
             info_rfvp = {"estado": f"error en la RFV por prima ({type(e).__name__}: {e}); la RFV sigue con el modelo",
@@ -9739,7 +9765,7 @@ def main():
         except Exception as e:  # noqa: BLE001
             print(f"   No se pudo generar el dashboard HTML: {e!r}")
 
-    print("\nRESUMEN")
+    print(f"\nRESUMEN (version del codigo {VERSION_CODIGO})")
     print(f"   {SALIDA_BD_DANOS.name}: {info_danos['actualizados']} renglones actualizados, "
           f"{info_danos['nuevos']} renglones nuevos en {HOJA_MONTOS}; {n_hp} renglones nuevos en {HOJA_PARAMETROS}; "
           f"TC actualizado en {info_danos['tc_cambiados']} renglones")
@@ -9802,12 +9828,21 @@ def main():
         filas_c = (comparativo or {}).get("filas", [])
         if filas_c:
             dics = [k for k in filas_c[0] if k.startswith("Proy ")]
-            print(f"   Reservas NETO totales (M USD) {' / '.join(k[5:] for k in dics)}:")
+            rfv_prima = bool(info_rfvp.get("aplica"))
+            print(f"   Reservas NETO totales (M USD) {' / '.join(k[5:] for k in dics)}, del modelo de las series (antes "
+                  "del BEL por FND de Danos y de la RFV por prima de Fianzas; la BD lleva esos):")
             for f in filas_c:
+                if rfv_prima and f["Reserva"].startswith("RFV") and f["Escenario"].startswith("Prima "):
+                    continue                           # (la RFV por prima no usa la prima de primas.py)
                 crec = next((v for k, v in f.items() if k.startswith("Crec.")), None)
                 print(f"      {f['Reserva']:<10} {f['Escenario']:<27} "
                       + " / ".join(f"{(f.get(k) or 0) / 1e6:,.1f}" for k in dics)
                       + (f"  (crec. {crec:+.1%})" if crec is not None else ""))
+            if rfv_prima:
+                c_n = norm("RFV NETO")
+                print(f"      {'RFV NETO':<10} {'En la BD (RFV por prima)':<27} " + " / ".join(
+                    f"{sum(v for (c, p_, _), v in proy_rfv.items() if c == c_n and p_ == int(k[5:])) / 1e6:,.1f}"
+                    for k in dics) + "  (su sensibilidad a la prima: hoja RFV_Prima_Sensibilidad)")
     if USAR_ESCENARIOS_PND:
         print(f"   Escenarios PND / PD (Danos): {diag_pnd.get('estado')}")
         for f in diag_pnd.get("decision") or []:
