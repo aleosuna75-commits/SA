@@ -1392,7 +1392,7 @@ function proporcionRfv(ramo) {                       // cuanto de la RFV se muev
   const sp = RZ.split || [], lista = rs => rs.length > 1 ? rs.slice(0, -1).join(', ') + ' y ' + rs[rs.length - 1] : rs[0];
   const conSaldo = r => /^saldo/.test(((RZ.tendencia || {})[r] || {}).modelo_frv || '');
   if (ramo === 'Todos' ? SALDO_RFV : conSaldo(ramo))
-    return 'la RFV suma la reserva de cada prima nueva (FPR × (1 + %GA)) y la cartera en vigor sigue su propia liberación, así que no se mueve en la misma proporción que la PRIMA 24M'
+    return 'la RFV suma la reserva de cada prima nueva (FPR × (1 + %GA) × la parte que sigue en vigor al cierre de su mes) y la cartera en vigor sigue su propia liberación, así que no se mueve en la misma proporción que la PRIMA 24M'
       + ((ramo === 'Todos' ? sp.length : sp.includes(ramo)) ? '; la RFV MA (monto afianzado) no depende de la prima' : '');
   if (ramo !== 'Todos') return sp.includes(ramo)
     ? 'solo la parte residual de la RFV se mueve con ella: la RFV MA (monto afianzado) no depende de la prima'
@@ -1511,7 +1511,7 @@ function tarjetasPrimaRfv(ramo, etiqRamo) {
             + (sens.some(f => f.Cambio === 'moneda del saldo') ? ', con toda la reserva en pesos o toda en dólares' : '')
             + (sens.some(f => f.Cambio === 'liberacion del saldo' && /ajustada/.test(f.Valor || '')) ? ', con la liberación ajustada en la historia en lugar de la vigencia de la cartera'
                : sens.some(f => f.Cambio === 'liberacion del saldo') ? ', y sin crecimiento propio del saldo (liberación con piso 0)' : '')
-            + (sens.some(f => f.Cambio === 'liberacion y moneda del saldo') ? ', y como la versión 2026-10-09d' : '') + '. '
+            + (sens.some(f => f.Cambio === 'liberacion y moneda del saldo') ? ', y con el método de la versión 2026-10-09d (liberación ajustada y toda en dólares)' : '') + '. '
           : 'RFV BRUTO de los ramos con RFV por prima si la prima que no es real cambia (con los mismos factores y tendencias), o si la base fuera de otra ventana de meses (el FRV se vuelve a medir con esa prima y su tendencia se vuelve a ajustar; la cesión no cambia). ') + `Base: ${b0}` }))),
       el('div', { class: 'cuerpo' }, el('div', { class: 'tabla-envoltura', style: 'max-height:none' }, t))));
   }
