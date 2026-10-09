@@ -497,8 +497,8 @@ def _leer_extra_rfv() -> dict:
         txt = re.sub(r"\s*\[carpeta de entradas: [^\]]*\]", "", txt)   # (la ruta local no va a los tableros)
         if any(v == "Monto afianzado" for v in vals) and "MA" not in na:
             na["MA"] = txt
-        elif any(v in ("PD de Fianzas", "Base FIANZAS") for v in vals) and "PD" not in na:
-            na["PD"] = txt
+        elif any(v == "PD de Fianzas" for v in vals) and txt.startswith("PD de Fianzas: N/A") and "PD" not in na:
+            na["PD"] = txt                           # (sin Res_Rvas pero con xDefault la PD no esta en N/A: es la referencia)
     num = (int, float)
     prima = {"base": [{k: (round(v, 6) if isinstance(v, float) else v) for k, v in f.items()
                        if k in ("Ramo", "Periodo", "Real o proyeccion", "Fuente", "PT usada (MXN)",
@@ -559,7 +559,7 @@ def leer_razones_rfv() -> dict | None:
     ma_est = {r: [o == "Estimado" for o in v] for r, v in origen.items() if r != "Todos"}
     if ma_est:
         ma_est["Todos"] = [any(v[i] for v in ma_est.values()) for i in range(len(periodos))]
-    ma_interp = sorted({periodos[i] for v in origen.values() for i, o in enumerate(v) if o == "Interpolado"})
+    ma_interp = sorted({periodos[i] for v in origen.values() for i, o in enumerate(v) if o.startswith("Interpolado")})
     ma_proy = sorted({periodos[i] for v in origen.values() for i, o in enumerate(v) if o.startswith("Proyectado")})
     ma_real = [p for i, p in enumerate(periodos) if any(v[i].startswith("Real") for r, v in origen.items() if r != "Todos")]
     huecos = set()
@@ -643,8 +643,10 @@ def notas_ramo_rfv(rz: dict, ultimo: int) -> dict:
                   if rz.get("ma_real_hasta") and ramo != "Todos" else f" MA de {etiqueta(ultimo)} estimado por el área.")
         if rz.get("ma_interpolado"):
             t += f" MA interpolado en {texto_meses(rz['ma_interpolado'])}."
-        if ramo != "Todos" and any(o.startswith("Proyectado") for o in (rz.get("origen_ma") or {}).get(ramo, [])):
-            t += " MA 2027 por tendencia."
+        o_proy = next((o for o in (rz.get("origen_ma") or {}).get(ramo, []) if o.startswith("Proyectado")), "")
+        if ramo != "Todos" and o_proy:
+            t += " MA 2027 " + ("por tendencia." if "tendencia" in o_proy else "sigue a la prima." if "PRIMA" in o_proy
+                                else "proyectado.")
         out[ramo] = t
     return out
 
@@ -1545,7 +1547,7 @@ def construir_razones_rfv(ws, wbd, wcr, rz: dict, ultimo: int, p_dic: int, nombr
 
     # ---- hoja
     preparar_hoja(ws, filas=FILAS_HOJA_RFV)
-    caja(ws, "B2:B46")
+    caja(ws, "B2:B48")
     ws["B3"] = "◆ ÍNDICES Y RESERVAS"
     ws["B3"].font = fuente(13, True)
     navegacion(ws, HOJA_DASH_RFV)
@@ -1553,6 +1555,15 @@ def construir_razones_rfv(ws, wbd, wcr, rz: dict, ultimo: int, p_dic: int, nombr
     split = ", ".join(rz.get("split") or []) or "ninguno"
     info = ", ".join(ramos_ma_informativa(rz)) or "ninguno"
     est = [p for i, p in enumerate(periodos) if (rz.get("ma_estimado") or {}).get("Todos", [False] * len(periodos))[i]]
+    proy_r = sorted((r for r, v in (rz.get("origen_ma") or {}).items() if r != "Todos"
+                     and any(o.startswith("Proyectado") for o in v)), key=lambda x: int(x) if x.isdigit() else 0)
+    o_proy = next((o for v in (rz.get("origen_ma") or {}).values() for o in v if o.startswith("Proyectado")), "")
+    nota_ma = "; ".join(x for x in [
+        f"estimado del área {texto_meses(est)}" if est else "",
+        f"interpolado (el CSV no trae esos meses) {texto_meses(rz['ma_interpolado'])}" if rz.get("ma_interpolado") else "",
+        (f"2027 {'por tendencia' if 'tendencia' in o_proy else 'sigue a la prima' if 'PRIMA' in o_proy else 'proyectado'} "
+         f"en {', '.join(proy_r)}, fijo en los demás" if proy_r else "2027 fijo en el último mes del CSV")
+        if rz.get("ma_proyectado") or est else ""] if x)
     huecos = texto_meses(rz.get("ma_huecos") or [])
     con_fv = [i for d in rz["datos"].values() for i, v in enumerate(d["FV"]) if v is not None]
     fv_h = [p for p in (rz.get("ma_huecos") or []) if con_fv and p >= periodos[min(con_fv)]]   # meses de FV sin MA
@@ -1560,11 +1571,7 @@ def construir_razones_rfv(ws, wbd, wcr, rz: dict, ultimo: int, p_dic: int, nombr
              "Valores de los bloques de la BD de RFV. Montos en M MXN.",
              f"MA aparte en {split}; en {info}, la RFV MA es informativa.",
              "Todos: razón de las sumas. Su PD pondera la de cada ramo por su reserva cedida.",
-             *([f"MA estimado por el área: {texto_meses(est)}."] if est else []),
-             *([f"MA interpolado (el CSV no trae esos meses): {texto_meses(rz['ma_interpolado'])}."]
-               if rz.get("ma_interpolado") else []),
-             *([f"MA proyectado por tendencia desde {etiqueta(rz['ma_proyectado'][0])} en algún ramo; los demás, fijo."]
-               if rz.get("ma_proyectado") else []), "",
+             *([f"MA: {nota_ma}."] if nota_ma else []),
              "Gris: FRV residual, RC PRIMA y PD de xDefault (fuera de la gráfica si es más de "
              f"{ESCALA_REF_RFV} veces mayor o menor que la PD). PD de un ramo: azul = medida en Res_Rvas, naranja = la última "
              "medida, fija; sin medida, la referencia de xDefault (prima cedida 24 m), fija.", "",
@@ -1578,8 +1585,8 @@ def construir_razones_rfv(ws, wbd, wcr, rz: dict, ultimo: int, p_dic: int, nombr
         for linea_ in textwrap.wrap(t, 31) or [""]:
             ws.cell(fila, 2, linea_).font = fuente(9, k < 2, TEXTO_2, k >= 3)
             fila += 1
-    if fila > 47:
-        print(f"   Aviso: las notas de {HOJA_DASH_RFV} llegan al renglón {fila - 1} (el panel lateral termina en el 46)",
+    if fila > 49:
+        print(f"   Aviso: las notas de {HOJA_DASH_RFV} llegan al renglón {fila - 1} (el panel lateral termina en el 48)",
               flush=True)
     ws.merge_cells("D9:AG9")                         # el monto afianzado del ramo elegido (texto de L_NotaRfv; un
     ws["D9"] = '=IFERROR(INDEX(L_NotaRfv,MATCH(SelRamoRfv,L_RamosRfv,0)),"")'   # renglon: la fila 9 es del menu)

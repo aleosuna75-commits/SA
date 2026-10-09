@@ -304,7 +304,8 @@ def preparar_datos() -> dict:
         "estatutarios": leer_estatutarios(),
         "nota_rangos": nota_rangos,
         "rfv_prima": nota_rfv_prima(resumen),
-        "rfv_factores": "FRV = FPR x (1 + %GA) x FV" in str(resumen.get("RFV por prima (Fianzas)") or ""),
+        "rfv_factores": bool(re.search(r"FRV = FPR x \(1 \+ %GA\)( x FD)? x FV",
+                                       str(resumen.get("RFV por prima (Fianzas)") or ""))),
         "rfv_ma": (re.search(r"monto afianzado aparte en ([0-9, ]+?):", str(resumen.get("RFV por prima (Fianzas)") or ""))
                    or [None, ""])[1],
         "rfv_ma_hasta": int((re.search(r"MA del CSV del area hasta (\d{6})",
@@ -1108,7 +1109,7 @@ function pintarReservas() {
   const { reserva, concepto, moneda } = E; const ramoRes = E.ramoRes;
   const conceptos = D.conceptos[reserva] || [], ramos = D.ramos_m[reserva] || [];
   const aviso = document.getElementById('nota-res');
-  aviso.textContent = `Cifras en millones de ${moneda}${moneda === 'MXN' ? ' (USD × TC del mes)' : ''} · real hasta ${eti(D.ultimo)} · montos: ${D.modelo_por_tipo.nivel || 'n/d'}; razones: ${D.modelo_por_tipo.razon || 'n/d'}${reserva === 'RFV' ? ' · Fianzas se modela en pesos y se convierte con el TC de Inversiones' + (D.rfv_prima ? ' · RFV por prima en ' + D.rfv_prima + '; IRR = BRUTO × CESION y NETO = BRUTO − IRR; RCONT con su modelo' + (D.rfv_factores ? '; en la BD, FRV = FPR × (1 + %GA) × FV y CESION = RC × FCR, con los factores de la metodología del área (segmento y prima de reserva, comisiones, cargas, gastos, factor residual FV, cesión y PD)' + (D.rfv_ma ? '; en ' + D.rfv_ma + ' la reserva por monto afianzado va aparte: FRV = FPR × (1 + %GA) × FV + RFV MA / PRIMA 24M, RFV MA = MA × (ω + α), con el MA del área' + (D.rfv_ma_hasta ? ' hasta ' + eti(D.rfv_ma_hasta) + ' (meses que no trae, interpolados); después, ' + (D.rfv_ma_regla || 'fijo') : '') : '') : '') : '') + (D.nota_rangos ? ' · ' + D.nota_rangos : '') : ''}`;
+  aviso.textContent = `Cifras en millones de ${moneda}${moneda === 'MXN' ? ' (USD × TC del mes)' : ''} · real hasta ${eti(D.ultimo)} · montos: ${D.modelo_por_tipo.nivel || 'n/d'}; razones: ${D.modelo_por_tipo.razon || 'n/d'}${reserva === 'RFV' ? ' · Fianzas se modela en pesos y se convierte con el TC de Inversiones' + (D.rfv_prima ? ' · RFV por prima en ' + D.rfv_prima + '; IRR = BRUTO × CESION y NETO = BRUTO − IRR; RCONT con su modelo' + (D.rfv_factores ? '; en la BD, FRV = FPR × (1 + %GA) × FD × FV y CESION = RC × FCR, con los factores de la metodología del área (segmento y prima de reserva, comisiones, cargas, gastos, factor de devengamiento FD = 1 en la historia, factor residual FV, cesión y PD)' + (D.rfv_ma ? '; en ' + D.rfv_ma + ' la reserva por monto afianzado va aparte: FRV = FPR × (1 + %GA) × FV + RFV MA / PRIMA 24M, RFV MA = MA × (ω + α), con el MA del área' + (D.rfv_ma_hasta ? ' hasta ' + eti(D.rfv_ma_hasta) + ((RZ && (RZ.ma_interpolado || []).length) ? ' (meses que no trae, interpolados)' : '') + '; después, ' + (D.rfv_ma_regla || 'fijo') : '') : '') : '') : '') + (D.nota_rangos ? ' · ' + D.nota_rangos : '') : ''}`;
   const vals = montoSerie(reserva, concepto, ramoRes);
   const u = vals[jUlt], pd = vals[jDic], pf = vals[jFin], v12 = vals[j12], p12 = vals[jUlt + 12];
   const f1 = v => fmt(v, 1);
@@ -1396,8 +1397,10 @@ function explicaRfv(col, ramo, o = {}) {
   const est = textoMeses(P_Z.filter((p, i) => ((RZ.ma_estimado || {})[ramo] || [])[i]));
   const maReal = RZ.ma_real_hasta ? `real hasta ${eti(RZ.ma_real_hasta)}` : 'real';
   const orgMa = (RZ.origen_ma || {})[ramo] || [];
-  const interp = textoMeses(P_Z.filter((p, i) => orgMa[i] === 'Interpolado'));
-  const proyMa = orgMa.some(o => (o || '').startsWith('Proyectado')) ? 'proyectado por su tendencia (Theil-Sen de los meses reales e interpolados, clara, amortiguada 5 % por mes)' : 'fijo en el último mes del CSV (sin tendencia clara)';
+  const interp = textoMeses(P_Z.filter((p, i) => (orgMa[i] || '').startsWith('Interpolado')));
+  const oProy = orgMa.find(o => (o || '').startsWith('Proyectado')) || '';
+  const proyMa = oProy ? oProy.replace('Proyectado (', 'proyectado: ').replace(/\)$/, '') + (oProy.includes('tendencia') ? ' (recta Theil-Sen de los meses reales e interpolados, solo si es clara, amortiguada 5 % por mes)' : '')
+    : (D.rfv_ma_regla ? `fijo en el último mes del CSV (regla por ramo: ${D.rfv_ma_regla})` : 'fijo en el último mes del CSV');
   const orgPd = (RZ.pd_origen || {})[ramo] || [], pdMed = ((RZ.pd_medida || {})[ramo] || []).some(Boolean), pdRef = orgPd.some(o => /referencia/i.test(o || ''));
   const txtPd = !pdMed && pdRef ? 'Probabilidad de incumplimiento del reasegurador. Este ramo no tiene castigo medido en Res_Rvas (Base FIANZAS que coincida con SAP): se muestra la referencia de xDefault del área (la PD por póliza que el área arma con la tabla del Anexo 8.20.2 de la CUSF y sus criterios), ponderada por prima cedida de 24 meses, al último mes del CSV y fija después; no es la PD por reserva cedida del castigo y no entra a la IRR (solo separa RC de FCR), en %'
     : 'Probabilidad de incumplimiento del reasegurador: CASTIGO / (IRR + CASTIGO) del cálculo del área (Res_Rvas) en los meses que coinciden con SAP; después, la última medida, fija' + (pdRef ? '; antes de la primera medida, la referencia de xDefault (prima cedida 24 m)' : '') + ', en %';
@@ -1411,7 +1414,7 @@ function explicaRfv(col, ramo, o = {}) {
     'PRIMA 24M (MXN)': `Suma de los últimos 24 meses de prima tomada (PExRamo, reforecast y FCST), millones de MXN${todos ? '; suma de los ramos' : ''}`,
     'CESION': `IRR / BRUTO, en %${suma}; desde ${ini}, RC × FCR` + (todos ? `, con la cesión de cada ramo ${conTendRfv('ces')}` : `, ${tendRfv(ramo, 'ces')}`),
     'RC': `Proporción cedida con transferencia cierta = CESIÓN / FCR, en %${todos ? '; Todos = suma de IRR / suma de (BRUTO × FCR)' : ''}; gris: RC PRIMA, prima cedida / tomada desde ene-19 (informativa: el área la aplica contrato por contrato; sin dato desde sep-26 porque el reforecast no trae la cedida)`,
-    'FV': `(RFV − RFV MA aparte) / (PR 24M + GA 24M), con PR = PRIMA 24M × FPR y GA = PR × %GA: factor residual (permanencia, facultativo y TC`
+    'FV': `(RFV − RFV MA aparte) / ((PR 24M + GA 24M) × FD), con PR = PRIMA 24M × FPR, GA = PR × %GA y FD = 1 (el área no devenga): factor residual (permanencia, facultativo y TC`
       + (todos ? ((RZ.split || []).length ? `; la RFV MA se resta en ${lista(RZ.split)}` : '') : split ? ', sin la reserva por monto afianzado, que va aparte' : ', con la reserva por monto afianzado, que aquí es informativa')
       + `)${todos ? '; Todos = suma de los numeradores / suma de (PR + GA), sin dato si a un ramo le falta su FV' : ''}; sin dato antes de ${isFinite(INI_FV) ? eti(P_Z[INI_FV]) : 'ene-26'} (no hay comisiones de Fianzas antes)`
       + (huecos ? `; en ${huecos}, sin dato porque el CSV del área no trae el monto afianzado de ${todos ? lista(RZ.split || []) : 'esos meses'}` + (sueltos ? ` (${sueltos} queda como punto suelto)` : '') : ''),
@@ -1541,9 +1544,8 @@ function pintarRfv() {
     const usaMa = col === 'MA (MXN)' || col === 'RFV MA / RFV BRUTO' || (col === 'FV' && (todos || split.includes(ramo))) || soloResid;
     const orgMa = usaMa ? ((RZ.origen_ma || {})[ramo] || []) : [];
     const notaMa = i => { const o = orgMa[i] || ''; const pref = soloResid ? 'residual con ' : '';
-      return o === 'Estimado' ? `${pref}MA estimado del área` : o === 'Interpolado' ? `${pref}MA interpolado` : o.startsWith('Real (copia') ? `${pref}MA copia del mes anterior`
-        : o.startsWith('Proyectado') ? `${pref}MA por tendencia` : o.startsWith('fijo en') ? `${pref}MA fijo en el último del CSV` : ''; };
-    const maEst = orgMa.map((o, i) => !!notaMa(i) && i <= zUlt);
+      return o === 'Estimado' ? `${pref}MA estimado del área` : o.startsWith('Interpolado') ? `${pref}MA interpolado${o.includes('estimado') ? ' con un estimado' : ''}` : o.startsWith('Real (copia') ? `${pref}MA copia del mes anterior`
+        : o.startsWith('Proyectado') ? `${pref}${o.replace('Proyectado (', 'MA proyectado: ').replace(/\)$/, '')}` : o.startsWith('fijo en') ? `${pref}MA fijo en el último del CSV` : ''; };
     const tipoReal = i => notaMa(i) ? `Real (${notaMa(i)})` : 'Real';
     const tipoProy = i => notaMa(i) ? `Proyección (${notaMa(i)})` : 'Proyección';
     const hayReal = real.some(v => v != null), hayProy = proy.some((v, i) => v != null && (esPd || i > zUlt));
