@@ -513,7 +513,8 @@ def _leer_extra_rfv() -> dict:
 def leer_razones_rfv() -> dict | None:
     """Hoja HOJA_RAZONES_RFV del diagnostico (las razones de la RFV de Fianzas por ramo y mes, con "Todos"): {"periodos",
     "ramos": [ramos con RFV por prima], "datos": {ramo o "Todos": {columna: [valor por periodo o None]}}, "origen_ma":
-    {ramo: [texto por periodo]}, "pd_medida": {ramo: [la PD del mes se midio en Res_Rvas]}, "split": [ramos con el
+    {ramo: [texto por periodo]}, "pd_medida": {ramo: [la PD del mes se midio en Res_Rvas]}, "pd_origen": {ramo: [origen
+    de la PD del mes: medida, ultima medida fija, referencia de xDefault o sin PD]}, "split": [ramos con el
     monto afianzado aparte], "factores": {ramo: {factor: valor del
     ultimo mes real y del ultimo proyectado}}, "ramos_todos": [texto por periodo], "renglones": n}. None sin la hoja
     (diagnostico de una version anterior o sin RFV por prima)."""
@@ -536,6 +537,7 @@ def leer_razones_rfv() -> dict | None:
     columnas = [c for c, _, _, _ in INDICADORES_RFV] + [g for _, _, _, g in INDICADORES_RFV if g] \
         + list(FACTORES_RFV_TABLA) + ["RFV BRUTO (MXN)", "RFV MA (MXN)"]
     datos, origen, ramos_todos, split, factores, pd_medida = {}, {}, [""] * len(periodos), set(), {}, {}
+    pd_origen = {}
     for r in crudos:
         ramo, i = str(r["Ramo"]), pos[int(r["Periodo"])]
         d = datos.setdefault(ramo, {c: [None] * len(periodos) for c in columnas})
@@ -543,6 +545,7 @@ def leer_razones_rfv() -> dict | None:
             d[c][i] = numero(r.get(c))
         origen.setdefault(ramo, [""] * len(periodos))[i] = str(r.get("Origen del MA") or "")
         pd_medida.setdefault(ramo, [False] * len(periodos))[i] = str(r.get("PD medida") or "") == "si"
+        pd_origen.setdefault(ramo, [""] * len(periodos))[i] = str(r.get("Origen de la PD") or "")
         if ramo == "Todos":
             ramos_todos[i] = str(r.get("Ramos en Todos") or "")
         elif str(r.get("MA aparte") or "") == "si":
@@ -556,7 +559,9 @@ def leer_razones_rfv() -> dict | None:
     ma_est = {r: [o == "Estimado" for o in v] for r, v in origen.items() if r != "Todos"}
     if ma_est:
         ma_est["Todos"] = [any(v[i] for v in ma_est.values()) for i in range(len(periodos))]
-    ma_real = [p for i, p in enumerate(periodos) if any(v[i] == "Real" for r, v in origen.items() if r != "Todos")]
+    ma_interp = sorted({periodos[i] for v in origen.values() for i, o in enumerate(v) if o == "Interpolado"})
+    ma_proy = sorted({periodos[i] for v in origen.values() for i, o in enumerate(v) if o.startswith("Proyectado")})
+    ma_real = [p for i, p in enumerate(periodos) if any(v[i].startswith("Real") for r, v in origen.items() if r != "Todos")]
     huecos = set()
     for ramo, d in datos.items():
         con = [i for i, v in enumerate(d["MA (MXN)"]) if v is not None]
@@ -567,9 +572,10 @@ def leer_razones_rfv() -> dict | None:
     bdreal = re.sub(r"\b(\d{6})\b", lambda m: etiqueta(int(m.group(1))), bdreal)     # "202601 a 202607" -> "ene-26 a jul-26"
     extra = _leer_extra_rfv()
     return {"periodos": periodos, "ramos": ramos, "datos": datos, "origen_ma": origen, "split": sorted(split),
-            "pd_medida": pd_medida, **extra,
+            "pd_medida": pd_medida, "pd_origen": pd_origen, **extra,
             "factores": factores, "ramos_todos": ramos_todos, "ultimo_real": p_ult, "renglones": len(crudos),
             "hay_real": any(real), "ma_estimado": ma_est, "ma_real_hasta": max(ma_real, default=0),
+            "ma_interpolado": ma_interp, "ma_proyectado": ma_proy,
             "ma_huecos": sorted(huecos), "xdefault_hasta": periodos[max(con_xd)] if con_xd else 0, "bdreal": bdreal,
             "escala_ref": ESCALA_REF_RFV}
 
@@ -629,9 +635,16 @@ def notas_ramo_rfv(rz: dict, ultimo: int) -> dict:
             t = f"Ramo {ramo}: sin monto afianzado en el CSV del área."
         if na.get("PD"):
             t += " PD en N/A (FCR = 1)."
+        elif ramo != "Todos" and not any((rz.get("pd_medida") or {}).get(ramo, [])) \
+                and any("referencia" in o for o in (rz.get("pd_origen") or {}).get(ramo, [])):
+            t += " PD de referencia (xDefault del área; sin castigo medido)."
         if (rz.get("ma_estimado") or {}).get(ramo, [False] * (i + 1))[i]:
             t += (f" MA de {etiqueta(ultimo)} estimado por el área (real hasta {etiqueta(rz['ma_real_hasta'])})."
                   if rz.get("ma_real_hasta") and ramo != "Todos" else f" MA de {etiqueta(ultimo)} estimado por el área.")
+        if rz.get("ma_interpolado"):
+            t += f" MA interpolado en {texto_meses(rz['ma_interpolado'])}."
+        if ramo != "Todos" and any(o.startswith("Proyectado") for o in (rz.get("origen_ma") or {}).get(ramo, [])):
+            t += " MA 2027 por tendencia."
         out[ramo] = t
     return out
 
@@ -881,7 +894,9 @@ def generar(ruta_salida: Path = SALIDA_DASHBOARD) -> Path:
            if pnd else {}),
         **({"L_RamosRfv": ["Todos"] + rz["ramos"],
             "L_NotaRfv": [notas_ramo_rfv(rz, ultimo)[r] for r in ["Todos"] + rz["ramos"]],
-            "L_XdefEscala": [ref_en_escala(rz, r) for r in ["Todos"] + rz["ramos"]]} if rz else {}),
+            "L_XdefEscala": [ref_en_escala(rz, r) for r in ["Todos"] + rz["ramos"]],
+            "L_PdMedida": [r == "Todos" or any((rz.get("pd_medida") or {}).get(r, []))
+                           for r in ["Todos"] + rz["ramos"]]} if rz else {}),
     }
     for j, (n_, valores) in enumerate(listas.items(), start=1):
         letra = get_column_letter(j)
@@ -1495,20 +1510,22 @@ def construir_razones_rfv(ws, wbd, wcr, rz: dict, ultimo: int, p_dic: int, nombr
     unidad.update({"OMEGA": "pct", "ALFA": "pct"})
     fmt_bd = {"mxn": "#,##0", "pct": "0.00%", "pct3": "0.000%", "razon": "0.0000"}
     # ---- base de datos
-    wbd.append(["Clave", "Ramo", "Periodo", "Tipo"] + todas + ["PD medida"])
+    wbd.append(["Clave", "Ramo", "Periodo", "Tipo"] + todas + ["PD medida", "Origen de la PD", "Origen del MA"])
     for ramo in ["Todos"] + rz["ramos"]:
         if ramo not in rz["datos"]:
             continue
         for i, p in enumerate(periodos):
             wbd.append([f"{ramo}|{p}", ramo, p, "Real" if p <= ultimo else "Proyección"]
                        + [rz["datos"][ramo][c][i] for c in todas]
-                       + ["si" if (rz.get("pd_medida") or {}).get(ramo, [False] * len(periodos))[i] else "no"])
+                       + ["si" if (rz.get("pd_medida") or {}).get(ramo, [False] * len(periodos))[i] else "no",
+                          (rz.get("pd_origen") or {}).get(ramo, [""] * len(periodos))[i],
+                          (rz.get("origen_ma") or {}).get(ramo, [""] * len(periodos))[i]])
     n_d = wbd.max_row
-    tabla = Table(displayName="TablaRazonesRFV", ref=f"A1:{get_column_letter(5 + len(todas))}{n_d}")
+    tabla = Table(displayName="TablaRazonesRFV", ref=f"A1:{get_column_letter(7 + len(todas))}{n_d}")
     tabla.tableStyleInfo = TableStyleInfo(name="TableStyleLight9", showRowStripes=True)
     wbd.add_table(tabla)
     wbd.freeze_panes = "B2"
-    for k in range(1, 5 + len(todas)):
+    for k in range(1, 8 + len(todas)):
         wbd.column_dimensions[get_column_letter(k)].width = 15
     for fila in wbd.iter_rows(min_row=2, min_col=2, max_col=2):
         for c in fila:
@@ -1543,10 +1560,14 @@ def construir_razones_rfv(ws, wbd, wcr, rz: dict, ultimo: int, p_dic: int, nombr
              "Valores de los bloques de la BD de RFV. Montos en M MXN.",
              f"MA aparte en {split}; en {info}, la RFV MA es informativa.",
              "Todos: razón de las sumas. Su PD pondera la de cada ramo por su reserva cedida.",
-             *([f"MA estimado por el área: {texto_meses(est)}."] if est else []), "",
+             *([f"MA estimado por el área: {texto_meses(est)}."] if est else []),
+             *([f"MA interpolado (el CSV no trae esos meses): {texto_meses(rz['ma_interpolado'])}."]
+               if rz.get("ma_interpolado") else []),
+             *([f"MA proyectado por tendencia desde {etiqueta(rz['ma_proyectado'][0])} en algún ramo; los demás, fijo."]
+               if rz.get("ma_proyectado") else []), "",
              "Gris: FRV residual, RC PRIMA y PD de xDefault (fuera de la gráfica si es más de "
              f"{ESCALA_REF_RFV} veces mayor o menor que la PD). PD de un ramo: azul = medida en Res_Rvas, naranja = la última "
-             "medida, fija.", "",
+             "medida, fija; sin medida, la referencia de xDefault (prima cedida 24 m), fija.", "",
              f"#N/D = sin dato: FV antes de {etiqueta(periodos[min(con_fv)]) if con_fv else 'ene-26'}"
              + (f"; MA, RFV MA y FRV residual en {huecos} (el CSV no los trae" + (f"; por eso tampoco hay FV de {split} ni de "
                 f"Todos en {texto_meses(fv_h)})" if fv_h else ")") if huecos else "")
@@ -1590,8 +1611,10 @@ def construir_razones_rfv(ws, wbd, wcr, rz: dict, ultimo: int, p_dic: int, nombr
         es_pd = c_ == "PD"
         # un ramo: azul = PD medida en Res_Rvas, naranja = la ultima medida, fija; Todos: real y proyeccion por mes (su
         # PD pondera la de cada ramo por su reserva cedida y cambia con la mezcla)
-        wcr.cell(1, cc, f'=IF({todos_sel},"Real","Medida (Res_Rvas)")' if es_pd else "Real")
-        wcr.cell(1, cc + 1, f'=IF({todos_sel},"Proyección","Última medida, fija")' if es_pd else "Proyección")
+        pdmed = "IFERROR(INDEX(L_PdMedida,MATCH(SelRamoRfv,L_RamosRfv,0)),TRUE)"
+        wcr.cell(1, cc, f'=IF({todos_sel},"Real",IF({pdmed},"Medida (Res_Rvas)","Sin PD medida"))' if es_pd else "Real")
+        wcr.cell(1, cc + 1, f'=IF({todos_sel},"Proyección",IF({pdmed},"Última medida, fija",'
+                            f'"Referencia (xDefault del área, prima cedida 24 m), fija"))' if es_pd else "Proyección")
         div = "/1000000" if u == "mxn" else ""
         for k, p in enumerate(periodos, start=2):
             def v(rng, _k=k, _div=div):
@@ -1613,11 +1636,15 @@ def construir_razones_rfv(ws, wbd, wcr, rz: dict, ultimo: int, p_dic: int, nombr
                 wcr.cell(1, cc + 3, f"{g} (todos los meses)")
                 wcr.cell(n_c + 2, cc + 2, "En escala")   # (ref_en_escala por ramo, en Listas)
                 wcr.cell(n_c + 2, cc + 3, "=IFERROR(INDEX(L_XdefEscala,MATCH(SelRamoRfv,L_RamosRfv,0)),FALSE)")
+                wcr.cell(n_c + 3, cc + 2, "Con PD medida")   # (sin medida, la PD ya es la de xDefault: la gris sobra)
+                wcr.cell(n_c + 3, cc + 3, f"={pdmed}")
                 for k in range(2, n_c + 1):
                     wcr.cell(k, cc + 3, f"={v(rango_de[g], k)}").number_format = fmt_c[u]
-                    wcr.cell(k, cc + 2, f"=IF(${L(cc + 3)}${n_c + 2},{L(cc + 3)}{k},NA())").number_format = fmt_c[u]
-                wcr.cell(1, cc + 2, f'=IF(COUNT({gr})>0,"{g}",IF(COUNT({cruda})=0,"{g} (sin dato en esta selección)",'
-                                    f'"{g} (fuera de escala: ver BD_RFV_Razones)"))')
+                    wcr.cell(k, cc + 2, f"=IF(AND(${L(cc + 3)}${n_c + 2},${L(cc + 3)}${n_c + 3}),{L(cc + 3)}{k},NA())"
+                             ).number_format = fmt_c[u]
+                wcr.cell(1, cc + 2, f'=IF(COUNT({gr})>0,"{g}",IF(NOT(${L(cc + 3)}${n_c + 3}),"{g} (es la misma PD)",'
+                                    f'IF(COUNT({cruda})=0,"{g} (sin dato en esta selección)",'
+                                    f'"{g} (fuera de escala: ver BD_RFV_Razones)")))')
             else:
                 for k in range(2, n_c + 1):
                     wcr.cell(k, cc + 2, f"={v(rango_de[g], k)}").number_format = fmt_c[u]

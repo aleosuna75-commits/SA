@@ -276,7 +276,8 @@ def preparar_datos() -> dict:
         unid_rz.update({g: unid_rz[c] for c, _, _, g in dx.INDICADORES_RFV if g})
         unid_rz.update({"RFV BRUTO (MXN)": "mxn", "RFV MA (MXN)": "mxn"})   # (la RFV MA que va aparte, en Todos)
         rz = {"periodos": rz["periodos"], "ramos": rz["ramos"], "split": rz["split"], "ultimo_real": rz["ultimo_real"],
-              "pd_medida": rz.get("pd_medida") or {},
+              "pd_medida": rz.get("pd_medida") or {}, "pd_origen": rz.get("pd_origen") or {},
+              "ma_interpolado": rz.get("ma_interpolado") or [], "ma_proyectado": rz.get("ma_proyectado") or [],
               "ramos_todos": rz["ramos_todos"], "origen_ma": rz["origen_ma"],
               **{k: rz.get(k) for k in ("ma_estimado", "ma_real_hasta", "ma_huecos", "xdefault_hasta", "bdreal",
                                         "escala_ref", "tendencia", "na", "prima")},
@@ -306,8 +307,10 @@ def preparar_datos() -> dict:
         "rfv_factores": "FRV = FPR x (1 + %GA) x FV" in str(resumen.get("RFV por prima (Fianzas)") or ""),
         "rfv_ma": (re.search(r"monto afianzado aparte en ([0-9, ]+?):", str(resumen.get("RFV por prima (Fianzas)") or ""))
                    or [None, ""])[1],
-        "rfv_ma_hasta": int((re.search(r"MA del CSV del area hasta (\d{6}) y fijo",
+        "rfv_ma_hasta": int((re.search(r"MA del CSV del area hasta (\d{6})",
                                        str(resumen.get("RFV por prima (Fianzas)") or "")) or [None, 0])[1]),
+        "rfv_ma_regla": (re.search(r"despues: ([^;)]+)", str(resumen.get("RFV por prima (Fianzas)") or ""))
+                         or [None, ""])[1].strip(),
         "factores_fijos": factores_fijos(resumen),
         "suavizado": notas_suavizado(resumen),
         "ppto": leer_contraste_presupuesto(),
@@ -1105,7 +1108,7 @@ function pintarReservas() {
   const { reserva, concepto, moneda } = E; const ramoRes = E.ramoRes;
   const conceptos = D.conceptos[reserva] || [], ramos = D.ramos_m[reserva] || [];
   const aviso = document.getElementById('nota-res');
-  aviso.textContent = `Cifras en millones de ${moneda}${moneda === 'MXN' ? ' (USD × TC del mes)' : ''} · real hasta ${eti(D.ultimo)} · montos: ${D.modelo_por_tipo.nivel || 'n/d'}; razones: ${D.modelo_por_tipo.razon || 'n/d'}${reserva === 'RFV' ? ' · Fianzas se modela en pesos y se convierte con el TC de Inversiones' + (D.rfv_prima ? ' · RFV por prima en ' + D.rfv_prima + '; IRR = BRUTO × CESION y NETO = BRUTO − IRR; RCONT con su modelo' + (D.rfv_factores ? '; en la BD, FRV = FPR × (1 + %GA) × FV y CESION = RC × FCR, con los factores de la metodología del área (segmento y prima de reserva, comisiones, cargas, gastos, factor residual FV, cesión y PD)' + (D.rfv_ma ? '; en ' + D.rfv_ma + ' la reserva por monto afianzado va aparte: FRV = FPR × (1 + %GA) × FV + RFV MA / PRIMA 24M, RFV MA = MA × (ω + α), con el MA del área' + (D.rfv_ma_hasta ? ' hasta ' + eti(D.rfv_ma_hasta) + ' y fijo después' : '') : '') : '') : '') + (D.nota_rangos ? ' · ' + D.nota_rangos : '') : ''}`;
+  aviso.textContent = `Cifras en millones de ${moneda}${moneda === 'MXN' ? ' (USD × TC del mes)' : ''} · real hasta ${eti(D.ultimo)} · montos: ${D.modelo_por_tipo.nivel || 'n/d'}; razones: ${D.modelo_por_tipo.razon || 'n/d'}${reserva === 'RFV' ? ' · Fianzas se modela en pesos y se convierte con el TC de Inversiones' + (D.rfv_prima ? ' · RFV por prima en ' + D.rfv_prima + '; IRR = BRUTO × CESION y NETO = BRUTO − IRR; RCONT con su modelo' + (D.rfv_factores ? '; en la BD, FRV = FPR × (1 + %GA) × FV y CESION = RC × FCR, con los factores de la metodología del área (segmento y prima de reserva, comisiones, cargas, gastos, factor residual FV, cesión y PD)' + (D.rfv_ma ? '; en ' + D.rfv_ma + ' la reserva por monto afianzado va aparte: FRV = FPR × (1 + %GA) × FV + RFV MA / PRIMA 24M, RFV MA = MA × (ω + α), con el MA del área' + (D.rfv_ma_hasta ? ' hasta ' + eti(D.rfv_ma_hasta) + ' (meses que no trae, interpolados); después, ' + (D.rfv_ma_regla || 'fijo') : '') : '') : '') : '') + (D.nota_rangos ? ' · ' + D.nota_rangos : '') : ''}`;
   const vals = montoSerie(reserva, concepto, ramoRes);
   const u = vals[jUlt], pd = vals[jDic], pf = vals[jFin], v12 = vals[j12], p12 = vals[jUlt + 12];
   const f1 = v => fmt(v, 1);
@@ -1392,6 +1395,12 @@ function explicaRfv(col, ramo, o = {}) {
     + (sueltos ? ` (por eso ${sueltos} se ve como punto suelto)` : '') : '';
   const est = textoMeses(P_Z.filter((p, i) => ((RZ.ma_estimado || {})[ramo] || [])[i]));
   const maReal = RZ.ma_real_hasta ? `real hasta ${eti(RZ.ma_real_hasta)}` : 'real';
+  const orgMa = (RZ.origen_ma || {})[ramo] || [];
+  const interp = textoMeses(P_Z.filter((p, i) => orgMa[i] === 'Interpolado'));
+  const proyMa = orgMa.some(o => (o || '').startsWith('Proyectado')) ? 'proyectado por su tendencia (Theil-Sen de los meses reales e interpolados, clara, amortiguada 5 % por mes)' : 'fijo en el último mes del CSV (sin tendencia clara)';
+  const orgPd = (RZ.pd_origen || {})[ramo] || [], pdMed = ((RZ.pd_medida || {})[ramo] || []).some(Boolean), pdRef = orgPd.some(o => /referencia/i.test(o || ''));
+  const txtPd = !pdMed && pdRef ? 'Probabilidad de incumplimiento del reasegurador. Este ramo no tiene castigo medido en Res_Rvas (Base FIANZAS que coincida con SAP): se muestra la referencia de xDefault del área (la PD por póliza que el área arma con la tabla del Anexo 8.20.2 de la CUSF y sus criterios), ponderada por prima cedida de 24 meses, al último mes del CSV y fija después; no es la PD por reserva cedida del castigo y no entra a la IRR (solo separa RC de FCR), en %'
+    : 'Probabilidad de incumplimiento del reasegurador: CASTIGO / (IRR + CASTIGO) del cálculo del área (Res_Rvas) en los meses que coinciden con SAP; después, la última medida, fija' + (pdRef ? '; antes de la primera medida, la referencia de xDefault (prima cedida 24 m)' : '') + ', en %';
   const resid = ((RZ.datos[ramo] || {})['FRV residual (sin RFV MA)']) || [];
   const hRes = textoMeses(huecosRfv(resid));
   return {
@@ -1408,11 +1417,11 @@ function explicaRfv(col, ramo, o = {}) {
       + (huecos ? `; en ${huecos}, sin dato porque el CSV del área no trae el monto afianzado de ${todos ? lista(RZ.split || []) : 'esos meses'}` + (sueltos ? ` (${sueltos} queda como punto suelto)` : '') : ''),
     'PD': todos
       ? 'Probabilidad de incumplimiento del reasegurador; Todos = 1 − suma de IRR / suma de la reserva cedida (IRR / FCR): la PD de cada ramo (medida en Res_Rvas o, después, la última medida, fija) ponderada por su reserva cedida, así que se mueve mes a mes con la mezcla de cesión, en %'
-      : 'Probabilidad de incumplimiento del reasegurador: CASTIGO / (IRR + CASTIGO) del cálculo del área (Res_Rvas) en los meses que coinciden con SAP; después, la última medida, fija, en %'
+      : txtPd
         + (o.hayGris ? `; PD de xDefault ponderada por prima cedida, 24 meses (referencia; no entra a la IRR${RZ.xdefault_hasta ? `; llega hasta ${eti(RZ.xdefault_hasta)}` : ''})`
           + (o.fueraEscala === 'mayor' ? `: va solo en la vista de tabla, porque llega a más de ${RZ.escala_ref || 3} veces la PD del área y aplanaría la gráfica`
             : o.fueraEscala === 'menor' ? `: va solo en la vista de tabla, porque baja a menos de un tercio de la PD del área y aplanaría la gráfica` : ', en gris') : ''),
-    'MA (MXN)': `Monto afianzado del proporcional de México (CSV del área: ${maReal}${est ? `, estimado del área ${est}` : ''}; después, fijo en el último mes del CSV), millones de MXN${todos ? '; suma de los ramos' : split ? '' : '; en este ramo es informativo'}${sinCsv}`,
+    'MA (MXN)': `Monto afianzado del proporcional de México (CSV del área: ${maReal}${interp ? `, interpolado en ${interp} porque el CSV no trae esos meses` : ''}${est ? `, estimado del área ${est}` : ''}; después, ${todos ? 'fijo o por tendencia según el ramo' : proyMa}), millones de MXN${todos ? '; suma de los ramos' : split ? '' : '; en este ramo es informativo'}${sinCsv}`,
     'RFV MA / RFV BRUTO': `RFV MA = MA × (ω + α) entre la RFV BRUTO en pesos, en %`
       + (todos ? ((RZ.na || {}).MA && !(RZ.split || []).length && !RAMOS_MA_INFO.length ? '; suma de RFV MA / suma de RFV BRUTO' : `; suma de RFV MA / suma de RFV BRUTO: incluye la que va aparte (${lista(RZ.split || [])}) y la informativa (${lista(RAMOS_MA_INFO)}), que queda dentro de FV`)
         : split ? '; en este ramo va aparte' : '; en este ramo es informativa (queda dentro de FV)')
@@ -1504,7 +1513,8 @@ function pintarRfv() {
         : [RAMOS_MA_INFO.length ? `incluye la informativa de ${RAMOS_MA_INFO.join(' y ')}` : '',
            maAparteTodos(zUlt) == null ? '' : `aparte (${split.join(' y ')}): ${fmt(maAparteTodos(zUlt) * 100, 1)} %`].filter(Boolean).join('; '))
         : (RZ.na || {}).MA && part[zUlt] == null ? 'sin monto afianzado en esta corrida' : split.includes(ramo) ? 'va aparte en este ramo' : 'informativa en este ramo')
-      + (((RZ.ma_estimado || {})[ramo] || [])[zUlt] ? ' · MA estimado del área' : '')),
+      + (((RZ.ma_estimado || {})[ramo] || [])[zUlt] ? ' · MA estimado del área' : '')
+      + ((RZ.ma_interpolado || []).length ? ` · MA interpolado en ${textoMeses(RZ.ma_interpolado)}` : '')),
   );
   const rejilla = document.getElementById('rejilla-rfv'); rejilla.replaceChildren(); tarjetasVivas.length = 0;
   RZ.indicadores.forEach(([col, titulo, unidad, ref], k) => {
@@ -1514,12 +1524,14 @@ function pintarRfv() {
     // PD de un ramo: azul = medida en Res_Rvas, naranja = la ultima medida, fija. En Todos no: su PD pondera la de cada
     // ramo por su reserva cedida y cambia con la mezcla, asi que va como las demas (real y proyeccion)
     const esPd = col === 'PD' && !todos, med = (RZ.pd_medida || {})[ramo] || [];
+    const orgPd = (RZ.pd_origen || {})[ramo] || [], hayMed = med.some(Boolean), hayRef = orgPd.some(o => /referencia/i.test(o || ''));
     if (esPd) {
       real = vals.map((v, i) => med[i] ? v : null);
       proy = vals.map((v, i) => !med[i] || (i < vals.length - 1 && !med[i + 1]) ? v : null);
     }
-    const nomReal = esPd ? 'Medida (Res_Rvas)' : 'Real', nomProy = esPd ? 'Última medida, fija' : 'Proyección';
-    const gris = ref ? serieRfv(ramo, ref, unidad) : null;
+    const nomReal = esPd ? 'Medida (Res_Rvas)' : 'Real';
+    const nomProy = esPd ? (hayMed ? (hayRef ? 'Última medida, fija (antes de la primera: referencia xDefault)' : 'Última medida, fija') : 'Referencia (xDefault del área, prima cedida 24 m), fija') : 'Proyección';
+    const gris = ref && !(esPd && !hayMed) ? serieRfv(ramo, ref, unidad) : null;   // (sin medida, la PD ya es la de xDefault)
     const hayGris = !!gris && gris.some(v => v != null);
     const fueraEscala = hayGris && col === 'PD' ? fueraDeEscala(vals, gris) : '';   // gris solo en la tabla
     const grisEnGrafica = hayGris && !fueraEscala;
@@ -1527,9 +1539,13 @@ function pintarRfv() {
     // (en FRV, solo el residual gris de los ramos con el MA aparte depende del MA)
     const soloResid = col === 'FRV' && split.includes(ramo);
     const usaMa = col === 'MA (MXN)' || col === 'RFV MA / RFV BRUTO' || (col === 'FV' && (todos || split.includes(ramo))) || soloResid;
-    const maEst = usaMa ? ((RZ.ma_estimado || {})[ramo] || []) : [];
-    const notaEst = soloResid ? 'residual con MA estimado del área' : 'MA estimado del área';
-    const tipoReal = i => maEst[i] ? `Real (${notaEst})` : 'Real';
+    const orgMa = usaMa ? ((RZ.origen_ma || {})[ramo] || []) : [];
+    const notaMa = i => { const o = orgMa[i] || ''; const pref = soloResid ? 'residual con ' : '';
+      return o === 'Estimado' ? `${pref}MA estimado del área` : o === 'Interpolado' ? `${pref}MA interpolado` : o.startsWith('Real (copia') ? `${pref}MA copia del mes anterior`
+        : o.startsWith('Proyectado') ? `${pref}MA por tendencia` : o.startsWith('fijo en') ? `${pref}MA fijo en el último del CSV` : ''; };
+    const maEst = orgMa.map((o, i) => !!notaMa(i) && i <= zUlt);
+    const tipoReal = i => notaMa(i) ? `Real (${notaMa(i)})` : 'Real';
+    const tipoProy = i => notaMa(i) ? `Proyección (${notaMa(i)})` : 'Proyección';
     const hayReal = real.some(v => v != null), hayProy = proy.some((v, i) => v != null && (esPd || i > zUlt));
     const naMa = (col === 'MA (MXN)' || col === 'RFV MA / RFV BRUTO') && (RZ.na || {}).MA, naPd = col === 'PD' && (RZ.na || {}).PD;
     const vacio = !hayReal && !hayProy ? (naMa ? `Sin monto afianzado en esta corrida. ${RZ.na.MA}` : naPd ? `Sin PD en esta corrida. ${RZ.na.PD}`
@@ -1542,7 +1558,7 @@ function pintarRfv() {
                         ...(hayReal ? [{ nombre: nomReal, valores: real, color: cssVar('--real'), etiquetaFin: true }] : []),
                         ...(hayProy ? [{ nombre: nomProy, valores: proy, color: cssVar('--proy'), dash: true, etiquetaFin: true }] : [])];
         graficaLineas(cuerpo, W, {
-          labels: P_Z.map(eti), tituloX: i => etiLarga(P_Z[i]) + (i <= zUlt ? (maEst[i] ? ` (real; ${notaEst})` : ' (real)') : ' (proyección)'), fmt: fv, cadaX: 3, etiquetasFin: true,
+          labels: P_Z.map(eti), tituloX: i => etiLarga(P_Z[i]) + (i <= zUlt ? (notaMa(i) ? ` (real; ${notaMa(i)})` : ' (real)') : (notaMa(i) ? ` (proyección; ${notaMa(i)})` : ' (proyección)')), fmt: fv, cadaX: 3, etiquetasFin: true,
           incluirCero: unidad === 'mxn', fmtTick: unidad === 'pct' || unidad === 'pct3' ? (t, d) => fmt(t, d) + ' %' : null,
           aria: `${titulo} de ${etiqRamo}, real y proyección`, series,
         });
@@ -1550,7 +1566,7 @@ function pintarRfv() {
       },
       () => vacio ? el('p', { class: 'sub', style: 'margin:12px 8px', text: vacio })
         : tablaDatos(['Mes', 'Tipo', `${titulo} (${un.eje})`, ...(hayGris ? [`${NOMBRE_REF_RFV[ref] || ref} (${un.eje})`] : []), ...(origen ? ['Origen del MA'] : [])],
-          P_Z.map((p, i) => [etiLarga(p), esPd ? (med[i] ? 'Medida' : i <= zUlt ? 'Real (última medida, fija)' : 'Proyección (fija)') : i <= zUlt ? tipoReal(i) : 'Proyección', fv(vals[i]), ...(hayGris ? [fv(gris[i])] : []), ...(origen ? [origen[i] || 's/d'] : [])])),
+          P_Z.map((p, i) => [etiLarga(p), esPd ? (orgPd[i] ? (i <= zUlt ? 'Real: ' : 'Proyección: ') + orgPd[i] : med[i] ? 'Medida' : i <= zUlt ? 'Real (última medida, fija)' : 'Proyección (fija)') : i <= zUlt ? tipoReal(i) : tipoProy(i), fv(vals[i]), ...(hayGris ? [fv(gris[i])] : []), ...(origen ? [origen[i] || 's/d'] : [])])),
       k === 0 || k === RZ.indicadores.length - 1);
     rejilla.append(c); tarjetasVivas.push(c);
   });
