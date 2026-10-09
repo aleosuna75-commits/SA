@@ -1759,7 +1759,7 @@ def _tablas_prima_rfv(ws, rz: dict, r0: int) -> None:
         sp = list(rz.get("split") or [])
         con_saldo = any(str(d.get("modelo_frv") or "").startswith("saldo") for d in (rz.get("tendencia") or {}).values())
         ws.cell(r0, 4, "Prima no real contra su historia · todos los ramos (" + (
-            "la RFV sube con la reserva de cada prima nueva y se libera poco a poco" if con_saldo else
+            "la RFV suma la reserva de cada prima nueva; la cartera en vigor sigue su liberación" if con_saldo else
             "la RFV se mueve casi en la misma proporción que su PRIMA 24M"
             + (f"; en {' y '.join(sp)}, solo la parte sin RFV MA" if sp else "")) + ")").font = fuente(11.5, True)
         cols = ((4, 6, "Ramo"), (7, 11, "Bloque"), (12, 15, "PT (M MXN)"), (16, 19, "Contra año anterior"),

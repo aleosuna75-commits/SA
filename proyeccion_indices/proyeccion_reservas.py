@@ -765,24 +765,26 @@ TIPO_MODELO_CESION_RFV = "saldo" # CESION (IRR / BRUTO) de la RFV, solo Fianzas:
 #   saldo_t = saldo_t-1 x (1 - q) x (TC_t / TC_t-1)^beta + k x PT_t
 # k = FPR x (1 + %GA) x FD (lo que constituye cada peso de prima nueva, factores medidos), q = la liberacion mensual,
 # medida en el historico del ramo (minimos cuadrados de la trayectoria con la prima real; los meses que SAP repite, hoy
-# feb-26, no se comparan y un salto de mas de k_salto MAD es un cambio de nivel), y beta la parte del saldo que se
-# revalua con el TC (92 % de la prima de Fianzas de ene-jul 2026 es en moneda extranjera; en la historia la reserva en
-# pesos se movio con el TC: la regresion del total da beta 0.58, error estandar 0.34, 18 meses). En 140 y 170 el saldo es
-# el residual (sin la RFV MA, que sigue con el MA del CSV). La proyeccion sube con cada prima que entra y se libera poco a
-# poco, como la historia, y el FRV, FV, CESION y RC salen del saldo, asi que no son rectas. Hoy q es 2.4 % al mes en 140,
-# -1.2 % en 150 (la reserva crecio mas que su prima; sin el salto de ago-26), 0.9 % en 160 y 1.5 % en 170. Backtest de
-# origen movil (cortes 202512 a 202605, meses reales hasta 202608, prima y TC reales; 132 ramo-mes): error de la RFV
-# BRUTO total 3.0 % con el saldo en dolares (beta 1) contra 2.9 % de la recta, 4.0 % con la beta medida y 5.6 % en pesos
-# (beta 0); RFV NETO 2.7 % contra 3.0 % de la recta e IRR 3.8 % contra 2.9 %; por ramo, en BRUTO, 140 6.1 %, 150 7.6 %,
-# 160 2.8 %, 170 2.1 % (la recta: 4.7, 9.6, 2.6, 1.7). Todos quedan abajo de lo real (la reserva crecio en 2026 mas de lo
-# que cualquiera preveia); repetir el ultimo real erra 2.0 %, pero deja la RFV plana.
+# oct-25 y feb-26 (RFV BRUTO e IRR en pesos a menos de 0.05 % del mes anterior), no se comparan y un salto de mas de
+# k_salto MAD es un cambio de nivel), y beta la parte del saldo que se revalua con el TC (92 % de la prima de Fianzas de
+# ene-jul 2026 es en moneda extranjera; en la historia la reserva en pesos se movio con el TC: la regresion del total da
+# beta 0.74, error estandar 0.33, 17 meses). En 140 y 170 el saldo es el residual (sin la RFV MA, que sigue con el MA del
+# CSV). COMISION_RFV cambia solo la reserva de la prima nueva; FD_FIANZAS devenga toda la cartera. La proyeccion sube con
+# cada prima que entra y se libera poco a poco, como la historia, y el FRV, FV, CESION y RC salen del saldo, asi que no son
+# rectas. Hoy q es 2.3 % al mes en 140, -1.2 % en 150 (la reserva crecio mas que su prima; sin el salto de ago-26), 0.9 %
+# en 160 y 1.5 % en 170. Backtest de origen movil (cortes 202512 a 202605, meses reales hasta 202608, prima y TC reales;
+# 132 ramo-mes): error de la RFV BRUTO total 2.2 % (sesgo -1.3 %) con el saldo en dolares (beta 1) contra 2.9 % de la
+# recta, 3.5 % con la beta medida, 5.5 % en pesos (beta 0) y 2.0 % repitiendo el ultimo real; RFV NETO 2.0 % contra 3.0 %
+# de la recta y 2.0 % del ultimo real; IRR 3.0 % contra 2.9 %; por ramo, en BRUTO, 140 6.0 %, 150 7.5 %, 160 2.4 %, 170
+# 2.4 % (la recta: 4.7, 9.6, 2.6, 1.7). Repetir el ultimo real erra parecido, pero deja la RFV plana.
+MIN_MESES_SALDO = 6              # meses comparados minimos para medir la liberacion del saldo (sin ellos, la tendencia)
 SALDO_RFV = {
     "revaluacion_tc": 1.0,       # beta: parte del saldo en moneda extranjera (1 = en dolares; 0 = en pesos, sin revaluar)
     "k_salto": 5.0,              # salto: error de un paso de mas de k_salto MAD (None = sin saltos)
     "piso_liberacion": None,     # piso de q (p. ej. 0.0: el saldo no crece sin prima); None = el medido
     "meses_cesion": 0,           # cesion de la prima nueva: prima cedida / tomada de los ultimos N meses; 0 = desde el
-                                 # primer mes de PExRamo (la RC PRIMA). Backtest de la RFV NETO total: 2.7 % desde 2019,
-                                 # 2.8 % con 24 meses, 3.1 % con 12 y 2.4 % con 36 (IRR 3.7, 3.5, 2.9 y 4.6 %); con la
+                                 # primer mes de PExRamo (la RC PRIMA). Backtest de la RFV NETO total: 2.0 % desde 2019,
+                                 # 2.0 % con 24 meses, 2.1 % con 12 y 1.8 % con 36 (IRR 3.0, 2.9, 2.7 y 3.6 %); con la
                                  # ventana larga la cesion queda mas estable (en el 150, dos contratos cedidos casi
                                  # completos en mar-25 y dic-25 llevan la de 24 meses a 41 %)
 }
@@ -794,8 +796,9 @@ TIPO_MODELO_FRV_USD = "razon"    # serie del FRV en dolares de la sensibilidad a
                                  # 1.9 % con SES y 1.97 % repitiendo el ultimo real; por ramo, 140 4.7 %, 150 9.6 %, 160
                                  # 2.6 %, 170 1.7 %; IRR total 2.9 % y NETO 3.0 %. La tendencia no le gana a repetir el
                                  # ultimo real: la baja del FRV del 160 de 2025 (0.66 a 0.60) se detuvo en 2026 (recta de 12
-                                 # meses t -0.9). Se usa porque el area pide seguir las tendencias del historico; "razon" o
-                                 # "ultimo" las quitan
+                                 # meses t -0.9). Con TIPO_MODELO_FRV = "saldo" (el de ahora) la recta solo queda de
+                                 # respaldo en un ramo sin saldo y esta serie no se usa: la sensibilidad a la moneda es el
+                                 # saldo en la otra moneda
 MIN_MESES_FRV = 12               # meses minimos de FRV real para proyectarlo
 HOJA_PT_RAMO = "PT_RAMO"         # hoja de la BD de RFV con la prima tomada del mes por ramo (MXN) y su suma de 24 meses
 # Factores de la metodologia del area (Resumen de la metodologia de Reservas de Fianzas en Vigor y script de FCST de
@@ -940,8 +943,8 @@ MEZCLA_REFORECAST_ANIOS = 3      # anos de los mismos meses para la mezcla del r
 ANIOS_RANGO_PRIMA = 5            # control de la prima de Fianzas de los meses sin real: el crecimiento de cada bloque
                                  # (reforecast o un ano del FCST) por ramo contra los mismos meses del ano anterior se compara
                                  # con el rango de crecimientos de esos mismos meses en los ANIOS_RANGO_PRIMA anos anteriores
-                                 # con dato real; fuera del rango hay AVISO (la RFV del ramo se mueve casi en la misma
-                                 # proporcion que su PRIMA 24M)
+                                 # con dato real; fuera del rango hay AVISO (con el saldo, esa prima constituye la
+                                 # reserva nueva; con la recta, la RFV se movia casi en la misma proporcion que la PRIMA 24M)
 AJUSTE_PRIMA_FIANZAS = {}        # factor sobre la PT de Fianzas de los meses sin real (sensibilidad o indicacion del area):
                                  # {ano: factor} o {(ramo, ano): factor}, p. ej. {("160", 2027): 1.10}; el de (ramo, ano)
                                  # manda; la cedida se ajusta con la misma razon
@@ -1333,9 +1336,11 @@ def texto_modelo_rfv(tipo: str) -> str:
                f"en pesos con {b:.0%} revaluado con el TC")
         return ("saldo desde el ultimo real: cada mes la reserva del mes anterior menos lo que se libera (la tasa medida "
                 "en el historico del ramo) mas la reserva de la prima nueva (FPR x (1 + %GA) x FD), " + mon
-                + "; la CESION: la cartera en vigor conserva su cesion y la prima nueva se cede como "
+                + ("; la CESION: " + texto_modelo_rfv("saldo_cesion") if TIPO_MODELO_CESION_RFV == "saldo" else ""))
+    if tipo == "saldo_cesion":
+        return ("la cartera en vigor conserva su cesion y la prima nueva se cede como "
                 + (f"en los ultimos {int(SALDO_RFV['meses_cesion'])} meses" if int(SALDO_RFV.get("meses_cesion") or 0) > 0
-                   else "la RC PRIMA (prima cedida / tomada desde el primer mes de PExRamo)"))
+                   else "la RC PRIMA (prima cedida / tomada desde el primer mes de PExRamo)") + " por FCR")
     if tipo in ("rfv", "rfv_log"):
         P = TENDENCIA_RFV_BASE
         amort = ("sin amortiguar" if P["amortiguacion"] == 1 else f"amortiguada {P['amortiguacion']:g} por mes")
@@ -4836,7 +4841,10 @@ def _referencia_y_ajustes_pt(out: dict, ramos: list, p1: int, tc: dict, partes: 
                     f"{fila[f'Peso del bloque en la PRIMA {MESES_PRIMA_RFV}M del ramo']:.0%} de la PRIMA "
                     f"{MESES_PRIMA_RFV}M del ramo al {fin} y el ramo "
                     f"{fila[f'Peso del ramo en la PRIMA {MESES_PRIMA_RFV}M total']:.1%} de la total: "
-                    + (f"la RFV del ramo, sin la RFV MA (que no depende de la prima), se mueve casi en la misma "
+                    + (("la reserva de esa prima (FPR x (1 + %GA)) entra al saldo de la RFV del ramo; la cartera en "
+                        "vigor no depende de ella" + (" ni la RFV MA" if MA_RFV and r in MA_RFV_RAMOS else ""))
+                       if TIPO_MODELO_FRV == "saldo" else
+                       f"la RFV del ramo, sin la RFV MA (que no depende de la prima), se mueve casi en la misma "
                        f"proporcion que su PRIMA {MESES_PRIMA_RFV}M" if MA_RFV and r in MA_RFV_RAMOS else
                        f"la RFV del ramo se mueve casi en la misma proporcion que su PRIMA {MESES_PRIMA_RFV}M")
                     + " (AJUSTE_PRIMA_FIANZAS para cambiarla; hoja RFV_Prima_Bloques)")
@@ -4982,11 +4990,15 @@ def sensibilidad_prima_rfv(bd: BDMontos, proy: dict, pt: dict | None, periodos_p
     if con_saldo:                                      # la moneda del saldo y la liberacion
         b0 = float(SALDO_RFV.get("revaluacion_tc") or 0.0)
         bm = (base.get("saldo_beta_medida") or (math.nan,))[0]
+        bm_c = round(min(max(bm, 0.0), 1.0), 2) if np.isfinite(bm) else None   # (la beta va de 0 a 1)
+        hechas = {b0}
         for b_, txt in ((0.0, "en pesos (beta 0)"), (1.0, "en dolares (beta 1)"),
-                        (round(bm, 2) if np.isfinite(bm) else None, f"beta medida en la historia ({bm:.2f})")):
-            if b_ is not None and abs(b_ - b0) > 1e-9:
+                        (bm_c, f"beta medida en la historia ({bm:.2f}" + (f", acotada a {bm_c:.2f})" if bm_c != round(bm, 2)
+                                                                         else ")"))):
+            if b_ is not None and all(abs(b_ - x) > 1e-9 for x in hechas):
+                hechas.add(b_)
                 corridas.append(("moneda del saldo", "", txt, pt, MESES_PRIMA_RFV, ma_info, None,
-                                 {**SALDO_RFV, "revaluacion_tc": float(min(max(b_, 0.0), 1.0))}))
+                                 {**SALDO_RFV, "revaluacion_tc": float(b_)}))
         if SALDO_RFV.get("piso_liberacion") is None:
             corridas.append(("liberacion del saldo", "", "piso 0 (el saldo no crece sin prima)", pt, MESES_PRIMA_RFV,
                              ma_info, None, {**SALDO_RFV, "piso_liberacion": 0.0}))
@@ -5123,7 +5135,9 @@ def _texto_factores_rfv(info: dict) -> str:
             + (", ".join(f"{r}: {v:.3%} ({p})" for r, (p, v) in ult.items()) + " (" + _texto_pd_corto(info.get("pdinfo"))
                + ")" if ult else "sin dato (FCR = 1 y RC = CESION)")
             + (f"; PD_FIANZAS en la proyeccion {indicaciones_rfv()[1]}" if indicaciones_rfv()[1] else "")
-            + "; RC PRIMA (prima cedida / prima tomada desde 2019) es informativa. Por ramo: "
+            + ("; RC PRIMA (prima cedida / prima tomada desde 2019): con el saldo, la reserva de la prima nueva se cede "
+               "en ella x FCR. Por ramo: " if info.get("saldo") and TIPO_MODELO_CESION_RFV == "saldo" else
+               "; RC PRIMA (prima cedida / prima tomada desde 2019) es informativa. Por ramo: ")
             + "; ".join(f"{r}: %SEG PR {f['SEG']:.1%}, FPR {f['FPR']:.2%}"
                         + (f", FV {primer_fv[r][1]:.2f} ({primer_fv[r][0]})" if r in primer_fv else "")
                         for r, f in fac.items() if np.isfinite(f["FPR"])))
@@ -6978,17 +6992,26 @@ def ajustar_saldo_rfv(per: list[int], saldo: dict, prima: dict, tc: dict, k: flo
     mide con minimos cuadrados de la trayectoria simulada desde el primer mes con la prima real: los meses sin saldo y los
     que SAP repite (igual al mes anterior, o los de copias: la RFV BRUTO repetida, aunque el residual cambie por la RFV
     MA) no se comparan; un salto (error de un paso de mas de k_salto MAD) es un cambio de nivel: la trayectoria se
-    re-ancla en el real de ese mes. Regresa {"q", "saltos", "copias", "n", "en_limite"} o {}."""
+    re-ancla en el real de ese mes. Un mes sin TC toma el del mes anterior (la revaluacion se aplica cuando vuelve a
+    haber TC). Hace falta que se comparen al menos MIN_MESES_SALDO meses. Regresa {"q", "q_medida", "piso_aplicado",
+    "saltos", "copias", "n", "en_limite"} o {}."""
     from scipy.optimize import minimize_scalar
     v = [saldo.get(p, math.nan) for p in per]
     ok = [bool(np.isfinite(x)) for x in v]
     if not per or not ok[0] or not (np.isfinite(k) and k >= 0) or sum(ok) < MIN_MESES_FRV:
         return {}
+    tcs, ult_tc = [], next((tc[p] for p in per if np.isfinite(tc.get(p, math.nan)) and tc[p] > 0), math.nan)
+    for p in per:                                      # (TC con arrastre en los meses que no lo traen)
+        if np.isfinite(tc.get(p, math.nan)) and tc[p] > 0:
+            ult_tc = tc[p]
+        tcs.append(ult_tc)
+    if not np.isfinite(ult_tc):
+        return {}
     copia = [j > 0 and ok[j] and ((per[j] in (copias or ())) or
                                   (ok[j - 1] and bool(np.isclose(v[j], v[j - 1], rtol=1e-9, atol=0.0))))
              for j in range(len(per))]                 # (SAP repite el mes: el mismo saldo en pesos)
     obs = [ok[j] and not copia[j] for j in range(len(per))]
-    fx = [1.0] + [(tc[per[j]] / tc[per[j - 1]]) ** beta for j in range(1, len(per))]
+    fx = [1.0] + [(tcs[j] / tcs[j - 1]) ** beta for j in range(1, len(per))]
     kp = [k * float(prima.get(p, 0.0)) for p in per]
     pasos = _pasos_saldo(per, obs)
 
@@ -7023,11 +7046,15 @@ def ajustar_saldo_rfv(per: list[int], saldo: dict, prima: dict, tc: dict, k: flo
         if anclas:
             q = float(minimize_scalar(lambda q_: sse(q_, anclas), bounds=lim, method="bounded",
                                       options={"xatol": 1e-7}).x)
+    n = sum(1 for j in range(1, len(per)) if obs[j] and j not in anclas)
+    if n < MIN_MESES_SALDO:                            # (casi todo repetido o sin dato: no hay como medir q)
+        return {}
     en_limite = min(abs(q - lim[0]), abs(q - lim[1])) < 1e-4
+    q_medida = q
     if piso is not None:
         q = max(q, float(piso))
-    return {"q": q, "saltos": [per[j] for j in sorted(anclas)], "copias": [per[j] for j in range(len(per)) if copia[j]],
-            "n": sum(1 for j in range(1, len(per)) if obs[j] and j not in anclas), "en_limite": en_limite}
+    return {"q": q, "q_medida": q_medida, "piso_aplicado": q != q_medida, "saltos": [per[j] for j in sorted(anclas)],
+            "copias": [per[j] for j in range(len(per)) if copia[j]], "n": n, "en_limite": en_limite}
 
 
 def proyectar_saldo_rfv(saldo0: float, irr0: float, rma0: float, ultimo: int, periodos: list[int], prima: dict,
@@ -7037,14 +7064,32 @@ def proyectar_saldo_rfv(saldo0: float, irr0: float, rma0: float, ultimo: int, pe
     IRR: la cartera en vigor conserva su cesion (la del mes anterior, sobre lo que sigue en vigor y la RFV MA del mes) y
     la reserva de la prima nueva se cede en cesion_nueva (prima cedida / tomada x FCR). Todo en pesos. Regresa
     [(periodo, saldo, irr, bruto)]."""
-    x, irr, b_prev, prev, out = saldo0, irr0, saldo0 + rma0, ultimo, []
+    x, irr, b_prev, prev, rm_u, out = saldo0, irr0, saldo0 + rma0, ultimo, rma0, []
     for p in periodos:
         viejo = x * (1 - q) * (tc[p] / tc[prev]) ** beta
         nuevo, rm = k * float(prima.get(p, 0.0)), float(rma.get(p, 0.0))
+        if not np.isfinite(rm):                        # (un mes sin RFV MA: la BRUTO de ese mes no va; la cesion de la
+            rm = rm_u                                  # cartera sigue con la ultima RFV MA conocida)
+        rm_u = rm
         irr = (irr / b_prev if b_prev else 0.0) * (viejo + rm) + cesion_nueva * nuevo
         x = viejo + nuevo
         b_prev, prev = x + rm, p
         out.append((p, x, irr, b_prev))
+    return out
+
+
+def meses_repetidos_rfv(bd: BDMontos, per_hist: list[int], tc: dict, tolerancia: float = 5e-4) -> dict:
+    """{ramo: {periodo}}: meses en que la RFV BRUTO y la RFV IRR de SAP en pesos repiten las del mes anterior (difieren
+    menos de tolerancia, la regla del aviso de insumos_area_fianzas): un mes sin actualizar, que el saldo no compara."""
+    c_b, c_i = norm("RFV BRUTO"), norm("RFV IRR")
+    out = {}
+    for a, b_ in zip(per_hist, per_hist[1:]):
+        for r in bd.cols_ramo:
+            par = [(bd.valores.get((c, a, r), math.nan) * tc.get(a, math.nan),
+                    bd.valores.get((c, b_, r), math.nan) * tc.get(b_, math.nan)) for c in (c_b, c_i)]
+            if all(np.isfinite(x) and np.isfinite(y) and x > 0 and y > 0 for x, y in par) \
+                    and all(abs(y / x - 1) < tolerancia for x, y in par):
+                out.setdefault(r, set()).add(b_)
     return out
 
 
@@ -7067,6 +7112,8 @@ def beta_medida_saldo(series: list[dict], tc: dict, copias: set | None = None) -
         n = j - j0
         c = sum(s["k"] * float(s["prima"].get(per[jj], 0.0)) for s in series for jj in range(j0 + 1, j + 1))
         x0 = tot[per[j0]]
+        if not (np.isfinite(tc.get(per[j], math.nan)) and np.isfinite(tc.get(per[j0], math.nan))):
+            continue
         X.append([-x0 * n, x0 * (tc[per[j]] / tc[per[j0]] - 1)])
         y.append(tot[per[j]] - x0 - c)
     if len(y) < 6:
@@ -7133,13 +7180,8 @@ def calcular_rfv_prima(bd: BDMontos, proy: dict, pt: dict | None, periodos_proy:
     sel = RAMOS_RFV_POR_PRIMA                          # (un "160" sin coma de tupla es un solo ramo, no "1", "6", "0")
     ramos_sel = None if sel is None else {str(x).strip() for x in ((sel,) if isinstance(sel, (str, int)) else sel)}
     out["tc_hist"] = {p: tc[p] for p in per_hist}
-    copias_b = set()                                   # meses en que SAP repite la RFV BRUTO en pesos del mes anterior
-    for j, p in enumerate(per_hist[1:], start=1):
-        a_ = [bd.valores.get((c_b, q_, r), math.nan) * tc[q_] for q_ in (per_hist[j - 1], p) for r in bd.cols_ramo]
-        n_ = len(bd.cols_ramo)
-        par = [(a_[i], a_[n_ + i]) for i in range(n_) if np.isfinite(a_[i]) and np.isfinite(a_[n_ + i]) and a_[i]]
-        if par and all(np.isclose(x, y, rtol=1e-9, atol=0.0) for x, y in par):
-            copias_b.add(p)
+    copias_r = meses_repetidos_rfv(bd, per_hist, tc)   # meses en que SAP repite la RFV del mes anterior (en pesos)
+    copias_b = set().union(*copias_r.values()) if copias_r else set()
     marcas = sorted({p for p in periodos_proy if p % 100 == 12} | {periodos_proy[-1]})
 
     def prima_usd(r, p):                               # PRIMA 24M en dolares (cada mes con su TC)
@@ -7210,11 +7252,16 @@ def calcular_rfv_prima(bd: BDMontos, proy: dict, pt: dict | None, periodos_proy:
                 saldo_h = {q: base_m[q] * _prima_ventana(pt, r, q)[0] for q in per if np.isfinite(base_m.get(q, math.nan))}
                 prima_r = {q: pt["mensual"].get((r, q), 0.0) for q in per + list(periodos_proy)}
                 aj = ajustar_saldo_rfv(per, saldo_h, prima_r, tc, k_s, beta, SALDO_RFV.get("k_salto"),
-                                       SALDO_RFV.get("piso_liberacion"), copias_b) if np.isfinite(k_s) else {}
+                                       SALDO_RFV.get("piso_liberacion"), copias_r.get(r)) if np.isfinite(k_s) else {}
                 if aj:
                     b_mxn, i_mxn = b_u * tc[ultimo], bd.valores.get((c_i, ultimo, r), math.nan) * tc[ultimo]
+                    ces_ult = [ces_h[q] for q in per_hist if np.isfinite(ces_h.get(q, math.nan))]
+                    irr_de_ces = not np.isfinite(i_mxn) and bool(ces_ult)
+                    if irr_de_ces:                     # (sin IRR al ultimo mes: la ultima cesion medida)
+                        i_mxn = ces_ult[-1] * b_mxn
                     rma_u = out["rfv_ma"].get((ultimo, r), math.nan) if split else 0.0
                     rma_p = {q: out["rfv_ma"].get((q, r), math.nan) if split else 0.0 for q in periodos_proy}
+                    k_p = (fac_k["FPR_P"] * (1 + fac_k["PGA"]) * fac_k["FD"]) if np.isfinite(fac_k["FPR_P"]) else k_s
                     nm = int(SALDO_RFV.get("meses_cesion") or 0)   # (0 o None: desde el primer mes de PExRamo)
                     if nm > 0:
                         q24 = [_mes_menos(ultimo, j) for j in range(nm)]
@@ -7227,35 +7274,40 @@ def calcular_rfv_prima(bd: BDMontos, proy: dict, pt: dict | None, periodos_proy:
                     fcr_s = fac["FCR"] if fac is not None else 1.0
                     ces_u = i_mxn / b_mxn if b_mxn else math.nan
                     ces_nueva = (rc_nueva * fcr_s if np.isfinite(rc_nueva) else ces_u)
-                    if np.isfinite(b_mxn) and np.isfinite(i_mxn) and np.isfinite(rma_u) \
-                            and all(np.isfinite(v) for v in rma_p.values()):
+                    if np.isfinite(b_mxn) and np.isfinite(i_mxn) and np.isfinite(rma_u):
                         tray = proyectar_saldo_rfv(b_mxn - rma_u, i_mxn, rma_u, ultimo, list(periodos_proy), prima_r,
-                                                   tc, rma_p, k_s, aj["q"], beta, ces_nueva)
+                                                   tc, rma_p, k_p, aj["q"], beta, ces_nueva)
                         aj_alt = ajustar_saldo_rfv(per, saldo_h, prima_r, tc, k_s, beta_alt, SALDO_RFV.get("k_salto"),
-                                                   SALDO_RFV.get("piso_liberacion"), copias_b)
+                                                   SALDO_RFV.get("piso_liberacion"), copias_r.get(r))
                         tray_alt = proyectar_saldo_rfv(b_mxn - rma_u, i_mxn, rma_u, ultimo, list(periodos_proy),
-                                                       prima_r, tc, rma_p, k_s, aj_alt["q"], beta_alt,
+                                                       prima_r, tc, rma_p, k_p, aj_alt["q"], beta_alt,
                                                        ces_nueva) if aj_alt else []
-                        sal = {**aj, "k": k_s, "beta": beta, "tray": tray, "tray_alt": tray_alt,
+                        sal = {**aj, "k": k_s, "k_p": k_p, "beta": beta, "tray": tray, "tray_alt": tray_alt,
                                "q_alt": aj_alt.get("q", math.nan), "rc_nueva": rc_nueva, "ces_nueva": ces_nueva,
-                               "ces_u": ces_u, "meses_cesion": nm, "k_de_com_saldo": fac_k is not fac}
+                               "ces_u": ces_u, "meses_cesion": nm, "k_de_com_saldo": fac_k is not fac,
+                               "irr_de_ces": irr_de_ces}
                         series_beta.append({"per": per, "saldo": saldo_h, "k": k_s, "prima": prima_r})
                     else:
-                        nota_saldo = "sin RFV MA o IRR al ultimo mes"
+                        nota_saldo = (f"sin RFV BRUTO o IRR en pesos al ultimo mes ({ultimo})" if split is False or
+                                      np.isfinite(rma_u) else f"sin RFV MA al ultimo mes ({ultimo})")
                 else:
                     nota_saldo = ("sin los factores para la reserva de la prima nueva (FPR)" if not np.isfinite(k_s)
-                                  else f"menos de {MIN_MESES_FRV} meses de saldo")
+                                  else f"menos de {MIN_MESES_SALDO} meses comparables de saldo (sin los repetidos por "
+                                       "SAP ni los saltos)")
             if sal is not None:
                 frv_f = np.array([x / s_ if (s_ := _prima_ventana(pt, r, p)[0]) > 0 else math.nan
                                   for p, x, _, _ in sal["tray"]], dtype=float)
-                txt_q = (f"{sal['q']:.2%} al mes" if sal["q"] >= 0 else
+                txt_q = (f"{sal['q']:.2%} al mes (el piso de SALDO_RFV; la medida es {sal['q_medida']:.2%})"
+                         if sal["piso_aplicado"] else f"{sal['q']:.2%} al mes" if sal["q"] >= 0 else
                          f"{sal['q']:.2%} al mes: el saldo crecio mas que lo que constituye su prima")
-                sal["texto"] = (f"saldo: libera {txt_q} (medida en {sal['n']} meses"
+                sal["texto"] = (f"saldo: libera {txt_q} ({'medida ' if not sal['piso_aplicado'] else ''}en {sal['n']} "
+                                "meses"
                                 + (f"; sin los saltos de {', '.join(map(str, sal['saltos']))}" if sal["saltos"] else "")
                                 + (f"; {', '.join(map(str, sal['copias']))} "
                                    + ("repite" if len(sal["copias"]) == 1 else "repiten") + " el mes anterior"
                                    if sal["copias"] else "")
-                                + f"), constituye {k_s:.3f} por peso de prima nueva"
+                                + f"), constituye {sal['k_p']:.3f} por peso de prima nueva"
+                                + (f" (con COMISION_RFV; la medida es {k_s:.3f})" if abs(sal["k_p"] - k_s) > 1e-12 else "")
                                 + (" (factores medidos con la base del real)" if sal["k_de_com_saldo"] else "")
                                 + (", en dolares" if beta == 1 else ", en pesos" if beta == 0 else
                                    f", {beta:.0%} revaluado con el TC"))
@@ -7265,7 +7317,8 @@ def calcular_rfv_prima(bd: BDMontos, proy: dict, pt: dict | None, periodos_proy:
                              "FRV pendiente aplicada (por mes)": math.nan,
                              "FRV saltos quitados": ", ".join(map(str, sal["saltos"])),
                              "Saldo: liberacion mensual (q)": sal["q"],
-                             "Saldo: constitucion por peso de prima nueva (k)": k_s,
+                             "Saldo: constitucion por peso de prima nueva (k)": sal["k_p"],
+                             "Saldo: liberacion medida": sal["q_medida"],
                              "Saldo: parte revaluada con el TC (beta)": beta,
                              "Saldo: meses comparados": sal["n"],
                              "Saldo: meses que repiten el anterior": ", ".join(map(str, sal["copias"])),
@@ -7273,8 +7326,12 @@ def calcular_rfv_prima(bd: BDMontos, proy: dict, pt: dict | None, periodos_proy:
                              f"FRV {ultimo}": frv_h[ultimo]})
                 if sal["en_limite"]:
                     out["alertas"].append(("FIANZAS", f"RFV | saldo | ramo {r}",
-                                           f"la liberacion del saldo quedo en el limite de la busqueda ({sal['q']:.1%} al "
-                                           "mes): revisar la historia del ramo"))
+                                           "la liberacion medida del saldo quedo en el limite de la busqueda "
+                                           f"({sal['q_medida']:.1%} al mes): revisar la historia del ramo"))
+                if sal["irr_de_ces"]:
+                    out["alertas"].append(("FIANZAS", f"RFV | saldo | ramo {r}",
+                                           f"sin RFV IRR al ultimo mes ({ultimo}): la cartera en vigor arranca con la "
+                                           f"ultima cesion medida ({sal['ces_u']:.1%})"))
                 if sal["q"] < 0:
                     out["alertas"].append(("FIANZAS", f"RFV | saldo | ramo {r}",
                                            f"en la historia la RFV del ramo crecio mas de lo que constituye su prima "
@@ -7285,9 +7342,10 @@ def calcular_rfv_prima(bd: BDMontos, proy: dict, pt: dict | None, periodos_proy:
                     out["alertas"].append(("FIANZAS", f"RFV | FRV | ramo {r}",
                                            f"con el saldo el FRV{' residual' if split else ''} pasa de "
                                            f"{base_m[ultimo]:.4f} ({ultimo}) a {frv_f[-1]:.4f} ({periodos_proy[-1]}), "
-                                           f"fuera del rango de su historia ({min(hist_f):.4f} a {max(hist_f):.4f}): la "
-                                           "PRIMA 24M y la reserva no se mueven igual (la reserva se libera mas "
-                                           "despacio que la ventana de 24 meses)"))
+                                           f"fuera del rango de su historia ({min(hist_f):.4f} a {max(hist_f):.4f}): "
+                                           + (f"la reserva se libera mas despacio que la ventana de la PRIMA "
+                                              f"{MESES_PRIMA_RFV}M o se revalua con el TC" if frv_f[-1] > max(hist_f) else
+                                              "la prima nueva constituye menos reserva por peso que la cartera en vigor")))
             else:
                 tipo_f = "rfv" if TIPO_MODELO_FRV == "saldo" else TIPO_MODELO_FRV
                 res = pronosticar(Serie(("FIANZAS", "RFV", "FRV", r), tipo_f, per,
@@ -7382,7 +7440,8 @@ def calcular_rfv_prima(bd: BDMontos, proy: dict, pt: dict | None, periodos_proy:
                                            "contratos de reaseguro: revisar con el area"))
         usd_f = None
         if sal is not None:                            # sensibilidad a la moneda: el saldo en la otra moneda
-            usd_f = np.array([(x + rm) / tc[p] if np.isfinite(x) else math.nan
+            f_fd = (fac["FD_P"] / fac["FD"]) if fac is not None and fac["completo"] and fac["FD"] else 1.0
+            usd_f = np.array([(x * f_fd + rm) / tc[p] if np.isfinite(x) else math.nan
                               for (p, x, _, _), rm in zip(sal["tray_alt"], [out["rfv_ma"].get((q, r), 0.0) if split
                                                                              else 0.0 for q in periodos_proy])],
                              dtype=float) if sal["tray_alt"] else None
@@ -7407,7 +7466,8 @@ def calcular_rfv_prima(bd: BDMontos, proy: dict, pt: dict | None, periodos_proy:
             if split and not (np.isfinite(rma) and s > 0):
                 continue
             dec = fac is not None and fac["completo"]
-            fv_ = fz / (fac["FPR"] * (1 + fac["PGA"]) * fac["FD"]) if dec else math.nan
+            fv_ = fz / ((fac["FPR_P"] if sal is not None else fac["FPR"]) * (1 + fac["PGA"]) * fac["FD"]) if dec \
+                else math.nan                          # (con el saldo, COMISION_RFV ya entro en la prima nueva)
             rc_ = cz / fac["FCR"] if fac is not None and fac["FCR"] > 0 else cz
             if dec:                                    # (con COMISION_RFV, PD_FIANZAS o FD_FIANZAS, los de la proyeccion)
                 fz = fac["FPR_P"] * (1 + fac["PGA"]) * fac["FD_P"] * fv_
@@ -7557,9 +7617,14 @@ def calcular_rfv_prima(bd: BDMontos, proy: dict, pt: dict | None, periodos_proy:
                                else "en pesos")
                             + f" contra {sum(out['usd'][(p, r)] for r in ap) / 1e6:,.1f} {etq_alt}")
         bm = out.get("saldo_beta_medida") or (math.nan, math.nan, 0)
-        out["sensibilidad"] = (("RFV BRUTO (M USD) de los ramos con RFV por prima, " + "; ".join(sens)
-                                + (": el saldo de la reserva se revalua con el TC (SALDO_RFV['revaluacion_tc'] = "
-                                   f"{beta:g}; 92 % de la prima de Fianzas es en moneda extranjera)"
+        pref = (("RFV BRUTO (M USD) de los ramos con saldo ("
+                 + ", ".join(sorted(out["saldo"], key=lambda x: int(x) if str(x).isdigit() else 0)) + "), ")
+                if out["saldo"] else "RFV BRUTO (M USD) de los ramos con RFV por prima, ")
+        out["sensibilidad"] = ((pref + "; ".join(sens)
+                                + ((f": el saldo de la reserva se revalua con el TC (SALDO_RFV['revaluacion_tc'] = "
+                                    f"{beta:g})" if beta > 0 else
+                                    ": el saldo de la reserva va en pesos, sin revaluar con el TC "
+                                    "(SALDO_RFV['revaluacion_tc'] = 0)")
                                    + (f"; en la historia la reserva en pesos se movio con el TC en {bm[0]:.2f} "
                                       f"(error estandar {bm[1]:.2f}, {bm[2]} meses)" if np.isfinite(bm[0]) else "")
                                    if out["saldo"] else
@@ -8108,8 +8173,21 @@ def escribir_bloques_rfv(bd: BDMontos, info: dict, hoja_pt: dict | None, periodo
     _partir_columnas(ws)                               # (la BD de entrada trae rangos <col> de varias columnas)
     col_estilo = max(fijas)
     ancho = ws.column_dimensions[get_column_letter(next(iter(bd.cols_ramo.values())))].width
-    modelo_frv = texto_modelo_rfv(TIPO_MODELO_FRV)
-    modelo_ces = texto_modelo_rfv(TIPO_MODELO_CESION_RFV)
+    con_saldo = sorted((info.get("saldo") or {}), key=lambda x: int(x) if str(x).isdigit() else 0)
+    sin_saldo = sorted({r for _, r in (info.get("aplica") or ())} - set(con_saldo),
+                       key=lambda x: int(x) if str(x).isdigit() else 0)
+    tipo_resp = "rfv" if TIPO_MODELO_FRV == "saldo" else TIPO_MODELO_FRV            # (la tendencia, sin saldo)
+    tipo_resp_c = "rfv" if TIPO_MODELO_CESION_RFV == "saldo" else TIPO_MODELO_CESION_RFV
+    if con_saldo:
+        modelo_frv = (texto_modelo_rfv("saldo") + (f" (en {', '.join(con_saldo)}; en {', '.join(sin_saldo)}, "
+                                                  f"{texto_modelo_rfv(tipo_resp)})" if sin_saldo else ""))
+        modelo_ces = ((texto_modelo_rfv("saldo_cesion") if TIPO_MODELO_CESION_RFV == "saldo" else
+                       texto_modelo_rfv(tipo_resp_c))
+                      + (f" (en {', '.join(con_saldo)}; en {', '.join(sin_saldo)}, {texto_modelo_rfv(tipo_resp_c)})"
+                         if sin_saldo and TIPO_MODELO_CESION_RFV == "saldo" else ""))
+    else:
+        modelo_frv, modelo_ces = texto_modelo_rfv(tipo_resp), texto_modelo_rfv(tipo_resp_c)
+    ces_saldo = bool(con_saldo) and TIPO_MODELO_CESION_RFV == "saldo"
     desde = f"; desde {periodos_proy[0]}, en los ramos con RFV por prima, " if periodos_proy else ""
     si_error = " (SI.ERROR: 0 si divide entre 0)"
     n = MESES_PRIMA_RFV
@@ -8127,7 +8205,9 @@ def escribir_bloques_rfv(bd: BDMontos, info: dict, hoja_pt: dict | None, periodo
         "PRIMA": f"PRIMA {n}M = suma de los ultimos {n} meses de PT en MXN ({hoja}): la prima que sostiene la reserva en "
                  "vigor",
         "RCP": (f"RC PRIMA = prima cedida / prima tomada desde {pt_info.get('inicio', '-')} ({hoja}: PmaCed de PExRamo): "
-                "la RC de la metodologia aproximada con la cartera; informativa (el area la aplica contrato por contrato). "
+                "la RC de la metodologia aproximada con la cartera; "
+                + ("con el saldo, la reserva de la prima nueva se cede en la RC PRIMA del ultimo mes real x FCR "
+                   if ces_saldo else "informativa ") + "(el area la aplica contrato por contrato). "
                 "N/A sin la cedida de todos los meses (el reforecast no la trae)" + si_error),
         "SEG": (f"%SEG PR = prima tomada del segmento de prima de reserva (extranjero proporcional y no proporcional) / "
                 f"prima tomada del ramo ({hoja}; {seg.get('texto') or 'sin base del real con Fianzas'}); el resto se "
@@ -8171,15 +8251,18 @@ def escribir_bloques_rfv(bd: BDMontos, info: dict, hoja_pt: dict | None, periodo
                + (f". En {t_split}: FV = (RFV BRUTO x TC - RFV MA) / ((PR {n}M + GA {n}M) x FD), el resto: permanencia del "
                   "segmento de prima de reserva, facultativo, cedentes sin monto afianzado en el CSV, TC y diferencias "
                   "entre SAP y el calculo del area (N/A en los meses sin MA)" if split else "") + si_error
-               + (desde + f"el FV proyectado ({hoja}: FRV {'residual ' if split else ''}del modelo / (FPR x (1 + %GA) x "
-                  f"FD), {modelo_frv})" if con_fv else "")),
+               + (desde + (f"el FV proyectado ({hoja}: el saldo {'residual ' if split else ''}/ PRIMA {n}M / (FPR x "
+                           f"(1 + %GA) x FD), {modelo_frv})" if con_saldo else
+                           f"el FV proyectado ({hoja}: FRV {'residual ' if split else ''}del modelo / (FPR x (1 + %GA) x "
+                           f"FD), {modelo_frv})") if con_fv else "")),
         "FRV": (f"FRV = RFV BRUTO del mes x TC / PRIMA {n}M: factor de reserva, lo que queda constituido por cada peso de "
                 f"prima de los ultimos {n} meses (en el renglon RFV BRUTO, su monto; en los demas, con "
                 "SUMAR.SI.CONJUNTO)" + si_error
                 + ((desde + "FRV = FPR x (1 + %GA) x FD x FV" + (f" (en {t_split}, + RFV MA / PRIMA {n}M)" if split else "")
                     + " (formula; sin el segmento del ramo, el FRV proyectado en valor). "
                     f"RFV BRUTO = PRIMA {n}M x FRV / TC") if periodos_proy and con_fv else
-                   (desde + f"el FRV proyectado ({modelo_frv}, {TIPO_MODELO_FRV}) (valor) en todos los renglones del "
+                   (desde + f"el FRV proyectado ({modelo_frv}, {TIPO_MODELO_FRV if con_saldo else tipo_resp}) (valor) "
+                    "en todos los renglones del "
                     f"mes. RFV BRUTO = PRIMA {n}M x FRV / TC" if periodos_proy else ""))),
         "PD": (f"PD = probabilidad de incumplimiento del reasegurador ({hoja}, columna ORIGEN DE LA PD): la medida, "
                "CASTIGO / (IRR + CASTIGO) del calculo del area (Res_Rvas, Base FIANZAS) en los meses en que coincide con "
