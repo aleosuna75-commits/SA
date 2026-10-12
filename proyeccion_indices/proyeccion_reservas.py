@@ -163,8 +163,8 @@ except Exception as _e:  # noqa: BLE001
 # =============================================================================
 CARPETA = Path(__file__).resolve().parent
 ENTRADAS = CARPETA / "entradas"
-VERSION_CODIGO = "2026-10-12a"   # version de los scripts: sale en la consola, en la hoja Resumen del diagnostico, en el pie
-                                 # del tablero HTML y en la hoja Dashboard Razones del Excel, para saber con que version se corrio
+VERSION_CODIGO = "2026-10-12b"   # version de los scripts: sale en la consola, en la hoja Resumen del diagnostico y en la hoja
+                                 # Dashboard Razones del Excel, para saber con que version se corrio
 SALIDAS = CARPETA / "salidas"
 
 ARCHIVO_BD_DANOS = ENTRADAS / "BD_ BEL - IRR - MR.xlsx"

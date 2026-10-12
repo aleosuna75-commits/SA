@@ -328,8 +328,7 @@ def generar(ruta_salida: Path = SALIDA_HTML) -> Path:
     datos = preparar_datos()
     json_datos = json.dumps(datos, ensure_ascii=False, separators=(",", ":")).replace("</", "<\\/")
     html = (PLANTILLA.replace("__DATOS__", json_datos)
-            .replace("__PIE__", dx.PIE_PAGINA)
-            .replace("__GENERADO__", datos["generado"]).replace("__VERSION__", datos["version"].replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")))
+            .replace("__PIE__", dx.PIE_PAGINA))
     tmp = ruta_salida.with_suffix(".tmp.html")
     tmp.write_text(html, encoding="utf-8")
     tmp.replace(ruta_salida)
@@ -542,7 +541,6 @@ table.datos tbody tr:hover { background: var(--surface-2); }
       <div class="filtro"><label for="f-concepto">Concepto</label><select id="f-concepto"></select></div>
       <div class="filtro"><label for="f-ramo-res">Ramo</label><select id="f-ramo-res"></select></div>
       <div class="filtro"><label for="f-moneda">Moneda</label><select id="f-moneda"><option>USD</option><option>MXN</option></select></div>
-      <div class="nota" id="nota-res"></div>
     </div>
     <div class="kpis" id="kpis-res"></div>
     <p class="sub" id="cedido" style="margin:0 0 10px;color:var(--ink-2)"></p>
@@ -570,7 +568,6 @@ table.datos tbody tr:hover { background: var(--surface-2); }
 </main>
 <footer class="pie">
   <span>__PIE__</span>
-  <span>Generado el __GENERADO__ por proyeccion_reservas.py, versión del código __VERSION__ · azul = real, naranja punteado = proyección, gris fino = modelo ajustado sobre la historia: recta de tendencia más el patrón por mes del año cuando la serie lo tiene (hoy solo los montos); la proyección arranca del último real y, en los índices, su desviación respecto al modelo se desvanece hacia el nivel del último año y la pendiente entra ponderada por su credibilidad (solo en las series que se proyectan con la recta: índices, LAGs y BEL/BRUTO por ramo, salvo los que van con factor de prima; la RFV se modela en pesos) · banda = intervalo al 80%</span>
 </footer>
 <script>
 'use strict';
@@ -1108,8 +1105,6 @@ function montoSerie(reserva, concepto, ramo) {
 function pintarReservas() {
   const { reserva, concepto, moneda } = E; const ramoRes = E.ramoRes;
   const conceptos = D.conceptos[reserva] || [], ramos = D.ramos_m[reserva] || [];
-  const aviso = document.getElementById('nota-res');
-  aviso.textContent = `Cifras en millones de ${moneda}${moneda === 'MXN' ? ' (USD × TC del mes)' : ''} · real hasta ${eti(D.ultimo)} · montos: ${D.modelo_por_tipo.nivel || 'n/d'}; razones: ${D.modelo_por_tipo.razon || 'n/d'}${reserva === 'RFV' ? ' · Fianzas se modela en pesos y se convierte con el TC de Inversiones' + (D.rfv_prima ? ' · RFV por prima en ' + D.rfv_prima + '; IRR = BRUTO × CESION y NETO = BRUTO − IRR; RCONT con su modelo' + (D.rfv_factores ? '; en la BD, FRV = FPR × (1 + %GA) × FD × FV y CESION = RC × FCR, con los factores de la metodología del área (segmento y prima de reserva, comisiones, cargas, gastos, factor de devengamiento FD = 1 en la historia, factor residual FV, cesión y PD)' + (D.rfv_ma ? '; en ' + D.rfv_ma + ' la reserva por monto afianzado va aparte: FRV = FPR × (1 + %GA) × FV + RFV MA / PRIMA 24M, RFV MA = MA × (ω + α), con el MA del área' + (D.rfv_ma_hasta ? ' hasta ' + eti(D.rfv_ma_hasta) + ((RZ && (RZ.ma_interpolado || []).length) ? ' (meses que no trae, interpolados)' : '') + '; después, ' + (D.rfv_ma_regla || 'fijo') : '') : '') : '') : '') + (D.nota_rangos ? ' · ' + D.nota_rangos : '') : ''}`;
   const vals = montoSerie(reserva, concepto, ramoRes);
   const u = vals[jUlt], pd = vals[jDic], pf = vals[jFin], v12 = vals[j12], p12 = vals[jUlt + 12];
   const f1 = v => fmt(v, 1);
