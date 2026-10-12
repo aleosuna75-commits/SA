@@ -1,0 +1,255 @@
+# -*- coding: utf-8 -*-
+"""
+Utilidades para guardar libros con openpyxl conservando lo mas fielmente posible el archivo original.
+
+openpyxl conserva valores, formatos, formulas, filtros, nombres definidos, anchos y paneles, pero:
+  * escribe los numeros con 16 digitos significativos (no 17) -> se parchea para escribir repr(float),
+    que reproduce exactamente el valor original;
+  * no escribe el atributo outlineLevelCol (barra de agrupacion de columnas) -> se fija antes de guardar;
+  * reinterpreta el pie de pagina de la etiqueta de sensibilidad ("&1#" invisible) -> despues de guardar
+    se vuelve a poner el bloque <headerFooter> original de cada hoja.
+Ademas, el guardado es atomico (archivo temporal + reemplazo) y avisa si el archivo esta abierto en Excel.
+"""
+from __future__ import annotations
+
+import html
+import math
+import os
+import posixpath
+import re
+import shutil
+import tempfile
+import zipfile
+from pathlib import Path
+
+import openpyxl.cell._writer as _writer_celdas
+
+_SAFE_STRING_ORIGINAL = _writer_celdas.safe_string
+
+
+def _safe_string_17(value):
+    if isinstance(value, float) and math.isfinite(value):
+        return repr(float(value))          # float() normaliza subclases (p.ej. np.float64)
+    return _SAFE_STRING_ORIGINAL(value)
+
+
+def parche_precision():
+    """Escribe los flotantes con repr (ida y vuelta exacta) en lugar de '%.16g'."""
+    _writer_celdas.safe_string = _safe_string_17
+
+
+def fijar_esquema_columnas(wb):
+    for ws in wb.worksheets:
+        niveles = [d.outline_level for d in ws.column_dimensions.values() if d.outline_level]
+        if niveles:
+            ws.column_dimensions.max_outline = max(niveles)
+
+
+def _hojas_xml(z: zipfile.ZipFile) -> dict:
+    """{nombre de hoja: ruta del xml dentro del zip}."""
+    wbxml = z.read("xl/workbook.xml").decode("utf-8")
+    rels = z.read("xl/_rels/workbook.xml.rels").decode("utf-8")
+    destino = {}
+    for rel in re.findall(r"<Relationship\b[^>]*>", rels):
+        rid = re.search(r'\bId="([^"]+)"', rel)
+        tgt = re.search(r'\bTarget="([^"]+)"', rel)
+        if rid and tgt:
+            t = html.unescape(tgt.group(1))
+            destino[rid.group(1)] = posixpath.normpath(t.lstrip("/") if t.startswith("/") else posixpath.join("xl", t))
+    hojas = {}
+    for hoja in re.findall(r"<sheet\b[^>]*>", wbxml):
+        nombre = re.search(r'\bname="([^"]+)"', hoja)
+        rid = re.search(r'\br:id="([^"]+)"', hoja)
+        if nombre and rid and rid.group(1) in destino:
+            hojas[html.unescape(nombre.group(1))] = destino[rid.group(1)]
+    return hojas
+
+
+_PATRON_HF = re.compile(r"<headerFooter\b[^>]*/>|<headerFooter\b.*?</headerFooter>", re.S)
+
+
+def restaurar_encabezados(original: Path, salida: Path) -> int:
+    """Vuelve a poner en `salida` el bloque <headerFooter> de cada hoja de `original` (mismo nombre)."""
+    if not Path(original).exists():
+        return 0
+    with zipfile.ZipFile(original) as zo:
+        hojas_o = _hojas_xml(zo)
+        bloques = {}
+        for nombre, ruta in hojas_o.items():
+            m = _PATRON_HF.search(zo.read(ruta).decode("utf-8"))
+            if m:
+                bloques[nombre] = m.group(0)
+    if not bloques:
+        return 0
+    with zipfile.ZipFile(salida) as zs:
+        hojas_s = _hojas_xml(zs)
+        reemplazos = {}
+        for nombre, bloque in bloques.items():
+            ruta = hojas_s.get(nombre)
+            if not ruta:
+                continue
+            xml = zs.read(ruta).decode("utf-8")
+            if _PATRON_HF.search(xml):
+                reemplazos[ruta] = _PATRON_HF.sub(lambda _m: bloque, xml, count=1)
+            else:
+                print(f"   Aviso: la hoja '{nombre}' perdio su encabezado/pie de pagina al guardar "
+                      "(p.ej. etiqueta de sensibilidad); revisalo en Excel.")
+        if not reemplazos:
+            return 0
+        fd, tmp = tempfile.mkstemp(suffix=".xlsx", dir=str(Path(salida).parent))
+        os.close(fd)
+        with zipfile.ZipFile(tmp, "w", zipfile.ZIP_DEFLATED) as zt:
+            for item in zs.infolist():
+                datos = reemplazos[item.filename].encode("utf-8") if item.filename in reemplazos \
+                    else zs.read(item.filename)
+                zt.writestr(item, datos)
+    _permisos_normales(tmp)
+    os.replace(tmp, salida)
+    return len(reemplazos)
+
+
+_PATRON_LINK = re.compile(r"^xl/externalLinks/(externalLink\d+)\.xml$")
+_PATRON_RID = re.compile(r'r:id="([^"]+)"')
+_PATRON_REL = re.compile(r'<Relationship\b[^>]*>')
+
+
+def _atributo(etiqueta: str, nombre: str) -> str | None:
+    m = re.search(rf'\b{nombre}="([^"]*)"', etiqueta)
+    return m.group(1) if m else None
+
+
+def _destinos(rels_xml: str) -> set:
+    """Nombres de archivo (sin ruta) a los que apuntan las relaciones de un vinculo externo."""
+    return {Path((_atributo(e, "Target") or "").replace("\\", "/")).name.lower() for e in _PATRON_REL.findall(rels_xml)}
+
+
+def restaurar_vinculos_externos(original: Path | None, salida: Path) -> list:
+    """openpyxl conserva los vinculos externos (p. ej. a los Res_Rvas) pero, cuando el original trae rutas alternas
+    (extension "extlinks2021" de Excel), escribe el <externalBook r:id="rId1"> con una sola relacion cuyo Id es otro:
+    Excel lo detecta al abrir y "repara" el archivo quitando el vinculo. Aqui se vuelven a poner, tal cual vienen en el
+    original, la parte y las relaciones de cada vinculo (se emparejan por el archivo al que apuntan) y despues se
+    valida que cada r:id de los vinculos exista en sus relaciones. Regresa la lista de ajustes hechos."""
+    salida = Path(salida)
+    originales = {}
+    if original is not None and Path(original).exists():
+        with zipfile.ZipFile(original) as zo:
+            nombres = set(zo.namelist())
+            for n in nombres:
+                m = _PATRON_LINK.match(n)
+                rels = f"xl/externalLinks/_rels/{m.group(1)}.xml.rels" if m else None
+                if m and rels in nombres:
+                    rel_xml = zo.read(rels).decode("utf-8")
+                    ids_o = {_atributo(e, "Id") for e in _PATRON_REL.findall(rel_xml)}
+                    if any(r not in ids_o for r in _PATRON_RID.findall(zo.read(n).decode("utf-8"))):
+                        continue      # el original ya viene roto (p. ej. guardado con openpyxl): lo repara la validacion
+                    for destino in _destinos(rel_xml):
+                        originales[destino] = (zo.read(n), zo.read(rels))
+    ajustes, reemplazos = [], {}
+    with zipfile.ZipFile(salida) as zs:
+        nombres = set(zs.namelist())
+        for n in sorted(nombres):
+            m = _PATRON_LINK.match(n)
+            if not m:
+                continue
+            rels = f"xl/externalLinks/_rels/{m.group(1)}.xml.rels"
+            rel_xml = zs.read(rels).decode("utf-8") if rels in nombres else ""
+            par = next((originales[d] for d in _destinos(rel_xml) if d in originales), None)
+            if par is not None:
+                reemplazos[n], reemplazos[rels] = par
+                ajustes.append(f"{m.group(1)}: restaurado del original")
+                continue
+            # sin original: al menos que cada r:id apunte a una relacion existente
+            xml = zs.read(n).decode("utf-8")
+            ids = [_atributo(e, "Id") for e in _PATRON_REL.findall(rel_xml)]
+            faltan = [r for r in _PATRON_RID.findall(xml) if r not in ids]
+            if faltan and len(ids) == 1:
+                reemplazos[n] = _PATRON_RID.sub(f'r:id="{ids[0]}"', xml).encode("utf-8")
+                ajustes.append(f"{m.group(1)}: r:id {faltan} -> {ids[0]}")
+            elif faltan:
+                ajustes.append(f"{m.group(1)}: r:id {faltan} sin relacion; Excel podria abrir el libro como reparado")
+        if not reemplazos:
+            return ajustes
+        fd, tmp = tempfile.mkstemp(suffix=".xlsx", dir=str(salida.parent))
+        os.close(fd)
+        with zipfile.ZipFile(tmp, "w", zipfile.ZIP_DEFLATED) as zt:
+            for item in zs.infolist():
+                zt.writestr(item, reemplazos.get(item.filename, zs.read(item.filename)))
+    _permisos_normales(tmp)
+    os.replace(tmp, salida)
+    return ajustes
+
+
+def verificar_escritura(rutas) -> None:
+    """Falla de inmediato (antes del calculo) si alguna salida esta abierta en Excel o en otro programa, o si
+    no se puede escribir en su carpeta."""
+    bloqueadas, carpetas = [], set()
+    for ruta in rutas:
+        ruta = Path(ruta)
+        carpetas.add(ruta.parent)
+        if ruta.exists():
+            try:
+                with open(ruta, "a"):
+                    pass
+            except PermissionError:
+                bloqueadas.append(ruta.name)
+    if bloqueadas:
+        raise SystemExit("Cierra estos archivos (estan abiertos en Excel u otro programa) y vuelve a correr: "
+                         + ", ".join(bloqueadas))
+    for carpeta in carpetas:
+        try:
+            with tempfile.TemporaryFile(dir=str(carpeta)):
+                pass
+        except OSError as e:
+            raise SystemExit(f"No se puede escribir en la carpeta {carpeta}: {e}") from e
+
+
+def _permisos_normales(ruta) -> None:
+    """mkstemp crea archivos 0600; se dejan con los permisos por omision del sistema (umask)."""
+    try:
+        mascara = os.umask(0)
+        os.umask(mascara)
+        os.chmod(ruta, 0o666 & ~mascara)
+    except OSError:
+        pass
+
+
+def guardar_libro(wb, ruta: Path, original: Path | None = None) -> None:
+    """Guarda con los parches de fidelidad, de forma atomica y con mensaje claro si el archivo esta abierto."""
+    ruta = Path(ruta)
+    parche_precision()
+    fijar_esquema_columnas(wb)
+    try:
+        fd, tmp = tempfile.mkstemp(suffix=".xlsx", dir=str(ruta.parent))
+    except OSError as e:
+        raise SystemExit(f"No se puede escribir en la carpeta {ruta.parent}: {e}") from e
+    os.close(fd)
+    try:
+        wb.save(tmp)
+        if original is not None:
+            try:
+                restaurar_encabezados(original, Path(tmp))
+            except Exception as e:  # noqa: BLE001
+                print(f"   Aviso: no se pudo restaurar el encabezado/pie de pagina original de {ruta.name}: {e!r}")
+        try:
+            for ajuste in restaurar_vinculos_externos(original, Path(tmp)):
+                if "restaurado del original" not in ajuste:
+                    print(f"   Aviso {ruta.name}: vinculo externo {ajuste}")
+        except Exception as e:  # noqa: BLE001
+            print(f"   Aviso: no se pudieron revisar los vinculos externos de {ruta.name}: {e!r}")
+        _permisos_normales(tmp)
+        try:
+            os.replace(tmp, ruta)
+        except PermissionError as e:
+            raise SystemExit(f"No se pudo escribir {ruta.name}: esta abierto en Excel u otro programa. "
+                             "Cierralo y vuelve a correr.") from e
+    finally:
+        if os.path.exists(tmp):
+            os.remove(tmp)
+
+
+def copiar(origen: Path, destino: Path) -> None:
+    try:
+        shutil.copyfile(origen, destino)
+    except PermissionError as e:
+        raise SystemExit(f"No se pudo escribir {Path(destino).name}: esta abierto en Excel u otro programa. "
+                         "Cierralo y vuelve a correr.") from e
