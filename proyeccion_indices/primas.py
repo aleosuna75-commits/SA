@@ -13,8 +13,8 @@ Lee de entradas/ (todas opcionales; si falta alguna, la proyeccion de reservas s
                            suscripcion; el ramo sale del centro de beneficio.
 
 Bases completas, nunca recortes. De cada patron se prueba primero el archivo MAS GRANDE (en el presupuesto del ano
-siguiente, primero los _Ced); si no se puede leer, no trae datos, esta recortado o esta incompleto, se pasa al
-siguiente. Un archivo recortado o incompleto NO se usa para el factor y NADA se completa sobre el:
+siguiente, primero el que NO es _Ced: PREFERIR_PPTO_SIN_CED); si no se puede leer, no trae datos, esta recortado
+o esta incompleto, se pasa al siguiente. Un archivo recortado o incompleto NO se usa para el factor y NADA se completa sobre el:
   * recortado: renglones de datos o fisicos en un limite tipico de extracto (LIMITES_TRUNCADO);
   * historico: contra el real al corte del reforecast por LN (si llega a ese mes) o contra su ano anterior completo;
     despues, por grupo, contra el real del ano en los meses que comparten;
@@ -72,6 +72,10 @@ PATRON_RFCST = "BD_RFCST_{aa}*.xlsx"
 HOJA_RFCST = "BD_RFCST{aa}"
 HOJA_PPTO_ANIO = "Ppto{aaaa}"
 PATRON_PPTO = "PptoTecnico{sig}*.csv"
+# Presupuesto del ano siguiente: con True se toma primero PptoTecnico{sig}.csv (sin la columna PRCT_CED) y el _Ced
+# queda de respaldo; con False, al reves. La prima tomada es la misma en los dos; PRCT_CED solo alimenta la prima
+# retenida del control (sin la columna, retenida = tomada), que no entra a ninguna reserva.
+PREFERIR_PPTO_SIN_CED = True
 CUENTAS_PRIMA = ("6104010000", "6108010000", "6111090000")   # prima tomada (viene en negativo: se voltea)
 PREFIJO_SINIESTRO, PREFIJO_COMISION = "54", "53"
 MIN_COBERTURA_HISTORIA = 0.95     # el historico debe traer al menos 95 % de la prima de los meses que comparte con
@@ -257,12 +261,14 @@ def _leer_columnas(ruta: Path, hoja: str, marcas: tuple, columnas: dict) -> tupl
     return pd.DataFrame({k: v[:ultimo] for k, v in datos.items()}), ultimo, i + 1 + ultimo
 
 
-def _buscar(patron: str, preferir_ced: bool = False) -> list:
+def _buscar(patron: str, es_ppto: bool = False) -> list:
     """Archivos de entradas/ que cumplen el patron, en orden de preferencia: el MAS GRANDE primero (si junto a la base
-    completa quedo una copia recortada) y, a igual tamano, el mas reciente; en el presupuesto del ano siguiente, los _Ced
-    antes que los demas (traen el % de cesion). Si el preferido resulta recortado o incompleto se usa el siguiente."""
+    completa quedo una copia recortada) y, a igual tamano, el mas reciente; en el presupuesto del ano siguiente, primero
+    los que no son _Ced (o los _Ced si PREFERIR_PPTO_SIN_CED = False). Si el preferido resulta recortado o incompleto se
+    usa el siguiente."""
     c = [p for p in ENTRADAS.glob(patron) if not p.name.startswith("~$") and p.is_file()]
-    c.sort(key=lambda p: (preferir_ced and "_ced" in p.name.lower(), p.stat().st_size, p.stat().st_mtime), reverse=True)
+    c.sort(key=lambda p: (es_ppto and (("_ced" in p.name.lower()) != PREFERIR_PPTO_SIN_CED),
+                          p.stat().st_size, p.stat().st_mtime), reverse=True)
     return c
 
 
@@ -802,7 +808,7 @@ def leer_primas(ultimo_reservas: int, periodo_fin: int, lineas_dashboard: dict |
     pat = {"hist": PATRON_REAL_HIST.format(**nombres), "anio": PATRON_REAL_ANIO.format(**nombres),
            "rfcst": PATRON_RFCST.format(**nombres), "ppto": PATRON_PPTO.format(**nombres)}
     hoja_rfcst, hoja_ppto_anio = HOJA_RFCST.format(**nombres), HOJA_PPTO_ANIO.format(**nombres)
-    cands = {k: _buscar(v, preferir_ced=(k == "ppto")) for k, v in pat.items()}
+    cands = {k: _buscar(v, es_ppto=(k == "ppto")) for k, v in pat.items()}
     if not cands["hist"] and not cands["anio"]:
         return None
     controles, avisos, tablas = [], [], {}
