@@ -163,7 +163,7 @@ except Exception as _e:  # noqa: BLE001
 # =============================================================================
 CARPETA = Path(__file__).resolve().parent
 ENTRADAS = CARPETA / "entradas"
-VERSION_CODIGO = "2026-10-09e"   # version de los scripts: sale en la consola, en la hoja Resumen del diagnostico, en el pie
+VERSION_CODIGO = "2026-10-12a"   # version de los scripts: sale en la consola, en la hoja Resumen del diagnostico, en el pie
                                  # del tablero HTML y en la hoja Dashboard Razones del Excel, para saber con que version se corrio
 SALIDAS = CARPETA / "salidas"
 
@@ -753,9 +753,17 @@ TIPO_MODELO_FRV = "saldo"        # FRV (y FRV residual de 140 y 170): "saldo" = 
                                  # saltos, desde el ultimo real, con tope de rango; version 2026-10-09c); "razon" = nivel
                                  # suavizado sin tendencia (SES, hasta la version 2026-10-08f); "ultimo" = repetir el
                                  # ultimo real; "fnd" = Holt amortiguado con guardia
-TIPO_MODELO_CESION_RFV = "saldo" # CESION (IRR / BRUTO) de la RFV, solo Fianzas: "saldo" = la cartera en vigor conserva su
-                                 # cesion y la prima nueva se cede como la RC PRIMA (SALDO_RFV["meses_cesion"]; solo con
-                                 # TIPO_MODELO_FRV = "saldo"); "rfv" y los demas, como el FRV. Danos sigue con
+TIPO_MODELO_CESION_RFV = "fnd"   # CESION (IRR / BRUTO) y RC de la RFV, solo Fianzas. En la historia, CESION = RFV IRR /
+                                 # RFV BRUTO y RC = CESION / FCR (formulas); desde 2026-10-12, por indicacion del area, la
+                                 # RC se proyecta como serie de tiempo y CESION = RC x FCR: "fnd" = Holt amortiguado con
+                                 # guardia (HOLT_FND, la serie de tiempo del FND de Danos); "razon" = SES; "rfv" = la recta
+                                 # de TENDENCIA_RFV; "ultimo" = repetir el ultimo real; "saldo" = la cartera en vigor
+                                 # conserva su cesion y la prima nueva se cede como la RC PRIMA (SALDO_RFV["meses_cesion"];
+                                 # solo con TIPO_MODELO_FRV = "saldo"; hasta la version 2026-10-09e). Banco de pruebas
+                                 # (2026-10-12; 6 cortes de 202512 a 202605, 132 ramo-mes): error de la RFV NETO total 2.1 %
+                                 # con "fnd", 2.0 % con "saldo", 2.2 % con "razon", 2.1 % con "rfv" y "ultimo"; IRR 2.8 %,
+                                 # 3.0 %, 2.7 %, 2.9 % y 2.7 %. A dic-27 la CESION del 160 queda en 26.5 % con "fnd" y
+                                 # 25.7 % con "saldo"; la recta llevaba la del 150 a 20.9 %. Danos sigue con
                                  # TIPO_MODELO_FACTORES["CESION"] ("razon")
 # La RFV como saldo (2026-10-09d). Con la recta del FRV la proyeccion era una linea y quedaba plana contra la historia:
 # la RFV BRUTO total paso de 78.8 M USD en ene-25 a 122.7 en ago-26 (unos 2.3 M USD por mes) y la recta la dejaba en
@@ -805,14 +813,18 @@ TIPO_MODELO_CESION_RFV = "saldo" # CESION (IRR / BRUTO) de la RFV, solo Fianzas:
 # 3.9 %), y en el 150 por escalones sin prima. La version d acertaba mas en 2026 porque su q, ajustada con beta = 1, traia la
 # apreciacion de 2025 y el crecimiento sin prima del 150, que siguieron en 2026 y que a 16 meses no son liberacion.
 MIN_MESES_SALDO = 6              # meses comparados minimos para medir la liberacion ajustada del saldo
-SALDO_RFV = {
-    "liberacion": "vigencia",    # q: "vigencia" = la de la cartera en vigor (VIGENCIA_RFV: de la prima de cada mes, la
-                                 # parte que sigue en vigor segun su edad, medida en el libro de valuacion del area; cada
-                                 # mes se libera lo que pasa de una edad a la siguiente, asi que q cambia con la edad de la
-                                 # cartera); "ajustada" = minimos cuadrados de la trayectoria historica (version 2026-10-09d)
-    "revaluacion_tc": "medida",  # beta: "medida" = la de cada ramo (VIGENCIA_RFV: moneda de la reserva en el libro de
-                                 # valuacion y 60 meses de tipos de cambio); o un numero para todos (1 = en dolares, como la
-                                 # version d; 0 = en pesos, sin revaluar)
+SALDO_RFV = {                    # Desde 2026-10-12, por decision del area, la version de 160 M USD de RFV BRUTO a dic-27:
+                                 # liberacion ajustada en la historia y la reserva en dolares (el metodo de la version
+                                 # 2026-10-09d, con la constitucion por la parte en vigor); el area la compara con lo real
+                                 # y con lo que estima cerrar 2026. La de la vigencia y la beta medida (145.8 M USD, version
+                                 # 2026-10-09e) queda en RFV_Prima_Sensibilidad
+    "liberacion": "ajustada",    # q: "ajustada" = minimos cuadrados de la trayectoria historica (version 2026-10-09d);
+                                 # "vigencia" = la de la cartera en vigor (VIGENCIA_RFV: de la prima de cada mes, la parte
+                                 # que sigue en vigor segun su edad, medida en el libro de valuacion del area; cada mes se
+                                 # libera lo que pasa de una edad a la siguiente, asi que q cambia con la edad de la cartera)
+    "revaluacion_tc": 1.0,       # beta: 1 = toda la reserva en dolares (revaluada con el TC); "medida" = la de cada ramo
+                                 # (VIGENCIA_RFV: moneda de la reserva en el libro de valuacion y 60 meses de tipos de
+                                 # cambio); 0 = en pesos, sin revaluar
     "k_salto": 5.0,              # salto: error de un paso de mas de k_salto MAD (None = sin saltos; solo "ajustada")
     "piso_liberacion": None,     # piso de q con "ajustada" (p. ej. 0.0: el saldo no crece sin prima); None = la medida
     "meses_cesion": 0,           # cesion de la prima nueva: prima cedida / tomada de los ultimos N meses; 0 = desde el
@@ -1428,6 +1440,12 @@ def texto_modelo_rfv(tipo: str) -> str:
             t = ("tendencia historica" + (" en logaritmos" if tipo == "rfv_log" else "") + " desde el ultimo real: "
                  f"recta Theil-Sen de hasta {P['ventana']} meses {saltos}, {peso}, {amort} y con {tope}")
         return t + (" (TENDENCIA_RFV cambia parametros por serie o ramo)" if TENDENCIA_RFV else "")
+    if tipo == "fnd" and MODELO_POR_TIPO.get("fnd") == HOLT_GUARDIA:
+        return (f"serie de tiempo, Holt amortiguado con guardia en logaritmos (HOLT_FND: nivel = ultimo real, tendencia = "
+                f"promedio exponencial de los cambios mensuales con beta {HOLT_FND['beta']}, amortiguada {HOLT_FND['phi']} "
+                f"por mes; un cambio de mas de {HOLT_FND['k_salto']:.0f} MAD es un salto: mueve el nivel y no la tendencia; "
+                f"tope a {HOLT_FND['meses_tope']} meses dentro del rango de 36 meses ampliado "
+                f"{HOLT_FND['tope_rango']:.0%})")
     return {"razon": "nivel suavizado sin tendencia (SES)", "ultimo": "ultimo real, sin tendencia"}.get(
         tipo, MODELO_POR_TIPO.get(tipo, tipo))
 
@@ -5030,7 +5048,7 @@ def sensibilidad_prima_rfv(bd: BDMontos, proy: dict, pt: dict | None, periodos_p
     (solo el FRV que se muestra) y en su lugar van la moneda del saldo (toda en pesos y toda en dolares) y la
     liberacion: con la de la vigencia, la ajustada en la historia y el metodo de la version 2026-10-09d (ajustada y en
     dolares, con la constitucion por la parte en vigor); con la ajustada, su piso 0. Filas por cambio, valor y mes de corte (diciembres y el ultimo proyectado)."""
-    global MESES_PRIMA_RFV, FD_FIANZAS, SALDO_RFV
+    global MESES_PRIMA_RFV, FD_FIANZAS, SALDO_RFV, TIPO_MODELO_CESION_RFV
     if not pt or not pt.get("mensual") or not base.get("aplica"):
         return []
     c_b, c_n = norm("RFV BRUTO"), norm("RFV NETO")
@@ -5062,6 +5080,13 @@ def sensibilidad_prima_rfv(bd: BDMontos, proy: dict, pt: dict | None, periodos_p
             if isinstance(b0, str) or abs(float(b0 or 0.0) - b_) > 1e-9:
                 corridas.append(("moneda del saldo", "", txt, pt, MESES_PRIMA_RFV, ma_info, None,
                                  {**SALDO_RFV, "revaluacion_tc": float(b_)}))
+        if SALDO_RFV.get("liberacion", "vigencia") != "vigencia":   # (la de la version 2026-10-09e)
+            corridas.append(("liberacion y moneda del saldo", "", "por la vigencia de la cartera y con la beta medida "
+                             "(la version 2026-10-09e)", pt, MESES_PRIMA_RFV, ma_info, None,
+                             {**SALDO_RFV, "liberacion": "vigencia", "revaluacion_tc": "medida"}))
+        if TIPO_MODELO_CESION_RFV != "saldo":          # (la cesion como saldo: la cartera conserva la suya)
+            corridas.append(("cesion", "", "como saldo: la cartera en vigor conserva su cesion y la prima nueva se cede "
+                             "como la RC PRIMA", pt, MESES_PRIMA_RFV, ma_info, None, None, "saldo"))
         if SALDO_RFV.get("liberacion", "vigencia") == "vigencia":
             corridas.append(("liberacion del saldo", "", "ajustada en la historia, con la beta medida", pt,
                              MESES_PRIMA_RFV, ma_info, None, {**SALDO_RFV, "liberacion": "ajustada"}))
@@ -5090,17 +5115,19 @@ def sensibilidad_prima_rfv(bd: BDMontos, proy: dict, pt: dict | None, periodos_p
         if any(x == r for _, x in base["aplica"]) and not (fd_rfv()[0].get(r)):
             corridas.append(("FD en la proyeccion (devengamiento)", f"ramo {r}", "FD_FIANZAS 0.5", pt, MESES_PRIMA_RFV,
                              ma_info, {r: 0.5}, None))
-    filas, n0, fd0, s0 = [], MESES_PRIMA_RFV, FD_FIANZAS, SALDO_RFV
-    for nombre, meses_txt, valor, ptx, ventana, ma_x, fd_x, sal_x in corridas:
+    filas, n0, fd0, s0, c0 = [], MESES_PRIMA_RFV, FD_FIANZAS, SALDO_RFV, TIPO_MODELO_CESION_RFV
+    for nombre, meses_txt, valor, ptx, ventana, ma_x, fd_x, sal_x, *ces_x in corridas:
         try:
             MESES_PRIMA_RFV = ventana
             if fd_x is not None:
                 FD_FIANZAS = fd_x
             if sal_x is not None:
                 SALDO_RFV = sal_x
+            if ces_x:
+                TIPO_MODELO_CESION_RFV = ces_x[0]
             info = calcular_rfv_prima(bd, proy, ptx, periodos_proy, ultimo, tc_hist, None, com, pdinfo, True, ma_x)
         finally:
-            MESES_PRIMA_RFV, FD_FIANZAS, SALDO_RFV = n0, fd0, s0
+            MESES_PRIMA_RFV, FD_FIANZAS, SALDO_RFV, TIPO_MODELO_CESION_RFV = n0, fd0, s0, c0
         for p in marcas:
             b0, nn0 = tot(base, c_b, p), tot(base, c_n, p)
             filas.append({"Cambio": nombre, "Meses": meses_txt, "Valor": valor, "Periodo": p,
@@ -7986,19 +8013,30 @@ def calcular_rfv_prima(bd: BDMontos, proy: dict, pt: dict | None, periodos_proy:
             ok_c = [p for p in per_hist if np.isfinite(ces_h[p])]
             ces_f = np.full(h, ces_h[ok_c[-1]]) if ok_c else np.zeros(h)
             tipo_c = "rfv" if TIPO_MODELO_CESION_RFV == "saldo" else TIPO_MODELO_CESION_RFV
+            con_rc = fac is not None and fac["FCR"] > 0     # (con FCR: se proyecta la RC y CESION = RC x FCR)
             if ok_c:
                 per_c = rango_periodos(ok_c[0], ultimo)
-                res_c = pronosticar(Serie(("FIANZAS", "RFV", "CESION", r), tipo_c, per_c,
-                                          [ces_h.get(q, math.nan) for q in per_c], ultimo, h, dominio=DOMINIO_CESION))
+                pdh_ = (pdinfo or {}).get("hist") or {}
+
+                def fcr_mes(q):                        # (FCR del mes como en la BD: 1 - PD, 1 sin PD)
+                    pd_q = pdh_.get((r, q), math.nan)
+                    return 1.0 - pd_q if np.isfinite(pd_q) else 1.0
+                serie_c = [(ces_h.get(q, math.nan) / fcr_mes(q)) if con_rc else ces_h.get(q, math.nan) for q in per_c]
+                res_c = pronosticar(Serie(("FIANZAS", "RFV", "RC" if con_rc else "CESION", r), tipo_c, per_c,
+                                          serie_c, ultimo, h, dominio=DOMINIO_CESION))
                 x = np.asarray(res_c.pronostico, dtype=float)
                 if len(x) == h and np.all(np.isfinite(x)):
-                    ces_f = x
+                    ces_f = x * fac["FCR"] if con_rc else x   # (la RC proyectada x FCR: abajo RC = CESION / FCR)
+                elif con_rc:
+                    ces_f = np.full(h, serie_c[-1] * fac["FCR"]) if np.isfinite(serie_c[-1]) else ces_f
                 u = ces_h[ok_c[-1]]
-                out["alertas"] += [("FIANZAS", f"RFV | CESION | ramo {r}", a) for a in res_c.alertas
+                out["alertas"] += [("FIANZAS", f"RFV | {'RC' if con_rc else 'CESION'} | ramo {r}", a) for a in res_c.alertas
                                    if not str(a).startswith("Se usa")]
                 prc = res_c.parametros or {}
-                fila.update({"CESION modelo": texto_modelo_rfv(tipo_c) if tipo_c in ("rfv", "rfv_log")
-                             else (res_c.regla or texto_modelo_rfv(tipo_c)),
+                txt_c = (texto_modelo_rfv(tipo_c) if tipo_c in ("rfv", "rfv_log", "fnd")
+                         else (res_c.regla or texto_modelo_rfv(tipo_c)))
+                fila.update({"CESION modelo": ((f"RC = CESION / FCR en la historia, proyectada con {txt_c}; CESION = RC x "
+                                                "FCR") if con_rc else txt_c),
                              "CESION tendencia aplicada": prc.get("regla_pendiente", ""),
                              "CESION pendiente aplicada (por mes)": prc.get("pendiente_aplicada", math.nan),
                              "CESION saltos quitados": ", ".join(str(per_c[-1 - k]) for k in prc.get("saltos_hace") or []
@@ -11610,8 +11648,14 @@ def main():
             info_rfvp["pdx"] = pdx_fz
             if info_rfvp.get("saldo"):                 # de donde salen la vigencia y la moneda del saldo
                 vig_r = vigencia_rfv()
-                info_rfvp["texto_vigencia"] = vig_r["texto"]
-                print(f"   Vigencia y moneda de la RFV (saldo): {vig_r['texto']}", flush=True)
+                uso_ = ("" if SALDO_RFV.get("liberacion") == "vigencia" and isinstance(SALDO_RFV.get("revaluacion_tc"), str)
+                        else "; la proyeccion toma de aqui la parte de la prima del mes en vigor al cierre (constitucion)"
+                        + ("" if SALDO_RFV.get("liberacion") == "vigencia" else
+                           "; la liberacion es la ajustada en la historia (SALDO_RFV)")
+                        + ("" if isinstance(SALDO_RFV.get("revaluacion_tc"), str) else
+                           f"; beta {float(SALDO_RFV.get('revaluacion_tc') or 0.0):g} en todos los ramos (SALDO_RFV)"))
+                info_rfvp["texto_vigencia"] = vig_r["texto"] + uso_
+                print(f"   Vigencia y moneda de la RFV (saldo): {info_rfvp['texto_vigencia']}", flush=True)
                 for a in vig_r.get("avisos") or []:
                     alertas.append(("FIANZAS", "Vigencia de la RFV", a))
                     print(f"   AVISO FIANZAS: {a}", flush=True)
@@ -11693,7 +11737,8 @@ def main():
             if f_.get("FRV tendencia aplicada") or f_.get("CESION tendencia aplicada"):
                 if str(f_.get("FRV tendencia aplicada") or "").startswith("saldo"):
                     print(f"   Saldo de la RFV, ramo {f_['Ramo']}: {f_['FRV tendencia aplicada'][len('saldo: '):]}"
-                          + (f"; CESION: {f_['CESION tendencia aplicada']}" if f_.get("CESION tendencia aplicada")
+                          + (f"; {'RC (CESION = RC x FCR)' if TIPO_MODELO_CESION_RFV != 'saldo' and f_.get('FCR') else 'CESION'}: "
+                             f"{f_['CESION tendencia aplicada']}" if f_.get("CESION tendencia aplicada")
                              else ""), flush=True)
                     continue
                 print(f"   Tendencia de la RFV, ramo {f_['Ramo']}: " + "; ".join(

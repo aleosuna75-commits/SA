@@ -1508,10 +1508,14 @@ function tarjetasPrimaRfv(ramo, etiqRamo) {
       el('header', {}, el('div', {}, el('h2', { text: 'Sensibilidad de la RFV a la prima · todos los ramos' }),
         el('p', { class: 'sub', text: (SALDO_RFV
           ? 'RFV BRUTO de los ramos con RFV por prima si la prima que no es real cambia (solo cambia la reserva que constituye la prima nueva; la cartera en vigor no)'
-            + (sens.some(f => f.Cambio === 'moneda del saldo') ? ', con toda la reserva en pesos o toda en dólares' : '')
+            + (sens.some(f => f.Cambio === 'moneda del saldo' && /pesos/.test(f.Valor || '')) && sens.some(f => f.Cambio === 'moneda del saldo' && /dolares/.test(f.Valor || '')) ? ', con toda la reserva en pesos o toda en dólares'
+               : sens.some(f => f.Cambio === 'moneda del saldo' && /pesos/.test(f.Valor || '')) ? ', con toda la reserva en pesos'
+               : sens.some(f => f.Cambio === 'moneda del saldo') ? ', con toda la reserva en dólares' : '')
             + (sens.some(f => f.Cambio === 'liberacion del saldo' && /ajustada/.test(f.Valor || '')) ? ', con la liberación ajustada en la historia en lugar de la vigencia de la cartera'
-               : sens.some(f => f.Cambio === 'liberacion del saldo') ? ', y sin crecimiento propio del saldo (liberación con piso 0)' : '')
-            + (sens.some(f => f.Cambio === 'liberacion y moneda del saldo') ? ', y con el método de la versión 2026-10-09d (liberación ajustada y toda en dólares)' : '') + '. '
+               : sens.some(f => f.Cambio === 'liberacion del saldo') ? ', sin crecimiento propio del saldo (liberación con piso 0)' : '')
+            + (sens.some(f => f.Cambio === 'liberacion y moneda del saldo' && /vigencia/.test(f.Valor || '')) ? ', con la liberación por la vigencia de la cartera y la β medida (versión 2026-10-09e)'
+               : sens.some(f => f.Cambio === 'liberacion y moneda del saldo') ? ', con el método de la versión 2026-10-09d (liberación ajustada y toda en dólares)' : '')
+            + (sens.some(f => f.Cambio === 'cesion') ? ', y con la cesión como saldo en lugar de la serie de tiempo de la RC' : '') + '. '
           : 'RFV BRUTO de los ramos con RFV por prima si la prima que no es real cambia (con los mismos factores y tendencias), o si la base fuera de otra ventana de meses (el FRV se vuelve a medir con esa prima y su tendencia se vuelve a ajustar; la cesión no cambia). ') + `Base: ${b0}` }))),
       el('div', { class: 'cuerpo' }, el('div', { class: 'tabla-envoltura', style: 'max-height:none' }, t))));
   }
