@@ -1,7 +1,7 @@
 # Metodología de redistribución de primas, comisiones y siniestros entre Terremoto (ramo 73) e Hidrometeorológicos y Otros Riesgos (ramo 71)
 
 **Presupuesto Técnico 2027 (RPAT / Patria Re)**
-Versión 1.4, 16 de octubre de 2026. Documento de trabajo para Planeación Financiera; pensado para que una persona que no estuvo en el equipo pueda reproducir, auditar y defender el procedimiento. Acompaña a `0a_Actualizar_Base1.py` (v1.0), a `0_Redistribucion_TEV_HyOR.py` (v1.4), a `README_Script_Redistribucion.md` y a la carpeta `pruebas/`.
+Versión 1.5, 16 de octubre de 2026. Documento de trabajo para Planeación Financiera; pensado para que una persona que no estuvo en el equipo pueda reproducir, auditar y defender el procedimiento. Acompaña a `0a_Actualizar_Base1.py` (v1.1), a `0_Redistribucion_TEV_HyOR.py` (v1.5), a `README_Script_Redistribucion.md` y a la carpeta `pruebas/`.
 
 ---
 
@@ -247,7 +247,7 @@ De lectura obligatoria en la trazabilidad:
 
 ## 13. Procedimiento operativo
 
-0. Actualizar la historia real: `0a_Actualizar_Base1.py` une la Base_1 del año pasado con el real del año en curso. La extracción nueva incluye 2 o 3 meses que ya están en la Base_1 previa; el script exige que esos meses cuadren (1 % por métrica y por ramo) antes de escribir, de modo que la historia nueva tenga la misma definición que la anterior. Revisar en su libro de control `Traslape`, `Meses_por_Anio` y `Particip_TEV_HyOR`.
+0. Actualizar la historia real: `0a_Actualizar_Base1.py` une la Base_1 del año pasado con el real del año en curso. La extracción nueva incluye 2 o 3 meses que ya están en la Base_1 previa; el script exige que esos meses cuadren (1 % por métrica y por ramo) antes de escribir, de modo que la historia nueva tenga la misma definición que la anterior. Revisar en su libro de control `Traslape`, `Meses_por_Anio` y `Particip_TEV_HyOR`. Los meses de la Base_1 previa posteriores a la fecha en que se guardó el archivo no pueden ser reales (la Base_1 de diciembre de 2025 trae 2026 completo, que sólo puede ser presupuesto o proyección): se excluyen y su real entra desde la extracción nueva. Por la misma razón, la redistribución nunca usa como año base un año posterior a la fecha del archivo de histórico.
 1. Confirmar que `Inputs\PptoTecnico2027.csv` es el extracto original y colocar los insumos en `5_Generacion\Inputs\Redistribucion\`.
 2. Correr `python 0_Redistribucion_TEV_HyOR.py --dry-run`. Revisar `Alcance_LLAVEs`, `LLAVEs_Revisar`, `LLAVEs_Sin_Peso`, `Sensibilidad_Metodos`, `Validacion_Tendencia`, la cobertura y la tolerancia sugerida.
 3. Resolver con las líneas de negocio los casos `REVISAR` y `SIN_PESO` (nivel 1 cuando exista) y capturar en el layout con justificación; muestrear contra slip/SIREC los negocios `AJUSTAR` de mayor prima.

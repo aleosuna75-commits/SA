@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-0a_Actualizar_Base1.py  (versión 1.0)
+0a_Actualizar_Base1.py  (versión 1.1)
 =====================================
 Actualiza la Base_1 (histórico REAL por LLAVE, DescRamo, AñoCont y MesCont con PmaTom, CosTom, SinTom, ...)
 con la información real del año en curso, para que 0_Redistribucion_TEV_HyOR.py calcule los pesos por ramo
@@ -49,7 +49,7 @@ from datetime import datetime
 import numpy as np
 import pandas as pd
 
-VERSION = "1.0"
+VERSION = "1.1"
 
 # =============================================================================
 # PARÁMETROS (editar aquí o pasar por línea de comandos)
@@ -59,7 +59,9 @@ _aqui = os.path.dirname(os.path.abspath(__file__))
 _ctamens = fr"C:\Users\{getpass.getuser()}\OneDrive - GPV\Documentos\Planeación Financiera\Presupuestos\{zAño}\5_Generacion"
 # La carpeta de trabajo es donde vive este script (5_Generacion); si ahí no hay carpeta Inputs, se usa la ruta estilo CtaMens.
 xFolder = _aqui if os.path.isdir(os.path.join(_aqui, "Inputs")) else _ctamens
-xRed = os.path.join(xFolder, "Inputs", "Redistribucion")
+# La carpeta se acepta con o sin acento ("Redistribución" / "Redistribucion")
+xRed = next((os.path.join(xFolder, "Inputs", n) for n in ("Redistribucion", "Redistribución") if os.path.isdir(os.path.join(xFolder, "Inputs", n))),
+            os.path.join(xFolder, "Inputs", "Redistribucion"))
 
 DEFAULTS = {
     "previa": os.path.join(xRed, "Base_1.xlsx"),                    # Base_1 del año pasado (no se modifica)
@@ -80,6 +82,7 @@ DEFAULTS = {
     "permitir_descramo_nuevo": False,
     "especiales_a_diciembre": False,                                # periodos 13-16 de 0FISCPER -> mes 12
     "escribir_xlsx": True,
+    "conservar_posteriores": False,                                 # conservar periodos de la previa posteriores a la fecha del archivo
     "dry_run": False,
 }
 
@@ -174,7 +177,9 @@ def archivos_nuevos(rutas):
         elif os.path.isfile(r):
             out.append(r)
         else:
-            raise ErrorBase1(f"No existe la ruta de información nueva: {r}")
+            raise ErrorBase1(f"No existe la ruta de información nueva: {r}\n"
+                             "Cree esa carpeta y deje ahí el extracto REAL del año en curso (csv o xlsx, formato Base_1 o extracto SAP BW de reales), "
+                             "incluyendo 2 o 3 meses que ya estén en la Base_1 previa para validar el traslape. O indique el archivo con --nueva \"ruta\".")
     if not out:
         raise ErrorBase1(f"No se encontró ningún archivo de información nueva en {rutas}. Deje ahí el extracto real del año (csv o xlsx).")
     return out
@@ -574,7 +579,8 @@ def main(p):
     log.info("=== Actualización Base_1 | script v%s | pandas %s ===", VERSION, pd.__version__)
     log.info("Previa: %s | Nueva: %s | Salida: %s", p["previa"], p["nueva"], p["salida_csv"])
     if not os.path.isfile(p["previa"]):
-        alterno = os.path.join(xFolder, "Inputs", "Base_1.xlsx")
+        cands = [os.path.join(xFolder, "Inputs", n, "Base_1.xlsx") for n in ("Redistribucion", "Redistribución")] + [os.path.join(xFolder, "Inputs", "Base_1.xlsx")]
+        alterno = next((x for x in cands if os.path.isfile(x)), cands[-1])
         if os.path.isfile(alterno) and os.path.abspath(alterno) != os.path.abspath(p["salida_xlsx"]):
             log.warning("No existe %s; se usa como Base_1 previa %s", p["previa"], alterno)
             p["previa"] = alterno
@@ -588,6 +594,25 @@ def main(p):
     prev_raw.columns = [str(x).strip() for x in prev_raw.columns]
     c, metricas, dims = esquema_previa(prev_raw)
     prev = preparar_previa(prev_raw, c, metricas)
+    # Periodos posteriores a la fecha del archivo no pueden ser reales (p.ej. 2026 en una Base_1 guardada en dic-2025: presupuesto o proyección)
+    mt = datetime.fromtimestamp(os.path.getmtime(p["previa"]))
+    cod_mt = mt.year * 100 + mt.month
+    cod_prev = prev[c["ANIO"]].astype(int) * 100 + prev[c["MES"]].astype(int)
+    futuros = cod_prev > cod_mt
+    excluida = pd.DataFrame()
+    if futuros.any():
+        excluida = prev[futuros].groupby([c["ANIO"], c["MES"]])[metricas].sum(min_count=1).reset_index()
+        excluida.insert(2, "FILAS", prev[futuros].groupby([c["ANIO"], c["MES"]]).size().values)
+        if p["conservar_posteriores"]:
+            log.warning("La Base_1 previa (guardada el %s) trae %s filas de periodos posteriores (%s a %s); se CONSERVAN por --conservar-posteriores.",
+                        mt.strftime("%d/%m/%Y"), int(futuros.sum()), cod_prev[futuros].min(), cod_prev[futuros].max())
+            excluida = pd.DataFrame()
+        else:
+            log.warning("La Base_1 previa fue guardada el %s pero trae %s filas de periodos posteriores (%s a %s). Esos meses no pueden ser reales "
+                        "(probablemente presupuesto o proyección) y se EXCLUYEN de la historia; detalle en la hoja Previa_Excluida. "
+                        "El real de esos meses debe venir en la información nueva.", mt.strftime("%d/%m/%Y"), int(futuros.sum()),
+                        cod_prev[futuros].min(), cod_prev[futuros].max())
+            prev = prev[~futuros].reset_index(drop=True)
     prev_cols = list(prev.columns)
     cpma = next(m for m in metricas if norm(m) == "PMATOM")
     per_prev = set(zip(prev[c["ANIO"]].astype(int), prev[c["MES"]].astype(int)))
@@ -704,6 +729,7 @@ def main(p):
     # --- libro de control ---
     resumen = [
         ("version_script", VERSION), ("fecha", ts), ("previa", p["previa"]), ("archivos_nuevos", ", ".join(n for n, _ in origen)),
+        ("previa_fecha_archivo", mt.strftime("%d/%m/%Y")), ("previa_filas_excluidas_posteriores", int(excluida["FILAS"].sum()) if not excluida.empty else 0),
         ("filas_previa", len(prev)), ("filas_previa_reemplazadas", len(prev_out)), ("filas_nuevas", len(nueva)), ("filas_final", len(final)),
         ("periodos_nuevos", f"{min(per_new)[0]}-{min(per_new)[1]:02d} a {max(per_new)[0]}-{max(per_new)[1]:02d} ({len(per_new)})"),
         ("meses_traslape", len(per_tras)), ("traslape", "OK" if traslape_ok else "NO CUADRA"),
@@ -722,6 +748,8 @@ def main(p):
     with pd.ExcelWriter(ctrl_path, engine="openpyxl") as w:
         pd.DataFrame(resumen, columns=["CONCEPTO", "VALOR"]).to_excel(w, sheet_name="Resumen", index=False)
         pd.DataFrame({"FALLAS_TRASLAPE": fallas}).to_excel(w, sheet_name="Fallas", index=False)
+        if not excluida.empty:
+            excluida.to_excel(w, sheet_name="Previa_Excluida", index=False)
         cuadre.to_excel(w, sheet_name="Cuadre", index=False)
         (tabla_tras if not tabla_tras.empty else pd.DataFrame({"NOTA": ["Sin meses de traslape"]})).to_excel(w, sheet_name="Traslape", index=False)
         periodos.to_excel(w, sheet_name="Periodos", index=False)
@@ -793,6 +821,7 @@ def parse_args(argv=None):
     ap.add_argument("--permitir-descramo-nuevo", action="store_true", default=d["permitir_descramo_nuevo"])
     ap.add_argument("--especiales-a-diciembre", action="store_true", default=d["especiales_a_diciembre"])
     ap.add_argument("--sin-xlsx", action="store_true")
+    ap.add_argument("--conservar-posteriores", action="store_true", help="no excluir periodos de la previa posteriores a la fecha del archivo")
     ap.add_argument("--dry-run", action="store_true", default=d["dry_run"])
     a = ap.parse_args(argv)
     p = dict(d)
@@ -801,7 +830,8 @@ def parse_args(argv=None):
               "tolerancia_traslape": a.tolerancia_traslape, "materialidad_traslape": a.materialidad_traslape,
               "aceptar_traslape": a.aceptar_traslape.strip(), "sin_traslape": a.sin_traslape.strip(),
               "permitir_descramo_nuevo": a.permitir_descramo_nuevo, "especiales_a_diciembre": a.especiales_a_diciembre,
-              "escribir_xlsx": d["escribir_xlsx"] and not a.sin_xlsx, "dry_run": a.dry_run})
+              "escribir_xlsx": d["escribir_xlsx"] and not a.sin_xlsx, "dry_run": a.dry_run,
+              "conservar_posteriores": a.conservar_posteriores})
     signos = dict(d["signos"])
     for s in a.signo:
         if "=" not in s:

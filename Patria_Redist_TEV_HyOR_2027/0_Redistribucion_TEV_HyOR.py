@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-0_Redistribucion_TEV_HyOR.py  (versión 1.4)
+0_Redistribucion_TEV_HyOR.py  (versión 1.5)
 ============================================
 Redistribución de primas (GL 61), comisiones (GL 53) y, opcionalmente, siniestros (GL 54)
 entre los ramos 73 (Terremoto y Erupción Volcánica, TEV) y 71 (Hidrometeorológicos y Otros
@@ -42,7 +42,7 @@ from datetime import datetime
 import numpy as np
 import pandas as pd
 
-VERSION = "1.4"
+VERSION = "1.5"
 
 # =============================================================================
 # PARÁMETROS (editar aquí o pasar por línea de comandos)
@@ -52,14 +52,16 @@ usuario = getpass.getuser()
 _aqui = os.path.dirname(os.path.abspath(__file__))
 # Carpeta de trabajo: donde vive este script (5_Generacion, junto a CtaMens.py); si ahí no hay carpeta Inputs, la ruta estilo CtaMens.
 xFolder = _aqui if os.path.isdir(os.path.join(_aqui, "Inputs")) else fr"C:\Users\{usuario}\OneDrive - GPV\Documentos\Planeación Financiera\Presupuestos\{zAño}\5_Generacion"
+# Carpeta de insumos de la redistribución: se acepta con o sin acento ("Redistribución" / "Redistribucion")
+xRed = next((fr"{xFolder}\Inputs\{n}" for n in ("Redistribucion", "Redistribución") if os.path.isdir(fr"{xFolder}\Inputs\{n}")), fr"{xFolder}\Inputs\Redistribucion")
 
 DEFAULTS = {
     # --- Entradas ---
     "ppto":    fr"{xFolder}\Inputs\PptoTecnico{zAño}.csv",                           # mismo archivo que lee CtaMens.py
-    "hist":    fr"{xFolder}\Inputs\Redistribucion\Hist_Real_LLAVE_Ramo.csv",          # histórico real (largo o ancho)
-    "pesos":   fr"{xFolder}\Inputs\Redistribucion\Pesos_Ramo_TEV_HyOR.xlsx",          # alternativa: pesos ya calculados
-    "td":      fr"{xFolder}\Inputs\Redistribucion\TD.xlsx",                           # alternativa: TD formato 2026
-    "layout":  fr"{xFolder}\Inputs\Redistribucion\Layout_Redistribucion.xlsx",        # decisiones documentadas (opcional)
+    "hist":    fr"{xRed}\Hist_Real_LLAVE_Ramo.csv",          # histórico real (largo o ancho)
+    "pesos":   fr"{xRed}\Pesos_Ramo_TEV_HyOR.xlsx",          # alternativa: pesos ya calculados
+    "td":      fr"{xRed}\TD.xlsx",                           # alternativa: TD formato 2026
+    "layout":  fr"{xRed}\Layout_Redistribucion.xlsx",        # decisiones documentadas (opcional)
     "subramo": fr"{xFolder}\Inputs\Subramo.csv",                                      # CeBe -> Ramo, Ramo2 (recomendado)
     # --- Insumos de CtaMens para las verificaciones previas (opcionales: si el archivo existe se usa) ---
     "pais":        fr"{xFolder}\Inputs\Pais.csv",
@@ -1231,7 +1233,8 @@ def validar_entradas(p):
     if not any(existe(p, k) for k in ("hist", "pesos", "td")) and not existe(p, "layout"):
         # Respaldo: la Base_1 tal como la guarda el equipo (sin actualizar con 0a_Actualizar_Base1.py). Se avisa en el log.
         insumos = os.path.dirname(os.path.abspath(p["ppto"]))
-        candidatos = [os.path.join(insumos, "Redistribucion", "Base_1_Actualizada.xlsx"), os.path.join(insumos, "Redistribucion", "Base_1.xlsx"),
+        candidatos = [os.path.join(insumos, n, f) for f in ("Hist_Real_LLAVE_Ramo.csv", "Base_1_Actualizada.xlsx", "Base_1.xlsx")
+                      for n in ("Redistribucion", "Redistribución")] + [
                       os.path.join(insumos, "Base_1.xlsx"), os.path.join(insumos, "Base_1.csv")]
         alterno = next((c for c in candidatos if os.path.isfile(c)), None)
         if alterno is None:
@@ -1258,6 +1261,16 @@ def main(p):
     log = setup_logger(p["out_dir"], ts)
     log.info("=== Redistribución TEV/HyOR %s | script v%s | pandas %s === parámetros: %s", zAño, VERSION, pd.__version__, {k: v for k, v in p.items() if k != "out_dir"})
     validar_entradas(p)
+    if existe(p, "hist"):
+        # Un año posterior a la fecha del archivo de histórico no puede ser real (p.ej. 2026 en una Base_1 guardada en dic-2025)
+        anio_archivo = datetime.fromtimestamp(os.path.getmtime(p["hist"])).year
+        futuros = [a for a in p["anios_base"] if a > anio_archivo]
+        if futuros:
+            p["anios_base"] = [a for a in p["anios_base"] if a <= anio_archivo]
+            log.warning("El histórico %s se guardó en %s: los años base %s no pueden ser reales y se excluyen. Años base efectivos: %s. "
+                        "Para incluir el real del año en curso, actualice la Base_1 con 0a_Actualizar_Base1.py.", p["hist"], anio_archivo, futuros, p["anios_base"])
+            if not p["anios_base"]:
+                raise ErrorRedistribucion("Ningún año base es anterior a la fecha del histórico; indique --anios-base o actualice la Base_1.")
 
     # ---- 0. Anti doble aplicación ----
     registro = os.path.join(p["out_dir"], "registro_salidas.txt")

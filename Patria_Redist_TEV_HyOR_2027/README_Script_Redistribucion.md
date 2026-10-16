@@ -1,4 +1,4 @@
-# Script previo a CtaMens: `0_Redistribucion_TEV_HyOR.py` (v1.4)
+# Script previo a CtaMens: `0_Redistribucion_TEV_HyOR.py` (v1.5)
 
 Redistribuye primas (GL 61), comisiones (GL 53) y, opcionalmente, siniestros (GL 54) entre los
 ramos **73 Terremoto (TEV)** y **71 Hidrometeorológicos y Otros Riesgos (HyOR)** en
@@ -33,6 +33,8 @@ Reglas del script:
 | LLAVE | `ZTIPOREAS-ZCEDENTE-ZCONTRATO-FUNCAREA`, contrato nulo = 0 (misma regla que CtaMens y la redistribución). |
 | DescRamo | Desde el CeBe: `--mapa-descramo`, luego lo que diga la Base_1 previa, luego `Subramo.csv`; siempre con la ortografía de la previa. Un CeBe sin ramo o un DescRamo que no existe en la previa detiene la corrida (`--permitir-descramo-nuevo` si de verdad es un ramo nuevo). |
 | Demás columnas | Directas del extracto (TipoRea, Susc, ...), `Territorio` con `Pais.csv`, o **aprendidas de la previa** sólo si allí la relación es unívoca (por FUNCAREA, DescRamo o LLAVE). Lo no derivable queda vacío, no en cero; las retenidas (`PmaRet`, `SinRet`, `CosRet`) quedan vacías para los meses nuevos de un extracto SAP. La hoja `Llenado_Columnas` dice cómo se llenó cada columna. |
+| Meses que no pueden ser reales | Los periodos de la Base_1 previa posteriores a la fecha de guardado del archivo (p.ej. meses de 2026 en una Base_1 guardada en diciembre de 2025) se excluyen de la historia y se listan en la hoja `Previa_Excluida`; su real debe venir en la información nueva. `--conservar-posteriores` los deja. La redistribución aplica la misma regla: excluye de los años base los años posteriores a la fecha del archivo de histórico. |
+| Carpeta | `Inputs\\Redistribucion` se acepta con o sin acento. |
 | Periodo | `0CALMONTH` (AAAAMM o MM.AAAA); si no viene, `0FISCPER` con variante K4. Periodos especiales 13-16 detienen la corrida salvo `--especiales-a-diciembre`. |
 
 Hojas del libro de control: `Resumen`, `Fallas`, `Cuadre` (previa − reemplazada + nueva = final, por métrica), `Traslape`, `Periodos`,

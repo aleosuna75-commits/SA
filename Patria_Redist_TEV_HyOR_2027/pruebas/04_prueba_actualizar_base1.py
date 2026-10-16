@@ -188,5 +188,37 @@ pres = sapdf.copy(); pres["/ERP/CATEGORY"] = "PRES01"
 pres.to_csv(os.path.join(T, "Real_pres.csv"), index=False)
 res.append(correr("a17_presupuesto_detiene", [], False, [os.path.join(T, "Real_pres.csv")], "presupuesto")[0])
 
+# Base_1 guardada antes de sus últimos periodos (como una Base_1 de dic-2025 con meses 2026): esos meses se excluyen
+import shutil, time
+fut = os.path.join(T, "Base_1_fut.xlsx"); shutil.copy(os.path.join(T, "Base_1.xlsx"), fut)
+ts_ = time.mktime((2026, 4, 30, 12, 0, 0, 0, 0, -1)); os.utime(fut, (ts_, ts_))
+out = os.path.join(T, "out_a18")
+r = subprocess.run([sys.executable, SCRIPT, "--previa", fut, "--nueva", os.path.join(T, "Real_2026.csv"), "--subramo", os.path.join(T, "Subramo.csv"),
+                    "--pais", os.path.join(T, "Pais.csv"), "--salida-csv", os.path.join(out, "h.csv"), "--out-dir", out, "--sin-xlsx"],
+                   capture_output=True, text=True, encoding="utf-8", errors="replace")
+okf = r.returncode == 0 and "se EXCLUYEN de la historia" in r.stdout
+if okf:
+    fin = pd.read_csv(os.path.join(out, "h.csv"))
+    got = fin.groupby("AñoCont")[["PmaTom"]].sum()["PmaTom"]
+    okf = abs(got.loc[2026] - esperado_final.loc[2026, "PmaTom"]) < 0.05  # mayo-junio vienen de la nueva, no se duplican
+print(f"[{'OK' if okf else 'FALLA'}] a18_previa_con_periodos_posteriores_a_su_fecha")
+if not okf:
+    print((r.stdout + r.stderr)[-2000:])
+res.append(okf)
+# la redistribución excluye años base posteriores a la fecha del histórico
+hist_fut = os.path.join(T, "hist_fut.xlsx"); shutil.copy(os.path.join(T, "Base_1.xlsx"), hist_fut)
+ts_ = time.mktime((2025, 12, 30, 12, 0, 0, 0, 0, -1)); os.utime(hist_fut, (ts_, ts_))
+ppto_dir = os.path.join(T, "redist")
+r = subprocess.run([sys.executable, REDIST, "--ppto", os.path.join(ppto_dir, "PptoTecnico2027.csv"), "--hist", hist_fut,
+                    "--out-dir", os.path.join(ppto_dir, "out_fut"), "--dry-run",
+                    "--subramo", "", "--pais", "", "--cesion", "", "--cesionpi", "", "--cesion-hist", "", "--matxl", "", "--dncostoxl", "",
+                    "--dnrecup", "", "--evcat", "", "--attritional", "", "--pesos", "", "--td", "", "--layout", ""],
+                   capture_output=True, text=True, encoding="utf-8", errors="replace")
+okr = r.returncode == 0 and "Años base efectivos: [2025]" in r.stdout
+print(f"[{'OK' if okr else 'FALLA'}] a19_redistribucion_excluye_anios_posteriores_al_archivo")
+if not okr:
+    print((r.stdout + r.stderr)[-2000:])
+res.append(okr)
+
 print(f"\n{sum(res)}/{len(res)} verificaciones OK")
 sys.exit(0 if all(res) else 1)
