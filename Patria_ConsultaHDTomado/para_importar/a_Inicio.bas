@@ -81,10 +81,13 @@ End Sub
 ' La columna A arma la llave del contrato con una formula. Se deja exactamente
 ' en las filas con datos, para que no queden llaves vacias ("---") debajo
 ' cuando la consulta trae menos filas que la anterior.
-Public Sub AjustaColumnaLlave(ws As Worksheet, ByVal nFilas As Long)
-    Dim f As String
+' nFilas es Variant porque en Office de 64 bits Recordset.RecordCount es
+' LongPtr y VBA no lo acepta directo en un parametro Long.
+Public Sub AjustaColumnaLlave(ws As Worksheet, ByVal nFilas As Variant)
+    Dim f As String, n As Long
+    n = CLng(nFilas)
     f = ws.Range("A3").Formula
     If Left(f, 1) <> "=" Then Exit Sub
     ws.Range(ws.Range("A4"), ws.Cells(ws.Rows.Count, 1)).ClearContents
-    If nFilas > 1 Then ws.Range("A3").Resize(nFilas).Formula = f
+    If n > 1 Then ws.Range("A3").Resize(n).Formula = f
 End Sub
