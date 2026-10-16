@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-0_Redistribucion_TEV_HyOR.py  (versión 1.2)
+0_Redistribucion_TEV_HyOR.py  (versión 1.3)
 ============================================
 Redistribución de primas (GL 61), comisiones (GL 53) y, opcionalmente, siniestros (GL 54)
 entre los ramos 73 (Terremoto y Erupción Volcánica, TEV) y 71 (Hidrometeorológicos y Otros
@@ -42,14 +42,16 @@ from datetime import datetime
 import numpy as np
 import pandas as pd
 
-VERSION = "1.2"
+VERSION = "1.3"
 
 # =============================================================================
 # PARÁMETROS (editar aquí o pasar por línea de comandos)
 # =============================================================================
 zAño = 2027
 usuario = getpass.getuser()
-xFolder = fr"C:\Users\{usuario}\OneDrive - GPV\Documentos\Planeación Financiera\Presupuestos\{zAño}\5_Generacion"
+_aqui = os.path.dirname(os.path.abspath(__file__))
+# Carpeta de trabajo: donde vive este script (5_Generacion, junto a CtaMens.py); si ahí no hay carpeta Inputs, la ruta estilo CtaMens.
+xFolder = _aqui if os.path.isdir(os.path.join(_aqui, "Inputs")) else fr"C:\Users\{usuario}\OneDrive - GPV\Documentos\Planeación Financiera\Presupuestos\{zAño}\5_Generacion"
 
 DEFAULTS = {
     # --- Entradas ---
@@ -364,7 +366,7 @@ def preparar_hist(hist, ramos, log):
     if canio is None:
         canio = next((up[k] for k in up if k.startswith(("AÑO", "ANIO", "YEAR"))), None)
     cmes_full = _detectar(up, ["CALMONTH", "0CALMONTH", "PERIODO", "MES_CONTABLE"])
-    cmes = _detectar(up, ["MES", "MONTH", "0CALMONTH2"])
+    cmes = _detectar(up, ["MES", "MONTH", "0CALMONTH2", "MESCONT", "MES_CONT", "MES CONTABLE"])
     h["MES"] = np.nan
     if canio is not None:
         h["ANIO"] = a_num_estricto(h[canio], canio, ctx)

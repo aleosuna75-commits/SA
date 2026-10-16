@@ -1,9 +1,43 @@
-# Script previo a CtaMens: `0_Redistribucion_TEV_HyOR.py` (v1.2)
+# Script previo a CtaMens: `0_Redistribucion_TEV_HyOR.py` (v1.3)
 
 Redistribuye primas (GL 61), comisiones (GL 53) y, opcionalmente, siniestros (GL 54) entre los
 ramos **73 Terremoto (TEV)** y **71 Hidrometeorológicos y Otros Riesgos (HyOR)** en
 `Inputs/PptoTecnico2027.csv`, **antes** de correr `CtaMens.py`. La metodología y su justificación están en
 `Metodologia_Redistribucion_TEV_HyOR_2027.md`; este README cubre la operación. Las pruebas están en `pruebas/`.
+
+## 0. Paso previo: actualizar la Base_1 con el real del año (`0a_Actualizar_Base1.py`)
+
+La redistribución calcula los pesos con la historia real por LLAVE y ramo. Esa historia es la `Base_1` (la misma del proceso 2026),
+actualizada con los meses reales del año en curso. Este script hace la actualización:
+
+1. Deje la Base_1 del año pasado en `Inputs\Redistribucion\Base_1.xlsx` (no se modifica nunca).
+2. Deje el real del año en `Inputs\Redistribucion\Base1_Nueva\` (uno o varios csv/xlsx). Acepta dos formatos:
+   * **Formato Base_1** (mismas columnas: `LLAVE`, `DescRamo`, `AñoCont`, `MesCont`, `PmaTom`, ...).
+   * **Extracto SAP BW de reales** con la misma estructura de columnas que `PptoTecnico2027.csv` (`/ERP/GL_ACCT`, `/ERP/AMOUNT`,
+     `/ERP/PROFTCTR`, `/ERP/FUNCAREA`, `ZTIPOREAS`, `ZCEDENTE`, `ZCONTRATO`, `0CALMONTH`, `ZREGIONRP`, ...), pero de la categoría de **reales**.
+3. **Incluya en la extracción nueva los últimos 2 o 3 meses que ya están en la Base_1 previa.** Esos meses de traslape son la prueba,
+   con datos, de que la consulta nueva tiene la misma definición que la Base_1 (cuentas, signo, LLAVE, ramo).
+4. `python 0a_Actualizar_Base1.py --dry-run` → revisar el libro `Outputs\Actualizacion_Base1\Control_Actualizacion_Base1_{fecha}.xlsx`.
+5. `python 0a_Actualizar_Base1.py` → escribe `Inputs\Redistribucion\Hist_Real_LLAVE_Ramo.csv` (el insumo por defecto de la redistribución)
+   y `Base_1_Actualizada.xlsx` (para `Base1_global.py`, si cabe en Excel).
+
+Reglas del script:
+
+| Tema | Regla |
+|---|---|
+| Unión | Los meses (AñoCont, MesCont) que trae la información nueva **reemplazan completos** a los mismos meses de la previa; no se suman. Los demás meses de la previa quedan intactos. |
+| Traslape | Por métrica y por DescRamo, la nueva debe reproducir a la previa en los meses comunes (tolerancia 1 %). Si no cuadra, no escribe la base. `--aceptar-traslape "justificación"` permite escribir dejando constancia. Un extracto SAP sin traslape se detiene salvo `--sin-traslape "justificación"`. |
+| Cuentas (SAP) | Prefijo 61 → `PmaTom`, 53 → `CosTom`, 54 → `SinTom`. Otras cuentas quedan fuera y se reportan en `GL_NoMap_*`. `--mapa-gl` cambia el mapa (columnas GL, METRICA, SIGNO). |
+| Signo (SAP) | Primas ×(−1) para pasar de la convención SAP a la de la Base_1. Si el traslape muestra exactamente el signo contrario, se corrige y se documenta. Un `--signo` explícito del usuario nunca se corrige. |
+| Categoría, moneda, sociedad | Si el extracto trae más de una, se detiene; se elige con `--filtro COLUMNA=VALOR`. Una categoría de presupuesto (`PRES…`) se rechaza. |
+| LLAVE | `ZTIPOREAS-ZCEDENTE-ZCONTRATO-FUNCAREA`, contrato nulo = 0 (misma regla que CtaMens y la redistribución). |
+| DescRamo | Desde el CeBe: `--mapa-descramo`, luego lo que diga la Base_1 previa, luego `Subramo.csv`; siempre con la ortografía de la previa. Un CeBe sin ramo o un DescRamo que no existe en la previa detiene la corrida (`--permitir-descramo-nuevo` si de verdad es un ramo nuevo). |
+| Demás columnas | Directas del extracto (TipoRea, Susc, ...), `Territorio` con `Pais.csv`, o **aprendidas de la previa** sólo si allí la relación es unívoca (por FUNCAREA, DescRamo o LLAVE). Lo no derivable queda vacío, no en cero; las retenidas (`PmaRet`, `SinRet`, `CosRet`) quedan vacías para los meses nuevos de un extracto SAP. La hoja `Llenado_Columnas` dice cómo se llenó cada columna. |
+| Periodo | `0CALMONTH` (AAAAMM o MM.AAAA); si no viene, `0FISCPER` con variante K4. Periodos especiales 13-16 detienen la corrida salvo `--especiales-a-diciembre`. |
+
+Hojas del libro de control: `Resumen`, `Fallas`, `Cuadre` (previa − reemplazada + nueva = final, por métrica), `Traslape`, `Periodos`,
+`Meses_por_Anio` (para saber si el año en curso llega a 8 meses), `Particip_TEV_HyOR` (participación de Terremoto por año, para comparar con
+la serie histórica), `Llenado_Columnas`, `LLAVEs_Nuevas`, `GL_NoMap_*`, `DescRamo_*`.
 
 ## 1. Dónde se corre y en qué orden
 
@@ -40,7 +74,7 @@ Orden de ejecución:
    `Inputs/Backups/PptoTecnico2027_PreRedist_{fecha}.csv` y escribe el redistribuido con el nombre original).
 6. **Dos pasadas de CtaMens:** pasada 1 → regenerar `xDnCostoXL`, `xDnRecup`, `xDnEvCat`, `xDnAttritional` con la base redistribuida → pasada 2.
 
-El script usa las mismas rutas por defecto que `CtaMens.py` (`C:\Users\{usuario}\OneDrive - GPV\...\2027\5_Generacion`).
+Desde la v1.3 el script toma como carpeta de trabajo la carpeta donde está guardado (`5_Generacion`, junto a `CtaMens.py`), así que no hay que editar rutas. Si ahí no existe la carpeta `Inputs`, usa la ruta estilo `CtaMens.py` (`C:\Users\{usuario}\OneDrive - GPV\...\2027\5_Generacion`).
 Cualquier ruta o parámetro se puede sobreescribir por línea de comandos: `python 0_Redistribucion_TEV_HyOR.py --help`.
 Si se corre por doble clic, la ventana se queda abierta al terminar y cualquier error queda en el log y en `ERROR_{fecha}.txt`.
 

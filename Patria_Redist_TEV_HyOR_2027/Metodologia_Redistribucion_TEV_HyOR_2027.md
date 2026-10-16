@@ -1,7 +1,7 @@
 # Metodología de redistribución de primas, comisiones y siniestros entre Terremoto (ramo 73) e Hidrometeorológicos y Otros Riesgos (ramo 71)
 
 **Presupuesto Técnico 2027 (RPAT / Patria Re)**
-Versión 1.2, 16 de octubre de 2026. Documento de trabajo para Planeación Financiera; pensado para que una persona que no estuvo en el equipo pueda reproducir, auditar y defender el procedimiento. Acompaña a `0_Redistribucion_TEV_HyOR.py` (v1.2), a `README_Script_Redistribucion.md` y a la carpeta `pruebas/`.
+Versión 1.3, 16 de octubre de 2026. Documento de trabajo para Planeación Financiera; pensado para que una persona que no estuvo en el equipo pueda reproducir, auditar y defender el procedimiento. Acompaña a `0a_Actualizar_Base1.py` (v1.0), a `0_Redistribucion_TEV_HyOR.py` (v1.3), a `README_Script_Redistribucion.md` y a la carpeta `pruebas/`.
 
 ---
 
@@ -233,7 +233,7 @@ De lectura obligatoria en la trazabilidad:
 | # | Insumo | Para qué | Quién |
 |---|---|---|---|
 | 1 | `PptoTecnico2027.csv` completo (todas las LN y regiones), confirmado como el extracto SAP **original** (fecha y sha256), no una versión ya intervenida | Universo real del problema; anti doble aplicación | Planeación Financiera |
-| 2 | **Histórico real por LLAVE × ramo × año y mes** de primas, comisiones y siniestros, 2024–2026 al corte, con ZTIPOREAS, ZCEDENTE, ZCONTRATO (0 para facultativos), FUNCAREA, PROFTCTR o DescRamo, periodo AAAAMM, cuenta y monto (estructura de `Base_1.xlsx` o de la consulta real de SAP BW) | Pesos de nivel 2, completitud de meses, sensibilidad, tendencia | Planeación Financiera / Reporting |
+| 2 | **Histórico real por LLAVE × ramo × año y mes** de primas, comisiones y siniestros, 2024–2026 al corte, con ZTIPOREAS, ZCEDENTE, ZCONTRATO (0 para facultativos), FUNCAREA, PROFTCTR o DescRamo, periodo AAAAMM, cuenta y monto (estructura de `Base_1.xlsx` o de la consulta real de SAP BW). Se arma con `0a_Actualizar_Base1.py`: Base_1 del año pasado más el real del año, validado por traslape | Pesos de nivel 2, completitud de meses, sensibilidad, tendencia | Planeación Financiera / Reporting |
 | 3 | `Subramo.csv` 2027 (con Ramo2 y RamoN) y `Pais.csv` | Ramo exacto de CtaMens; verificación de LLAVE1 | Planeación Financiera |
 | 4 | Participación contractual por ramo de los negocios en `REVISAR` y `SIN_PESO` (slip, SIREC, insumo de la LN) | Pesos de nivel 1 (layout `FORZAR`) y confirmaciones (`INCLUIR`/`EXCLUIR`) | Suscripción / líneas de negocio |
 | 5 | Output actual de CtaMens (`CtaMens_2027.xlsx`, `ConsultaP.xlsx`) y la hoja de totales por ramo de la captura | Validación antes/después | Planeación Financiera |
@@ -247,6 +247,7 @@ De lectura obligatoria en la trazabilidad:
 
 ## 13. Procedimiento operativo
 
+0. Actualizar la historia real: `0a_Actualizar_Base1.py` une la Base_1 del año pasado con el real del año en curso. La extracción nueva incluye 2 o 3 meses que ya están en la Base_1 previa; el script exige que esos meses cuadren (1 % por métrica y por ramo) antes de escribir, de modo que la historia nueva tenga la misma definición que la anterior. Revisar en su libro de control `Traslape`, `Meses_por_Anio` y `Particip_TEV_HyOR`.
 1. Confirmar que `Inputs\PptoTecnico2027.csv` es el extracto original y colocar los insumos en `5_Generacion\Inputs\Redistribucion\`.
 2. Correr `python 0_Redistribucion_TEV_HyOR.py --dry-run`. Revisar `Alcance_LLAVEs`, `LLAVEs_Revisar`, `LLAVEs_Sin_Peso`, `Sensibilidad_Metodos`, `Validacion_Tendencia`, la cobertura y la tolerancia sugerida.
 3. Resolver con las líneas de negocio los casos `REVISAR` y `SIN_PESO` (nivel 1 cuando exista) y capturar en el layout con justificación; muestrear contra slip/SIREC los negocios `AJUSTAR` de mayor prima.
