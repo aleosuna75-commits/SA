@@ -574,7 +574,12 @@ def main(p):
     log.info("=== Actualización Base_1 | script v%s | pandas %s ===", VERSION, pd.__version__)
     log.info("Previa: %s | Nueva: %s | Salida: %s", p["previa"], p["nueva"], p["salida_csv"])
     if not os.path.isfile(p["previa"]):
-        raise ErrorBase1(f"No existe la Base_1 previa: {p['previa']}")
+        alterno = os.path.join(xFolder, "Inputs", "Base_1.xlsx")
+        if os.path.isfile(alterno) and os.path.abspath(alterno) != os.path.abspath(p["salida_xlsx"]):
+            log.warning("No existe %s; se usa como Base_1 previa %s", p["previa"], alterno)
+            p["previa"] = alterno
+        else:
+            raise ErrorBase1(f"No existe la Base_1 previa: {p['previa']} (tampoco {alterno}).")
     for k in ("salida_csv", "salida_xlsx"):
         if p[k] and os.path.abspath(p[k]) == os.path.abspath(p["previa"]):
             raise ErrorBase1("La salida no puede ser el mismo archivo que la Base_1 previa (la previa nunca se sobreescribe).")

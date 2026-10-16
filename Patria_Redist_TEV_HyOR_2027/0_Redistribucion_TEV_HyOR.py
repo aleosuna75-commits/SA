@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-0_Redistribucion_TEV_HyOR.py  (versión 1.3)
+0_Redistribucion_TEV_HyOR.py  (versión 1.4)
 ============================================
 Redistribución de primas (GL 61), comisiones (GL 53) y, opcionalmente, siniestros (GL 54)
 entre los ramos 73 (Terremoto y Erupción Volcánica, TEV) y 71 (Hidrometeorológicos y Otros
@@ -42,7 +42,7 @@ from datetime import datetime
 import numpy as np
 import pandas as pd
 
-VERSION = "1.3"
+VERSION = "1.4"
 
 # =============================================================================
 # PARÁMETROS (editar aquí o pasar por línea de comandos)
@@ -1229,7 +1229,18 @@ def validar_entradas(p):
     if not os.path.isfile(p["ppto"]):
         raise ErrorRedistribucion(f"No existe el presupuesto: {p['ppto']}")
     if not any(existe(p, k) for k in ("hist", "pesos", "td")) and not existe(p, "layout"):
-        raise ErrorRedistribucion("No se encontró ningún insumo de pesos (histórico, tabla de pesos o TD) ni layout. Revise las rutas en DEFAULTS o los argumentos.")
+        # Respaldo: la Base_1 tal como la guarda el equipo (sin actualizar con 0a_Actualizar_Base1.py). Se avisa en el log.
+        insumos = os.path.dirname(os.path.abspath(p["ppto"]))
+        candidatos = [os.path.join(insumos, "Redistribucion", "Base_1_Actualizada.xlsx"), os.path.join(insumos, "Redistribucion", "Base_1.xlsx"),
+                      os.path.join(insumos, "Base_1.xlsx"), os.path.join(insumos, "Base_1.csv")]
+        alterno = next((c for c in candidatos if os.path.isfile(c)), None)
+        if alterno is None:
+            buscados = [p.get(k) for k in ("hist", "pesos", "td", "layout")] + candidatos
+            raise ErrorRedistribucion("No se encontró ningún insumo de pesos (histórico, tabla de pesos o TD) ni layout. Rutas revisadas:\n  "
+                                      + "\n  ".join(str(b) for b in buscados if b) + "\nDeje la Base_1 en alguna de ellas o indique la ruta con --hist.")
+        logging.getLogger("redist").warning("No existe %s; se usa como histórico %s. Si esta Base_1 no incluye el real del año en curso, "
+                                            "los pesos saldrán sólo de los años que sí trae (ver Pesos_Calculados y el log).", p.get("hist"), alterno)
+        p["hist"] = alterno
     os.makedirs(p["out_dir"], exist_ok=True)
     if not p["dry_run"]:
         os.makedirs(os.path.dirname(os.path.abspath(p["salida"])) or ".", exist_ok=True)

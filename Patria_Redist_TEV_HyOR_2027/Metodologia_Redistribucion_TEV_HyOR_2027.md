@@ -1,7 +1,7 @@
 # Metodología de redistribución de primas, comisiones y siniestros entre Terremoto (ramo 73) e Hidrometeorológicos y Otros Riesgos (ramo 71)
 
 **Presupuesto Técnico 2027 (RPAT / Patria Re)**
-Versión 1.3, 16 de octubre de 2026. Documento de trabajo para Planeación Financiera; pensado para que una persona que no estuvo en el equipo pueda reproducir, auditar y defender el procedimiento. Acompaña a `0a_Actualizar_Base1.py` (v1.0), a `0_Redistribucion_TEV_HyOR.py` (v1.3), a `README_Script_Redistribucion.md` y a la carpeta `pruebas/`.
+Versión 1.4, 16 de octubre de 2026. Documento de trabajo para Planeación Financiera; pensado para que una persona que no estuvo en el equipo pueda reproducir, auditar y defender el procedimiento. Acompaña a `0a_Actualizar_Base1.py` (v1.0), a `0_Redistribucion_TEV_HyOR.py` (v1.4), a `README_Script_Redistribucion.md` y a la carpeta `pruebas/`.
 
 ---
 

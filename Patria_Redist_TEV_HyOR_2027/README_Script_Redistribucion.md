@@ -1,4 +1,4 @@
-# Script previo a CtaMens: `0_Redistribucion_TEV_HyOR.py` (v1.3)
+# Script previo a CtaMens: `0_Redistribucion_TEV_HyOR.py` (v1.4)
 
 Redistribuye primas (GL 61), comisiones (GL 53) y, opcionalmente, siniestros (GL 54) entre los
 ramos **73 Terremoto (TEV)** y **71 Hidrometeorológicos y Otros Riesgos (HyOR)** en
