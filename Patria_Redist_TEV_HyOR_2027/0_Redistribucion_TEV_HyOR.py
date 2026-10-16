@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-0_Redistribucion_TEV_HyOR.py  (versión 2.0)
+0_Redistribucion_TEV_HyOR.py  (versión 2.1)
 ============================================
 Redistribución de primas (GL 61), comisiones (GL 53) y, opcionalmente, siniestros (GL 54)
 entre los ramos 73 (Terremoto y Erupción Volcánica, TEV) y 71 (Hidrometeorológicos y Otros
@@ -45,7 +45,7 @@ from datetime import datetime
 import numpy as np
 import pandas as pd
 
-VERSION = "2.0"
+VERSION = "2.1"
 
 # =============================================================================
 # PARÁMETROS (editar aquí o pasar por línea de comandos)
@@ -107,6 +107,7 @@ DEFAULTS = {
     "sobrescribir_input": False,    # True: respalda el original en Backups/ y escribe el redistribuido con el nombre original
     "aprobacion": "",               # corrida productiva: responsable y fecha que aprobaron parámetros y layout (queda en Resumen)
     "dry_run": False,
+    "sirec": True,                  # al terminar, consulta SIREC para los negocios VALIDAR_SIREC (sirec_conexion.py); si falla sólo avisa
 }
 
 TIPO_POR_GL = {"61": "Primas", "53": "Comisiones", "54": "Siniestros"}
@@ -1661,6 +1662,15 @@ def main(p):
     log.info("Trazabilidad escrita: %s%s", traza, f" | detalle fila a fila: {det_csv}" if len(detalle) else "")
     log.info("Resumen: %s", resumen)
     log.info("Tiempo: %.1f s", time.perf_counter() - t0)
+    if p.get("sirec") and not fallas and not p["dry_run"] and len(alcance) and alcance["VALIDAR_SIREC"].any():
+        try:
+            sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+            import sirec_conexion
+            res_sirec = sirec_conexion.ejecutar(_carpeta_trabajo(p))
+            log.info("SIREC: %s", res_sirec)
+        except Exception as e:  # la base ya quedó escrita; SIREC es validación complementaria
+            log.warning("SIREC no se pudo consultar (%s: %s). La base redistribuida ya quedó escrita; puede correr sirec_conexion.py aparte.",
+                        type(e).__name__, e)
     if fallas:
         raise AssertionError("Los controles de cuadre fallaron; no se escribió el csv. Vea el log y la trazabilidad con sufijo _CONTROL_FALLIDO.")
     return resumen
@@ -1672,6 +1682,7 @@ def parse_args():
         ap.add_argument(f"--{k}")
     ap.add_argument("--ppto-previo", dest="ppto_previo", help="CtaMens del presupuesto aprobado del año anterior; AUTO o ''")
     ap.add_argument("--modo-decision", dest="modo_decision", choices=["fijo", "revisar"])
+    ap.add_argument("--sin-sirec", dest="sin_sirec", action="store_true", help="no consultar SIREC al terminar")
     ap.add_argument("--out-dir", dest="out_dir"); ap.add_argument("--cesion-hist", dest="cesion_hist")
     ap.add_argument("--ramos", help="p.ej. 71,73"); ap.add_argument("--anio-decision", dest="anio_decision", type=int)
     ap.add_argument("--anios-base", dest="anios_base", help="p.ej. 2025,2026"); ap.add_argument("--metodo-pesos", dest="metodo_pesos", choices=METODOS)
@@ -1707,6 +1718,7 @@ def parse_args():
     if a.no_conservar_cero: p["conservar_filas_cero"] = False
     if a.sobrescribir_input: p["sobrescribir_input"] = True
     if a.dry_run: p["dry_run"] = True
+    if a.sin_sirec: p["sirec"] = False
     return p
 
 

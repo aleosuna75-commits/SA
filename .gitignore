@@ -11,3 +11,6 @@ venv/
 # Datos descargados por el extractor (se regeneran)
 world-master/
 world.tar.gz
+
+# Credenciales locales de SIREC (nunca al repositorio)
+sirec_config.py
