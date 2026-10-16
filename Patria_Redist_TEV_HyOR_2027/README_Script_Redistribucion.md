@@ -1,84 +1,73 @@
-# Script previo a CtaMens: `0_Redistribucion_TEV_HyOR.py` (v1.5)
+# Scripts previos a CtaMens: `0a_Actualizar_Base1.py` y `0_Redistribucion_TEV_HyOR.py` (v2.0)
 
-Redistribuye primas (GL 61), comisiones (GL 53) y, opcionalmente, siniestros (GL 54) entre los
-ramos **73 Terremoto (TEV)** y **71 Hidrometeorológicos y Otros Riesgos (HyOR)** en
-`Inputs/PptoTecnico2027.csv`, **antes** de correr `CtaMens.py`. La metodología y su justificación están en
-`Metodologia_Redistribucion_TEV_HyOR_2027.md`; este README cubre la operación. Las pruebas están en `pruebas/`.
+Redistribuyen primas (GL 61), comisiones (GL 53) y, opcionalmente, siniestros (GL 54) entre los ramos
+**71 Terremoto (`A071000000`)** y **73 HyORH (`A073000000`)** en `Inputs\PptoTecnico2027.csv`, **antes** de correr `CtaMens.py`.
+La metodología y su justificación están en `Metodologia_Redistribucion_TEV_HyOR_2027.md` (la sección 0.1 resume los cambios de la v2.0);
+este README cubre la operación. Las pruebas están en `pruebas/`.
 
-## 0. Paso previo: actualizar la Base_1 con el real del año (`0a_Actualizar_Base1.py`)
+## 0. Cómo se corre (dos pasos, sin mover archivos)
 
-La redistribución calcula los pesos con la historia real por LLAVE y ramo. Esa historia es la `Base_1` (la misma del proceso 2026),
-actualizada con los meses reales del año en curso. Este script hace la actualización:
+Guarde los scripts en `5_Generacion`, junto a `CtaMens.py`. Toman como carpeta de trabajo la carpeta donde están guardados.
 
-1. Deje la Base_1 del año pasado en `Inputs\Redistribucion\Base_1.xlsx` (no se modifica nunca).
-2. Deje el real del año en `Inputs\Redistribucion\Base1_Nueva\` (uno o varios csv/xlsx). Acepta dos formatos:
-   * **Formato Base_1** (mismas columnas: `LLAVE`, `DescRamo`, `AñoCont`, `MesCont`, `PmaTom`, ...).
-   * **Extracto SAP BW de reales** con la misma estructura de columnas que `PptoTecnico2027.csv` (`/ERP/GL_ACCT`, `/ERP/AMOUNT`,
-     `/ERP/PROFTCTR`, `/ERP/FUNCAREA`, `ZTIPOREAS`, `ZCEDENTE`, `ZCONTRATO`, `0CALMONTH`, `ZREGIONRP`, ...), pero de la categoría de **reales**.
-3. **Incluya en la extracción nueva los últimos 2 o 3 meses que ya están en la Base_1 previa.** Esos meses de traslape son la prueba,
-   con datos, de que la consulta nueva tiene la misma definición que la Base_1 (cuentas, signo, LLAVE, ramo).
-4. `python 0a_Actualizar_Base1.py --dry-run` → revisar el libro `Outputs\Actualizacion_Base1\Control_Actualizacion_Base1_{fecha}.xlsx`.
-5. `python 0a_Actualizar_Base1.py` → escribe `Inputs\Redistribucion\Hist_Real_LLAVE_Ramo.csv` (el insumo por defecto de la redistribución)
-   y `Base_1_Actualizada.xlsx` (para `Base1_global.py`, si cabe en Excel).
+```
+python 0a_Actualizar_Base1.py
+python 0_Redistribucion_TEV_HyOR.py
+```
 
-Reglas del script:
+1. **`0a_Actualizar_Base1.py` arma la Base_1.** Busca solo:
+   * la Base_1 más reciente (`Base_1*.xlsx/csv` en `Inputs`, `Inputs\Redistribución` u `Outputs`), que nunca se modifica;
+   * los CtaMens de cada año en `Outputs`, el más reciente por año: `BD_CtaMens_MMAA*.xlsx` (año 20AA) y `CtaMens_AAAA_*.xlsx`;
+   * archivos reales nuevos, si existen, en `Inputs\Redistribución\Base1_Nueva` (extracto SAP BW de reales o formato Base_1).
+
+   Escribe `Inputs\Redistribución\Base_1_{fecha}.csv` y `.xlsx` con la columna `FUENTE` (REAL o PPTO) y el libro
+   `Outputs\Actualizacion_Base1\Control_Actualizacion_Base1_{fecha}.xlsx`.
+2. **`0_Redistribucion_TEV_HyOR.py` redistribuye y escribe la base.** Toma la Base_1 más reciente (prefiere el csv) y el CtaMens del
+   presupuesto 2026 aprobado, aplica los criterios fijos y escribe `Inputs\PptoTecnico2027_Red.csv`. El diagnóstico queda en
+   `Outputs\Redistribucion_TEV_HyOR\Trazabilidad_Redistribucion_TEV_HyOR_{fecha}.xlsx`.
+3. **CtaMens.** Apunte `CtaMens.py` a `PptoTecnico2027_Red.csv` (o corra la redistribución con `--sobrescribir-input`, que respalda el
+   original en `Inputs\Backups`). **Dos pasadas:** pasada 1 → regenerar `xDnCostoXL`, `xDnRecup`, `xDnEvCat`, `xDnAttritional` con la base
+   redistribuida → pasada 2.
+
+Con cada corrida de `0a_Actualizar_Base1.py` se genera una Base_1 nueva con fecha; la redistribución siempre toma la más reciente.
+
+### Reglas de la Base_1
 
 | Tema | Regla |
 |---|---|
-| Unión | Los meses (AñoCont, MesCont) que trae la información nueva **reemplazan completos** a los mismos meses de la previa; no se suman. Los demás meses de la previa quedan intactos. |
-| Traslape | Por métrica y por DescRamo, la nueva debe reproducir a la previa en los meses comunes (tolerancia 1 %). Si no cuadra, no escribe la base. `--aceptar-traslape "justificación"` permite escribir dejando constancia. Un extracto SAP sin traslape se detiene salvo `--sin-traslape "justificación"`. |
-| Cuentas (SAP) | Prefijo 61 → `PmaTom`, 53 → `CosTom`, 54 → `SinTom`. Otras cuentas quedan fuera y se reportan en `GL_NoMap_*`. `--mapa-gl` cambia el mapa (columnas GL, METRICA, SIGNO). |
-| Signo (SAP) | Primas ×(−1) para pasar de la convención SAP a la de la Base_1. Si el traslape muestra exactamente el signo contrario, se corrige y se documenta. Un `--signo` explícito del usuario nunca se corrige. |
-| Categoría, moneda, sociedad | Si el extracto trae más de una, se detiene; se elige con `--filtro COLUMNA=VALOR`. Una categoría de presupuesto (`PRES…`) se rechaza. |
-| LLAVE | `ZTIPOREAS-ZCEDENTE-ZCONTRATO-FUNCAREA`, contrato nulo = 0 (misma regla que CtaMens y la redistribución). |
-| DescRamo | Desde el CeBe: `--mapa-descramo`, luego lo que diga la Base_1 previa, luego `Subramo.csv`; siempre con la ortografía de la previa. Un CeBe sin ramo o un DescRamo que no existe en la previa detiene la corrida (`--permitir-descramo-nuevo` si de verdad es un ramo nuevo). |
-| Demás columnas | Directas del extracto (TipoRea, Susc, ...), `Territorio` con `Pais.csv`, o **aprendidas de la previa** sólo si allí la relación es unívoca (por FUNCAREA, DescRamo o LLAVE). Lo no derivable queda vacío, no en cero; las retenidas (`PmaRet`, `SinRet`, `CosRet`) quedan vacías para los meses nuevos de un extracto SAP. La hoja `Llenado_Columnas` dice cómo se llenó cada columna. |
-| Meses que no pueden ser reales | Los periodos de la Base_1 previa posteriores a la fecha de guardado del archivo (p.ej. meses de 2026 en una Base_1 guardada en diciembre de 2025) se excluyen de la historia y se listan en la hoja `Previa_Excluida`; su real debe venir en la información nueva. `--conservar-posteriores` los deja. La redistribución aplica la misma regla: excluye de los años base los años posteriores a la fecha del archivo de histórico. |
-| Carpeta | `Inputs\\Redistribucion` se acepta con o sin acento. |
-| Periodo | `0CALMONTH` (AAAAMM o MM.AAAA); si no viene, `0FISCPER` con variante K4. Periodos especiales 13-16 detienen la corrida salvo `--especiales-a-diciembre`. |
+| FUENTE | Cada fila dice si es REAL (contabilizado) o PPTO (presupuesto de un CtaMens, con el nombre del archivo). Sólo REAL alimenta los pesos; PPTO 2026 alimenta el respaldo. |
+| El real manda | Un presupuesto nunca reemplaza meses que ya son reales (ni de la Base_1 previa ni de archivos reales nuevos). Lo descartado queda en la hoja `PPTO_Descartado`. |
+| Meses que no pueden ser reales | Si la Base_1 previa no trae `FUENTE`, sus meses posteriores a la fecha en que se guardó el archivo se excluyen (hoja `Previa_Excluida`). |
+| CtaMens → Base_1 | LLAVE = ZTIPOREAS-ZCEDENTE-ZCONTRATO-FUNCAREA; AñoCont/MesCont desde PERIODO o CALMONTH; DescRamo desde la columna RAMO/RamoN del CtaMens, con la ortografía de la previa cuando coincide; Territorio y FUNCAREA_2 directos; `PmaTom`/`CosTom`/`SinTom` desde GL 61/53/54 y `PmaRet`/`CosRet`/`SinRet` desde la columna RETENIDA; el signo se alinea con el de la parte REAL de la previa. |
+| Real nuevo (SAP o Base_1) | Debe traer 2 o 3 meses que ya estén como reales en la previa; si esos meses no cuadran (1 % por métrica y por ramo), no se escribe la base. |
+| Cuadre | Previa − reemplazada + nueva = final, por métrica (hoja `Cuadre`). |
 
-Hojas del libro de control: `Resumen`, `Fallas`, `Cuadre` (previa − reemplazada + nueva = final, por métrica), `Traslape`, `Periodos`,
-`Meses_por_Anio` (para saber si el año en curso llega a 8 meses), `Particip_TEV_HyOR` (participación de Terremoto por año, para comparar con
-la serie histórica), `Llenado_Columnas`, `LLAVEs_Nuevas`, `GL_NoMap_*`, `DescRamo_*`.
+### Archivos del diagnóstico de la redistribución que conviene leer primero
 
-## 1. Dónde se corre y en qué orden
+* `Resumen`: participación de Terremoto y HyORH antes y después, fuentes usadas, controles.
+* `Alcance_LLAVEs`: decisión, caso, fuente del peso y alertas de cada negocio.
+* `Ajustadas_Con_Alertas` y `Validar_SIREC`: lo que conviene revisar.
+* `LLAVEs_Sin_Peso`: negocios sin ningún dato propio (no se ajustan).
+
+## 1. Estructura de carpetas
 
 ```
 5_Generacion/
+├── 0a_Actualizar_Base1.py, 0_Redistribucion_TEV_HyOR.py, sirec_conexion.py, CtaMens.py
 ├── Inputs/
 │   ├── PptoTecnico2027.csv                 <- insumo original (no se modifica salvo --sobrescribir-input)
-│   ├── PptoTecnico2027_Red.csv             <- SALIDA del script: mismas 45 columnas y orden
-│   ├── Subramo.csv, Pais.csv, Cesion.csv, CesionPI.csv, Porc_Cesión_Hist.xlsx   <- insumos de CtaMens (opcionales: si están, se verifican)
-│   └── Redistribucion/
-│       ├── Hist_Real_LLAVE_Ramo.csv        <- histórico REAL por LLAVE, ramo, año y mes (ver §3)   [opción A, recomendada]
-│       ├── Pesos_Ramo_TEV_HyOR.xlsx        <- tabla de pesos ya calculada / congelada (hoja "Pesos") [opción B, corrida productiva]
-│       ├── TD.xlsx                         <- TD con el formato 2026 (hoja "TD")                   [opción C]
-│       └── Layout_Redistribucion.xlsx      <- decisiones documentadas (EXCLUIR / INCLUIR / FORZAR)  [opcional]
-├── 2_CostosXL/xMatCostoXL.xlsx, xDnCostoXL.xlsx, xDnRecup.xlsx    <- opcionales: verificación de la firma XL de los clones
-├── 3_EvCat/xDnEvCat.xlsx, xDnAttritional.xlsx                      <- opcionales: verificación de PROFTCTR+región de los clones
-└── Outputs/Redistribucion_TEV_HyOR/
-    ├── Trazabilidad_Redistribucion_TEV_HyOR_{fecha}.xlsx   (sufijo _CONTROL_FALLIDO si un control detuvo la corrida)
-    ├── Detalle_Filas_{fecha}.csv
-    ├── Log_Redistribucion_{fecha}.txt
-    ├── ERROR_{fecha}.txt                   <- sólo si la corrida se detuvo con error
-    └── registro_salidas.txt                <- sha256 de cada csv generado (anti doble aplicación)
+│   ├── PptoTecnico2027_Red.csv             <- SALIDA de la redistribución: mismas columnas y orden
+│   ├── Base_1.xlsx                         <- Base_1 original (dic-2025)
+│   ├── Subramo.csv, Pais.csv, Cesion.csv, CesionPI.csv, Porc_Cesión_Hist.xlsx
+│   └── Redistribución/                     <- con o sin acento
+│       ├── Base_1_{fecha}.csv / .xlsx      <- SALIDA de 0a_Actualizar_Base1.py
+│       ├── Base1_Nueva/                    <- opcional: reales nuevos (SAP BW o formato Base_1)
+│       └── Layout_Redistribucion.xlsx      <- opcional: decisiones documentadas (EXCLUIR / FORZAR / INCLUIR)
+├── 2_CostosXL/ y 3_EvCat/                  <- matrices que se verifican y se regeneran entre pasadas de CtaMens
+└── Outputs/
+    ├── BD_CtaMens_0526_1.xlsx, CtaMens_2027_5.xlsx   <- CtaMens de cada año (se leen, no se mueven)
+    ├── Actualizacion_Base1/                <- control y log de la Base_1
+    └── Redistribucion_TEV_HyOR/            <- trazabilidad, detalle fila a fila, log, registro sha256
 ```
-
-Orden de ejecución:
-
-1. Confirmar que `PptoTecnico2027.csv` es el extracto SAP original. `python 0_Redistribucion_TEV_HyOR.py --dry-run` → revisar
-   `Alcance_LLAVEs`, `LLAVEs_Revisar`, `LLAVEs_Sin_Peso`, `Sensibilidad_Metodos`, `Validacion_Tendencia`, y en el log la cobertura y la tolerancia sugerida.
-2. Resolver con el negocio los casos `REVISAR` y `SIN_PESO`; capturar las decisiones en el Layout (con justificación).
-3. Aprobar por escrito los parámetros; opcionalmente congelar `Pesos_Aplicados` como `Pesos_Ramo_TEV_HyOR.xlsx`.
-4. Corrida productiva: `python 0_Redistribucion_TEV_HyOR.py --aprobacion "Nombre, fecha"`. Revisar `Control_Participacion`,
-   `Control_Share_LLAVE`, `Combos_Nuevos`, `Combos_Desaparecen` y `Verif_Insumos_CtaMens`; completar las llaves de cesión que falten.
-5. En `CtaMens.py` cambiar `xFile` a `PptoTecnico2027_Red.csv` (o correr con `--sobrescribir-input`, que copia el original a
-   `Inputs/Backups/PptoTecnico2027_PreRedist_{fecha}.csv` y escribe el redistribuido con el nombre original).
-6. **Dos pasadas de CtaMens:** pasada 1 → regenerar `xDnCostoXL`, `xDnRecup`, `xDnEvCat`, `xDnAttritional` con la base redistribuida → pasada 2.
-
-Desde la v1.3 el script toma como carpeta de trabajo la carpeta donde está guardado (`5_Generacion`, junto a `CtaMens.py`), así que no hay que editar rutas. Si ahí no existe la carpeta `Inputs`, usa la ruta estilo `CtaMens.py` (`C:\Users\{usuario}\OneDrive - GPV\...\2027\5_Generacion`).
-Cualquier ruta o parámetro se puede sobreescribir por línea de comandos: `python 0_Redistribucion_TEV_HyOR.py --help`.
-Si se corre por doble clic, la ventana se queda abierta al terminar y cualquier error queda en el log y en `ERROR_{fecha}.txt`.
 
 ## 2. Parámetros metodológicos (bloque `DEFAULTS` del script)
 
@@ -86,18 +75,21 @@ Si se corre por doble clic, la ventana se queda abierta al terminar y cualquier 
 |---|---|---|
 | `ramos` | `[71, 73]` | Ramos entre los que se redistribuye. Bidireccional (71→73 y 73→71). |
 | `anio_decision` | `2027` | Año fiscal sobre el que se decide el alcance (el que filtra CtaMens). El reparto se aplica a `anios_fiscales`. |
-| `anios_base` | `[2025, 2026]` | Años del histórico real que alimentan los pesos. |
+| `hist` | `AUTO` | La Base_1 más reciente (o una ruta con `--hist`). |
+| `ppto_previo` | `AUTO` | CtaMens del presupuesto aprobado del año anterior en `Outputs` (respaldo de pesos); `''` para no usarlo. |
+| `modo_decision` | `fijo` | Criterios fijos: todo lo que difiere más que la tolerancia se ajusta y las cautelas quedan como `ALERTAS`. `revisar` = comportamiento v1. |
+| `anios_base` | `AUTO` | Los 2 últimos años REALES completos anteriores al año de decisión (hoy 2024 y 2025). |
 | `metodo_pesos` | `ponderado` | `ponderado`: suma de \|montos\| de los años base válidos. `ultimo`: último año válido. `promedio_simple`: promedio de las participaciones anuales. |
-| `min_meses_anio` | `8` | Si el histórico trae el mes, un año base con menos meses registrados se excluye (precedente 2026: INCOMPLETE_MONTHS < 8). |
-| `tolerancia` | `0.05` | Se ajusta cuando la participación del ramo 73 difiere de la de los pesos en más de 5 pp. También define la reclasificación total. El log reporta una tolerancia sugerida por el dato (p90 del rango interanual) cuando el histórico tiene ≥ 3 años. |
+| `min_meses_anio` | `8` | Un año base cuenta si la **base** tiene información real en al menos 8 meses de ese año (completitud del corte, no de cada negocio). |
+| `tolerancia` | `0.05` | Se ajusta cuando la participación del ramo 73 (HyORH) difiere de la de los pesos en más de 5 pp. También define la reclasificación total. El log reporta una tolerancia sugerida por el dato (p90 del rango interanual) cuando el histórico tiene ≥ 3 años. |
 | `modo_alcance` | `auto` | `auto`: reglas + layout. `layout`: sólo las LLAVEs del layout. |
-| `ajustar_split_explicito` | `False` | Una LLAVE que **ya trae ambos ramos** queda en `REVISAR`; se ajusta sólo con `INCLUIR`. |
-| `reclasificacion_total` | `revisar` | Histórico ≥ 1−tolerancia en un ramo vs presupuesto ≥ 1−tolerancia en el otro → `REVISAR` (`auto` lo aplica). |
+| `ajustar_split_explicito` | `False` | Una LLAVE que **ya trae ambos ramos** queda en alerta (en modo `revisar`: `REVISAR`); se ajusta sólo con `INCLUIR`. |
+| `reclasificacion_total` | `revisar` | Histórico ≥ 1−tolerancia en un ramo vs presupuesto ≥ 1−tolerancia en el otro → alerta (en modo `revisar`: `REVISAR`) (`auto` lo aplica). |
 | `materialidad` | `0` | \|prima 71+73\| mínima (MXN) en el año de decisión para ajustar; 0 = sin filtro. Precedente 2026: 100,000 MXN anuales. |
-| `credibilidad_pct` | `0.10` | `REVISAR` si la prima histórica base es menor que el 10 % de la prima presupuestada del año de decisión (o que la materialidad). |
-| `banda_ratio` | `[1/3, 3]` | `REVISAR` si presupuesto ÷ último año real queda fuera de la banda. |
-| `revisar_sensibles` | `True` | `REVISAR` si los tres métodos de peso difieren más que la tolerancia o hay cambio estructural (un año base mono-ramo y otro bi-ramo). |
-| `revisar_facultativos` | `True` | ZTIPOREAS = 3 → `REVISAR` (la LLAVE agrupa varios contratos/corredores). Un contrato nulo en negocio no facultativo siempre queda en `REVISAR`. |
+| `credibilidad_pct` | `0.10` | alerta (en modo `revisar`: `REVISAR`) si la prima histórica base es menor que el 10 % de la prima presupuestada del año de decisión (o que la materialidad). |
+| `banda_ratio` | `[1/3, 3]` | alerta (en modo `revisar`: `REVISAR`) si presupuesto ÷ último año real queda fuera de la banda. |
+| `revisar_sensibles` | `True` | alerta (en modo `revisar`: `REVISAR`) si los tres métodos de peso difieren más que la tolerancia o hay cambio estructural (un año base mono-ramo y otro bi-ramo). |
+| `revisar_facultativos` | `True` | ZTIPOREAS = 3 → alerta (en modo `revisar`: `REVISAR`) (la LLAVE agrupa varios contratos/corredores). Un contrato nulo en negocio no facultativo siempre queda en `REVISAR`. |
 | `excluir_funcarea` | `["LN04004"]` | LN cuyo centro de beneficio reescribe CtaMens: fuera de alcance. |
 | `comisiones` | `propio` | Pesos propios del histórico de comisiones; si no los hay o son inválidos, los de primas (documentado en `ORIGEN_PESO`). Un `FORZAR` gobierna todos los tipos. Alternativas: `prima`, `no`. |
 | `siniestros` | `prima` | Los siniestros GL 54 de 71/73 (si existen) se reparten con los pesos de primas. Alternativas: `propio`, `no` (como en 2026). |
@@ -157,13 +149,13 @@ signos opuestos entre ramos → inválido). Las LLAVEs con tramo de contrato vac
 
 | DECISION | Cuándo | Qué hacer |
 |---|---|---|
-| `AJUSTAR` | Negocio cargado en un solo ramo, con pesos creíbles y estables, cuya participación difiere de la de los pesos en más de la tolerancia; o `INCLUIR`/`FORZAR` | Revisar en el dry-run junto con `Validacion_Tendencia`; después nada |
-| `REVISAR` | Ya trae ambos ramos; reclasificación total; histórico poco creíble o fuera de banda; pesos sensibles al método o cambio estructural; facultativo; contrato nulo en no facultativo; sin primas de referencia | Confirmar con el negocio y capturar `INCLUIR` (o `EXCLUIR`, o `FORZAR` con el slip) |
-| `NO_AJUSTAR` | Dentro de tolerancia, inmaterial, `EXCLUIR`, LN excluida, sin filas en el año de decisión, fuera del layout en modo `layout` | Nada |
-| `SIN_PESO` | No hay histórico válido ni layout | Conseguir el dato (histórico real o condición contractual → `FORZAR`) |
+| `AJUSTAR` | La participación presupuestada difiere de la del peso en más de la tolerancia (`CASO`: `MONO_RAMO`, `SPLIT_EXPLICITO` o `RECLASIFICACION_TOTAL`); o `INCLUIR`/`FORZAR` en el layout | Revisar `ALERTAS` cuando las haya; si una es fundada, `EXCLUIR` o `FORZAR` en el layout y volver a correr |
+| `NO_AJUSTAR` | Dentro de tolerancia, inmaterial, `EXCLUIR`, LN04004, sin filas en el año de decisión | Nada |
+| `SIN_PESO` | Sin peso contractual, ni real válido, ni presupuesto aprobado 2026 | Conseguir el dato (condición contractual → `FORZAR`) |
+| `REVISAR` | Sólo en `--modo-decision revisar` | Confirmar con `INCLUIR` / `EXCLUIR` |
 
-Cada fila trae los datos que sustentan la decisión: participación presupuestada y de los pesos, diferencia, prima histórica base, último real,
-razón presupuesto/real, años válidos, cambio estructural, sensibilidad, origen y fuente del peso, y si la estructura de ramos difiere en otros años fiscales.
+`FUENTE_PESO` dice de dónde salió el porcentaje (`HIST_ponderado` = real; `PPTO_APROBADO_2026` = respaldo; `LAYOUT_FORZADO` = contrato).
+`VALIDAR_SIREC` marca facultativos y contratos nulos, que conviene cotejar contrato por contrato con `sirec_conexion.py`.
 
 ## 5. Qué produce
 
@@ -223,3 +215,16 @@ congelada, respaldo, sólo FY 2027, sin `ZREGIONRP`, dry-run, fila original en c
 
 Desempeño (4 núcleos, 16 GB): 1.4 millones de filas con 6,580 LLAVEs ajustadas (peor caso): unos 220 s, de los cuales unos 60 s son controles
 y unos 50 s la trazabilidad. Memoria pico del orden de 3 a 4 GB por millón de filas.
+
+**Pruebas de la v2.0.** Los 24 casos de `03_casos_limite.py` corren con `--modo-decision revisar` para seguir midiendo el comportamiento v1.
+`pruebas/04_prueba_actualizar_base1.py` (20 verificaciones) prueba la Base_1: traslape, signos, categorías, CeBe sin ramo, formatos SAP y Base_1,
+periodos posteriores a la fecha del archivo y lectura por la redistribución. `pruebas/05_prueba_criterios_fijos.py` (15 verificaciones) prueba
+los criterios fijos: búsqueda de la Base_1 más reciente, traducción Terremoto = 71 / HyORH = 73, años base automáticos, peso real,
+respaldo con el presupuesto 2026 aprobado, `SIN_PESO`, tolerancia, que el presupuesto 2027 nunca sea peso y conservación del total.
+
+**Corrida con los archivos reales (16/10/2026).** Con el extracto LN04001/LN04002, la `BD_CtaMens_0526_1.xlsx` y el `CtaMens_2027_5.xlsx`:
+`0a_Actualizar_Base1.py` tarda unos 2 minutos (lectura de los dos xlsx) y reproduce la participación de Terremoto de cada CtaMens (54.08 % en
+2026 y 30.16 % en 2027); la redistribución tarda 31 s, ajusta 194 de 329 negocios y lleva Terremoto de 10.9 % a 46.1 % de la prima 2027 del
+extracto. Una verificación independiente confirmó totales por LLAVE-cuenta-año-mes intactos, filas de otros ramos idénticas y, en los 194
+negocios ajustados, una participación igual a la del presupuesto 2026 aprobado (diferencia máxima 0.000003). En esa corrida la Base_1 real era
+sintética; con la Base_1 real los negocios con real válido tomarán su peso del real.

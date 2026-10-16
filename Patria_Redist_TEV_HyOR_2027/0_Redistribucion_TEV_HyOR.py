@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-0_Redistribucion_TEV_HyOR.py  (versión 1.5)
+0_Redistribucion_TEV_HyOR.py  (versión 2.0)
 ============================================
 Redistribución de primas (GL 61), comisiones (GL 53) y, opcionalmente, siniestros (GL 54)
 entre los ramos 73 (Terremoto y Erupción Volcánica, TEV) y 71 (Hidrometeorológicos y Otros
@@ -30,10 +30,13 @@ Uso (rutas por defecto al estilo de CtaMens.py; todas se pueden sobreescribir po
 """
 
 import argparse
+import glob
+import unicodedata
 import getpass
 import hashlib
 import logging
 import os
+import re
 import shutil
 import sys
 import time
@@ -42,7 +45,7 @@ from datetime import datetime
 import numpy as np
 import pandas as pd
 
-VERSION = "1.5"
+VERSION = "2.0"
 
 # =============================================================================
 # PARÁMETROS (editar aquí o pasar por línea de comandos)
@@ -53,37 +56,40 @@ _aqui = os.path.dirname(os.path.abspath(__file__))
 # Carpeta de trabajo: donde vive este script (5_Generacion, junto a CtaMens.py); si ahí no hay carpeta Inputs, la ruta estilo CtaMens.
 xFolder = _aqui if os.path.isdir(os.path.join(_aqui, "Inputs")) else fr"C:\Users\{usuario}\OneDrive - GPV\Documentos\Planeación Financiera\Presupuestos\{zAño}\5_Generacion"
 # Carpeta de insumos de la redistribución: se acepta con o sin acento ("Redistribución" / "Redistribucion")
-xRed = next((fr"{xFolder}\Inputs\{n}" for n in ("Redistribucion", "Redistribución") if os.path.isdir(fr"{xFolder}\Inputs\{n}")), fr"{xFolder}\Inputs\Redistribucion")
+xRed = next((os.path.join(xFolder, "Inputs", n) for n in ("Redistribucion", "Redistribución") if os.path.isdir(os.path.join(xFolder, "Inputs", n))),
+            os.path.join(xFolder, "Inputs", "Redistribucion"))
 
 DEFAULTS = {
     # --- Entradas ---
-    "ppto":    fr"{xFolder}\Inputs\PptoTecnico{zAño}.csv",                           # mismo archivo que lee CtaMens.py
-    "hist":    fr"{xRed}\Hist_Real_LLAVE_Ramo.csv",          # histórico real (largo o ancho)
-    "pesos":   fr"{xRed}\Pesos_Ramo_TEV_HyOR.xlsx",          # alternativa: pesos ya calculados
-    "td":      fr"{xRed}\TD.xlsx",                           # alternativa: TD formato 2026
-    "layout":  fr"{xRed}\Layout_Redistribucion.xlsx",        # decisiones documentadas (opcional)
-    "subramo": fr"{xFolder}\Inputs\Subramo.csv",                                      # CeBe -> Ramo, Ramo2 (recomendado)
+    "ppto":    os.path.join(xFolder, "Inputs", f"PptoTecnico{zAño}.csv"),                           # mismo archivo que lee CtaMens.py
+    "hist":    "AUTO",                                       # AUTO = la Base_1 más reciente (Inputs, Inputs\Redistribución, Outputs); o una ruta
+    "ppto_previo": "AUTO",                                   # AUTO = CtaMens del presupuesto aprobado del año anterior en Outputs (BD_CtaMens_*/CtaMens_{año-1}_*); '' = no usar
+    "pesos":   os.path.join(xRed, "Pesos_Ramo_TEV_HyOR.xlsx"),          # alternativa: pesos ya calculados
+    "td":      os.path.join(xRed, "TD.xlsx"),                           # alternativa: TD formato 2026
+    "layout":  os.path.join(xRed, "Layout_Redistribucion.xlsx"),        # decisiones documentadas (opcional)
+    "subramo": os.path.join(xFolder, "Inputs", "Subramo.csv"),                                      # CeBe -> Ramo, Ramo2 (recomendado)
     # --- Insumos de CtaMens para las verificaciones previas (opcionales: si el archivo existe se usa) ---
-    "pais":        fr"{xFolder}\Inputs\Pais.csv",
-    "cesion":      fr"{xFolder}\Inputs\Cesion.csv",
-    "cesionpi":    fr"{xFolder}\Inputs\CesionPI.csv",
-    "cesion_hist": fr"{xFolder}\Inputs\Porc_Cesión_Hist.xlsx",
-    "matxl":       fr"{xFolder}\2_CostosXL\xMatCostoXL.xlsx",
-    "dncostoxl":   fr"{xFolder}\2_CostosXL\xDnCostoXL.xlsx",
-    "dnrecup":     fr"{xFolder}\2_CostosXL\xDnRecup.xlsx",
-    "evcat":       fr"{xFolder}\3_EvCat\xDnEvCat.xlsx",
-    "attritional": fr"{xFolder}\3_EvCat\xDnAttritional.xlsx",
+    "pais":        os.path.join(xFolder, "Inputs", "Pais.csv"),
+    "cesion":      os.path.join(xFolder, "Inputs", "Cesion.csv"),
+    "cesionpi":    os.path.join(xFolder, "Inputs", "CesionPI.csv"),
+    "cesion_hist": os.path.join(xFolder, "Inputs", "Porc_Cesión_Hist.xlsx"),
+    "matxl":       os.path.join(xFolder, "2_CostosXL", "xMatCostoXL.xlsx"),
+    "dncostoxl":   os.path.join(xFolder, "2_CostosXL", "xDnCostoXL.xlsx"),
+    "dnrecup":     os.path.join(xFolder, "2_CostosXL", "xDnRecup.xlsx"),
+    "evcat":       os.path.join(xFolder, "3_EvCat", "xDnEvCat.xlsx"),
+    "attritional": os.path.join(xFolder, "3_EvCat", "xDnAttritional.xlsx"),
     # --- Salidas ---
-    "salida":  fr"{xFolder}\Inputs\PptoTecnico{zAño}_Red.csv",
-    "out_dir": fr"{xFolder}\Outputs\Redistribucion_TEV_HyOR",
+    "salida":  os.path.join(xFolder, "Inputs", f"PptoTecnico{zAño}_Red.csv"),
+    "out_dir": os.path.join(xFolder, "Outputs", "Redistribucion_TEV_HyOR"),
     # --- Metodología ---
     "ramos": [71, 73],              # ramos entre los que se redistribuye (bidireccional)
     "anio_decision": zAño,          # año fiscal sobre el que se decide el alcance (el que filtra CtaMens); el reparto aplica a anios_fiscales
-    "anios_base": [2025, 2026],     # años del histórico real que alimentan los pesos (un año parcial se excluye si trae menos de min_meses_anio meses)
+    "anios_base": "AUTO",           # AUTO = los 2 últimos años REALES completos (>= min_meses_anio meses en la base) anteriores al año de decisión
     "metodo_pesos": "ponderado",    # 'ponderado' (suma de |montos| de los años base válidos) | 'ultimo' (último año válido) | 'promedio_simple'
-    "min_meses_anio": 8,            # si el histórico trae el mes: un año base con menos meses registrados se excluye (precedente 2026: INCOMPLETE_MONTHS < 8)
+    "min_meses_anio": 8,            # un año base cuenta si la BASE tiene al menos 8 meses con información en ese año (completitud del corte, no de cada negocio)
     "tolerancia": 0.05,             # 5 puntos porcentuales de diferencia entre participación presupuestada y de los pesos
     "modo_alcance": "auto",         # 'auto' (reglas + layout) | 'layout' (sólo LLAVEs del layout)
+    "modo_decision": "fijo",        # 'fijo': criterios fijos, todo lo que difiere > tolerancia se AJUSTA y las cautelas quedan como ALERTAS | 'revisar': modo v1 (REVISAR)
     "ajustar_split_explicito": False,   # False: una LLAVE que YA trae ambos ramos (partición explícita del cargador) queda en REVISAR
     "reclasificacion_total": "revisar", # 'revisar': histórico >= 1-tolerancia en un ramo vs presupuesto >= 1-tolerancia en el otro -> REVISAR | 'auto'
     "materialidad": 0.0,            # |prima 71+73| mínima (MXN) en el año de decisión para ajustar; 0 = sin filtro (precedente 2026: 100,000 MXN)
@@ -243,15 +249,43 @@ def ramo_desde_proftctr(serie, subramo_df=None, columna="Ramo"):
     return ramo
 
 
+# Texto del ramo -> código. Se llena desde Subramo.csv (RamoN -> Ramo2), que es como lo hace CtaMens. Respaldo, verificado en
+# BD_CtaMens 2026 y CtaMens 2027: A071000000 = 'Terremoto' (71) y A073000000 = 'HyORH' (73).
+RAMO_POR_TEXTO = {}
+
+
+def _txt(v):
+    return unicodedata.normalize("NFKD", str(v)).encode("ascii", "ignore").decode("ascii").strip().upper()
+
+
+def cargar_ramo_por_texto(subramo_df, log):
+    RAMO_POR_TEXTO.clear()
+    if subramo_df is None or not {"RamoN"}.issubset(subramo_df.columns):
+        return
+    col = "Ramo2" if "Ramo2" in subramo_df.columns else ("Ramo" if "Ramo" in subramo_df.columns else None)
+    if col is None:
+        return
+    t = subramo_df.dropna(subset=["RamoN", col]).assign(K=lambda d: d["RamoN"].map(_txt), V=lambda d: pd.to_numeric(d[col], errors="coerce"))
+    t = t.dropna(subset=["V"])
+    for k, g in t.groupby("K"):
+        vals = sorted(set(g["V"].astype(int)))
+        if len(vals) == 1:
+            RAMO_POR_TEXTO[k] = float(vals[0])
+    log.info("Ramo por texto (Subramo.csv RamoN -> %s): %s", col, {k: int(v) for k, v in RAMO_POR_TEXTO.items() if v in (71.0, 73.0)})
+
+
 def ramo_desde_texto(v):
-    """'Terremoto'/'TEV' -> 73 ; 'HYORH'/'HyOR'/'Hidro...' -> 71 ; número -> número ; otro -> NaN"""
+    """Texto del ramo -> código, con Subramo.csv (RamoN -> Ramo2). Respaldo: 'Terremoto'/'TEV' -> 71 ; 'HYORH'/'HyOR'/'Hidro...' -> 73."""
     if pd.isna(v):
         return np.nan
-    s = str(v).strip().lower()
+    k = _txt(v)
+    if k in RAMO_POR_TEXTO:
+        return RAMO_POR_TEXTO[k]
+    s = k.lower()
     if s.startswith("terr") or s == "tev":
-        return 73
-    if s.startswith("hyor") or s.startswith("hidro") or s.startswith("hyo"):
-        return 71
+        return 71.0
+    if s.startswith("hyo") or s.startswith("hidro"):
+        return 73.0
     try:
         return float(s)
     except ValueError:
@@ -329,11 +363,13 @@ def _detectar(up, candidatos):
     return next((up[k] for k in candidatos if k in up), None)
 
 
-def preparar_hist(hist, ramos, log):
+def preparar_hist(hist, ramos, log, cod_archivo=None):
     """
     Normaliza el histórico real: devuelve (h, meses) con
       h     = LLAVE, RAMO, TIPO, ANIO, MONTO (agregado por año; todos los años, sin filtrar por años base)
-      meses = (LLAVE, TIPO, ANIO) -> número de meses distintos registrados (None si el histórico no trae mes)
+      meses = ANIO -> número de meses con información en la BASE completa (todas las LLAVEs y ramos) para filas REALES (None si no trae mes)
+    ORIGEN: 'REAL' o 'PPTO' según la columna FUENTE (Base_1 generada por 0a_Actualizar_Base1.py). Sin FUENTE, los periodos posteriores
+    a la fecha de guardado del archivo (cod_archivo = AAAAMM) no pueden ser reales y se marcan 'FUERA' (no se usan).
     Acepta: LLAVE o sus 4 componentes; RAMO numérico, PROFTCTR/CeBe o DescRamo texto; ANIO/AñoCont o CALMONTH/PERIODO (AAAAMM);
     GL/TIPO/TY + MONTO, o formato ancho tipo Base_1 (PmaTom/CosTom/SinTom); columna Mes opcional.
     """
@@ -383,6 +419,20 @@ def preparar_hist(hist, ramos, log):
         per = a_num_estricto(h[cmes_full], cmes_full, ctx)
         h["ANIO"] = np.where(per > 9999, per // 100, per)
         h["MES"] = np.where(per > 9999, per % 100, np.nan)
+    # origen de cada fila: real o presupuesto
+    cfuente = _detectar(up, ["FUENTE"])
+    if cfuente is not None:
+        fu = h[cfuente].astype(str).str.strip().str.upper()
+        h["ORIGEN"] = np.where(fu.str.startswith("PPTO"), "PPTO", np.where(fu.str.startswith("REAL"), "REAL", "FUERA"))
+    elif cod_archivo is not None:
+        cod = h["ANIO"] * 100 + pd.Series(h["MES"], index=h.index).fillna(1)  # sin mes: basta con que el año no sea posterior al del archivo
+        h["ORIGEN"] = np.where(cod <= cod_archivo, "REAL", "FUERA")
+        nf = int((h["ORIGEN"] == "FUERA").sum())
+        if nf:
+            log.warning("%s: %s filas de periodos posteriores a la fecha del archivo (%s) no pueden ser reales y NO se usan (probablemente presupuesto).",
+                        ctx, nf, cod_archivo)
+    else:
+        h["ORIGEN"] = "REAL"
     # cuenta y monto (largo o ancho)
     if _detectar(up, ["TIPO", "GL", "GL_ACCT", "/ERP/GL_ACCT", "CUENTA", "TY", "GL2"]) is None:
         anchas = {}
@@ -407,20 +457,25 @@ def preparar_hist(hist, ramos, log):
             raise ErrorRedistribucion(f"{ctx}: necesita MONTO.")
         h["MONTO"] = a_num_estricto(h[cmonto], cmonto, ctx)
     h["MONTO"] = pd.to_numeric(h["MONTO"], errors="coerce").fillna(0.0)
+    meses = None
+    if h["MES"].notna().any():  # completitud del corte: meses con información en la base completa (todas las LLAVEs y ramos), sólo filas reales
+        mm = h[(h["MONTO"] != 0) & (h["ORIGEN"] == "REAL")].dropna(subset=["MES", "ANIO"])
+        meses = mm.groupby(mm["ANIO"].astype(int))["MES"].nunique().rename("N_MESES_BASE")
+        log.info("%s: meses con información real en la base por año: %s", ctx, meses.to_dict())
     presentes = {"años": sorted(h["ANIO"].dropna().astype(int).unique().tolist()), "ramos": sorted(h["RAMO"].dropna().unique().tolist()),
                  "tipos": sorted(h["TIPO"].dropna().unique().tolist())}
     h = h[h["RAMO"].isin(ramos) & h["TIPO"].notna() & h["ANIO"].notna() & (h["LLAVE"] != "")]
     if h.empty:
         raise ErrorRedistribucion(f"{ctx}: ninguna fila cae en ramos {ramos} con tipo de cuenta reconocido. Presentes en el archivo: {presentes}.")
-    meses = None
-    if h["MES"].notna().any():
-        meses = (h[h["MONTO"] != 0].dropna(subset=["MES"]).groupby(["LLAVE", "TIPO", "ANIO"])["MES"].nunique().rename("N_MESES"))
-        meses.index = meses.index.set_levels(meses.index.levels[2].astype(int), level=2)
-    h = h.groupby(["LLAVE", "RAMO", "TIPO", "ANIO"], as_index=False)["MONTO"].sum()
+    h = h.groupby(["LLAVE", "RAMO", "TIPO", "ANIO", "ORIGEN"], as_index=False)["MONTO"].sum()
     h["ANIO"] = h["ANIO"].astype(int)
-    log.info("Histórico normalizado: %s filas LLAVE-ramo-tipo-año | LLAVEs: %s | años: %s | con detalle mensual: %s | suma MONTO por tipo y ramo:\n%s",
-             len(h), h["LLAVE"].nunique(), sorted(h["ANIO"].unique().tolist()), meses is not None,
-             h.pivot_table(index="TIPO", columns="RAMO", values="MONTO", aggfunc="sum").round(2).to_string())
+    log.info("Histórico normalizado: %s filas LLAVE-ramo-tipo-año | LLAVEs: %s | años por origen: %s | con detalle mensual: %s | suma MONTO por tipo y ramo (REAL):\n%s",
+             len(h), h["LLAVE"].nunique(), {o: sorted(g["ANIO"].unique().tolist()) for o, g in h.groupby("ORIGEN")}, meses is not None,
+             h[h["ORIGEN"] == "REAL"].pivot_table(index="TIPO", columns="RAMO", values="MONTO", aggfunc="sum").round(2).to_string())
+    hp = h[(h["ORIGEN"] == "REAL") & (h["TIPO"] == "Primas")].pivot_table(index="ANIO", columns="RAMO", values="MONTO", aggfunc="sum").abs()
+    if len(hp.columns) == 2:
+        log.info("Participación del ramo %s en la prima REAL por año (comparar con la serie histórica de Terremoto): %s",
+                 int(min(ramos)), (hp[min(ramos)] / hp.sum(axis=1)).round(4).to_dict())
     return h, meses
 
 
@@ -464,12 +519,12 @@ def pesos_desde_hist(h, meses, ramos, anios_base, metodo, min_meses, log):
         raise ErrorRedistribucion(f"{ctx}: ningún registro en los años base {anios_base}; años presentes: {presentes}. Revise --anios-base.")
     wide, signo_ok, no_cero = _wide_hist(h, ramos)
     completo = pd.Series(True, index=wide.index)
-    if meses is not None:
-        nm = meses.reindex(wide.index)
-        completo = nm.isna() | (nm >= min_meses)
+    if meses is not None:  # meses = ANIO -> meses con información en la base completa
+        nm = pd.Series(wide.index.get_level_values("ANIO").astype(int)).map(meses).values
+        completo = pd.Series(pd.isna(nm) | (nm >= min_meses), index=wide.index)
     valido_anio = signo_ok & no_cero & completo
     excl = wide[~valido_anio].reset_index()[["LLAVE", "TIPO", "ANIO"]].copy()
-    por = np.where(~signo_ok[~valido_anio].values, "signos opuestos entre ramos", np.where(~no_cero[~valido_anio].values, "suma cero", f"menos de {min_meses} meses registrados"))
+    por = np.where(~signo_ok[~valido_anio].values, "signos opuestos entre ramos", np.where(~no_cero[~valido_anio].values, "suma cero", f"la base tiene menos de {min_meses} meses en ese año"))
     excl["POR"] = por
     motivos_excl = (excl.assign(txt=lambda d: "año " + d["ANIO"].astype(int).astype(str) + " excluido (" + d["POR"] + ")")
                         .groupby(["LLAVE", "TIPO"])["txt"].agg("; ".join)) if len(excl) else pd.Series(dtype=str)
@@ -825,10 +880,13 @@ def tabla_alcance(df, c_amt, c_fy, pesos, pesos_ef, sens, decisiones, ramos, p, 
         ratio = (ppto_abs / monto_ult) if (pd.notna(monto_ult) and monto_ult > 0) else np.nan
         cred_min = max(p["materialidad"], p["credibilidad_pct"] * ppto_abs)
         funcarea = str(atrib.loc[llave, "FUNCAREA_LL"]); facultativo = str(atrib.loc[llave, "ZTIPOREAS_LL"]) == "3"
+        caso, cautelas = "", []
+        contrato_nulo = str(atrib.loc[llave, "ZCONTRATO_LL"]) == "0"
+        fuente_ll = str(fuente.get(llave, ""))
         if acc == "EXCLUIR":
             dec, mot = "NO_AJUSTAR", f"Layout EXCLUIR: {just}"
         elif not tiene_peso:
-            dec, mot = "SIN_PESO", "sin histórico/pesos válidos de primas para esta LLAVE (requiere información del negocio: layout FORZAR o histórico)"
+            dec, mot = "SIN_PESO", "sin pesos válidos de primas (ni real ni presupuesto aprobado del año anterior): se deja como viene; layout FORZAR si se conoce el reparto"
         elif not en_anio:
             dec, mot = "NO_AJUSTAR", f"sin filas de ramos {ramos} con monto en el año de decisión {anio}"
         elif modo == "layout" and acc is None:
@@ -837,7 +895,7 @@ def tabla_alcance(df, c_amt, c_fy, pesos, pesos_ef, sens, decisiones, ramos, p, 
             dec, mot = "AJUSTAR", f"Layout {acc}: {just}"
         elif funcarea in [x.upper() for x in p["excluir_funcarea"]]:
             dec, mot = "NO_AJUSTAR", f"LN {funcarea} excluida (CtaMens reescribe su PROFTCTR con CAT_LN4004)"
-        elif tipo_ref != "Primas":
+        elif tipo_ref != "Primas" and p["modo_decision"] == "revisar":
             dec, mot = "REVISAR", f"sin primas de referencia en ramos {ramos} (sólo {tipo_ref}); confirmar con INCLUIR si procede"
         elif pd.isna(diff):
             dec, mot = "NO_AJUSTAR", "no se pudo calcular la participación"
@@ -845,32 +903,43 @@ def tabla_alcance(df, c_amt, c_fy, pesos, pesos_ef, sens, decisiones, ramos, p, 
             dec, mot = "NO_AJUSTAR", f"dentro de tolerancia (diferencia {abs(diff):.1%})"
         elif p["materialidad"] > 0 and ppto_abs < p["materialidad"]:
             dec, mot = "NO_AJUSTAR", f"inmaterial: |prima 71+73 {anio}| = {ppto_abs:,.0f} < materialidad {p['materialidad']:,.0f}"
-        elif recl_total and p["reclasificacion_total"] != "auto":
-            dec, mot = "REVISAR", f"reclasificación total (histórico {abs(share_hist):.1%} en {r_ref} vs presupuesto {abs(share_ppto):.1%}, umbral 1-tolerancia): confirmar con INCLUIR"
-        elif not es_layout and pd.notna(monto_hist) and monto_hist < cred_min:
-            dec, mot = "REVISAR", f"histórico poco creíble: |prima histórica base| = {monto_hist:,.0f} < {cred_min:,.0f} ({p['credibilidad_pct']:.0%} del presupuesto {anio} o materialidad)"
-        elif not es_layout and pd.notna(ratio) and not (p["banda_ratio"][0] <= ratio <= p["banda_ratio"][1]):
-            dec, mot = "REVISAR", f"presupuesto {anio} / último real anual = {ratio:.2f} fuera de la banda [{p['banda_ratio'][0]:.2f}, {p['banda_ratio'][1]:.2f}]"
-        elif not es_layout and p["revisar_sensibles"] and (cambio or es_sensible):
-            det = ""
-            if sens_det is not None and llave in sens_det.index:
-                det = " | " + ", ".join(f"{c.replace('W' + str(r_ref) + '_', '')}={sens_det.loc[llave, c]:.3f}" for c in sens_det.columns if c.startswith(f"W{r_ref}_"))
-            dec, mot = "REVISAR", ("cambio estructural entre años base (un año mono-ramo y otro bi-ramo)" if cambio else "pesos sensibles al método") + f": confirmar con INCLUIR (opcionalmente METODO){det}"
-        elif str(atrib.loc[llave, "ZCONTRATO_LL"]) == "0" and not facultativo:
-            dec, mot = "REVISAR", "contrato nulo en negocio no facultativo: la LLAVE agrupa varios contratos distintos; pedir el número de contrato a la LN y confirmar con INCLUIR o FORZAR"
-        elif facultativo and p["revisar_facultativos"]:
-            dec, mot = "REVISAR", "facultativo: la LLAVE agrupa varios contratos/corredores de la cedente; confirmar con INCLUIR o aportar el slip (FORZAR)"
-        elif tiene_ambos and not p["ajustar_split_explicito"]:
-            dec, mot = "REVISAR", f"la LLAVE ya trae ambos ramos (partición explícita del cargador, participación {share_ppto:.1%} vs histórica {share_hist:.1%}): confirmar con INCLUIR"
         else:
-            dec, mot = "AJUSTAR", f"cargada en un solo ramo; |participación ppto - histórica| = {abs(diff):.1%} > tolerancia {tol:.1%}"
+            caso = "RECLASIFICACION_TOTAL" if recl_total else ("SPLIT_EXPLICITO" if tiene_ambos else "MONO_RAMO")
+            # cautelas: en modo 'revisar' (v1) detienen el ajuste; en modo 'fijo' (defecto) se ajusta y quedan como ALERTAS para el diagnóstico
+            if tipo_ref != "Primas":
+                cautelas.append(f"sin primas de referencia en ramos {ramos} (sólo {tipo_ref})")
+            if recl_total and p["reclasificacion_total"] != "auto":
+                cautelas.append(f"reclasificación total (peso {abs(share_hist):.1%} en {r_ref} vs presupuesto {abs(share_ppto):.1%})")
+            if not es_layout and pd.notna(monto_hist) and monto_hist < cred_min:
+                cautelas.append(f"histórico poco creíble: |prima base| = {monto_hist:,.0f} < {cred_min:,.0f} ({p['credibilidad_pct']:.0%} del presupuesto {anio} o materialidad)")
+            if not es_layout and pd.notna(ratio) and not (p["banda_ratio"][0] <= ratio <= p["banda_ratio"][1]):
+                cautelas.append(f"presupuesto {anio} / último real anual = {ratio:.2f} fuera de la banda [{p['banda_ratio'][0]:.2f}, {p['banda_ratio'][1]:.2f}]")
+            if not es_layout and p["revisar_sensibles"] and (cambio or es_sensible):
+                det = ""
+                if sens_det is not None and llave in sens_det.index:
+                    det = " | " + ", ".join(f"{c.replace('W' + str(r_ref) + '_', '')}={sens_det.loc[llave, c]:.3f}" for c in sens_det.columns if c.startswith(f"W{r_ref}_"))
+                cautelas.append(("cambio estructural entre años base (un año mono-ramo y otro bi-ramo)" if cambio else "pesos sensibles al método") + det)
+            if contrato_nulo and not facultativo:
+                cautelas.append("contrato nulo en negocio no facultativo: la LLAVE agrupa varios contratos (validar en SIREC)")
+            if facultativo and p["revisar_facultativos"]:
+                cautelas.append("facultativo: la LLAVE agrupa varios contratos/corredores de la cedente (validar en SIREC)")
+            if tiene_ambos and not p["ajustar_split_explicito"]:
+                cautelas.append(f"la LLAVE ya trae ambos ramos (participación {share_ppto:.1%} vs peso {share_hist:.1%})")
+            if fuente_ll.startswith("PPTO_APROBADO"):
+                cautelas.append(f"peso tomado del presupuesto aprobado ({fuente_ll}) por falta de real válido")
+            if p["modo_decision"] == "revisar" and cautelas:
+                dec, mot = "REVISAR", cautelas[0] + ": confirmar con INCLUIR"
+            else:
+                dec, mot = "AJUSTAR", f"{caso}: |participación ppto - peso| = {abs(diff):.1%} > tolerancia {tol:.1%}"
         fila = {"LLAVE": llave, "ZTIPOREAS": atrib.loc[llave, "ZTIPOREAS_LL"], "ZCEDENTE": atrib.loc[llave, "ZCEDENTE_LL"],
                 "ZCONTRATO": atrib.loc[llave, "ZCONTRATO_LL"], "FUNCAREA": funcarea, "ANIO_DECISION": anio, "TIPO_REFERENCIA": tipo_ref,
                 "PPTO_TOTAL_REF_7173": tot[tipo_ref] if tipo_ref else 0.0, f"SHARE_{r_ref}_PPTO": share_ppto, f"SHARE_{r_ref}_PESO": share_hist,
                 "DIFERENCIA": diff, "TIENE_AMBOS_RAMOS": tiene_ambos, "PRIMA_HIST_BASE": monto_hist, "PRIMA_ULTIMO_REAL": monto_ult,
                 "RATIO_PPTO_ULTIMO_REAL": ratio, "N_ANIOS_VALIDOS": n_anios, "CAMBIO_ESTRUCTURAL": cambio, "SENSIBLE_METODO": es_sensible,
                 "RAMOS_OTROS_FY_DIFIEREN": bool(est_otros.get(llave, False)), "FUENTE_PESO": fuente.get(llave, ""), "ORIGEN_PESO": origen.get(llave, ""),
-                "TIPOS_CON_PESO": tipos_peso.get(llave, ""), "DECISION": dec, "MOTIVO": mot}
+                "TIPOS_CON_PESO": tipos_peso.get(llave, ""), "DECISION": dec, "MOTIVO": mot, "CASO": caso,
+                "ALERTAS": " | ".join(cautelas) if dec == "AJUSTAR" else "", "N_ALERTAS": len(cautelas) if dec == "AJUSTAR" else 0,
+                "VALIDAR_SIREC": bool(facultativo or contrato_nulo)}
         for t in TIPOS:
             for r in ramos:
                 fila[f"PPTO_{t}_{r}"] = float(fp.get((t, r), 0.0))
@@ -879,6 +948,10 @@ def tabla_alcance(df, c_amt, c_fy, pesos, pesos_ef, sens, decisiones, ramos, p, 
     log.info("Alcance (año de decisión %s): %s LLAVEs con ramos %s | AJUSTAR=%s | REVISAR=%s | NO_AJUSTAR=%s | SIN_PESO=%s", anio, len(al), ramos,
              int((al["DECISION"] == "AJUSTAR").sum()), int((al["DECISION"] == "REVISAR").sum()), int((al["DECISION"] == "NO_AJUSTAR").sum()),
              int((al["DECISION"] == "SIN_PESO").sum()))
+    aj = al[al["DECISION"] == "AJUSTAR"]
+    if len(aj):
+        log.info("AJUSTAR por caso: %s | con alertas: %s | por fuente del peso: %s", aj["CASO"].value_counts().to_dict(), int((aj["N_ALERTAS"] > 0).sum()),
+                 aj["FUENTE_PESO"].value_counts().to_dict())
     if (al["DECISION"] == "REVISAR").any():
         log.info("Motivos de REVISAR: %s", al[al["DECISION"] == "REVISAR"]["MOTIVO"].str.split(":").str[0].str.split("(").str[0].str.strip().value_counts().to_dict())
     return al
@@ -1225,25 +1298,90 @@ def verificar_insumos_ctamens(df_antes_prep, salida_prep, detalle, p, subramo_df
 
 
 # =============================================================================
+# BÚSQUEDA DE INSUMOS (la Base_1 más reciente; el CtaMens del presupuesto aprobado del año anterior)
+# =============================================================================
+def _carpeta_trabajo(p):
+    return os.path.dirname(os.path.dirname(os.path.abspath(p["ppto"])))  # ...\5_Generacion
+
+
+def buscar_base1_reciente(p):
+    base = _carpeta_trabajo(p)
+    dirs = [os.path.join(base, "Inputs"), os.path.join(base, "Inputs", "Redistribucion"), os.path.join(base, "Inputs", "Redistribución"),
+            os.path.join(base, "Outputs"), os.path.join(base, "Outputs", "Base_1")]
+    cands = []
+    for d in dirs:
+        for pat in ("Base_1*.csv", "Base_1*.xlsx", "Base1*.csv", "Base1*.xlsx", "Hist_Real_LLAVE_Ramo.csv", "Hist_Real_LLAVE_Ramo.xlsx"):
+            cands += [x for x in glob.glob(os.path.join(d, pat)) if not os.path.basename(x).startswith("~$")]
+    if not cands:
+        return "", dirs
+    # la más reciente; a igual nombre base, el csv (lectura más rápida)
+    cands = sorted(set(cands), key=lambda x: (max(os.path.getmtime(y) for y in cands if os.path.splitext(y)[0] == os.path.splitext(x)[0]), x.lower().endswith(".csv")), reverse=True)
+    return cands[0], dirs
+
+
+def buscar_ppto_previo(p):
+    """CtaMens del presupuesto del año anterior al de decisión en Outputs: CtaMens_{año}_*.xlsx/csv o BD_CtaMens_MMAA*.xlsx/csv; el más reciente."""
+    y = int(p["anio_decision"]) - 1
+    out = os.path.join(_carpeta_trabajo(p), "Outputs")
+    cands = []
+    for pat in (f"CtaMens_{y}*.xlsx", f"CtaMens_{y}*.csv", "BD_CtaMens_*.xlsx", "BD_CtaMens_*.csv"):
+        for x in glob.glob(os.path.join(out, pat)):
+            b = os.path.basename(x)
+            if b.startswith("~$"):
+                continue
+            m = re.match(r"BD_CtaMens_(\d{2})(\d{2})", b)
+            if m and 2000 + int(m.group(2)) != y:
+                continue
+            cands.append(x)
+    if not cands:
+        return ""
+    return max(cands, key=os.path.getmtime)
+
+
+def hist_desde_ctamens(path, ramos, subramo_df, anio, log):
+    """Montos del presupuesto aprobado (salida/BD de CtaMens) por LLAVE-ramo-tipo para el año indicado (ORIGEN='PPTO')."""
+    t0 = time.perf_counter()
+    d, _ = leer_tabla(path)
+    d.columns = [str(c).strip() for c in d.columns]
+    up = {c.upper(): c for c in d.columns}
+    cper = _detectar(up, ["PERIODO", "CALMONTH", "0CALMONTH"]); cgl = _detectar(up, ["TY", "GL_ACCT", "/ERP/GL_ACCT"])
+    camt = _detectar(up, ["MONTO", "AMOUNT", "/ERP/AMOUNT"]); cprof = _detectar(up, ["PROFTCTR", "/ERP/PROFTCTR"])
+    req = {"periodo": cper, "cuenta": cgl, "monto": camt, "PROFTCTR": cprof, "ZTIPOREAS": up.get("ZTIPOREAS"), "ZCEDENTE": up.get("ZCEDENTE"),
+           "ZCONTRATO": up.get("ZCONTRATO"), "FUNCAREA": _detectar(up, ["FUNCAREA", "/ERP/FUNCAREA"])}
+    falt = [k for k, v in req.items() if v is None]
+    if falt:
+        raise ErrorRedistribucion(f"Presupuesto previo {path}: faltan columnas {falt}.")
+    per = a_num_estricto(d[cper], cper, "Presupuesto previo")
+    d = d[(per // 100) == anio].copy()
+    if d.empty:
+        log.warning("Presupuesto previo %s: no trae periodos de %s; no se usa.", path, anio)
+        return pd.DataFrame(columns=["LLAVE", "RAMO", "TIPO", "ANIO", "ORIGEN", "MONTO"])
+    d["RAMO"] = ramo_desde_proftctr(d[cprof], subramo_df, "Ramo2" if (subramo_df is not None and "Ramo2" in subramo_df.columns) else "Ramo")
+    d["TIPO"] = d[cgl].map(normalizar_tipo)
+    d["LLAVE"] = construir_llave(d, req["ZTIPOREAS"], req["ZCEDENTE"], req["ZCONTRATO"], req["FUNCAREA"])
+    d["MONTO"] = a_num_estricto(d[camt], camt, "Presupuesto previo").fillna(0.0)
+    d = d[d["RAMO"].isin(ramos) & d["TIPO"].notna()]
+    h = d.groupby(["LLAVE", "RAMO", "TIPO"], as_index=False)["MONTO"].sum().assign(ANIO=anio, ORIGEN="PPTO")
+    hp = h[h["TIPO"] == "Primas"].groupby("RAMO")["MONTO"].sum().abs()
+    log.info("Presupuesto aprobado %s leído de %s (%.0f s): %s LLAVEs con ramos %s | participación del ramo %s en primas: %.4f", anio, path,
+             time.perf_counter() - t0, h["LLAVE"].nunique(), ramos, min(ramos), float(hp.get(min(ramos), 0) / hp.sum()) if hp.sum() else float("nan"))
+    return h[["LLAVE", "RAMO", "TIPO", "ANIO", "ORIGEN", "MONTO"]]
+
+
+# =============================================================================
 # MAIN
 # =============================================================================
 def validar_entradas(p):
     if not os.path.isfile(p["ppto"]):
         raise ErrorRedistribucion(f"No existe el presupuesto: {p['ppto']}")
-    if not any(existe(p, k) for k in ("hist", "pesos", "td")) and not existe(p, "layout"):
-        # Respaldo: la Base_1 tal como la guarda el equipo (sin actualizar con 0a_Actualizar_Base1.py). Se avisa en el log.
-        insumos = os.path.dirname(os.path.abspath(p["ppto"]))
-        candidatos = [os.path.join(insumos, n, f) for f in ("Hist_Real_LLAVE_Ramo.csv", "Base_1_Actualizada.xlsx", "Base_1.xlsx")
-                      for n in ("Redistribucion", "Redistribución")] + [
-                      os.path.join(insumos, "Base_1.xlsx"), os.path.join(insumos, "Base_1.csv")]
-        alterno = next((c for c in candidatos if os.path.isfile(c)), None)
-        if alterno is None:
-            buscados = [p.get(k) for k in ("hist", "pesos", "td", "layout")] + candidatos
-            raise ErrorRedistribucion("No se encontró ningún insumo de pesos (histórico, tabla de pesos o TD) ni layout. Rutas revisadas:\n  "
-                                      + "\n  ".join(str(b) for b in buscados if b) + "\nDeje la Base_1 en alguna de ellas o indique la ruta con --hist.")
-        logging.getLogger("redist").warning("No existe %s; se usa como histórico %s. Si esta Base_1 no incluye el real del año en curso, "
-                                            "los pesos saldrán sólo de los años que sí trae (ver Pesos_Calculados y el log).", p.get("hist"), alterno)
-        p["hist"] = alterno
+    dirs_buscados = []
+    if str(p.get("hist", "")).upper() == "AUTO":
+        p["hist"], dirs_buscados = buscar_base1_reciente(p)
+    if str(p.get("ppto_previo", "")).upper() == "AUTO":
+        p["ppto_previo"] = buscar_ppto_previo(p)
+    if not any(existe(p, k) for k in ("hist", "pesos", "td", "ppto_previo")) and not existe(p, "layout"):
+        raise ErrorRedistribucion("No se encontró ningún insumo de pesos: ni Base_1 (Base_1*.csv/xlsx), ni tabla de pesos, ni TD, ni CtaMens del presupuesto "
+                                  "anterior, ni layout. Carpetas revisadas:\n  " + "\n  ".join(dirs_buscados) + "\nIndique la ruta con --hist si está en otro lugar.")
     os.makedirs(p["out_dir"], exist_ok=True)
     if not p["dry_run"]:
         os.makedirs(os.path.dirname(os.path.abspath(p["salida"])) or ".", exist_ok=True)
@@ -1261,16 +1399,7 @@ def main(p):
     log = setup_logger(p["out_dir"], ts)
     log.info("=== Redistribución TEV/HyOR %s | script v%s | pandas %s === parámetros: %s", zAño, VERSION, pd.__version__, {k: v for k, v in p.items() if k != "out_dir"})
     validar_entradas(p)
-    if existe(p, "hist"):
-        # Un año posterior a la fecha del archivo de histórico no puede ser real (p.ej. 2026 en una Base_1 guardada en dic-2025)
-        anio_archivo = datetime.fromtimestamp(os.path.getmtime(p["hist"])).year
-        futuros = [a for a in p["anios_base"] if a > anio_archivo]
-        if futuros:
-            p["anios_base"] = [a for a in p["anios_base"] if a <= anio_archivo]
-            log.warning("El histórico %s se guardó en %s: los años base %s no pueden ser reales y se excluyen. Años base efectivos: %s. "
-                        "Para incluir el real del año en curso, actualice la Base_1 con 0a_Actualizar_Base1.py.", p["hist"], anio_archivo, futuros, p["anios_base"])
-            if not p["anios_base"]:
-                raise ErrorRedistribucion("Ningún año base es anterior a la fecha del histórico; indique --anios-base o actualice la Base_1.")
+    log.info("Insumos: Base_1 = %s | presupuesto aprobado del año anterior = %s", p.get("hist") or "(ninguna)", p.get("ppto_previo") or "(ninguno)")
 
     # ---- 0. Anti doble aplicación ----
     registro = os.path.join(p["out_dir"], "registro_salidas.txt")
@@ -1306,6 +1435,7 @@ def main(p):
     else:
         log.info("Sin Subramo.csv: el ramo se deriva de los dígitos 2-4 de %s", c_prof)
 
+    cargar_ramo_por_texto(subramo_df, log)
     df["TIPO"] = df[c_gl].astype(str).str[:2].map(TIPO_POR_GL)
     col_ramo_sub = "Ramo2" if (subramo_df is not None and "Ramo2" in subramo_df.columns) else "Ramo"  # CtaMens arma LLAVE1/cesión/XL con Ramo2
     df["RAMO"] = ramo_desde_proftctr(df[c_prof], subramo_df, col_ramo_sub)
@@ -1327,22 +1457,55 @@ def main(p):
 
     # ---- 2. Pesos ----
     fuentes, hnorm, meses, tol_sug, sens, tend = [], None, None, None, pd.DataFrame(), pd.DataFrame()
+    pesos = marco_pesos_vacio()
     if existe(p, "hist"):
         hist, _ = leer_tabla(p["hist"])
-        hnorm, meses = preparar_hist(hist, p["ramos"], log)
-        pesos = pesos_desde_hist(hnorm, meses, p["ramos"], p["anios_base"], p["metodo_pesos"], p["min_meses_anio"], log); fuentes.append(f"hist={p['hist']}")
-        tol_sug = tolerancia_sugerida(hnorm, p["ramos"], log)
-        sens = sensibilidad_pesos(hnorm, meses, p["ramos"], p["anios_base"], p["min_meses_anio"], p["tolerancia"])
-        if len(sens):
-            log.info("Sensibilidad entre métodos de peso: %s LLAVE-tipo SENSIBLES (dif > %s) de %s", int(sens["SENSIBLE"].sum()), p["tolerancia"], len(sens))
-        tend = validacion_tendencia(hnorm, df, c_amt, c_fy, p["anio_decision"], p["ramos"], log)
-    elif existe(p, "pesos"):
-        pesos = pesos_desde_tabla(pd.read_excel(p["pesos"], sheet_name="Pesos", engine="openpyxl"), p["ramos"], log); fuentes.append(f"pesos={p['pesos']}")
-    elif existe(p, "td"):
-        pesos = pesos_desde_td(pd.read_excel(p["td"], sheet_name="TD", engine="openpyxl"), p["ramos"], log); fuentes.append(f"td={p['td']}")
+        mt = datetime.fromtimestamp(os.path.getmtime(p["hist"]))
+        hall, meses = preparar_hist(hist, p["ramos"], log, cod_archivo=mt.year * 100 + mt.month)
+        hnorm = hall[hall["ORIGEN"] == "REAL"].drop(columns="ORIGEN")
+        auto_base = str(p["anios_base"]).upper() == "AUTO"
+        if auto_base:
+            reales = sorted(a for a in hnorm["ANIO"].unique() if a < p["anio_decision"] and (meses is None or meses.get(a, 0) >= p["min_meses_anio"]))
+            p["anios_base"] = [int(a) for a in reales[-2:]]
+            log.info("Años base (AUTO: 2 últimos años reales completos, >= %s meses en la base): %s", p["min_meses_anio"], p["anios_base"])
+        if p["anios_base"] and (len(hnorm[hnorm["ANIO"].isin(p["anios_base"])]) or not auto_base):  # años base explícitos sin datos -> error claro
+            pesos = pesos_desde_hist(hnorm, meses, p["ramos"], p["anios_base"], p["metodo_pesos"], p["min_meses_anio"], log); fuentes.append(f"hist={p['hist']}")
+            tol_sug = tolerancia_sugerida(hnorm, p["ramos"], log)
+            sens = sensibilidad_pesos(hnorm, meses, p["ramos"], p["anios_base"], p["min_meses_anio"], p["tolerancia"])
+            if len(sens):
+                log.info("Sensibilidad entre métodos de peso: %s LLAVE-tipo SENSIBLES (dif > %s) de %s", int(sens["SENSIBLE"].sum()), p["tolerancia"], len(sens))
+            tend = validacion_tendencia(hnorm, df, c_amt, c_fy, p["anio_decision"], p["ramos"], log)
+        else:
+            log.warning("La Base_1 no tiene años reales completos anteriores a %s (años base %s): no hay pesos reales.", p["anio_decision"], p["anios_base"])
+        hpp = hall[(hall["ORIGEN"] == "PPTO") & (hall["ANIO"] == p["anio_decision"] - 1)].drop(columns="ORIGEN")
     else:
-        pesos = marco_pesos_vacio()
-        log.warning("No se encontró histórico, tabla de pesos ni TD: sólo se aplicará el layout (FORZAR).")
+        hpp = pd.DataFrame()
+    if existe(p, "pesos"):
+        pesos = pesos_desde_tabla(pd.read_excel(p["pesos"], sheet_name="Pesos", engine="openpyxl"), p["ramos"], log); fuentes.append(f"pesos={p['pesos']}")
+    elif existe(p, "td") and not existe(p, "hist"):
+        pesos = pesos_desde_td(pd.read_excel(p["td"], sheet_name="TD", engine="openpyxl"), p["ramos"], log); fuentes.append(f"td={p['td']}")
+    # respaldo: reparto del presupuesto APROBADO del año anterior, sólo para LLAVE-tipo sin peso real válido
+    anio_prev = p["anio_decision"] - 1
+    if (hpp is None or len(hpp) == 0) and existe(p, "ppto_previo"):
+        hpp = hist_desde_ctamens(p["ppto_previo"], p["ramos"], subramo_df, anio_prev, log)
+        fuentes.append(f"ppto_previo={p['ppto_previo']}")
+    if hpp is not None and len(hpp):
+        pp = pesos_desde_hist(hpp, None, p["ramos"], [anio_prev], "ultimo", 0, logger_silencioso())
+        pp = pp[pp["VALIDO"]].copy()
+        pp["FUENTE"] = f"PPTO_APROBADO_{anio_prev}"; pp["DETALLE"] = f"reparto del presupuesto aprobado {anio_prev} (sin real válido para esta LLAVE-tipo)"
+        val_real = set(zip(pesos.loc[pesos["VALIDO"], "LLAVE"], pesos.loc[pesos["VALIDO"], "TIPO"])) if len(pesos) else set()
+        k_pp = pd.Series(list(zip(pp["LLAVE"], pp["TIPO"])), index=pp.index)
+        pp = pp[~k_pp.isin(val_real)]
+        if len(pp):
+            k_new = set(zip(pp["LLAVE"], pp["TIPO"]))
+            if len(pesos):
+                k_old = pd.Series(list(zip(pesos["LLAVE"], pesos["TIPO"])), index=pesos.index)
+                pesos = pesos[~k_old.isin(k_new)]
+            pesos = pd.concat([pesos, completar_columnas_pesos(pp)], ignore_index=True)
+            log.info("Respaldo con el presupuesto aprobado %s: %s LLAVE-tipo sin real válido toman su reparto (%s LLAVEs de Primas)",
+                     anio_prev, len(k_new), pp.loc[pp["TIPO"] == "Primas", "LLAVE"].nunique())
+    if len(pesos) == 0 and not existe(p, "layout"):
+        raise ErrorRedistribucion("No se obtuvo ningún peso válido (ni real ni del presupuesto aprobado). Revise la Base_1 y el CtaMens del año anterior.")
     decisiones, metodos = {}, {}
     if existe(p, "layout"):
         pesos, decisiones, metodos = aplicar_layout(pesos, pd.read_excel(p["layout"], sheet_name=0, engine="openpyxl"), p["ramos"], log); fuentes.append(f"layout={p['layout']}")
@@ -1350,7 +1513,7 @@ def main(p):
         if hnorm is None:
             raise ErrorRedistribucion("El layout indica METODO por LLAVE pero no hay histórico; METODO sólo aplica con histórico real.")
         for m in set(metodos.values()):
-            alt = pesos_desde_hist(hnorm, meses, p["ramos"], p["anios_base"], m, p["min_meses_anio"], logger_silencioso())
+            alt = pesos_desde_hist(hnorm, meses, p["ramos"], p["anios_base"], m, p["min_meses_anio"], logger_silencioso())  # sólo real
             ll = [l for l, mm in metodos.items() if mm == m]
             pesos = pd.concat([pesos[~pesos["LLAVE"].isin(ll)], alt[alt["LLAVE"].isin(ll)]], ignore_index=True)
         log.info("Pesos con método propio por LLAVE (layout INCLUIR+METODO): %s", metodos)
@@ -1396,6 +1559,23 @@ def main(p):
                                       p["anios_fiscales"], subramo_df, log)
         salida_prep["_ID_ORIGEN"] = salida["_ID_ORIGEN"].values
         verif = verificar_insumos_ctamens(None, salida_prep, detalle, p, subramo_df, c_prof, c_amt, c_fy, p["ramos"], log)
+    # participación de cada ramo en la prima del año de decisión, antes y después (comparar con la serie histórica)
+    nombres = {}
+    if subramo_df is not None and "RamoN" in subramo_df.columns:
+        for r in p["ramos"]:
+            v = subramo_df.loc[pd.to_numeric(subramo_df[col_ramo_sub], errors="coerce") == r, "RamoN"].dropna().astype(str).unique()
+            nombres[r] = "/".join(v) if len(v) else str(r)
+    def _part(d):
+        x = d[(pd.to_numeric(d[c_fy], errors="coerce") == p["anio_decision"]) & (d[c_gl].astype(str).str[:2] == "61")]
+        rr = ramo_desde_proftctr(x[c_prof], subramo_df, col_ramo_sub)
+        t = x.groupby(rr)[c_amt].sum().abs()
+        tot = sum(float(t.get(r, 0.0)) for r in p["ramos"])
+        return {r: (float(t.get(r, 0.0)) / tot if tot else np.nan) for r in p["ramos"]}
+    part_antes = _part(df)
+    part_desp = _part(salida) if salida is not None else {}
+    for r in p["ramos"]:
+        log.info("Participación de %s (%s) en la prima %s: antes %.2f%% | después %s", nombres.get(r, r), r, p["anio_decision"], 100 * part_antes[r],
+                 f"{100 * part_desp[r]:.2f}%" if part_desp else "(dry-run)")
     fallas = ctrl["fallas"] if ctrl else []
     for f in fallas:
         log.error("CONTROL FALLIDO: %s", f)
@@ -1422,6 +1602,11 @@ def main(p):
         "version_script": VERSION, "fecha": ts, "aprobacion": p.get("aprobacion", ""), "controles": ("FALLIDOS: " + " | ".join(fallas)) if fallas else ("OK" if ctrl else "dry-run"),
         "ppto": p["ppto"], "sha256_entrada": h_in, "fuentes_pesos": " ; ".join(fuentes) or "ninguna",
         "cobertura_prima_con_pesos": cobertura, "firmas_huerfanas_llaves_biramo": huerfanas,
+        "ppto_previo": p.get("ppto_previo", ""), "modo_decision": p["modo_decision"],
+        "participacion_antes": str({f"{nombres.get(r, r)} ({r})": round(v, 4) for r, v in part_antes.items()}),
+        "participacion_despues": str({f"{nombres.get(r, r)} ({r})": round(v, 4) for r, v in part_desp.items()}) if part_desp else "",
+        "llaves_ajustadas_con_alertas": int(((alcance["DECISION"] == "AJUSTAR") & (alcance["N_ALERTAS"] > 0)).sum()) if len(alcance) else 0,
+        "llaves_validar_sirec": int(alcance["VALIDAR_SIREC"].sum()) if len(alcance) else 0,
         "ramos": str(p["ramos"]), "anio_decision": p["anio_decision"], "anios_base": str(p["anios_base"]), "metodo_pesos": p["metodo_pesos"],
         "min_meses_anio": p["min_meses_anio"], "tolerancia": p["tolerancia"], "tolerancia_sugerida_por_dato_p90": tol_sug, "modo_alcance": p["modo_alcance"],
         "ajustar_split_explicito": p["ajustar_split_explicito"], "reclasificacion_total": p["reclasificacion_total"], "materialidad": p["materialidad"],
@@ -1446,6 +1631,8 @@ def main(p):
         if len(alcance):
             alcance[alcance["DECISION"] == "REVISAR"].to_excel(w, sheet_name="LLAVEs_Revisar", index=False)
             alcance[alcance["DECISION"] == "SIN_PESO"].to_excel(w, sheet_name="LLAVEs_Sin_Peso", index=False)
+            alcance[(alcance["DECISION"] == "AJUSTAR") & (alcance["N_ALERTAS"] > 0)].to_excel(w, sheet_name="Ajustadas_Con_Alertas", index=False)
+            alcance[alcance["VALIDAR_SIREC"]].to_excel(w, sheet_name="Validar_SIREC", index=False)
         pesos.to_excel(w, sheet_name="Pesos_Calculados", index=False)
         pesos_ef.to_excel(w, sheet_name="Pesos_Aplicados", index=False)
         if len(sens):
@@ -1480,9 +1667,11 @@ def main(p):
 
 
 def parse_args():
-    ap = argparse.ArgumentParser(description="Redistribución TEV (73) / HyOR (71) previa a CtaMens.py")
+    ap = argparse.ArgumentParser(description="Redistribución Terremoto (71) / HyORH (73) previa a CtaMens.py")
     for k in ["ppto", "hist", "pesos", "td", "layout", "subramo", "salida", "pais", "cesion", "cesionpi", "matxl", "dncostoxl", "dnrecup", "evcat", "attritional"]:
         ap.add_argument(f"--{k}")
+    ap.add_argument("--ppto-previo", dest="ppto_previo", help="CtaMens del presupuesto aprobado del año anterior; AUTO o ''")
+    ap.add_argument("--modo-decision", dest="modo_decision", choices=["fijo", "revisar"])
     ap.add_argument("--out-dir", dest="out_dir"); ap.add_argument("--cesion-hist", dest="cesion_hist")
     ap.add_argument("--ramos", help="p.ej. 71,73"); ap.add_argument("--anio-decision", dest="anio_decision", type=int)
     ap.add_argument("--anios-base", dest="anios_base", help="p.ej. 2025,2026"); ap.add_argument("--metodo-pesos", dest="metodo_pesos", choices=METODOS)
@@ -1503,12 +1692,12 @@ def parse_args():
     p = dict(DEFAULTS)
     for k in ["ppto", "hist", "pesos", "td", "layout", "subramo", "salida", "out_dir", "pais", "cesion", "cesionpi", "cesion_hist", "matxl", "dncostoxl", "dnrecup",
               "evcat", "attritional", "anio_decision", "metodo_pesos", "min_meses_anio", "tolerancia", "comisiones", "siniestros", "decimales", "modo_alcance",
-              "reclasificacion_total", "materialidad", "credibilidad_pct", "aprobacion"]:
+              "reclasificacion_total", "materialidad", "credibilidad_pct", "aprobacion", "ppto_previo", "modo_decision"]:
         v = getattr(a, k)
         if v is not None:
             p[k] = v
     if a.ramos: p["ramos"] = [int(x) for x in a.ramos.split(",")]
-    if a.anios_base: p["anios_base"] = [int(x) for x in a.anios_base.split(",")]
+    if a.anios_base: p["anios_base"] = "AUTO" if a.anios_base.upper() == "AUTO" else [int(x) for x in a.anios_base.split(",")]
     if a.banda_ratio: p["banda_ratio"] = [float(x) for x in a.banda_ratio.split(",")]
     if a.excluir_funcarea is not None: p["excluir_funcarea"] = [x.strip() for x in a.excluir_funcarea.split(",") if x.strip()]
     if a.anios_fiscales: p["anios_fiscales"] = "todos" if a.anios_fiscales == "todos" else [int(x) for x in a.anios_fiscales.split(",")]

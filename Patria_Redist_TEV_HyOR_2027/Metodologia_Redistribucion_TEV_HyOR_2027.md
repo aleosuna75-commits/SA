@@ -1,25 +1,36 @@
-# Metodología de redistribución de primas, comisiones y siniestros entre Terremoto (ramo 73) e Hidrometeorológicos y Otros Riesgos (ramo 71)
+# Metodología de redistribución de primas, comisiones y siniestros entre Terremoto (ramo 71) e Hidrometeorológicos y Otros Riesgos (HyORH, ramo 73)
 
 **Presupuesto Técnico 2027 (RPAT / Patria Re)**
-Versión 1.5, 16 de octubre de 2026. Documento de trabajo para Planeación Financiera; pensado para que una persona que no estuvo en el equipo pueda reproducir, auditar y defender el procedimiento. Acompaña a `0a_Actualizar_Base1.py` (v1.1), a `0_Redistribucion_TEV_HyOR.py` (v1.5), a `README_Script_Redistribucion.md` y a la carpeta `pruebas/`.
+Versión 2.0, 16 de octubre de 2026. Documento de trabajo para Planeación Financiera; pensado para que una persona que no estuvo en el equipo pueda reproducir, auditar y defender el procedimiento. Acompaña a `0a_Actualizar_Base1.py` (v2.0), a `0_Redistribucion_TEV_HyOR.py` (v2.0), a `sirec_conexion.py`, a `README_Script_Redistribucion.md` y a la carpeta `pruebas/`.
 
 ---
 
 ## 0. Resumen ejecutivo
 
-* **Problema.** En el Presupuesto Técnico 2027 (archivo `PptoTecnico2027.csv`, insumo de `CtaMens.py`) hay negocios multirramo cuya prima quedó cargada en un solo ramo catastrófico. A nivel compañía, la participación de Terremoto dentro de la prima catastrófica (73 ÷ (73 + 71)) fue de 58.4 % a 58.8 % cada año entre 2023 y 2026, y en el FCST 2027 cae a 30.2 % (Terremoto −45 %, HyOR +81 %). El error está en el **porcentaje por ramo aplicado a cada negocio en la carga**, no en el total del negocio.
-* **Solución.** Un script previo a `CtaMens.py` (`0_Redistribucion_TEV_HyOR.py`) que, negocio por negocio (LLAVE), reparte el monto de cada fila entre los ramos 73 y 71 con un porcentaje **observado** (histórico real contabilizado del propio negocio, o condición contractual documentada), conservando exactamente el total del negocio por cuenta, mes y firma de fila, y dejando trazabilidad fila a fila.
-* **Sin números inventados.** Cada porcentaje proviene de un dato verificable y queda registrado con su fuente. Sólo se ajustan automáticamente los negocios cargados en un solo ramo cuya historia es creíble y estable; todo lo demás (particiones ya cargadas en ambos ramos, reclasificaciones completas, historia escasa o inestable, facultativos, contratos sin número) queda en `REVISAR` hasta que el negocio lo confirme por escrito. Los negocios sin información **no se ajustan** y se reportan. La participación global histórica (≈59 %) se usa **sólo como validación**, nunca como objetivo.
-* **Coherencia con 2026.** Se conserva la unidad de negocio (LLAVE = TipoRea-Cedente-Contrato-LN), la lógica de clonar la fila al ramo faltante cambiando únicamente el centro de beneficio, el reparto proporcional al perfil mensual original, el redondeo con cierre al centavo, los umbrales de 2026 como validación y la trazabilidad. Cambia, de forma deliberada y documentada (sección 3), que 2027 **conserva totales** (2026 permitió cambiar niveles por negocio con montos objetivo capturados a mano), toca **sólo** los ramos 71 y 73, y es un solo script reproducible.
+* **Problema.** En el Presupuesto Técnico 2027 (archivo `PptoTecnico2027.csv`, insumo de `CtaMens.py`) la mayoría de los negocios con prima catastrófica quedó cargada completa en HyORH (centro de beneficio `A073000000`). En el CtaMens 2027 sólo 19 de 614 negocios traen ambos ramos y 567 están 100 % en HyORH; en el presupuesto 2026 aprobado, 249 de 612 negocios traían ambos ramos. La participación de Terremoto (`A071000000`) en la prima catastrófica fue de 58.4 % a 58.8 % cada año entre 2023 y 2026 en el real, fue 54.1 % en el presupuesto 2026 aprobado y cae a 30.2 % en el CtaMens 2027. El error está en el **porcentaje por ramo aplicado a cada negocio en la carga**, no en el total del negocio.
+* **Solución.** Dos scripts previos a `CtaMens.py`. `0a_Actualizar_Base1.py` arma la Base_1 (historia por negocio, ramo y mes) con la Base_1 más reciente y los CtaMens de cada año que estén en `Outputs`, marcando cada fila como REAL o PPTO. `0_Redistribucion_TEV_HyOR.py` reparte, negocio por negocio (LLAVE), el monto de cada fila entre Terremoto (71) y HyORH (73) con un porcentaje **observado**, conserva exactamente el total del negocio por cuenta, mes y firma de fila, escribe la base redistribuida y deja trazabilidad fila a fila.
+* **Criterios fijos (v2.0).** El script decide solo y siempre escribe la base. Fuente del porcentaje, en este orden: condición contractual capturada en el layout; real de los dos últimos años completos del propio negocio; reparto del presupuesto 2026 aprobado del propio negocio. Se ajusta todo negocio cuya participación presupuestada difiere de la observada en más de 5 puntos. Las cautelas que en la v1 detenían el ajuste (historia escasa, reclasificación total, facultativos, contrato nulo, partición ya cargada) ya no lo detienen: quedan como **alertas** en el diagnóstico para revisarlas después.
+* **Sin números inventados.** Cada porcentaje proviene de un dato verificable del propio negocio y queda registrado con su fuente (`FUENTE_PESO`). Los negocios sin ningún dato propio **no se ajustan** y se reportan. La participación global histórica (≈59 %) se usa **sólo como validación**, nunca como objetivo.
+* **Coherencia con años anteriores.** Se conserva la unidad de negocio (LLAVE = TipoRea-Cedente-Contrato-LN), la clonación de la fila al ramo faltante cambiando sólo el centro de beneficio, el reparto proporcional al perfil mensual, el cierre al centavo y la trazabilidad de 2026. El respaldo con el presupuesto 2026 aprobado hace que un negocio sin real válido quede repartido como se aprobó el año pasado.
 * **Lo que sigue después del script.** Las matrices de costos XL y de siniestros catastróficos que usa CtaMens se dimensionan con la propia base, así que el procedimiento completo es de **dos pasadas** de CtaMens con regeneración de matrices entre ellas (sección 9), y el efecto llega hasta reservas (sección 10).
 
----
+### 0.1 Cambios de la versión 2.0 (léase primero)
+
+| Cambio | Antes (v1.x) | Ahora (v2.0) | Por qué |
+|---|---|---|---|
+| Códigos de ramo | Se asumió 71 = HyOR y 73 = Terremoto, y el texto "Terremoto" de la Base_1 se traducía a 73 | **71 = Terremoto (`A071000000`) y 73 = HyORH (`A073000000`)**, tomado de `Subramo.csv` (RamoN → Ramo2), como lo hace CtaMens | Así lo dicen la BD_CtaMens 2026 y el CtaMens 2027 del propio equipo. Con la traducción anterior, los pesos históricos quedaban cruzados contra el presupuesto. En la corrida del 16/10 no se ajustó ningún negocio, así que el csv escrito era idéntico al original y no hubo daño |
+| Decisión | Muchas cautelas mandaban el negocio a `REVISAR` y no se ajustaba | Criterios fijos: se ajusta y la cautela queda como `ALERTAS` (`modo_decision = fijo`; `revisar` conserva el comportamiento anterior) | Pedido de Planeación Financiera: generar la base directo y revisar el diagnóstico después |
+| Meses completos | Cada negocio debía tener prima en 8 meses de un año para que ese año contara | Cuenta la **completitud del corte de la base**: un año vale si la base tiene información en al menos 8 meses de ese año | Un negocio que factura trimestral o anual sí tiene un año completo. La regla anterior invalidaba la mayoría de los pesos |
+| Años base | 2025 y 2026 fijos | Los 2 últimos años **reales** completos anteriores a 2027 (automático) | La Base_1 de dic-2025 trae 2026 completo, que no puede ser real |
+| Respaldo | Sin real válido, no se ajustaba | Reparto del **presupuesto 2026 aprobado** del propio negocio (CtaMens 2026 en `Outputs`), marcado `PPTO_APROBADO_2026` | Es un dato observable del propio negocio, aprobado el año pasado; da coherencia con 2026 |
+| Base_1 | Se actualizaba con un extracto real | Se arma con la Base_1 más reciente + CtaMens de cada año (columna `FUENTE` = REAL o PPTO). Un presupuesto nunca sustituye meses reales | No hay Base_1 de 2026; los CtaMens sí existen |
+| SIREC | Mencionado | `sirec_conexion.py`: conexión y consultas preparadas, **no se ejecutan** por defecto | Validación contractual de facultativos y contratos nulos, y fuente futura del real |
 
 ## 1. Diagnóstico
 
 ### 1.1 Evidencia a nivel compañía (captura `Res_Rec_Ajustes_Form_f`)
 
-| Año | HyOR (71) | Terremoto (73) | 73 + 71 | Participación 73 |
+| Año | HyORH (73) | Terremoto (71) | Terremoto + HyORH | Participación Terremoto |
 |---|---:|---:|---:|---:|
 | 2023 | 1,262,584,088 | 1,804,029,461 | 3,066,613,549 | 58.8 % |
 | 2024 | 1,698,151,532 | 2,388,431,292 | 4,086,582,824 | 58.4 % |
@@ -27,13 +38,14 @@ Versión 1.5, 16 de octubre de 2026. Documento de trabajo para Planeación Finan
 | 2026 (al corte de la captura) | 1,743,336,974 | 2,484,104,761 | 4,227,441,735 | 58.8 % |
 | FCST 2027 | 4,158,455,158 | 1,795,630,092 | 5,954,085,250 | **30.2 %** |
 
-La participación de Terremoto es notablemente estable durante cuatro años y se rompe en 2027. La suma 73 + 71 del FCST 2027 crece 7.3 % contra 2025 (último cierre completo; la columna 2026 es parcial y no debe usarse como base de crecimiento sin anualizar): el total no es la anomalía, el reparto sí.
+La participación de Terremoto es notablemente estable durante cuatro años y se rompe en 2027. La suma Terremoto + HyORH del FCST 2027 crece 7.3 % contra 2025 (último cierre completo; la columna 2026 es parcial y no debe usarse como base de crecimiento sin anualizar): el total no es la anomalía, el reparto sí.
 
 ### 1.2 Evidencia en el detalle (extracto `PptoTecnico2027.xlsx`, LN04001 y LN04002, 69,999 filas)
 
 * **El cargador aplica un porcentaje fijo por ramo a todas las filas del negocio.** En las tres LLAVEs que ya traen 71 y 73, las filas de ambos ramos son idénticas en todos sus atributos (mes, año de suscripción, corredor, región, moneda, tipo de cesión) y sólo cambian el centro de beneficio y el monto; la razón 73 ÷ (71 + 73) es constante fila a fila (0.3333, 0.26, 0.32) en primas y en comisiones, y la razón comisión ÷ prima es la misma en ambos ramos (0.25 / 0.25; 0.155 / 0.155). El mismo patrón aparece en 148 LLAVEs que mezclan Incendio (ramo 60) con 71/73, con porcentajes redondos (0.50, 0.45, 0.52, 0.40, 0.60) idénticos por mes, por año de suscripción y por corredor. El porcentaje es también idéntico en los años fiscales 2026 y 2028 en adelante.
 * **Los siniestros catastróficos no vienen en el presupuesto.** No existe ninguna fila de siniestros (GL 54) para los ramos 71 ni 73 en ningún año fiscal del archivo; `CtaMens.py` los modela con las matrices `xDnEvCat` / `xDnAttritional` por centro de beneficio y región, prorrateadas por la prima (GL 61).
-* **El extracto no contiene el problema global.** En LN04001/LN04002 Terremoto es el 89 % de la prima 71 + 73; el "todo en Hidro" está en otras líneas o regiones. Por eso el procedimiento es **bidireccional** (71→73 y 73→71), igual que los fallbacks `73:71, 71:73` del proceso 2026.
+* **El extracto sí contiene el problema.** En LN04001/LN04002, HyORH (73) es el 89.1 % de la prima catastrófica 2027 y Terremoto (71) sólo el 10.9 %. Es el "todo en Hidro" que se observó a nivel compañía. El procedimiento es **bidireccional** (71→73 y 73→71), igual que los fallbacks `73:71, 71:73` del proceso 2026.
+* **Comparación contra el presupuesto 2026 aprobado (BD_CtaMens 2026 y CtaMens 2027 completos).** De 527 negocios presentes en ambos años, 336 cambian su participación de Terremoto en más de 5 puntos y 217 pasaron de tener ambos ramos en 2026 a uno solo en 2027. Esos 527 negocios concentran el 77.8 % de la prima catastrófica 2027. Con su reparto 2026, su participación de Terremoto pasa de 26.6 % a 53.0 %, y la de todo el CtaMens 2027 pasaría de 30.2 % a 50.7 % (el resto de los negocios sin cambio). Es una cota de referencia, no un objetivo.
 * Hay 162 filas de ajuste con signo contrario (reversos) en 10 LLAVEs; el método respeta el signo de cada fila.
 * Los montos tienen a lo sumo dos decimales y no hay filas duplicadas (misma firma y mismo centro de beneficio).
 * 33 LLAVEs de los ramos 71/73 tienen contrato nulo (hasta 5 corredores cada una); 32 son facultativas y una es un negocio proporcional de 17 millones que agrupa varios contratos distintos bajo contrato "0".
@@ -101,7 +113,7 @@ Si el contrato o slip, el expediente en SIREC o el insumo de presupuesto de la l
 
 ### Nivel 2. Histórico real del propio negocio
 
-Insumo: montos reales contabilizados (prima tomada, comisiones, siniestros) por LLAVE × ramo × año **y mes**, extraídos de la misma fuente que alimenta los reportes reales (consulta real de SAP BW; `Base_1.xlsx` del análisis 2026 tiene esa estructura). Para facultativos y contratos nulos el histórico debe venir con la misma codificación que el presupuesto (contrato 0), de lo contrario no cruza.
+Insumo: la Base_1 más reciente (la arma `0a_Actualizar_Base1.py`), sólo sus filas con `FUENTE` = REAL: montos reales contabilizados (prima tomada, comisiones, siniestros) por LLAVE × ramo (DescRamo) × año y mes. Si la Base_1 no trae la columna `FUENTE` (la Base_1 original), los meses posteriores a la fecha en que se guardó el archivo no pueden ser reales y no se usan. El texto del ramo se traduce a código con `Subramo.csv` (RamoN → Ramo2): "Terremoto" → 71 y "HyORH" → 73. Para facultativos y contratos nulos el histórico debe venir con la misma codificación que el presupuesto (contrato 0), de lo contrario no cruza.
 
 Fórmula (método `ponderado`, recomendado):
 
@@ -111,41 +123,48 @@ w(LLAVE, tipo, ramo) = Σ_{años base válidos} |Monto_real(LLAVE, tipo, ramo, a
                        Σ_{ramo' ∈ {71,73}} Σ_{años base válidos} |Monto_real(LLAVE, tipo, ramo', año)|
 ```
 
-* **Validez año por año.** Un año cuenta sólo si (a) los montos de ambos ramos tienen el mismo signo (un reverso que domina un ramo lo invalida), (b) no suman cero y (c) si el histórico trae el mes, tiene al menos `min_meses_anio` meses registrados (8, el umbral INCOMPLETE_MONTHS de 2026). Los años excluidos quedan anotados en `MOTIVO`; la LLAVE pasa a `Sin_Peso` sólo si no queda ningún año válido.
-* **Años base recomendados:** los dos últimos ejercicios con datos (2025 y 2026 al corte). Un año parcial sesga el peso si los dos ramos no se contabilizan con la misma cadencia; por eso el histórico debe traer el mes, el año parcial se descarta cuando no alcanza los meses mínimos, y los negocios cuyos pesos cambian entre métodos quedan en `REVISAR` (abajo). Con un solo año base el método es la lectura más plausible de la "distribución del año anterior" de 2026.
+* **Validez año por año.** Un año cuenta sólo si (a) los montos de ambos ramos tienen el mismo signo (un reverso que domina un ramo lo invalida), (b) no suman cero y (c) la **base** tiene información real en al menos `min_meses_anio` meses de ese año (8, el umbral INCOMPLETE_MONTHS de 2026). La regla (c) mide si el corte está completo, no si el negocio tuvo prima cada mes: un negocio que factura trimestral o anual tiene un año completo. Los años excluidos quedan anotados en `MOTIVO`.
+* **Años base:** automáticos, los dos últimos años reales completos anteriores al año de decisión (hoy 2024 y 2025). Un año parcial sesga el peso si los dos ramos no se contabilizan con la misma cadencia; por eso se descarta. `--anios-base` permite fijarlos a mano.
 * **Alternativas parametrizadas:** `ultimo` (sólo el último año válido) y `promedio_simple` (promedio de las participaciones anuales). El layout permite fijar el método por negocio (`INCLUIR` + `METODO`) cuando el negocio decide, por ejemplo, usar sólo el último año tras una renovación.
-* **Sensibilidad y cambio estructural.** El script calcula el peso con los tres métodos (`Sensibilidad_Metodos`) y detecta cambio estructural (un año base mono-ramo y otro bi-ramo). Si los métodos difieren más que la tolerancia o hay cambio estructural, el negocio queda en `REVISAR`: la ponderación por montos sólo "reduce ruido" cuando la mezcla es estable, y amplifica un año atípico cuando no lo es.
-* **Credibilidad.** El histórico decide sólo si tiene volumen: la prima histórica base del negocio debe ser al menos el 10 % de su prima presupuestada del año de decisión (o la materialidad, si es mayor), y la razón presupuesto ÷ último año real debe estar entre 1/3 y 3. Fuera de eso el negocio queda en `REVISAR` con el dato visible. Un real diminuto o de un solo año no debe decidir un presupuesto decenas de veces mayor.
+* **Sensibilidad y cambio estructural.** El script calcula el peso con los tres métodos (`Sensibilidad_Metodos`) y detecta cambio estructural (un año base mono-ramo y otro bi-ramo). Si los métodos difieren más que la tolerancia o hay cambio estructural, el negocio se ajusta y lleva la alerta correspondiente.
+* **Credibilidad.** Si la prima histórica base del negocio es menor que el 10 % de su prima presupuestada, o la razón presupuesto ÷ último año real queda fuera de [1/3, 3], el negocio se ajusta y lleva la alerta, con el dato visible. Estas dos reglas comparan montos de fuentes distintas; si la Base_1 y el presupuesto están en escalas distintas, la alerta lo hará evidente.
 * Un ramo ausente del histórico recibe peso 0 (el negocio era mono-ramo en el real).
 * Pesos por tipo: se calculan por separado para primas, comisiones y siniestros cuando el histórico los trae; comisiones sin histórico propio válido toman los pesos de primas (coherente con el patrón del cargador: misma razón comisión/prima en ambos ramos).
 
+### Nivel 2b. Presupuesto aprobado del año anterior del propio negocio
+
+Sólo para los negocios (y tipos de cuenta) sin peso real válido. Fuente: el CtaMens del presupuesto aprobado del año anterior al de decisión, es decir las filas `FUENTE` = PPTO 2026 de la Base_1 o, si la Base_1 no las trae, el `BD_CtaMens_MMAA*.xlsx` / `CtaMens_2026_*.xlsx` más reciente de `Outputs`. El peso es la participación por ramo del propio negocio en ese presupuesto (`FUENTE_PESO = PPTO_APROBADO_2026`). No es real, pero es un dato observable del mismo contrato, revisado y aprobado el año anterior (el presupuesto 2026 ya pasó por la recalibración TEV/HyOR de 2026). Todo negocio ajustado con este peso lleva la alerta "peso tomado del presupuesto aprobado". El presupuesto del propio año de decisión (CtaMens 2027) **nunca** se usa como peso: es justamente lo que se corrige.
+
 ### Nivel 3. Sin información
 
-El negocio **no se ajusta**. Queda listado en `LLAVEs_Sin_Peso` para que la línea de negocio aporte el dato (nivel 1) o se extraiga su real (nivel 2). No se usa un promedio de cartera, línea o territorio como sustituto: sería atribuir a un contrato específico un porcentaje que no le pertenece (equivale a forzar el agregado). Si el negocio decide aplicarlo de todos modos, debe capturarse como `FORZAR` con esa justificación explícita, de modo que quede visible en la auditoría.
+El negocio **no se ajusta**. Queda listado en `LLAVEs_Sin_Peso` para que la línea de negocio aporte el dato (nivel 1) o se extraiga su real (nivel 2). Típicamente son negocios nuevos en 2027. No se usa un promedio de cartera, línea o territorio como sustituto: sería atribuir a un contrato específico un porcentaje que no le pertenece (equivale a forzar el agregado). Si el negocio decide aplicarlo de todos modos, debe capturarse como `FORZAR` con esa justificación explícita, de modo que quede visible en la auditoría.
 
 ---
 
-## 6. Regla de alcance (qué negocios se ajustan)
+## 6. Regla de alcance (qué negocios se ajustan): criterios fijos
 
 La decisión se toma sobre el año fiscal que consume CtaMens (`anio_decision` = 2027) y filas con monto distinto de cero; el reparto, una vez decidido, se aplica a todos los años fiscales del negocio. Para cada LLAVE con prima en 71 o 73, en este orden:
 
 1. `EXCLUIR` en el layout → `NO_AJUSTAR` (motivo registrado).
-2. Sin pesos válidos de primas (nivel 1 ni 2) → `SIN_PESO`.
+2. Sin pesos válidos de primas (ni contractual, ni real, ni presupuesto aprobado 2026) → `SIN_PESO`: no se ajusta.
 3. Sin filas con monto en el año de decisión → `NO_AJUSTAR`.
-4. `INCLUIR` o `FORZAR` en el layout → `AJUSTAR` (con justificación obligatoria; `INCLUIR` admite `METODO`).
+4. `INCLUIR` o `FORZAR` en el layout → `AJUSTAR` (con justificación obligatoria).
 5. LN excluida (LN04004, cuyo centro de beneficio reescribe CtaMens) → `NO_AJUSTAR`.
-6. Sin primas de referencia en 71/73 (sólo comisiones o siniestros) → `REVISAR`.
-7. |share73 presupuestada − share73 de los pesos| ≤ tolerancia (5 puntos porcentuales) → `NO_AJUSTAR`.
-8. Prima 71+73 del negocio en el año de decisión por debajo de la materialidad (parámetro; 0 por defecto; el precedente 2026 usó 100,000 MXN anuales) → `NO_AJUSTAR`.
-9. Reclasificación total (histórico ≥ 1 − tolerancia en un ramo y presupuesto ≥ 1 − tolerancia en el otro) → `REVISAR`: es un cambio de ramo completo que debe confirmar el negocio. El umbral es la misma tolerancia de la regla 7, para que un 97/3 no se mueva automáticamente.
-10. Histórico poco creíble (volumen o razón presupuesto ÷ real fuera de banda, sección 5) → `REVISAR`.
-11. Pesos sensibles al método o cambio estructural entre años base → `REVISAR`.
-12. Contrato nulo en negocio no facultativo (la LLAVE agrupa varios contratos) → `REVISAR`; pedir el número de contrato a la LN.
-13. Facultativo (ZTIPOREAS = 3; la LLAVE agrupa todo el facultativo de la cedente en la LN) → `REVISAR`; preferir el slip (`FORZAR`).
-14. El negocio **ya trae ambos ramos** (partición explícita del cargador) → `REVISAR`: el real histórico estima la mezcla pasada, no el contrato vigente; una partición cargada deliberadamente no se sobreescribe sin confirmación.
-15. En otro caso (negocio cargado en un solo ramo cuya historia creíble y estable muestra ambos) → `AJUSTAR`.
+6. |participación presupuestada − participación del peso| ≤ tolerancia (5 puntos porcentuales) → `NO_AJUSTAR`.
+7. Prima 71+73 del negocio por debajo de la materialidad (0 por defecto) → `NO_AJUSTAR`.
+8. En otro caso → `AJUSTAR`, con el caso identificado en `CASO`: `MONO_RAMO` (cargado en un solo ramo), `SPLIT_EXPLICITO` (ya traía ambos ramos con otra proporción) o `RECLASIFICACION_TOTAL` (el peso dice un ramo y el presupuesto el otro).
 
-Los casos `REVISAR` se resuelven con `INCLUIR` (aplicar los pesos) o `EXCLUIR` (dejar) en el layout, con justificación. Los `AJUSTAR` automáticos se revisan en el `--dry-run` junto con `Validacion_Tendencia` (banderas inspiradas en los umbrales 2026: un ramo sube ≥ +60 % y el otro cae ≤ −40 % con la suma dentro de (−40 %, +60 %); ramo que desaparece o aparece) antes de la corrida productiva. La tolerancia hace explícito el umbral; cuando el histórico trae tres o más años, el script reporta además una tolerancia sugerida por el dato (percentil 90 del rango interanual de la participación en los negocios con ambos ramos). Toda decisión queda en `Alcance_LLAVEs` con su motivo y los datos que la sustentan (participaciones, prima histórica, razón, años válidos, sensibilidad).
+Cada negocio ajustado lleva en `ALERTAS` las cautelas que aplican, para revisarlas después en la hoja `Ajustadas_Con_Alertas`:
+
+* sin primas de referencia (sólo comisiones o siniestros);
+* reclasificación total;
+* historia poco creíble (volumen o razón presupuesto ÷ real fuera de banda);
+* pesos sensibles al método o cambio estructural entre años base;
+* contrato nulo en negocio no facultativo, o facultativo (la LLAVE agrupa varios contratos): además `VALIDAR_SIREC` = verdadero y la hoja `Validar_SIREC` los lista para cotejarlos con SIREC;
+* el negocio ya traía ambos ramos;
+* peso tomado del presupuesto aprobado 2026 por falta de real válido.
+
+Si una alerta resulta fundada, se corrige con el layout (`EXCLUIR` para dejar el negocio como viene, `FORZAR` con el porcentaje del contrato) y se vuelve a correr. `--modo-decision revisar` restituye el comportamiento de la v1 (las cautelas detienen el ajuste). La participación global de Terremoto antes y después se reporta en el log y en `Resumen`; es una validación, no un objetivo.
 
 ---
 
@@ -233,9 +252,9 @@ De lectura obligatoria en la trazabilidad:
 | # | Insumo | Para qué | Quién |
 |---|---|---|---|
 | 1 | `PptoTecnico2027.csv` completo (todas las LN y regiones), confirmado como el extracto SAP **original** (fecha y sha256), no una versión ya intervenida | Universo real del problema; anti doble aplicación | Planeación Financiera |
-| 2 | **Histórico real por LLAVE × ramo × año y mes** de primas, comisiones y siniestros, 2024–2026 al corte, con ZTIPOREAS, ZCEDENTE, ZCONTRATO (0 para facultativos), FUNCAREA, PROFTCTR o DescRamo, periodo AAAAMM, cuenta y monto (estructura de `Base_1.xlsx` o de la consulta real de SAP BW). Se arma con `0a_Actualizar_Base1.py`: Base_1 del año pasado más el real del año, validado por traslape | Pesos de nivel 2, completitud de meses, sensibilidad, tendencia | Planeación Financiera / Reporting |
+| 2 | **Base_1** más reciente (real por LLAVE × ramo × año y mes) y los **CtaMens** de cada año en `Outputs` (`BD_CtaMens_0526_1.xlsx` = presupuesto 2026 aprobado; `CtaMens_2027_*.xlsx`). `0a_Actualizar_Base1.py` los une con la columna `FUENTE`. El real 2026 se incorporará cuando exista su extracción (SAP BW de reales o SIREC, `sirec_conexion.py`), validado por traslape | Pesos de nivel 2 y 2b, completitud de meses, sensibilidad, tendencia | Planeación Financiera / Reporting |
 | 3 | `Subramo.csv` 2027 (con Ramo2 y RamoN) y `Pais.csv` | Ramo exacto de CtaMens; verificación de LLAVE1 | Planeación Financiera |
-| 4 | Participación contractual por ramo de los negocios en `REVISAR` y `SIN_PESO` (slip, SIREC, insumo de la LN) | Pesos de nivel 1 (layout `FORZAR`) y confirmaciones (`INCLUIR`/`EXCLUIR`) | Suscripción / líneas de negocio |
+| 4 | Participación contractual por ramo de los negocios con alertas, en `Validar_SIREC` y en `SIN_PESO` (slip, SIREC, insumo de la LN) | Pesos de nivel 1 (layout `FORZAR`) y exclusiones (`EXCLUIR`) | Suscripción / líneas de negocio |
 | 5 | Output actual de CtaMens (`CtaMens_2027.xlsx`, `ConsultaP.xlsx`) y la hoja de totales por ramo de la captura | Validación antes/después | Planeación Financiera |
 | 6 | Insumos 2026: `LAYOUT_RED.xlsx`, `TD.xlsx` / `TD_RED.xlsx`, consolidados, `Base_1.xlsx` | Coherencia con 2026 y back-test | Archivo del equipo |
 | 7 | `Cesion.csv`, `Porc_Cesión_Hist.xlsx`, `CesionPI.csv`, `xMatCostoXL.xlsx`, `xDnCostoXL.xlsx`, `xDnRecup.xlsx`, `xDnEvCat.xlsx`, `xDnAttritional.xlsx` | Verificación previa de la sección 10 (el script las usa si están en disco) | Planeación Financiera |
@@ -247,15 +266,13 @@ De lectura obligatoria en la trazabilidad:
 
 ## 13. Procedimiento operativo
 
-0. Actualizar la historia real: `0a_Actualizar_Base1.py` une la Base_1 del año pasado con el real del año en curso. La extracción nueva incluye 2 o 3 meses que ya están en la Base_1 previa; el script exige que esos meses cuadren (1 % por métrica y por ramo) antes de escribir, de modo que la historia nueva tenga la misma definición que la anterior. Revisar en su libro de control `Traslape`, `Meses_por_Anio` y `Particip_TEV_HyOR`. Los meses de la Base_1 previa posteriores a la fecha en que se guardó el archivo no pueden ser reales (la Base_1 de diciembre de 2025 trae 2026 completo, que sólo puede ser presupuesto o proyección): se excluyen y su real entra desde la extracción nueva. Por la misma razón, la redistribución nunca usa como año base un año posterior a la fecha del archivo de histórico.
-1. Confirmar que `Inputs\PptoTecnico2027.csv` es el extracto original y colocar los insumos en `5_Generacion\Inputs\Redistribucion\`.
-2. Correr `python 0_Redistribucion_TEV_HyOR.py --dry-run`. Revisar `Alcance_LLAVEs`, `LLAVEs_Revisar`, `LLAVEs_Sin_Peso`, `Sensibilidad_Metodos`, `Validacion_Tendencia`, la cobertura y la tolerancia sugerida.
-3. Resolver con las líneas de negocio los casos `REVISAR` y `SIN_PESO` (nivel 1 cuando exista) y capturar en el layout con justificación; muestrear contra slip/SIREC los negocios `AJUSTAR` de mayor prima.
-4. Fijar y aprobar por escrito los parámetros; congelar los pesos (`Pesos_Aplicados` → `Pesos_Ramo_TEV_HyOR.xlsx`) si se quiere una corrida reproducible sin histórico crudo.
-5. Corrida productiva con `--aprobacion`. Revisar `Control_Participacion`, `Control_Share_LLAVE`, `Combos_Nuevos`, `Combos_Desaparecen` y `Verif_Insumos_CtaMens`; completar las llaves de cesión que falten para el ramo receptor.
-6. Apuntar `CtaMens.py` al archivo redistribuido (o usar `--sobrescribir-input`, que respalda el original). **Pasada 1** de CtaMens → regenerar `xDnCostoXL`, `xDnRecup`, `xDnEvCat`, `xDnAttritional` con la base redistribuida → **pasada 2** de CtaMens.
-7. Validación post-CtaMens por niveles (sección 11, punto 12), reservas incluidas, y comparación con 2026.
-8. Archivar junto al presupuesto: csv original, csv redistribuido, libro de trazabilidad, detalle fila a fila, log, layout, histórico, parámetros aprobados, matrices regeneradas y este documento.
+1. Dejar en `5_Generacion` los dos scripts (`0a_Actualizar_Base1.py` y `0_Redistribucion_TEV_HyOR.py`) y confirmar que `Inputs\PptoTecnico2027.csv` es el extracto original.
+2. Correr `0a_Actualizar_Base1.py`. Toma la Base_1 más reciente (en `Inputs`, `Inputs\Redistribución` u `Outputs`) y los CtaMens de cada año en `Outputs` (el más reciente por año), y escribe `Inputs\Redistribución\Base_1_{fecha}.csv` y `.xlsx`. Revisar en su libro de control `Fuentes_por_Anio`, `Particip_TEV_HyOR` y, si existe, `Previa_Excluida`.
+3. Correr `0_Redistribucion_TEV_HyOR.py`. Toma la Base_1 más reciente y el CtaMens 2026, aplica los criterios fijos y escribe `Inputs\PptoTecnico2027_Red.csv`. El log reporta la participación de Terremoto antes y después.
+4. Revisar el diagnóstico en `Outputs\Redistribucion_TEV_HyOR\Trazabilidad_*.xlsx`: `Alcance_LLAVEs`, `Ajustadas_Con_Alertas`, `Validar_SIREC`, `LLAVEs_Sin_Peso`, `Control_Participacion`, `Combos_Nuevos` y `Verif_Insumos_CtaMens`. Lo que haya que cambiar se captura en el layout (`EXCLUIR` / `FORZAR` con justificación) y se repite el paso 3.
+5. Apuntar `CtaMens.py` al archivo redistribuido (o usar `--sobrescribir-input`, que respalda el original). **Pasada 1** de CtaMens → regenerar `xDnCostoXL`, `xDnRecup`, `xDnEvCat`, `xDnAttritional` con la base redistribuida → **pasada 2** de CtaMens.
+6. Validación post-CtaMens por niveles (sección 11, punto 12), reservas incluidas, y comparación con 2026.
+7. Archivar junto al presupuesto: csv original, csv redistribuido, Base_1 usada, libros de control y trazabilidad, detalle fila a fila, logs, layout y este documento.
 
 ---
 
@@ -263,7 +280,8 @@ De lectura obligatoria en la trazabilidad:
 
 * **El histórico como estimador.** La participación real pasada de un negocio es la mejor evidencia disponible de su mezcla de ramos, pero no es una garantía: renovaciones con cambio de alcance, contratos nuevos, años con eventos CAT y años parciales la alteran. Las reglas de credibilidad, sensibilidad, cambio estructural y meses mínimos reducen el riesgo; el nivel 1 (condición contractual) y el layout lo cierran.
 * **Punto ciego.** El método corrige inconsistencias entre presupuesto y real; es ciego a errores comunes a ambos. Si la contabilidad asignara el ramo con la misma parametrización por contrato que alimentó al cargador, un negocio mal parametrizado se vería mono-ramo en ambos y quedaría en `NO_AJUSTAR`. La estabilidad del 58.4–58.8 % en 2023–2026 sugiere que el real no comparte el sesgo, pero debe confirmarse con Contabilidad, y el único remedio es el nivel 1: muestreo de slips de los negocios mono-ramo de mayor prima.
-* **Facultativos y contratos nulos.** La LLAVE 2026 agrupa bajo contrato 0 todo el facultativo de una cedente y LN (hasta 5 corredores en el extracto) y, en al menos un caso, varios contratos proporcionales distintos. Por eso quedan en `REVISAR`; la extensión natural es incluir el corredor o el año de suscripción en la LLAVE cuando el histórico lo permita.
+* **Facultativos y contratos nulos.** La LLAVE 2026 agrupa bajo contrato 0 todo el facultativo de una cedente y LN (hasta 5 corredores en el extracto) y, en al menos un caso, varios contratos proporcionales distintos. Se ajustan con el peso del grupo y se marcan `VALIDAR_SIREC`; `sirec_conexion.py` trae la conexión y la consulta para cotejarlos contrato por contrato. La extensión natural es incluir el corredor o el año de suscripción en la LLAVE cuando el histórico lo permita.
+* **Presupuesto 2026 como respaldo.** Para negocios sin real válido el peso es el reparto aprobado en 2026, no un real. Si ese reparto tenía un error, se hereda; por eso esos negocios llevan alerta y deben contrastarse con el real 2026 cuando exista.
 * **Un solo porcentaje por negocio.** En el extracto el porcentaje por ramo es idéntico por año de suscripción, corredor, moneda y año fiscal, así que un peso por LLAVE-tipo basta. Si el real mostrara mezclas distintas por año de suscripción, habría que refinar la llave.
 * **Matrices y reservas.** Las matrices XL y EvCat se dimensionan con la base; sin la segunda pasada el siniestro CAT y el costo XL del ramo receptor quedan en cero. El efecto llega a reservas por ramo.
 * **Cesión.** La prima movida toma la cesión del ramo receptor según las tablas de CtaMens; si faltan llaves para el ramo receptor, la cesión cae a fallbacks. `Verif_Insumos_CtaMens` existe para completarlas antes de correr CtaMens.
@@ -272,22 +290,20 @@ De lectura obligatoria en la trazabilidad:
 
 ---
 
-## 15. Decisiones pendientes (con recomendación)
+## 15. Decisiones (v2.0: criterios fijos ya aplicados)
 
-| Decisión | Opciones | Recomendación |
+| Decisión | Valor fijo en v2.0 | Alternativa disponible |
 |---|---|---|
-| Años base del histórico | 2026 solo / 2025 + 2026 al corte / 2024–2025 cerrados | **2025 + 2026 al corte con histórico mensual** y método ponderado; si 2026 no alcanza 8 meses en un negocio, el script lo excluye solo |
-| Tolerancia de alcance | 5 pp / la sugerida por el dato (p90) | **5 pp** en la primera corrida; comparar con la sugerida por el dato y fijar por escrito |
-| Comisiones | pesos propios con fallback a primas / siempre primas | **Propios con fallback** (coherente con 2026 y con el dato) |
-| Siniestros GL 54 (si existen) | pesos de primas / propios / no tocar | **Pesos de primas**; si se prefiere coherencia estricta con 2026, "no tocar" y documentarlo |
-| Años fiscales del reparto | todos / sólo 2027 | **Todos** (evita saltos entre años en el mismo negocio) |
-| Matrices XL y EvCat | dos pasadas con regeneración / una pasada | **Dos pasadas** (sección 9) |
-| Negocios sin información | dejar sin ajuste / promedio de cartera vía FORZAR | **Dejar sin ajuste y gestionarlos con la LN** |
-| Negocios ya cargados en ambos ramos que difieren del histórico | sobreescribir automáticamente / `REVISAR` y confirmar | **`REVISAR` y confirmar** |
-| Reclasificación total | automática / `REVISAR` y confirmar | **`REVISAR` y confirmar** |
-| Materialidad | 0 (todo) / 100,000 MXN anuales (precedente 2026) | **0** en la primera corrida para ver el universo completo; fijar después, por escrito, antes de ver agregados |
-| Facultativos y contratos nulos | `REVISAR` (defecto) / ajuste automático / LLAVE con corredor | **`REVISAR`** y pedir slip o número de contrato |
-| Gobernanza | histórico crudo en cada corrida / pesos congelados aprobados | **Pesos congelados aprobados** para la corrida productiva |
+| Años base del real | Automático: 2 últimos años reales completos (hoy 2024 y 2025) | `--anios-base` |
+| Respaldo sin real válido | Reparto del presupuesto 2026 aprobado del propio negocio | `--ppto-previo ''` para no usarlo |
+| Tolerancia de alcance | 5 puntos porcentuales | `--tolerancia` |
+| Cautelas (reclasificación total, credibilidad, sensibilidad, facultativos, contrato nulo, partición ya cargada) | Se ajusta y queda como alerta | `--modo-decision revisar` (las cautelas detienen el ajuste) |
+| Comisiones | Pesos propios con respaldo en los de primas | `--comisiones prima` |
+| Siniestros GL 54 (si existen) | Pesos de primas | `--siniestros no` |
+| Años fiscales del reparto | Todos | `--anios-fiscales 2027` |
+| Matrices XL y EvCat | Dos pasadas de CtaMens con regeneración | — |
+| Negocios sin información | Sin ajuste, listados en `LLAVEs_Sin_Peso` | Layout `FORZAR` con justificación |
+| Materialidad | 0 (todo el universo) | `--materialidad` |
 
 ---
 
@@ -300,8 +316,9 @@ De lectura obligatoria en la trazabilidad:
 
 ## Anexo A. Glosario
 
-* **TEV**: Terremoto y Erupción Volcánica (ramo 73, centro de beneficio `A073000000`).
-* **HyOR / HyORH**: Hidrometeorológicos y Otros Riesgos (ramo 71, `A071000000`).
+* **Terremoto / TEV**: Terremoto y Erupción Volcánica (ramo 71, centro de beneficio `A071000000`; RamoN "Terremoto" en `Subramo.csv`).
+* **HyORH / HyOR**: Huracán y otros riesgos hidrometeorológicos (ramo 73, `A073000000` y `A073000001`; RamoN "HyORH").
+* **FUENTE (Base_1)**: REAL (contabilizado) o PPTO (presupuesto, tomado de un CtaMens). Sólo REAL alimenta los pesos de nivel 2; PPTO del año anterior al de decisión alimenta el respaldo de nivel 2b.
 * **CtaMens**: script que genera la cuenta mensual presupuestada (prima tomada, cedida, retenida, costos XL, siniestros CAT, gastos) a partir del presupuesto técnico, y la base `ConsultaP.xlsx` para reservas.
 * **GL 61 / 53 / 54**: cuentas de primas, comisiones y siniestros (prefijo de `/ERP/GL_ACCT`).
 * **FISCYEAR / CALMONTH**: año fiscal y mes calendario de la fila presupuestada.

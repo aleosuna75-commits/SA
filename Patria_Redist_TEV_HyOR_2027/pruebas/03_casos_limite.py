@@ -10,7 +10,7 @@ os.chdir(sys.argv[1])
 os.makedirs('edge', exist_ok=True)
 def run(name, args, expect_ok=True, grep=None):
     out = f'edge/{name}'; os.makedirs(out, exist_ok=True)
-    cmd = [sys.executable, '-I', S, '--ppto', 'Inputs/PptoTecnico2027.csv', '--subramo', '/nonexistent', '--salida', f'{out}/Red.csv', '--out-dir', out] + args
+    cmd = [sys.executable, '-I', S, '--ppto', 'Inputs/PptoTecnico2027.csv', '--subramo', '/nonexistent', '--salida', f'{out}/Red.csv', '--out-dir', out, '--modo-decision', 'revisar', '--ppto-previo', ''] + (['--anios-base', '2025,2026'] if '--anios-base' not in args else []) + args
     r = subprocess.run(cmd, capture_output=True, text=True)
     ok = (r.returncode == 0)
     txt = r.stdout + r.stderr

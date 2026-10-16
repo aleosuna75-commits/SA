@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-0a_Actualizar_Base1.py  (versión 1.1)
+0a_Actualizar_Base1.py  (versión 2.0)
 =====================================
 Actualiza la Base_1 (histórico REAL por LLAVE, DescRamo, AñoCont y MesCont con PmaTom, CosTom, SinTom, ...)
 con la información real del año en curso, para que 0_Redistribucion_TEV_HyOR.py calcule los pesos por ramo
@@ -37,6 +37,7 @@ Uso:
 """
 
 import argparse
+import glob
 import getpass
 import logging
 import os
@@ -49,7 +50,7 @@ from datetime import datetime
 import numpy as np
 import pandas as pd
 
-VERSION = "1.1"
+VERSION = "2.0"
 
 # =============================================================================
 # PARÁMETROS (editar aquí o pasar por línea de comandos)
@@ -64,14 +65,14 @@ xRed = next((os.path.join(xFolder, "Inputs", n) for n in ("Redistribucion", "Red
             os.path.join(xFolder, "Inputs", "Redistribucion"))
 
 DEFAULTS = {
-    "previa": os.path.join(xRed, "Base_1.xlsx"),                    # Base_1 del año pasado (no se modifica)
-    "nueva": [os.path.join(xRed, "Base1_Nueva")],                   # archivo(s) o carpeta con la información real nueva
+    "previa": "AUTO",      # AUTO = la Base_1 más reciente (Inputs, Inputs\Redistribución, Outputs); nunca se modifica
+    "nueva": ["AUTO"],     # AUTO = CtaMens de cada año en Outputs (el más reciente por año) + archivos en Inputs\Redistribución\Base1_Nueva (reales)
     "subramo": os.path.join(xFolder, "Inputs", "Subramo.csv"),      # CeBe -> ramo (sólo para formato SAP)
     "pais": os.path.join(xFolder, "Inputs", "Pais.csv"),            # TerrSAP -> Territorio (sólo para formato SAP)
     "mapa_descramo": "",                                            # opcional: CeBe -> DescRamo (prevalece sobre Subramo)
     "mapa_gl": "",                                                  # opcional: GL (prefijo) -> METRICA, SIGNO
-    "salida_csv": os.path.join(xRed, "Hist_Real_LLAVE_Ramo.csv"),   # insumo por defecto de 0_Redistribucion_TEV_HyOR.py
-    "salida_xlsx": os.path.join(xRed, "Base_1_Actualizada.xlsx"),   # para Base1_global.py (si cabe en Excel)
+    "salida_csv": "AUTO",  # AUTO = Inputs\Redistribución\Base_1_{fecha}.csv (la redistribución toma siempre la Base_1 más reciente)
+    "salida_xlsx": "AUTO", # AUTO = Inputs\Redistribución\Base_1_{fecha}.xlsx (para Base1_global.py)
     "out_dir": os.path.join(xFolder, "Outputs", "Actualizacion_Base1"),
     "filtros": [],                                                  # p.ej. ["/ERP/CATEGORY=REAL01"]
     "tolerancia_traslape": 0.01,                                    # 1 % por métrica y por ramo en los meses de traslape
@@ -185,6 +186,44 @@ def archivos_nuevos(rutas):
     return out
 
 
+def buscar_base1_reciente():
+    dirs = [os.path.join(xFolder, "Inputs"), os.path.join(xFolder, "Inputs", "Redistribucion"), os.path.join(xFolder, "Inputs", "Redistribución"),
+            os.path.join(xFolder, "Outputs"), os.path.join(xFolder, "Outputs", "Base_1")]
+    cands = []
+    for d in dirs:
+        for pat in ("Base_1*.csv", "Base_1*.xlsx", "Base1*.csv", "Base1*.xlsx"):
+            cands += [x for x in glob.glob(os.path.join(d, pat)) if not os.path.basename(x).startswith("~$")]
+    if not cands:
+        raise ErrorBase1("No se encontró ninguna Base_1 (Base_1*.xlsx/csv) en:\n  " + "\n  ".join(dirs))
+    return sorted(set(cands), key=lambda x: (max(os.path.getmtime(y) for y in cands if os.path.splitext(y)[0] == os.path.splitext(x)[0]), x.lower().endswith(".csv")), reverse=True)[0]
+
+
+def buscar_nuevos_auto(log):
+    """CtaMens en Outputs (el más reciente por año: CtaMens_AAAA_*.xlsx/csv o BD_CtaMens_MMAA*.xlsx/csv) + archivos reales en Base1_Nueva."""
+    out = os.path.join(xFolder, "Outputs")
+    por_anio = {}
+    for x in glob.glob(os.path.join(out, "*.xlsx")) + glob.glob(os.path.join(out, "*.csv")):
+        b = os.path.basename(x)
+        if b.startswith("~$"):
+            continue
+        m1 = re.match(r"CtaMens_(20\d{2})", b, re.I)
+        m2 = re.match(r"BD_CtaMens_(\d{2})(\d{2})", b, re.I)
+        anio = int(m1.group(1)) if m1 else (2000 + int(m2.group(2)) if m2 else None)
+        if anio is None:
+            continue
+        if anio not in por_anio or os.path.getmtime(x) > os.path.getmtime(por_anio[anio]):
+            por_anio[anio] = x
+    archivos = [por_anio[a] for a in sorted(por_anio)]
+    for a in sorted(por_anio):
+        log.info("  CtaMens %s: %s", a, por_anio[a])
+    real = os.path.join(xRed, "Base1_Nueva")
+    if os.path.isdir(real):
+        archivos.append(real)
+    if not archivos:
+        raise ErrorBase1(f"No se encontró ningún CtaMens (CtaMens_AAAA_*.xlsx o BD_CtaMens_MMAA*.xlsx) en {out} ni carpeta {real}.")
+    return archivos
+
+
 def setup_logger(out_dir, ts):
     os.makedirs(out_dir, exist_ok=True)
     log = logging.getLogger("base1")
@@ -234,7 +273,10 @@ def preparar_previa(prev, c, metricas):
 def detectar_formato(df):
     if all(buscar(df, [k]) is not None for k in ["LLAVE", "DescRamo", "MesCont", "PmaTom"]) and buscar(df, ["AñoCont", "AnioCont"]) is not None:
         return "BASE1"
-    if all(buscar(df, v) is not None for v in [["/ERP/GL_ACCT", "GL_ACCT"], ["/ERP/AMOUNT", "AMOUNT"], ["/ERP/PROFTCTR", "PROFTCTR", "CeBe"]]):
+    if all(buscar(df, v) is not None for v in [["/ERP/GL_ACCT", "GL_ACCT", "TY"], ["/ERP/AMOUNT", "AMOUNT", "MONTO"], ["/ERP/PROFTCTR", "PROFTCTR", "CeBe"]]):
+        # salida o BD de CtaMens (presupuesto): trae el cálculo de cesión y llaves de CtaMens
+        if any(buscar(df, [k]) is not None for k in ["RETENIDA", "CEDIDA", "LLAVE1", "LLAVE2"]):
+            return "CTAMENS"
         return "SAP"
     return None
 
@@ -261,7 +303,7 @@ def nueva_formato_base1(df, prev_cols, metricas, c, log):
 
 def periodo_sap(df, p, log):
     """(año, mes) desde 0CALMONTH (AAAAMM, MM.AAAA) o 0FISCPER (AAAAPPP, PPP.AAAA) o 0FISCYEAR+0FISCPER3. Aborta si no se puede leer."""
-    ccal = buscar(df, ["0CALMONTH", "CALMONTH"])
+    ccal = buscar(df, ["0CALMONTH", "CALMONTH", "PERIODO"])
     cfp = buscar(df, ["0FISCPER", "FISCPER"])
     cfy, cp3 = buscar(df, ["0FISCYEAR", "FISCYEAR"]), buscar(df, ["0FISCPER3", "FISCPER3"])
     cvar = buscar(df, ["0FISCVARNT", "FISCVARNT"])
@@ -382,9 +424,9 @@ def aprender_columna(prev, col_dest, clave_prev):
     return d.drop_duplicates("K").set_index("K")["V"]
 
 
-def nueva_formato_sap(df, prev, prev_cols, metricas, c, p, log, nombre):
-    """Convierte un extracto SAP de reales al formato de la Base_1 previa."""
-    ctx = f"Extracto SAP {nombre}"
+def nueva_formato_sap(df, prev, prev_cols, metricas, c, p, log, nombre, es_ppto=False, etiqueta="REAL"):
+    """Convierte un extracto SAP de reales, o una salida/BD de CtaMens (presupuesto, es_ppto=True), al formato de la Base_1 previa."""
+    ctx = f"{'CtaMens' if es_ppto else 'Extracto SAP'} {nombre}"
     df = df.copy()
     df.columns = [str(x).strip() for x in df.columns]
     # filtros explícitos
@@ -408,7 +450,7 @@ def nueva_formato_sap(df, prev, prev_cols, metricas, c, p, log, nombre):
             if nombre_col == "categoría" and vals and vals[0].upper().startswith("PRES"):
                 raise ErrorBase1(f"{ctx}: la categoría es {vals[0]} (presupuesto). La Base_1 es histórico REAL; use el extracto de reales.")
             log.info("  %s: %s", nombre_col, vals)
-    cgl = buscar(df, ["/ERP/GL_ACCT", "GL_ACCT"]); camt = buscar(df, ["/ERP/AMOUNT", "AMOUNT"])
+    cgl = buscar(df, ["/ERP/GL_ACCT", "GL_ACCT", "TY"]); camt = buscar(df, ["/ERP/AMOUNT", "AMOUNT", "MONTO"])
     cprof = buscar(df, ["/ERP/PROFTCTR", "PROFTCTR", "CeBe"]); cfunc = buscar(df, ["/ERP/FUNCAREA", "FUNCAREA"])
     ctr, cced, ccto = buscar(df, ["ZTIPOREAS"]), buscar(df, ["ZCEDENTE"]), buscar(df, ["ZCONTRATO"])
     falt = [n for n, v in [("FUNCAREA", cfunc), ("ZTIPOREAS", ctr), ("ZCEDENTE", cced), ("ZCONTRATO", ccto)] if v is None]
@@ -446,13 +488,27 @@ def nueva_formato_sap(df, prev, prev_cols, metricas, c, p, log, nombre):
     mapa_desc, fuente_desc, conflictos, desc_prev = mapa_cebe_descramo(prev, c, p, log)
     cebe = df[cprof].astype(str).str.strip()
     df["_DESC"] = cebe.map(mapa_desc)
+    ctxt = buscar(df, ["RamoN"])
+    if ctxt is None and es_ppto:
+        cr = buscar(df, ["RAMO"])
+        if cr is not None and pd.to_numeric(df[cr], errors="coerce").isna().all():
+            ctxt = cr
+    if es_ppto and ctxt is not None:
+        # el CtaMens trae el nombre del ramo (Subramo.csv RamoN): se usa tal cual, con la ortografía de la previa cuando coincide
+        por_norm = {}
+        for v in sorted(desc_prev):
+            por_norm.setdefault(norm_txt(v), v)
+        df["_DESC"] = df[ctxt].map(lambda v: por_norm.get(norm_txt(v), str(v).strip()) if pd.notna(v) else np.nan).where(df[ctxt].notna(), df["_DESC"])
+        log.info("  DescRamo desde la columna %s del CtaMens (ortografía de la previa cuando coincide)", ctxt)
     sin_ramo = df[df["_DESC"].isna()]
     if not sin_ramo.empty:
         t = sin_ramo.groupby(cebe[sin_ramo.index])["_VAL"].agg(["count", "sum"]).sort_values("sum", key=abs, ascending=False)
         raise ErrorBase1(f"{ctx}: {len(t)} centros de beneficio sin DescRamo (ni en la Base_1 previa, ni en Subramo.csv, ni en mapa_descramo). "
                          f"Agréguelos a un mapa CeBe -> DescRamo (--mapa-descramo). Principales:\n{t.head(15).to_string()}")
     nuevos_desc = sorted(set(df["_DESC"].unique()) - desc_prev)
-    if nuevos_desc and not p["permitir_descramo_nuevo"]:
+    if nuevos_desc and es_ppto:
+        log.warning("  %s: ramos %s no existen con ese nombre en la Base_1 previa; se conservan con el nombre del CtaMens.", ctx, nuevos_desc)
+    elif nuevos_desc and not p["permitir_descramo_nuevo"]:
         raise ErrorBase1(f"{ctx}: los ramos {nuevos_desc} no existen en la Base_1 previa ({sorted(desc_prev)}). Un nombre distinto partiría la historia del ramo en dos. "
                          "Corrija el mapa (--mapa-descramo) o, si de verdad es un ramo nuevo, use --permitir-descramo-nuevo.")
     # columnas de la previa: directas, aprendidas o vacías
@@ -463,6 +519,7 @@ def nueva_formato_sap(df, prev, prev_cols, metricas, c, p, log, nombre):
         "ZSUSCYEAR": buscar(df, ["ZSUSCYEAR"]), "SUSC": buscar(df, ["ZSUSCYEAR"]), "ANOSUSC": buscar(df, ["ZSUSCYEAR"]),
         "ZCORREDOR": buscar(df, ["ZCORREDOR"]), "CORREDOR": buscar(df, ["ZCORREDOR"]), "ZREGIONRP": buscar(df, ["ZREGIONRP"]),
         "REGION": buscar(df, ["ZREGIONRP"]), "TERRSAP": buscar(df, ["ZREGIONRP"]),
+        "TERRITORIO": buscar(df, ["Territorio"]), "FUNCAREA2": buscar(df, ["FUNCAREA_2"]),
     }
     llenado, salida = [], pd.DataFrame(index=df.index)
     func_prev = llave_canonica(prev[c["LLAVE"]]).str.split("-").str[-1]
@@ -472,11 +529,13 @@ def nueva_formato_sap(df, prev, prev_cols, metricas, c, p, log, nombre):
         if pc in metricas:
             continue
         n = norm(pc)
-        if pc in directas:
+        if n == "FUENTE":
+            salida[pc] = etiqueta; metodo = f"ETIQUETA ({etiqueta})"
+        elif pc in directas:
             salida[pc] = df[directas[pc]]; metodo = "DIRECTA"
         elif n in equivalentes and equivalentes[n] is not None:
             src = equivalentes[n]
-            salida[pc] = df[src].map(tramo) if n not in ("FUNCAREA", "LN", "CEBE", "PROFTCTR", "ZREGIONRP", "REGION", "TERRSAP") else df[src].astype(str).str.strip()
+            salida[pc] = df[src].map(tramo) if n not in ("FUNCAREA", "LN", "CEBE", "PROFTCTR", "ZREGIONRP", "REGION", "TERRSAP", "TERRITORIO", "FUNCAREA2") else df[src].astype(str).str.strip()
             metodo = f"DIRECTA ({src})"
         elif n == "TERRITORIO" and buscar(df, ["ZREGIONRP"]) is not None and p["pais"] and os.path.isfile(p["pais"]):
             pa = leer(p["pais"]); ct, cv = buscar(pa, ["TerrSAP"]), buscar(pa, ["Territorio"])
@@ -498,6 +557,17 @@ def nueva_formato_sap(df, prev, prev_cols, metricas, c, p, log, nombre):
     # agregación al grano de la Base_1: dimensiones + periodo, métricas en columnas
     dims = [pc for pc in prev_cols if pc not in metricas]
     salida["_MET"] = df["_MET"]; salida["_VAL"] = df["_VAL"]
+    cret = buscar(df, ["RETENIDA"])
+    ret_de = {"PMATOM": "PmaRet", "COSTOM": "CosRet", "SINTOM": "SinRet", "COMTOM": "ComRet"}
+    mets_prev = {norm(m): m for m in metricas}
+    if cret is not None:  # retenidas calculadas por el propio CtaMens (misma convención de signo que la tomada)
+        r = salida.copy()
+        r["_MET"] = df["_MET"].map(lambda m: mets_prev.get(norm(ret_de.get(norm(m), "")), None))
+        r["_VAL"] = a_num(df[cret], cret, ctx).fillna(0.0) * df["_SIG"]
+        r = r[r["_MET"].notna()]
+        if len(r):
+            salida = pd.concat([salida, r], ignore_index=True)
+            log.info("  retenidas desde la columna %s del CtaMens -> %s", cret, sorted(r["_MET"].unique()))
     llaves_grupo = dims + ["_MET"]
     tmp = salida.copy()
     for d in dims:
@@ -556,17 +626,20 @@ def evaluar_traslape(t, tol, mat):
     return (not fallas), fallas, ratios
 
 
-def participacion_tev_hyor(base, c, cpma):
-    d = base[[c["DESC"], c["ANIO"], cpma]].copy()
+def participacion_tev_hyor(base, c, cpma, cfu="FUENTE"):
+    """Participación de Terremoto (A071000000) frente a HyORH (A073000000) por año y tipo de fuente (REAL/PPTO)."""
+    cols = [c["DESC"], c["ANIO"], cpma] + ([cfu] if cfu in base.columns else [])
+    d = base[cols].copy()
     t = d[c["DESC"]].map(norm_txt)
-    d["RAMO"] = np.where(t.str.startswith("TERR") | (t == "TEV"), "Terremoto (73)", np.where(t.str.startswith(("HYO", "HIDRO")), "HyOR (71)", None))
+    d["RAMO"] = np.where(t.str.startswith("TERR") | (t == "TEV"), "Terremoto", np.where(t.str.startswith(("HYO", "HIDRO")), "HyORH", None))
+    d["TIPO_FUENTE"] = d[cfu].astype(str).str.split().str[0].str.upper() if cfu in d.columns else "REAL"
     d = d[d["RAMO"].notna()]
     if d.empty:
         return pd.DataFrame()
-    p = d.pivot_table(index=c["ANIO"], columns="RAMO", values=cpma, aggfunc="sum").fillna(0.0)
+    p = d.pivot_table(index=[c["ANIO"], "TIPO_FUENTE"], columns="RAMO", values=cpma, aggfunc="sum").fillna(0.0)
     tot = p.sum(axis=1)
-    if "Terremoto (73)" in p:
-        p["PCT_TERREMOTO"] = np.where(tot != 0, p["Terremoto (73)"] / tot, np.nan)
+    if "Terremoto" in p:
+        p["PCT_TERREMOTO"] = np.where(tot != 0, p["Terremoto"] / tot, np.nan)
     return p.reset_index()
 
 
@@ -577,6 +650,14 @@ def main(p):
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
     log = setup_logger(p["out_dir"], ts)
     log.info("=== Actualización Base_1 | script v%s | pandas %s ===", VERSION, pd.__version__)
+    if str(p["previa"]).upper() == "AUTO":
+        p["previa"] = buscar_base1_reciente()
+    if [str(x).upper() for x in p["nueva"]] == ["AUTO"]:
+        p["nueva"] = buscar_nuevos_auto(log)
+    if str(p["salida_csv"]).upper() == "AUTO":
+        p["salida_csv"] = os.path.join(xRed, f"Base_1_{ts}.csv")
+    if str(p["salida_xlsx"]).upper() == "AUTO":
+        p["salida_xlsx"] = os.path.join(xRed, f"Base_1_{ts}.xlsx")
     log.info("Previa: %s | Nueva: %s | Salida: %s", p["previa"], p["nueva"], p["salida_csv"])
     if not os.path.isfile(p["previa"]):
         cands = [os.path.join(xFolder, "Inputs", n, "Base_1.xlsx") for n in ("Redistribucion", "Redistribución")] + [os.path.join(xFolder, "Inputs", "Base_1.xlsx")]
@@ -594,11 +675,12 @@ def main(p):
     prev_raw.columns = [str(x).strip() for x in prev_raw.columns]
     c, metricas, dims = esquema_previa(prev_raw)
     prev = preparar_previa(prev_raw, c, metricas)
+    cfu_prev = buscar(prev, ["FUENTE"])
     # Periodos posteriores a la fecha del archivo no pueden ser reales (p.ej. 2026 en una Base_1 guardada en dic-2025: presupuesto o proyección)
     mt = datetime.fromtimestamp(os.path.getmtime(p["previa"]))
     cod_mt = mt.year * 100 + mt.month
     cod_prev = prev[c["ANIO"]].astype(int) * 100 + prev[c["MES"]].astype(int)
-    futuros = cod_prev > cod_mt
+    futuros = (cod_prev > cod_mt) & (cfu_prev is None)  # con columna FUENTE, la propia FUENTE dice qué es real y qué es presupuesto
     excluida = pd.DataFrame()
     if futuros.any():
         excluida = prev[futuros].groupby([c["ANIO"], c["MES"]])[metricas].sum(min_count=1).reset_index()
@@ -613,6 +695,11 @@ def main(p):
                         "El real de esos meses debe venir en la información nueva.", mt.strftime("%d/%m/%Y"), int(futuros.sum()),
                         cod_prev[futuros].min(), cod_prev[futuros].max())
             prev = prev[~futuros].reset_index(drop=True)
+    if cfu_prev is None:
+        prev["FUENTE"] = "REAL (Base_1 previa)"
+        cfu_prev = "FUENTE"
+    prev[cfu_prev] = prev[cfu_prev].fillna("REAL (Base_1 previa)").astype(str)
+    es_real_prev = prev[cfu_prev].str.upper().str.startswith("REAL")
     prev_cols = list(prev.columns)
     cpma = next(m for m in metricas if norm(m) == "PMATOM")
     per_prev = set(zip(prev[c["ANIO"]].astype(int), prev[c["MES"]].astype(int)))
@@ -632,22 +719,58 @@ def main(p):
         log.info("Archivo nuevo %s: formato %s, %s filas", nombre, fmt, len(df))
         if fmt == "BASE1":
             g, faltan, llen = nueva_formato_base1(df, prev_cols, metricas, c, log)
+            g[cfu_prev] = g[cfu_prev].where(g[cfu_prev].notna(), "REAL (" + nombre + ")").astype(str)
             info = {"signos": {}, "fuente_periodo": "AñoCont/MesCont"}
+        elif fmt == "CTAMENS":
+            anios_f = sorted(set(pd.to_numeric(df[buscar(df, ["PERIODO", "CALMONTH", "0CALMONTH"])], errors="coerce").dropna().astype(int) // 100))
+            etiqueta = f"PPTO {'/'.join(map(str, anios_f))} ({nombre})"
+            g, llen, info = nueva_formato_sap(df, prev, prev_cols, metricas, c, p, log, nombre, es_ppto=True, etiqueta=etiqueta)
+            # signo: sin meses reales con qué compararlo, se alinea con el signo predominante de la parte REAL de la previa
+            for m in metricas:
+                if norm(m) in {norm(k) for k in p["signos"]}:
+                    continue
+                sp, sn = prev.loc[es_real_prev, m].sum(), g[m].sum()
+                if pd.notna(sp) and pd.notna(sn) and sp != 0 and sn != 0 and np.sign(sp) != np.sign(sn):
+                    g[m] = -g[m]
+                    info.setdefault("signos_ajustados", []).append(m)
+            if info.get("signos_ajustados"):
+                log.info("  signo alineado con la previa (real) en %s", info["signos_ajustados"])
         else:
-            g, llen, info = nueva_formato_sap(df, prev, prev_cols, metricas, c, p, log, nombre)
+            g, llen, info = nueva_formato_sap(df, prev, prev_cols, metricas, c, p, log, nombre, es_ppto=False, etiqueta=f"REAL SAP ({nombre})")
         if g[c["ANIO"]].isna().any() or g[c["MES"]].isna().any():
             raise ErrorBase1(f"{nombre}: hay filas sin AñoCont o MesCont.")
+        es_ppto_g = fmt == "CTAMENS" or g[cfu_prev].astype(str).str.upper().str.startswith("PPTO").all()
         per = set(zip(g[c["ANIO"]].astype(int), g[c["MES"]].astype(int)))
-        for (o_nombre, o_per) in origen:
+        for (o_nombre, o_per, o_ppto) in origen:
             dup = per & o_per
-            if dup:
+            if dup and o_ppto == es_ppto_g:
                 raise ErrorBase1(f"Los archivos {o_nombre} y {nombre} traen los mismos periodos {sorted(dup)[:6]}: se duplicaría la información. Deje sólo uno por periodo.")
-        origen.append((nombre, per))
-        partes.append(g); llenados.append(pd.DataFrame(llen).assign(ARCHIVO=nombre)); infos.append((nombre, fmt, info))
-    nueva = pd.concat(partes, ignore_index=True)
+        origen.append((nombre, per, es_ppto_g))
+        partes.append((g, es_ppto_g)); llenados.append(pd.DataFrame(llen).assign(ARCHIVO=nombre)); infos.append((nombre, fmt, info))
+    # el real manda: un presupuesto nunca reemplaza meses reales (ni de la previa ni de los archivos nuevos)
+    cod = lambda d: d[c["ANIO"]].astype(int) * 100 + d[c["MES"]].astype(int)
+    reales_nuevos = [g for g, pp in partes if not pp]
+    cod_real = set(cod(prev[es_real_prev])) | (set(pd.concat([cod(g) for g in reales_nuevos])) if reales_nuevos else set())
+    partes_ok, descartes = [], []
+    for g, pp in partes:
+        if pp:
+            pisa = cod(g).isin(cod_real)
+            if pisa.any():
+                descartes.append({"FUENTE": g[cfu_prev].iloc[0], "PERIODOS_DESCARTADOS": ", ".join(map(str, sorted(set(cod(g)[pisa])))), "FILAS": int(pisa.sum())})
+                log.warning("  %s: %s filas de periodos que ya son reales (%s) se descartan: el real manda.", g[cfu_prev].iloc[0], int(pisa.sum()),
+                            sorted(set(cod(g)[pisa]))[:12])
+                g = g[~pisa]
+        partes_ok.append(g)
+    nueva = pd.concat(partes_ok, ignore_index=True)
+    if nueva.empty:
+        raise ErrorBase1("La información nueva no aporta ningún periodo (todo estaba ya como real en la Base_1 previa).")
     per_new = set(zip(nueva[c["ANIO"]].astype(int), nueva[c["MES"]].astype(int)))
-    per_tras = per_prev & per_new
+    es_real_new = nueva[cfu_prev].astype(str).str.upper().str.startswith("REAL")
+    per_prev_real = set(zip(prev.loc[es_real_prev, c["ANIO"]].astype(int), prev.loc[es_real_prev, c["MES"]].astype(int)))
+    per_new_real = set(zip(nueva.loc[es_real_new, c["ANIO"]].astype(int), nueva.loc[es_real_new, c["MES"]].astype(int)))
+    per_tras = per_prev_real & per_new_real  # el traslape sólo valida información REAL contra REAL
     hay_sap = any(fmt == "SAP" for _, fmt, _ in infos)
+    solo_ppto = not es_real_new.any()
     log.info("Información nueva: %s filas | periodos %s-%02d a %s-%02d (%s meses) | traslape con la previa: %s meses %s",
              len(nueva), *min(per_new), *max(per_new), len(per_new), len(per_tras), sorted(per_tras))
 
@@ -655,7 +778,7 @@ def main(p):
     ajustes_signo = {}
     traslape_ok, fallas, tabla_tras = True, [], pd.DataFrame()
     if per_tras:
-        tabla_tras = comparar_traslape(prev, nueva, c, metricas, per_tras)
+        tabla_tras = comparar_traslape(prev[es_real_prev], nueva[es_real_new], c, metricas, per_tras)
         traslape_ok, fallas, ratios = evaluar_traslape(tabla_tras, p["tolerancia_traslape"], p["materialidad_traslape"])
         # signo invertido en un extracto SAP sin signo explícito del usuario: se corrige y se documenta
         if hay_sap:
@@ -663,14 +786,16 @@ def main(p):
                 if norm(m) in {norm(k) for k in p["signos"]}:
                     continue
                 if pd.notna(r) and abs(r + 1) <= p["tolerancia_traslape"]:
-                    nueva[m] = -nueva[m]; ajustes_signo[m] = "invertido: el traslape mostró la nueva = -1 x previa"
+                    nueva.loc[es_real_new, m] = -nueva.loc[es_real_new, m]; ajustes_signo[m] = "invertido: el traslape mostró la nueva = -1 x previa"
                     log.warning("Signo de %s invertido por evidencia del traslape (razón nueva/previa = %.4f)", m, r)
             if ajustes_signo:
-                tabla_tras = comparar_traslape(prev, nueva, c, metricas, per_tras)
+                tabla_tras = comparar_traslape(prev[es_real_prev], nueva[es_real_new], c, metricas, per_tras)
                 traslape_ok, fallas, ratios = evaluar_traslape(tabla_tras, p["tolerancia_traslape"], p["materialidad_traslape"])
         log.info("Traslape (razón nueva/previa por métrica): %s", {k: round(v, 6) for k, v in ratios.items()})
         if not traslape_ok:
             log.error("El traslape NO cuadra (tolerancia %.2f%%):\n  %s", 100 * p["tolerancia_traslape"], "\n  ".join(fallas[:30]))
+    elif solo_ppto:
+        log.info("La información nueva es sólo presupuesto (CtaMens): no aplica el traslape con el real. Se marca con FUENTE = PPTO y nunca sustituye meses reales.")
     else:
         msg = ("No hay meses de traslape entre la previa y la información nueva: no se puede comprobar con datos que la consulta nueva "
                "tenga la misma definición (cuentas, signo, LLAVE, ramo). Recomendación: extraiga también los últimos 2-3 meses que ya están en la Base_1 previa.")
@@ -721,14 +846,16 @@ def main(p):
              100 * pct_llave_conocida if pd.notna(pct_llave_conocida) else float("nan"), llaves_nuevas["LLAVE"].nunique())
     if pd.notna(pct_llave_conocida) and pct_llave_conocida < 0.5:
         log.warning("Menos de la mitad de la prima nueva cae en LLAVEs conocidas: revise que la LLAVE se construya igual que en la Base_1 previa.")
-    part = participacion_tev_hyor(final, c, cpma)
+    part = participacion_tev_hyor(final, c, cpma, cfu_prev)
+    fuentes_tab = final.groupby([cfu_prev, c["ANIO"]], dropna=False).agg(FILAS=(cpma, "size"), PmaTom=(cpma, "sum"),
+                                                                       MESES=(c["MES"], "nunique")).reset_index()
     if not part.empty:
         log.info("Participación Terremoto vs HyOR en la base actualizada (PmaTom):\n%s", part.round(4).to_string(index=False))
     log.info("Cuadre: %s | filas %s = %s previa intacta + %s nueva", "OK" if cuadre_ok else "FALLA", len(final), len(prev_keep), len(nueva))
 
     # --- libro de control ---
     resumen = [
-        ("version_script", VERSION), ("fecha", ts), ("previa", p["previa"]), ("archivos_nuevos", ", ".join(n for n, _ in origen)),
+        ("version_script", VERSION), ("fecha", ts), ("previa", p["previa"]), ("archivos_nuevos", ", ".join(o[0] for o in origen)),
         ("previa_fecha_archivo", mt.strftime("%d/%m/%Y")), ("previa_filas_excluidas_posteriores", int(excluida["FILAS"].sum()) if not excluida.empty else 0),
         ("filas_previa", len(prev)), ("filas_previa_reemplazadas", len(prev_out)), ("filas_nuevas", len(nueva)), ("filas_final", len(final)),
         ("periodos_nuevos", f"{min(per_new)[0]}-{min(per_new)[1]:02d} a {max(per_new)[0]}-{max(per_new)[1]:02d} ({len(per_new)})"),
@@ -750,6 +877,9 @@ def main(p):
         pd.DataFrame({"FALLAS_TRASLAPE": fallas}).to_excel(w, sheet_name="Fallas", index=False)
         if not excluida.empty:
             excluida.to_excel(w, sheet_name="Previa_Excluida", index=False)
+        fuentes_tab.to_excel(w, sheet_name="Fuentes_por_Anio", index=False)
+        if descartes:
+            pd.DataFrame(descartes).to_excel(w, sheet_name="PPTO_Descartado", index=False)
         cuadre.to_excel(w, sheet_name="Cuadre", index=False)
         (tabla_tras if not tabla_tras.empty else pd.DataFrame({"NOTA": ["Sin meses de traslape"]})).to_excel(w, sheet_name="Traslape", index=False)
         periodos.to_excel(w, sheet_name="Periodos", index=False)

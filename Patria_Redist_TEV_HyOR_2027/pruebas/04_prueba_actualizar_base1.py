@@ -214,7 +214,7 @@ r = subprocess.run([sys.executable, REDIST, "--ppto", os.path.join(ppto_dir, "Pp
                     "--subramo", "", "--pais", "", "--cesion", "", "--cesionpi", "", "--cesion-hist", "", "--matxl", "", "--dncostoxl", "",
                     "--dnrecup", "", "--evcat", "", "--attritional", "", "--pesos", "", "--td", "", "--layout", ""],
                    capture_output=True, text=True, encoding="utf-8", errors="replace")
-okr = r.returncode == 0 and "Años base efectivos: [2025]" in r.stdout
+okr = r.returncode == 0 and "no pueden ser reales y NO se usan" in r.stdout and "2 últimos años reales completos, >= 8 meses en la base): [2024, 2025]" in r.stdout
 print(f"[{'OK' if okr else 'FALLA'}] a19_redistribucion_excluye_anios_posteriores_al_archivo")
 if not okr:
     print((r.stdout + r.stderr)[-2000:])
