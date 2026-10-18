@@ -1,4 +1,4 @@
-# Scripts previos a CtaMens: `0a_Actualizar_Base1.py` y `0_Redistribucion_TEV_HyOR.py` (v2.0)
+# Scripts previos a CtaMens: `0a_Actualizar_Base1.py` (v2.0) y `0_Redistribucion_TEV_HyOR.py` (v2.2)
 
 Redistribuyen primas (GL 61), comisiones (GL 53) y, opcionalmente, siniestros (GL 54) entre los ramos
 **71 Terremoto (`A071000000`)** y **73 HyORH (`A073000000`)** en `Inputs\PptoTecnico2027.csv`, **antes** de correr `CtaMens.py`.
@@ -78,6 +78,9 @@ Con cada corrida de `0a_Actualizar_Base1.py` se genera una Base_1 nueva con fech
 | `hist` | `AUTO` | La Base_1 más reciente (o una ruta con `--hist`). |
 | `ppto_previo` | `AUTO` | CtaMens del presupuesto aprobado del año anterior en `Outputs` (respaldo de pesos); `''` para no usarlo. |
 | `modo_decision` | `fijo` | Criterios fijos: todo lo que difiere más que la tolerancia se ajusta y las cautelas quedan como `ALERTAS`. `revisar` = comportamiento v1. |
+| `cartera_nuevos` | `True` | Contratos sin datos propios cargados en un solo ramo toman la mezcla de su grupo (cedente > LN y tipo de reaseguro > LN); grupo mono-ramo = no se tocan. `--sin-cartera` lo apaga. |
+| `cartera_min_llaves` | `{CEDENTE: 1, LN_TIPOREA: 3, LN: 3}` | Otras LLAVEs con datos que debe tener el grupo para usarse. |
+| `sirec` | `True` | Al terminar, consulta SIREC para los negocios `VALIDAR_SIREC`; si falla sólo avisa. `--sin-sirec` lo omite. |
 | `anios_base` | `AUTO` | Los 2 últimos años REALES completos anteriores al año de decisión (hoy 2024 y 2025). |
 | `metodo_pesos` | `ponderado` | `ponderado`: suma de \|montos\| de los años base válidos. `ultimo`: último año válido. `promedio_simple`: promedio de las participaciones anuales. |
 | `min_meses_anio` | `8` | Un año base cuenta si la **base** tiene información real en al menos 8 meses de ese año (completitud del corte, no de cada negocio). |
@@ -154,7 +157,8 @@ signos opuestos entre ramos → inválido). Las LLAVEs con tramo de contrato vac
 | `SIN_PESO` | Sin peso contractual, ni real válido, ni presupuesto aprobado 2026 | Conseguir el dato (condición contractual → `FORZAR`) |
 | `REVISAR` | Sólo en `--modo-decision revisar` | Confirmar con `INCLUIR` / `EXCLUIR` |
 
-`FUENTE_PESO` dice de dónde salió el porcentaje (`HIST_ponderado` = real; `PPTO_APROBADO_2026` = respaldo; `LAYOUT_FORZADO` = contrato).
+`FUENTE_PESO` dice de dónde salió el porcentaje (`HIST_ponderado` = real; `PPTO_APROBADO_2026` = respaldo; `CARTERA_*` = contrato nuevo con la mezcla
+de su grupo; `LAYOUT_FORZADO` = contrato). La hoja `Cartera_Nuevos` explica, contrato por contrato, qué grupo se usó o por qué no se tocó.
 `VALIDAR_SIREC` marca facultativos y contratos nulos, que conviene cotejar contrato por contrato con `sirec_conexion.py`.
 
 ## 5. Qué produce
@@ -218,9 +222,10 @@ y unos 50 s la trazabilidad. Memoria pico del orden de 3 a 4 GB por millón de f
 
 **Pruebas de la v2.0.** Los 24 casos de `03_casos_limite.py` corren con `--modo-decision revisar` para seguir midiendo el comportamiento v1.
 `pruebas/04_prueba_actualizar_base1.py` (20 verificaciones) prueba la Base_1: traslape, signos, categorías, CeBe sin ramo, formatos SAP y Base_1,
-periodos posteriores a la fecha del archivo y lectura por la redistribución. `pruebas/05_prueba_criterios_fijos.py` (15 verificaciones) prueba
+periodos posteriores a la fecha del archivo y lectura por la redistribución. `pruebas/05_prueba_criterios_fijos.py` (21 verificaciones) prueba
 los criterios fijos: búsqueda de la Base_1 más reciente, traducción Terremoto = 71 / HyORH = 73, años base automáticos, peso real,
-respaldo con el presupuesto 2026 aprobado, `SIN_PESO`, tolerancia, que el presupuesto 2027 nunca sea peso y conservación del total.
+respaldo con el presupuesto 2026 aprobado, `SIN_PESO`, tolerancia, que el presupuesto 2027 nunca sea peso, conservación del total y, desde la v2.2,
+la cartera para contratos nuevos (peso de la cedente, partición de la LN respetada, cedente mono-ramo sin tocar y `--sin-cartera`).
 
 **Corrida con los archivos reales (16/10/2026).** Con el extracto LN04001/LN04002, la `BD_CtaMens_0526_1.xlsx` y el `CtaMens_2027_5.xlsx`:
 `0a_Actualizar_Base1.py` tarda unos 2 minutos (lectura de los dos xlsx) y reproduce la participación de Terremoto de cada CtaMens (54.08 % en
@@ -228,3 +233,9 @@ respaldo con el presupuesto 2026 aprobado, `SIN_PESO`, tolerancia, que el presup
 extracto. Una verificación independiente confirmó totales por LLAVE-cuenta-año-mes intactos, filas de otros ramos idénticas y, en los 194
 negocios ajustados, una participación igual a la del presupuesto 2026 aprobado (diferencia máxima 0.000003). En esa corrida la Base_1 real era
 sintética; con la Base_1 real los negocios con real válido tomarán su peso del real.
+
+**Cartera para contratos nuevos (v2.2, 18/10/2026).** Con el CtaMens 2027 completo convertido a formato de presupuesto (todas las LN, 614
+negocios con Terremoto o HyORH) y los pesos del presupuesto 2026, el script deja a Terremoto en 50.18 % sin cartera y en 53.06 % con cartera.
+45 contratos nuevos (14.5M USD de prima) toman la mezcla de su grupo: 24 la de su cedente y 21 la de su LN y tipo de reaseguro. Otros 36 se dejan
+como vienen porque su grupo es de un solo ramo. Una verificación independiente recalculó el grupo, la fuente y el peso de los 81 candidatos
+sin usar el código del script y coincidió en los 81.

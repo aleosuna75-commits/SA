@@ -1,7 +1,7 @@
 # Metodología de redistribución de primas, comisiones y siniestros entre Terremoto (ramo 71) e Hidrometeorológicos y Otros Riesgos (HyORH, ramo 73)
 
 **Presupuesto Técnico 2027 (RPAT / Patria Re)**
-Versión 2.0, 16 de octubre de 2026. Documento de trabajo para Planeación Financiera; pensado para que una persona que no estuvo en el equipo pueda reproducir, auditar y defender el procedimiento. Acompaña a `0a_Actualizar_Base1.py` (v2.0), a `0_Redistribucion_TEV_HyOR.py` (v2.0), a `sirec_conexion.py`, a `README_Script_Redistribucion.md` y a la carpeta `pruebas/`.
+Versión 2.2, 18 de octubre de 2026. Documento de trabajo para Planeación Financiera; pensado para que una persona que no estuvo en el equipo pueda reproducir, auditar y defender el procedimiento. Acompaña a `0a_Actualizar_Base1.py` (v2.0), a `0_Redistribucion_TEV_HyOR.py` (v2.2), a `sirec_conexion.py`, a `README_Script_Redistribucion.md` y a la carpeta `pruebas/`.
 
 ---
 
@@ -24,7 +24,9 @@ Versión 2.0, 16 de octubre de 2026. Documento de trabajo para Planeación Finan
 | Años base | 2025 y 2026 fijos | Los 2 últimos años **reales** completos anteriores a 2027 (automático) | La Base_1 de dic-2025 trae 2026 completo, que no puede ser real |
 | Respaldo | Sin real válido, no se ajustaba | Reparto del **presupuesto 2026 aprobado** del propio negocio (CtaMens 2026 en `Outputs`), marcado `PPTO_APROBADO_2026` | Es un dato observable del propio negocio, aprobado el año pasado; da coherencia con 2026 |
 | Base_1 | Se actualizaba con un extracto real | Se arma con la Base_1 más reciente + CtaMens de cada año (columna `FUENTE` = REAL o PPTO). Un presupuesto nunca sustituye meses reales | No hay Base_1 de 2026; los CtaMens sí existen |
-| SIREC | Mencionado | `sirec_conexion.py`: conexión y consultas preparadas, **no se ejecutan** por defecto | Validación contractual de facultativos y contratos nulos, y fuente futura del real |
+| SIREC | Mencionado | `sirec_conexion.py` se ejecuta al final de la redistribución (v2.1); credenciales en `sirec_config.py` local, fuera del repositorio | Validación contractual de facultativos y contratos nulos, y fuente futura del real |
+| Contratos nuevos (v2.2) | Sin datos propios: no se ajustaban | **Nivel 3, cartera**: si están cargados en un solo ramo, toman la mezcla de su grupo más parecido con datos (cedente > LN y tipo de reaseguro > LN). Si ese grupo es de un solo ramo, no se tocan; si la LN ya los repartió, se respeta | Decisión de Planeación Financiera del 18/10/2026: con el modelo 2.0 Terremoto quedó en 50.8 % (−7 % contra el real 2025) y el 22 % de la prima 2027 es de contratos sin historia |
+| Control de participación (v2.2) | Tolerancia fija de 0.001 | Tolerancia de 0.001 o el error máximo del redondeo a centavos (filas × 0.01 ÷ total), la mayor | Una LLAVE con 0.08 de prima no se puede partir 72/28 en centavos |
 
 ## 1. Diagnóstico
 
@@ -135,9 +137,24 @@ w(LLAVE, tipo, ramo) = Σ_{años base válidos} |Monto_real(LLAVE, tipo, ramo, a
 
 Sólo para los negocios (y tipos de cuenta) sin peso real válido. Fuente: el CtaMens del presupuesto aprobado del año anterior al de decisión, es decir las filas `FUENTE` = PPTO 2026 de la Base_1 o, si la Base_1 no las trae, el `BD_CtaMens_MMAA*.xlsx` / `CtaMens_2026_*.xlsx` más reciente de `Outputs`. El peso es la participación por ramo del propio negocio en ese presupuesto (`FUENTE_PESO = PPTO_APROBADO_2026`). No es real, pero es un dato observable del mismo contrato, revisado y aprobado el año anterior (el presupuesto 2026 ya pasó por la recalibración TEV/HyOR de 2026). Todo negocio ajustado con este peso lleva la alerta "peso tomado del presupuesto aprobado". El presupuesto del propio año de decisión (CtaMens 2027) **nunca** se usa como peso: es justamente lo que se corrige.
 
-### Nivel 3. Sin información
+### Nivel 3. Cartera para contratos nuevos (decisión del 18/10/2026)
 
-El negocio **no se ajusta**. Queda listado en `LLAVEs_Sin_Peso` para que la línea de negocio aporte el dato (nivel 1) o se extraiga su real (nivel 2). Típicamente son negocios nuevos en 2027. No se usa un promedio de cartera, línea o territorio como sustituto: sería atribuir a un contrato específico un porcentaje que no le pertenece (equivale a forzar el agregado). Si el negocio decide aplicarlo de todos modos, debe capturarse como `FORZAR` con esa justificación explícita, de modo que quede visible en la auditoría.
+Hasta la v2.1 un contrato sin datos propios no se ajustaba, porque asignarle el porcentaje de un grupo es atribuirle una mezcla que no se observó en ese contrato. Con la v2.0 la participación de Terremoto quedó en 50.8 % y el 22 % de la prima catastrófica 2027 corresponde a contratos sin historia, casi todos cargados 100 % en HyORH. Dejarlos así también es una suposición: que no tienen nada de Terremoto. Planeación Financiera decidió el 18/10/2026 asignarles la mezcla de su cartera, salvo a los que se sabe que no son multirramo. La regla es:
+
+* **Para quién.** LLAVEs sin peso propio (ni contractual, ni real, ni presupuesto aprobado 2026) cargadas en **un solo ramo** en 2027, fuera de LN04004 y sin decisión en el layout. Si la LN ya cargó el contrato nuevo en ambos ramos, su partición es la mejor evidencia del contrato y se respeta.
+* **Qué grupo.** El más específico que tenga datos, en este orden: (1) los **otros contratos de la misma cedente en la misma LN** (al menos 1); (2) los contratos de la **misma LN y mismo tipo de reaseguro** (al menos 3); (3) los de la **misma LN** (al menos 3). La propia LLAVE nunca entra a su grupo.
+* **Qué fuente.** En cada nivel, primero el real de los años base y, si el grupo no tiene real, el presupuesto 2026 aprobado. Nunca se suman ambas fuentes en un mismo grupo (pueden venir en escalas o monedas distintas). El presupuesto 2027 nunca se usa.
+* **Los que sabemos que no son multirramo.** Si el primer grupo con datos es de un solo ramo (su participación queda a 5 puntos o menos de 0 % o de 100 %), el contrato se considera mono-ramo y **no se toca**. Esto aplica a la cedente que sólo escribe HyORH o a líneas como LN04008, sin Terremoto en 2026. Un contrato concreto se puede excluir con `EXCLUIR` en el layout.
+* **Cómo queda marcado.** `FUENTE_PESO` = `CARTERA_CEDENTE`, `CARTERA_LN_TIPOREA` o `CARTERA_LN`; `CASO` = `NUEVO_CARTERA`; alerta "contrato nuevo sin datos propios". La hoja `Cartera_Nuevos` lista, por contrato candidato, el grupo usado, cuántos contratos tiene, su fuente, su participación y el resultado.
+* **Cómo se apaga.** `--sin-cartera` (o `cartera_nuevos = False`).
+
+Es el nivel de evidencia más débil del procedimiento: describe la cartera, no el contrato. Por eso estos contratos llevan alerta y deben confirmarse con la LN o con SIREC en cuanto sea posible.
+
+**Impacto medido (no es un objetivo).** En una simulación con el CtaMens 2027 completo y los pesos del presupuesto 2026, el modelo sin cartera deja a Terremoto en 50.2 % y con cartera en 53.1 % (+2.9 puntos). 45 contratos nuevos toman peso de cartera (24 por su cedente y 21 por su LN y tipo de reaseguro) y 36 se dejan como vienen porque su grupo es de un solo ramo. El resultado queda por debajo del presupuesto 2026 aprobado (54.3 %) y del real 2023-2026 (58.4 %-58.8 %).
+
+### Nivel 4. Sin información
+
+El negocio **no se ajusta**. Queda listado en `LLAVEs_Sin_Peso` para que la línea de negocio aporte el dato (nivel 1) o se extraiga su real (nivel 2).
 
 ---
 
@@ -146,7 +163,7 @@ El negocio **no se ajusta**. Queda listado en `LLAVEs_Sin_Peso` para que la lín
 La decisión se toma sobre el año fiscal que consume CtaMens (`anio_decision` = 2027) y filas con monto distinto de cero; el reparto, una vez decidido, se aplica a todos los años fiscales del negocio. Para cada LLAVE con prima en 71 o 73, en este orden:
 
 1. `EXCLUIR` en el layout → `NO_AJUSTAR` (motivo registrado).
-2. Sin pesos válidos de primas (ni contractual, ni real, ni presupuesto aprobado 2026) → `SIN_PESO`: no se ajusta.
+2. Sin pesos válidos de primas (ni contractual, ni real, ni presupuesto aprobado 2026, ni cartera con mezcla de ramos) → `SIN_PESO`: no se ajusta. Un contrato nuevo que la LN ya cargó en ambos ramos queda aquí y se respeta su partición.
 3. Sin filas con monto en el año de decisión → `NO_AJUSTAR`.
 4. `INCLUIR` o `FORZAR` en el layout → `AJUSTAR` (con justificación obligatoria).
 5. LN excluida (LN04004, cuyo centro de beneficio reescribe CtaMens) → `NO_AJUSTAR`.
@@ -162,7 +179,8 @@ Cada negocio ajustado lleva en `ALERTAS` las cautelas que aplican, para revisarl
 * pesos sensibles al método o cambio estructural entre años base;
 * contrato nulo en negocio no facultativo, o facultativo (la LLAVE agrupa varios contratos): además `VALIDAR_SIREC` = verdadero y la hoja `Validar_SIREC` los lista para cotejarlos con SIREC;
 * el negocio ya traía ambos ramos;
-* peso tomado del presupuesto aprobado 2026 por falta de real válido.
+* peso tomado del presupuesto aprobado 2026 por falta de real válido;
+* contrato nuevo sin datos propios con peso de cartera (`CASO` = `NUEVO_CARTERA`).
 
 Si una alerta resulta fundada, se corrige con el layout (`EXCLUIR` para dejar el negocio como viene, `FORZAR` con el porcentaje del contrato) y se vuelve a correr. `--modo-decision revisar` restituye el comportamiento de la v1 (las cautelas detienen el ajuste). La participación global de Terremoto antes y después se reporta en el log y en `Resumen`; es una validación, no un objetivo.
 
@@ -302,6 +320,8 @@ De lectura obligatoria en la trazabilidad:
 | Siniestros GL 54 (si existen) | Pesos de primas | `--siniestros no` |
 | Años fiscales del reparto | Todos | `--anios-fiscales 2027` |
 | Matrices XL y EvCat | Dos pasadas de CtaMens con regeneración | — |
+| Contratos nuevos cargados en un solo ramo | Mezcla de su grupo (cedente > LN y tipo > LN), salvo grupo mono-ramo | `--sin-cartera`; layout `EXCLUIR` por contrato |
+| Contratos nuevos que la LN ya repartió | Se respeta la partición de la LN | Layout `FORZAR` |
 | Negocios sin información | Sin ajuste, listados en `LLAVEs_Sin_Peso` | Layout `FORZAR` con justificación |
 | Materialidad | 0 (todo el universo) | `--materialidad` |
 
