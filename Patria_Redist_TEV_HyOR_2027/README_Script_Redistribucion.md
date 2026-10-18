@@ -1,4 +1,4 @@
-# Scripts previos a CtaMens: `0a_Actualizar_Base1.py` (v2.0) y `0_Redistribucion_TEV_HyOR.py` (v2.2)
+# Scripts previos a CtaMens: `0a_Actualizar_Base1.py` (v2.0) y `0_Redistribucion_TEV_HyOR.py` (v2.3)
 
 Redistribuyen primas (GL 61), comisiones (GL 53) y, opcionalmente, siniestros (GL 54) entre los ramos
 **71 Terremoto (`A071000000`)** y **73 HyORH (`A073000000`)** en `Inputs\PptoTecnico2027.csv`, **antes** de correr `CtaMens.py`.
@@ -78,8 +78,13 @@ Con cada corrida de `0a_Actualizar_Base1.py` se genera una Base_1 nueva con fech
 | `hist` | `AUTO` | La Base_1 más reciente (o una ruta con `--hist`). |
 | `ppto_previo` | `AUTO` | CtaMens del presupuesto aprobado del año anterior en `Outputs` (respaldo de pesos); `''` para no usarlo. |
 | `modo_decision` | `fijo` | Criterios fijos: todo lo que difiere más que la tolerancia se ajusta y las cautelas quedan como `ALERTAS`. `revisar` = comportamiento v1. |
-| `cartera_nuevos` | `True` | Contratos sin datos propios cargados en un solo ramo toman la mezcla de su grupo (cedente > LN y tipo de reaseguro > LN); grupo mono-ramo = no se tocan. `--sin-cartera` lo apaga. |
-| `cartera_min_llaves` | `{CEDENTE: 1, LN_TIPOREA: 3, LN: 3}` | Otras LLAVEs con datos que debe tener el grupo para usarse. |
+| `cartera_nuevos` | `True` | Nivel 3: contratos sin ningún dato propio, cargados en un solo ramo, toman la mezcla de su grupo (cedente+LN+tipo > LN+tipo+región > LN+región > LN) con la tolerancia de 5 pp. `--sin-cartera` lo apaga. |
+| `cartera_min_llaves` | `{CEDENTE_TIPOREA: 1, LN_TIPOREA_REGION: 3, LN_REGION: 3, LN: 3}` | Otras LLAVEs válidas que debe tener el grupo. El nivel cedente no aplica a facultativos ni a cedentes 0 y 9999. |
+| `cartera_cobertura_real` | `0.80` | En un grupo se usa el real si sus LLAVEs cubren al menos el 80 % de la prima del presupuesto aprobado del grupo; si no, el presupuesto aprobado. Nunca se suman fuentes. |
+| `cartera_prima_min` | `1000` | Candidato sólo si su prima neta del año tiene el signo normal y es de al menos 1,000 (unidades de `/ERP/AMOUNT`). |
+| `cartera_material_pct` | `0.001` | Contratos con prima de al menos el 0.10 % de la prima 71+73 del año van a `Cartera_Confirmar`. |
+| `cartera_reclasificar` | `True` | `--cartera-sin-reclasificar`: no mueve contratos cuyo grupo es casi todo del otro ramo. |
+| `cartera_en_vigor` | `True` | `--cartera-sin-en-vigor`: cartera sólo para contratos nuevos de suscripción del año; los en vigor sin historia se dejan como vienen. |
 | `sirec` | `True` | Al terminar, consulta SIREC para los negocios `VALIDAR_SIREC`; si falla sólo avisa. `--sin-sirec` lo omite. |
 | `anios_base` | `AUTO` | Los 2 últimos años REALES completos anteriores al año de decisión (hoy 2024 y 2025). |
 | `metodo_pesos` | `ponderado` | `ponderado`: suma de \|montos\| de los años base válidos. `ultimo`: último año válido. `promedio_simple`: promedio de las participaciones anuales. |
@@ -157,8 +162,12 @@ signos opuestos entre ramos → inválido). Las LLAVEs con tramo de contrato vac
 | `SIN_PESO` | Sin peso contractual, ni real válido, ni presupuesto aprobado 2026 | Conseguir el dato (condición contractual → `FORZAR`) |
 | `REVISAR` | Sólo en `--modo-decision revisar` | Confirmar con `INCLUIR` / `EXCLUIR` |
 
-`FUENTE_PESO` dice de dónde salió el porcentaje (`HIST_ponderado` = real; `PPTO_APROBADO_2026` = respaldo; `CARTERA_*` = contrato nuevo con la mezcla
-de su grupo; `LAYOUT_FORZADO` = contrato). La hoja `Cartera_Nuevos` explica, contrato por contrato, qué grupo se usó o por qué no se tocó.
+`FUENTE_PESO` dice de dónde salió el porcentaje (`HIST_ponderado` = real; `PPTO_APROBADO_2026` = respaldo; `CARTERA_*` = contrato sin datos
+propios con la mezcla de su grupo; `LAYOUT_FORZADO` = contrato). `CASO` distingue `NUEVO_CARTERA` y `EN_VIGOR_CARTERA` (contrato en vigor sin
+historia catastrófica, que además va a `Validar_SIREC`), con sufijo `_RECLASIFICA` cuando el grupo es casi todo del otro ramo. Hojas del nivel 3:
+`Cartera_Nuevos` (cada candidato, su grupo, fuente, cobertura del real, niveles saltados, alertas y resultado), `Cartera_Confirmar` (lo que conviene
+confirmar con la LN o SIREC) y `Backtest_Cartera` (prueba retrospectiva sobre el presupuesto 2026). El `Resumen` trae el aporte del nivel 3 en
+puntos, total y por caso.
 `VALIDAR_SIREC` marca facultativos y contratos nulos, que conviene cotejar contrato por contrato con `sirec_conexion.py`.
 
 ## 5. Qué produce
@@ -222,7 +231,7 @@ y unos 50 s la trazabilidad. Memoria pico del orden de 3 a 4 GB por millón de f
 
 **Pruebas de la v2.0.** Los 24 casos de `03_casos_limite.py` corren con `--modo-decision revisar` para seguir midiendo el comportamiento v1.
 `pruebas/04_prueba_actualizar_base1.py` (20 verificaciones) prueba la Base_1: traslape, signos, categorías, CeBe sin ramo, formatos SAP y Base_1,
-periodos posteriores a la fecha del archivo y lectura por la redistribución. `pruebas/05_prueba_criterios_fijos.py` (21 verificaciones) prueba
+periodos posteriores a la fecha del archivo y lectura por la redistribución. `pruebas/05_prueba_criterios_fijos.py` (26 verificaciones) prueba
 los criterios fijos: búsqueda de la Base_1 más reciente, traducción Terremoto = 71 / HyORH = 73, años base automáticos, peso real,
 respaldo con el presupuesto 2026 aprobado, `SIN_PESO`, tolerancia, que el presupuesto 2027 nunca sea peso, conservación del total y, desde la v2.2,
 la cartera para contratos nuevos (peso de la cedente, partición de la LN respetada, cedente mono-ramo sin tocar y `--sin-cartera`).
@@ -234,8 +243,9 @@ extracto. Una verificación independiente confirmó totales por LLAVE-cuenta-añ
 negocios ajustados, una participación igual a la del presupuesto 2026 aprobado (diferencia máxima 0.000003). En esa corrida la Base_1 real era
 sintética; con la Base_1 real los negocios con real válido tomarán su peso del real.
 
-**Cartera para contratos nuevos (v2.2, 18/10/2026).** Con el CtaMens 2027 completo convertido a formato de presupuesto (todas las LN, 614
-negocios con Terremoto o HyORH) y los pesos del presupuesto 2026, el script deja a Terremoto en 50.18 % sin cartera y en 53.06 % con cartera.
-45 contratos nuevos (14.5M USD de prima) toman la mezcla de su grupo: 24 la de su cedente y 21 la de su LN y tipo de reaseguro. Otros 36 se dejan
-como vienen porque su grupo es de un solo ramo. Una verificación independiente recalculó el grupo, la fuente y el peso de los 81 candidatos
-sin usar el código del script y coincidió en los 81.
+**Cartera para contratos sin datos propios (v2.3, 18/10/2026).** Con el CtaMens 2027 completo convertido a formato de presupuesto (todas las LN,
+614 negocios con Terremoto o HyORH) y los pesos del presupuesto 2026: sin nivel 3, 50.18 %; sólo contratos nuevos, 51.34 %; sin reclasificaciones,
+52.29 %; v2.3 completa, 53.35 %. Hay 72 candidatos (52 nuevos y 20 en vigor): 32 toman reparto, 19 se reclasifican casi completos y 21 no se tocan
+porque su grupo coincide con su carga. La especificación salió de una revisión independiente (tres analistas y dos escépticos); su motor
+independiente y el script coinciden en los 72 candidatos en nivel, número de miembros y participación del grupo. La prueba `05` cubre los casos
+del nivel 3 (26 verificaciones).

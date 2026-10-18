@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-0_Redistribucion_TEV_HyOR.py  (versión 2.2)
+0_Redistribucion_TEV_HyOR.py  (versión 2.3)
 ============================================
 Redistribución de primas (GL 61), comisiones (GL 53) y, opcionalmente, siniestros (GL 54)
 entre los ramos 73 (Terremoto y Erupción Volcánica, TEV) y 71 (Hidrometeorológicos y Otros
@@ -45,7 +45,7 @@ from datetime import datetime
 import numpy as np
 import pandas as pd
 
-VERSION = "2.2"
+VERSION = "2.3"
 
 # =============================================================================
 # PARÁMETROS (editar aquí o pasar por línea de comandos)
@@ -108,9 +108,16 @@ DEFAULTS = {
     "aprobacion": "",               # corrida productiva: responsable y fecha que aprobaron parámetros y layout (queda en Resumen)
     "dry_run": False,
     "sirec": True,                  # al terminar, consulta SIREC para los negocios VALIDAR_SIREC (sirec_conexion.py); si falla sólo avisa
-    # --- Nivel 3: porcentaje de cartera para contratos nuevos (decisión de Planeación Financiera, 18/10/2026) ---
-    "cartera_nuevos": True,         # LLAVEs sin datos propios y cargadas en un solo ramo toman la mezcla de su grupo (cedente > LN+tipo > LN)
-    "cartera_min_llaves": {"CEDENTE": 1, "LN_TIPOREA": 3, "LN": 3},  # otras LLAVEs con datos que debe tener el grupo para usarse
+    # --- Nivel 3: porcentaje de cartera para contratos nuevos (decisión de Planeación Financiera, 18/10/2026; especificación v2.3) ---
+    "cartera_nuevos": True,         # contratos SIN ningún dato propio, cargados en un solo ramo, toman la mezcla de su grupo más parecido
+    "cartera_min_llaves": {"CEDENTE_TIPOREA": 1, "LN_TIPOREA_REGION": 3, "LN_REGION": 3, "LN": 3},  # otras LLAVEs válidas que debe tener el grupo
+    "cartera_cobertura_real": 0.80, # el real se usa en un grupo si sus LLAVEs cubren >= 80 % de la prima del presupuesto aprobado del grupo
+    "cartera_prima_min": 1000.0,    # candidato sólo si su prima neta del año de decisión es positiva y |prima| >= este monto
+    "cartera_material_pct": 0.001,  # contratos con prima >= 0.10 % de la prima 71+73 del año: lista Cartera_Confirmar (confirmar con LN o SIREC)
+    "cartera_volumen_alerta": 3.0,  # alerta si la prima del contrato es > 3 veces la prima del presupuesto aprobado de su grupo
+    "cedentes_genericas": ["0", "9999"],  # cedentes que no forman grupo de cedente
+    "cartera_reclasificar": True,   # False: si el grupo es casi todo del otro ramo, el contrato se deja como viene (sensibilidad)
+    "cartera_en_vigor": True,       # False: los contratos en vigor sin historia catastrófica no toman cartera (se deja como vienen)
 }
 
 TIPO_POR_GL = {"61": "Primas", "53": "Comisiones", "54": "Siniestros"}
@@ -276,6 +283,24 @@ def cargar_ramo_por_texto(subramo_df, log):
         if len(vals) == 1:
             RAMO_POR_TEXTO[k] = float(vals[0])
     log.info("Ramo por texto (Subramo.csv RamoN -> %s): %s", col, {k: int(v) for k, v in RAMO_POR_TEXTO.items() if v in (71.0, 73.0)})
+
+
+# Región (Territorio de Pais.csv) por código ZREGIONRP/TerrSAP. Se llena con Pais.csv y con los pares que traiga el CtaMens
+# del presupuesto aprobado. Respaldo, verificado en BD_CtaMens 2026 y CtaMens 2027 (relación uno a uno).
+REGION_POR_CODIGO = {}
+REGION_RESPALDO = {"R01": "MEXICO", "R02": "CENTROAMERICA", "R03": "CONO SUR", "R04": "PACTO ANDINO Y VENEZUELA", "R05": "ULTRAMAR", "R06": "EL CARIBE"}
+
+
+def _region_key(v):
+    """Región normalizada: nombre de territorio en mayúsculas sin acentos; un código R0x se traduce a su territorio."""
+    if v is None or (not isinstance(v, str) and pd.isna(v)):
+        return ""
+    k = " ".join(_txt(v).split())
+    if k in ("", "NAN", "NONE"):
+        return ""
+    if re.fullmatch(r"R\d+", k):
+        return REGION_POR_CODIGO.get(k) or REGION_RESPALDO.get(k) or k
+    return k
 
 
 def ramo_desde_texto(v):
@@ -466,11 +491,29 @@ def preparar_hist(hist, ramos, log, cod_archivo=None):
         mm = h[(h["MONTO"] != 0) & (h["ORIGEN"] == "REAL")].dropna(subset=["MES", "ANIO"])
         meses = mm.groupby(mm["ANIO"].astype(int))["MES"].nunique().rename("N_MESES_BASE")
         log.info("%s: meses con información real en la base por año: %s", ctx, meses.to_dict())
+    # LLAVEs con prima en CUALQUIER ramo, por origen y año (para saber si un contrato "nuevo" en 71/73 ya existía en otros ramos)
+    pres_ramos = {}
+    xp = h[(h["TIPO"] == "Primas") & (h["MONTO"] != 0) & h["ANIO"].notna() & (h["LLAVE"] != "")]
+    for (o, a), g in xp.groupby(["ORIGEN", xp["ANIO"].astype(int)]):
+        pres_ramos[(o, int(a))] = set(g["LLAVE"])
     presentes = {"años": sorted(h["ANIO"].dropna().astype(int).unique().tolist()), "ramos": sorted(h["RAMO"].dropna().unique().tolist()),
                  "tipos": sorted(h["TIPO"].dropna().unique().tolist())}
     h = h[h["RAMO"].isin(ramos) & h["TIPO"].notna() & h["ANIO"].notna() & (h["LLAVE"] != "")]
     if h.empty:
         raise ErrorRedistribucion(f"{ctx}: ninguna fila cae en ramos {ramos} con tipo de cuenta reconocido. Presentes en el archivo: {presentes}.")
+    # región dominante (por |prima|) de cada LLAVE y origen, para los grupos de cartera
+    regiones = {}
+    creg = _detectar(up, ["TERRITORIO", "ZREGIONRP", "REGION", "REGIÓN", "TERRSAP"])
+    if creg is not None and creg in h.columns:
+        x = h[(h["TIPO"] == "Primas") & (h["MONTO"] != 0)]
+        if len(x):
+            x = x.assign(_R=x[creg].map(_region_key), _A=x["MONTO"].abs())
+            x = x[x["_R"] != ""]
+            x = x.assign(_Y=x["ANIO"].astype(int))
+            dom = (x.groupby(["ORIGEN", "_Y", "LLAVE", "_R"])["_A"].sum().reset_index().sort_values(["_A", "_R"])
+                   .drop_duplicates(["ORIGEN", "_Y", "LLAVE"], keep="last"))
+            regiones = {(o, int(y)): g.set_index("LLAVE")["_R"] for (o, y), g in dom.groupby(["ORIGEN", "_Y"])}
+    regiones["__PRESENTES__"] = pres_ramos
     h = h.groupby(["LLAVE", "RAMO", "TIPO", "ANIO", "ORIGEN"], as_index=False)["MONTO"].sum()
     h["ANIO"] = h["ANIO"].astype(int)
     log.info("Histórico normalizado: %s filas LLAVE-ramo-tipo-año | LLAVEs: %s | años por origen: %s | con detalle mensual: %s | suma MONTO por tipo y ramo (REAL):\n%s",
@@ -480,7 +523,7 @@ def preparar_hist(hist, ramos, log, cod_archivo=None):
     if len(hp.columns) == 2:
         log.info("Participación del ramo %s en la prima REAL por año (comparar con la serie histórica de Terremoto): %s",
                  int(min(ramos)), (hp[min(ramos)] / hp.sum(axis=1)).round(4).to_dict())
-    return h, meses
+    return h, meses, regiones
 
 
 def _wide_hist(h, ramos):
@@ -747,80 +790,234 @@ def aplicar_layout(pesos, layout, ramos, log):
     return pesos, decisiones, metodos
 
 
-def _montos_por_llave(h, ramos):
-    """|monto| de primas por LLAVE y ramo (suma de |monto anual|), en columnas por ramo."""
-    if h is None or len(h) == 0:
-        return pd.DataFrame(columns=ramos)
-    x = h[h["TIPO"] == "Primas"].copy()
-    x["MONTO"] = x["MONTO"].abs()
-    return x.pivot_table(index="LLAVE", columns="RAMO", values="MONTO", aggfunc="sum").reindex(columns=ramos).fillna(0.0)
+NIVELES_CARTERA = ["CEDENTE_TIPOREA", "LN_TIPOREA_REGION", "LN_REGION", "LN"]
 
 
-def pesos_cartera(candidatas, h_real, h_ppto, etiqueta_real, etiqueta_ppto, ramos, tol, min_llaves, log):
+def _partes_llave(llave):
+    """'1-40-16-LN04001' -> (tiporea, cedente, contrato, LN base sin sufijo, p.ej. LN04008-AGRO -> LN04008)."""
+    t = str(llave).split("-", 3)
+    if len(t) < 4:
+        return None
+    return t[0], t[1], t[2], t[3].split("-")[0].upper()
+
+
+def _clave_grupo(nivel, partes, region, genericas):
+    tr, ced, _, ln = partes
+    if nivel == "CEDENTE_TIPOREA":
+        return None if (tr == "3" or ced in genericas) else (ced, ln, tr)  # facultativos y cedentes genéricas no forman grupo de cedente
+    if nivel == "LN_TIPOREA_REGION":
+        return (ln, tr, region) if region else None
+    if nivel == "LN_REGION":
+        return (ln, region) if region else None
+    return (ln,)
+
+
+def miembros_desde_pesos(pw, ramos, regiones, genericas):
+    """LLAVEs con peso VÁLIDO de primas de una fuente: MONTO_BASE por ramo (montos con signo coherente; los reversos que invalidan un año ya
+    quedaron fuera) y la clave de grupo de cada nivel."""
+    if pw is None or len(pw) == 0:
+        return pd.DataFrame(columns=list(ramos))
+    v = pw[pw["VALIDO"].astype(bool) & (pw["TIPO"] == "Primas")]
+    m = v.pivot_table(index="LLAVE", columns="RAMO", values="MONTO_BASE", aggfunc="sum").reindex(columns=ramos).fillna(0.0).abs()
+    m = m[m.sum(axis=1) > 0].copy()
+    m["_REG"] = pd.Series(m.index, index=m.index).map(lambda l: regiones.get(l, "") if regiones is not None else "").fillna("")
+    for niv in NIVELES_CARTERA:
+        m[niv] = [(_clave_grupo(niv, _partes_llave(l), r, genericas) if _partes_llave(l) else None) for l, r in zip(m.index, m["_REG"])]
+    return m
+
+
+def _grupo(m, nivel, clave, excluir):
+    if m is None or len(m) == 0 or clave is None:
+        return m.iloc[0:0] if (m is not None and len(m)) else pd.DataFrame()
+    return m[(m[nivel] == clave) & (m.index != excluir)]
+
+
+def _elegir_grupo(llave, partes, region, mem_real, mem_pp, ramos, p, solo_ppto=False):
+    """Primer nivel con grupo suficiente. En cada nivel: el real si cubre >= cobertura de la prima del presupuesto aprobado del grupo
+    (o si el grupo no tiene presupuesto aprobado), si no el presupuesto aprobado. Nunca se suman fuentes. Devuelve (dict, saltos)."""
+    saltos = []
+    mins, gen = p["cartera_min_llaves"], set(map(str, p["cedentes_genericas"]))
+    for niv in NIVELES_CARTERA:
+        clave = _clave_grupo(niv, partes, region, gen)
+        if clave is None:
+            saltos.append(f"{niv}: no aplica" + (" (facultativo o cedente genérica)" if niv == "CEDENTE_TIPOREA" else " (sin región)"))
+            continue
+        gp = _grupo(mem_pp, niv, clave, llave)
+        gr = pd.DataFrame() if solo_ppto else _grupo(mem_real, niv, clave, llave)
+        tot_pp = float(gp[ramos].sum().sum()) if len(gp) else 0.0
+        cob = (float(gp.loc[gp.index.isin(gr.index), ramos].sum().sum()) / tot_pp) if (tot_pp > 0 and len(gr)) else (np.nan if not len(gr) else 1.0)
+        orden = []
+        if len(gr) and (tot_pp == 0 or cob >= p["cartera_cobertura_real"]):
+            orden.append(("REAL", gr))
+        if len(gp):
+            orden.append(("PPTO", gp))
+        for fuente, g in orden:
+            if len(g) >= mins.get(niv, 3):
+                tot = g[ramos].sum()
+                return {"NIVEL": niv, "FUENTE": fuente, "CLAVE": "-".join(map(str, clave)), "N": len(g), "COBERTURA_REAL": cob,
+                        "PRIMA_GRUPO_PPTO": tot_pp, "MAX_MIEMBRO_PPTO": float(gp[ramos].sum(axis=1).max()) if len(gp) else 0.0,
+                        "SHARE": float(tot[max(ramos)] / tot.sum()), "TOT": tot}, saltos
+        saltos.append(f"{niv}: grupo insuficiente (real {len(gr)}, presupuesto {len(gp)}, mínimo {mins.get(niv, 3)})")
+    return None, saltos
+
+
+def pesos_cartera(cand, mem_real, mem_pp, etq_real, etq_pp, ramos, p, log):
     """
-    Nivel 3 (contratos nuevos): para cada LLAVE candidata (sin peso propio y cargada en un solo ramo), la mezcla de ramos de su grupo
-    más específico con datos, en este orden: misma cedente y LN (sus otros contratos) > misma LN y tipo de reaseguro > misma LN.
-    En cada nivel se usa primero el real (años base) y, si el grupo no tiene real, el presupuesto aprobado del año anterior; nunca se mezclan
-    fuentes dentro de un grupo (pueden venir en escalas distintas). La propia LLAVE nunca entra a su grupo.
-    El primer grupo con datos decide: si ese grupo es de un solo ramo (participación <= tol o >= 1 - tol), el contrato se considera
-    mono-ramo y NO recibe peso de cartera.
-    Devuelve (pesos, diagnóstico).
+    Nivel 3 (contratos nuevos, especificación v2.3). cand: DataFrame indexado por LLAVE con RAMO_CARGADO, PRIMA (neta, en la convención
+    del presupuesto), REGION. Para cada candidato se elige el primer grupo con datos (_elegir_grupo) y:
+      * grupo con mezcla (participación entre tol y 1 - tol): el contrato toma la mezcla del grupo;
+      * grupo de un solo ramo: el contrato queda 100 % en el ramo del grupo; si es el ramo en que viene, no se toca (NO_AJUSTAR);
+        si es el contrario, se reclasifica (con alerta);
+      * sin grupo: se deja como viene (SIN_PESO).
+    Devuelve (pesos de primas, diagnóstico por candidato, resultados por LLAVE para el alcance).
     """
-    fuentes = [(etiqueta_real, _montos_por_llave(h_real, ramos)), (etiqueta_ppto, _montos_por_llave(h_ppto, ramos))]
-    niveles = [("CEDENTE", lambda t: (t[1], t[3])), ("LN_TIPOREA", lambda t: (t[3], t[0])), ("LN", lambda t: (t[3],))]
-    r_ref = max(ramos)
-    tablas = []
-    for etq, m in fuentes:
-        if m.empty:
-            tablas.append((etq, m, None))
+    tol, r_ref = p["tolerancia"], max(ramos)
+    otro = {ramos[0]: ramos[1], ramos[1]: ramos[0]}
+    filas, diag, res = [], [], {}
+    tot_abs = float(cand.attrs.get("PRIMA_TOTAL_ABS", cand["PRIMA"].abs().sum()))
+    for llave, c in cand.iterrows():
+        partes = _partes_llave(llave)
+        g, saltos = _elegir_grupo(llave, partes, c["REGION"], mem_real, mem_pp, ramos, p)
+        material = abs(c["PRIMA"]) >= p["cartera_material_pct"] * tot_abs if tot_abs else False
+        alertas = []
+        fila = {"LLAVE": llave, "RAMO_CARGADO": int(c["RAMO_CARGADO"]), "PRIMA_ANIO_DECISION": c["PRIMA"], "REGION": c["REGION"],
+                "EXISTIA_OTROS_RAMOS": bool(c.get("EXISTIA_OTROS_RAMOS", False)), "SUSCRIPCION_MIN": c.get("SUSC_MIN", np.nan),
+                "FRONTING": bool(c.get("FRONTING", False)), "NIVELES_SALTADOS": " | ".join(saltos), "MATERIAL": bool(material)}
+        if g is None:
+            fila.update({"NIVEL": "", "FUENTE_GRUPO": "", "GRUPO": "", "N_LLAVES_GRUPO": 0, f"SHARE_{r_ref}_GRUPO": np.nan,
+                         "RESULTADO": "SIN_GRUPO", "MOTIVO": "contrato nuevo sin grupo con datos suficientes: se deja como viene"})
+            fila["TIPO_CANDIDATO"] = str(c.get("TIPO_CANDIDATO", "NUEVO"))
+            res[llave] = {"RESULTADO": "SIN_GRUPO", "MOTIVO": fila["MOTIVO"], "ALERTAS": [], "TIPO_CANDIDATO": fila["TIPO_CANDIDATO"]}
+            diag.append(fila)
             continue
-        partes = m.index.to_series().str.split("-", n=3)
-        claves = {n: partes.map(fn) for n, fn in niveles}
-        tablas.append((etq, m, claves))
-    filas, diag = [], []
-    for llave in sorted(candidatas):
-        t = llave.split("-", 3)
-        if len(t) < 4:
+        etq = etq_real if g["FUENTE"] == "REAL" else etq_pp
+        share = g["SHARE"]
+        if g["N"] == 1:
+            alertas.append("grupo de una sola LLAVE")
+        ratio = (abs(c["PRIMA"]) / g["PRIMA_GRUPO_PPTO"]) if g["PRIMA_GRUPO_PPTO"] > 0 else np.nan
+        if pd.notna(ratio) and ratio > p["cartera_volumen_alerta"]:
+            alertas.append(f"la prima del contrato es {ratio:.1f} veces la prima del presupuesto aprobado de su grupo")
+        if material:
+            alertas.append("contrato material: confirmar con la LN o SIREC")
+        detalle = f"{g['NIVEL']} {g['CLAVE']}: {g['N']} LLAVEs ({etq}), participación {r_ref} del grupo {share:.4f}"
+        fila.update({"NIVEL": g["NIVEL"], "FUENTE_GRUPO": etq, "GRUPO": g["CLAVE"], "N_LLAVES_GRUPO": g["N"], "COBERTURA_REAL": g["COBERTURA_REAL"],
+                     "PRIMA_PPTO_GRUPO": g["PRIMA_GRUPO_PPTO"], "RAZON_PRIMA_VS_GRUPO": ratio, f"SHARE_{r_ref}_GRUPO": share})
+        if g.get("MAX_MIEMBRO_PPTO", 0) and abs(c["PRIMA"]) > g["MAX_MIEMBRO_PPTO"]:
+            alertas.append("el contrato es más grande que cualquier contrato de su grupo en el presupuesto aprobado (fuera del rango observado)")
+        if c.get("EXISTIA_OTROS_RAMOS", False):
+            alertas.append("la LLAVE ya existía en otros ramos sin prima catastrófica: cobertura nueva o mal codificada; pedir real o slip")
+        if pd.notna(c.get("SUSC_MIN", np.nan)) and c["SUSC_MIN"] < p["anio_decision"] - 1:
+            alertas.append(f"año de suscripción {int(c['SUSC_MIN'])}: contrato anterior sin historia catastrófica; pedir real o slip")
+        # misma regla que el resto: la mezcla del grupo se aplica si difiere del cargado en más de la tolerancia (sin trato especial)
+        share_cargado = 1.0 if int(c["RAMO_CARGADO"]) == r_ref else 0.0
+        tot = g["TOT"]
+        pesos_r = {r: float(tot[r] / tot.sum()) for r in ramos}
+        tipo_c = str(c.get("TIPO_CANDIDATO", "NUEVO"))
+        if tipo_c == "EN_VIGOR":
+            alertas.insert(0, "contrato en vigor sin historia catastrófica en las fuentes: pedir su real (SAP BW o SIREC) o el slip")
+        if abs(share - share_cargado) <= tol:
+            resultado, motivo = "MISMO_RAMO", f"contrato sin datos propios: su grupo ({detalle}) coincide con como viene cargado (diferencia <= tolerancia); no se toca"
+        elif abs(share - share_cargado) >= 1 - tol:
+            resultado, motivo = "RECLASIFICA", detalle
+            alertas.insert(0, f"el grupo es casi todo del otro ramo ({detalle}): el contrato pasa casi completo de ramo; confirmar con la LN")
+        else:
+            resultado, motivo = "REPARTO", detalle
+        # interruptores (sensibilidad / gobierno): sin reclasificaciones o sin contratos en vigor, el contrato se deja como viene
+        pendiente = None
+        if resultado == "RECLASIFICA" and not p.get("cartera_reclasificar", True):
+            pendiente = "RECLASIFICA_PENDIENTE", f"reclasificación por grupo no aplicada (cartera_reclasificar = False): {detalle}; confirmar con la LN (FORZAR)"
+        elif resultado != "MISMO_RAMO" and tipo_c == "EN_VIGOR" and not p.get("cartera_en_vigor", True):
+            pendiente = "EN_VIGOR_PENDIENTE", f"contrato en vigor sin historia catastrófica (cartera_en_vigor = False): {detalle}; pedir real o slip"
+        fila.update({"TIPO_CANDIDATO": tipo_c})
+        if pendiente:
+            fila.update({"RESULTADO": pendiente[0], "MOTIVO": pendiente[1], "ALERTAS": " | ".join(alertas)})
+            res[llave] = {"RESULTADO": pendiente[0], "MOTIVO": pendiente[1], "ALERTAS": alertas, "TIPO_CANDIDATO": tipo_c}
+            diag.append(fila)
             continue
-        dec = None
-        for nivel, fn in niveles:
-            g = fn(t)
-            for etq, m, claves in tablas:
-                if claves is None:
-                    continue
-                miembros = m[(claves[nivel] == g) & (m.index != llave)]
-                miembros = miembros[miembros.sum(axis=1) > 0]
-                if len(miembros) < min_llaves.get(nivel, 1):
-                    continue
-                tot = miembros.sum()
-                share = float(tot[r_ref] / tot.sum())
-                dec = (nivel, etq, g, len(miembros), share, tot)
-                break
-            if dec:
-                break
-        if dec is None:
-            diag.append({"LLAVE": llave, "NIVEL": "", "FUENTE_GRUPO": "", "GRUPO": "", "N_LLAVES_GRUPO": 0, f"SHARE_{r_ref}_GRUPO": np.nan,
-                         "RESULTADO": "sin grupo con datos: se deja como viene"})
-            continue
-        nivel, etq, g, n, share, tot = dec
-        mono = share <= tol or share >= 1 - tol
-        diag.append({"LLAVE": llave, "NIVEL": nivel, "FUENTE_GRUPO": etq, "GRUPO": "-".join(map(str, g)), "N_LLAVES_GRUPO": n,
-                     f"SHARE_{r_ref}_GRUPO": share, "RESULTADO": ("grupo de un solo ramo: el contrato se considera mono-ramo y se deja como viene"
-                                                                  if mono else "peso de cartera")})
-        if mono:
-            continue
+        fila.update({"RESULTADO": resultado, "MOTIVO": motivo, "ALERTAS": " | ".join(alertas)})
+        res[llave] = {"RESULTADO": resultado, "MOTIVO": motivo, "ALERTAS": alertas, "NIVEL": g["NIVEL"], "TIPO_CANDIDATO": tipo_c}
+        diag.append(fila)
         for r in ramos:
-            filas.append({"LLAVE": llave, "TIPO": "Primas", "RAMO": int(r), "PESO": float(tot[r] / tot.sum()), "MONTO_BASE": float(tot[r]),
-                          "FUENTE": f"CARTERA_{nivel}", "DETALLE": f"mezcla de {n} LLAVEs del grupo {nivel} {'-'.join(map(str, g))} ({etq})",
-                          "ORIGEN_PESO": "cartera", "VALIDO": True, "MOTIVO": "", "N_ANIOS_VALIDOS": np.nan, "ULTIMO_ANIO": np.nan,
-                          "MONTO_ULTIMO_ANIO": np.nan, "CAMBIO_ESTRUCTURAL": False})
+            filas.append({"LLAVE": llave, "TIPO": "Primas", "RAMO": int(r), "PESO": pesos_r[r], "MONTO_BASE": float(g["TOT"][r]),
+                          "FUENTE": f"CARTERA_{g['NIVEL']}", "DETALLE": detalle, "ORIGEN_PESO": "cartera", "VALIDO": True, "MOTIVO": "",
+                          "N_ANIOS_VALIDOS": np.nan, "ULTIMO_ANIO": np.nan, "MONTO_ULTIMO_ANIO": np.nan, "CAMBIO_ESTRUCTURAL": False})
     d = pd.DataFrame(diag)
+    d.attrs["umbral_material"] = p["cartera_material_pct"] * tot_abs
+    if len(d):
+        # lista para confirmar con la LN o SIREC (no detiene la corrida)
+        mot = []
+        for _, r_ in d.iterrows():
+            m_ = []
+            if r_["MATERIAL"]:
+                m_.append("material")
+            if r_.get("RESULTADO") == "RECLASIFICA" and (r_.get("N_LLAVES_GRUPO", 0) <= 2 or "veces la prima" in str(r_.get("ALERTAS", ""))):
+                m_.append("reclasificación con grupo chico o desproporcionado")
+            if r_.get("TIPO_CANDIDATO") == "EN_VIGOR":
+                m_.append("contrato en vigor sin historia catastrófica: pedir real o slip")
+            if r_["FRONTING"] and r_.get("RESULTADO") in ("REPARTO", "RECLASIFICA"):
+                m_.append("fronting: verificar cesión de los clones")
+            mot.append("; ".join(m_))
+        d["CONFIRMAR"] = mot
     out = completar_columnas_pesos(pd.DataFrame(filas)) if filas else marco_pesos_vacio()
     if len(d):
-        log.info("Cartera (contratos nuevos): %s candidatas | con peso de cartera: %s por nivel %s | grupo mono-ramo (se dejan): %s | sin grupo: %s",
-                 len(d), int((d["RESULTADO"] == "peso de cartera").sum()), d.loc[d["RESULTADO"] == "peso de cartera", "NIVEL"].value_counts().to_dict(),
-                 int(d["RESULTADO"].str.startswith("grupo de un solo").sum()), int(d["RESULTADO"].str.startswith("sin grupo").sum()))
-    return out, d
+        log.info("Cartera (contratos sin datos propios): %s candidatos (%s) | resultados: %s | por nivel: %s | por fuente: %s | materiales: %s",
+                 len(d), d["TIPO_CANDIDATO"].value_counts().to_dict() if "TIPO_CANDIDATO" in d else {}, d["RESULTADO"].value_counts().to_dict(),
+                 d.loc[d["NIVEL"] != "", "NIVEL"].value_counts().to_dict(), d.loc[d["NIVEL"] != "", "FUENTE_GRUPO"].value_counts().to_dict(),
+                 int(d["MATERIAL"].sum()))
+    return out, d, res
+
+
+def backtest_cartera(mem_pp, ramos, p):
+    """
+    Prueba retrospectiva (dejar uno fuera) sobre el presupuesto aprobado: cada LLAVE válida se predice con la jerarquía de cartera usando
+    sólo las demás LLAVEs (fuente presupuesto aprobado) y se compara con su participación real en ese presupuesto. Mide qué tan bien el
+    porcentaje de cartera describe un contrato; no se usa para elegir parámetros por su efecto en el total.
+    """
+    if mem_pp is None or len(mem_pp) == 0:
+        return pd.DataFrame(), pd.DataFrame()
+    r_ref, tol = max(ramos), p["tolerancia"]
+    filas = []
+    for llave, row in mem_pp.iterrows():
+        partes = _partes_llave(llave)
+        if partes is None:
+            continue
+        tot = float(row[ramos].sum())
+        real = float(row[r_ref] / tot) if tot else np.nan
+        g, _ = _elegir_grupo(llave, partes, row["_REG"], None, mem_pp, ramos, p, solo_ppto=True)
+        if g is None:
+            filas.append({"LLAVE": llave, "NIVEL": "SIN_GRUPO", "PRIMA": tot, f"SHARE_{r_ref}_REAL_PPTO": real, "PREDICHO": np.nan, "ERROR_ABS": np.nan})
+            continue
+        pred = g["SHARE"]
+        if pred <= tol:
+            pred = 0.0
+        elif pred >= 1 - tol:
+            pred = 1.0
+        filas.append({"LLAVE": llave, "NIVEL": g["NIVEL"], "PRIMA": tot, f"SHARE_{r_ref}_REAL_PPTO": real, "PREDICHO": pred, "ERROR_ABS": abs(pred - real)})
+    det = pd.DataFrame(filas)
+    if det.empty:
+        return det, pd.DataFrame()
+    # LLAVEs cuya mezcla es un parámetro de planeación: igual (+-0.5 pp) a la moda de su grupo LN+tipo+región (con al menos 3 iguales).
+    # Se aciertan "por construcción"; la prueba se publica también sin ellas.
+    det["LN"] = det["LLAVE"].map(lambda l: (_partes_llave(l) or ("", "", "", ""))[3])
+    claves = det["LLAVE"].map(lambda l: _clave_grupo("LN_TIPOREA_REGION", _partes_llave(l), mem_pp.loc[l, "_REG"] if l in mem_pp.index else "", set()) if _partes_llave(l) else None)
+    det["_G"] = claves.astype(str)
+    det["_S3"] = det[f"SHARE_{r_ref}_REAL_PPTO"].round(3)
+    moda = det.groupby(["_G", "_S3"]).size().reset_index(name="_N").sort_values("_N").drop_duplicates("_G", keep="last").set_index("_G")
+    det["PARAMETRO_PLANEACION"] = [bool(g_ in moda.index and moda.loc[g_, "_N"] >= 3 and abs(s_ - moda.loc[g_, "_S3"]) <= 0.005)
+                                   for g_, s_ in zip(det["_G"], det[f"SHARE_{r_ref}_REAL_PPTO"].fillna(-9))]
+    det = det.drop(columns=["_G", "_S3"])
+    v = det.dropna(subset=["ERROR_ABS"])
+    def resumen(g, nombre, corte):
+        return {"CORTE": corte, "GRUPO": nombre, "LLAVES": len(g), "ERROR_MEDIO_PP": 100 * g["ERROR_ABS"].mean(),
+                "ERROR_PONDERADO_PRIMA_PP": 100 * np.average(g["ERROR_ABS"], weights=g["PRIMA"]) if g["PRIMA"].sum() else np.nan,
+                "SESGO_PONDERADO_PP": 100 * np.average(g["PREDICHO"] - g[f"SHARE_{r_ref}_REAL_PPTO"], weights=g["PRIMA"]) if g["PRIMA"].sum() else np.nan}
+    res = [resumen(g, n, "NIVEL") for n, g in v.groupby("NIVEL")] + ([resumen(v, "TOTAL", "NIVEL")] if len(v) else [])
+    res += [resumen(g, n, "LN") for n, g in v.groupby("LN")]
+    sp = v[~v["PARAMETRO_PLANEACION"]]
+    if len(sp):
+        res += [resumen(g, n, "NIVEL, SIN PARAMETROS DE PLANEACION") for n, g in sp.groupby("NIVEL")] + [resumen(sp, "TOTAL", "NIVEL, SIN PARAMETROS DE PLANEACION")]
+    res.append({"CORTE": "NIVEL", "GRUPO": "SIN_GRUPO", "LLAVES": int(det["ERROR_ABS"].isna().sum())})
+    return det, pd.DataFrame(res)
 
 
 def pesos_efectivos(pesos, ramos, politica_com, politica_sin):
@@ -915,7 +1112,7 @@ def validacion_tendencia(h, df, c_amt, c_fy, anio_ppto, ramos, log):
 # =============================================================================
 # ALCANCE
 # =============================================================================
-def tabla_alcance(df, c_amt, c_fy, pesos, pesos_ef, sens, decisiones, ramos, p, log):
+def tabla_alcance(df, c_amt, c_fy, pesos, pesos_ef, sens, decisiones, ramos, p, log, cartera_res=None):
     """
     Una fila por LLAVE con ramo 71/73 en el presupuesto. La decisión se toma sobre el año fiscal anio_decision (el que consume CtaMens)
     y AMOUNT != 0. DECISION: AJUSTAR | NO_AJUSTAR | SIN_PESO | REVISAR (requiere confirmación del negocio vía layout INCLUIR/EXCLUIR).
@@ -963,8 +1160,13 @@ def tabla_alcance(df, c_amt, c_fy, pesos, pesos_ef, sens, decisiones, ramos, p, 
         caso, cautelas = "", []
         contrato_nulo = str(atrib.loc[llave, "ZCONTRATO_LL"]) == "0"
         fuente_ll = str(fuente.get(llave, ""))
+        cres = (cartera_res or {}).get(llave)
         if acc == "EXCLUIR":
             dec, mot = "NO_AJUSTAR", f"Layout EXCLUIR: {just}"
+        elif cres is not None and cres["RESULTADO"].endswith("_PENDIENTE") and not tiene_peso:
+            dec, mot = "NO_AJUSTAR", cres["MOTIVO"]
+        elif cres is not None and cres["RESULTADO"] == "SIN_GRUPO" and not tiene_peso:
+            dec, mot = "SIN_PESO", cres["MOTIVO"]
         elif not tiene_peso:
             dec, mot = "SIN_PESO", ("contrato sin datos propios que la LN ya cargó en ambos ramos: se respeta su partición" if tiene_ambos else
                                     "sin pesos válidos de primas (ni real, ni presupuesto aprobado, ni cartera con mezcla de ramos): se deja como viene; layout FORZAR si se conoce el reparto")
@@ -981,13 +1183,15 @@ def tabla_alcance(df, c_amt, c_fy, pesos, pesos_ef, sens, decisiones, ramos, p, 
         elif pd.isna(diff):
             dec, mot = "NO_AJUSTAR", "no se pudo calcular la participación"
         elif abs(diff) <= tol:
-            dec, mot = "NO_AJUSTAR", f"dentro de tolerancia (diferencia {abs(diff):.1%})"
+            dec, mot = "NO_AJUSTAR", (cres["MOTIVO"] if (cres is not None and cres["RESULTADO"] == "MISMO_RAMO" and acc is None)
+                                      else f"dentro de tolerancia (diferencia {abs(diff):.1%})")
         elif p["materialidad"] > 0 and ppto_abs < p["materialidad"]:
             dec, mot = "NO_AJUSTAR", f"inmaterial: |prima 71+73 {anio}| = {ppto_abs:,.0f} < materialidad {p['materialidad']:,.0f}"
         else:
             caso = "RECLASIFICACION_TOTAL" if recl_total else ("SPLIT_EXPLICITO" if tiene_ambos else "MONO_RAMO")
             if fuente_ll.startswith("CARTERA"):
-                caso = "NUEVO_CARTERA"
+                pref = "EN_VIGOR" if (cres or {}).get("TIPO_CANDIDATO") == "EN_VIGOR" else "NUEVO"
+                caso = f"{pref}_CARTERA" + ("_RECLASIFICA" if (cres is not None and cres["RESULTADO"] == "RECLASIFICA") else "")
             # cautelas: en modo 'revisar' (v1) detienen el ajuste; en modo 'fijo' (defecto) se ajusta y quedan como ALERTAS para el diagnóstico
             if tipo_ref != "Primas":
                 cautelas.append(f"sin primas de referencia en ramos {ramos} (sólo {tipo_ref})")
@@ -1009,7 +1213,8 @@ def tabla_alcance(df, c_amt, c_fy, pesos, pesos_ef, sens, decisiones, ramos, p, 
             if tiene_ambos and not p["ajustar_split_explicito"]:
                 cautelas.append(f"la LLAVE ya trae ambos ramos (participación {share_ppto:.1%} vs peso {share_hist:.1%})")
             if fuente_ll.startswith("CARTERA"):
-                cautelas.append(f"contrato nuevo sin datos propios: peso de cartera ({fuente_ll}); confirmar la cobertura con la LN o SIREC")
+                cautelas.append(f"contrato nuevo sin datos propios: peso de cartera ({fuente_ll}); estima la mezcla del grupo, no la del contrato")
+                cautelas.extend((cres or {}).get("ALERTAS", []))
             if fuente_ll.startswith("PPTO_APROBADO"):
                 cautelas.append(f"peso tomado del presupuesto aprobado ({fuente_ll}) por falta de real válido")
             if p["modo_decision"] == "revisar" and cautelas:
@@ -1024,7 +1229,8 @@ def tabla_alcance(df, c_amt, c_fy, pesos, pesos_ef, sens, decisiones, ramos, p, 
                 "RAMOS_OTROS_FY_DIFIEREN": bool(est_otros.get(llave, False)), "FUENTE_PESO": fuente.get(llave, ""), "ORIGEN_PESO": origen.get(llave, ""),
                 "TIPOS_CON_PESO": tipos_peso.get(llave, ""), "DECISION": dec, "MOTIVO": mot, "CASO": caso,
                 "ALERTAS": " | ".join(cautelas) if dec == "AJUSTAR" else "", "N_ALERTAS": len(cautelas) if dec == "AJUSTAR" else 0,
-                "VALIDAR_SIREC": bool(facultativo or contrato_nulo)}
+                "VALIDAR_SIREC": bool(facultativo or contrato_nulo or (cres or {}).get("TIPO_CANDIDATO") == "EN_VIGOR"),
+                "TIPO_CANDIDATO_CARTERA": (cres or {}).get("TIPO_CANDIDATO", "")}
         for t in TIPOS:
             for r in ramos:
                 fila[f"PPTO_{t}_{r}"] = float(fp.get((t, r), 0.0))
@@ -1447,17 +1653,31 @@ def hist_desde_ctamens(path, ramos, subramo_df, anio, log):
     d = d[(per // 100) == anio].copy()
     if d.empty:
         log.warning("Presupuesto previo %s: no trae periodos de %s; no se usa.", path, anio)
-        return pd.DataFrame(columns=["LLAVE", "RAMO", "TIPO", "ANIO", "ORIGEN", "MONTO"])
+        return pd.DataFrame(columns=["LLAVE", "RAMO", "TIPO", "ANIO", "ORIGEN", "MONTO"]), pd.Series(dtype=object)
     d["RAMO"] = ramo_desde_proftctr(d[cprof], subramo_df, "Ramo2" if (subramo_df is not None and "Ramo2" in subramo_df.columns) else "Ramo")
     d["TIPO"] = d[cgl].map(normalizar_tipo)
     d["LLAVE"] = construir_llave(d, req["ZTIPOREAS"], req["ZCEDENTE"], req["ZCONTRATO"], req["FUNCAREA"])
     d["MONTO"] = a_num_estricto(d[camt], camt, "Presupuesto previo").fillna(0.0)
+    presentes_otros = set(d.loc[(d["TIPO"] == "Primas") & (d["MONTO"] != 0), "LLAVE"])
     d = d[d["RAMO"].isin(ramos) & d["TIPO"].notna()]
+    # región: pares código -> territorio que trae el propio CtaMens, y región dominante por LLAVE
+    ccod, cter = up.get("ZREGIONRP"), _detectar(up, ["TERRITORIO"])
+    if ccod and cter:
+        for cod, ter in d[[ccod, cter]].dropna().drop_duplicates().itertuples(index=False):
+            REGION_POR_CODIGO.setdefault(_txt(cod).strip(), " ".join(_txt(ter).split()))
+    reg = pd.Series(dtype=object)
+    creg = cter or ccod
+    if creg:
+        x = d[(d["TIPO"] == "Primas") & (d["MONTO"] != 0)].assign(_R=lambda z: z[creg].map(_region_key), _A=lambda z: z["MONTO"].abs())
+        x = x[x["_R"] != ""]
+        if len(x):
+            reg = x.groupby(["LLAVE", "_R"])["_A"].sum().reset_index().sort_values(["_A", "_R"]).drop_duplicates("LLAVE", keep="last").set_index("LLAVE")["_R"]
     h = d.groupby(["LLAVE", "RAMO", "TIPO"], as_index=False)["MONTO"].sum().assign(ANIO=anio, ORIGEN="PPTO")
     hp = h[h["TIPO"] == "Primas"].groupby("RAMO")["MONTO"].sum().abs()
     log.info("Presupuesto aprobado %s leído de %s (%.0f s): %s LLAVEs con ramos %s | participación del ramo %s en primas: %.4f", anio, path,
              time.perf_counter() - t0, h["LLAVE"].nunique(), ramos, min(ramos), float(hp.get(min(ramos), 0) / hp.sum()) if hp.sum() else float("nan"))
-    return h[["LLAVE", "RAMO", "TIPO", "ANIO", "ORIGEN", "MONTO"]]
+    reg.attrs["presentes"] = presentes_otros
+    return h[["LLAVE", "RAMO", "TIPO", "ANIO", "ORIGEN", "MONTO"]], reg
 
 
 # =============================================================================
@@ -1550,10 +1770,19 @@ def main(p):
     # ---- 2. Pesos ----
     fuentes, hnorm, meses, tol_sug, sens, tend = [], None, None, None, pd.DataFrame(), pd.DataFrame()
     pesos = marco_pesos_vacio()
+    regiones_hist, reg_pp, pesos_real, pp_all = {}, pd.Series(dtype=object), marco_pesos_vacio(), marco_pesos_vacio()
+    if existe(p, "pais"):  # código de región -> territorio (Pais.csv: TerrSAP -> Territorio), como lo hace CtaMens
+        try:
+            pais_df, _ = leer_tabla(p["pais"])
+            if {"TerrSAP", "Territorio"}.issubset(pais_df.columns):
+                for cod, ter in pais_df[["TerrSAP", "Territorio"]].dropna().drop_duplicates().itertuples(index=False):
+                    REGION_POR_CODIGO.setdefault(_txt(cod).strip(), " ".join(_txt(ter).split()))
+        except Exception as e:  # la región sólo afina los grupos de cartera; sin Pais.csv se usa el respaldo
+            log.warning("No se pudo leer Pais.csv para las regiones (%s); se usa la relación R01-R06 observada en los CtaMens.", e)
     if existe(p, "hist"):
         hist, _ = leer_tabla(p["hist"])
         mt = datetime.fromtimestamp(os.path.getmtime(p["hist"]))
-        hall, meses = preparar_hist(hist, p["ramos"], log, cod_archivo=mt.year * 100 + mt.month)
+        hall, meses, regiones_hist = preparar_hist(hist, p["ramos"], log, cod_archivo=mt.year * 100 + mt.month)
         hnorm = hall[hall["ORIGEN"] == "REAL"].drop(columns="ORIGEN")
         auto_base = str(p["anios_base"]).upper() == "AUTO"
         if auto_base:
@@ -1562,6 +1791,7 @@ def main(p):
             log.info("Años base (AUTO: 2 últimos años reales completos, >= %s meses en la base): %s", p["min_meses_anio"], p["anios_base"])
         if p["anios_base"] and (len(hnorm[hnorm["ANIO"].isin(p["anios_base"])]) or not auto_base):  # años base explícitos sin datos -> error claro
             pesos = pesos_desde_hist(hnorm, meses, p["ramos"], p["anios_base"], p["metodo_pesos"], p["min_meses_anio"], log); fuentes.append(f"hist={p['hist']}")
+            pesos_real = pesos.copy()
             tol_sug = tolerancia_sugerida(hnorm, p["ramos"], log)
             sens = sensibilidad_pesos(hnorm, meses, p["ramos"], p["anios_base"], p["min_meses_anio"], p["tolerancia"])
             if len(sens):
@@ -1570,6 +1800,7 @@ def main(p):
         else:
             log.warning("La Base_1 no tiene años reales completos anteriores a %s (años base %s): no hay pesos reales.", p["anio_decision"], p["anios_base"])
         hpp = hall[(hall["ORIGEN"] == "PPTO") & (hall["ANIO"] == p["anio_decision"] - 1)].drop(columns="ORIGEN")
+        reg_pp = regiones_hist.get(("PPTO", p["anio_decision"] - 1), pd.Series(dtype=object))
     else:
         hpp = pd.DataFrame()
     if existe(p, "pesos"):
@@ -1579,11 +1810,12 @@ def main(p):
     # respaldo: reparto del presupuesto APROBADO del año anterior, sólo para LLAVE-tipo sin peso real válido
     anio_prev = p["anio_decision"] - 1
     if (hpp is None or len(hpp) == 0) and existe(p, "ppto_previo"):
-        hpp = hist_desde_ctamens(p["ppto_previo"], p["ramos"], subramo_df, anio_prev, log)
+        hpp, reg_pp = hist_desde_ctamens(p["ppto_previo"], p["ramos"], subramo_df, anio_prev, log)
         fuentes.append(f"ppto_previo={p['ppto_previo']}")
     if hpp is not None and len(hpp):
         pp = pesos_desde_hist(hpp, None, p["ramos"], [anio_prev], "ultimo", 0, logger_silencioso())
         pp = pp[pp["VALIDO"]].copy()
+        pp_all = pp.copy()
         pp["FUENTE"] = f"PPTO_APROBADO_{anio_prev}"; pp["DETALLE"] = f"reparto del presupuesto aprobado {anio_prev} (sin real válido para esta LLAVE-tipo)"
         val_real = set(zip(pesos.loc[pesos["VALIDO"], "LLAVE"], pesos.loc[pesos["VALIDO"], "TIPO"])) if len(pesos) else set()
         k_pp = pd.Series(list(zip(pp["LLAVE"], pp["TIPO"])), index=pp.index)
@@ -1609,18 +1841,71 @@ def main(p):
             ll = [l for l, mm in metodos.items() if mm == m]
             pesos = pd.concat([pesos[~pesos["LLAVE"].isin(ll)], alt[alt["LLAVE"].isin(ll)]], ignore_index=True)
         log.info("Pesos con método propio por LLAVE (layout INCLUIR+METODO): %s", metodos)
-    # ---- Nivel 3: cartera para contratos nuevos ----
-    cartera_diag = pd.DataFrame()
+    # ---- Nivel 3: cartera para contratos nuevos (especificación v2.3) ----
+    cartera_diag, cartera_res, bt_det, bt_res = pd.DataFrame(), {}, pd.DataFrame(), pd.DataFrame()
     if p.get("cartera_nuevos"):
         dec_prim = cat[(cat[c_fy] == p["anio_decision"]) & (cat["TIPO"] == "Primas") & (cat[c_amt] != 0)]
-        ramos_ll = dec_prim.groupby("LLAVE")["RAMO"].nunique()
+        g_dec = dec_prim.groupby("LLAVE")
+        ramos_ll, neto_ll = g_dec["RAMO"].nunique(), g_dec[c_amt].sum()
+        signo_ref = np.sign(dec_prim[c_amt].sum()) or -1.0
+        # "con datos propios" = cualquier fila de prima 71/73 en el real de los años base o en el presupuesto aprobado, válida o no
+        base_list = p["anios_base"] if isinstance(p["anios_base"], list) else []
+        con_datos = set()
+        if hnorm is not None:
+            con_datos |= set(hnorm.loc[(hnorm["TIPO"] == "Primas") & hnorm["ANIO"].isin(base_list) & (hnorm["MONTO"] != 0), "LLAVE"])
+        if hpp is not None and len(hpp):
+            con_datos |= set(hpp.loc[(hpp["TIPO"] == "Primas") & (hpp["MONTO"] != 0), "LLAVE"])
         con_peso = set(pesos.loc[pesos["VALIDO"].astype(bool) & (pesos["TIPO"] == "Primas"), "LLAVE"]) if len(pesos) else set()
         excl_ln = {x.upper() for x in p["excluir_funcarea"]}
-        cand = [l for l, n in ramos_ll.items() if n == 1 and l not in con_peso and l not in decisiones and l.split("-", 3)[-1].upper() not in excl_ln]
-        if cand:
-            h_real_base = hnorm[hnorm["ANIO"].isin(p["anios_base"])] if (hnorm is not None and isinstance(p["anios_base"], list)) else None
-            pc, cartera_diag = pesos_cartera(cand, h_real_base, hpp, f"REAL {p['anios_base']}", f"PPTO_APROBADO_{p['anio_decision'] - 1}",
-                                             p["ramos"], p["tolerancia"], p["cartera_min_llaves"], log)
+        c_reg_ppto = col(df, "REG", obligatoria=False)
+        filas_c = []
+        for l, n in ramos_ll.items():
+            acc = decisiones.get(l, (None, ""))[0]
+            if (n != 1 or l in con_peso or l in con_datos or acc in ("EXCLUIR", "FORZAR") or l.split("-", 3)[-1].upper() in excl_ln
+                    or np.sign(neto_ll[l]) != signo_ref or abs(neto_ll[l]) < p["cartera_prima_min"]):
+                continue
+            filas_c.append(l)
+        if filas_c:
+            sub = dec_prim[dec_prim["LLAVE"].isin(filas_c)]
+            ramo_c = sub.groupby("LLAVE")["RAMO"].first()
+            if c_reg_ppto is not None:
+                rr = sub.assign(_R=sub[c_reg_ppto].map(_region_key), _A=sub[c_amt].abs())
+                reg_c = rr.groupby(["LLAVE", "_R"])["_A"].sum().reset_index().sort_values("_A").drop_duplicates("LLAVE", keep="last").set_index("LLAVE")["_R"]
+            else:
+                reg_c = pd.Series(dtype=object)
+            cand = pd.DataFrame({"RAMO_CARGADO": ramo_c, "PRIMA": neto_ll.reindex(ramo_c.index).abs()})
+            # ¿la LLAVE ya existía en otros ramos (real antes del año de decisión o presupuesto aprobado del año anterior)?
+            otros = set()
+            for (o_, a_), s_ in regiones_hist.get("__PRESENTES__", {}).items():
+                if (o_ == "REAL" and a_ < p["anio_decision"]) or (o_ == "PPTO" and a_ == p["anio_decision"] - 1):
+                    otros |= s_
+            otros |= set(getattr(reg_pp, "attrs", {}).get("presentes", set()))
+            cand["EXISTIA_OTROS_RAMOS"] = cand.index.isin(otros)
+            c_susc = col(df, "SUSC", obligatoria=False)
+            cand["SUSC_MIN"] = (pd.to_numeric(sub[c_susc], errors="coerce").groupby(sub["LLAVE"]).min().reindex(cand.index)
+                                if c_susc is not None else np.nan)
+            # contrato NUEVO (sólo suscripción del año de decisión y sin presencia previa en otros ramos) o EN VIGOR sin historia catastrófica
+            cand["TIPO_CANDIDATO"] = np.where(cand["EXISTIA_OTROS_RAMOS"] | (cand["SUSC_MIN"].fillna(p["anio_decision"]) < p["anio_decision"]),
+                                              "EN_VIGOR", "NUEVO")
+            c_tces = next((c_ for c_ in sub.columns if str(c_).upper() == "ZTIPOCES"), None)
+            cand["FRONTING"] = (sub.assign(_F=pd.to_numeric(sub[c_tces], errors="coerce") == 3).groupby("LLAVE")["_F"].any().reindex(cand.index).fillna(False)
+                                if c_tces is not None else False)
+            cand["REGION"] = reg_c.reindex(cand.index).fillna("")
+            cand.attrs["PRIMA_TOTAL_ABS"] = float(abs(dec_prim[c_amt].sum()))
+            gen = set(map(str, p["cedentes_genericas"]))
+            reg_real = pd.Series(dtype=object)
+            for a_ in sorted(base_list):  # el año más reciente prevalece
+                s_ = regiones_hist.get(("REAL", a_))
+                if s_ is not None and len(s_):
+                    reg_real = pd.concat([reg_real[~reg_real.index.isin(s_.index)], s_])
+            mem_real = miembros_desde_pesos(pesos_real, p["ramos"], reg_real, gen)
+            mem_pp = miembros_desde_pesos(pp_all, p["ramos"], reg_pp, gen)
+            pc, cartera_diag, cartera_res = pesos_cartera(cand, mem_real, mem_pp, f"REAL {base_list}", f"PPTO_APROBADO_{p['anio_decision'] - 1}",
+                                                          p["ramos"], p, log)
+            bt_det, bt_res = backtest_cartera(mem_pp, p["ramos"], p)
+            if len(bt_res):
+                log.info("Prueba retrospectiva de la cartera sobre el presupuesto aprobado (error absoluto por contrato, pp):\n%s",
+                         bt_res[bt_res["CORTE"] != "LN"].round(2).to_string(index=False))
             if len(pc):
                 pesos = pd.concat([pesos[~pesos["LLAVE"].isin(set(pc["LLAVE"]))], pc], ignore_index=True)
                 fuentes.append("cartera (contratos nuevos)")
@@ -1637,7 +1922,29 @@ def main(p):
     pesos_ef = pesos_efectivos(pesos if len(pesos) else marco_pesos_vacio(), p["ramos"], p["comisiones"], p["siniestros"])
 
     # ---- 3. Alcance ----
-    alcance = tabla_alcance(df, c_amt, c_fy, pesos, pesos_ef, sens, decisiones, p["ramos"], p, log)
+    alcance = tabla_alcance(df, c_amt, c_fy, pesos, pesos_ef, sens, decisiones, p["ramos"], p, log, cartera_res=cartera_res)
+    c_tces_df = next((c_ for c_ in df.columns if str(c_).upper() == "ZTIPOCES"), None)
+    if len(alcance) and c_tces_df is not None:
+        fr = set(cat.loc[(cat[c_fy] == p["anio_decision"]) & (pd.to_numeric(cat[c_tces_df], errors="coerce") == 3), "LLAVE"])
+        alcance["FRONTING"] = alcance["LLAVE"].isin(fr)
+        m_fr = alcance["FRONTING"] & (alcance["DECISION"] == "AJUSTAR")
+        if m_fr.any():
+            nota = "fronting (ZTIPOCES 3): verificar en la pasada 1 de CtaMens que los clones queden 100 % cedidos"
+            alcance.loc[m_fr, "ALERTAS"] = alcance.loc[m_fr, "ALERTAS"].astype(str).map(lambda a: (a + " | " + nota) if a else nota)
+            alcance.loc[m_fr, "N_ALERTAS"] = alcance.loc[m_fr, "N_ALERTAS"] + 1
+            log.info("LLAVEs ajustadas con fronting (ZTIPOCES 3): %s; verificar en CtaMens que sus clones queden 100 %% cedidos", int(m_fr.sum()))
+    # aporte de la cartera a la participación del ramo menor (Terremoto) en la prima del año de decisión, en puntos porcentuales
+    aporte_cartera_pp, aporte_partes = 0.0, {}
+    if len(alcance) and "CASO" in alcance.columns:
+        r_min, r_max = min(p["ramos"]), max(p["ramos"])
+        tot_dec = float(cat.loc[(cat[c_fy] == p["anio_decision"]) & (cat["TIPO"] == "Primas"), c_amt].sum())
+        ac = alcance[(alcance["DECISION"] == "AJUSTAR") & alcance["CASO"].astype(str).str.contains("CARTERA")]
+        if len(ac) and tot_dec:
+            mov = (1 - ac[f"SHARE_{r_max}_PESO"]) * ac["PPTO_TOTAL_REF_7173"] - ac[f"PPTO_Primas_{r_min}"]
+            aporte_cartera_pp = float(100 * mov.sum() / tot_dec)
+            aporte_partes = {k: round(float(100 * v / tot_dec), 2) for k, v in mov.groupby(ac["CASO"]).sum().items()}
+        log.info("Aporte de la cartera (contratos sin datos propios) a la participación del ramo %s: %+.2f pp (%s contratos ajustados) | por caso: %s",
+                 r_min, aporte_cartera_pp, len(ac), aporte_partes)
     llaves_aj = alcance.loc[alcance["DECISION"] == "AJUSTAR", "LLAVE"].tolist()
     # diagnósticos de cobertura: % de la prima del año de decisión con pesos, y firmas huérfanas en LLAVEs con ambos ramos
     dec_rows = cat[(cat[c_fy] == p["anio_decision"]) & (cat["TIPO"] == "Primas") & (cat[c_amt] != 0)]
@@ -1711,7 +2018,10 @@ def main(p):
         "cobertura_prima_con_pesos": cobertura, "firmas_huerfanas_llaves_biramo": huerfanas,
         "ppto_previo": p.get("ppto_previo", ""), "modo_decision": p["modo_decision"],
         "cartera_nuevos": p.get("cartera_nuevos"), "cartera_min_llaves": str(p.get("cartera_min_llaves")),
-        "llaves_con_peso_cartera": int((cartera_diag["RESULTADO"] == "peso de cartera").sum()) if len(cartera_diag) else 0,
+        "cartera_cobertura_real": p.get("cartera_cobertura_real"), "cartera_prima_min": p.get("cartera_prima_min"),
+        "cartera_material_pct": p.get("cartera_material_pct"),
+        "cartera_umbral_material": (round(float(cartera_diag.attrs.get("umbral_material", np.nan)), 2) if len(cartera_diag) else None), "cartera_reclasificar": p.get("cartera_reclasificar"), "cartera_en_vigor": p.get("cartera_en_vigor"), "cartera_resultados": (cartera_diag["RESULTADO"].value_counts().to_dict() if len(cartera_diag) else {}),
+        "aporte_cartera_pp": round(aporte_cartera_pp, 4), "aporte_cartera_por_caso_pp": str(aporte_partes),
         "participacion_antes": str({f"{nombres.get(r, r)} ({r})": round(v, 4) for r, v in part_antes.items()}),
         "participacion_despues": str({f"{nombres.get(r, r)} ({r})": round(v, 4) for r, v in part_desp.items()}) if part_desp else "",
         "llaves_ajustadas_con_alertas": int(((alcance["DECISION"] == "AJUSTAR") & (alcance["N_ALERTAS"] > 0)).sum()) if len(alcance) else 0,
@@ -1744,6 +2054,10 @@ def main(p):
             alcance[alcance["VALIDAR_SIREC"]].to_excel(w, sheet_name="Validar_SIREC", index=False)
         if len(cartera_diag):
             cartera_diag.to_excel(w, sheet_name="Cartera_Nuevos", index=False)
+            cartera_diag[cartera_diag["CONFIRMAR"] != ""].to_excel(w, sheet_name="Cartera_Confirmar", index=False)
+        if len(bt_res):
+            bt_res.to_excel(w, sheet_name="Backtest_Cartera", index=False)
+            bt_det.head(p["max_filas_excel_detalle"]).to_excel(w, sheet_name="Backtest_Cartera_Detalle", index=False)
         pesos.to_excel(w, sheet_name="Pesos_Calculados", index=False)
         pesos_ef.to_excel(w, sheet_name="Pesos_Aplicados", index=False)
         if len(sens):
@@ -1794,6 +2108,8 @@ def parse_args():
     ap.add_argument("--modo-decision", dest="modo_decision", choices=["fijo", "revisar"])
     ap.add_argument("--sin-sirec", dest="sin_sirec", action="store_true", help="no consultar SIREC al terminar")
     ap.add_argument("--sin-cartera", dest="sin_cartera", action="store_true", help="no aplicar el porcentaje de cartera a contratos nuevos")
+    ap.add_argument("--cartera-sin-reclasificar", dest="cartera_sin_reclasificar", action="store_true", help="no mover contratos cuyo grupo es del otro ramo")
+    ap.add_argument("--cartera-sin-en-vigor", dest="cartera_sin_en_vigor", action="store_true", help="cartera sólo para contratos nuevos de suscripción del año")
     ap.add_argument("--out-dir", dest="out_dir"); ap.add_argument("--cesion-hist", dest="cesion_hist")
     ap.add_argument("--ramos", help="p.ej. 71,73"); ap.add_argument("--anio-decision", dest="anio_decision", type=int)
     ap.add_argument("--anios-base", dest="anios_base", help="p.ej. 2025,2026"); ap.add_argument("--metodo-pesos", dest="metodo_pesos", choices=METODOS)
@@ -1831,6 +2147,8 @@ def parse_args():
     if a.dry_run: p["dry_run"] = True
     if a.sin_sirec: p["sirec"] = False
     if a.sin_cartera: p["cartera_nuevos"] = False
+    if a.cartera_sin_reclasificar: p["cartera_reclasificar"] = False
+    if a.cartera_sin_en_vigor: p["cartera_en_vigor"] = False
     return p
 
 
