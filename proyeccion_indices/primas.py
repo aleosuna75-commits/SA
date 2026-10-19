@@ -76,6 +76,9 @@ PATRON_PPTO = "PptoTecnico{sig}*.csv"
 # queda de respaldo; con False, al reves. La prima tomada es la misma en los dos; PRCT_CED solo alimenta la prima
 # retenida del control (sin la columna, retenida = tomada), que no entra a ninguna reserva.
 PREFERIR_PPTO_SIN_CED = True
+PPTO_EXCLUIR = ("_red",)          # presupuestos del ano siguiente que no son el presupuesto general y no se usan como tal:
+                                  # PptoTecnico{sig}_Red trae la redistribucion de primas de TEV e Hidro del area (si el
+                                  # script de reservas lo usa, es solo para esos ramos)
 CUENTAS_PRIMA = ("6104010000", "6108010000", "6111090000")   # prima tomada (viene en negativo: se voltea)
 PREFIJO_SINIESTRO, PREFIJO_COMISION = "54", "53"
 MIN_COBERTURA_HISTORIA = 0.95     # el historico debe traer al menos 95 % de la prima de los meses que comparte con
@@ -264,9 +267,10 @@ def _leer_columnas(ruta: Path, hoja: str, marcas: tuple, columnas: dict) -> tupl
 def _buscar(patron: str, es_ppto: bool = False) -> list:
     """Archivos de entradas/ que cumplen el patron, en orden de preferencia: el MAS GRANDE primero (si junto a la base
     completa quedo una copia recortada) y, a igual tamano, el mas reciente; en el presupuesto del ano siguiente, primero
-    los que no son _Ced (o los _Ced si PREFERIR_PPTO_SIN_CED = False). Si el preferido resulta recortado o incompleto se
-    usa el siguiente."""
-    c = [p for p in ENTRADAS.glob(patron) if not p.name.startswith("~$") and p.is_file()]
+    los que no son _Ced (o los _Ced si PREFERIR_PPTO_SIN_CED = False) y sin los de PPTO_EXCLUIR (el _Red). Si el preferido
+    resulta recortado o incompleto se usa el siguiente."""
+    c = [p for p in ENTRADAS.glob(patron) if not p.name.startswith("~$") and p.is_file()
+         and not (es_ppto and any(x in p.stem.lower() for x in PPTO_EXCLUIR))]
     c.sort(key=lambda p: (es_ppto and (("_ced" in p.name.lower()) != PREFERIR_PPTO_SIN_CED),
                           p.stat().st_size, p.stat().st_mtime), reverse=True)
     return c
