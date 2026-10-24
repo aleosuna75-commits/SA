@@ -56,6 +56,59 @@ def color(row):
     return f"#{c}" if isinstance(c, str) and len(c) == 6 else "#888"
 
 
+def seccion_real(obj, base):
+    """Compara contra el resultado real de la qualy si ya está en cache (qualy_real_1297.json)."""
+    import json
+    f = base / "cache" / "qualy_real_1297.json"
+    if not f.exists():
+        return ""
+    real = pd.DataFrame(json.loads(f.read_text()))
+    if real.empty or "position" not in real:
+        return ""
+    real = real[["driver_number", "position"]].rename(columns={"position": "real"})
+    real["real"] = pd.to_numeric(real.real, errors="coerce")
+    v1_f = base / "prediccion_pre_qualy_v1.csv"
+    v1 = pd.read_csv(v1_f)[["driver_number", "pred_rank"]].rename(columns={"pred_rank": "v1"}) if v1_f.exists() else None
+    t = obj[["driver_number", "name_acronym", "team_name", "team_colour", "pred_rank"]].merge(real, on="driver_number", how="left")
+    if v1 is not None:
+        t = t.merge(v1, on="driver_number", how="left")
+    t = t.sort_values("real", na_position="last")
+    top_real = set(t[t.real <= 10].driver_number)
+    hits_v2 = len(top_real & set(t[t.pred_rank <= 10].driver_number))
+    hits_v1 = len(top_real & set(t[t.v1 <= 10].driver_number)) if v1 is not None else None
+    pole = t.iloc[0]
+    filas = []
+    for _, r in t.iterrows():
+        ok = lambda col: "hit" if (r.real <= 10) == (r[col] <= 10) else "miss"
+        v1c = (f'<td class="num {ok("v1")}">{int(r.v1)}</td>' if v1 is not None and pd.notna(r.v1) else "<td></td>")
+        filas.append(f"""<tr class="{'in' if r.real <= 10 else ''}"><td class="num">{fint(r.real)}</td>
+          <td><span class="chip" style="background:{color(r)}"></span><b>{e(r.name_acronym)}</b><span class="sub">{e(r.team_name)}</span></td>
+          {v1c}<td class="num {ok('pred_rank')}">{int(r.pred_rank)}</td></tr>""")
+    k1 = (f'<div class="kpi"><b>{hits_v1}/10</b><span>Aciertos del pronóstico pre-qualy (v1, 14:20 UTC)</span></div>'
+          if hits_v1 is not None else "")
+    return f"""
+<section>
+  <h2>{STAR.format(c="st")}Resultado real vs. pronóstico</h2>
+  <p class="lead">La v1 se publicó (commit en git) antes de la FP3 y de la qualy. La v2 incluye los arreglos de la auditoría
+  y se generó <b>durante/después</b> de la qualy, con los mismos datos de FP1/FP2 (no usa el resultado), así que no cuenta como pronóstico previo.</p>
+  <div class="kpis">
+    <div class="kpi"><b>{e(pole.name_acronym)}</b><span>Pole real</span></div>
+    {k1}
+    <div class="kpi"><b>{hits_v2}/10</b><span>Aciertos del modelo corregido (v2)</span></div>
+    <div class="kpi"><b>{fila_real_media(t)}</b><span>Error medio de posición (v2)</span></div>
+  </div>
+  <div class="tw" style="margin-top:12px"><table class="real">
+    <tr><th>Real</th><th>Piloto</th>{'<th>Pred v1</th>' if v1 is not None else ''}<th>Pred v2</th></tr>
+    {''.join(filas)}
+  </table></div>
+</section>"""
+
+
+def fila_real_media(t):
+    x = t.dropna(subset=["real"])
+    return f"{(x.real - x.pred_rank).abs().mean():.1f}"
+
+
 def generar_html(R, ruta):
     obj, tabla, imp, cota, por_gp = R["obj"], R["tabla"], R["imp"], R["cota"], R["por_gp"]
     mejor = R["mejor"]
@@ -139,6 +192,7 @@ def generar_html(R, ruta):
     burb = ", ".join(f"<b>{e(r.name_acronym)}</b> ({pct(r.p_q3)})" for _, r in burbuja.iterrows())
 
     favorito = obj.sort_values("p_pole", ascending=False).iloc[0]
+    real_html = seccion_real(obj, ruta.parent)
     n_train = len(R["train"])
     n_gp = R["train"].meeting_key.nunique()
     n_vars = R.get("n_vars", len(ETIQUETAS))
@@ -206,6 +260,8 @@ td b + .sub{{display:inline;margin-left:6px}}
 tr.win td{{background:rgba(200,16,46,.22);font-weight:700}} tr.base td{{color:var(--muted)}}
 .two{{display:grid;grid-template-columns:1.2fr 1fr;gap:22px}}
 .card{{background:var(--card);border:1px solid var(--line);border-radius:4px;padding:16px}}
+td.hit{{color:#5fd38d;font-weight:700}} td.miss{{color:var(--red2);font-weight:700}}
+table.real tr:nth-child(12) td{{border-top:2px dashed var(--red2)}}
 .irow{{display:grid;grid-template-columns:190px 1fr 48px;gap:8px;align-items:center;font-size:13px;margin:5px 0}}
 .ibar{{height:10px;background:rgba(255,255,255,.08);border-radius:5px;overflow:hidden}}
 .ibar i{{display:block;height:100%;background:var(--sand)}}
@@ -244,6 +300,7 @@ footer{{border-top:6px solid var(--red);margin-top:40px;padding:20px 0 40px;colo
     <div class="kpi"><b>{n_gp} GPs</b><span>{n_train:,} filas piloto-GP · {n_vars} variables</span></div>
   </div>
 </section>
+{real_html}
 
 <section>
   <h2>{STAR.format(c="st")}La parrilla según el modelo</h2>
@@ -310,7 +367,12 @@ footer{{border-top:6px solid var(--red);margin-top:40px;padding:20px 0 40px;colo
   (quién suele esconder ritmo el viernes); lluvia/temperatura y fin de semana sprint.<br>
   <b>Modelos comparados:</b> 2 baselines, Ridge, Random Forest, Extra Trees, Gradient Boosting, XGBoost, LightGBM, LightGBM LambdaRank,
   XGBoost Ranker y 2 ensambles. Ganó: <b>{e(mejor)}</b>. 2026 pesa 3× y 2025 1.5× por el nuevo reglamento.<br>
-  <b>Probabilidades:</b> Monte Carlo con los errores reales de validación del modelo (según la zona de la parrilla).
+  <b>Probabilidades:</b> Monte Carlo con los errores reales de validación del modelo (ventana de ±2 posiciones predichas).<br>
+  <b>Auditoría (v2):</b> se corrigieron una fuga de fechas en Las Vegas 2024 (zona horaria OpenF1 vs Jolpica), el sesgo FP→Qualy del
+  equipo que veía al compañero en el mismo GP, una vuelta corrupta que borraba la FP1 de Miami 2026, nombres de equipos de Jolpica
+  (Alpine, RB, Cadillac) y la calibración del Monte Carlo; además la validación ahora incluye a los pilotos que no marcaron tiempo.
+  Seis experimentos de mejora (hiperparámetros, objetivo, ~90 variables nuevas, pesos, ensambles/stacking/CatBoost y modelos jerárquicos)
+  no superaron al Random Forest de forma robusta.
   </div>
   <p class="note" style="margin-top:14px">Ojo: el modelo no ve la FP3 (sábado por la mañana), ni lluvia en la qualy, banderas rojas,
   límites de pista o penalizaciones de motor (éstas no cambian la posición de qualy, sólo la salida). La qualy F1 es ruidosa:

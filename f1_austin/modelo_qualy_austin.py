@@ -48,6 +48,8 @@ EQUIPO_CANON = {
     "AlphaTauri": "Racing Bulls", "RB": "Racing Bulls", "Racing Bulls": "Racing Bulls",
     "Alfa Romeo": "Audi", "Kick Sauber": "Audi", "Sauber": "Audi", "Audi": "Audi",
     "Haas F1 Team": "Haas", "Red Bull Racing": "Red Bull",
+    # nombres de constructor en Jolpica
+    "RB F1 Team": "Racing Bulls", "Alpine F1 Team": "Alpine", "Cadillac F1 Team": "Cadillac",
 }
 
 
@@ -112,9 +114,14 @@ def features_practica(sk, pref):
 
     n_vueltas = laps.groupby("driver_number").size()
     v = laps[laps.lap_duration.notna() & (laps.is_pit_out_lap != True)].copy()
+    # descartar vueltas cuyo tiempo no cuadra con la suma de sectores (datos corruptos)
+    suma = v[["duration_sector_1", "duration_sector_2", "duration_sector_3"]].sum(axis=1, min_count=3)
+    v = v[~((suma - v.lap_duration).abs() > 1.0)]
     if v.empty:
         return pd.DataFrame()
-    mejor_ses = v.lap_duration.min()
+    # referencia robusta: 3.ª mejor marca entre pilotos (no el mínimo absoluto)
+    mejores = v.groupby("driver_number").lap_duration.min().sort_values()
+    mejor_ses = mejores.iloc[min(2, len(mejores) - 1)]
     v = v[v.lap_duration < mejor_ses * 1.12]
     out = pd.DataFrame(index=sorted(laps.driver_number.unique()))
     out.index.name = "driver_number"
@@ -296,7 +303,8 @@ def construir_dataset():
 
     hist = defaultdict(dict)
     for mk, grupo in data.groupby("meeting_key", sort=False):
-        fecha = grupo.race_date.iloc[0]
+        # inicio del fin de semana (FP1): la carrera anterior siempre cae antes y la del propio GP después
+        fecha = pd.Timestamp(grupo.date.iloc[0]).tz_convert(None).normalize()
         circuito_jolpica = mapa_circ.get(grupo.circuit_key.iloc[0])
         prev_q = jq[jq.date < fecha]
         prev_r = jr[jr.date < fecha]
@@ -339,6 +347,11 @@ def construir_dataset():
                                 .transform(lambda s: s.shift(1).rolling(8, min_periods=2).mean()))
     data["h_fp_to_q_team"] = (data.groupby("team").fp_to_q
                               .transform(lambda s: s.shift(1).rolling(12, min_periods=3).mean()))
+    # la primera fila de cada (GP, equipo) sólo ve GPs anteriores: se usa para ambos pilotos
+    data["h_fp_to_q_team"] = data.groupby(["meeting_key", "team"]).h_fp_to_q_team.transform("first")
+    # Posición para evaluar: los que no marcaron tiempo en qualy van al fondo
+    data["q_eval"] = data.q_pos.fillna(99)
+    data["q_eval"] = data.groupby("meeting_key").q_eval.rank(method="first")
     data["year_idx"] = data.year - 2023
     data["is_2026_regs"] = (data.year >= 2026).astype(int)
     return data, meetings
@@ -450,13 +463,14 @@ def metricas(df_pred, col):
 
 
 def walk_forward(data, desde=2024):
+    """Entrena con pilotos con tiempo de qualy; evalúa con TODOS los inscritos (sin tiempo = al fondo)."""
     entrenables = data.dropna(subset=["q_pos"])
     pruebas = entrenables[entrenables.year >= desde].meeting_key.drop_duplicates().tolist()
     preds = {n: [] for n in catalogo()}
     for i, mk in enumerate(pruebas):
         fecha = entrenables[entrenables.meeting_key == mk].date.iloc[0]
         tr = entrenables[entrenables.date < fecha].sort_values(["meeting_key", "driver_number"])
-        te = entrenables[entrenables.meeting_key == mk]
+        te = data[data.meeting_key == mk].assign(q_pos=lambda x: x.q_eval)
         grupos = tr.groupby("meeting_key", sort=False).size().loc[tr.meeting_key.unique()].values
         for nombre, fab in catalogo().items():
             m = fab().fit(tr[FEATURES], tr.q_pos.values, pesos(tr), grupos)
@@ -517,15 +531,14 @@ def importancias(modelos):
 
 
 def montecarlo(pred_rank, residuos, n=20000, seed=SEED):
-    """Ruido empírico de los residuos walk-forward (por bloque de posición predicha)."""
+    """Ruido empírico de los residuos walk-forward (ventana de ±2 posiciones predichas)."""
     rng = np.random.default_rng(seed)
     k = len(pred_rank)
-    bloques = {b: residuos[(residuos.pred_rank >= b * 5 + 1) & (residuos.pred_rank <= b * 5 + 5)].res.values
-               for b in range(5)}
     sims = np.zeros((n, k))
     for j, pr in enumerate(pred_rank):
-        b = min(int((pr - 1) // 5), 4)
-        r = bloques[b] if len(bloques[b]) > 30 else residuos.res.values
+        r = residuos[(residuos.pred_rank - pr).abs() <= 2].res.values
+        if len(r) < 30:
+            r = residuos.res.values
         sims[:, j] = pr + rng.choice(r, n) + rng.uniform(-0.5, 0.5, n)
     pos = sims.argsort(axis=1).argsort(axis=1) + 1
     return pd.DataFrame({
@@ -544,11 +557,12 @@ def main():
     data, meetings = construir_dataset()
     data.to_csv(BASE / "dataset_qualy.csv", index=False)
     obj = data[data.meeting_key == OBJETIVO_MEETING].copy()
-    train = data[(data.meeting_key != OBJETIVO_MEETING) & data.q_pos.notna()]
+    historia = data[(data.meeting_key != OBJETIVO_MEETING) & data.q_eval.notna()]
+    train = historia[historia.q_pos.notna()]
     print(f"Filas de entrenamiento: {len(train)}  | GPs: {train.meeting_key.nunique()}  | Features: {len(FEATURES)}")
 
     print("Validación walk-forward 2024-2026...")
-    tabla, preds = walk_forward(train)
+    tabla, preds = walk_forward(historia)
     print(tabla.to_string(index=False))
     mejor = tabla.modelo.iloc[0]
     print("Mejor modelo:", mejor)
