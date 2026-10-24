@@ -101,6 +101,65 @@ footer{border-top:6px solid var(--red);margin-top:40px;padding:20px 0 40px;color
   </div>
 </section>
 
+<section>
+  <h2><svg viewBox="0 0 24 24" class="st" aria-hidden="true"><path d="M12 1.8l2.95 6.9 7.45.65-5.65 4.9 1.7 7.3L12 17.7l-6.45 3.85 1.7-7.3L1.6 9.35l7.45-.65z"/></svg>Resultado real vs. pronóstico</h2>
+  <p class="lead">La v1 se publicó (commit en git) antes de la FP3 y de la qualy. La v2 incluye los arreglos de la auditoría
+  y se generó <b>durante/después</b> de la qualy, con los mismos datos de FP1/FP2 (no usa el resultado), así que no cuenta como pronóstico previo.</p>
+  <div class="kpis">
+    <div class="kpi"><b>ANT</b><span>Pole real</span></div>
+    <div class="kpi"><b>10/10</b><span>Aciertos del pronóstico pre-qualy (v1, commit 14:29 UTC)</span></div>
+    <div class="kpi"><b>10/10</b><span>Aciertos del modelo corregido (v2)</span></div>
+    <div class="kpi"><b>1.2</b><span>Error medio de posición (v2)</span></div>
+  </div>
+  <div class="tw" style="margin-top:12px"><table class="real">
+    <tr><th>Real</th><th>Piloto</th><th>Pred v1</th><th>Pred v2</th></tr>
+    <tr class="in"><td class="num">1</td>
+          <td><span class="chip" style="background:#00D7B6"></span><b>ANT</b><span class="sub">Mercedes</span></td>
+          <td class="num hit">1</td><td class="num hit">2</td></tr><tr class="in"><td class="num">2</td>
+          <td><span class="chip" style="background:#4781D7"></span><b>VER</b><span class="sub">Red Bull Racing</span></td>
+          <td class="num hit">2</td><td class="num hit">3</td></tr><tr class="in"><td class="num">3</td>
+          <td><span class="chip" style="background:#4781D7"></span><b>HAD</b><span class="sub">Red Bull Racing</span></td>
+          <td class="num hit">8</td><td class="num hit">8</td></tr><tr class="in"><td class="num">4</td>
+          <td><span class="chip" style="background:#ED1131"></span><b>LEC</b><span class="sub">Ferrari</span></td>
+          <td class="num hit">3</td><td class="num hit">1</td></tr><tr class="in"><td class="num">5</td>
+          <td><span class="chip" style="background:#ED1131"></span><b>HAM</b><span class="sub">Ferrari</span></td>
+          <td class="num hit">5</td><td class="num hit">4</td></tr><tr class="in"><td class="num">6</td>
+          <td><span class="chip" style="background:#00D7B6"></span><b>RUS</b><span class="sub">Mercedes</span></td>
+          <td class="num hit">4</td><td class="num hit">5</td></tr><tr class="in"><td class="num">7</td>
+          <td><span class="chip" style="background:#F47600"></span><b>PIA</b><span class="sub">McLaren</span></td>
+          <td class="num hit">6</td><td class="num hit">6</td></tr><tr class="in"><td class="num">8</td>
+          <td><span class="chip" style="background:#F47600"></span><b>NOR</b><span class="sub">McLaren</span></td>
+          <td class="num hit">7</td><td class="num hit">7</td></tr><tr class="in"><td class="num">9</td>
+          <td><span class="chip" style="background:#6C98FF"></span><b>LIN</b><span class="sub">Racing Bulls</span></td>
+          <td class="num hit">10</td><td class="num hit">10</td></tr><tr class="in"><td class="num">10</td>
+          <td><span class="chip" style="background:#6C98FF"></span><b>LAW</b><span class="sub">Racing Bulls</span></td>
+          <td class="num hit">9</td><td class="num hit">9</td></tr><tr class=""><td class="num">11</td>
+          <td><span class="chip" style="background:#00A1E8"></span><b>GAS</b><span class="sub">Alpine</span></td>
+          <td class="num hit">11</td><td class="num hit">11</td></tr><tr class=""><td class="num">12</td>
+          <td><span class="chip" style="background:#F50537"></span><b>HUL</b><span class="sub">Audi</span></td>
+          <td class="num hit">15</td><td class="num hit">15</td></tr><tr class=""><td class="num">13</td>
+          <td><span class="chip" style="background:#F50537"></span><b>BOR</b><span class="sub">Audi</span></td>
+          <td class="num hit">12</td><td class="num hit">12</td></tr><tr class=""><td class="num">14</td>
+          <td><span class="chip" style="background:#00A1E8"></span><b>COL</b><span class="sub">Alpine</span></td>
+          <td class="num hit">14</td><td class="num hit">14</td></tr><tr class=""><td class="num">15</td>
+          <td><span class="chip" style="background:#229971"></span><b>ALO</b><span class="sub">Aston Martin</span></td>
+          <td class="num hit">16</td><td class="num hit">16</td></tr><tr class=""><td class="num">16</td>
+          <td><span class="chip" style="background:#9C9FA2"></span><b>BEA</b><span class="sub">Haas F1 Team</span></td>
+          <td class="num hit">13</td><td class="num hit">13</td></tr><tr class=""><td class="num">17</td>
+          <td><span class="chip" style="background:#9C9FA2"></span><b>OCO</b><span class="sub">Haas F1 Team</span></td>
+          <td class="num hit">18</td><td class="num hit">17</td></tr><tr class=""><td class="num">18</td>
+          <td><span class="chip" style="background:#229971"></span><b>STR</b><span class="sub">Aston Martin</span></td>
+          <td class="num hit">17</td><td class="num hit">18</td></tr><tr class=""><td class="num">19</td>
+          <td><span class="chip" style="background:#1868DB"></span><b>SAI</b><span class="sub">Williams</span></td>
+          <td class="num hit">19</td><td class="num hit">19</td></tr><tr class=""><td class="num">20</td>
+          <td><span class="chip" style="background:#1868DB"></span><b>ALB</b><span class="sub">Williams</span></td>
+          <td class="num hit">20</td><td class="num hit">20</td></tr><tr class=""><td class="num">21</td>
+          <td><span class="chip" style="background:#909090"></span><b>PER</b><span class="sub">Cadillac</span></td>
+          <td class="num hit">22</td><td class="num hit">22</td></tr><tr class=""><td class="num">22</td>
+          <td><span class="chip" style="background:#909090"></span><b>BOT</b><span class="sub">Cadillac</span></td>
+          <td class="num hit">21</td><td class="num hit">21</td></tr>
+  </table></div>
+</section>
 
 <section>
   <h2><svg viewBox="0 0 24 24" class="st" aria-hidden="true"><path d="M12 1.8l2.95 6.9 7.45.65-5.65 4.9 1.7 7.3L12 17.7l-6.45 3.85 1.7-7.3L1.6 9.35l7.45-.65z"/></svg>La parrilla según el modelo</h2>
@@ -559,6 +618,6 @@ footer{border-top:6px solid var(--red);margin-top:40px;padding:20px 0 40px;color
   incluso el mejor modelo acierta ~8 de 10.</p>
 </section>
 </main>
-<footer><div class="wrap">Generado 24/10/2026 21:53 UTC · Datos: OpenF1 &amp; Jolpica-F1 · Proyecto no oficial, sin relación con Formula 1.
+<footer><div class="wrap">Generado 24/10/2026 22:38 UTC · Datos: OpenF1 &amp; Jolpica-F1 · Proyecto no oficial, sin relación con Formula 1.
 <span class="west" style="float:right;color:var(--sand)">Keep Austin Fast</span></div></footer>
 </body></html>

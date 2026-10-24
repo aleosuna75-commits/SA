@@ -84,7 +84,7 @@ def seccion_real(obj, base):
         filas.append(f"""<tr class="{'in' if r.real <= 10 else ''}"><td class="num">{fint(r.real)}</td>
           <td><span class="chip" style="background:{color(r)}"></span><b>{e(r.name_acronym)}</b><span class="sub">{e(r.team_name)}</span></td>
           {v1c}<td class="num {ok('pred_rank')}">{int(r.pred_rank)}</td></tr>""")
-    k1 = (f'<div class="kpi"><b>{hits_v1}/10</b><span>Aciertos del pronóstico pre-qualy (v1, 14:20 UTC)</span></div>'
+    k1 = (f'<div class="kpi"><b>{hits_v1}/10</b><span>Aciertos del pronóstico pre-qualy (v1, commit 14:29 UTC)</span></div>'
           if hits_v1 is not None else "")
     return f"""
 <section>
