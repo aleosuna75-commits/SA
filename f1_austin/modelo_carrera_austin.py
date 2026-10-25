@@ -358,28 +358,31 @@ def main():
     p = preds[mejor].copy()
     p["pred_rank"] = p.groupby("meeting_key").pred.rank(method="first")
     p["res"] = p.real - p.pred_rank
-    por_gp = metricas(preds[mejor], "pred").merge(meetings[["meeting_key", "circuit", "year"]], on="meeting_key")
+    mejor_ml = tabla[~tabla.modelo.str.startswith("Baseline")].modelo.iloc[0]
     nombre_base = tabla[tabla.modelo.str.startswith("Baseline")].modelo.iloc[0]
+    por_gp = metricas(preds[mejor_ml], "pred").merge(meetings[["meeting_key", "circuit", "year"]], on="meeting_key")
     base_gp = metricas(preds[nombre_base], "pred")
 
-    predecir, modelos = ajustar_final(mejor, historia)
+    predecir, _ = ajustar_final(mejor, historia)
+    predecir_ml, modelos = ajustar_final(mejor_ml, historia)
     imp = importancias(modelos)
     if imp.empty:
         _, mods = ajustar_final("Ensamble árboles (RF+ET+GB+XGB+LGB)", historia)
         imp = importancias(mods)
     obj["score"] = predecir(obj[FEATURES_CARRERA])
     obj["pred_rank"] = obj.score.rank(method="first").astype(int)
+    obj["pred_ml"] = pd.Series(predecir_ml(obj[FEATURES_CARRERA])).rank(method="first").astype(int).values
     mc = Q.montecarlo(obj.pred_rank.values, p[["pred_rank", "res"]].dropna()).rename(
         columns={"p_pole": "p_win", "p_top3": "p_podio", "p_q3": "p_top10", "p_q2": "p_top16"})
     obj = pd.concat([obj, mc], axis=1).sort_values("pred_rank")
     obj.to_csv(BASE / "prediccion_carrera_austin_2026.csv", index=False)
 
-    R = {"tabla": tabla, "mejor": mejor, "obj": obj, "imp": imp, "por_gp": por_gp, "base_gp": base_gp,
+    R = {"tabla": tabla, "mejor": mejor, "mejor_ml": mejor_ml, "base": nombre_base, "obj": obj, "imp": imp, "por_gp": por_gp, "base_gp": base_gp,
          "historia": historia, "n_vars": len(FEATURES_CARRERA), "jr": carreras_jolpica()}
     from reporte_carrera_html import generar_html
     generar_html(R, BASE / "reporte_carrera_austin_2026.html")
     print("\nPREDICCIÓN TOP 10 CARRERA:")
-    print(obj[["pred_rank", "name_acronym", "grid", "q_pos", "long_rank_all", "p_top10", "p_podio", "p_win"]].head(12).to_string(index=False))
+    print(obj[["pred_rank", "name_acronym", "grid", "q_pos", "long_rank_all", "pred_ml", "p_top10", "p_podio", "p_win"]].head(12).to_string(index=False))
     return R
 
 
