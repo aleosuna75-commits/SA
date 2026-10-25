@@ -46,7 +46,7 @@ def descargar(forzar_actual=None):
         get(f"{OPENF1}/session_result?session_key>={lo}&session_key<={hi}", f"results_{año}")
         get(f"{OPENF1}/drivers?session_key>={lo}&session_key<={hi}", f"drivers_{año}")
         for s in ses:
-            if s["session_name"] in ("Practice 1", "Practice 2") and not s.get("is_cancelled"):
+            if s["session_name"] in ("Practice 1", "Practice 2", "Practice 3") and not s.get("is_cancelled"):
                 sk = s["session_key"]
                 get(f"{OPENF1}/laps?session_key={sk}", f"laps_{sk}")
                 get(f"{OPENF1}/stints?session_key={sk}", f"stints_{sk}")
