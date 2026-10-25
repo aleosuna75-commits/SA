@@ -53,6 +53,7 @@ def generar_html(R, ruta):
     supera = fml.ndcg10 > fg.ndcg10
     historia = R["historia"]
     obj = obj.copy()
+    tiene_dnf = "p_dnf" in obj
 
     def mov(r):
         d = int(r.grid - r.pred_rank)
@@ -85,7 +86,7 @@ def generar_html(R, ruta):
           <td class="num">{fnum(r.r_circ_mean, 1)}</td>
           <td class="num">{int(r.pos_p10)}–{int(r.pos_p90)}</td>
           <td class="prob"><div class="bar"><i style="width:{100 * r.p_top10:.0f}%"></i></div><span>{pct(r.p_top10)}</span></td>
-          <td class="num">{pct(r.p_podio)}</td><td class="num">{pct(r.p_win)}</td></tr>""")
+          <td class="num">{pct(r.p_podio)}</td><td class="num">{pct(r.p_win)}</td>{f'<td class="num">{pct(r.p_dnf)}</td>' if tiene_dnf else ''}</tr>""")
 
     mod = []
     for _, r in tabla.iterrows():
@@ -95,10 +96,25 @@ def generar_html(R, ruta):
           <td class="num">{r.pos_exact10:.2f}</td><td class="num">{r.mae_top10:.2f}</td><td class="num">{r.spearman:.3f}</td>
           <td class="num">{100 * r.win_acc:.0f}%</td><td class="num">{r.podium_hits:.2f}</td></tr>""")
 
+    coef = R.get("sim_coef")
+    if coef is not None:
+        nombres_coef = {"gc": "Salir adelante/atrás (regresión a la media)", "pace": "Ritmo de carrera vs salida",
+                        "pace_mob": "Ritmo × facilidad de rebase", "lg": "Gap de tanda larga", "qg": "Gap de qualy",
+                        "form": "Forma reciente vs salida", "tform": "Forma del equipo vs salida",
+                        "qpen": "Penalización (qualy vs salida)", "sp": "Resultado del sprint",
+                        "gc_mob": "Posición × facilidad de rebase", "form_mob": "Forma × facilidad de rebase",
+                        "form_gn": "Forma × salir atrás", "pace_gn": "Ritmo × salir atrás"}
+        imp = coef.abs().sort_values(ascending=False)
+        titulo_imp, lead_imp = "Qué mueve posiciones", ("Peso de cada término en el cambio de posición esperado del simulador "
+                                                        "(|coeficiente|; + = pierde posiciones, − = gana).")
+        etiq = lambda k: f"{nombres_coef.get(k, k)} ({'+' if coef[k] > 0 else '−'})"
+    else:
+        titulo_imp, lead_imp = "Qué pesa más", "Importancia de variables (modelos de árbol)."
+        etiq = lambda k: ETIQUETAS_CARRERA.get(k, k)
     imp_top = imp.head(15)
     mx = imp_top.max() if len(imp_top) else 1
-    imps = "".join(f'<div class="irow"><span>{e(ETIQUETAS_CARRERA.get(k, k))}</span><div class="ibar"><i style="width:{100 * v / mx:.0f}%"></i></div>'
-                   f'<b>{100 * v:.1f}%</b></div>' for k, v in imp_top.items())
+    imps = "".join(f'<div class="irow"><span>{e(etiq(k))}</span><div class="ibar"><i style="width:{100 * v / mx:.0f}%"></i></div>'
+                   f'<b>{(f"{coef[k]:+.2f}" if coef is not None else f"{100 * v:.1f}%")}</b></div>' for k, v in imp_top.items())
 
     g26 = por_gp[por_gp.year >= 2026].merge(base_gp[["meeting_key", "ndcg10"]].rename(columns={"ndcg10": "ndcg_grid"}), on="meeting_key")
     val = "".join(
@@ -155,7 +171,7 @@ def generar_html(R, ruta):
   <p class="lead">▲▼ = posiciones que el pronóstico espera ganar o perder respecto a la salida. ML = orden según el mejor modelo de machine learning. Ritmo de carrera = gap de tanda larga en las prácticas donde la mayoría del campo hizo tandas largas (en Austin, FP2).
   Rango = percentiles 10-90 de la simulación.</p>
   <div class="tw"><table class="full">
-    <tr><th>Pred</th><th>Piloto</th><th>Sale</th><th>Mov.</th><th>ML</th><th>Ritmo carrera</th><th>FP3</th><th>Carrera últ. 10</th><th>COTA</th><th>Rango</th><th>P(Top 10)</th><th>P(Podio)</th><th>P(Victoria)</th></tr>
+    <tr><th>Pred</th><th>Piloto</th><th>Sale</th><th>Mov.</th><th>ML</th><th>Ritmo carrera</th><th>FP3</th><th>Carrera últ. 10</th><th>COTA</th><th>Rango</th><th>P(Top 10)</th><th>P(Podio)</th><th>P(Victoria)</th>{'<th>P(Abandono)</th>' if tiene_dnf else ''}</tr>
     {''.join(filas)}
   </table></div>
 </section>
@@ -174,10 +190,10 @@ def generar_html(R, ruta):
   Los modelos de ML agregan el ritmo de carrera de las prácticas, la fiabilidad y la tendencia de cada piloto y equipo a ganar o perder posiciones; en 65 carreras eso apenas cambia el orden del Top 10.</p>
 </section>
 <section class="two">
-  <div class="card"><h2 style="font-size:20px">{STAR.format(c="st")}Qué pesa más</h2>
-  <p class="lead">Importancia de variables (modelos de árbol).</p>{imps}</div>
-  <div class="card"><h2 style="font-size:20px">{STAR.format(c="st")}2026: mejor ML vs {e(fg.modelo.replace("Baseline: ", ""))}</h2>
-  <p class="lead">Aciertos del Top 10 del mejor modelo de ML ({e(R["mejor_ml"])}) por carrera. Rojo = ordenó igual o mejor que el {e(fg.modelo.replace("Baseline: ", ""))} (NDCG); café = peor.
+  <div class="card"><h2 style="font-size:20px">{STAR.format(c="st")}{titulo_imp}</h2>
+  <p class="lead">{lead_imp}</p>{imps}</div>
+  <div class="card"><h2 style="font-size:20px">{STAR.format(c="st")}2026: modelo vs {e(fg.modelo.replace("Baseline: ", ""))}</h2>
+  <p class="lead">Aciertos del Top 10 del pronóstico ({e(mejor)}) por carrera. Rojo = ordenó igual o mejor que el {e(fg.modelo.replace("Baseline: ", ""))} (NDCG); café = peor.
   Le ganó o empató en {gana + empata} de {len(g26)}.</p><div class="vchart">{val}</div></div>
 </section>
 <section class="two">
@@ -193,7 +209,12 @@ def generar_html(R, ruta):
   FP3, ritmo de tanda larga de las tres prácticas, sprint, resultados recientes, posiciones ganadas, % de carreras terminadas,
   fiabilidad del equipo, historial del piloto en el circuito y movilidad del circuito.<br>
   <b>Modelos comparados:</b> parrilla y qualy como baselines, Ridge, Random Forest, Extra Trees, Gradient Boosting, XGBoost, LightGBM,
-  LightGBM LambdaRank, XGBoost Ranker y 2 ensambles. Ganó por NDCG@10: <b>{e(mejor)}</b>.
+  LightGBM LambdaRank, XGBoost Ranker, 2 ensambles y un simulador de carrera. Ganó por NDCG@10: <b>{e(mejor)}</b>.<br>
+  <b>Simulador de carrera:</b> cada piloto arranca en su casilla real y se mueve según su ventaja de ritmo (tanda larga, gap de qualy,
+  forma del piloto y del equipo, sprint), con más margen para remontar cuanto más atrás sale; luego se agrega ruido de primera vuelta e
+  incidentes (mayor en media parrilla) y una probabilidad de abandono (fiabilidad del equipo y del piloto, % de abandonos del circuito).
+  Todo se ajusta sólo con carreras anteriores y se simulan 20,000 carreras; el pronóstico es la posición media simulada.
+  En validación superó al orden de qualy en 2024, 2025 y 2026 (la ventaja es modesta: +0.009 de NDCG@10, ~1 error estándar).
   </div>
   <p class="note" style="margin-top:14px">Ojo: una carrera es mucho más aleatoria que una qualy. El modelo no ve lluvia, safety cars,
   choques de la primera curva, estrategia de paradas ni fallas mecánicas puntuales (sólo la tasa histórica). Usa las probabilidades,

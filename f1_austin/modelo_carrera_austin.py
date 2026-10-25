@@ -25,11 +25,14 @@ import pandas as pd
 from scipy.stats import spearmanr
 
 import modelo_qualy_austin as Q
+from sim_carrera import Simulador, X_media, prep
 
 warnings.filterwarnings("ignore")
 BASE = Path(__file__).parent
 CACHE = BASE / "cache"
 OBJETIVO_MEETING = Q.OBJETIVO_MEETING
+SIM = "Simulador de carrera (Monte Carlo)"
+MC_VAR = {"is26": False, "gn_inter": True}
 
 # Parrilla oficial Austin 2026 tras penalizaciones de unidad de potencia (FIA, viernes 23/10):
 # Lindblad -5 (6.º ICE), Colapinto -10 (4.ª CE), Bortoleto al fondo (ES + CE nuevos).
@@ -279,7 +282,7 @@ def walk_forward(data, desde=2024):
     entrenables = data.dropna(subset=["race_pos"])
     pruebas = entrenables[entrenables.year >= desde].meeting_key.drop_duplicates().tolist()
     cat = catalogo()
-    preds = {n: [] for n in cat}
+    preds = {n: [] for n in list(cat) + [SIM]}
     for i, mk in enumerate(pruebas):
         fecha = entrenables[entrenables.meeting_key == mk].date.iloc[0]
         tr = entrenables[entrenables.date < fecha].sort_values(["meeting_key", "driver_number"])
@@ -290,6 +293,9 @@ def walk_forward(data, desde=2024):
             p = te[["meeting_key", "driver_number", "year"]].assign(real=te.race_pos.values)
             p["pred"] = m.predict(te[FEATURES_CARRERA])
             preds[nombre].append(p)
+        p = te[["meeting_key", "driver_number", "year"]].assign(real=te.race_pos.values)
+        p["pred"] = Simulador(MC_VAR).fit(tr).predict(te)
+        preds[SIM].append(p)
         print(f"  walk-forward {i + 1}/{len(pruebas)}", end="\r", flush=True)
     print()
     preds = {n: pd.concat(v) for n, v in preds.items()}
@@ -359,27 +365,40 @@ def main():
     p = preds[mejor].copy()
     p["pred_rank"] = p.groupby("meeting_key").pred.rank(method="first")
     p["res"] = p.real - p.pred_rank
-    mejor_ml = tabla[~tabla.modelo.str.startswith("Baseline")].modelo.iloc[0]
+    mejor_ml = tabla[~tabla.modelo.str.startswith("Baseline") & (tabla.modelo != SIM)].modelo.iloc[0]
     nombre_base = tabla[tabla.modelo.str.startswith("Baseline")].modelo.iloc[0]
-    por_gp = metricas(preds[mejor_ml], "pred").merge(meetings[["meeting_key", "circuit", "year"]], on="meeting_key")
+    por_gp = metricas(preds[mejor], "pred").merge(meetings[["meeting_key", "circuit", "year"]], on="meeting_key")
     base_gp = metricas(preds[nombre_base], "pred")
 
-    predecir, _ = ajustar_final(mejor, historia)
     predecir_ml, modelos = ajustar_final(mejor_ml, historia)
     imp = importancias(modelos)
     if imp.empty:
         _, mods = ajustar_final("Ensamble árboles (RF+ET+GB+XGB+LGB)", historia)
         imp = importancias(mods)
-    obj["score"] = predecir(obj[FEATURES_CARRERA])
-    obj["pred_rank"] = obj.score.rank(method="first").astype(int)
     obj["pred_ml"] = pd.Series(predecir_ml(obj[FEATURES_CARRERA])).rank(method="first").astype(int).values
-    mc = Q.montecarlo(obj.pred_rank.values, p[["pred_rank", "res"]].dropna()).rename(
-        columns={"p_pole": "p_win", "p_top3": "p_podio", "p_q3": "p_top10", "p_q2": "p_top16"})
+    sim_coef = None
+    if mejor == SIM:
+        # 20,000 carreras simuladas: ritmo vs salida, ruido de primera vuelta/incidentes y abandonos
+        sim = Simulador(MC_VAR).fit(historia)
+        media, mu, sig, p_dnf, pos = sim.simular(obj, n_sims=20000, seed=0)
+        obj["score"] = media
+        obj["pred_rank"] = obj.score.rank(method="first").astype(int)
+        mc = pd.DataFrame({"p_win": (pos == 1).mean(0), "p_podio": (pos <= 3).mean(0), "p_top10": (pos <= 10).mean(0),
+                           "p_dnf": p_dnf, "pos_media": media, "pos_p10": np.percentile(pos, 10, axis=0),
+                           "pos_p90": np.percentile(pos, 90, axis=0)})
+        nombres = X_media(prep(historia.head(30)), MC_VAR, como_df=True).columns
+        sim_coef = pd.Series(sim.rm.coef_, index=nombres)
+    else:
+        predecir, _ = ajustar_final(mejor, historia)
+        obj["score"] = predecir(obj[FEATURES_CARRERA])
+        obj["pred_rank"] = obj.score.rank(method="first").astype(int)
+        mc = Q.montecarlo(obj.pred_rank.values, p[["pred_rank", "res"]].dropna()).rename(
+            columns={"p_pole": "p_win", "p_top3": "p_podio", "p_q3": "p_top10", "p_q2": "p_top16"})
     obj = pd.concat([obj, mc], axis=1).sort_values("pred_rank")
     obj.to_csv(BASE / "prediccion_carrera_austin_2026.csv", index=False)
 
     R = {"tabla": tabla, "mejor": mejor, "mejor_ml": mejor_ml, "base": nombre_base, "obj": obj, "imp": imp, "por_gp": por_gp, "base_gp": base_gp,
-         "historia": historia, "n_vars": len(FEATURES_CARRERA), "jr": carreras_jolpica()}
+         "historia": historia, "n_vars": len(FEATURES_CARRERA), "jr": carreras_jolpica(), "sim_coef": sim_coef}
     from reporte_carrera_html import generar_html
     generar_html(R, BASE / "reporte_carrera_austin_2026.html")
     print("\nPREDICCIÓN TOP 10 CARRERA:")
