@@ -171,7 +171,7 @@ def generar_html(R, ruta):
   </table></div>
   {f'<p class="note" style="margin-top:12px"><b>Ganó el orden de qualy.</b> Ningún modelo de ML lo superó en NDCG@10: el mejor, {e(R["mejor_ml"])}, quedó a {fg.ndcg10 - fml.ndcg10:.3f}, dentro del ruido, aunque algunos ordenan un poco mejor a toda la parrilla (Spearman). Por eso el pronóstico oficial es el orden de qualy, y la columna «ML» de la tabla muestra dónde difiere el mejor modelo de ML.</p>' if not supera else ''}
   <p class="note" style="margin-top:12px">La parrilla de salida y la qualy son rivales duros: en F1 el orden de salida explica la mayor parte del resultado.
-  El modelo la mejora usando el ritmo de carrera de las prácticas, la fiabilidad y la tendencia de cada piloto y equipo a ganar o perder posiciones.</p>
+  Los modelos de ML agregan el ritmo de carrera de las prácticas, la fiabilidad y la tendencia de cada piloto y equipo a ganar o perder posiciones; en 65 carreras eso apenas cambia el orden del Top 10.</p>
 </section>
 <section class="two">
   <div class="card"><h2 style="font-size:20px">{STAR.format(c="st")}Qué pesa más</h2>
