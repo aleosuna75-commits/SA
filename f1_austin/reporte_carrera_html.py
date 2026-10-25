@@ -48,7 +48,8 @@ def generar_html(R, ruta):
     obj, tabla, imp, por_gp, base_gp, jr = R["obj"], R["tabla"], R["imp"], R["por_gp"], R["base_gp"], R["jr"]
     mejor = R["mejor"]
     fm = tabla[tabla.modelo == mejor].iloc[0]
-    fg = tabla[tabla.modelo == "Baseline: orden de parrilla"].iloc[0]
+    fg = tabla[tabla.modelo.str.startswith("Baseline")].iloc[0]       # baseline más fuerte
+    supera = fm.ndcg10 > fg.ndcg10
     historia = R["historia"]
     obj = obj.copy()
 
@@ -77,7 +78,7 @@ def generar_html(R, ruta):
           <td class="num">{int(r.pred_rank)}</td>
           <td><span class="chip" style="background:{color(r)}"></span><b>{e(r.name_acronym)}</b><span class="sub">{e(r.team_name)}</span></td>
           <td class="num">{int(r.grid)}{pen}</td><td class="num">{mov(r)}</td>
-          <td class="num">{fint(r.long_rank_all)}<span class="sub">+{fnum(r.long_gap_all, 2)}%</span></td>
+          <td class="num">{fint(r.long_rank_all)}<span class="sub">{('+' + fnum(r.long_gap_all, 2) + '%') if pd.notna(r.long_gap_all) else '—'}</span></td>
           <td class="num">{fint(r.fp3_rank)}</td>
           <td class="num">{fnum(r.r_mean10, 1)}</td>
           <td class="num">{fnum(r.r_circ_mean, 1)}</td>
@@ -100,7 +101,7 @@ def generar_html(R, ruta):
 
     g26 = por_gp[por_gp.year >= 2026].merge(base_gp[["meeting_key", "ndcg10"]].rename(columns={"ndcg10": "ndcg_grid"}), on="meeting_key")
     val = "".join(
-        f'<div class="vcol" title="{e(r.circuit)}: NDCG modelo {r.ndcg10:.2f} vs parrilla {r.ndcg_grid:.2f}">'
+        f'<div class="vcol" title="{e(r.circuit)}: NDCG modelo {r.ndcg10:.2f} vs baseline {r.ndcg_grid:.2f}">'
         f'<div class="vbar" style="height:{max(r.ndcg10 - 0.5, 0) * 200:.0f}%;background:{"var(--red)" if r.ndcg10 >= r.ndcg_grid else "var(--leather)"}">'
         f'<span>{r.top10_hits}</span></div><small>{e(r.circuit[:8])}</small></div>' for _, r in g26.iterrows())
     gana = int((g26.ndcg10 > g26.ndcg_grid).sum()); empata = int((g26.ndcg10 == g26.ndcg_grid).sum())
@@ -137,7 +138,7 @@ def generar_html(R, ruta):
 <section><div class="kpis">
   <div class="kpi"><b>{e(fav.name_acronym)}</b><span>Favorito a ganar ({pct(fav.p_win)})</span></div>
   <div class="kpi"><b>{fm.top10_hits:.1f}/10</b><span>Aciertos promedio del Top 10 (validación)</span></div>
-  <div class="kpi"><b>{fm.ndcg10:.3f}</b><span>NDCG@10 (quiénes + orden) · parrilla {fg.ndcg10:.3f}</span></div>
+  <div class="kpi"><b>{fm.ndcg10:.3f}</b><span>NDCG@10 (quiénes + orden) · {e(fg.modelo.replace("Baseline: ", ""))} {fg.ndcg10:.3f}</span></div>
   <div class="kpi"><b>{historia.meeting_key.nunique()} GPs</b><span>{len(historia):,} filas piloto-carrera · {R['n_vars']} variables</span></div>
 </div></section>
 
@@ -150,7 +151,7 @@ def generar_html(R, ruta):
 
 <section>
   <h2>{STAR.format(c="st")}Tabla completa</h2>
-  <p class="lead">▲▼ = posiciones que el modelo espera ganar o perder respecto a la salida. Ritmo de carrera = mejor tanda larga de FP1-FP3.
+  <p class="lead">▲▼ = posiciones que el modelo espera ganar o perder respecto a la salida. Ritmo de carrera = gap de tanda larga en las prácticas donde la mayoría del campo hizo tandas largas (en Austin, FP2).
   Rango = percentiles 10-90 de la simulación.</p>
   <div class="tw"><table class="full">
     <tr><th>Pred</th><th>Piloto</th><th>Sale</th><th>Mov.</th><th>Ritmo carrera</th><th>FP3</th><th>Carrera últ. 10</th><th>COTA</th><th>Rango</th><th>P(Top 10)</th><th>P(Podio)</th><th>P(Victoria)</th></tr>
@@ -167,14 +168,15 @@ def generar_html(R, ruta):
     <tr><th>Modelo</th><th>NDCG@10</th><th>NDCG@10 2026</th><th>Top 10 aciertos</th><th>Pos. exactas</th><th>Error Top 10</th><th>Spearman</th><th>Ganador</th><th>Podio aciertos</th></tr>
     {''.join(mod)}
   </table></div>
-  <p class="note" style="margin-top:12px">La parrilla de salida es un rival duro: en F1 el orden de salida explica la mayor parte del resultado.
+  {'' if supera or mejor.startswith("Baseline") else f'<p class="note" style="margin-top:12px"><b>Ojo:</b> el modelo elegido no supera al baseline «{e(fg.modelo)}» en NDCG@10.</p>'}
+  <p class="note" style="margin-top:12px">La parrilla de salida y la qualy son rivales duros: en F1 el orden de salida explica la mayor parte del resultado.
   El modelo la mejora usando el ritmo de carrera de las prácticas, la fiabilidad y la tendencia de cada piloto y equipo a ganar o perder posiciones.</p>
 </section>
 <section class="two">
   <div class="card"><h2 style="font-size:20px">{STAR.format(c="st")}Qué pesa más</h2>
   <p class="lead">Importancia de variables (modelos de árbol).</p>{imps}</div>
-  <div class="card"><h2 style="font-size:20px">{STAR.format(c="st")}2026: modelo vs parrilla</h2>
-  <p class="lead">Aciertos del Top 10 por carrera. Rojo = el modelo ordenó mejor que la parrilla (NDCG); café = no.
+  <div class="card"><h2 style="font-size:20px">{STAR.format(c="st")}2026: modelo vs baseline</h2>
+  <p class="lead">Aciertos del Top 10 por carrera. Rojo = el modelo ordenó igual o mejor que el baseline más fuerte (NDCG); café = peor.
   Le ganó o empató en {gana + empata} de {len(g26)}.</p><div class="vchart">{val}</div></div>
 </section>
 <section class="two">

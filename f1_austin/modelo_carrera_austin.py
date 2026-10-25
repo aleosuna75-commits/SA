@@ -70,6 +70,17 @@ def resultados_openf1():
     return res
 
 
+def q_gap_segmento(qr):
+    """Gap % dentro del último segmento (Q1/Q2/Q3) que corrió cada piloto, contra el mejor de ese segmento."""
+    seg = pd.DataFrame([v if isinstance(v, list) else [v, None, None] for v in qr.duration],
+                       index=qr.index).reindex(columns=[0, 1, 2]).apply(pd.to_numeric, errors="coerce")
+    gap = (seg - seg.min()) / seg.min() * 100
+    ult = seg.notna().cumsum(axis=1).idxmax(axis=1)
+    tiene = seg.notna().any(axis=1)
+    return pd.Series([gap.at[i, c] if tiene[i] else np.nan for i, c in ult.items()],
+                     index=qr.index, dtype=float).clip(upper=5)
+
+
 def mejor_tiempo(d):
     if isinstance(d, list):
         v = [x for x in d if x]
@@ -97,8 +108,9 @@ def construir_dataset_carrera():
             if not f3.empty:
                 base = base.merge(f3, on="driver_number", how="left")
         qr = res[res.session_key == m.q][["driver_number", "duration"]].copy()
-        qr["q_best"] = qr.duration.map(mejor_tiempo)
-        base = base.merge(qr[["driver_number", "q_best"]], on="driver_number", how="left")
+        qr["q_best"] = pd.to_numeric(qr.duration.map(mejor_tiempo), errors="coerce")
+        qr["q_gap"] = q_gap_segmento(qr) if len(qr) else np.nan
+        base = base.merge(qr[["driver_number", "q_best", "q_gap"]], on="driver_number", how="left")
         if "Sprint" in nombres:
             sp = res[res.session_key == nombres["Sprint"]][["driver_number", "position"]]
             base = base.merge(sp.rename(columns={"position": "sprint_pos"}), on="driver_number", how="left")
@@ -115,11 +127,14 @@ def construir_dataset_carrera():
 
     # Gap de qualy, compañero, ritmo de carrera combinado
     g = data.groupby("meeting_key")
-    data["q_gap"] = (data.q_best - g.q_best.transform("min")) / g.q_best.transform("min") * 100
     data["q_team_best"] = data.groupby(["meeting_key", "team"]).q_pos.transform("min")
     data["q_teammate_delta"] = data.q_pos - data.q_team_best
-    # media de los gaps de tanda larga de cada sesión (el mínimo empata a todos los líderes de sesión en 0)
-    data["long_gap_all"] = data[["fp1_long_gap", "fp2_long_gap", "fp3_long_gap"]].mean(axis=1)
+    # ritmo de carrera: media de los gaps de tanda larga sólo en sesiones donde >=60% del campo hizo tanda larga
+    cols = ["fp1_long_gap", "fp2_long_gap", "fp3_long_gap"]
+    cob = data.groupby("meeting_key")[cols].transform("count").div(data.n_drivers, axis=0)
+    lg = data[cols].where(cob >= 0.6)
+    lg = lg.where(lg.notna().any(axis=1), data[cols])      # si no queda ninguna, usar lo que haya
+    data["long_gap_all"] = lg.mean(axis=1)
     data["long_rank_all"] = data.groupby("meeting_key").long_gap_all.rank(method="min")
     data["long_team_best"] = data.groupby(["meeting_key", "team"]).long_gap_all.transform("min")
     data["fp_best_all"] = data[["fp1_best", "fp2_best", "fp3_best"]].min(axis=1)
@@ -191,6 +206,7 @@ def construir_dataset_carrera():
             hist[idx] = h
     data = data.join(pd.DataFrame.from_dict(hist, orient="index"))
     data["r_eval"] = data.race_pos
+    data[FEATURES_CARRERA] = data[FEATURES_CARRERA].apply(pd.to_numeric, errors="coerce")
     return data, meetings
 
 
@@ -336,14 +352,15 @@ def main():
     print("Validación walk-forward 2024-2026...")
     tabla, preds = walk_forward(historia)
     print(tabla.to_string(index=False))
-    mejor = tabla[~tabla.modelo.str.startswith("Baseline")].modelo.iloc[0]
+    mejor = tabla.modelo.iloc[0]          # el mejor por NDCG@10, aunque sea un baseline
     print("Mejor modelo (NDCG@10):", mejor)
 
     p = preds[mejor].copy()
     p["pred_rank"] = p.groupby("meeting_key").pred.rank(method="first")
     p["res"] = p.real - p.pred_rank
     por_gp = metricas(preds[mejor], "pred").merge(meetings[["meeting_key", "circuit", "year"]], on="meeting_key")
-    base_gp = metricas(preds["Baseline: orden de parrilla"], "pred")
+    nombre_base = tabla[tabla.modelo.str.startswith("Baseline")].modelo.iloc[0]
+    base_gp = metricas(preds[nombre_base], "pred")
 
     predecir, modelos = ajustar_final(mejor, historia)
     imp = importancias(modelos)
