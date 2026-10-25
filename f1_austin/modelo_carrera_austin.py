@@ -352,7 +352,8 @@ def main():
     print("Validación walk-forward 2024-2026...")
     tabla, preds = walk_forward(historia)
     print(tabla.to_string(index=False))
-    mejor = tabla.modelo.iloc[0]          # el mejor por NDCG@10, aunque sea un baseline
+    # el pronóstico debe ser un modelo de carrera real: se elige el mejor que no sea baseline
+    mejor = tabla[~tabla.modelo.str.startswith("Baseline")].modelo.iloc[0]
     print("Mejor modelo (NDCG@10):", mejor)
 
     p = preds[mejor].copy()

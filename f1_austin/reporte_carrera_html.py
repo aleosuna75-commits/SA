@@ -169,7 +169,7 @@ def generar_html(R, ruta):
     <tr><th>Modelo</th><th>NDCG@10</th><th>NDCG@10 2026</th><th>Top 10 aciertos</th><th>Pos. exactas</th><th>Error Top 10</th><th>Spearman</th><th>Ganador</th><th>Podio aciertos</th></tr>
     {''.join(mod)}
   </table></div>
-  {f'<p class="note" style="margin-top:12px"><b>Ganó el orden de qualy.</b> Ningún modelo de ML lo superó en NDCG@10: el mejor, {e(R["mejor_ml"])}, quedó a {fg.ndcg10 - fml.ndcg10:.3f}, dentro del ruido, aunque algunos ordenan un poco mejor a toda la parrilla (Spearman). Por eso el pronóstico oficial es el orden de qualy, y la columna «ML» de la tabla muestra dónde difiere el mejor modelo de ML.</p>' if not supera else ''}
+  <p class="note" style="margin-top:12px"><b>Pronóstico = {e(mejor)}</b>, el mejor modelo de carrera por NDCG@10. Como referencia, el {e(fg.modelo.replace("Baseline: ", ""))} obtiene {fg.ndcg10:.3f} frente a {fm.ndcg10:.3f}{' (el modelo lo supera)' if fm.ndcg10 > fg.ndcg10 else ': repetir la qualy es una referencia muy difícil de batir, pero no dice cómo cambia la carrera'}. La columna «ML» muestra el mejor modelo de ML puro.</p>
   <p class="note" style="margin-top:12px">La parrilla de salida y la qualy son rivales duros: en F1 el orden de salida explica la mayor parte del resultado.
   Los modelos de ML agregan el ritmo de carrera de las prácticas, la fiabilidad y la tendencia de cada piloto y equipo a ganar o perder posiciones; en 65 carreras eso apenas cambia el orden del Top 10.</p>
 </section>
