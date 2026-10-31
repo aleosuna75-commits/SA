@@ -73,3 +73,4 @@ HIR STR PER BOT (VER y LAW −1 por choque en FP2; BOT al fondo por motor). Pron
 PENDIENTE: decisión de comisarios sobre la Q1 (HAM, BOR, BOT, PER: tiempo delta máximo). Si cambia la parrilla: correr
 `python3 modelo_carrera_austin.py 1298 --parrilla '{...}'`, ajustar parrilla_fuente, db carrera/mexico2026 (if_version 2), construir_web_mexico.py
 con --post/--carrera, republicar Artifact y publicar_sitio.py.
+23:31 UTC: qualy oficial de OpenF1 = la del live timing (22/22 idénticas). Parrilla de Crash.net = la usada. Sin decisión publicada sobre la Q1 (HAM/BOR/BOT/PER) ni sobre el MGU-K de Lawson (GPblog): sin cambios. Revisión final programada 2026-11-01 15:30 UTC (OpenF1 starting_grid 11404 + prensa).
