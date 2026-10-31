@@ -20,7 +20,7 @@ Se publica como Artifact de claude.ai (db: docs `gp/mexico2026` y `live/qualy`, 
 y la misma carpeta `web_mexico/` va a Netlify (sin db → datos incrustados).
 - [x] Workflow wzw9vriwd (relanzado 14:20 con menú hamburguesa y referencias AURA en scratchpad/live/referencias): `web_mexico/index.html` (página), `live_qualy.py` (colector F1 Live Timing), modelo con `--fp3` + `exportar_datos_web.py`
 - [x] Publicar Artifact con capabilities `{db:{rules:[gp y live: read view, write owner]}, user:{}}`; sembrar docs con ArtifactData; dar link
-- [ ] 18:40 UTC: bajar FP3 (`descarga_datos.py`, borrar cache de la sesión 11399), correr modelo con FP3, actualizar `gp/mexico2026` (campo cambio), republicar sitio
+- [x] 18:40 UTC: bajar FP3 (`descarga_datos.py`, borrar cache de la sesión 11399), correr modelo con FP3, actualizar `gp/mexico2026` (campo cambio), republicar sitio
 - [ ] 20:50 UTC: lanzar `live_qualy.py` en segundo plano y relevar `live/qualy_mexico.json` → doc `live/qualy` cada ~60-90 s hasta 22:05 UTC
 - [ ] 22:20 UTC: resultado final (OpenF1 11400) → `live/qualy` estado terminada, sección real vs pronóstico, republicar, reportar aciertos
 
@@ -63,3 +63,5 @@ a las 17:44). Comando de la qualy (20:50 UTC, desde f1_austin/; relanzar igual s
 (mejor vuelta 22/22 y vueltas 22/22 validadas; sin clima) → copiada a cache/*_11399.json; corrida del modelo con --fp3 en curso
 (log corrida_mexico_fp3.log). Luego: `python3 exportar_datos_web.py mexico_fp3 --previo resultado_qualy_mexico.pkl`, db gp/mexico2026
 (if_version 2), construir_web_mexico.py, republicar Artifact, publicar_sitio.py.
+19:06 UTC: pronóstico con FP3 publicado (RF 8.27/10; gp/mexico2026 v3; Artifact v3). Cambios: NOR 5→3, RUS 3→5, PIA 7→6, HAM 6→7,
+LAW 10→9, LIN entra (10), GAS sale (9→11). Docs db: gp v3, live v2.
