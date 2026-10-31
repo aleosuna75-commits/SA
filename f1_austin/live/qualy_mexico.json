@@ -1,5 +1,5 @@
 {
- "actualizado": "2026-10-31T22:08:58.647Z",
+ "actualizado": "2026-10-31T22:09:20.199Z",
  "estado": "terminada",
  "segmento": 3,
  "reloj": "00:00",
@@ -83,7 +83,7 @@
    "q2": "1:16.728",
    "q3": "1:16.824",
    "eliminado_en": null,
-   "en_pits": false,
+   "en_pits": true,
    "vueltas": 21,
    "dif": "+0.310",
    "neumatico": "SOFT"
@@ -97,7 +97,7 @@
    "q2": "1:17.047",
    "q3": "1:16.900",
    "eliminado_en": null,
-   "en_pits": false,
+   "en_pits": true,
    "vueltas": 20,
    "dif": "+0.386",
    "neumatico": "SOFT"
@@ -111,7 +111,7 @@
    "q2": "1:17.207",
    "q3": "1:17.029",
    "eliminado_en": null,
-   "en_pits": false,
+   "en_pits": true,
    "vueltas": 21,
    "dif": "+0.515",
    "neumatico": "SOFT"
@@ -125,7 +125,7 @@
    "q2": "1:17.135",
    "q3": "1:17.117",
    "eliminado_en": null,
-   "en_pits": false,
+   "en_pits": true,
    "vueltas": 21,
    "dif": "+0.603",
    "neumatico": "SOFT"
@@ -353,8 +353,8 @@
  "colector": {
   "conectado": true,
   "reconexiones": 1,
-  "ultimo_dato": "2026-10-31T22:08:58.647Z",
-  "mensajes": 12826,
+  "ultimo_dato": "2026-10-31T22:09:19.198Z",
+  "mensajes": 12872,
   "errores": 0,
   "version": "1.1"
  }
