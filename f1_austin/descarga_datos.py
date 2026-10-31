@@ -1,4 +1,9 @@
-"""Descarga y cachea datos de OpenF1 (2023-2026) y Jolpica (histórico COTA)."""
+"""Descarga y cachea datos de OpenF1 (2023-2026) y Jolpica (historial por temporada y por circuito).
+
+Uso:
+  python3 descarga_datos.py                        # todo lo que falte en cache
+  python3 descarga_datos.py gp 2026 1298 rodriguez # refresca la temporada y el GP objetivo (México)
+"""
 import json, time, os, sys
 from pathlib import Path
 import requests
@@ -64,6 +69,30 @@ def descargar(forzar_actual=None):
     descargar_jolpica()
 
 
+def descargar_circuito(circuito):
+    """Histórico de qualys de un circuito de Jolpica (p.ej. 'americas', 'rodriguez')."""
+    prefijo = "jolpica_cota" if circuito == "americas" else f"jolpica_circ_{circuito}"
+    off = 0
+    while True:
+        d = get(f"{JOLPICA}/circuits/{circuito}/qualifying.json?limit=100&offset={off}", f"{prefijo}_{off}")
+        off += 100
+        if off >= int(d["MRData"]["total"]):
+            break
+
+
+def refrescar_temporada(año, meeting_key):
+    """Borra la cache de la temporada en curso y del GP objetivo para volver a bajarla con lo más reciente."""
+    for p in [f"sessions_{año}", f"results_{año}", f"drivers_{año}"]:
+        (CACHE / f"{p}.json").unlink(missing_ok=True)
+    for p in CACHE.glob(f"jolpica_*_{año}_*.json"):
+        p.unlink()
+    ses = get(f"{OPENF1}/sessions?meeting_key={meeting_key}", f"tmp_sessions_{meeting_key}")
+    (CACHE / f"tmp_sessions_{meeting_key}.json").unlink(missing_ok=True)
+    for s in ses:
+        for p in CACHE.glob(f"*_{s['session_key']}.json"):
+            p.unlink()
+
+
 def descargar_jolpica(desde=2018, hasta=2026):
     """Qualys y carreras de todas las temporadas (para forma e historial por circuito)."""
     for año in range(desde, hasta + 1):
@@ -81,5 +110,11 @@ def descargar_jolpica(desde=2018, hasta=2026):
 if __name__ == "__main__":
     if sys.argv[1:2] == ["jolpica"]:
         descargar_jolpica()
+    elif sys.argv[1:2] == ["gp"]:
+        # python3 descarga_datos.py gp <año> <meeting_key> <circuito_jolpica>
+        año, mk, circ = int(sys.argv[2]), int(sys.argv[3]), sys.argv[4]
+        refrescar_temporada(año, mk)
+        descargar()
+        descargar_circuito(circ)
     else:
         descargar([int(x) for x in sys.argv[1:]])

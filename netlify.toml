@@ -1,0 +1,11 @@
+# Sitio estático de pronósticos F1 (se genera con f1_austin/publicar_sitio.py).
+# Netlify publica la carpeta sitio_f1 tal cual: no hay paso de build.
+[build]
+  publish = "sitio_f1"
+  command = ""
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"

@@ -18,7 +18,7 @@ Flujo:
   5. Simulación Monte Carlo con los residuos de validación -> P(Q3), P(pole), P(Top 3).
   6. Se genera reporte_qualy_austin_2026.html (estilo texano).
 
-Uso:  python3 modelo_qualy_austin.py
+Uso:  python3 modelo_qualy_austin.py [meeting_key]     (1297 = Austin, 1298 = México)
 """
 import json
 import warnings
@@ -39,7 +39,17 @@ import xgboost as xgb
 warnings.filterwarnings("ignore")
 BASE = Path(__file__).parent
 CACHE = BASE / "cache"
-OBJETIVO_MEETING = 1297          # United States Grand Prix 2026
+OBJETIVO_MEETING = 1297          # United States Grand Prix 2026 (default; ver GPS y main(meeting))
+
+# Configuración por GP objetivo: textos del reporte, circuito en Jolpica y tema visual
+GPS = {
+    1297: {"slug": "austin", "nombre": "United States Grand Prix", "circuito": "Circuit of the Americas",
+           "ciudad": "Austin, Texas", "circuito_jolpica": "americas", "fecha_texto": "Sábado 24 de octubre de 2026",
+           "hora_texto": "4:00 PM CT", "tema": "texas"},
+    1298: {"slug": "mexico", "nombre": "Gran Premio de la Ciudad de México", "circuito": "Autódromo Hermanos Rodríguez",
+           "ciudad": "Ciudad de México", "circuito_jolpica": "rodriguez", "fecha_texto": "Sábado 31 de octubre de 2026",
+           "hora_texto": "3:00 PM (hora CDMX)", "tema": "muertos"},
+}
 AÑOS = [2023, 2024, 2025, 2026]
 SEED = 7
 
@@ -208,9 +218,11 @@ def tabla_jolpica(tipo):
     return df
 
 
-def tabla_cota():
+def tabla_cota(circuito="americas"):
+    """Historial de qualys de un circuito (Jolpica). COTA usa los archivos jolpica_cota_*."""
+    patron = "jolpica_cota_*.json" if circuito == "americas" else f"jolpica_circ_{circuito}_*.json"
     filas = []
-    for f in sorted(CACHE.glob("jolpica_cota_*.json")):
+    for f in sorted(CACHE.glob(patron)):
         for r in json.loads(f.read_text())["MRData"]["RaceTable"]["Races"]:
             for q in r["QualifyingResults"]:
                 filas.append({"season": int(r["season"]), "code": q["Driver"].get("code"),
@@ -238,7 +250,7 @@ def construir_dataset():
         meetings.append({
             "meeting_key": mk, "year": g.year.iloc[0], "date": g.date_start.min(),
             "circuit": g.circuit_short_name.iloc[0], "circuit_key": g.circuit_key.iloc[0],
-            "fp1": nombres.get("Practice 1"), "fp2": nombres.get("Practice 2"),
+            "fp1": nombres.get("Practice 1"), "fp2": nombres.get("Practice 2"), "fp3": nombres.get("Practice 3"),
             "q": nombres["Qualifying"], "sprint": int("Sprint" in nombres),
             "race_date": fecha_carrera,
         })
@@ -246,7 +258,12 @@ def construir_dataset():
 
     filas = []
     for _, m in meetings.iterrows():
-        dq = pil[pil.session_key == m.q] if (pil.session_key == m.q).any() else pil[pil.meeting_key == m.meeting_key]
+        # pilotos titulares: los de la qualy; si aún no existe, los de FP3/FP2 (en FP1 puede haber novatos)
+        dq = pil[pil.meeting_key == m.meeting_key]
+        for sk in (m.q, m.fp3, m.fp2):
+            if pd.notna(sk) and (pil.session_key == sk).any():
+                dq = pil[pil.session_key == sk]
+                break
         dq = dq.drop_duplicates("driver_number")
         base = dq[["driver_number", "name_acronym", "full_name", "team", "team_name", "team_colour"]].copy()
         f1 = features_practica(int(m.fp1), "fp1")
@@ -552,12 +569,24 @@ def montecarlo(pred_rank, residuos, n=20000, seed=SEED):
 # ----------------------------------------------------------------------------------------
 # 6. Main
 # ----------------------------------------------------------------------------------------
-def main():
+def generar_reporte(resultado):
+    gp = resultado["gp"]
+    if gp["tema"] == "muertos":
+        from reporte_mexico_html import generar_html
+    else:
+        from reporte_html import generar_html
+    generar_html(resultado, BASE / f"reporte_qualy_{gp['slug']}_2026.html")
+
+
+def main(meeting=OBJETIVO_MEETING):
+    gp = {**GPS[meeting], "meeting_key": meeting}
+    print(f"GP objetivo: {gp['nombre']} (meeting {meeting})")
     print("Construyendo dataset...")
     data, meetings = construir_dataset()
     data.to_csv(BASE / "dataset_qualy.csv", index=False)
-    obj = data[data.meeting_key == OBJETIVO_MEETING].copy()
-    historia = data[(data.meeting_key != OBJETIVO_MEETING) & data.q_eval.notna()]
+    obj = data[data.meeting_key == meeting].copy()
+    print(f"Pilotos del GP objetivo: {len(obj)}")
+    historia = data[(data.meeting_key != meeting) & (data.date < obj.date.min()) & data.q_eval.notna()]
     train = historia[historia.q_pos.notna()]
     print(f"Filas de entrenamiento: {len(train)}  | GPs: {train.meeting_key.nunique()}  | Features: {len(FEATURES)}")
 
@@ -587,16 +616,21 @@ def main():
     mc = montecarlo(obj.pred_rank.values, p[["pred_rank", "res"]])
     obj = pd.concat([obj, mc], axis=1).sort_values("pred_rank")
 
-    cota = tabla_cota()
-    resultado = {"tabla": tabla, "mejor": mejor, "obj": obj, "imp": imp, "por_gp": por_gp,
-                 "cota": cota, "train": train, "residuos": p, "n_vars": len(FEATURES)}
-    obj.to_csv(BASE / "prediccion_qualy_austin_2026.csv", index=False)
-    from reporte_html import generar_html
-    generar_html(resultado, BASE / "reporte_qualy_austin_2026.html")
+    circ = tabla_cota(gp["circuito_jolpica"])
+    resultado = {"tabla": tabla, "mejor": mejor, "obj": obj, "imp": imp, "por_gp": por_gp, "cota": circ, "circ": circ,
+                 "train": train, "residuos": p, "n_vars": len(FEATURES), "gp": gp}
+    obj.to_csv(BASE / f"prediccion_qualy_{gp['slug']}_2026.csv", index=False)
+    pd.to_pickle(resultado, BASE / f"resultado_qualy_{gp['slug']}.pkl")   # para regenerar el HTML sin reentrenar
+    generar_reporte(resultado)
     print("\nPREDICCIÓN TOP 10:")
     print(obj[["pred_rank", "name_acronym", "team_name", "fp1_rank", "fp2_rank", "p_q3", "p_pole"]].head(12).to_string(index=False))
     return resultado
 
 
 if __name__ == "__main__":
-    main()
+    import sys
+    if sys.argv[1:2] == ["html"]:
+        # python3 modelo_qualy_austin.py html mexico  -> regenera el reporte desde resultado_qualy_mexico.pkl
+        generar_reporte(pd.read_pickle(BASE / f"resultado_qualy_{sys.argv[2]}.pkl"))
+    else:
+        main(int(sys.argv[1]) if len(sys.argv) > 1 else OBJETIVO_MEETING)
