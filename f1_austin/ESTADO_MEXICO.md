@@ -11,7 +11,7 @@ y predicción del Top 10 de la qualy de México. Si la sesión se corta, retomar
       (hecho 07:20 UTC; Random Forest 8.21/10 en validación. Falta el HTML: `python3 modelo_qualy_austin.py html mexico`)
 - [x] `python3 publicar_sitio.py` → `../sitio_f1/` (index = México); revisar capturas 1280/390 px
 - [x] Commit + push; entregar al usuario el HTML, la tabla del Top 10 y los pasos de Netlify/dominio
-- [ ] Después de la qualy (≈22:15 UTC): bajar `session_result?session_key=11400` a `cache/qualy_real_1298.json`,
+- [x] Después de la qualy (≈22:15 UTC): bajar `session_result?session_key=11400` a `cache/qualy_real_1298.json`,
       regenerar el HTML (sección resultado real vs pronóstico), republicar el sitio y reportar aciertos
 
 ## Fase 2 (pedido 14:00 UTC): página cinematográfica en vivo, compartible en Safari
@@ -22,7 +22,7 @@ y la misma carpeta `web_mexico/` va a Netlify (sin db → datos incrustados).
 - [x] Publicar Artifact con capabilities `{db:{rules:[gp y live: read view, write owner]}, user:{}}`; sembrar docs con ArtifactData; dar link
 - [x] 18:40 UTC: bajar FP3 (`descarga_datos.py`, borrar cache de la sesión 11399), correr modelo con FP3, actualizar `gp/mexico2026` (campo cambio), republicar sitio
 - [x] 20:50 UTC: lanzar `live_qualy.py` en segundo plano y relevar `live/qualy_mexico.json` → doc `live/qualy` cada ~60-90 s hasta 22:05 UTC
-- [ ] 22:20 UTC: resultado final (OpenF1 11400) → `live/qualy` estado terminada, sección real vs pronóstico, republicar, reportar aciertos
+- [x] 22:20 UTC: resultado final (OpenF1 11400) → `live/qualy` estado terminada, sección real vs pronóstico, republicar, reportar aciertos
 
 Artifact publicado: https://claude.ai/artifact/A5ptCSyCPL7Eb63tt5U6zJ (file_path f1_austin/web_mexico/index.html; docs gp/mexico2026 v1 y live/qualy v1 sembrados).
 Para viewers sin sesión de claude.ai la página usa los datos incrustados: además de actualizar la db, republicar el Artifact
@@ -37,7 +37,7 @@ Colector: `python3 live_qualy.py --salida live/qualy_mexico.json --minutos 80 --
 estrategia (doc `carrera/mexico2026`). Workflow w0qyrzm9d: secciones nuevas en la página + simulador con degradación/estrategia y
 pipeline de carrera parametrizado (`python3 modelo_carrera_austin.py 1298 [--penalizaciones '{...}']` → web_mexico/datos_carrera.json).
 - [x] Workflow w0qyrzm9d terminado e integrado (republicar Artifact con reglas db también para `post` y `carrera`)
-- [ ] 22:05-22:20 UTC: qualy real → cache/qualy_real_1298.json; buscar penalizaciones de parrilla de México (prensa/FIA);
+- [x] 22:05-22:20 UTC: qualy real → cache/qualy_real_1298.json; buscar penalizaciones de parrilla de México (prensa/FIA);
       escribir post/qualy; correr modelo de carrera; escribir carrera/mexico2026; incrustar y republicar Artifact; publicar_sitio.py; commit
 
 ### Cambio de piloto (15:55 UTC): Hirakawa (HIR, #50) reemplaza a Ocon en Haas desde FP3 (qualy y carrera incluidas)
@@ -45,7 +45,7 @@ Fuentes: Haas vía The Race / Sky / RaceFans (31/10). OpenF1 aún lista a OCO (#
 - [x] `GPS[1298]["sustituciones"] = {"OCO": "HIR"}` + `aplicar_sustituciones()` en modelo_qualy_austin.py (base de pilotos del GP)
 - [x] Pronóstico de qualy recalculado con HIR (+ prior de debutantes: HIR P18; RF 8.26/10) (corrida en curso, log corrida_mexico_hir.log) → actualizar doc gp/mexico2026 en la db
       (la republicación con datos incrustados espera a que el agente de la página termine, ~18:30)
-- [ ] Carrera: verificar que la parrilla (qualy_real_1298.json, #50) y el dataset de carrera usen HIR y no OCO
+- [x] Carrera: verificar que la parrilla (qualy_real_1298.json, #50) y el dataset de carrera usen HIR y no OCO
 
 16:35 UTC: Artifact v2 publicado (Hirakawa, secciones post-qualy/carrera, reglas db gp/live/post/carrera; compartido "cualquiera con el link").
 Docs db: gp/mexico2026 v2, live/qualy v2. Carrera: `python3 modelo_carrera_austin.py 1298 [--penalizaciones '{...}' | --parrilla '{...}']`
@@ -67,3 +67,9 @@ a las 17:44). Comando de la qualy (20:50 UTC, desde f1_austin/; relanzar igual s
 LAW 10→9, LIN entra (10), GAS sale (9→11). Docs db: gp v3, live v2.
 21:31 UTC: comisarios investigan tras la sesión a BOR, BOT, HAM, PER (máximo tiempo delta en Q1) → revisar penalizaciones de parrilla antes del pronóstico de carrera
 22:08 UTC: qualy terminada (provisional): HAM RUS LEC VER ANT NOR HAD LAW LIN GAS | HUL COL PIA BOR BEA SAI | ALB ALO HIR STR PER BOT. live/qualy v48. Grabación: live/crudo_qualy.jsonl
+22:20 UTC: post/qualy v1 (9/10 en Top 10, pole fallada: HAM; Q1 5/6, Q2 4/6, MAE 2.0, Spearman 0.907) y carrera/mexico2026 v2 publicados
+(Artifact v16). Parrilla usada (qualy live timing, OpenF1 aún 401): HAM RUS LEC ANT VER NOR HAD LIN LAW GAS HUL COL PIA BOR BEA SAI ALB ALO
+HIR STR PER BOT (VER y LAW −1 por choque en FP2; BOT al fondo por motor). Pronóstico final: HAM RUS LEC ANT VER HAD NOR LAW LIN PIA.
+PENDIENTE: decisión de comisarios sobre la Q1 (HAM, BOR, BOT, PER: tiempo delta máximo). Si cambia la parrilla: correr
+`python3 modelo_carrera_austin.py 1298 --parrilla '{...}'`, ajustar parrilla_fuente, db carrera/mexico2026 (if_version 2), construir_web_mexico.py
+con --post/--carrera, republicar Artifact y publicar_sitio.py.

@@ -59,9 +59,13 @@ def main():
         shutil.rmtree(SITIO)
     SITIO.mkdir()
     import subprocess, sys
-    subprocess.run([sys.executable, str(BASE / "construir_web_mexico.py"), "--salida", str(SITIO / "index.html"),
-                    "--documento", "--gp", str(PORTADA / "datos_gp.json"), "--live", str(BASE / "live" / "qualy_mexico.json")],
-                   check=True)
+    cmd = [sys.executable, str(BASE / "construir_web_mexico.py"), "--salida", str(SITIO / "index.html"),
+           "--documento", "--gp", str(PORTADA / "datos_gp.json"), "--live", str(BASE / "live" / "qualy_mexico.json")]
+    # evaluación de la qualy y pronóstico de carrera, cuando ya existen
+    for opcion, archivo in (("--post", BASE / "live" / "post_qualy.json"), ("--carrera", PORTADA / "datos_carrera.json")):
+        if archivo.exists():
+            cmd += [opcion, str(archivo)]
+    subprocess.run(cmd, check=True)
     shutil.copytree(PORTADA / "img", SITIO / "img")
     print("->", (SITIO / "index.html").relative_to(SITIO.parent), "(página en vivo) + img/")
     for i, (slug, etiqueta, q, c) in enumerate(PAGINAS):
