@@ -493,6 +493,8 @@ def resolver_parrilla(meeting, pilotos, qualy_archivo=None, penalizaciones=None,
         if faltan:
             raise SystemExit(f"--parrilla incompleta, faltan: {sorted(faltan)}")
         return qualy, {acr2num[a]: int(p) for a, p in parrilla_manual.items() if a in acr2num}, "Parrilla indicada a mano"
+    if manual and not penalizaciones:              # parrilla oficial ya cargada en GPS_CARRERA (p. ej. Austin)
+        return qualy, {acr2num[a]: p for a, p in manual.items() if a in acr2num}, "Parrilla configurada en GPS_CARRERA"
     oficial = parrilla_openf1(meeting)
     if oficial and not penalizaciones:
         return qualy, oficial, "Parrilla oficial (OpenF1 starting_grid)"
@@ -502,7 +504,13 @@ def resolver_parrilla(meeting, pilotos, qualy_archivo=None, penalizaciones=None,
         desconocidos = [a for a in (penalizaciones or {}) if a not in acr2num]
         if desconocidos:
             raise SystemExit(f"Penalizaciones con siglas desconocidas: {desconocidos} (válidas: {sorted(acr2num)})")
+        fuera = q[q.acr.isna()].driver_number.tolist()
+        if fuera:
+            print(f"AVISO: la qualy trae números que no son titulares de este GP: {fuera} (se ignoran)")
         q = q.dropna(subset=["acr"])
+        sin_q = sorted(set(acr2num) - set(q.acr))
+        if sin_q:
+            print(f"AVISO: titulares sin resultado de qualy (salen al fondo): {sin_q}")
         q["pos_ord"] = q.position.fillna(99)
         q = q.sort_values(["pos_ord", "driver_number"])
         orden = {a: i + 1 for i, a in enumerate(q.acr)}
@@ -750,6 +758,12 @@ if __name__ == "__main__":
     ap.add_argument("--completo", action="store_true", help="también compara los 13 modelos de ML (lento)")
     ap.add_argument("--sin-validacion", action="store_true", help="usa la validación guardada en validacion_carrera.json")
     ap.add_argument("--sims", type=int, default=N_SIMS)
+    ap.add_argument("--solo-dataset", action="store_true", help="sólo reconstruye dataset_carrera.csv (sin parrilla ni pronóstico)")
     a = ap.parse_args()
+    if a.solo_dataset:
+        d, _ = construir_dataset_carrera(a.meeting)
+        d.to_csv(BASE / "dataset_carrera.csv", index=False)
+        print("Escrito", BASE / "dataset_carrera.csv", len(d), "filas")
+        raise SystemExit
     main(a.meeting, json.loads(a.penalizaciones) if a.penalizaciones else None, a.qualy_archivo,
          json.loads(a.parrilla) if a.parrilla else None, a.completo, a.prueba, a.sims, a.sin_validacion)

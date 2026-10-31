@@ -1,6 +1,6 @@
 {
- "actualizado": "2026-10-31T16:09:15Z",
- "dataset": "/tmp/claude-0/-home-user-SA/2bd39326-8617-5400-b04f-4c3059628357/scratchpad/carrera_prueba/dataset_carrera.csv",
+ "actualizado": "2026-10-31T16:15:18Z",
+ "dataset": "dataset_carrera.csv",
  "protocolo": "Validación walk-forward 2024-2026 de las variantes del simulador de carrera con degradación y estrategia.\n\nProtocolo (fijado ANTES de ver resultados):\n  * Variantes: base (oficial en Austin), deg, deg_team, pace_deg, deg_hist, sig_par, deg+sig_par.\n  * Cada GP de 2024-2026 se predice entrenando sólo con GPs anteriores (corte por inicio del fin de semana).\n  * Selección: mejor NDCG@10 en 2024-2025; se adopta en lugar de la base sólo si también supera a la base en\n    2026 (que funciona como control, aunque se mira). Si no, queda la base y las variables nuevas se muestran\n    sólo como información (deg_s_vuelta, paradas).\n  * Se reporta todo (por año, top10_hits, win_acc, podium_hits) contra el orden de qualy y de parrilla.\n\nResultado (31/10/2026, dataset con Austin 2026, 66 GPs): la regla elige deg+sig_par (+0.0008 NDCG@10 en 2024-2025,\nempate en 2026), pero (1) la diferencia es menor que el ruido Monte Carlo (con otras semillas la base va de 0.8884\na 0.8898 y deg+sig_par de 0.8884 a 0.8910) y (2) el coeficiente de degradación sale NEGATIVO (más degradación en\nprácticas -> mejor resultado), contrario a la hipótesis. Decisión tomada MIRANDO este walk-forward (se declara):\nqueda la base como oficial y la degradación/paradas se muestran sólo como información. Ver OFICIAL/MOTIVO.",
  "variantes": {
   "base": {

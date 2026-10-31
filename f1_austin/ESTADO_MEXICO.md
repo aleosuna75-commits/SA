@@ -36,13 +36,18 @@ Colector: `python3 live_qualy.py --salida live/qualy_mexico.json --minutos 80 --
 (1) cómo le fue al modelo en la qualy (doc `post/qualy`) y (2) pronóstico de CARRERA = orden FINAL tras degradación, ritmo y
 estrategia (doc `carrera/mexico2026`). Workflow w0qyrzm9d: secciones nuevas en la página + simulador con degradación/estrategia y
 pipeline de carrera parametrizado (`python3 modelo_carrera_austin.py 1298 [--penalizaciones '{...}']` → web_mexico/datos_carrera.json).
-- [ ] Workflow w0qyrzm9d terminado e integrado (republicar Artifact con reglas db también para `post` y `carrera`)
+- [x] Workflow w0qyrzm9d terminado e integrado (republicar Artifact con reglas db también para `post` y `carrera`)
 - [ ] 22:05-22:20 UTC: qualy real → cache/qualy_real_1298.json; buscar penalizaciones de parrilla de México (prensa/FIA);
       escribir post/qualy; correr modelo de carrera; escribir carrera/mexico2026; incrustar y republicar Artifact; publicar_sitio.py; commit
 
 ### Cambio de piloto (15:55 UTC): Hirakawa (HIR, #50) reemplaza a Ocon en Haas desde FP3 (qualy y carrera incluidas)
 Fuentes: Haas vía The Race / Sky / RaceFans (31/10). OpenF1 aún lista a OCO (#31) en FP3/Q/carrera.
 - [x] `GPS[1298]["sustituciones"] = {"OCO": "HIR"}` + `aplicar_sustituciones()` en modelo_qualy_austin.py (base de pilotos del GP)
-- [ ] Pronóstico de qualy recalculado con HIR (corrida en curso, log corrida_mexico_hir.log) → actualizar doc gp/mexico2026 en la db
+- [x] Pronóstico de qualy recalculado con HIR (+ prior de debutantes: HIR P18; RF 8.26/10) (corrida en curso, log corrida_mexico_hir.log) → actualizar doc gp/mexico2026 en la db
       (la republicación con datos incrustados espera a que el agente de la página termine, ~18:30)
 - [ ] Carrera: verificar que la parrilla (qualy_real_1298.json, #50) y el dataset de carrera usen HIR y no OCO
+
+16:35 UTC: Artifact v2 publicado (Hirakawa, secciones post-qualy/carrera, reglas db gp/live/post/carrera; compartido "cualquiera con el link").
+Docs db: gp/mexico2026 v2, live/qualy v2. Carrera: `python3 modelo_carrera_austin.py 1298 [--penalizaciones '{...}' | --parrilla '{...}']`
+→ web_mexico/datos_carrera.json (degradación/paradas sólo informativas: no mejoraron la validación). Republicar siempre con:
+`python3 construir_web_mexico.py --gp web_mexico/datos_gp.json --live live/qualy_mexico.json [--post live/post_qualy.json --carrera web_mexico/datos_carrera.json]`
