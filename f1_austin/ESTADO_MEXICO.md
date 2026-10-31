@@ -31,3 +31,11 @@ y luego Artifact publish del mismo file_path. Sitio Netlify: `python3 publicar_s
 Comandos FP3 (del agente): `python3 descarga_datos.py 11399`; `python3 modelo_qualy_austin.py 1298 --fp3 --jobs 2`;
 `python3 exportar_datos_web.py mexico_fp3 --previo resultado_qualy_mexico.pkl` (escribe web_mexico/datos_gp.json con fase FP3 y cambio).
 Colector: `python3 live_qualy.py --salida live/qualy_mexico.json --minutos 80 --grabar live/crudo_qualy.jsonl` (prueba: `--cualquier-sesion --minutos 3`).
+
+## Fase 3 (pedido 15:30 UTC): al terminar la qualy, en la MISMA página (recargando)
+(1) cómo le fue al modelo en la qualy (doc `post/qualy`) y (2) pronóstico de CARRERA = orden FINAL tras degradación, ritmo y
+estrategia (doc `carrera/mexico2026`). Workflow w0qyrzm9d: secciones nuevas en la página + simulador con degradación/estrategia y
+pipeline de carrera parametrizado (`python3 modelo_carrera_austin.py 1298 [--penalizaciones '{...}']` → web_mexico/datos_carrera.json).
+- [ ] Workflow w0qyrzm9d terminado e integrado (republicar Artifact con reglas db también para `post` y `carrera`)
+- [ ] 22:05-22:20 UTC: qualy real → cache/qualy_real_1298.json; buscar penalizaciones de parrilla de México (prensa/FIA);
+      escribir post/qualy; correr modelo de carrera; escribir carrera/mexico2026; incrustar y republicar Artifact; publicar_sitio.py; commit
