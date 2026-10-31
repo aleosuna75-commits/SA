@@ -7,13 +7,14 @@ tipografías vienen de Google Fonts. Página estática lista para Netlify.
 import base64
 import json
 import math
+import re
 from datetime import datetime, timezone
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
 
-from reporte_html import ETIQUETAS, color, e, fint, fnum
+from reporte_html import ETIQUETAS, e
 
 BASE = Path(__file__).resolve().parent
 
@@ -50,13 +51,33 @@ def signo(x, d=2):
     return f"+{x:.{d}f}" if x >= 0 else f"−{abs(x):.{d}f}"
 
 
+def fnum(x, d=1, suf=""):
+    """Como reporte_html.fnum pero tolera pd.NA, None y float32 NaN."""
+    return "—" if nan(x) else f"{float(x):.{d}f}{suf}"
+
+
+def fint(x):
+    return "—" if nan(x) else f"{int(x)}"
+
+
+def color(row):
+    """Color de escudería; acepta 'FF8000' o '#FF8000' y cae a gris si no es un hex válido."""
+    c = row.get("team_colour")
+    c = c.strip().lstrip("#") if isinstance(c, str) else ""
+    return f"#{c}" if re.fullmatch(r"[0-9A-Fa-f]{6}", c) else "#888888"
+
+
+# OpenF1 escribe los apellidos en MAYÚSCULAS y sin acentos
+ACENTOS = {"Perez": "Pérez", "Hulkenberg": "Hülkenberg", "Raikkonen": "Räikkönen", "Gutierrez": "Gutiérrez"}
+
+
 def nombre(r):
     fn = r.get("full_name")
-    return fn.title() if isinstance(fn, str) and fn.strip() else str(r.get("name_acronym", ""))
-
-
-def num(v, d=1):
-    return f"{v:.{d}f}".rstrip("0").rstrip(".") if isinstance(v, float) else str(v)
+    if not (isinstance(fn, str) and fn.strip()):
+        return str(r.get("name_acronym", ""))
+    # sólo se capitalizan las palabras en mayúsculas (respeta "de la", "van", etc.)
+    pal = [w.title() if w.isupper() and len(w) > 1 else w for w in fn.split()]
+    return " ".join(ACENTOS.get(w, w) for w in pal)
 
 
 # ----------------------------------------------------------------------------------------
@@ -112,8 +133,8 @@ def vela_svg(p):
 
 def casco_svg():
     """Calavera de azúcar con casco de piloto, rodeada de cempasúchil y velas."""
-    shell = ("M68,205 C58,118 92,32 160,30 C228,32 262,118 252,205 C249,240 224,266 190,272 "
-             "L130,272 C96,266 71,240 68,205Z")
+    shell = ("M56,200 C46,108 86,30 160,28 C234,30 274,108 264,200 C260,240 230,268 192,274 "
+             "L128,274 C90,268 60,240 56,200Z")
     ojos = []
     for ex in (124, 196):
         pet = "".join(f'<use href="#pt" transform="rotate({k * 30 + 15}) scale(.86)" '
@@ -162,10 +183,10 @@ def casco_svg():
   <path d="M141,97 c-8,-12 -28,-9 -27,3 c1,8 12,8 13,1"/><path d="M179,97 c8,-12 28,-9 27,3 c-1,8 -12,8 -13,1"/>
 </g>
 <g fill="{C['rosa']}"><circle cx="104" cy="106" r="2.4"/><circle cx="96" cy="111" r="2"/><circle cx="216" cy="106" r="2.4"/><circle cx="224" cy="111" r="2"/></g>
-<path d="M82,122 Q160,104 238,122 L242,166 Q160,182 78,166Z" fill="url(#gVisor)" stroke="#0d0618" stroke-width="2.5"/>
+<path d="M76,122 Q160,103 244,122 L248,166 Q160,183 72,166Z" fill="url(#gVisor)" stroke="#0d0618" stroke-width="2.5"/>
 {''.join(ojos)}
-<path d="M96,127 Q160,112 224,127 L223,133 Q160,119 97,133Z" fill="#fff" opacity=".2"/>
-<g fill="{C['oscuro']}" stroke="{C['turq']}" stroke-width="2"><circle cx="80" cy="144" r="7"/><circle cx="240" cy="144" r="7"/></g>
+<path d="M92,127 Q160,111 228,127 L227,133 Q160,118 93,133Z" fill="#fff" opacity=".2"/>
+<g fill="{C['oscuro']}" stroke="{C['turq']}" stroke-width="2"><circle cx="73" cy="144" r="7"/><circle cx="247" cy="144" r="7"/></g>
 <path d="M160,180 C150,190 146,198 152,202 C156,205 160,201 160,198 C160,201 164,205 168,202 C174,198 170,190 160,180Z" fill="{C['oscuro']}"/>
 {''.join(mejillas)}
 <path d="M112,226 Q160,246 208,226" stroke="{C['oscuro']}" stroke-width="3" fill="none" stroke-linecap="round"/>
@@ -214,6 +235,24 @@ def papel_uri(colores=None, fw=64, h=84):
     return "data:image/svg+xml;base64," + base64.b64encode("".join(out).encode()).decode()
 
 
+def guirnalda_uri():
+    """Guirnalda de cempasúchil (SVG autocontenido en data URI, repetible en x) para la base del altar."""
+    anillos = [(16, 1.72, 0, "#d9480f"), (14, 1.38, 12.8, "#f76707"), (12, 1.06, 4, "#ff922b"),
+               (10, .76, 18, "#ffa94d"), (8, .48, 0, "#ffc078")]
+
+    def fl(cx, cy, k):
+        pet = "".join(f'<use xlink:href="#p" transform="rotate({off + j * 360 / n:.1f}) scale({sc})" fill="{f}"/>'
+                      for n, sc, off, f in anillos for j in range(n))
+        return f'<g transform="translate({cx} {cy}) scale({k})">{pet}<circle r="5" fill="#e8590c"/></g>'
+
+    hojas = "".join(f'<ellipse cx="{x}" cy="{y}" rx="15" ry="5" transform="rotate({a} {x} {y})" fill="#2b6a48"/>'
+                    for x, y, a in [(62, 36, -25), (70, 40, 20), (134, 38, -18), (142, 41, 24)])
+    svg = ('<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="150" height="46" '
+           f'viewBox="0 0 150 46"><defs><path id="p" d="{PETALO}"/></defs>{hojas}'
+           f'{fl(30, 28, .42)}{fl(100, 31, .36)}</svg>')
+    return "data:image/svg+xml;base64," + base64.b64encode(svg.encode()).decode()
+
+
 FAVICON = ("data:image/svg+xml;base64," + base64.b64encode(
     ('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><g transform="translate(32 32)">'
      + "".join(f'<ellipse cx="0" cy="-17" rx="8" ry="13" transform="rotate({k * 30})" fill="{"#f76707" if k % 2 else "#ff9f1c"}"/>'
@@ -260,7 +299,7 @@ linear-gradient(180deg,#1c0b31 0%,#130a22 100%)}
 h1{font-size:clamp(38px,6.2vw,70px);line-height:.98;margin:6px 0 14px;letter-spacing:1px;text-shadow:0 4px 0 rgba(0,0,0,.35)}
 h1 em{font-style:normal;color:var(--cempa)}
 .hsub{font-size:18px;line-height:1.5}
-.hsub b{color:var(--cempa2)}
+.hsub b{color:var(--cempa2);white-space:nowrap}
 .tags{display:flex;flex-wrap:wrap;gap:8px;margin-top:18px}
 .tag{background:var(--rosa);padding:4px 12px;border-radius:3px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;font-size:12px}
 .tag.alt{background:transparent;border:1.5px solid var(--turq);color:var(--turq);padding:2.5px 10.5px}
@@ -275,7 +314,7 @@ h2{font-size:clamp(20px,2.6vw,26px);margin:0 0 6px;display:flex;align-items:cent
 h2 .ic{width:32px;height:32px;flex:none}
 .lead{color:var(--muted);margin:0 0 16px;max-width:780px}
 .lead b{color:var(--ink)}
-.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
 .kpi{background:linear-gradient(180deg,var(--card2),var(--card));border:1px solid var(--line);border-radius:6px;padding:18px 14px 14px;position:relative;overflow:hidden}
 .kpi::before{content:"";position:absolute;left:0;right:0;top:0;height:5px;background:var(--k,var(--cempa))}
 .kpi:nth-child(4n+2){--k:var(--rosa)} .kpi:nth-child(4n+3){--k:var(--turq)} .kpi:nth-child(4n+4){--k:var(--morado)}
@@ -286,8 +325,8 @@ h2 .ic{width:32px;height:32px;flex:none}
 background:radial-gradient(rgba(255,255,255,.035) 1px,transparent 1.6px) 0 0/6px 6px,linear-gradient(180deg,#1b1624,#120f18)}
 .pista .meta{height:18px;background:repeating-conic-gradient(#f7efe3 0 25%,#141019 0 50%) 0 0/18px 18px}
 .pista .rotulo{position:absolute;right:12px;top:24px;font-family:"Sancreek",serif;color:rgba(247,239,227,.22);font-size:15px;letter-spacing:1px}
-.parrilla{display:grid;grid-template-columns:1fr 1fr;gap:14px 30px;padding:34px 22px 26px}
-.slot{position:relative;display:flex;align-items:center;gap:12px;background:linear-gradient(90deg,var(--card2),#170c27);
+.parrilla{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:18px 30px;padding:34px 22px 26px;align-items:start}
+.slot{position:relative;min-width:0;display:flex;align-items:center;gap:12px;background:linear-gradient(90deg,var(--card2),#170c27);
 border-left:6px solid var(--tc);padding:12px 14px 14px 12px;border-radius:4px;box-shadow:0 3px 0 rgba(0,0,0,.45)}
 .slot::before{content:"";position:absolute;left:-6px;right:0;top:-9px;height:9px;border:2px solid rgba(247,239,227,.7);border-bottom:0}
 .slot.der{margin-top:40px}
@@ -303,7 +342,7 @@ border-left:6px solid var(--tc);padding:12px 14px 14px 12px;border-radius:4px;bo
 .slot .mini{position:absolute;left:0;right:0;bottom:0;height:3px;background:rgba(255,255,255,.07)}
 .slot .mini i{display:block;height:100%;background:linear-gradient(90deg,var(--cempa),var(--rosa))}
 .slot .fl{width:22px;height:22px;position:absolute;right:-9px;top:-11px}
-.velas{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:12px}
+.velas{display:grid;grid-template-columns:repeat(var(--n,5),minmax(0,260px));gap:12px}
 .velacard{background:linear-gradient(180deg,var(--card2),var(--card));border:1px solid var(--line);border-radius:6px;padding:12px 12px 12px 8px;
 display:flex;gap:8px;align-items:flex-end;position:relative;overflow:hidden}
 .velacard::after{content:"";position:absolute;left:0;right:0;bottom:0;height:3px;background:var(--tc)}
@@ -312,7 +351,7 @@ display:flex;gap:8px;align-items:flex-end;position:relative;overflow:hidden}
 .velacard .eq{color:var(--muted);font-size:12px;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .velacard .vp{font-weight:900;font-size:24px;color:var(--cempa2);line-height:1.1;display:block;margin-top:8px}
 .velacard .vp small{font-size:11px;color:var(--muted);font-weight:700;letter-spacing:1px;margin-left:4px}
-.velacard .rg{font-size:12px;color:var(--muted)}
+.velacard .rg{font-size:12px;color:var(--muted);display:block;white-space:nowrap;line-height:1.35}
 .velacard>div{min-width:0}
 .checo{margin-top:16px;display:grid;grid-template-columns:auto 1fr;gap:6px 18px;align-items:center;background:var(--card);
 border:1px solid var(--line);border-radius:6px;padding:16px 18px;position:relative;overflow:hidden}
@@ -331,49 +370,67 @@ td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
 tr.in td:first-child{color:var(--cempa);font-weight:900}
 tr.corte td{border-top:2px dashed var(--rosa2)}
 .sub{display:block;color:var(--muted);font-size:11px}
-td b + .sub{display:inline;margin-left:6px}
+td b + .sub{display:inline-block;margin-left:6px;max-width:170px;overflow:hidden;text-overflow:ellipsis;vertical-align:bottom}
+table.real td b + .sub{max-width:min(130px,11vw)}
 .chip{display:inline-block;width:4px;height:16px;margin-right:8px;vertical-align:-3px;border-radius:1px}
 .prob{display:flex;align-items:center;gap:8px;min-width:150px}
 .bar{flex:1;height:8px;background:rgba(255,255,255,.1);border-radius:4px;overflow:hidden}
 .bar i{display:block;height:100%;background:linear-gradient(90deg,var(--cempa),var(--rosa))}
 .prob span{min-width:34px;text-align:right;font-variant-numeric:tabular-nums}
+.fijo{position:sticky;left:0;z-index:1;background-color:var(--card)}
+th.fijo{background-color:var(--morado2);z-index:2}
+tr:nth-child(even) td.fijo{background-color:#211434}
+td.mname{white-space:normal;min-width:220px;line-height:1.3}
+.desliza{display:none;font-size:12px;color:var(--muted);margin:-8px 0 8px;letter-spacing:.5px}
 tr.win td{background:rgba(255,159,28,.15);font-weight:700}
 tr.win td:first-child{box-shadow:inset 4px 0 0 var(--cempa)}
+tr.win td.fijo{background:#3f262d}
 tr.base td{color:var(--muted)}
 .ganador{display:inline-flex;align-items:center;gap:6px}
 .ganador .ic{width:18px;height:18px}
-.two{display:grid;grid-template-columns:1.15fr 1fr;gap:22px}
+.two{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:22px}
+.mitades{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px;margin-top:14px;align-items:start}
 .card{background:linear-gradient(180deg,var(--card2),var(--card));border:1px solid var(--line);border-radius:6px;padding:18px}
 .card h2{font-size:19px}
 .card h2 .ic{width:26px;height:26px}
 td.hit{color:var(--hit);font-weight:700} td.miss{color:var(--miss);font-weight:700}
-.irow{display:grid;grid-template-columns:200px 1fr 50px;gap:10px;align-items:center;font-size:13.5px;margin:6px 0}
+.irow{display:grid;grid-template-columns:200px minmax(0,1fr) 50px;gap:10px;align-items:center;font-size:13.5px;margin:6px 0}
+.irow span{overflow-wrap:anywhere;line-height:1.25}
 .ibar{height:10px;background:rgba(255,255,255,.08);border-radius:5px;overflow:hidden}
 .ibar i{display:block;height:100%;background:linear-gradient(90deg,var(--turq),#7ee3d8);border-radius:5px}
 .irow b{text-align:right;font-variant-numeric:tabular-nums}
-.vchart{position:relative;display:flex;gap:4px;align-items:flex-end;height:200px;padding-top:20px}
+.vchart{position:relative;display:flex;gap:4px;align-items:flex-end;height:270px;padding-top:20px}
 .vcol{flex:1;display:flex;flex-direction:column;align-items:center;height:100%;justify-content:flex-end;min-width:0}
 .vbox{position:relative;width:100%;height:calc(100% - 66px);display:flex;align-items:flex-end}
 .vbar{width:100%;background:linear-gradient(180deg,var(--cempa2),var(--naranja));border-radius:3px 3px 0 0;position:relative;min-height:4px}
 .vbar span{position:absolute;top:-18px;left:-4px;right:-4px;text-align:center;font-size:11px;font-weight:700}
 .vcol small{font-size:10px;color:var(--muted);writing-mode:vertical-rl;transform:rotate(180deg);margin-top:6px;height:60px;white-space:nowrap;overflow:hidden}
 .vprom{position:absolute;left:0;right:0;border-top:2px dashed var(--rosa2);pointer-events:none}
-.vprom em{position:absolute;right:0;top:-20px;font-style:normal;font-size:11px;color:var(--rosa2);font-weight:700;background:var(--card);padding:0 4px}
-.altar{display:grid;grid-template-columns:repeat(auto-fill,minmax(132px,1fr));gap:14px}
+.vleg{font-size:12px;color:var(--muted);margin-top:8px}.vleg i{display:inline-block;width:22px;border-top:2px dashed var(--rosa2);vertical-align:middle;margin-right:6px}
+.altar{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:16px 14px;position:relative;z-index:1}
 .retrato{position:relative;background:linear-gradient(180deg,#2c1846,#1d1030);border:2px solid var(--cempa);outline:1px solid rgba(255,159,28,.45);
-outline-offset:3px;border-radius:3px;padding:12px 8px 10px;text-align:center;margin:4px}
-.retrato .anio{font-family:"Bungee",sans-serif;font-size:21px;color:var(--cempa2);line-height:1}
-.retrato .nom{font-weight:900;font-size:14.5px;margin-top:6px;line-height:1.2}
+outline-offset:3px;border-radius:3px;padding:14px 8px 11px;text-align:center;margin:4px}
+.retrato .anio{font-family:"Bungee",sans-serif;font-size:22px;color:var(--cempa2);line-height:1}
+.retrato .nom{font-weight:900;font-size:15px;margin-top:6px;line-height:1.2}
 .retrato .eq{color:var(--muted);font-size:12px}
 .retrato.vivo{border-color:var(--turq);outline-color:rgba(25,195,179,.45)}
 .retrato.vivo .anio{color:var(--turq)}
 .retrato .fl{width:22px;height:22px;position:absolute;left:50%;top:-13px;transform:translateX(-50%)}
-.leyenda{font-size:12px;color:var(--muted);margin-top:12px}
-.leyenda i{display:inline-block;width:10px;height:10px;border:2px solid var(--turq);margin-right:6px;vertical-align:-1px}
+section.card{padding:20px}
+.ofrenda{position:relative;overflow:hidden;padding-bottom:0!important}
+.guirnalda{height:46px;margin:14px -20px 0;background:url(__GUIRNALDA__) repeat-x 0 100%/auto 46px}
+.tira{display:inline-flex;gap:3px}
+.tira i{width:22px;height:20px;border-radius:3px;font-style:normal;font-size:10.5px;font-weight:900;display:inline-flex;align-items:center;justify-content:center;color:#120a1f}
+.tira.cab i{background:none;color:var(--ink);font-size:10.5px;height:auto}
+i.t1{background:var(--cempa)} i.t3{background:var(--rosa2)} i.t10{background:var(--turq)} i.tx{background:rgba(255,255,255,.22);color:var(--ink)!important}
+i.t0{background:transparent;border:1px dashed rgba(255,255,255,.18)}
+.leyenda{font-size:12px;color:var(--muted);margin-top:12px;display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center}
+.leyenda span{display:inline-flex;align-items:center;gap:6px}
+.leyenda i{display:inline-block;width:12px;height:12px;border-radius:2px}
 .metodo{font-size:14.5px;line-height:1.65}
 .metodo b{color:var(--cempa2)}
-.ojo{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-.ojo .card{display:grid;grid-template-columns:auto 1fr;gap:4px 14px;align-items:start}
+.ojo{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px}
+.ojo .card{display:grid;grid-template-columns:auto minmax(0,1fr);gap:4px 14px;align-items:start}
 .ojo .oi{width:36px;height:36px;color:var(--cempa);grid-row:span 2;margin-top:2px}
 .ojo .card:nth-child(2) .oi{color:var(--turq)} .ojo .card:nth-child(3) .oi{color:var(--rosa2)} .ojo .card:nth-child(4) .oi{color:#c79bff}
 .ojo h3{font-size:15px;margin:0;letter-spacing:.5px;line-height:1.3}
@@ -382,13 +439,15 @@ outline-offset:3px;border-radius:3px;padding:12px 8px 10px;text-align:center;mar
 footer{margin-top:46px;background:linear-gradient(180deg,transparent,rgba(0,0,0,.35))}
 footer .wrap{padding:18px 16px 40px;color:var(--muted);font-size:13px;display:flex;flex-wrap:wrap;gap:10px 24px;justify-content:space-between;align-items:center}
 footer .deco{color:var(--cempa);font-size:20px}
+@media(max-width:1000px){.velas{grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media(max-width:860px){.hero .wrap{grid-template-columns:1fr 250px}}
 @media(max-width:760px){
 .picado{height:64px;background-size:auto 64px}
 .hero .wrap{grid-template-columns:1fr;gap:0}
 .casco{max-width:230px;order:-1;margin-top:4px}
-.kpis{grid-template-columns:1fr 1fr} .two{grid-template-columns:1fr} .ojo{grid-template-columns:1fr}
-.irow{grid-template-columns:140px 1fr 46px}
+.kpis{grid-template-columns:minmax(0,1fr) minmax(0,1fr)} .two,.mitades{grid-template-columns:minmax(0,1fr)} .ojo{grid-template-columns:minmax(0,1fr)}
+.irow{grid-template-columns:140px minmax(0,1fr) 46px} .altar{grid-template-columns:repeat(3,minmax(0,1fr))}
+.desliza{display:block} .fijo{box-shadow:inset -1px 0 0 rgba(255,159,28,.25)}
 .vcol small{font-size:9px}}
 @media(max-width:600px){
 .parrilla{gap:12px 12px;padding:30px 10px 18px}
@@ -399,9 +458,10 @@ footer .deco{color:var(--cempa);font-size:20px}
 .pteam{font-size:11px}
 .pprob span{font-size:15px} .pprob small{font-size:9px}
 .pista .rotulo{display:none}
-.velas{grid-template-columns:1fr 1fr;gap:10px}
+.velas{grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px}
 .velacard .acr{font-size:19px} .velacard .vp{font-size:20px}
-.checo{grid-template-columns:1fr}
+.checo{grid-template-columns:minmax(0,1fr)} .reyes .sub{display:none} .altar{grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px 8px}
+td b + .sub,table.real td b + .sub{max-width:92px} td.mname{min-width:150px;font-size:13px} table{font-size:13.5px} section.card{padding:16px} .guirnalda{margin:12px -16px 0}
 .kpi{padding:16px 12px 12px}
 h1{font-size:40px}
 .hsub{font-size:16px}}
@@ -454,6 +514,10 @@ def seccion_real(obj, ruta, mk):
         filas.append(f"""<tr class="{cls}"><td class="num">{fint(r.real)}</td>
 <td><span class="chip" style="background:{color(r)}"></span><b>{e(r.name_acronym)}</b><span class="sub">{e(r.team_name)}</span></td>
 <td class="num {ok}">P{int(r.pred_rank)}</td><td class="num">{delta}</td></tr>""")
+    mitad = math.ceil(len(filas) / 2)
+    cab = '<tr><th class="num">Real</th><th>Piloto</th><th class="num">Pronóstico</th><th class="num">Δ</th></tr>'
+    tablas = "".join(f'<div class="tw"><table class="real">{cab}{"".join(parte)}</table></div>'
+                     for parte in (filas[:mitad], filas[mitad:]) if parte)
     return f"""
 <section id="real">
   <h2>{flor()}Resultado real vs. pronóstico</h2>
@@ -466,10 +530,7 @@ def seccion_real(obj, ruta, mk):
     <div class="kpi"><b>{hits3}<small>/3</small></b><span>Aciertos en el Top 3</span></div>
     <div class="kpi"><b>{fnum(mae, 1)}</b><span>Error medio de posición</span></div>
   </div>
-  <div class="tw" style="margin-top:14px"><table>
-    <tr><th class="num">Real</th><th>Piloto</th><th class="num">Pronóstico</th><th class="num">Δ</th></tr>
-    {''.join(filas)}
-  </table></div>
+  <div class="mitades">{tablas}</div>
 </section>"""
 
 
@@ -515,8 +576,10 @@ def generar_html(R, ruta):
     base = bases.top10_hits.max() if len(bases) else np.nan
 
     circ = R["circ"].copy()
-    circ = circ[circ.season >= 2015]
+    circ["season"] = pd.to_numeric(circ.season, errors="coerce")
     circ["pos"] = pd.to_numeric(circ.pos, errors="coerce")
+    circ = circ[circ.season >= 2015].copy()
+    circ["season"] = circ.season.astype(int)
     circ_med = circ.dropna(subset=["pos"]).groupby("code").pos.agg(["mean", "min", "count"])
     obj["mx_mean"] = obj.name_acronym.map(circ_med["mean"])
     obj["mx_n"] = obj.name_acronym.map(circ_med["count"]).fillna(0)
@@ -547,9 +610,11 @@ def generar_html(R, ruta):
       <div class="velacard" style="--tc:{color(r)}">{vela_svg(r.p_q3)}
         <div><span class="acr">{e(r.name_acronym)}</span><span class="eq">{e(r.team_name)}</span>
         <span class="vp">{pct(r.p_q3)}<small>Q3</small></span>
-        <span class="rg">Pron. P{int(r.pred_rank)} · rango {fint(r.pos_p10)}–{fint(r.pos_p90)}</span></div>
+        <span class="rg">Pronóstico P{int(r.pred_rank)}</span><span class="rg">Rango P{fint(r.pos_p10)}–P{fint(r.pos_p90)}</span></div>
       </div>""" for _, r in burbuja.iterrows())
-        velas = f'<div class="velas">{velas}</div>'
+        n_v = len(burbuja)
+        n_col = n_v if n_v <= 6 else min(6, math.ceil(n_v / 2))
+        velas = f'<div class="velas" style="--n:{n_col}">{velas}</div>'
     else:
         velas = '<p class="lead"><b>Nadie en la burbuja:</b> el corte entre Q2 y Q3 se ve claro esta vez.</p>'
 
@@ -558,20 +623,19 @@ def generar_html(R, ruta):
     for _, r in obj.iterrows():
         pr = int(r.pred_rank)
         q3 = 0 if nan(r.p_q3) else r.p_q3
-        fp1 = (f'{fint(r.fp1_rank)}<span class="sub">+{fnum(r.fp1_gap, 2)}%</span>' if not nan(r.fp1_rank)
-               else '—<span class="sub">no rodó</span>')
-        fp2 = (f'{fint(r.fp2_rank)}<span class="sub">+{fnum(r.fp2_gap, 2)}%</span>' if not nan(r.fp2_rank)
-               else '—<span class="sub">no rodó</span>')
+        fp1, fp2 = (f'{fint(rk)}<span class="sub">{"" if nan(gap) else f"+{gap:.2f}%"}</span>' if not nan(rk)
+                    else '—<span class="sub">no rodó</span>'
+                    for rk, gap in ((r.fp1_rank, r.fp1_gap), (r.fp2_rank, r.fp2_gap)))
         mx = (f'{fnum(r.mx_mean, 1)}<span class="sub">{int(r.mx_n)} vis.</span>' if r.mx_n > 0
               else '—<span class="sub">debut</span>')
         cls = ("in" if pr <= 10 else "") + (" corte" if pr == 11 else "")
         filas.append(f"""<tr class="{cls}">
 <td class="num">{pr}</td>
-<td><span class="chip" style="background:{color(r)}"></span><b>{e(r.name_acronym)}</b><span class="sub">{e(r.team_name)}</span></td>
+<td class="fijo"><span class="chip" style="background:{color(r)}"></span><b>{e(r.name_acronym)}</b><span class="sub" title="{e(r.team_name)}">{e(r.team_name)}</span></td>
 <td class="num">{fp1}</td><td class="num">{fp2}</td><td class="num">{fint(r.fp2_long_rank)}</td>
 <td class="num">{fnum(r.h_q_mean5, 1)}</td><td class="num">{mx}</td>
 <td class="num">{fint(r.pos_p10)}–{fint(r.pos_p90)}</td>
-<td class="prob"><div class="bar"><i style="width:{100 * q3:.0f}%"></i></div><span>{pct(r.p_q3)}</span></td>
+<td><div class="prob"><div class="bar"><i style="width:{100 * q3:.0f}%"></i></div><span>{pct(r.p_q3)}</span></div></td>
 <td class="num">{pct(r.p_top3)}</td><td class="num">{pct(r.p_pole)}</td>
 </tr>""")
 
@@ -580,7 +644,7 @@ def generar_html(R, ruta):
     for _, r in tabla.iterrows():
         cls = "win" if r.modelo == mejor else ("base" if str(r.modelo).startswith("Baseline") else "")
         nom = (f'<span class="ganador">{flor()}{e(r.modelo)}</span>' if cls == "win" else e(r.modelo))
-        mod.append(f"""<tr class="{cls}"><td>{nom}</td>
+        mod.append(f"""<tr class="{cls}"><td class="mname fijo">{nom}</td>
 <td class="num">{fnum(r.top10_hits, 2)}</td><td class="num">{fnum(r.get('top10_hits_2026'), 2)}</td>
 <td class="num">{fnum(r.spearman, 3)}</td><td class="num">{fnum(r.mae, 2)}</td>
 <td class="num">{'—' if nan(r.pole_acc) else f'{100 * r.pole_acc:.0f}%'}</td><td class="num">{fnum(r.top3_hits, 2)}</td>
@@ -590,12 +654,15 @@ def generar_html(R, ruta):
     imp_top = imp.sort_values(ascending=False).head(15)
     mx_imp = imp_top.max() if len(imp_top) and imp_top.max() > 0 else 1
     imps = "".join(
-        f'<div class="irow"><span>{e(ETIQUETAS.get(k, k))}</span>'
+        f'<div class="irow"><span>{e(ETIQUETAS.get(k, str(k).replace("_", " ")))}</span>'
         f'<div class="ibar"><i style="width:{100 * v / mx_imp:.0f}%"></i></div><b>{100 * v:.1f}%</b></div>'
         for k, v in imp_top.items())
 
     # ---------------- Validación 2026 ----------------
-    g26 = por_gp[por_gp.year >= 2026]
+    g26 = por_gp[pd.to_numeric(por_gp.year, errors="coerce") >= 2026].dropna(subset=["top10_hits"])
+    if "date" in R["train"]:   # meeting_key no siempre es cronológico (p. ej. un GP agregado tarde al calendario)
+        orden_gp = pd.to_datetime(R["train"].groupby("meeting_key").date.min(), errors="coerce", utc=True)
+        g26 = g26.assign(_f=g26.meeting_key.map(orden_gp)).sort_values("_f", kind="stable", na_position="last")
     if len(g26):
         prom = g26.top10_hits.mean()
         cols = "".join(
@@ -604,7 +671,7 @@ def generar_html(R, ruta):
             f'<small>{e(NOMBRES_CIRCUITO.get(r.circuit, r.circuit))}</small></div>'
             for _, r in g26.iterrows())
         val = (f'<div class="vchart">{cols}<div class="vprom" style="bottom:calc(66px + (100% - 86px) * {prom / 10:.3f})">'
-               f'<em>promedio {prom:.1f}</em></div></div>')
+               f'</div></div><div class="vleg"><i></i>Promedio 2026: {prom:.1f} de 10</div>')
         val_lead = (f"Aciertos del Top 10 en cada GP de esta temporada, prediciendo sin ver el resultado "
                     f"({len(g26)} GPs, promedio <b>{prom:.1f}/10</b>).")
     else:
@@ -621,13 +688,40 @@ def generar_html(R, ruta):
     faltan = [y for y in range(2015, int(max(temporadas)) + 1) if y not in temporadas] if temporadas else []
     nota_faltan = f" (en {', '.join(map(str, faltan))} no hubo GP)" if faltan else ""
     reyes = (circ[circ.code.isin(actuales)].dropna(subset=["pos"]).groupby("code").pos
-             .agg(n="count", q3=lambda s: int((s <= 10).sum()), mejor="min", media="mean")
-             .sort_values(["media", "mejor"]).head(8))
-    col_by = obj.set_index("name_acronym")
+             .agg(n="count", q3=lambda s: int((s <= 10).sum()), poles=lambda s: int((s == 1).sum()),
+                  mejor="min", media="mean")
+             .sort_values(["media", "mejor"]).head(10))
+    col_by = obj.drop_duplicates("name_acronym").set_index("name_acronym")
+    pos_por = circ.dropna(subset=["pos"]).set_index(["code", "season"]).pos
+    pos_por = pos_por[~pos_por.index.duplicated()]
+
+    def tira(code):
+        celdas = []
+        for y in temporadas:
+            p_ = pos_por.get((code, y), np.nan)
+            if nan(p_):
+                celdas.append(f'<i class="t0" title="{y}: no corrió"></i>')
+            else:
+                k = "t1" if p_ == 1 else ("t3" if p_ <= 3 else ("t10" if p_ <= 10 else "tx"))
+                celdas.append(f'<i class="{k}" title="{y}: P{int(p_)}">{int(p_)}</i>')
+        return f'<span class="tira">{"".join(celdas)}</span>'
+
     rey = "".join(
-        f"<tr><td><span class='chip' style='background:{color(col_by.loc[k]) if k in col_by.index else '#888'}'></span><b>{e(k)}</b></td>"
-        f"<td class='num'>{int(r.n)}</td><td class='num'>{int(r.q3)}</td><td class='num'>P{int(r.mejor)}</td>"
-        f"<td class='num'>{r.media:.1f}</td></tr>" for k, r in reyes.iterrows())
+        f"<tr><td><span class='chip' style='background:{color(col_by.loc[k]) if k in col_by.index else '#888'}'></span><b>{e(k)}</b>"
+        f"<span class='sub'>{e(col_by.loc[k].team_name) if k in col_by.index else ''}</span></td>"
+        f"<td class='num'>{int(r.n)}</td><td class='num'>{int(r.q3)}</td><td class='num'>{int(r.poles)}</td>"
+        f"<td class='num'>P{int(r.mejor)}</td><td class='num'>{r.media:.1f}</td><td>{tira(k)}</td></tr>"
+        for k, r in reyes.iterrows())
+    if not altar:
+        altar = '<p class="lead" style="grid-column:1/-1">Sin poles registradas en este circuito desde 2015.</p>'
+    if not rey:
+        rey = '<tr><td colspan="7">Ningún piloto de la parrilla actual tiene qualys registradas aquí desde 2015.</td></tr>'
+    if not imps:
+        imps = f'<p class="lead">El modelo elegido ({e(mejor)}) no reporta importancia de variables.</p>'
+    imp_lead = ("Importancia de variables (promedio de los modelos de árbol del ensamble)." if str(mejor).startswith("Ensamble")
+                else f"Importancia de variables del modelo elegido ({e(mejor)}).")
+    anios_tira = (f'<span class="tira cab">{"".join(f"<i>{str(y)[2:]}</i>" for y in temporadas)}</span>'
+                  if temporadas else "")
 
     # ---------------- KPIs y textos ----------------
     favorito = obj.sort_values("p_pole", ascending=False).iloc[0]
@@ -637,17 +731,21 @@ def generar_html(R, ruta):
     sin_fp1 = obj[obj.fp1_rank.isna()]
     if len(sin_fp1):
         lista = ", ".join(f"<b>{e(a)}</b>" for a in sin_fp1.name_acronym)
-        txt_fp1 = (f"En esta FP1 <b>{len(sin_fp1)}</b> titular{'es' if len(sin_fp1) > 1 else ''} no rodó"
-                   f"{'' if len(sin_fp1) == 1 else ' (cedieron el coche)'}: {lista}. Para ellos el modelo sólo ve FP2 "
-                   "y su historial, así que su pronóstico es más incierto.")
+        n1 = len(sin_fp1)
+        txt_fp1 = ((f"En esta FP1 <b>{n1}</b> titulares no rodaron" if n1 > 1 else "En esta FP1 <b>1</b> titular no rodó")
+                   + f" (normalmente porque cedieron el coche a un novato): {lista}. Para "
+                   + ("ellos" if n1 > 1 else "él") + " el modelo sólo ve FP2 y el historial, así que el pronóstico es más incierto.")
     else:
         txt_fp1 = ("En México los equipos suelen ceder coches a novatos en la FP1; cuando un titular no rueda, "
                    "el modelo sólo ve su FP2 y su historial.")
     real_html = seccion_real(obj, ruta, gp["meeting_key"])
     ahora = datetime.now(timezone.utc).strftime("%d/%m/%Y %H:%M UTC")
     papel = papel_uri()
-    css = CSS.replace("__PAPEL__", papel)
+    css = CSS.replace("__PAPEL__", papel).replace("__GUIRNALDA__", guirnalda_uri())
     mejora = fila_mejor.top10_hits - base if not nan(base) else np.nan
+    anios = pd.to_numeric(por_gp.year, errors="coerce").dropna()
+    periodo = (f"{int(anios.min())}–{int(anios.max())}" if len(anios) and anios.min() != anios.max()
+               else (f"{int(anios.min())}" if len(anios) else "2024–2026"))
     titulo = f"Qualy {gp['ciudad'].replace('Ciudad de México', 'México')} 2026 · Pronóstico"
 
     doc = f"""<!doctype html>
@@ -679,13 +777,14 @@ def generar_html(R, ruta):
   <div class="cuadros"></div>
 </header>
 
-<main class="wrap">
+<main>
+<div class="wrap">
 <section>
   <div class="kpis">
     <div class="kpi"><b>{e(favorito.name_acronym)} <small>{pct(favorito.p_pole)}</small></b><span>Favorito a la pole · {e(nombre(favorito))}</span></div>
-    <div class="kpi"><b>{fnum(fila_mejor.top10_hits, 1)}<small>/10</small></b><span>Aciertos promedio en el Top 10 (validación 2024–2026)</span></div>
+    <div class="kpi"><b>{fnum(fila_mejor.top10_hits, 1)}<small>/10</small></b><span>Aciertos promedio en el Top 10 (validación {periodo})</span></div>
     <div class="kpi"><b>{signo(mejora)}</b><span>Aciertos de Top 10 vs. el mejor baseline de prácticas</span></div>
-    <div class="kpi"><b>{n_gp} GPs</b><span>{n_train:,} filas piloto-GP · {n_vars} variables</span></div>
+    <div class="kpi"><b>{n_gp}</b><span>Grandes Premios de entrenamiento · {n_train:,} filas piloto-GP · {n_vars} variables</span></div>
   </div>
 </section>
 {real_html}
@@ -713,23 +812,25 @@ def generar_html(R, ruta):
   <p class="lead">Rango = posiciones entre los percentiles 10 y 90 de la simulación. Tanda larga = ritmo de carrera en FP2.
   México = qualy media en el Hermanos Rodríguez desde 2015. “No rodó” en FP1 suele ser un titular que cedió el coche a un novato.
   La línea punteada marca el corte de Q3.</p>
+  <p class="desliza">Desliza la tabla para ver todas las columnas →</p>
   <div class="tw"><table class="full">
-    <tr><th class="num">Pron.</th><th>Piloto</th><th class="num">FP1</th><th class="num">FP2</th><th class="num">Tanda larga</th>
+    <tr><th class="num">Pron.</th><th class="fijo">Piloto</th><th class="num">FP1</th><th class="num">FP2</th><th class="num">Tanda larga</th>
     <th class="num">Qualy últ. 5</th><th class="num">México</th><th class="num">Rango</th><th>P(Q3)</th><th class="num">P(Top 3)</th><th class="num">P(Pole)</th></tr>
     {''.join(filas)}
   </table></div>
 </section>
-</main>
+</div>
 
 <div class="picado mini" aria-hidden="true"></div>
 
-<main class="wrap">
+<div class="wrap">
 <section id="modelos">
   <h2>{flor()}Duelo de modelos</h2>
-  <p class="lead">Validación walk-forward: cada GP de 2024–2026 se predijo entrenando <i>sólo</i> con fines de semana anteriores.
+  <p class="lead">Validación walk-forward: cada GP de {periodo} se predijo entrenando <i>sólo</i> con fines de semana anteriores.
   Gana el modelo con más aciertos en el Top 10 (desempate: correlación de Spearman).</p>
+  <p class="desliza">Desliza la tabla para ver todas las columnas →</p>
   <div class="tw"><table>
-    <tr><th>Modelo</th><th class="num">Top 10 aciertos</th><th class="num">Top 10 en 2026</th><th class="num">Spearman</th>
+    <tr><th class="fijo">Modelo</th><th class="num">Top 10 aciertos</th><th class="num">Top 10 en 2026</th><th class="num">Spearman</th>
     <th class="num">Error medio (pos.)</th><th class="num">Pole acertada</th><th class="num">Top 3 aciertos</th><th class="num">GPs</th></tr>
     {''.join(mod)}
   </table></div>
@@ -738,7 +839,7 @@ def generar_html(R, ruta):
 <section class="two">
   <div class="card">
     <h2>{flor()}Qué pesa más</h2>
-    <p class="lead">Importancia de variables (promedio de los modelos de árbol).</p>
+    <p class="lead">{imp_lead}</p>
     {imps}
   </div>
   <div class="card">
@@ -748,18 +849,22 @@ def generar_html(R, ruta):
   </div>
 </section>
 
-<section class="two">
-  <div class="card">
-    <h2>{flor()}Altar de poles</h2>
-    <p class="lead">Poles en el {e(gp['circuito'])} desde su regreso al calendario en 2015{nota_faltan}.</p>
-    <div class="altar">{altar}</div>
-    <div class="leyenda"><i></i>Borde turquesa: sigue en la parrilla 2026.</div>
-  </div>
-  <div class="card">
-    <h2>{flor()}Los que mandan en México</h2>
-    <p class="lead">Parrilla actual, ordenada por su qualy media en el Hermanos Rodríguez desde 2015 (Q3 = veces en el Top 10).</p>
-    <div class="tw"><table><tr><th>Piloto</th><th class="num">Visitas</th><th class="num">Q3</th><th class="num">Mejor</th><th class="num">Media</th></tr>{rey}</table></div>
-  </div>
+<section class="card ofrenda">
+  <h2>{flor()}Altar de poles</h2>
+  <p class="lead">Poles en el {e(gp['circuito'])} desde su regreso al calendario en 2015{nota_faltan}.
+  Borde turquesa: el piloto sigue en la parrilla 2026.</p>
+  <div class="altar">{altar}</div>
+  <div class="guirnalda" aria-hidden="true"></div>
+</section>
+
+<section class="card">
+  <h2>{flor()}Los que mandan en México</h2>
+  <p class="lead">Parrilla actual, ordenada por su qualy media en el Hermanos Rodríguez desde 2015. Q3 = veces en el Top 10.
+  La tira muestra su posición de qualy año por año.</p>
+  <p class="desliza">Desliza la tabla para ver la tira año por año →</p>
+  <div class="tw"><table class="reyes"><tr><th>Piloto</th><th class="num">Visitas</th><th class="num">Q3</th><th class="num">Poles</th>
+  <th class="num">Mejor</th><th class="num">Media</th><th>{anios_tira}</th></tr>{rey}</table></div>
+  <div class="leyenda tl"><span><i class="t1"></i>Pole</span><span><i class="t3"></i>P2–P3</span><span><i class="t10"></i>P4–P10</span><span><i class="tx"></i>P11 o peor</span><span><i class="t0"></i>No corrió</span></div>
 </section>
 
 <section id="metodo">
@@ -773,7 +878,7 @@ def generar_html(R, ruta):
   campeonato; historial en el circuito; forma del equipo; sesgo histórico “prácticas → qualy” del piloto y del equipo (quién suele
   esconder ritmo el viernes); lluvia/temperatura y fin de semana sprint.<br>
   <b>Modelos comparados:</b> {len(tabla)} en total, entre baselines, Ridge, Random Forest, Extra Trees, Gradient Boosting, XGBoost, LightGBM,
-  rankers (LambdaRank, XGBoost Ranker) y ensambles. Ganó: <b>{e(mejor)}</b>. 2026 pesa 3× y 2025 1.5× por el nuevo reglamento.<br>
+  rankers (LambdaRank, XGBoost Ranker) y ensambles. Ganó: <b>{e(mejor)}</b>. Lo reciente pesa más: 2026 (nuevo reglamento) cuenta 3× y 2025, 1.5×.<br>
   <b>Entrenamiento:</b> {n_train:,} filas piloto-GP de {n_gp} Grandes Premios.<br>
   <b>Probabilidades:</b> Monte Carlo (20,000 simulaciones) con los errores reales de validación del modelo.
   </div>
@@ -797,6 +902,7 @@ def generar_html(R, ruta):
       ~{fnum(fila_mejor.top10_hits, 0)} de 10.</p></div>
   </div>
 </section>
+</div>
 </main>
 
 <footer>
