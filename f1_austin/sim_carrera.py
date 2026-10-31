@@ -1,4 +1,4 @@
-"""Simulador Monte Carlo de carrera (GP EE.UU. 2026).
+"""Simulador Monte Carlo de carrera (por GP; nació en el GP EE.UU. 2026).
 
 Cada piloto: posición de salida (grid) + ventaja de ritmo (tanda larga, qualy, forma) que se
 convierte en posiciones según la facilidad de rebase del circuito; ruido heterocedástico
@@ -8,6 +8,9 @@ con carreras pasadas. Pronóstico = posición media simulada.
 
 Variante usada en producción: MC_VAR = {"is26": False, "gn_inter": True}
 (walk-forward 2024-2026: NDCG@10 0.8886 vs 0.8794 del orden de qualy; mejor en los tres años).
+Variantes de degradación/estrategia (validar_carrera.py): "deg" (pérdida por degradación con el stint típico),
+"deg_team" (la del equipo), "pace_deg" (ritmo de carrera = tanda larga + degradación x stint), "sig_par"
+(ruido según paradas típicas del circuito). Ver validacion_carrera.json para cuál es la oficial.
 """
 import numpy as np
 import pandas as pd
@@ -41,12 +44,30 @@ def prep(df):
     d["tfin"] = d.team_finish_rate5.fillna(0.86)
     d["rfin"] = d.r_finish_rate10.fillna(0.86)
     d["gn"] = (d.g - 1) / (d.n - 1)
+    # Degradación (prácticas) y estrategia (carreras previas del circuito); faltantes -> promedio del campo
+    def col(c, default):
+        return d[c] if c in d else pd.Series(default, index=d.index, dtype=float)
+    d["deg"] = col("deg_rel", np.nan).clip(-0.15, 0.15).fillna(0.0)
+    d["degt"] = col("deg_team_rel", np.nan).clip(-0.15, 0.15).fillna(d.deg)
+    d["degh"] = col("deg_hist_rel", np.nan).clip(-0.15, 0.15).fillna(0.0)    # carreras previas del piloto
+    d["sl"] = col("stint_len", np.nan).fillna(25.0).clip(10, 60)
+    d["rl"] = col("ref_lap", np.nan).fillna(90.0)
+    d["npar"] = col("est_paradas_media", np.nan).fillna(1.2)
+    # pérdida media por vuelta por degradación con la estrategia típica (en % de vuelta, como lg)
+    d["degc"] = d.deg * d.sl / 2 / d.rl * 100
+    d["degct"] = d.degt * d.sl / 2 / d.rl * 100
+    d["degch"] = d.degh * d.sl / 2 / d.rl * 100
+    # ritmo de carrera ajustado: la tanda larga de prácticas (~10 vueltas) + lo que se suma en un stint de carrera
+    d["lg_deg"] = d.lg + d.deg * (d.sl - 10).clip(lower=0) / 2 / d.rl * 100
+    d["pace_r_deg"] = d.assign(_x=d.lg_deg).groupby("meeting_key")._x.rank(method="average")
     return d
 
 
 def X_media(d, var, como_df=False):
     """Diseño para el cambio de posición esperado (y - grid)."""
     mob = (d.cga - 3.3)            # facilidad de rebase del circuito (centrada)
+    if var.get("pace_deg", False):  # ritmo esperado de carrera = ritmo base + degradación x stint
+        d = d.assign(pace_r=d.pace_r_deg, lg=d.lg_deg)
     cols = {
         "gc": d.g - (d.n + 1) / 2,                 # regresión a la media por estar delante/detrás
         "pace": d.pace_r - d.g,                    # ritmo de carrera vs salida
@@ -92,13 +113,23 @@ def X_media(d, var, como_df=False):
         cols["form3_gn"] = (d.r_mean3.fillna(d.form) - d.g) * d.gn
     if var.get("pole", False):
         cols["pole"] = (d.g == 1).astype(float)
+    if var.get("deg", False):
+        cols["degc"] = d.degc
+    if var.get("deg_team", False):
+        cols["degct"] = d.degct
+    if var.get("deg_hist", False):
+        cols["degch"] = d.degch
+    if var.get("deg_gn", False):
+        cols["degc_gn"] = d.degc * d.gn
     for c in var.get("drop", []):
         cols.pop(c, None)
     X = pd.DataFrame(cols).astype(float)
     return X if como_df else X.values
 
 
-def X_sigma(d):
+def X_sigma(d, var=None):
+    if (var or {}).get("sig_par", False):     # más paradas -> más cambios de posición por estrategia
+        return np.c_[d.gn, d.gn ** 2, d.cga - 3.3, d.npar - 1.2]
     return np.c_[d.gn, d.gn ** 2, d.cga - 3.3]
 
 
@@ -126,7 +157,7 @@ class Simulador:
         self.rm = Ridge(alpha=v.get("alpha", 1.0)).fit(Xm, y.values, sample_weight=w[fin])
         res = y.values - self.rm.predict(Xm)
         # 2) ruido heterocedástico (primera vuelta + carrera): |resid| ~ salida, circuito
-        self.rs = Ridge(alpha=1.0).fit(X_sigma(df_), np.abs(res), sample_weight=w[fin])
+        self.rs = Ridge(alpha=1.0).fit(X_sigma(df_, v), np.abs(res), sample_weight=w[fin])
         self.sig_floor = 0.5
         # 3) abandono
         self.rd = LogisticRegression(C=1.0, max_iter=500).fit(X_dnf(d), dnf, sample_weight=w)
@@ -136,7 +167,7 @@ class Simulador:
         v = self.var
         d = prep(test)
         mu = d.g.values + self.rm.predict(X_media(d, v))
-        sig = np.maximum(self.rs.predict(X_sigma(d)) * np.sqrt(np.pi / 2), self.sig_floor) * v.get("sig_k", 1.0)
+        sig = np.maximum(self.rs.predict(X_sigma(d, v)) * np.sqrt(np.pi / 2), self.sig_floor) * v.get("sig_k", 1.0)
         p_dnf = self.rd.predict_proba(X_dnf(d))[:, 1] * v.get("dnf_k", 1.0)
         rng = np.random.default_rng(seed)
         n = len(d)

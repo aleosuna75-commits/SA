@@ -1,12 +1,17 @@
 """Incrusta los datos de respaldo en web_mexico/index.html (página cinematográfica del pronóstico de qualy).
 
-La página lee en vivo los docs "gp/mexico2026" y "live/qualy" de la base de datos del Artifact; cuando no hay base
-(Netlify, archivo local) usa el JSON incrustado en <script type="application/json" id="datos">{"gp":…,"live":…}</script>.
+La página lee en vivo los docs "gp/mexico2026", "live/qualy", "post/qualy" y "carrera/mexico2026" de la base de datos
+del Artifact; cuando no hay base (Netlify, archivo local, viewer sin sesión) usa el JSON incrustado en
+<script type="application/json" id="datos">{"gp":…,"live":…,"post":…,"carrera":…}</script>.
+"post" (cómo le fue al modelo en la qualy) y "carrera" (pronóstico del orden final de la carrera) son opcionales:
+si no se pasan, la página muestra su estado de espera ("Se publica al terminar la qualy").
 Este script sólo reemplaza ese bloque; el resto del HTML no se toca.
 
 Uso:
   python3 construir_web_mexico.py                       # gp desde resultado_qualy_mexico.pkl (FP2, cambio 0), live pendiente
   python3 construir_web_mexico.py --gp web_mexico/datos_gp.json --live live/qualy_mexico.json
+  python3 construir_web_mexico.py --gp web_mexico/datos_gp.json --live live/qualy_mexico.json \
+      --post web_mexico/post_qualy.json --carrera web_mexico/carrera_mexico2026.json   # tras la qualy
   python3 construir_web_mexico.py --salida /tmp/prueba.html --live prueba_live.json   # copia para pruebas
   python3 construir_web_mexico.py --salida ../sitio_f1/index.html --documento          # copia con doctype (Netlify)
 """
@@ -76,6 +81,24 @@ def live_pendiente(gp):
             "fuente": "F1 Live Timing"}
 
 
+def _cargar_opcional(ruta, nombre, valido):
+    """Lee el JSON de un doc opcional (post/qualy o carrera/mexico2026) y verifica su forma mínima."""
+    d = json.load(open(ruta, encoding="utf-8"))
+    if not isinstance(d, dict) or not valido(d):
+        raise SystemExit(f"{ruta}: no parece un doc {nombre} válido")
+    return d
+
+
+def post_valido(d):
+    filas = d.get("filas")
+    return (isinstance(filas, list) and any(isinstance(f, dict) and f.get("acr") for f in filas)) or bool(d.get("top10_real"))
+
+
+def carrera_valida(d):
+    ps = d.get("pilotos")
+    return isinstance(ps, list) and any(isinstance(p, dict) and p.get("acr") for p in ps)
+
+
 def incrustar(html, datos):
     js = json.dumps(datos, ensure_ascii=False, separators=(",", ":")).replace("</", "<\\/")
     patron = re.compile(r'(<script type="application/json" id="datos">)(.*?)(</script>)', re.S)
@@ -89,6 +112,8 @@ def main():
     ap.add_argument("--pkl", default=str(BASE / "resultado_qualy_mexico.pkl"))
     ap.add_argument("--gp", help="JSON del doc gp/mexico2026 (en lugar del .pkl)")
     ap.add_argument("--live", help="JSON del doc live/qualy (por defecto: estado pendiente)")
+    ap.add_argument("--post", help="JSON del doc post/qualy: cómo le fue al modelo en la qualy (por defecto ausente)")
+    ap.add_argument("--carrera", help="JSON del doc carrera/mexico2026: pronóstico del orden final (por defecto ausente)")
     ap.add_argument("--entrada", default=str(HTML))
     ap.add_argument("--salida", default=None)
     ap.add_argument("--documento", action="store_true",
@@ -99,7 +124,12 @@ def main():
     live = json.load(open(a.live)) if a.live else live_pendiente(gp)
     html = Path(a.entrada).read_text(encoding="utf-8")
     out = Path(a.salida) if a.salida else Path(a.entrada)
-    final = incrustar(html, {"gp": gp, "live": live})
+    datos = {"gp": gp, "live": live}
+    if a.post:
+        datos["post"] = _cargar_opcional(a.post, "post/qualy", post_valido)
+    if a.carrera:
+        datos["carrera"] = _cargar_opcional(a.carrera, "carrera/mexico2026", carrera_valida)
+    final = incrustar(html, datos)
     if a.documento:
         if out.resolve() == Path(a.entrada).resolve():
             raise SystemExit("--documento requiere --salida distinta de la entrada")
@@ -107,7 +137,8 @@ def main():
                  '<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"></head><body>'
                  + final + "</body></html>")
     out.write_text(final, encoding="utf-8")
-    print(f"{out}: gp fase={gp.get('fase')} pilotos={len(gp.get('pilotos', []))} live={live.get('estado')}")
+    print(f"{out}: gp fase={gp.get('fase')} pilotos={len(gp.get('pilotos', []))} live={live.get('estado')} "
+          f"post={'sí' if 'post' in datos else 'no'} carrera={'sí' if 'carrera' in datos else 'no'}")
 
 
 if __name__ == "__main__":

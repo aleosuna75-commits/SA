@@ -1,46 +1,66 @@
 """
-Modelo de predicción del Top 10 de la CARRERA - GP de Estados Unidos (COTA, Austin) 2026.
+Modelo de predicción del ORDEN FINAL de la CARRERA, parametrizado por GP (Austin 1297, México 1298, ...).
 
 Reutiliza el pipeline auditado del modelo de qualy (modelo_qualy_austin.py) y agrega lo que se sabe
 antes de la carrera:
-  * Parrilla de salida real (con penalizaciones) y resultado/gap de la qualy.
+  * Parrilla de salida (qualy + penalizaciones, o la parrilla oficial de OpenF1) y gap de la qualy.
   * FP3 y ritmo de tanda larga de FP1+FP2+FP3.
+  * Degradación de neumáticos por piloto/equipo en las tandas largas (degradacion.py).
+  * Estrategia por circuito con carreras pasadas: paradas típicas, pérdida en pits, largo de stint.
   * Resultado del sprint (fines de semana sprint).
   * Historial de carrera: resultados recientes, posiciones ganadas vs parrilla, abandonos, forma del equipo
     en carrera, historial del piloto en el circuito y qué tanto se rebasa en el circuito.
 
 Objetivo: posición final de carrera (Jolpica; los abandonos quedan clasificados al fondo en su orden oficial).
-Selección del modelo: walk-forward 2024-2026 y NDCG@10 (premia acertar QUIÉNES quedan en el Top 10 y en
-QUÉ ORDEN, con más peso a las primeras posiciones). Desempate: Spearman.
+Pronóstico oficial: simulador Monte Carlo (sim_carrera.py, variante MC_VAR). Validación walk-forward 2024-2026,
+métrica principal NDCG@10.
 
-Uso:  python3 descarga_datos.py && python3 modelo_carrera_austin.py
+Uso:
+  python3 modelo_carrera_austin.py 1298                         # modo rápido (simulador + walk-forward del simulador)
+  python3 modelo_carrera_austin.py 1298 --penalizaciones '{"XXX": 5, "YYY": "fondo", "ZZZ": "pits"}'
+  python3 modelo_carrera_austin.py 1298 --qualy-archivo ruta.json --prueba DIR   # prueba: todo se escribe en DIR
+  python3 modelo_carrera_austin.py 1298 --parrilla '{"VER": 1, ...}'              # parrilla completa a mano
+  python3 modelo_carrera_austin.py 1297 --completo               # además compara los 13 modelos de ML (lento)
+Parrilla: --parrilla > cache/starting_grid_<mk>.json (si no se pasan penalizaciones) > qualy (cache/qualy_real_<mk>.json
+o --qualy-archivo) + penalizaciones. Salidas: prediccion_carrera_<slug>_2026.csv y web_<slug>/datos_carrera.json
+(forma del doc "carrera/<slug>2026" de la página en vivo).
 """
+import argparse
 import json
+import time
 import warnings
 from collections import defaultdict
+from datetime import datetime, timezone
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
 from scipy.stats import spearmanr
 
+import degradacion as D
 import modelo_qualy_austin as Q
 from sim_carrera import Simulador, X_media, prep
 
 warnings.filterwarnings("ignore")
 BASE = Path(__file__).parent
 CACHE = BASE / "cache"
-OBJETIVO_MEETING = Q.OBJETIVO_MEETING
+OBJETIVO_MEETING = 1297            # default histórico (Austin); el GP se pasa por línea de comandos
 SIM = "Simulador de carrera (Monte Carlo)"
-MC_VAR = {"is26": False, "gn_inter": True}
+MC_VAR_BASE = {"is26": False, "gn_inter": True}
+MC_VAR = dict(MC_VAR_BASE)          # variante oficial (ver validar_carrera.py y validacion_carrera.json)
+N_SIMS = 20000
 
 # Parrilla oficial Austin 2026 tras penalizaciones de unidad de potencia (FIA, viernes 23/10):
 # Lindblad -5 (6.º ICE), Colapinto -10 (4.ª CE), Bortoleto al fondo (ES + CE nuevos).
-# Fuentes: formula1.com, the-race.com, gpfans.com. Si OpenF1 publica starting_grid, se usa ésa.
-PARRILLA_OBJETIVO = {
+PARRILLA_AUSTIN = {
     "ANT": 1, "VER": 2, "HAD": 3, "LEC": 4, "HAM": 5, "RUS": 6, "PIA": 7, "NOR": 8, "LAW": 9, "GAS": 10,
     "HUL": 11, "ALO": 12, "BEA": 13, "LIN": 14, "OCO": 15, "STR": 16, "SAI": 17, "ALB": 18, "PER": 19,
     "BOT": 20, "COL": 21, "BOR": 22,
+}
+PARRILLA_OBJETIVO = PARRILLA_AUSTIN   # compatibilidad
+GPS_CARRERA = {
+    1297: {"vueltas": 56, "parrilla_manual": PARRILLA_AUSTIN},
+    1298: {"vueltas": 71, "parrilla_manual": None},
 }
 
 
@@ -91,16 +111,79 @@ def mejor_tiempo(d):
     return d if d else np.nan
 
 
+def leer_qualy(ruta):
+    """Lista OpenF1 session_result (driver_number, position, duration) -> DataFrame; None si no sirve."""
+    ruta = Path(ruta)
+    if not ruta.exists():
+        return None
+    x = json.loads(ruta.read_text())
+    if not isinstance(x, list) or len(x) < 15:
+        return None
+    q = pd.DataFrame(x)
+    if "duration" not in q:
+        q["duration"] = None
+    q["position"] = pd.to_numeric(q.get("position"), errors="coerce")
+    return q[["driver_number", "position", "duration"]]
+
+
+def aplicar_penalizaciones(orden, pen):
+    """orden: {acr: posición de qualy}; pen: {acr: lugares (int) | 'fondo' | 'pits'} -> {acr: salida 1..n}.
+    Lugares: el piloto queda detrás del que clasificó en qualy+lugares. 'fondo' detrás de todos los demás
+    (en su orden de qualy); 'pits' sale desde el pit lane, detrás incluso de los enviados al fondo."""
+    clave = {}
+    for acr, p in orden.items():
+        x = (pen or {}).get(acr)
+        if x is None:
+            clave[acr] = p
+        elif str(x).lower() == "fondo":
+            clave[acr] = 1000 + p
+        elif str(x).lower() in ("pits", "pit", "pitlane"):
+            clave[acr] = 2000 + p
+        else:
+            clave[acr] = p + int(x) + 0.5
+    return {a: i + 1 for i, a in enumerate(sorted(clave, key=lambda a: clave[a]))}
+
+
+def parrilla_openf1(meeting):
+    """Parrilla oficial de OpenF1 si ya está publicada (cache/starting_grid_<mk>.json) como {driver_number: pos}."""
+    f = CACHE / f"starting_grid_{meeting}.json"
+    if not f.exists():
+        return None
+    g = json.loads(f.read_text())
+    if not isinstance(g, list) or len(g) < 15:
+        return None
+    return {x["driver_number"]: x["position"] for x in g if x.get("position")}
+
+
 # ----------------------------------------------------------------------------------------
 # Dataset
 # ----------------------------------------------------------------------------------------
-def construir_dataset_carrera():
+def construir_dataset_carrera(meeting=OBJETIVO_MEETING, qualy=None, parrilla=None):
+    """qualy: DataFrame (driver_number, position, duration) de la qualy del GP objetivo si OpenF1 aún no la tiene
+    en results_<año>.json. parrilla: {driver_number: salida} del GP objetivo (None -> starting_grid o qualy)."""
     data, meetings = Q.construir_dataset()       # FP1/FP2 + historial de qualy (ya auditado)
     ses = Q.tabla_sesiones()
     res = resultados_openf1()
     jr = carreras_jolpica()
+    est_tabla, est_degs = D.tabla_estrategia()
+    pil = Q.tabla_pilotos().drop_duplicates(["meeting_key", "driver_number"])
+    deg_hist = D.deg_carrera_piloto(est_tabla, est_degs).merge(
+        pil[["meeting_key", "driver_number", "name_acronym"]], on=["meeting_key", "driver_number"]).sort_values("fecha")
 
-    # FP3, qualy (gap), sprint por GP
+    obj = data.meeting_key == meeting
+    if qualy is not None and obj.any():
+        mq = meetings.set_index("meeting_key").q.get(meeting)
+        res = pd.concat([res[res.session_key != mq], qualy.assign(session_key=mq, meeting_key=meeting)], ignore_index=True)
+        qp = qualy.set_index("driver_number").position
+        data.loc[obj, "q_pos"] = data.loc[obj, "driver_number"].map(qp).values
+        # sin tiempo / no clasificados: al fondo en el orden del archivo
+        falta = obj & data.q_pos.isna()
+        if falta.any():
+            base_n = data.loc[obj, "q_pos"].max()
+            base_n = 0 if pd.isna(base_n) else base_n
+            data.loc[falta, "q_pos"] = base_n + np.arange(1, falta.sum() + 1)
+
+    # FP3, qualy (gap), sprint y degradación por GP
     extra = []
     for _, m in meetings.iterrows():
         g = ses[ses.meeting_key == m.meeting_key]
@@ -117,6 +200,9 @@ def construir_dataset_carrera():
         if "Sprint" in nombres:
             sp = res[res.session_key == nombres["Sprint"]][["driver_number", "position"]]
             base = base.merge(sp.rename(columns={"position": "sprint_pos"}), on="driver_number", how="left")
+        dg = D.deg_gp([(nombres.get(s), s) for s in ("Practice 1", "Practice 2", "Practice 3")])
+        if len(dg):
+            base = base.merge(dg[["driver_number", "deg_rel", "deg_abs", "deg_laps", "deg_gp_med"]], on="driver_number", how="left")
         rk = nombres.get("Race")
         base["meeting_key"] = m.meeting_key
         base["race_start"] = g[g.session_name == "Race"].date_start.min() if rk else pd.NaT
@@ -124,12 +210,12 @@ def construir_dataset_carrera():
     extra = pd.concat(extra, ignore_index=True)
     data = data.merge(extra, on=["meeting_key", "driver_number"], how="left")
     for c in Q.FEATURES + ["fp3_gap", "fp3_rank", "fp3_long_gap", "fp3_long_rank", "fp3_ideal_gap",
-                           "fp3_soft_gap", "fp3_laps", "sprint_pos", "fp3_trap_delta"]:
+                           "fp3_soft_gap", "fp3_laps", "sprint_pos", "fp3_trap_delta", "fp3_best",
+                           "deg_rel", "deg_abs", "deg_laps", "deg_gp_med"]:
         if c not in data:
             data[c] = np.nan
 
     # Gap de qualy, compañero, ritmo de carrera combinado
-    g = data.groupby("meeting_key")
     data["q_team_best"] = data.groupby(["meeting_key", "team"]).q_pos.transform("min")
     data["q_teammate_delta"] = data.q_pos - data.q_team_best
     # ritmo de carrera: media de los gaps de tanda larga sólo en sesiones donde >=60% del campo hizo tanda larga
@@ -143,9 +229,14 @@ def construir_dataset_carrera():
     data["fp_best_all"] = data[["fp1_best", "fp2_best", "fp3_best"]].min(axis=1)
     data["fp_rank_all"] = data.groupby("meeting_key").fp_best_all.rank(method="min")
     data["race_vs_q_pace"] = data.long_rank_all - data.q_pos     # <0: mejor ritmo de carrera que de qualy
+    # degradación: equipo y cobertura del campo
+    data["deg_team_rel"] = data.groupby(["meeting_key", "team"]).deg_rel.transform("mean")
+    data["deg_cov"] = data.groupby("meeting_key").deg_rel.transform("count") / data.n_drivers
+    data["ref_lap"] = data.groupby("meeting_key").fp_best_all.transform("min")
 
     # Emparejar cada GP con su carrera de Jolpica (fecha de carrera dentro del fin de semana)
     carreras = jr[["season", "round", "date", "circuit"]].drop_duplicates(["season", "round"])
+    vueltas_carrera = jr.groupby(["season", "round"]).laps.max()
     emparejo = {}
     for _, m in meetings.iterrows():
         ini = pd.Timestamp(m.date).tz_convert(None).normalize()
@@ -162,14 +253,14 @@ def construir_dataset_carrera():
         tgt.append(x)
     tgt = pd.concat(tgt).rename(columns={"code": "name_acronym", "pos": "race_pos"})
     data = data.merge(tgt, on=["meeting_key", "name_acronym"], how="left")
-    obj = data.meeting_key == OBJETIVO_MEETING
-    grid_openf1 = parrilla_openf1()
-    data.loc[obj, "grid"] = data.loc[obj, "name_acronym"].map(grid_openf1 or PARRILLA_OBJETIVO)
+    obj = data.meeting_key == meeting
+    if parrilla:
+        data.loc[obj, "grid"] = data.loc[obj, "driver_number"].map(parrilla)
     data["grid"] = data.grid.fillna(data.q_pos).fillna(data.n_drivers)
     data["grid_penalty"] = data.grid - data.q_pos
     data["grid_team_best"] = data.groupby(["meeting_key", "team"]).grid.transform("min")
 
-    # Historial de carrera (corte: inicio del fin de semana, igual que en la qualy)
+    # Historial de carrera y estrategia (corte: inicio del fin de semana, igual que en la qualy)
     hist = defaultdict(dict)
     for mk, grupo in data.groupby("meeting_key", sort=False):
         corte = pd.Timestamp(grupo.date.iloc[0]).tz_convert(None).normalize()
@@ -185,6 +276,14 @@ def construir_dataset_carrera():
             circ_dnf = 1 - pc_all.terminado.mean()
         else:
             circ_gain_abs = circ_corr = circ_dnf = np.nan
+        # vueltas programadas: configuración del GP o la carrera emparejada / edición anterior del circuito
+        if mk in GPS_CARRERA:
+            vueltas = GPS_CARRERA[mk]["vueltas"]
+        elif mk in emparejo:
+            vueltas = vueltas_carrera.get((emparejo[mk].season, emparejo[mk]["round"]))
+        else:
+            vueltas = pc_all.laps.max() if len(pc_all) else np.nan
+        est = D.estrategia_circuito(est_tabla, grupo.circuit_key.iloc[0], corte, vueltas)
         temporada = grupo.year.iloc[0]
         for idx, row in grupo.iterrows():
             p = prev[prev.code == row.name_acronym]
@@ -200,7 +299,12 @@ def construir_dataset_carrera():
                 "r_circ_mean": p[p.circuit == circ].pos.mean() if circ and len(p) else np.nan,
                 "r_circ_gain": p[p.circuit == circ].gain.mean() if circ and len(p) else np.nan,
                 "circ_gain_abs": circ_gain_abs, "circ_grid_corr": circ_corr, "circ_dnf_rate": circ_dnf,
+                "est_paradas": est["paradas"], "est_paradas_media": est["paradas_media"],
+                "est_perdida_pit": est["perdida_pit"], "est_n_ediciones": est["n_ediciones"], "vueltas": est["vueltas"],
             }
+            # degradación observada en las últimas 6 carreras secas del piloto (sólo pasado)
+            dh = deg_hist[(deg_hist.name_acronym == row.name_acronym) & (deg_hist.fecha < corte)].race_rel.tail(6)
+            h["deg_hist_rel"] = dh.sum() / (len(dh) + 2) if len(dh) else np.nan     # encogida hacia 0
             t = prev[prev.team == row.team]
             ult = t[["season", "round"]].drop_duplicates().tail(5)
             tt = t.merge(ult, on=["season", "round"])
@@ -208,6 +312,7 @@ def construir_dataset_carrera():
             h["team_finish_rate5"] = tt.terminado.mean() if len(tt) else np.nan
             hist[idx] = h
     data = data.join(pd.DataFrame.from_dict(hist, orient="index"))
+    data["stint_len"] = data.vueltas / (data.est_paradas.round() + 1)
     data["r_eval"] = data.race_pos
     data[FEATURES_CARRERA] = data[FEATURES_CARRERA].apply(pd.to_numeric, errors="coerce")
     return data, meetings
@@ -222,19 +327,10 @@ FEATURES_CARRERA = Q.FEATURES + [
     "circ_dnf_rate", "team_r_mean5", "team_finish_rate5",
 ]
 FEATURES_CARRERA = list(dict.fromkeys(FEATURES_CARRERA))
-
-
-def parrilla_openf1():
-    """Parrilla oficial de OpenF1 si ya está publicada (cache/starting_grid_1297.json)."""
-    f = CACHE / "starting_grid_1297.json"
-    if not f.exists():
-        return None
-    g = json.loads(f.read_text())
-    if not isinstance(g, list) or len(g) < 15:
-        return None
-    pil = Q.tabla_pilotos()
-    acr = pil[pil.meeting_key == OBJETIVO_MEETING].drop_duplicates("driver_number").set_index("driver_number").name_acronym
-    return {acr[x["driver_number"]]: x["position"] for x in g if x["driver_number"] in acr}
+# Degradación y estrategia: las usa el simulador (variantes en sim_carrera.py); se dejan fuera del catálogo de ML
+# para que la comparación de los 13 modelos sea la misma que la auditada en Austin.
+FEATURES_DEG = ["deg_rel", "deg_abs", "deg_laps", "deg_team_rel", "deg_cov", "deg_hist_rel", "est_paradas", "est_paradas_media",
+                "est_perdida_pit", "vueltas", "stint_len"]
 
 
 # ----------------------------------------------------------------------------------------
@@ -276,6 +372,38 @@ def metricas(df, col):
             "podium_hits": len(set(g[g.real <= 3].driver_number) & set(g[pr <= 3].driver_number)),
         })
     return pd.DataFrame(out)
+
+
+def resumen_metricas(p):
+    """Métricas walk-forward medias (todas y por año) de un DataFrame de predicciones."""
+    mt = metricas(p, "pred")
+    yr = p.groupby("meeting_key").year.first()
+    mt["year"] = mt.meeting_key.map(yr)
+    out = {"ndcg10": mt.ndcg10.mean()}
+    for y in sorted(mt.year.unique()):
+        out[f"ndcg10_{y}"] = mt[mt.year == y].ndcg10.mean()
+    out.update({"top10_hits": mt.top10_hits.mean(), "pos_exact10": mt.pos_exact10.mean(),
+                "mae_top10": mt.mae_top10.mean(), "spearman": mt.spearman.mean(),
+                "win_acc": mt.win_hit.mean(), "podium_hits": mt.podium_hits.mean(), "n_gp": int(len(mt))})
+    return out
+
+
+def walk_forward_sim(data, variantes, desde=2024, n_sims=N_SIMS):
+    """Walk-forward sólo del simulador (rápido): {nombre_variante: preds}. Incluye el orden de qualy como referencia."""
+    entrenables = data.dropna(subset=["race_pos"])
+    pruebas = entrenables[entrenables.year >= desde].meeting_key.drop_duplicates().tolist()
+    preds = {n: [] for n in list(variantes) + ["Baseline: orden de qualy", "Baseline: orden de parrilla"]}
+    for mk in pruebas:
+        fecha = entrenables[entrenables.meeting_key == mk].date.iloc[0]
+        tr = entrenables[entrenables.date < fecha].sort_values(["meeting_key", "driver_number"])
+        te = entrenables[entrenables.meeting_key == mk]
+        cab = te[["meeting_key", "driver_number", "year"]].assign(real=te.race_pos.values)
+        for n, var in variantes.items():
+            sim = Simulador(var).fit(tr)
+            preds[n].append(cab.assign(pred=sim.simular(te, n_sims=n_sims, seed=0)[0]))
+        preds["Baseline: orden de qualy"].append(cab.assign(pred=te.q_pos.fillna(25).values))
+        preds["Baseline: orden de parrilla"].append(cab.assign(pred=te.grid.fillna(25).values))
+    return {n: pd.concat(v) for n, v in preds.items()}
 
 
 def walk_forward(data, desde=2024):
@@ -346,65 +474,262 @@ def importancias(modelos):
     return pd.Series(np.mean(imp, axis=0), index=FEATURES_CARRERA).sort_values(ascending=False) if imp else pd.Series(dtype=float)
 
 
-def main():
+# ----------------------------------------------------------------------------------------
+# Parrilla del GP objetivo
+# ----------------------------------------------------------------------------------------
+def resolver_parrilla(meeting, pilotos, qualy_archivo=None, penalizaciones=None, parrilla_manual=None):
+    """pilotos: DataFrame (driver_number, name_acronym) del GP objetivo.
+    Devuelve (qualy DataFrame o None, {driver_number: salida} o None, texto de la fuente)."""
+    acr2num = dict(zip(pilotos.name_acronym, pilotos.driver_number))
+    num2acr = {v: k for k, v in acr2num.items()}
+    ruta_q = Path(qualy_archivo) if qualy_archivo else CACHE / f"qualy_real_{meeting}.json"
+    qualy = leer_qualy(ruta_q)
+    manual = parrilla_manual or GPS_CARRERA.get(meeting, {}).get("parrilla_manual")
+    if parrilla_manual:
+        faltan = set(acr2num) - set(parrilla_manual)
+        if faltan:
+            raise SystemExit(f"--parrilla incompleta, faltan: {sorted(faltan)}")
+        return qualy, {acr2num[a]: int(p) for a, p in parrilla_manual.items() if a in acr2num}, "Parrilla indicada a mano"
+    oficial = parrilla_openf1(meeting)
+    if oficial and not penalizaciones:
+        return qualy, oficial, "Parrilla oficial (OpenF1 starting_grid)"
+    if qualy is not None:
+        q = qualy.copy()
+        q["acr"] = q.driver_number.map(num2acr)
+        desconocidos = [a for a in (penalizaciones or {}) if a not in acr2num]
+        if desconocidos:
+            raise SystemExit(f"Penalizaciones con siglas desconocidas: {desconocidos} (válidas: {sorted(acr2num)})")
+        q = q.dropna(subset=["acr"])
+        q["pos_ord"] = q.position.fillna(99)
+        q = q.sort_values(["pos_ord", "driver_number"])
+        orden = {a: i + 1 for i, a in enumerate(q.acr)}
+        for a in acr2num:                          # titulares que no aparecen en la qualy: al fondo
+            orden.setdefault(a, len(orden) + 1)
+        salida = aplicar_penalizaciones(orden, penalizaciones)
+        fuente = "Qualy oficial (OpenF1)" if qualy_archivo is None else f"Qualy de archivo ({ruta_q.name})"
+        if penalizaciones:
+            fuente += " + penalizaciones: " + ", ".join(
+                f"{a} {('+' + str(v) + ' lugares') if str(v).lstrip('-').isdigit() else ('al fondo' if str(v).lower() == 'fondo' else 'desde pits')}"
+                for a, v in penalizaciones.items())
+        return qualy, {acr2num[a]: p for a, p in salida.items()}, fuente
+    if manual:
+        return None, {acr2num[a]: p for a, p in manual.items() if a in acr2num}, "Parrilla configurada en GPS_CARRERA"
+    return None, None, None
+
+
+# ----------------------------------------------------------------------------------------
+# Salida para la página en vivo
+# ----------------------------------------------------------------------------------------
+def _f(x, nd=3):
+    try:
+        x = float(x)
+    except (TypeError, ValueError):
+        return None
+    return None if not np.isfinite(x) else round(x, nd)
+
+
+def nota_piloto(r, umbral_deg):
+    mov = r.grid - r.pred_rank
+    if r.p_dnf >= 0.2:
+        return "riesgo de abandono"
+    if pd.notna(r.deg_rel) and r.deg_rel >= umbral_deg and r.deg_rel > 0.02:
+        return "riesgo de degradación"
+    if mov >= 3:
+        return "remonta por ritmo" if r.ritmo_rank < r.grid else "remonta"
+    if mov <= -3:
+        return "pierde posiciones por ritmo" if r.ritmo_rank > r.grid else "pierde posiciones"
+    if r.grid_penalty >= 3:
+        return "sale con penalización"
+    if pd.notna(r.deg_rel) and r.deg_rel <= -0.02:
+        return "cuida bien los neumáticos"
+    if r.pred_rank == 1:
+        return "favorito"
+    return ""
+
+
+def doc_carrera(obj, meeting, val, fuente, est, var_nombre):
+    gp = Q.GPS.get(meeting, {})
+    obj = obj.sort_values("pred_rank")
+    umbral = obj.deg_rel.quantile(0.8) if obj.deg_rel.notna().sum() >= 5 else np.inf
+    pil = []
+    for _, r in obj.iterrows():
+        par = r.get("paradas_pred")
+        pil.append({
+            "acr": r.name_acronym, "nombre": _nombre(r.full_name), "equipo": r.team_name, "color": _color(r.team_colour),
+            "salida": int(r.grid), "pred": int(r.pred_rank), "pos_media": _f(r.pos_media, 2),
+            "p_win": _f(r.p_win), "p_podio": _f(r.p_podio), "p_top10": _f(r.p_top10), "p_dnf": _f(r.p_dnf),
+            "p10": int(r.pos_p10), "p90": int(r.pos_p90), "ritmo_rank": int(r.ritmo_rank),
+            "deg_s_vuelta": _f(r.deg_rel, 3), "paradas": None if pd.isna(par) else int(par),
+            "nota": nota_piloto(r, umbral),
+        })
+    top = obj.head(3)
+    fav = top.iloc[0]
+    remontas = obj[(obj.grid - obj.pred_rank) >= 3].sort_values("pred_rank")
+    caidas = obj[(obj.grid - obj.pred_rank) <= -3].sort_values("pred_rank")
+    n_txt = f"{N_SIMS:,}".replace(",", " ")
+    r1 = (f"El simulador ({n_txt} carreras) ve a {_nombre(fav.full_name)} como favorito "
+          f"({fav.p_win * 100:.0f}% de victoria); el podio más probable es {', '.join(top.name_acronym)}.")
+    r2 = (f"Estrategia esperada: {est['paradas']:.0f} parada{'s' if round(est['paradas']) != 1 else ''} "
+          f"(pérdida en pits ≈ {est['perdida_pit']:.0f} s).")
+    mov = []
+    if len(remontas):
+        mov.append("remontan " + ", ".join(f"{a} (sale {int(g)}.º → {int(p)}.º)" for a, g, p in
+                                            remontas[["name_acronym", "grid", "pred_rank"]].head(3).itertuples(index=False)))
+    if len(caidas):
+        mov.append("pierden terreno " + ", ".join(f"{a} ({int(g)}.º → {int(p)}.º)" for a, g, p in
+                                                  caidas[["name_acronym", "grid", "pred_rank"]].head(2).itertuples(index=False)))
+    r3 = ("Por ritmo de carrera y degradación " + "; ".join(mov) + ".") if mov else ""
+    return {
+        "actualizado": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "modelo": f"Simulador Monte Carlo de carrera ({N_SIMS:,} carreras".replace(",", " ") + f"; variante {var_nombre})",
+        "validacion": {"ndcg10": _f(val["ndcg10"], 4), "top10_hits": _f(val["top10_hits"], 2), "win_acc": _f(val["win_acc"], 3),
+                       "podium_hits": _f(val["podium_hits"], 2), "n_gp": int(val["n_gp"])},
+        "parrilla_fuente": fuente,
+        "vueltas": int(est["vueltas"]) if pd.notna(est["vueltas"]) else GPS_CARRERA.get(meeting, {}).get("vueltas"),
+        "estrategia": {"paradas_tipicas": _f(est["paradas"], 1), "perdida_pit_s": _f(est["perdida_pit"], 1),
+                       "nota": est["nota"]},
+        "pilotos": pil,
+        "resumen": " ".join(x for x in (r1, r2, r3) if x),
+    }
+
+
+def _nombre(full):
+    if not isinstance(full, str):
+        return None
+    return " ".join(w.capitalize() if w.isupper() and len(w) > 1 else w for w in full.split())
+
+
+def _color(c):
+    if not isinstance(c, str) or not c.strip():
+        return "888888"
+    return c.strip().lstrip("#").upper()
+
+
+def paradas_piloto(obj, est):
+    """Paradas esperadas por piloto: las típicas del circuito; +1 si su degradación relativa es muy alta y
+    con esa degradación una parada extra cuesta menos que lo que pierde con el stint largo (regla, no validada)."""
+    n = round(est["paradas"])
+    L, pp = est["vueltas"], est["perdida_pit"]
+    out = []
+    for _, r in obj.iterrows():
+        k = n
+        if pd.notna(r.deg_rel) and pd.notna(L) and pd.notna(pp) and r.deg_rel > 0.03:
+            # tiempo extra por degradación relativa con n vs n+1 paradas: deg·L²/(2(n+1)) - deg·L²/(2(n+2))
+            ahorro = r.deg_rel * L ** 2 * (1 / (2 * (n + 1)) - 1 / (2 * (n + 2)))
+            if ahorro > pp:
+                k = n + 1
+        out.append(k)
+    return out
+
+
+# ----------------------------------------------------------------------------------------
+# Main
+# ----------------------------------------------------------------------------------------
+def main(meeting=OBJETIVO_MEETING, penalizaciones=None, qualy_archivo=None, parrilla_manual=None,
+         completo=False, prueba=None, n_sims=N_SIMS, sin_validacion=False):
+    t0 = time.time()
+    gp = {**Q.GPS.get(meeting, {"slug": str(meeting)}), "meeting_key": meeting}
+    slug = gp["slug"]
+    salida_dir = Path(prueba) if prueba else BASE
+    salida_dir.mkdir(parents=True, exist_ok=True)
+    pil = Q.tabla_pilotos()
+    ses = Q.tabla_sesiones()
+    sk_obj = ses[ses.meeting_key == meeting].set_index("session_name").session_key
+    # titulares: qualy > FP3 > FP2 (FP1 puede tener novatos)
+    titulares = pil[pil.meeting_key == meeting]
+    for s in ("Qualifying", "Practice 3", "Practice 2"):
+        if s in sk_obj and (pil.session_key == sk_obj[s]).any():
+            titulares = pil[pil.session_key == sk_obj[s]]
+            break
+    titulares = titulares.drop_duplicates("driver_number")[["driver_number", "name_acronym"]]
+    qualy, parrilla, fuente = resolver_parrilla(meeting, titulares, qualy_archivo, penalizaciones, parrilla_manual)
+    if parrilla is None:
+        raise SystemExit(f"No hay parrilla para {meeting}: falta cache/qualy_real_{meeting}.json "
+                         "(o pasar --qualy-archivo / --parrilla).")
+    print("Parrilla:", fuente)
+
     print("Construyendo dataset de carrera...")
-    data, meetings = construir_dataset_carrera()
-    data.to_csv(BASE / "dataset_carrera.csv", index=False)
-    obj = data[data.meeting_key == OBJETIVO_MEETING].copy().reset_index(drop=True)
-    historia = data[(data.meeting_key != OBJETIVO_MEETING) & data.race_pos.notna()]
-    print(f"Filas: {len(historia)} | GPs: {historia.meeting_key.nunique()} | Variables: {len(FEATURES_CARRERA)}")
-    print("Parrilla objetivo:", dict(zip(obj.name_acronym, obj.grid)))
-
-    print("Validación walk-forward 2024-2026...")
-    tabla, preds = walk_forward(historia)
-    print(tabla.to_string(index=False))
-    # el pronóstico debe ser un modelo de carrera real: se elige el mejor que no sea baseline
-    mejor = tabla[~tabla.modelo.str.startswith("Baseline")].modelo.iloc[0]
-    print("Mejor modelo (NDCG@10):", mejor)
-
-    p = preds[mejor].copy()
-    p["pred_rank"] = p.groupby("meeting_key").pred.rank(method="first")
-    p["res"] = p.real - p.pred_rank
-    mejor_ml = tabla[~tabla.modelo.str.startswith("Baseline") & (tabla.modelo != SIM)].modelo.iloc[0]
-    nombre_base = tabla[tabla.modelo.str.startswith("Baseline")].modelo.iloc[0]
-    por_gp = metricas(preds[mejor], "pred").merge(meetings[["meeting_key", "circuit", "year"]], on="meeting_key")
-    base_gp = metricas(preds[nombre_base], "pred")
-
-    predecir_ml, modelos = ajustar_final(mejor_ml, historia)
-    imp = importancias(modelos)
-    if imp.empty:
-        _, mods = ajustar_final("Ensamble árboles (RF+ET+GB+XGB+LGB)", historia)
-        imp = importancias(mods)
-    obj["pred_ml"] = pd.Series(predecir_ml(obj[FEATURES_CARRERA])).rank(method="first").astype(int).values
-    sim_coef = None
-    if mejor == SIM:
-        # 20,000 carreras simuladas: ritmo vs salida, ruido de primera vuelta/incidentes y abandonos
-        sim = Simulador(MC_VAR).fit(historia)
-        media, mu, sig, p_dnf, pos = sim.simular(obj, n_sims=20000, seed=0)
-        obj["score"] = media
-        obj["pred_rank"] = obj.score.rank(method="first").astype(int)
-        mc = pd.DataFrame({"p_win": (pos == 1).mean(0), "p_podio": (pos <= 3).mean(0), "p_top10": (pos <= 10).mean(0),
-                           "p_dnf": p_dnf, "pos_media": media, "pos_p10": np.percentile(pos, 10, axis=0),
-                           "pos_p90": np.percentile(pos, 90, axis=0)})
-        nombres = X_media(prep(historia.head(30)), MC_VAR, como_df=True).columns
-        sim_coef = pd.Series(sim.rm.coef_, index=nombres)
+    data, meetings = construir_dataset_carrera(meeting, qualy=qualy, parrilla=parrilla)
+    if prueba is None:
+        data.to_csv(BASE / "dataset_carrera.csv", index=False)
     else:
-        predecir, _ = ajustar_final(mejor, historia)
-        obj["score"] = predecir(obj[FEATURES_CARRERA])
-        obj["pred_rank"] = obj.score.rank(method="first").astype(int)
-        mc = Q.montecarlo(obj.pred_rank.values, p[["pred_rank", "res"]].dropna()).rename(
-            columns={"p_pole": "p_win", "p_top3": "p_podio", "p_q3": "p_top10", "p_q2": "p_top16"})
-    obj = pd.concat([obj, mc], axis=1).sort_values("pred_rank")
-    obj.to_csv(BASE / "prediccion_carrera_austin_2026.csv", index=False)
+        data.to_csv(salida_dir / "dataset_carrera.csv", index=False)
+    obj = data[data.meeting_key == meeting].copy().reset_index(drop=True)
+    historia = data[(data.meeting_key != meeting) & data.race_pos.notna()]
+    print(f"Filas: {len(historia)} | GPs: {historia.meeting_key.nunique()} | ({time.time() - t0:.0f} s)")
+    print("Parrilla objetivo:", dict(zip(obj.name_acronym, obj.grid.astype(int))))
 
-    R = {"tabla": tabla, "mejor": mejor, "mejor_ml": mejor_ml, "base": nombre_base, "obj": obj, "imp": imp, "por_gp": por_gp, "base_gp": base_gp,
-         "historia": historia, "n_vars": len(FEATURES_CARRERA), "jr": carreras_jolpica(), "sim_coef": sim_coef}
-    from reporte_carrera_html import generar_html
-    generar_html(R, BASE / "reporte_carrera_austin_2026.html")
-    print("\nPREDICCIÓN TOP 10 CARRERA:")
-    print(obj[["pred_rank", "name_acronym", "grid", "q_pos", "long_rank_all", "pred_ml", "p_top10", "p_podio", "p_win"]].head(12).to_string(index=False))
-    return R
+    # Validación: walk-forward del simulador oficial (rápido) o guardada
+    val_f = BASE / "validacion_carrera.json"
+    val = None
+    if not sin_validacion:
+        print("Validación walk-forward 2024-2026 del simulador...")
+        preds = walk_forward_sim(historia, {SIM: MC_VAR}, n_sims=4000)
+        tab = {n: resumen_metricas(p) for n, p in preds.items()}
+        for n, v in tab.items():
+            print(f"  {n:38s} NDCG@10 {v['ndcg10']:.4f} | top10 {v['top10_hits']:.2f} | win {v['win_acc']:.3f} | "
+                  f"podio {v['podium_hits']:.2f} | n={v['n_gp']}")
+        val = tab[SIM]
+    elif val_f.exists():
+        val = json.loads(val_f.read_text())["oficial"]["metricas"]
+    else:
+        val = {"ndcg10": np.nan, "top10_hits": np.nan, "win_acc": np.nan, "podium_hits": np.nan, "n_gp": 0}
 
+    if completo:
+        print("Comparación completa de modelos (lento)...")
+        tabla, _ = walk_forward(historia)
+        print(tabla.to_string(index=False))
+        tabla.to_csv(salida_dir / f"comparacion_modelos_carrera_{slug}.csv", index=False)
+
+    # Pronóstico: N carreras simuladas
+    sim = Simulador(MC_VAR).fit(historia)
+    media, mu, sig, p_dnf, pos = sim.simular(obj, n_sims=n_sims, seed=0)
+    obj["score"] = media
+    obj["pred_rank"] = obj.score.rank(method="first").astype(int)
+    mc = pd.DataFrame({"p_win": (pos == 1).mean(0), "p_podio": (pos <= 3).mean(0), "p_top10": (pos <= 10).mean(0),
+                       "p_dnf": p_dnf, "pos_media": media, "pos_p10": np.percentile(pos, 10, axis=0),
+                       "pos_p90": np.percentile(pos, 90, axis=0)})
+    obj = pd.concat([obj, mc], axis=1)
+    d = prep(obj)
+    obj["ritmo_rank"] = d.pace_r.rank(method="first").astype(int).values
+    est_row = obj.iloc[0]
+    est = {"paradas": est_row.est_paradas, "perdida_pit": est_row.est_perdida_pit, "vueltas": est_row.vueltas,
+           "n_ediciones": int(est_row.est_n_ediciones)}
+    obj["paradas_pred"] = paradas_piloto(obj, est)
+    est["nota"] = (f"Paradas típicas y pérdida en pits: mediana de {est['n_ediciones']} edicion(es) anteriores en seco "
+                   f"(OpenF1). deg_s_vuelta = degradación de neumáticos en tandas largas de FP1-FP3 relativa al promedio "
+                   f"del campo en el mismo compuesto (s/vuelta, corregida por combustible; + = degrada más).")
+    obj = obj.sort_values("pred_rank").reset_index(drop=True)
+    csv = salida_dir / f"prediccion_carrera_{slug}_2026.csv"
+    obj.to_csv(csv, index=False)
+
+    doc = doc_carrera(obj, meeting, val, fuente, est, VARIANTE_NOMBRE)
+    web_dir = BASE / f"web_{slug}"
+    ruta_json = (salida_dir / "datos_carrera.json") if prueba else (
+        web_dir / "datos_carrera.json" if web_dir.exists() else BASE / f"datos_carrera_{slug}.json")
+    ruta_json.write_text(json.dumps(doc, ensure_ascii=False, indent=1))
+
+    if completo and meeting == 1297 and prueba is None:
+        print("(El reporte HTML temático de Austin se regenera con la versión anterior del flujo.)")
+    print(f"\nPRONÓSTICO ORDEN FINAL ({fuente}):")
+    print(obj[["pred_rank", "name_acronym", "grid", "q_pos", "ritmo_rank", "deg_rel", "paradas_pred",
+               "p_top10", "p_podio", "p_win", "p_dnf"]].round(3).to_string(index=False))
+    print(f"\nEscrito: {csv}\nEscrito: {ruta_json}\n({time.time() - t0:.0f} s)")
+    return obj, doc
+
+
+VARIANTE_NOMBRE = "base (salida + ritmo + forma + sprint + abandonos)"
 
 if __name__ == "__main__":
-    main()
+    ap = argparse.ArgumentParser(description="Pronóstico del orden final de carrera (simulador Monte Carlo).")
+    ap.add_argument("meeting", nargs="?", type=int, default=OBJETIVO_MEETING)
+    ap.add_argument("--penalizaciones", default=None, help='JSON {"ACR": lugares | "fondo" | "pits"}')
+    ap.add_argument("--qualy-archivo", default=None, help="lista OpenF1 session_result (default cache/qualy_real_<mk>.json)")
+    ap.add_argument("--parrilla", default=None, help='JSON {"ACR": salida} con la parrilla completa')
+    ap.add_argument("--prueba", default=None, help="directorio: escribe CSV/JSON/dataset ahí y no toca los archivos oficiales")
+    ap.add_argument("--completo", action="store_true", help="también compara los 13 modelos de ML (lento)")
+    ap.add_argument("--sin-validacion", action="store_true", help="usa la validación guardada en validacion_carrera.json")
+    ap.add_argument("--sims", type=int, default=N_SIMS)
+    a = ap.parse_args()
+    main(a.meeting, json.loads(a.penalizaciones) if a.penalizaciones else None, a.qualy_archivo,
+         json.loads(a.parrilla) if a.parrilla else None, a.completo, a.prueba, a.sims, a.sin_validacion)
