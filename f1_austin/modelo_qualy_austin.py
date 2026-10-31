@@ -62,6 +62,24 @@ GPS = {
 }
 
 
+def imputar_debutantes(data):
+    """Pilotos sin ninguna qualy previa: en vez de la mediana (que los trata como pilotos de media parrilla), su
+    historial de qualy toma el promedio de los debutantes ANTERIORES (sólo pasado; 16 si no hay). Desde 2023 los
+    debutantes promedian P15.4 y el 90% calificó detrás de su compañero."""
+    data = data.sort_values(["date", "driver_number"]).copy()
+    deb = data[data.h_experience == 0]
+    for mk, g in deb.groupby("meeting_key", sort=False):
+        fecha = g.date.iloc[0]
+        pasado = deb[(deb.date < fecha) & deb.q_pos.notna()]
+        prior = pasado.q_pos.mean() if len(pasado) else 16.0
+        q3 = (pasado.q_pos <= 10).mean() if len(pasado) else 0.1
+        idx = g.index
+        for c in ("h_q_last", "h_q_mean3", "h_q_mean5", "h_q_mean10", "h_q_season"):
+            data.loc[idx, c] = data.loc[idx, c].fillna(prior)
+        data.loc[idx, "h_q3_rate10"] = data.loc[idx, "h_q3_rate10"].fillna(q3)
+    return data
+
+
 def aplicar_sustituciones(base, pil, meeting_key):
     """Cambia pilotos titulares anunciados que OpenF1 todavía no refleja (p. ej. OCO -> HIR en México 2026)."""
     cambios = GPS.get(meeting_key, {}).get("sustituciones", {})
@@ -392,6 +410,7 @@ def construir_dataset(con_fp3=False):
             hist[idx] = h
     H = pd.DataFrame.from_dict(hist, orient="index")
     data = data.join(H)
+    data = imputar_debutantes(data)
     data["h_pts_rank"] = data.groupby("meeting_key").h_pts_season.rank(ascending=False, method="min")
 
     # Sesgo histórico "prácticas -> qualy": cuánto gana/pierde el piloto vs su rank de FP
