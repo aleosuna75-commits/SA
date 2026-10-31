@@ -56,8 +56,24 @@ GPS = {
            "hora_texto": "4:00 PM CT", "tema": "texas"},
     1298: {"slug": "mexico", "nombre": "Gran Premio de la Ciudad de México", "circuito": "Autódromo Hermanos Rodríguez",
            "ciudad": "Ciudad de México", "circuito_jolpica": "rodriguez", "fecha_texto": "Sábado 31 de octubre de 2026",
-           "hora_texto": "3:00 PM (hora CDMX)", "tema": "muertos"},
+           "hora_texto": "3:00 PM (hora CDMX)", "tema": "muertos",
+           # Haas reemplazó a Ocon por Hirakawa desde la FP3 (anuncio del 31/10); OpenF1 aún lista a OCO en FP3/Q/carrera
+           "sustituciones": {"OCO": "HIR"}},
 }
+
+
+def aplicar_sustituciones(base, pil, meeting_key):
+    """Cambia pilotos titulares anunciados que OpenF1 todavía no refleja (p. ej. OCO -> HIR en México 2026)."""
+    cambios = GPS.get(meeting_key, {}).get("sustituciones", {})
+    for sale, entra in cambios.items():
+        if entra in set(base.name_acronym) or sale not in set(base.name_acronym):
+            continue
+        fila = pil[(pil.meeting_key == meeting_key) & (pil.name_acronym == entra)].drop_duplicates("driver_number")
+        if fila.empty:
+            continue
+        cols = ["driver_number", "name_acronym", "full_name", "team", "team_name", "team_colour"]
+        base.loc[base.name_acronym == sale, cols] = fila[cols].iloc[0].values
+    return base
 AÑOS = [2023, 2024, 2025, 2026]
 SEED = 7
 # Hilos para RF/ET/XGB/LGB. -1 = comportamiento original (RF/ET todos los núcleos, XGB 4).
@@ -279,6 +295,7 @@ def construir_dataset(con_fp3=False):
                 break
         dq = dq.drop_duplicates("driver_number")
         base = dq[["driver_number", "name_acronym", "full_name", "team", "team_name", "team_colour"]].copy()
+        base = aplicar_sustituciones(base.reset_index(drop=True), pil, m.meeting_key)
         f1 = features_practica(int(m.fp1), "fp1")
         f2 = features_practica(int(m.fp2), "fp2") if pd.notna(m.fp2) else pd.DataFrame()
         if f1.empty and f2.empty:
