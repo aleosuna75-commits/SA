@@ -19,8 +19,14 @@ Flujo:
   6. Se genera reporte_qualy_austin_2026.html (estilo texano).
 
 Uso:  python3 modelo_qualy_austin.py [meeting_key]     (1297 = Austin, 1298 = México)
+      python3 modelo_qualy_austin.py 1298 --fp3 [--jobs 2] [--modelos "Random Forest"]
+          versión sábado: agrega variables de FP3 (NaN en fines de semana sprint) y escribe
+          *_fp3 (resultado_qualy_<slug>_fp3.pkl, prediccion_qualy_<slug>_fp3_2026.csv, ...) sin
+          tocar el pronóstico FP1/FP2. --jobs (o F1_N_JOBS) limita los hilos de RF/ET/XGB/LGB.
+      python3 modelo_qualy_austin.py html <slug>[_fp3]  -> regenera sólo el HTML desde el .pkl
 """
 import json
+import os
 import warnings
 from collections import defaultdict
 from pathlib import Path
@@ -52,6 +58,9 @@ GPS = {
 }
 AÑOS = [2023, 2024, 2025, 2026]
 SEED = 7
+# Hilos para RF/ET/XGB/LGB. -1 = comportamiento original (RF/ET todos los núcleos, XGB 4).
+# Los resultados de RF/ET con random_state fijo no dependen de n_jobs.
+N_JOBS = int(os.environ.get("F1_N_JOBS", "-1"))
 
 # Continuidad de escuderías entre renombres
 EQUIPO_CANON = {
@@ -234,7 +243,9 @@ def tabla_cota(circuito="americas"):
 # ----------------------------------------------------------------------------------------
 # 4. Dataset piloto-fin de semana
 # ----------------------------------------------------------------------------------------
-def construir_dataset():
+def construir_dataset(con_fp3=False):
+    """con_fp3=True agrega variables de la FP3 (sábado, antes de la qualy) y combinadas FP1-3.
+    En fines de semana sprint no hay FP3: fp3_* queda NaN y las combinadas usan FP1/FP2."""
     ses = tabla_sesiones()
     res = tabla_resultados()
     pil = tabla_pilotos()
@@ -273,6 +284,10 @@ def construir_dataset():
         df = base.merge(f1, on="driver_number", how="left") if not f1.empty else base
         if not f2.empty:
             df = df.merge(f2, on="driver_number", how="left")
+        if con_fp3 and pd.notna(m.fp3):
+            f3 = features_practica(int(m.fp3), "fp3")
+            if not f3.empty:
+                df = df.merge(f3, on="driver_number", how="left")
         qr = res[res.session_key == m.q][["driver_number", "position"]].rename(columns={"position": "q_pos"})
         df = df.merge(qr, on="driver_number", how="left")
         df["q_pos"] = pd.to_numeric(df.q_pos, errors="coerce")
@@ -296,6 +311,8 @@ def construir_dataset():
     data["laps_total"] = data[["fp1_laps", "fp2_laps"]].sum(axis=1, min_count=1)
     data["long_gap_best"] = data[["fp1_long_gap", "fp2_long_gap"]].min(axis=1)
     data["fp_rain"] = data[["fp1_rain", "fp2_rain"]].max(axis=1)
+    if con_fp3:
+        data = agregar_combinadas_fp3(data)
 
     # Compañero de equipo y nivel de la escudería
     data["team_best_gap"] = data.groupby(["meeting_key", "team"]).comb_gap.transform("min")
@@ -374,6 +391,28 @@ def construir_dataset():
     return data, meetings
 
 
+def agregar_combinadas_fp3(data):
+    """Variables combinadas FP1-FP3 por GP (sólo información de ese fin de semana, previa a la qualy)."""
+    for c in [c for c in data.columns if c.startswith("fp1_")]:
+        c3 = c.replace("fp1_", "fp3_")
+        if c3 not in data:                     # ningún GP con FP3 (o todos sprint)
+            data[c3] = np.nan
+    g = data.groupby("meeting_key")
+    data["c3_best"] = data[["fp1_best", "fp2_best", "fp3_best"]].min(axis=1)
+    data["c3_gap"] = (data.c3_best - g.c3_best.transform("min")) / g.c3_best.transform("min") * 100
+    data["c3_rank"] = g.c3_best.rank(method="min")
+    data["main3_gap"] = data.fp3_gap.fillna(data.fp2_gap).fillna(data.fp1_gap)   # última sesión disponible
+    data["main3_rank"] = data.fp3_rank.fillna(data.fp2_rank).fillna(data.fp1_rank)
+    data["fp3_improve"] = data.fp2_rank - data.fp3_rank            # mejora de FP2 a FP3 (NaN en sprint)
+    data["ideal3_best_gap"] = data[["fp1_ideal_gap", "fp2_ideal_gap", "fp3_ideal_gap"]].min(axis=1)
+    data["long3_gap_best"] = data[["fp1_long_gap", "fp2_long_gap", "fp3_long_gap"]].min(axis=1)
+    data["laps3_total"] = data[["fp1_laps", "fp2_laps", "fp3_laps"]].sum(axis=1, min_count=1)
+    data["team3_best_gap"] = data.groupby(["meeting_key", "team"]).c3_gap.transform("min")
+    data["teammate3_delta"] = data.c3_gap - data.team3_best_gap
+    data["has_fp3"] = data.groupby("meeting_key").fp3_best.transform(lambda s: float(s.notna().any()))
+    return data
+
+
 FEATURES = [
     # FP1
     "fp1_gap", "fp1_rank", "fp1_laps", "fp1_ideal_gap", "fp1_s1_gap", "fp1_s2_gap", "fp1_s3_gap",
@@ -391,6 +430,17 @@ FEATURES = [
     "h_r_mean5", "h_pts_season", "h_pts_rank", "h_dnf_rate10", "h_experience", "h_circ_mean",
     "h_circ_best", "h_circ_n", "h_team_q_mean5", "h_fp_to_q_driver", "h_fp_to_q_team",
     "year_idx", "is_2026_regs",
+]
+
+# Versión sábado (después de la FP3): todo lo anterior + FP3 + combinadas FP1-FP3
+FEATURES_FP3 = FEATURES + [
+    # FP3
+    "fp3_gap", "fp3_rank", "fp3_laps", "fp3_ideal_gap", "fp3_ideal_rank", "fp3_s1_gap", "fp3_s2_gap",
+    "fp3_s3_gap", "fp3_trap_delta", "fp3_i1_delta", "fp3_i2_delta", "fp3_soft_gap", "fp3_long_gap",
+    "fp3_top3_spread", "fp3_track_temp", "fp3_rain",
+    # Combinadas FP1-FP3
+    "c3_gap", "c3_rank", "main3_gap", "main3_rank", "fp3_improve", "ideal3_best_gap", "long3_gap_best",
+    "laps3_total", "team3_best_gap", "teammate3_delta", "has_fp3",
 ]
 
 
@@ -433,32 +483,39 @@ class Modelo:
         return -p if self.tipo == "rank" else p
 
 
-def catalogo():
+def catalogo(con_fp3=False):
     imp = lambda: SimpleImputer(strategy="median")
-    return {
+    nj = N_JOBS
+    xgb_jobs = 4 if nj < 0 else nj
+    lgb_jobs = {} if nj < 0 else {"n_jobs": nj}
+    cat = {
         "Baseline: rank FP2 (o FP1)": lambda: Modelo("b1", "baseline", "main_rank"),
         "Baseline: mejor vuelta FP1+FP2": lambda: Modelo("b2", "baseline", "comb_rank"),
         "Ridge": lambda: Modelo("ridge", "sk", make_pipeline(imp(), StandardScaler(), Ridge(alpha=10))),
         "Random Forest": lambda: Modelo("rf", "sk", make_pipeline(imp(), RandomForestRegressor(
-            n_estimators=500, min_samples_leaf=4, max_features=0.4, random_state=SEED, n_jobs=-1))),
+            n_estimators=500, min_samples_leaf=4, max_features=0.4, random_state=SEED, n_jobs=nj))),
         "Extra Trees": lambda: Modelo("et", "sk", make_pipeline(imp(), ExtraTreesRegressor(
-            n_estimators=600, min_samples_leaf=3, max_features=0.5, random_state=SEED, n_jobs=-1))),
+            n_estimators=600, min_samples_leaf=3, max_features=0.5, random_state=SEED, n_jobs=nj))),
         "Gradient Boosting": lambda: Modelo("gb", "sk", make_pipeline(imp(), GradientBoostingRegressor(
             n_estimators=300, max_depth=3, learning_rate=0.03, subsample=0.8, random_state=SEED))),
         "XGBoost": lambda: Modelo("xgb", "native", xgb.XGBRegressor(
             n_estimators=500, max_depth=3, learning_rate=0.03, subsample=0.8, colsample_bytree=0.6,
-            min_child_weight=3, reg_lambda=2.0, random_state=SEED, n_jobs=4)),
+            min_child_weight=3, reg_lambda=2.0, random_state=SEED, n_jobs=xgb_jobs)),
         "LightGBM": lambda: Modelo("lgb", "native", lgb.LGBMRegressor(
             n_estimators=500, num_leaves=15, learning_rate=0.03, subsample=0.8, subsample_freq=1,
-            colsample_bytree=0.6, min_child_samples=15, reg_lambda=2.0, random_state=SEED, verbose=-1)),
+            colsample_bytree=0.6, min_child_samples=15, reg_lambda=2.0, random_state=SEED, verbose=-1, **lgb_jobs)),
         "LightGBM LambdaRank": lambda: Modelo("lgbr", "rank", lgb.LGBMRanker(
             n_estimators=400, num_leaves=15, learning_rate=0.03, subsample=0.8, subsample_freq=1,
             colsample_bytree=0.6, min_child_samples=15, random_state=SEED, verbose=-1,
-            label_gain=list(range(31)))),
+            label_gain=list(range(31)), **lgb_jobs)),
         "XGBoost Ranker": lambda: Modelo("xgbr", "rank", xgb.XGBRanker(
             n_estimators=400, max_depth=3, learning_rate=0.05, subsample=0.8, colsample_bytree=0.6,
-            objective="rank:pairwise", random_state=SEED, n_jobs=4)),
+            objective="rank:pairwise", random_state=SEED, n_jobs=xgb_jobs)),
     }
+    if con_fp3:
+        cat = {"Baseline: rank FP3 (o FP2/FP1)": lambda: Modelo("b3", "baseline", "main3_rank"),
+               "Baseline: mejor vuelta FP1-FP3": lambda: Modelo("b4", "baseline", "c3_rank"), **cat}
+    return cat
 
 
 def metricas(df_pred, col):
@@ -479,20 +536,25 @@ def metricas(df_pred, col):
     return pd.DataFrame(out)
 
 
-def walk_forward(data, desde=2024):
-    """Entrena con pilotos con tiempo de qualy; evalúa con TODOS los inscritos (sin tiempo = al fondo)."""
+def walk_forward(data, desde=2024, features=None, con_fp3=False, nombres=None):
+    """Entrena con pilotos con tiempo de qualy; evalúa con TODOS los inscritos (sin tiempo = al fondo).
+    features: lista de variables (default FEATURES); nombres: subconjunto del catálogo (default todo)."""
+    features = FEATURES if features is None else features
+    cat = catalogo(con_fp3)
+    if nombres is not None:
+        cat = {n: cat[n] for n in nombres}
     entrenables = data.dropna(subset=["q_pos"])
     pruebas = entrenables[entrenables.year >= desde].meeting_key.drop_duplicates().tolist()
-    preds = {n: [] for n in catalogo()}
+    preds = {n: [] for n in cat}
     for i, mk in enumerate(pruebas):
         fecha = entrenables[entrenables.meeting_key == mk].date.iloc[0]
         tr = entrenables[entrenables.date < fecha].sort_values(["meeting_key", "driver_number"])
         te = data[data.meeting_key == mk].assign(q_pos=lambda x: x.q_eval)
         grupos = tr.groupby("meeting_key", sort=False).size().loc[tr.meeting_key.unique()].values
-        for nombre, fab in catalogo().items():
-            m = fab().fit(tr[FEATURES], tr.q_pos.values, pesos(tr), grupos)
+        for nombre, fab in cat.items():
+            m = fab().fit(tr[features], tr.q_pos.values, pesos(tr), grupos)
             p = te[["meeting_key", "driver_number", "q_pos", "year"]].copy()
-            p["pred"] = m.predict(te[FEATURES])
+            p["pred"] = m.predict(te[features])
             preds[nombre].append(p)
         print(f"  walk-forward {i + 1}/{len(pruebas)}", end="\r")
     print()
@@ -503,9 +565,9 @@ def walk_forward(data, desde=2024):
         rk = [preds[n].groupby("meeting_key").pred.rank().values for n in nombres]
         base["pred"] = np.mean(rk, axis=0)
         return base
-    preds["Ensamble árboles (RF+ET+GB+XGB+LGB)"] = ens(["Random Forest", "Extra Trees", "Gradient Boosting", "XGBoost", "LightGBM"])
-    preds["Ensamble total (Ridge+árboles+rankers)"] = ens(["Ridge", "Random Forest", "Extra Trees", "Gradient Boosting",
-                                                           "XGBoost", "LightGBM", "LightGBM LambdaRank", "XGBoost Ranker"])
+    for nom_ens, miembros in ENSAMBLES.items():
+        if all(n in preds for n in miembros):
+            preds[nom_ens] = ens(miembros)
     tabla = []
     for n, p in preds.items():
         mt = metricas(p, "pred")
@@ -517,17 +579,20 @@ def walk_forward(data, desde=2024):
     return tabla, preds
 
 
-def ajustar_final(nombre, train):
+ENSAMBLES = {
+    "Ensamble árboles (RF+ET+GB+XGB+LGB)": ["Random Forest", "Extra Trees", "Gradient Boosting", "XGBoost", "LightGBM"],
+    "Ensamble total (Ridge+árboles+rankers)": ["Ridge", "Random Forest", "Extra Trees", "Gradient Boosting",
+                                               "XGBoost", "LightGBM", "LightGBM LambdaRank", "XGBoost Ranker"],
+}
+
+
+def ajustar_final(nombre, train, features=None, con_fp3=False):
+    features = FEATURES if features is None else features
     train = train.sort_values(["meeting_key", "driver_number"])
     grupos = train.groupby("meeting_key", sort=False).size().loc[train.meeting_key.unique()].values
-    if nombre.startswith("Ensamble"):
-        miembros = (["Random Forest", "Extra Trees", "Gradient Boosting", "XGBoost", "LightGBM"]
-                    if "árboles" in nombre else
-                    ["Ridge", "Random Forest", "Extra Trees", "Gradient Boosting", "XGBoost", "LightGBM",
-                     "LightGBM LambdaRank", "XGBoost Ranker"])
-    else:
-        miembros = [nombre]
-    modelos = [catalogo()[n]().fit(train[FEATURES], train.q_pos.values, pesos(train), grupos) for n in miembros]
+    miembros = ENSAMBLES.get(nombre, [nombre])
+    cat = catalogo(con_fp3)
+    modelos = [cat[n]().fit(train[features], train.q_pos.values, pesos(train), grupos) for n in miembros]
 
     def predecir(X):
         rk = [pd.Series(m.predict(X)).rank().values for m in modelos]
@@ -535,7 +600,8 @@ def ajustar_final(nombre, train):
     return predecir, modelos
 
 
-def importancias(modelos):
+def importancias(modelos, features=None):
+    features = FEATURES if features is None else features
     imp = []
     for m in modelos:
         est = m.est.steps[-1][1] if hasattr(m.est, "steps") else m.est
@@ -544,7 +610,7 @@ def importancias(modelos):
             imp.append(v / v.sum())
     if not imp:
         return pd.Series(dtype=float)
-    return pd.Series(np.mean(imp, axis=0), index=FEATURES).sort_values(ascending=False)
+    return pd.Series(np.mean(imp, axis=0), index=features).sort_values(ascending=False)
 
 
 def montecarlo(pred_rank, residuos, n=20000, seed=SEED):
@@ -575,23 +641,31 @@ def generar_reporte(resultado):
         from reporte_mexico_html import generar_html
     else:
         from reporte_html import generar_html
-    generar_html(resultado, BASE / f"reporte_qualy_{gp['slug']}_2026.html")
+    sufijo = resultado.get("sufijo", "")
+    generar_html(resultado, BASE / f"reporte_qualy_{gp['slug']}{sufijo}_2026.html")
 
 
-def main(meeting=OBJETIVO_MEETING):
+def main(meeting=OBJETIVO_MEETING, con_fp3=False, nombres_modelos=None):
+    """con_fp3=True: versión del sábado con FP3; escribe archivos *_fp3 (no pisa el pronóstico FP1/FP2).
+    nombres_modelos: lista de nombres del catálogo para el walk-forward (default: todos; más rápido con uno solo)."""
     gp = {**GPS[meeting], "meeting_key": meeting}
-    print(f"GP objetivo: {gp['nombre']} (meeting {meeting})")
+    feats = FEATURES_FP3 if con_fp3 else FEATURES
+    sufijo = "_fp3" if con_fp3 else ""
+    print(f"GP objetivo: {gp['nombre']} (meeting {meeting})" + ("  [con FP3]" if con_fp3 else ""))
     print("Construyendo dataset...")
-    data, meetings = construir_dataset()
-    data.to_csv(BASE / "dataset_qualy.csv", index=False)
+    data, meetings = construir_dataset(con_fp3=con_fp3)
+    data.to_csv(BASE / f"dataset_qualy{sufijo}.csv", index=False)
     obj = data[data.meeting_key == meeting].copy()
     print(f"Pilotos del GP objetivo: {len(obj)}")
+    if con_fp3 and obj.fp3_best.notna().sum() < 10:
+        print(f"AVISO: la FP3 del GP objetivo tiene datos de sólo {obj.fp3_best.notna().sum()} pilotos "
+              "(¿falta bajarla? python3 descarga_datos.py <session_key_fp3>)")
     historia = data[(data.meeting_key != meeting) & (data.date < obj.date.min()) & data.q_eval.notna()]
     train = historia[historia.q_pos.notna()]
-    print(f"Filas de entrenamiento: {len(train)}  | GPs: {train.meeting_key.nunique()}  | Features: {len(FEATURES)}")
+    print(f"Filas de entrenamiento: {len(train)}  | GPs: {train.meeting_key.nunique()}  | Features: {len(feats)}")
 
     print("Validación walk-forward 2024-2026...")
-    tabla, preds = walk_forward(historia)
+    tabla, preds = walk_forward(historia, features=feats, con_fp3=con_fp3, nombres=nombres_modelos)
     print(tabla.to_string(index=False))
     mejor = tabla.modelo.iloc[0]
     print("Mejor modelo:", mejor)
@@ -603,34 +677,52 @@ def main(meeting=OBJETIVO_MEETING):
     por_gp = metricas(preds[mejor], "pred").merge(
         meetings[["meeting_key", "circuit", "year"]], on="meeting_key")
 
-    predecir, modelos = ajustar_final(mejor, train)
-    if not importancias(modelos).empty:
-        imp = importancias(modelos)
+    predecir, modelos = ajustar_final(mejor, train, feats, con_fp3)
+    if not importancias(modelos, feats).empty:
+        imp = importancias(modelos, feats)
     else:
-        _, mods_imp = ajustar_final("Ensamble árboles (RF+ET+GB+XGB+LGB)", train)
-        imp = importancias(mods_imp)
+        _, mods_imp = ajustar_final("Ensamble árboles (RF+ET+GB+XGB+LGB)", train, feats, con_fp3)
+        imp = importancias(mods_imp, feats)
 
     obj = obj.reset_index(drop=True)
-    obj["score"] = predecir(obj[FEATURES])
+    obj["score"] = predecir(obj[feats])
     obj["pred_rank"] = obj.score.rank(method="first").astype(int)
     mc = montecarlo(obj.pred_rank.values, p[["pred_rank", "res"]])
     obj = pd.concat([obj, mc], axis=1).sort_values("pred_rank")
 
     circ = tabla_cota(gp["circuito_jolpica"])
     resultado = {"tabla": tabla, "mejor": mejor, "obj": obj, "imp": imp, "por_gp": por_gp, "cota": circ, "circ": circ,
-                 "train": train, "residuos": p, "n_vars": len(FEATURES), "gp": gp}
-    obj.to_csv(BASE / f"prediccion_qualy_{gp['slug']}_2026.csv", index=False)
-    pd.to_pickle(resultado, BASE / f"resultado_qualy_{gp['slug']}.pkl")   # para regenerar el HTML sin reentrenar
-    generar_reporte(resultado)
+                 "train": train, "residuos": p, "n_vars": len(feats), "gp": gp,
+                 "fase": "FP3" if con_fp3 else "FP2", "con_fp3": con_fp3, "sufijo": sufijo, "features": list(feats),
+                 "generado": pd.Timestamp.now(tz="UTC").strftime("%Y-%m-%dT%H:%M:%SZ")}
+    obj.to_csv(BASE / f"prediccion_qualy_{gp['slug']}{sufijo}_2026.csv", index=False)
+    pd.to_pickle(resultado, BASE / f"resultado_qualy_{gp['slug']}{sufijo}.pkl")   # para regenerar el HTML sin reentrenar
+    try:
+        generar_reporte(resultado)
+    except Exception as e:                    # el .pkl/.csv ya quedaron escritos
+        print("AVISO: no se pudo generar el HTML:", repr(e))
+        if not con_fp3:
+            raise
     print("\nPREDICCIÓN TOP 10:")
-    print(obj[["pred_rank", "name_acronym", "team_name", "fp1_rank", "fp2_rank", "p_q3", "p_pole"]].head(12).to_string(index=False))
+    cols = ["pred_rank", "name_acronym", "team_name", "fp1_rank", "fp2_rank"] + (["fp3_rank"] if con_fp3 else []) + ["p_q3", "p_pole"]
+    print(obj[cols].head(12).to_string(index=False))
     return resultado
 
 
 if __name__ == "__main__":
     import sys
-    if sys.argv[1:2] == ["html"]:
-        # python3 modelo_qualy_austin.py html mexico  -> regenera el reporte desde resultado_qualy_mexico.pkl
-        generar_reporte(pd.read_pickle(BASE / f"resultado_qualy_{sys.argv[2]}.pkl"))
+    args = sys.argv[1:]
+    if args[:1] == ["html"]:
+        # python3 modelo_qualy_austin.py html mexico      -> desde resultado_qualy_mexico.pkl
+        # python3 modelo_qualy_austin.py html mexico_fp3  -> desde resultado_qualy_mexico_fp3.pkl
+        generar_reporte(pd.read_pickle(BASE / f"resultado_qualy_{args[1]}.pkl"))
     else:
-        main(int(sys.argv[1]) if len(sys.argv) > 1 else OBJETIVO_MEETING)
+        con_fp3 = "--fp3" in args
+        if "--jobs" in args:
+            N_JOBS = int(args[args.index("--jobs") + 1])
+            args.pop(args.index("--jobs") + 1)
+        modelos = None
+        if "--modelos" in args:          # p. ej. --modelos "Random Forest"  (separados por coma)
+            modelos = [m.strip() for m in args.pop(args.index("--modelos") + 1).split(",")]
+        posicionales = [a for a in args if not a.startswith("--")]
+        main(int(posicionales[0]) if posicionales else OBJETIVO_MEETING, con_fp3=con_fp3, nombres_modelos=modelos)
