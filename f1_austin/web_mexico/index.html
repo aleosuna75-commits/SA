@@ -451,10 +451,10 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
 @media (max-width:900px){.pie__grid{grid-template-columns:minmax(0,1fr)}}
 
 /* ---------- Aviso: la qualy terminó (sólo con datos post/carrera) ---------- */
-.aviso-post{display:block;text-decoration:none;color:var(--hueso);border-bottom:1px solid var(--linea);background:linear-gradient(90deg,rgba(255,138,61,.16),rgba(255,138,61,.04) 55%,rgba(255,138,61,0)),var(--carbon);transition:background .4s}
-.aviso-post:hover{background:linear-gradient(90deg,rgba(255,138,61,.26),rgba(255,138,61,.07) 55%,rgba(255,138,61,0)),var(--carbon)}
-.aviso-post__in{display:flex;flex-wrap:wrap;align-items:center;gap:10px 18px;padding-block:16px}
-.aviso-post__txt{flex:1 1 260px;min-width:0;font-size:14.5px;color:#d9cfc4}
+.aviso-post{display:flex;flex-wrap:wrap;align-items:center;gap:10px 16px;max-width:640px;margin:0 0 30px;padding:14px 18px;text-decoration:none;color:var(--hueso);border:1px solid rgba(255,138,61,.45);background:rgba(11,10,10,.58);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);transition:border-color .3s,background .3s}
+.aviso-post[hidden]{display:none}
+.aviso-post:hover{border-color:var(--cempa);background:rgba(40,22,12,.7)}
+.aviso-post__txt{flex:1 1 240px;min-width:0;font-size:14px;line-height:1.5;color:#d9cfc4}
 .aviso-post__txt b{color:var(--hueso);font-weight:500}
 .aviso-post__ir{font:600 10.5px/1 var(--f-body);letter-spacing:.22em;text-transform:uppercase;color:var(--cempa);display:inline-flex;align-items:center;gap:10px;white-space:nowrap}
 .aviso-post__ir::after{content:"→";font-size:15px;letter-spacing:0;transition:transform .4s var(--ease)}
@@ -467,8 +467,9 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
 .espera__txt .ceja{margin:0}
 .espera__cuando{margin:0;font-family:var(--f-display);font-weight:400;font-size:clamp(24px,3.2vw,38px);line-height:1.12;text-wrap:balance;color:var(--hueso)}
 .espera__txt .txt{font-size:14.5px}
-.espera__lista{grid-column:1/-1;list-style:none;margin:0;padding:18px 0 0;border-top:1px solid var(--linea);display:flex;flex-wrap:wrap;gap:8px}
-.espera__lista li{font:500 10px/1 var(--f-body);letter-spacing:.2em;text-transform:uppercase;color:var(--ceniza);padding:9px 11px;border:1px solid var(--linea)}
+.espera__lista{grid-column:1/-1;list-style:none;margin:0;padding:18px 0 0;border-top:1px solid var(--linea);display:flex;flex-wrap:wrap;gap:10px 26px}
+.espera__lista li{position:relative;padding-left:14px;font:500 10px/1.4 var(--f-body);letter-spacing:.2em;text-transform:uppercase;color:var(--humo)}
+.espera__lista li::before{content:"";position:absolute;left:0;top:.5em;width:5px;height:5px;border-radius:50%;background:var(--cempa);opacity:.7}
 .podio-fantasma{display:grid;grid-template-columns:repeat(3,42px);gap:5px;align-items:end;height:110px}
 .podio-fantasma span{display:grid;place-items:center;border:1px dashed var(--linea-2);font:600 20px/1 var(--f-dato);color:var(--humo);background:rgba(239,231,220,.02)}
 .podio-fantasma span:nth-child(1){height:66px}
@@ -487,6 +488,7 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
 .acta__datos dd{margin:0;font:600 34px/1 var(--f-dato);font-variant-numeric:tabular-nums;color:var(--hueso);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .acta__datos dd small{font-size:17px;color:var(--humo);margin-left:3px;font-weight:500}
 .acta__datos p{margin:0;font-size:12px;color:var(--humo);line-height:1.35}
+.acta__datos p .bloque{display:block}
 .veredicto{font-weight:500}.veredicto.ok{color:var(--jade)}.veredicto.no{color:var(--rosa)}
 .duelo{display:grid;gap:10px;margin-bottom:12px}
 .duelo__fila{display:grid;grid-template-columns:104px minmax(0,1fr);gap:8px 14px;align-items:center}
@@ -539,8 +541,8 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
 .carrera{position:relative;background:var(--noche)}
 .carrera__portada{position:relative;isolation:isolate;min-height:clamp(440px,66vh,640px);display:flex;align-items:flex-end;overflow:hidden;background:#0a0909}
 .carrera__foto{position:absolute;inset:0;z-index:-1;overflow:hidden}
-.carrera__foto img{position:absolute;left:0;top:-10%;width:100%;height:120%;object-fit:cover;object-position:62% 64%;filter:saturate(.85) contrast(1.12) brightness(.58);will-change:transform}
-.carrera__foto::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,var(--noche) 0%,rgba(11,10,10,.2) 26%,rgba(11,10,10,.35) 62%,var(--noche) 100%),linear-gradient(90deg,rgba(11,10,10,.92) 0%,rgba(11,10,10,.5) 50%,rgba(11,10,10,.08) 100%),radial-gradient(45% 50% at 15% 85%,rgba(255,138,61,.22),transparent 70%)}
+.carrera__foto img{position:absolute;left:0;top:-10%;width:100%;height:120%;object-fit:cover;object-position:58% 46%;filter:saturate(.9) contrast(1.1) brightness(.74);will-change:transform}
+.carrera__foto::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,var(--noche) 0%,rgba(11,10,10,.12) 24%,rgba(11,10,10,.3) 62%,var(--noche) 100%),linear-gradient(90deg,rgba(11,10,10,.9) 0%,rgba(11,10,10,.45) 46%,rgba(11,10,10,0) 100%),radial-gradient(45% 50% at 15% 85%,rgba(255,138,61,.22),transparent 70%)}
 .carrera__portada-in{width:100%;padding-block:clamp(100px,13vw,160px) clamp(40px,5vw,64px);display:grid;gap:22px;justify-items:start}
 .carrera__portada-in .ceja{margin:0}
 .carrera__t{font-size:clamp(50px,9.4vw,128px)}
@@ -566,9 +568,9 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
 .escalon__mov b{font:600 15px/1 var(--f-dato);letter-spacing:.02em}
 .escalon__bloque{position:relative;display:grid;align-content:start;justify-items:center;gap:16px;padding:20px 8px 22px;background:linear-gradient(180deg,rgba(255,138,61,.13),rgba(29,24,25,.92) 38%,rgba(20,17,18,.92));box-shadow:inset 0 1px 0 rgba(239,231,220,.08);transform-origin:50% 100%;transition:transform 1.2s var(--ease),opacity .8s var(--ease);transition-delay:var(--d,0s)}
 .escalon__bloque::before{content:"";position:absolute;left:0;right:0;top:0;height:3px;background:var(--c,#888);box-shadow:0 0 18px var(--c,#888)}
-.escalon--1 .escalon__bloque{height:clamp(230px,25vw,310px);--d:.25s}
-.escalon--2 .escalon__bloque{height:clamp(180px,19vw,240px);--d:.1s}
-.escalon--3 .escalon__bloque{height:clamp(150px,15vw,196px);--d:.4s}
+.escalon--1 .escalon__bloque{min-height:clamp(262px,27vw,340px);--d:.25s}
+.escalon--2 .escalon__bloque{min-height:clamp(224px,22vw,284px);--d:.1s}
+.escalon--3 .escalon__bloque{min-height:clamp(192px,18vw,236px);--d:.4s}
 .escalon__num{font:700 clamp(58px,8vw,112px)/.8 var(--f-dato);color:transparent;-webkit-text-stroke:1.2px rgba(239,231,220,.55)}
 .escalon--1 .escalon__num{-webkit-text-stroke:0;color:var(--cempa);text-shadow:0 0 34px rgba(255,138,61,.55)}
 .escalon__probs{display:grid;gap:10px;font:500 9.5px/1.2 var(--f-body);letter-spacing:.16em;text-transform:uppercase;color:var(--ceniza)}
@@ -650,6 +652,8 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
   .orden__mov{justify-items:end;text-align:right}
   .podio-fichas{grid-template-columns:minmax(0,1fr);gap:0}
   .podio-fichas li{order:0!important;padding:14px 0;border-bottom:1px solid var(--linea)}
+  .podio-fichas li:last-child{border-bottom:0}
+  .det span{padding:5px 7px;letter-spacing:.1em;gap:5px}
   .podio-fichas h4{display:block}
   .riesgos li{grid-template-columns:minmax(0,1fr)}
 }
@@ -740,6 +744,8 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
   <div class="heroe__velo" aria-hidden="true"></div>
   <div class="wrap heroe__in">
     <div class="heroe__txt">
+      <!-- Aviso tras la qualy: sólo aparece cuando existen los docs post/qualy o carrera/mexico2026 -->
+      <a class="aviso-post" id="aviso-post" href="#carrera" hidden><span class="pill pill--fin">Qualy terminada</span><span class="aviso-post__txt" id="aviso-post-txt"></span><span class="aviso-post__ir" id="aviso-post-ir">Pronóstico de carrera</span></a>
       <p class="ceja">Sobre el Autódromo · la pista más alta del calendario</p>
       <h1 class="titular">Donde<br>las velas<br>aceleran<span class="punto">.</span></h1>
       <p class="heroe__bajada"><strong>Pronóstico de qualy · Edición Día de Muertos.</strong> Gran Premio de la Ciudad de México, Autódromo Hermanos Rodríguez. Sábado 31 de octubre, 3:00 PM hora CDMX.</p>
@@ -756,11 +762,6 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
   </div>
   <div class="heroe__desliza" aria-hidden="true">Desliza</div>
 </header>
-
-<!-- Aviso tras la qualy: sólo aparece cuando existen los docs post/qualy o carrera/mexico2026 -->
-<a class="aviso-post" id="aviso-post" href="#carrera" hidden>
-  <span class="wrap aviso-post__in"><span class="pill pill--fin">Qualy terminada</span><span class="aviso-post__txt" id="aviso-post-txt"></span><span class="aviso-post__ir" id="aviso-post-ir">Pronóstico de carrera</span></span>
-</a>
 
 <!-- ===================== ESTADO ===================== -->
 <section class="estado" id="estado" aria-label="Cuenta regresiva y estado">
@@ -939,7 +940,7 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
         <div class="espera__txt">
           <p class="ceja">En espera del resultado oficial</p>
           <p class="espera__cuando" data-espera>Se publica al terminar la qualy · ~4:00 PM CDMX</p>
-          <p class="txt">Recarga la página después de la Q3 y aquí aparece el marcador del modelo.</p>
+          <p class="txt">Al terminar la Q3 aquí aparece el marcador del modelo. Si no aparece solo, recarga la página.</p>
         </div>
         <ul class="espera__lista" aria-label="Lo que se publicará"><li>Aciertos del Top 10</li><li>Pole</li><li>Caídos en Q1 y Q2</li><li>Posiciones exactas</li><li>Error medio</li></ul>
       </div>
@@ -1444,6 +1445,10 @@ function cadaSegundo(){
 }
 
 /* ---------------- Tras la qualy: utilidades ---------------- */
+/* num()/pos() de arriba convierten null en 0; aquí null significa "no viene" */
+function nn(v){ return v == null || v === "" ? null : num(v); }
+function pn(v){ v = nn(v); return v == null ? null : Math.round(v); }
+function pctN(v){ return nn(v) == null ? "—" : pct(v); }
 var FIN_QUALY = Date.UTC(2026, 9, 31, 22, 0, 0);
 var revelarListo = false;
 function renderEsperas(){
@@ -1451,7 +1456,7 @@ function renderEsperas(){
   $$("[data-espera]").forEach(function(el){ if (el.textContent !== t) el.textContent = t; });
 }
 function acrs(v){ return Array.isArray(v) ? v.filter(function(x){ return typeof x === "string" && x; }) : []; }
-function fija(v, d){ v = num(v); return v == null ? "—" : v.toFixed(d); }
+function fija(v, d){ v = nn(v); return v == null ? "—" : v.toFixed(d); }
 function flechaMov(d){ return d == null ? '<b class="igual">—</b>' : d > 0 ? '<b class="sube">▲' + d + '</b>' : d < 0 ? '<b class="baja">▼' + (-d) + '</b>' : '<b class="igual">=</b>'; }
 function tile(et, valor, unidad, pie){ return '<div><dt>' + et + '</dt><dd>' + valor + (unidad && valor !== "—" ? '<small>' + unidad + '</small>' : '') + '</dd>' + (pie ? '<p>' + pie + '</p>' : '') + '</div>'; }
 function ponerContenido(box, html){
@@ -1472,13 +1477,13 @@ function datosPost(){
   var m = porAcr();
   var filas = (Array.isArray(POST.filas) ? POST.filas : []).filter(function(f){ return f && f.acr; }).map(function(f){
     var g = m[f.acr] || {};
-    return {acr:String(f.acr), nombre:f.nombre || g.nombre || f.acr, equipo:f.equipo || g.equipo || "", color:f.color || g.color, pred:pos(f.pred) || pos(g.pred), real:pos(f.real)};
+    return {acr:String(f.acr), nombre:f.nombre || g.nombre || f.acr, equipo:f.equipo || g.equipo || "", color:f.color || g.color, pred:pn(f.pred) || pn(g.pred), real:pn(f.real)};
   }).sort(function(a, b){ return (a.real || 99) - (b.real || 99) || (a.pred || 99) - (b.pred || 99); });
   var fm = {}; filas.forEach(function(f){ fm[f.acr] = f; });
   var tp = acrs(POST.top10_pred).slice(0, 10), tr = acrs(POST.top10_real).slice(0, 10);
   if (!tp.length) tp = filas.filter(function(f){ return f.pred && f.pred <= 10; }).sort(function(a, b){ return a.pred - b.pred; }).map(function(f){ return f.acr; });
   if (!tr.length) tr = filas.filter(function(f){ return f.real && f.real <= 10; }).map(function(f){ return f.acr; });
-  var ac = pos(POST.aciertos_top10);
+  var ac = pn(POST.aciertos_top10);
   if (ac == null) ac = tp.filter(function(a){ return tr.indexOf(a) >= 0; }).length;
   var poleP = POST.pole_pred || tp[0] || "", poleR = POST.pole_real || tr[0] || "";
   var poleOk = typeof POST.acierto_pole === "boolean" ? POST.acierto_pole : !!(poleP && poleP === poleR);
@@ -1489,16 +1494,16 @@ function renderPost(){
   $("#menu-rev").textContent = D ? D.ac + "/10 aciertos" : "4:00 PM CDMX";
   if (!D || !box) return;
   function info(a){ return D.fm[a] || D.m[a] || {acr:a}; }
-  function frac(a, t){ a = pos(a); t = pos(t); return a == null ? "—" : a + (t ? '<small>/' + t + '</small>' : ''); }
-  var mae = num(POST.mae), sp = num(POST.spearman), ex = pos(POST.exactos);
-  var prom = GP && GP.metricas && num(GP.metricas.top10_hits);
+  function frac(a, t){ a = pn(a); t = pn(t); return a == null ? "—" : a + (t ? '<small>/' + t + '</small>' : ''); }
+  var mae = nn(POST.mae), sp = nn(POST.spearman), ex = pn(POST.exactos);
+  var prom = GP && GP.metricas && nn(GP.metricas.top10_hits);
   var h = [];
   // Marcador
   h.push('<div class="acta rv"><div class="acta__marcador"><p class="ceja">Aciertos del Top 10</p>' +
     '<div class="marcador__grande"><span class="marcador__num" data-contar data-valor="' + D.ac + '" data-dec="0">' + D.ac + '</span><span class="marcador__de">/10</span></div>' +
     '<p class="meta">De los diez que el modelo puso en la Q3, ' + D.ac + (D.ac === 1 ? ' llegó' : ' llegaron') + '.' + (prom != null ? ' Su promedio en la validación: ' + prom.toFixed(2) + '.' : '') + '</p></div>');
   h.push('<dl class="acta__datos">' +
-    tile("Pole", D.poleR ? esc(D.poleR) : "—", "", D.poleR ? (D.poleOk ? '<span class="veredicto ok">✓ Acertada</span>' : '<span class="veredicto no">✗ Fallada</span> · pronóstico ' + esc(D.poleP || "—")) : "Pronóstico " + esc(D.poleP || "—")) +
+    tile("Pole", D.poleR ? esc(D.poleR) : "—", "", D.poleR ? (D.poleOk ? '<span class="veredicto ok">✓ Acertada</span><span class="bloque">Era el favorito del modelo</span>' : '<span class="veredicto no">✗ Fallada</span><span class="bloque">El modelo esperaba a ' + esc(D.poleP || "—") + '</span>') : "Pronóstico " + esc(D.poleP || "—")) +
     tile("Caídos en Q1", frac(POST.q1_fuera_aciertos, POST.q1_fuera_total), "", "Anticipados por el modelo") +
     tile("Caídos en Q2", frac(POST.q2_fuera_aciertos, POST.q2_fuera_total), "", "Anticipados por el modelo") +
     tile("Exactos", ex == null ? "—" : String(ex), "", "Pilotos en su posición exacta") +
@@ -1552,8 +1557,8 @@ function pilotosCarrera(){
   var ps = CARRERA.pilotos.filter(function(p){ return p && p.acr; }).map(function(p){
     var g = m[p.acr] || {};
     return {acr:String(p.acr), nombre:p.nombre || g.nombre || p.acr, equipo:p.equipo || g.equipo || "", color:p.color || g.color,
-      salida:pos(p.salida), pred:pos(p.pred), media:num(p.pos_media), win:num(p.p_win), podio:num(p.p_podio), top10:num(p.p_top10), dnf:num(p.p_dnf),
-      p10:pos(p.p10), p90:pos(p.p90), ritmo:pos(p.ritmo_rank), deg:num(p.deg_s_vuelta), paradas:num(p.paradas), nota:typeof p.nota === "string" ? p.nota.trim() : ""};
+      salida:pn(p.salida), pred:pn(p.pred), media:nn(p.pos_media), win:nn(p.p_win), podio:nn(p.p_podio), top10:nn(p.p_top10), dnf:nn(p.p_dnf),
+      p10:pn(p.p10), p90:pn(p.p90), ritmo:pn(p.ritmo_rank), deg:nn(p.deg_s_vuelta), paradas:nn(p.paradas), nota:typeof p.nota === "string" ? p.nota.trim() : ""};
   });
   ps.sort(function(a, b){ return (a.pred || 99) - (b.pred || 99) || (a.media == null ? 99 : a.media) - (b.media == null ? 99 : b.media); });
   ps.forEach(function(p, i){ p.fin = i + 1; p.d = p.salida ? p.salida - p.fin : null; });
@@ -1563,10 +1568,10 @@ function sale(p){ return p.salida ? "Sale P" + p.salida : "Salida por definir"; 
 function chips(p, campos){
   var r = [];
   campos.forEach(function(c){
-    if (c === "top10" && p.top10 != null) r.push(["Top 10", pct(p.top10)]);
-    if (c === "podio" && p.podio != null) r.push(["Podio", pct(p.podio)]);
-    if (c === "win" && p.win != null) r.push(["Victoria", pct(p.win)]);
-    if (c === "dnf" && p.dnf != null) r.push(["Abandono", pct(p.dnf)]);
+    if (c === "top10" && p.top10 != null) r.push(["Top 10", pctN(p.top10)]);
+    if (c === "podio" && p.podio != null) r.push(["Podio", pctN(p.podio)]);
+    if (c === "win" && p.win != null) r.push(["Victoria", pctN(p.win)]);
+    if (c === "dnf" && p.dnf != null) r.push(["Abandono", pctN(p.dnf)]);
     if (c === "ritmo" && p.ritmo) r.push(["Ritmo", p.ritmo + ".º"]);
     if (c === "deg" && p.deg != null) r.push(["Desgaste", p.deg.toFixed(3) + " s/v"]);
     if (c === "paradas" && p.paradas != null) r.push(["Paradas", p.paradas % 1 ? p.paradas.toFixed(1) : String(p.paradas)]);
@@ -1577,12 +1582,12 @@ function pendienteSVG(ps){
   var lin = ps.filter(function(p){ return p.fin <= 10 || (p.salida && p.salida <= 10); });
   if (!lin.length) return "";
   var N = 10; lin.forEach(function(p){ N = Math.max(N, p.fin, p.salida || 0); });
-  var W = 400, xL = 104, xR = 296, top = 40, st = 25, H = top + N * st + 6;
+  var W = 420, xL = 112, xR = 300, top = 40, st = 25, H = top + N * st + 6;
   function Y(k){ return (top + (k - 0.5) * st).toFixed(1); }
   var s = ['<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="Posición de salida contra posición final pronosticada de los pilotos que salen o terminan en el Top 10">',
-    '<text class="pend__cab" x="' + xL + '" y="14" text-anchor="middle">SALIDA</text><text class="pend__cab" x="' + xR + '" y="14" text-anchor="middle">META · V' + (pos(CARRERA.vueltas) || 71) + '</text>',
+    '<text class="pend__cab" x="' + xL + '" y="14" text-anchor="middle">SALIDA</text><text class="pend__cab" x="' + xR + '" y="14" text-anchor="middle">META · V' + (pn(CARRERA.vueltas) || 71) + '</text>',
     '<line class="pend__eje" x1="' + xL + '" y1="' + (top - 8) + '" x2="' + xL + '" y2="' + (H - 4) + '"></line><line class="pend__eje" x1="' + xR + '" y1="' + (top - 8) + '" x2="' + xR + '" y2="' + (H - 4) + '"></line>',
-    '<line class="pend__corte" x1="' + (xL - 46) + '" y1="' + Y(10.5) + '" x2="' + (xR + 46) + '" y2="' + Y(10.5) + '"></line><text class="pend__corte-t" x="' + (W / 2) + '" y="' + (Y(10.5) - 6) + '" text-anchor="middle">TOP 10</text>'];
+    '<line class="pend__corte" x1="' + (xL - 56) + '" y1="' + Y(10.5) + '" x2="' + (W - 50) + '" y2="' + Y(10.5) + '"></line><text class="pend__corte-t" x="' + W + '" y="' + (+Y(10.5) + 3) + '" text-anchor="end">TOP 10</text>'];
   lin.forEach(function(p, i){
     var c = col(p.color), y2 = Y(p.fin), fuera = p.fin > 10;
     var t = p.acr + ": " + sale(p).toLowerCase() + ", termina P" + p.fin + (p.d ? (p.d > 0 ? " (gana " + p.d + ")" : " (pierde " + (-p.d) + ")") : "");
@@ -1606,7 +1611,7 @@ function renderCarrera(){
   var ps = pilotosCarrera(); if (!ps.length) return;
   var pod = ps.slice(0, 3), resto = ps.slice(3, 10);
   var e = CARRERA.estrategia || {}, v = CARRERA.validacion || {};
-  var vueltas = pos(CARRERA.vueltas) || 71;
+  var vueltas = pn(CARRERA.vueltas) || 71;
   var res = typeof CARRERA.resumen === "string" && CARRERA.resumen.trim() ? CARRERA.resumen.trim() :
     "El modelo ve ganar a " + (pod[0].nombre || pod[0].acr) + (pod[1] ? ", con " + (pod[1].nombre || pod[1].acr) + (pod[2] ? " y " + (pod[2].nombre || pod[2].acr) : "") + " en el podio." : ".");
   var h = [];
@@ -1619,7 +1624,7 @@ function renderCarrera(){
       '<div class="escalon__pil"><span class="escalon__acr">' + esc(p.acr) + '</span><span class="escalon__nom">' + esc(p.nombre) + '</span><span class="escalon__eq">' + esc(p.equipo) + '</span>' +
       '<span class="escalon__mov">' + sale(p) + ' ' + flechaMov(p.d) + '</span></div>' +
       '<div class="escalon__bloque"><span class="escalon__num"><span class="solo-lector">Termina P</span>' + p.fin + '</span>' +
-      '<div class="escalon__probs"><span>Victoria<b>' + pct(p.win) + '</b></span><span>Podio<b>' + pct(p.podio) + '</b></span></div></div></li>';
+      '<div class="escalon__probs"><span>Victoria<b>' + pctN(p.win) + '</b></span><span>Podio<b>' + pctN(p.podio) + '</b></span></div></div></li>';
   }).join("") + '</ol>');
   h.push('<ul class="podio-fichas rv" aria-label="Detalle del podio">' + pod.map(function(p){
     var c = chips(p, ["top10", "dnf", "ritmo", "deg", "paradas"]);
@@ -1638,9 +1643,9 @@ function renderCarrera(){
   // Salida → meta + estrategia
   var dnfs = ps.filter(function(p){ return p.dnf != null; });
   var dnfSum = dnfs.length ? dnfs.reduce(function(t, p){ return t + p.dnf; }, 0) : null;
-  var pt = num(e.paradas_tipicas);
+  var pt = nn(e.paradas_tipicas);
   h.push('<div class="carrera__grid">' +
-    '<div class="pendiente rv"><h3 class="sub">De la parrilla a la meta</h3><p class="txt">A la izquierda, dónde arranca cada piloto; a la derecha, dónde termina según el modelo. Las líneas que suben ganan lugares. Pasa el cursor para aislar una.</p>' +
+    '<div class="pendiente rv"><h3 class="sub">De la parrilla a la meta</h3><p class="txt">A la izquierda, dónde arranca cada piloto; a la derecha, dónde termina según el modelo. Las líneas que suben ganan lugares. Toca o pasa el cursor sobre una para aislarla.</p>' +
       '<div class="pendiente__svg">' + pendienteSVG(ps) + '</div></div>' +
     '<div class="estrategia rv"><h3 class="sub">La estrategia</h3><p class="txt" style="font-size:14px;margin-bottom:22px">Lo que el simulador supone para el domingo en el Autódromo.</p><dl class="metricas">' +
       tile("Vueltas", String(vueltas), "", "Carrera completa, sin acortar") +
@@ -1655,8 +1660,8 @@ function renderCarrera(){
       '</ul></div></div>' +
     '</div>');
   // Validación
-  var wa = num(v.win_acc); if (wa != null && wa <= 1) wa *= 100;
-  var ngp = pos(v.n_gp);
+  var wa = nn(v.win_acc); if (wa != null && wa <= 1) wa *= 100;
+  var ngp = pn(v.n_gp);
   h.push('<div class="valida rv"><div><p class="ceja">El simulador, puesto a prueba</p><p class="txt" style="font-size:14px">Promedios en ' + (ngp ? ngp + ' carreras' : 'carreras anteriores') + ' con validación walk-forward: cada GP se pronosticó sólo con datos de las carreras previas.</p>' +
     '<p class="meta" style="margin-top:14px">' + (CARRERA.modelo ? '<span>Modelo: ' + esc(CARRERA.modelo) + '</span>' : '') + (CARRERA.parrilla_fuente ? '<span>Parrilla: ' + esc(CARRERA.parrilla_fuente) + '</span>' : '') + (CARRERA.actualizado ? '<span>Actualizado: ' + esc(hora(CARRERA.actualizado)) + '</span>' : '') + '</p></div>' +
     '<dl class="metricas">' +
@@ -1672,7 +1677,7 @@ function renderCarrera(){
     var r = '<tr style="--c:' + col(p.color) + '"><td class="pos">' + p.fin + '</td>' +
       '<td><div class="pil"><i></i><div><b>' + esc(p.acr) + '</b><span>' + esc(p.nombre) + ' · ' + esc(p.equipo) + '</span>' + (p.nota ? '<span class="nota-t">' + esc(p.nota) + '</span>' : '') + '</div></div></td>' +
       '<td class="num">' + (p.salida || '<span class="vacio">—</span>') + '</td><td class="num mv">' + flechaMov(p.d) + '</td>' +
-      '<td class="opc">' + rg + '</td><td class="num opc">' + pct(p.win) + '</td><td class="num opc">' + pct(p.podio) + '</td><td class="num">' + pct(p.top10) + '</td><td class="num opc">' + pct(p.dnf) + '</td>' +
+      '<td class="opc">' + rg + '</td><td class="num opc">' + pctN(p.win) + '</td><td class="num opc">' + pctN(p.podio) + '</td><td class="num">' + pctN(p.top10) + '</td><td class="num opc">' + pctN(p.dnf) + '</td>' +
       '<td class="num opc">' + (p.ritmo ? p.ritmo + '.º' : '<span class="vacio">—</span>') + '</td><td class="num opc">' + (p.deg != null ? p.deg.toFixed(3) : '<span class="vacio">—</span>') + '</td><td class="num opc">' + (p.paradas != null ? (p.paradas % 1 ? p.paradas.toFixed(1) : p.paradas) : '<span class="vacio">—</span>') + '</td></tr>';
     if (p.fin === 3 && ps.length > 3) r += '<tr class="corte" aria-hidden="true"><td colspan="12"><div><span>Podio</span></div></td></tr>';
     if (p.fin === 10 && ps.length > 10) r += '<tr class="corte" aria-hidden="true"><td colspan="12"><div><span>Puntos · Top 10</span></div></td></tr>';
@@ -1690,8 +1695,8 @@ function renderAvisoPost(){
   var D = datosPost(), ps = pilotosCarrera();
   if (!D && !ps.length){ a.hidden = true; return; }
   var t = [];
-  if (D) t.push('El modelo acertó <b>' + D.ac + ' de 10</b> en el Top 10' + (D.poleR ? ' y ' + (D.poleOk ? 'dio con la pole de <b>' + esc(D.poleR) + '</b>' : 'falló la pole: fue para <b>' + esc(D.poleR) + '</b>') : ''));
-  if (ps.length) t.push('Para el domingo ve ganar a <b>' + esc(ps[0].nombre || ps[0].acr) + '</b>' + (ps[0].salida ? ', que sale P' + ps[0].salida : ''));
+  if (D) t.push('El modelo acertó <b>' + D.ac + ' de 10</b> del Top 10' + (D.poleR ? (D.poleOk ? ' y la pole' : '; la pole fue de <b>' + esc(D.poleR) + '</b>') : ''));
+  if (ps.length) t.push('Para el domingo ve ganar a <b>' + esc(ps[0].nombre || ps[0].acr) + '</b>');
   $("#aviso-post-txt").innerHTML = t.join(". ") + ".";
   a.setAttribute("href", ps.length ? "#carrera" : "#revision");
   $("#aviso-post-ir").textContent = ps.length ? "Pronóstico de carrera" : "Ver la revisión";

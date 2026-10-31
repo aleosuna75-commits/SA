@@ -47,7 +47,10 @@ CACHE = BASE / "cache"
 OBJETIVO_MEETING = 1297            # default histórico (Austin); el GP se pasa por línea de comandos
 SIM = "Simulador de carrera (Monte Carlo)"
 MC_VAR_BASE = {"is26": False, "gn_inter": True}
-MC_VAR = dict(MC_VAR_BASE)          # variante oficial (ver validar_carrera.py y validacion_carrera.json)
+# Variante oficial (validar_carrera.py / validacion_carrera.json): las variantes con degradación y estrategia empatan
+# con la base dentro del ruido Monte Carlo y el coeficiente de degradación sale con signo contrario al esperado,
+# así que el pronóstico usa la base y la degradación/paradas van en la salida sólo como información.
+MC_VAR = dict(MC_VAR_BASE)
 N_SIMS = 20000
 
 # Parrilla oficial Austin 2026 tras penalizaciones de unidad de potencia (FIA, viernes 23/10):
@@ -528,22 +531,25 @@ def _f(x, nd=3):
     return None if not np.isfinite(x) else round(x, nd)
 
 
-def nota_piloto(r, umbral_deg):
+def nota_piloto(r, umbral_deg, umbral_dnf):
+    """Frase corta por piloto (prioridad: favorito, movimiento, degradación, abandono, gomas)."""
     mov = r.grid - r.pred_rank
-    if r.p_dnf >= 0.2:
-        return "riesgo de abandono"
-    if pd.notna(r.deg_rel) and r.deg_rel >= umbral_deg and r.deg_rel > 0.02:
-        return "riesgo de degradación"
+    if r.pred_rank == 1:
+        return "favorito"
+    if mov >= 3 and r.grid_penalty >= 3:
+        return "remonta tras la penalización"
     if mov >= 3:
         return "remonta por ritmo" if r.ritmo_rank < r.grid else "remonta"
     if mov <= -3:
         return "pierde posiciones por ritmo" if r.ritmo_rank > r.grid else "pierde posiciones"
+    if pd.notna(r.deg_rel) and r.deg_rel >= umbral_deg and r.deg_rel > 0.02:
+        return "riesgo de degradación"
+    if r.p_dnf >= umbral_dnf:
+        return "riesgo de abandono"
     if r.grid_penalty >= 3:
         return "sale con penalización"
-    if pd.notna(r.deg_rel) and r.deg_rel <= -0.02:
+    if pd.notna(r.deg_rel) and r.deg_rel <= -0.03:
         return "cuida bien los neumáticos"
-    if r.pred_rank == 1:
-        return "favorito"
     return ""
 
 
@@ -551,6 +557,7 @@ def doc_carrera(obj, meeting, val, fuente, est, var_nombre):
     gp = Q.GPS.get(meeting, {})
     obj = obj.sort_values("pred_rank")
     umbral = obj.deg_rel.quantile(0.8) if obj.deg_rel.notna().sum() >= 5 else np.inf
+    umbral_dnf = max(0.2, obj.p_dnf.quantile(0.85))
     pil = []
     for _, r in obj.iterrows():
         par = r.get("paradas_pred")
@@ -560,7 +567,7 @@ def doc_carrera(obj, meeting, val, fuente, est, var_nombre):
             "p_win": _f(r.p_win), "p_podio": _f(r.p_podio), "p_top10": _f(r.p_top10), "p_dnf": _f(r.p_dnf),
             "p10": int(r.pos_p10), "p90": int(r.pos_p90), "ritmo_rank": int(r.ritmo_rank),
             "deg_s_vuelta": _f(r.deg_rel, 3), "paradas": None if pd.isna(par) else int(par),
-            "nota": nota_piloto(r, umbral),
+            "nota": nota_piloto(r, umbral, umbral_dnf),
         })
     top = obj.head(3)
     fav = top.iloc[0]
@@ -571,17 +578,25 @@ def doc_carrera(obj, meeting, val, fuente, est, var_nombre):
           f"({fav.p_win * 100:.0f}% de victoria); el podio más probable es {', '.join(top.name_acronym)}.")
     r2 = (f"Estrategia esperada: {est['paradas']:.0f} parada{'s' if round(est['paradas']) != 1 else ''} "
           f"(pérdida en pits ≈ {est['perdida_pit']:.0f} s).")
+    def motivo(r, sube):
+        if sube and r.grid_penalty >= 3:
+            return "tras su penalización"
+        if sube and r.ritmo_rank < r.grid:
+            return "por ritmo de carrera"
+        if not sube and r.ritmo_rank > r.grid:
+            return "por ritmo de carrera"
+        return "por forma reciente"
     mov = []
     if len(remontas):
-        mov.append("remontan " + ", ".join(f"{a} (sale {int(g)}.º → {int(p)}.º)" for a, g, p in
-                                            remontas[["name_acronym", "grid", "pred_rank"]].head(3).itertuples(index=False)))
+        mov.append("Remontan " + ", ".join(f"{r.name_acronym} ({int(r.grid)}.º → {int(r.pred_rank)}.º, {motivo(r, True)})"
+                                            for _, r in remontas.head(3).iterrows()))
     if len(caidas):
-        mov.append("pierden terreno " + ", ".join(f"{a} ({int(g)}.º → {int(p)}.º)" for a, g, p in
-                                                  caidas[["name_acronym", "grid", "pred_rank"]].head(2).itertuples(index=False)))
-    r3 = ("Por ritmo de carrera y degradación " + "; ".join(mov) + ".") if mov else ""
+        mov.append("pierden terreno " + ", ".join(f"{r.name_acronym} ({int(r.grid)}.º → {int(r.pred_rank)}.º, {motivo(r, False)})"
+                                                  for _, r in caidas.head(2).iterrows()))
+    r3 = ("; ".join(mov) + ".") if mov else ""
     return {
         "actualizado": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
-        "modelo": f"Simulador Monte Carlo de carrera ({N_SIMS:,} carreras".replace(",", " ") + f"; variante {var_nombre})",
+        "modelo": f"Simulador Monte Carlo de carrera ({n_txt} carreras simuladas: {var_nombre})",
         "validacion": {"ndcg10": _f(val["ndcg10"], 4), "top10_hits": _f(val["top10_hits"], 2), "win_acc": _f(val["win_acc"], 3),
                        "podium_hits": _f(val["podium_hits"], 2), "n_gp": int(val["n_gp"])},
         "parrilla_fuente": fuente,
@@ -641,7 +656,11 @@ def main(meeting=OBJETIVO_MEETING, penalizaciones=None, qualy_archivo=None, parr
         if s in sk_obj and (pil.session_key == sk_obj[s]).any():
             titulares = pil[pil.session_key == sk_obj[s]]
             break
-    titulares = titulares.drop_duplicates("driver_number")[["driver_number", "name_acronym"]]
+    titulares = titulares.drop_duplicates("driver_number")
+    if hasattr(Q, "aplicar_sustituciones"):        # p. ej. OCO -> HIR en México 2026 (GPS[...]["sustituciones"])
+        cols = ["driver_number", "name_acronym", "full_name", "team", "team_name", "team_colour"]
+        titulares = Q.aplicar_sustituciones(titulares[cols].reset_index(drop=True), pil, meeting)
+    titulares = titulares[["driver_number", "name_acronym"]]
     qualy, parrilla, fuente = resolver_parrilla(meeting, titulares, qualy_archivo, penalizaciones, parrilla_manual)
     if parrilla is None:
         raise SystemExit(f"No hay parrilla para {meeting}: falta cache/qualy_real_{meeting}.json "
@@ -664,7 +683,7 @@ def main(meeting=OBJETIVO_MEETING, penalizaciones=None, qualy_archivo=None, parr
     val = None
     if not sin_validacion:
         print("Validación walk-forward 2024-2026 del simulador...")
-        preds = walk_forward_sim(historia, {SIM: MC_VAR}, n_sims=4000)
+        preds = walk_forward_sim(historia, {SIM: MC_VAR}, n_sims=n_sims)
         tab = {n: resumen_metricas(p) for n, p in preds.items()}
         for n, v in tab.items():
             print(f"  {n:38s} NDCG@10 {v['ndcg10']:.4f} | top10 {v['top10_hits']:.2f} | win {v['win_acc']:.3f} | "
@@ -718,7 +737,8 @@ def main(meeting=OBJETIVO_MEETING, penalizaciones=None, qualy_archivo=None, parr
     return obj, doc
 
 
-VARIANTE_NOMBRE = "base (salida + ritmo + forma + sprint + abandonos)"
+VARIANTE_NOMBRE = ("salida, ritmo de tanda larga FP1-FP3, gap de qualy, forma de piloto y equipo, facilidad de rebase "
+                   "del circuito, primera vuelta e incidentes, abandonos")
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser(description="Pronóstico del orden final de carrera (simulador Monte Carlo).")

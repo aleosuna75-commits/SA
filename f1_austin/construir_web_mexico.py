@@ -11,7 +11,7 @@ Uso:
   python3 construir_web_mexico.py                       # gp desde resultado_qualy_mexico.pkl (FP2, cambio 0), live pendiente
   python3 construir_web_mexico.py --gp web_mexico/datos_gp.json --live live/qualy_mexico.json
   python3 construir_web_mexico.py --gp web_mexico/datos_gp.json --live live/qualy_mexico.json \
-      --post web_mexico/post_qualy.json --carrera web_mexico/carrera_mexico2026.json   # tras la qualy
+      --post live/post_qualy.json --carrera live/carrera_mexico2026.json   # tras la qualy
   python3 construir_web_mexico.py --salida /tmp/prueba.html --live prueba_live.json   # copia para pruebas
   python3 construir_web_mexico.py --salida ../sitio_f1/index.html --documento          # copia con doctype (Netlify)
 """
