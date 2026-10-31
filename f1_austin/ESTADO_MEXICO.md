@@ -56,3 +56,6 @@ Docs db: gp/mexico2026 v2, live/qualy v2. Carrera: `python3 modelo_carrera_austi
 Sí trae TimingStats (mejores vueltas con hora), tiempos de sector, neumáticos, pits, reloj, estado y mensajes de carrera. Workflow wn21wo97b
 (hora límite 19:45): modo público en live_qualy.py que reconstruye la clasificación con las mejores vueltas por segmento
 (Q1 exacta; Q2/Q3 aproximadas). Si falla, plan B: monitoreo por segmentos con el feed público sólo para Q1 y resultado oficial al final.
+18:37 UTC: colector v1.1 con modo público listo (probado 50 min con la FP3 real: 20/20 idéntico a TimingData; el feed se corrigió solo
+a las 17:44). Comando de la qualy (20:50 UTC, desde f1_austin/; relanzar igual si se cae):
+`python3 live_qualy.py --salida live/qualy_mexico.json --minutos 80 --grabar live/crudo_qualy.jsonl --precargar live/crudo_qualy.jsonl`
