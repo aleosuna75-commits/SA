@@ -18,8 +18,16 @@ y predicción del Top 10 de la qualy de México. Si la sesión se corta, retomar
 Estilo AURA (foto cinematográfica, serif editorial, acento naranja) + Día de Muertos + carreras, con animaciones.
 Se publica como Artifact de claude.ai (db: docs `gp/mexico2026` y `live/qualy`, contrato en el workflow wzw9vriwd)
 y la misma carpeta `web_mexico/` va a Netlify (sin db → datos incrustados).
-- [ ] Workflow wzw9vriwd (relanzado 14:20 con menú hamburguesa y referencias AURA en scratchpad/live/referencias): `web_mexico/index.html` (página), `live_qualy.py` (colector F1 Live Timing), modelo con `--fp3` + `exportar_datos_web.py`
-- [ ] Publicar Artifact con capabilities `{db:{rules:[gp y live: read view, write owner]}, user:{}}`; sembrar docs con ArtifactData; dar link
+- [x] Workflow wzw9vriwd (relanzado 14:20 con menú hamburguesa y referencias AURA en scratchpad/live/referencias): `web_mexico/index.html` (página), `live_qualy.py` (colector F1 Live Timing), modelo con `--fp3` + `exportar_datos_web.py`
+- [x] Publicar Artifact con capabilities `{db:{rules:[gp y live: read view, write owner]}, user:{}}`; sembrar docs con ArtifactData; dar link
 - [ ] 18:40 UTC: bajar FP3 (`descarga_datos.py`, borrar cache de la sesión 11399), correr modelo con FP3, actualizar `gp/mexico2026` (campo cambio), republicar sitio
 - [ ] 20:50 UTC: lanzar `live_qualy.py` en segundo plano y relevar `live/qualy_mexico.json` → doc `live/qualy` cada ~60-90 s hasta 22:05 UTC
 - [ ] 22:20 UTC: resultado final (OpenF1 11400) → `live/qualy` estado terminada, sección real vs pronóstico, republicar, reportar aciertos
+
+Artifact publicado: https://claude.ai/artifact/A5ptCSyCPL7Eb63tt5U6zJ (file_path f1_austin/web_mexico/index.html; docs gp/mexico2026 v1 y live/qualy v1 sembrados).
+Para viewers sin sesión de claude.ai la página usa los datos incrustados: además de actualizar la db, republicar el Artifact
+con `python3 construir_web_mexico.py --gp web_mexico/datos_gp.json --live live/qualy_mexico.json` (sin --documento; reescribe web_mexico/index.html)
+y luego Artifact publish del mismo file_path. Sitio Netlify: `python3 publicar_sitio.py`.
+Comandos FP3 (del agente): `python3 descarga_datos.py 11399`; `python3 modelo_qualy_austin.py 1298 --fp3 --jobs 2`;
+`python3 exportar_datos_web.py mexico_fp3 --previo resultado_qualy_mexico.pkl` (escribe web_mexico/datos_gp.json con fase FP3 y cambio).
+Colector: `python3 live_qualy.py --salida live/qualy_mexico.json --minutos 80 --grabar live/crudo_qualy.jsonl` (prueba: `--cualquier-sesion --minutos 3`).

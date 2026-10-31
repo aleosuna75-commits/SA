@@ -1,7 +1,7 @@
 """Arma la carpeta del sitio estático para Netlify (../sitio_f1) a partir de los reportes generados.
 
 Estructura publicada:
-    sitio_f1/index.html            -> GP más reciente (portada)
+    sitio_f1/index.html            -> página en vivo de México (web_mexico/) + img/
     sitio_f1/<slug>/qualy.html     -> pronóstico de qualy de cada GP
     sitio_f1/<slug>/carrera.html   -> pronóstico de carrera (si existe)
 
@@ -16,7 +16,11 @@ from pathlib import Path
 BASE = Path(__file__).parent
 SITIO = BASE.parent / "sitio_f1"
 
-# (slug, etiqueta, archivo qualy, archivo carrera) — el primero es la portada
+# Portada: página en vivo de México (web_mexico/, la misma que se publica como Artifact). Se copia completa,
+# con doctype (construir_web_mexico.py --documento) y sus imágenes; no recibe barra: trae su propio menú.
+PORTADA = BASE / "web_mexico"
+
+# (slug, etiqueta, archivo qualy, archivo carrera) — páginas de archivo con barra común
 PAGINAS = [
     ("mexico", "México 2026", "reporte_qualy_mexico_2026.html", None),
     ("austin", "Austin 2026", "reporte_qualy_austin_2026.html", "reporte_carrera_austin_2026.html"),
@@ -34,9 +38,9 @@ padding:8px 16px;background:#0b0b0f;border-bottom:1px solid rgba(255,255,255,.12
 
 
 def nav(actual, prefijo):
-    links = []
+    links = [f'<a href="{prefijo}index.html">Inicio · En vivo</a>']
     for i, (slug, etiqueta, q, c) in enumerate(PAGINAS):
-        href_q = f"{prefijo}index.html" if i == 0 else f"{prefijo}{slug}/qualy.html"
+        href_q = f"{prefijo}{slug}/qualy.html"
         links.append(f'<a class="{"on" if actual == (slug, "qualy") else ""}" href="{href_q}">{etiqueta} · Qualy</a>')
         if c:
             links.append(f'<a class="{"on" if actual == (slug, "carrera") else ""}" href="{prefijo}{slug}/carrera.html">'
@@ -54,15 +58,18 @@ def main():
     if SITIO.exists():
         shutil.rmtree(SITIO)
     SITIO.mkdir()
+    import subprocess, sys
+    subprocess.run([sys.executable, str(BASE / "construir_web_mexico.py"), "--salida", str(SITIO / "index.html"),
+                    "--documento", "--gp", str(PORTADA / "datos_gp.json"), "--live", str(BASE / "live" / "qualy_mexico.json")],
+                   check=True)
+    shutil.copytree(PORTADA / "img", SITIO / "img")
+    print("->", (SITIO / "index.html").relative_to(SITIO.parent), "(página en vivo) + img/")
     for i, (slug, etiqueta, q, c) in enumerate(PAGINAS):
         for tipo, archivo in (("qualy", q), ("carrera", c)):
             if not archivo or not (BASE / archivo).exists():
                 continue
             html = (BASE / archivo).read_text(encoding="utf-8")
-            if i == 0 and tipo == "qualy":
-                destino, prefijo = SITIO / "index.html", ""
-            else:
-                destino, prefijo = SITIO / slug / f"{tipo}.html", "../"
+            destino, prefijo = SITIO / slug / f"{tipo}.html", "../"
             destino.parent.mkdir(exist_ok=True)
             destino.write_text(inyectar(html, nav((slug, tipo), prefijo)), encoding="utf-8")
             print("->", destino.relative_to(SITIO.parent))

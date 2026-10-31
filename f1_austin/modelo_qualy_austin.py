@@ -23,6 +23,8 @@ Uso:  python3 modelo_qualy_austin.py [meeting_key]     (1297 = Austin, 1298 = M�
           versión sábado: agrega variables de FP3 (NaN en fines de semana sprint) y escribe
           *_fp3 (resultado_qualy_<slug>_fp3.pkl, prediccion_qualy_<slug>_fp3_2026.csv, ...) sin
           tocar el pronóstico FP1/FP2. --jobs (o F1_N_JOBS) limita los hilos de RF/ET/XGB/LGB.
+          En el walk-forward los GPs sprint (sin FP3) se predicen con las variables FP1/FP2, como en vivo.
+          Si la FP3 del GP objetivo no está en cache (<10 pilotos), aborta sin escribir el pronóstico.
       python3 modelo_qualy_austin.py html <slug>[_fp3]  -> regenera sólo el HTML desde el .pkl
 """
 import json
@@ -538,7 +540,9 @@ def metricas(df_pred, col):
 
 def walk_forward(data, desde=2024, features=None, con_fp3=False, nombres=None):
     """Entrena con pilotos con tiempo de qualy; evalúa con TODOS los inscritos (sin tiempo = al fondo).
-    features: lista de variables (default FEATURES); nombres: subconjunto del catálogo (default todo)."""
+    features: lista de variables (default FEATURES); nombres: subconjunto del catálogo (default todo).
+    con_fp3: en los GPs sin FP3 (sprint) los modelos usan FEATURES (FP1/FP2), igual que se haría en
+    vivo: ese sábado no hay información nueva antes de la qualy. Los baselines usan sus columnas."""
     features = FEATURES if features is None else features
     cat = catalogo(con_fp3)
     if nombres is not None:
@@ -551,10 +555,13 @@ def walk_forward(data, desde=2024, features=None, con_fp3=False, nombres=None):
         tr = entrenables[entrenables.date < fecha].sort_values(["meeting_key", "driver_number"])
         te = data[data.meeting_key == mk].assign(q_pos=lambda x: x.q_eval)
         grupos = tr.groupby("meeting_key", sort=False).size().loc[tr.meeting_key.unique()].values
+        sin_fp3 = con_fp3 and not te.fp3_best.notna().any()
         for nombre, fab in cat.items():
-            m = fab().fit(tr[features], tr.q_pos.values, pesos(tr), grupos)
+            m = fab()
+            f = FEATURES if (sin_fp3 and m.tipo != "baseline") else features
+            m.fit(tr[f], tr.q_pos.values, pesos(tr), grupos)
             p = te[["meeting_key", "driver_number", "q_pos", "year"]].copy()
-            p["pred"] = m.predict(te[features])
+            p["pred"] = m.predict(te[f])
             preds[nombre].append(p)
         print(f"  walk-forward {i + 1}/{len(pruebas)}", end="\r")
     print()
@@ -658,8 +665,9 @@ def main(meeting=OBJETIVO_MEETING, con_fp3=False, nombres_modelos=None):
     obj = data[data.meeting_key == meeting].copy()
     print(f"Pilotos del GP objetivo: {len(obj)}")
     if con_fp3 and obj.fp3_best.notna().sum() < 10:
-        print(f"AVISO: la FP3 del GP objetivo tiene datos de sólo {obj.fp3_best.notna().sum()} pilotos "
-              "(¿falta bajarla? python3 descarga_datos.py <session_key_fp3>)")
+        # sin FP3 la versión sábado no aporta nada (y no se debe publicar como "FP3")
+        raise SystemExit(f"ERROR: la FP3 del GP objetivo tiene datos de sólo {obj.fp3_best.notna().sum()} pilotos. "
+                         "Bájala primero: python3 descarga_datos.py <session_key_fp3> (México: 11399)")
     historia = data[(data.meeting_key != meeting) & (data.date < obj.date.min()) & data.q_eval.notna()]
     train = historia[historia.q_pos.notna()]
     print(f"Filas de entrenamiento: {len(train)}  | GPs: {train.meeting_key.nunique()}  | Features: {len(feats)}")
@@ -676,6 +684,8 @@ def main(meeting=OBJETIVO_MEETING, con_fp3=False, nombres_modelos=None):
     p = p.dropna(subset=["res"])
     por_gp = metricas(preds[mejor], "pred").merge(
         meetings[["meeting_key", "circuit", "year"]], on="meeting_key")
+    print("Por año (" + mejor + "):")
+    print(por_gp.groupby("year")[["top10_hits", "spearman", "pole_hit"]].mean().round(3).to_string())
 
     predecir, modelos = ajustar_final(mejor, train, feats, con_fp3)
     if not importancias(modelos, feats).empty:
