@@ -16,9 +16,9 @@ y predicción del Top 10 de la qualy de México. Si la sesión se corta, retomar
 
 ## Fase 2 (pedido 14:00 UTC): página cinematográfica en vivo, compartible en Safari
 Estilo AURA (foto cinematográfica, serif editorial, acento naranja) + Día de Muertos + carreras, con animaciones.
-Se publica como Artifact de claude.ai (db: docs `gp/mexico2026` y `live/qualy`, contrato en el workflow w6w5u0pbl)
+Se publica como Artifact de claude.ai (db: docs `gp/mexico2026` y `live/qualy`, contrato en el workflow wzw9vriwd)
 y la misma carpeta `web_mexico/` va a Netlify (sin db → datos incrustados).
-- [ ] Workflow w6w5u0pbl: `web_mexico/index.html` (página), `live_qualy.py` (colector F1 Live Timing), modelo con `--fp3` + `exportar_datos_web.py`
+- [ ] Workflow wzw9vriwd (relanzado 14:20 con menú hamburguesa y referencias AURA en scratchpad/live/referencias): `web_mexico/index.html` (página), `live_qualy.py` (colector F1 Live Timing), modelo con `--fp3` + `exportar_datos_web.py`
 - [ ] Publicar Artifact con capabilities `{db:{rules:[gp y live: read view, write owner]}, user:{}}`; sembrar docs con ArtifactData; dar link
 - [ ] 18:40 UTC: bajar FP3 (`descarga_datos.py`, borrar cache de la sesión 11399), correr modelo con FP3, actualizar `gp/mexico2026` (campo cambio), republicar sitio
 - [ ] 20:50 UTC: lanzar `live_qualy.py` en segundo plano y relevar `live/qualy_mexico.json` → doc `live/qualy` cada ~60-90 s hasta 22:05 UTC
