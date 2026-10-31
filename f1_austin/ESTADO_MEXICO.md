@@ -51,3 +51,8 @@ Fuentes: Haas vía The Race / Sky / RaceFans (31/10). OpenF1 aún lista a OCO (#
 Docs db: gp/mexico2026 v2, live/qualy v2. Carrera: `python3 modelo_carrera_austin.py 1298 [--penalizaciones '{...}' | --parrilla '{...}']`
 → web_mexico/datos_carrera.json (degradación/paradas sólo informativas: no mejoraron la validación). Republicar siempre con:
 `python3 construir_web_mexico.py --gp web_mexico/datos_gp.json --live live/qualy_mexico.json [--post live/post_qualy.json --carrera web_mexico/datos_carrera.json]`
+
+### 17:45 UTC: prueba del colector en FP3 → el feed público NO trae TimingData (posiciones) y SessionInfo dice "Race"
+Sí trae TimingStats (mejores vueltas con hora), tiempos de sector, neumáticos, pits, reloj, estado y mensajes de carrera. Workflow wn21wo97b
+(hora límite 19:45): modo público en live_qualy.py que reconstruye la clasificación con las mejores vueltas por segmento
+(Q1 exacta; Q2/Q3 aproximadas). Si falla, plan B: monitoreo por segmentos con el feed público sólo para Q1 y resultado oficial al final.
