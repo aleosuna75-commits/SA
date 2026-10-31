@@ -12875,3 +12875,13 @@
 {"t": 1793484558.9049969, "m": {"type": 1, "target": "feed", "arguments": ["TimingData", {"Lines": {"30": {"InPit": true, "Status": 80, "NumberOfPitStops": 5}}}, "2026-10-31T22:09:16.889Z"]}}
 {"t": 1793484559.154377, "m": {"type": 1, "target": "feed", "arguments": ["TimingData", {"Lines": {"16": {"Sectors": {"2": {"Segments": {"0": {"Status": 2048}}}}}}}, "2026-10-31T22:09:17.14Z"]}}
 {"t": 1793484559.1982358, "m": {"type": 1, "target": "feed", "arguments": ["TimingData", {"Lines": {"10": {"Sectors": {"2": {"Segments": {"1": {"Status": 2048}}}}}}}, "2026-10-31T22:09:17.14Z"]}}
+{"t": 1793484562.519024, "m": {"type": 1, "target": "feed", "arguments": ["Heartbeat", {"Utc": "2026-10-31T22:09:22.5336423Z", "_kf": true}, "2026-10-31T22:09:20.434Z"]}}
+{"t": 1793484562.7446654, "m": {"type": 1, "target": "feed", "arguments": ["TimingData", {"Lines": {"16": {"Sectors": {"2": {"Segments": {"1": {"Status": 2048}}}}}}}, "2026-10-31T22:09:20.74Z"]}}
+{"t": 1793484563.2871761, "m": {"type": 1, "target": "feed", "arguments": ["TimingData", {"Lines": {"3": {"Sectors": {"0": {"Segments": {"2": {"Status": 2048}}}}}}}, "2026-10-31T22:09:21.271Z"]}}
+{"t": 1793484563.73909, "m": {"type": 1, "target": "feed", "arguments": ["TimingData", {"Lines": {"3": {"Speeds": {"ST": {"Value": "248", "PersonalFastest": false}}}}}, "2026-10-31T22:09:21.731Z"]}}
+{"t": 1793484566.1219432, "m": {"type": 1, "target": "feed", "arguments": ["TimingData", {"Lines": {"12": {"Sectors": {"1": {"Segments": {"1": {"Status": 2048}}}}}}}, "2026-10-31T22:09:24.115Z"]}}
+{"t": 1793484566.1655533, "m": {"type": 1, "target": "feed", "arguments": ["TimingData", {"Lines": {"3": {"Sectors": {"0": {"Segments": {"3": {"Status": 2048}}}}}}}, "2026-10-31T22:09:24.158Z"]}}
+{"t": 1793484566.791172, "m": {"type": 1, "target": "feed", "arguments": ["TimingData", {"Lines": {"10": {"Sectors": {"2": {"Segments": {"2": {"Status": 2048}}}}}}}, "2026-10-31T22:09:24.789Z"]}}
+{"t": 1793484568.6229436, "m": {"type": 6}}
+{"t": 1793484569.987476, "m": {"type": 1, "target": "feed", "arguments": ["TimingData", {"Lines": {"16": {"Sectors": {"2": {"Segments": {"2": {"Status": 2048}}}}}}}, "2026-10-31T22:09:27.986Z"]}}
+{"t": 1793484571.094461, "evento": "desconectado"}

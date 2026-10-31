@@ -1,5 +1,5 @@
 {
- "actualizado": "2026-10-31T22:09:20.199Z",
+ "actualizado": "2026-10-31T22:09:31.100Z",
  "estado": "terminada",
  "segmento": 3,
  "reloj": "00:00",
@@ -351,10 +351,10 @@
   }
  ],
  "colector": {
-  "conectado": true,
+  "conectado": false,
   "reconexiones": 1,
-  "ultimo_dato": "2026-10-31T22:09:19.198Z",
-  "mensajes": 12872,
+  "ultimo_dato": "2026-10-31T22:09:29.987Z",
+  "mensajes": 12881,
   "errores": 0,
   "version": "1.1"
  }
