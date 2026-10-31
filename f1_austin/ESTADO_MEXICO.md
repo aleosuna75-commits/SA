@@ -59,3 +59,7 @@ Sí trae TimingStats (mejores vueltas con hora), tiempos de sector, neumáticos,
 18:37 UTC: colector v1.1 con modo público listo (probado 50 min con la FP3 real: 20/20 idéntico a TimingData; el feed se corrigió solo
 a las 17:44). Comando de la qualy (20:50 UTC, desde f1_austin/; relanzar igual si se cae):
 `python3 live_qualy.py --salida live/qualy_mexico.json --minutos 80 --grabar live/crudo_qualy.jsonl --precargar live/crudo_qualy.jsonl`
+18:52 UTC: OpenF1 sigue en 401 tras la FP3. FP3 reconstruida desde la grabación del live timing con `fp3_desde_live.py`
+(mejor vuelta 22/22 y vueltas 22/22 validadas; sin clima) → copiada a cache/*_11399.json; corrida del modelo con --fp3 en curso
+(log corrida_mexico_fp3.log). Luego: `python3 exportar_datos_web.py mexico_fp3 --previo resultado_qualy_mexico.pkl`, db gp/mexico2026
+(if_version 2), construir_web_mexico.py, republicar Artifact, publicar_sitio.py.
