@@ -1,6 +1,6 @@
 {
- "actualizado": "2026-10-31T22:11:45Z",
- "aciertos_top10": 9,
+ "actualizado": "2026-11-01T02:58:54Z",
+ "aciertos_top10": 8,
  "top10_pred": [
   "ANT",
   "LEC",
@@ -21,20 +21,20 @@
   "ANT",
   "NOR",
   "HAD",
-  "LAW",
   "LIN",
-  "GAS"
+  "GAS",
+  "HUL"
  ],
  "pole_pred": "ANT",
  "pole_real": "HAM",
  "acierto_pole": false,
- "q1_fuera_aciertos": 5,
+ "q1_fuera_aciertos": 4,
  "q1_fuera_total": 6,
- "q2_fuera_aciertos": 4,
+ "q2_fuera_aciertos": 3,
  "q2_fuera_total": 6,
- "mae": 2.0,
- "spearman": 0.907,
- "exactos": 4,
+ "mae": 2.82,
+ "spearman": 0.808,
+ "exactos": 2,
  "filas": [
   {
    "acr": "HAM",
@@ -100,22 +100,13 @@
    "dif": 1
   },
   {
-   "acr": "LAW",
-   "nombre": "Liam Lawson",
-   "equipo": "Racing Bulls",
-   "color": "6C98FF",
-   "pred": 9,
-   "real": 8,
-   "dif": 1
-  },
-  {
    "acr": "LIN",
    "nombre": "Arvid Lindblad",
    "equipo": "Racing Bulls",
    "color": "6C98FF",
    "pred": 10,
-   "real": 9,
-   "dif": 1
+   "real": 8,
+   "dif": 2
   },
   {
    "acr": "GAS",
@@ -123,8 +114,8 @@
    "equipo": "Alpine",
    "color": "00A1E8",
    "pred": 11,
-   "real": 10,
-   "dif": 1
+   "real": 9,
+   "dif": 2
   },
   {
    "acr": "HUL",
@@ -132,8 +123,8 @@
    "equipo": "Audi",
    "color": "F50537",
    "pred": 13,
-   "real": 11,
-   "dif": 2
+   "real": 10,
+   "dif": 3
   },
   {
    "acr": "COL",
@@ -141,8 +132,8 @@
    "equipo": "Alpine",
    "color": "00A1E8",
    "pred": 12,
-   "real": 12,
-   "dif": 0
+   "real": 11,
+   "dif": 1
   },
   {
    "acr": "PIA",
@@ -150,8 +141,8 @@
    "equipo": "McLaren",
    "color": "F47600",
    "pred": 6,
-   "real": 13,
-   "dif": -7
+   "real": 12,
+   "dif": -6
   },
   {
    "acr": "BOR",
@@ -159,8 +150,8 @@
    "equipo": "Audi",
    "color": "F50537",
    "pred": 16,
-   "real": 14,
-   "dif": 2
+   "real": 13,
+   "dif": 3
   },
   {
    "acr": "BEA",
@@ -168,8 +159,8 @@
    "equipo": "Haas F1 Team",
    "color": "9C9FA2",
    "pred": 15,
-   "real": 15,
-   "dif": 0
+   "real": 14,
+   "dif": 1
   },
   {
    "acr": "SAI",
@@ -177,8 +168,8 @@
    "equipo": "Williams",
    "color": "1868DB",
    "pred": 17,
-   "real": 16,
-   "dif": 1
+   "real": 15,
+   "dif": 2
   },
   {
    "acr": "ALB",
@@ -186,8 +177,8 @@
    "equipo": "Williams",
    "color": "1868DB",
    "pred": 20,
-   "real": 17,
-   "dif": 3
+   "real": 16,
+   "dif": 4
   },
   {
    "acr": "ALO",
@@ -195,8 +186,8 @@
    "equipo": "Aston Martin",
    "color": "229971",
    "pred": 14,
-   "real": 18,
-   "dif": -4
+   "real": 17,
+   "dif": -3
   },
   {
    "acr": "HIR",
@@ -204,8 +195,8 @@
    "equipo": "Haas F1 Team",
    "color": "9C9FA2",
    "pred": 18,
-   "real": 19,
-   "dif": -1
+   "real": 18,
+   "dif": 0
   },
   {
    "acr": "STR",
@@ -213,8 +204,8 @@
    "equipo": "Aston Martin",
    "color": "229971",
    "pred": 21,
-   "real": 20,
-   "dif": 1
+   "real": 19,
+   "dif": 2
   },
   {
    "acr": "PER",
@@ -222,8 +213,8 @@
    "equipo": "Cadillac",
    "color": "909090",
    "pred": 19,
-   "real": 21,
-   "dif": -2
+   "real": 20,
+   "dif": -1
   },
   {
    "acr": "BOT",
@@ -231,9 +222,18 @@
    "equipo": "Cadillac",
    "color": "909090",
    "pred": 22,
+   "real": 21,
+   "dif": 1
+  },
+  {
+   "acr": "LAW",
+   "nombre": "Liam Lawson",
+   "equipo": "Racing Bulls",
+   "color": "6C98FF",
+   "pred": 9,
    "real": 22,
-   "dif": 0
+   "dif": -13
   }
  ],
- "resumen": "El modelo acertó 9 de los 10 que llegaron a la Q3; sólo se le escapó PIA (eliminado en Q2) y en su lugar entró GAS. La pole fue para Hamilton, a quien el modelo veía P7 con 1% de probabilidad: su vuelta de Q3 fue la sorpresa del día. Error medio de 2.0 lugares y correlación de 0.907 entre pronóstico y resultado."
+ "resumen": "En pista, el modelo acertó 9 de los 10 que llegaron a la Q3 (sólo se le escapó Piastri, eliminado en Q2). Tras la descalificación de Lawson (MGU-K en su vuelta de Q2), la clasificación oficial sube a Hülkenberg al Top 10 y el acierto oficial queda en 8 de 10. La pole fue para Hamilton, a quien el modelo veía P7 con 1% de probabilidad. Error medio de 2.82 lugares y correlación de 0.808 contra la clasificación oficial."
 }
