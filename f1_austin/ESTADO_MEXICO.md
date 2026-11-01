@@ -87,3 +87,4 @@ Workflow w6x89rhce: `sim_vueltas.py` (simulador vuelta a vuelta calibrado con 88
 (vuelta a vuelta anclado 0.8866 vs 0.8898, Wilcoxon p=0.015 a favor del actual); vuelta a vuelta aporta estrategias (1 parada 58%, M-H
 ~v28, pit 22.9 s), duelos (undercut RUS→HAM v25 48%), rebases (~54), SC/VSC 71%, trazas. Regenerar: `python3 sim_vueltas.py mexico --sims 6000`
 (si cambia la parrilla: primero modelo_carrera_austin.py --parrilla, luego sim_vueltas.py, luego construir_web_mexico.py con --vueltas).
+15:31 UTC 1/11: revisión final sin cambios (parrilla igual: LAW P22; sin salidas desde pit lane reportadas; pronóstico seco ~26-27 °C, consistente con el modelo). OpenF1 starting_grid aún 404.
