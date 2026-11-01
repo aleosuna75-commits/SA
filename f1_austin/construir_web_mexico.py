@@ -1,10 +1,11 @@
 """Incrusta los datos de respaldo en web_mexico/index.html (página cinematográfica del pronóstico de qualy).
 
-La página lee en vivo los docs "gp/mexico2026", "live/qualy", "post/qualy" y "carrera/mexico2026" de la base de datos
-del Artifact; cuando no hay base (Netlify, archivo local, viewer sin sesión) usa el JSON incrustado en
-<script type="application/json" id="datos">{"gp":…,"live":…,"post":…,"carrera":…}</script>.
-"post" (cómo le fue al modelo en la qualy) y "carrera" (pronóstico del orden final de la carrera) son opcionales:
-si no se pasan, la página muestra su estado de espera ("Se publica al terminar la qualy").
+La página lee en vivo los docs "gp/mexico2026", "live/qualy", "post/qualy", "carrera/mexico2026" y "carrera/vueltas"
+de la base de datos del Artifact; cuando no hay base (Netlify, archivo local, viewer sin sesión) usa el JSON incrustado en
+<script type="application/json" id="datos">{"gp":…,"live":…,"post":…,"carrera":…,"vueltas":…}</script>.
+"post" (cómo le fue al modelo en la qualy), "carrera" (pronóstico del orden final de la carrera) y "vueltas" (la carrera
+vuelta a vuelta: estrategias, posiciones por vuelta, undercut/overcut, rebases y safety car) son opcionales:
+si no se pasan, la página muestra su estado de espera.
 Este script sólo reemplaza ese bloque; el resto del HTML no se toca.
 
 Uso:
@@ -12,6 +13,8 @@ Uso:
   python3 construir_web_mexico.py --gp web_mexico/datos_gp.json --live live/qualy_mexico.json
   python3 construir_web_mexico.py --gp web_mexico/datos_gp.json --live live/qualy_mexico.json \
       --post live/post_qualy.json --carrera live/carrera_mexico2026.json   # tras la qualy
+  python3 construir_web_mexico.py --gp web_mexico/datos_gp.json --live live/qualy_mexico.json \
+      --post live/post_qualy.json --carrera web_mexico/datos_carrera.json --vueltas web_mexico/datos_vueltas.json
   python3 construir_web_mexico.py --salida /tmp/prueba.html --live prueba_live.json   # copia para pruebas
   python3 construir_web_mexico.py --salida ../sitio_f1/index.html --documento          # copia con doctype (Netlify)
 """
@@ -82,7 +85,7 @@ def live_pendiente(gp):
 
 
 def _cargar_opcional(ruta, nombre, valido):
-    """Lee el JSON de un doc opcional (post/qualy o carrera/mexico2026) y verifica su forma mínima."""
+    """Lee el JSON de un doc opcional (post/qualy, carrera/mexico2026 o carrera/vueltas) y verifica su forma mínima."""
     d = json.load(open(ruta, encoding="utf-8"))
     if not isinstance(d, dict) or not valido(d):
         raise SystemExit(f"{ruta}: no parece un doc {nombre} válido")
@@ -97,6 +100,13 @@ def post_valido(d):
 def carrera_valida(d):
     ps = d.get("pilotos")
     return isinstance(ps, list) and any(isinstance(p, dict) and p.get("acr") for p in ps)
+
+
+def vueltas_valida(d):
+    trazas, est = d.get("trazas"), d.get("estrategias")
+    return ((isinstance(trazas, list) and any(isinstance(t, dict) and t.get("acr") and isinstance(t.get("posiciones"), list)
+                                              for t in trazas))
+            or (isinstance(est, list) and any(isinstance(e, dict) and e.get("acr") for e in est)))
 
 
 def incrustar(html, datos):
@@ -114,6 +124,8 @@ def main():
     ap.add_argument("--live", help="JSON del doc live/qualy (por defecto: estado pendiente)")
     ap.add_argument("--post", help="JSON del doc post/qualy: cómo le fue al modelo en la qualy (por defecto ausente)")
     ap.add_argument("--carrera", help="JSON del doc carrera/mexico2026: pronóstico del orden final (por defecto ausente)")
+    ap.add_argument("--vueltas", help="JSON del doc carrera/vueltas (web_mexico/datos_vueltas.json): carrera vuelta a vuelta, "
+                                      "estrategias, duelos, rebases y safety car (por defecto ausente)")
     ap.add_argument("--entrada", default=str(HTML))
     ap.add_argument("--salida", default=None)
     ap.add_argument("--documento", action="store_true",
@@ -129,6 +141,8 @@ def main():
         datos["post"] = _cargar_opcional(a.post, "post/qualy", post_valido)
     if a.carrera:
         datos["carrera"] = _cargar_opcional(a.carrera, "carrera/mexico2026", carrera_valida)
+    if a.vueltas:
+        datos["vueltas"] = _cargar_opcional(a.vueltas, "carrera/vueltas", vueltas_valida)
     final = incrustar(html, datos)
     if a.documento:
         if out.resolve() == Path(a.entrada).resolve():
@@ -138,7 +152,8 @@ def main():
                  + final + "</body></html>")
     out.write_text(final, encoding="utf-8")
     print(f"{out}: gp fase={gp.get('fase')} pilotos={len(gp.get('pilotos', []))} live={live.get('estado')} "
-          f"post={'sí' if 'post' in datos else 'no'} carrera={'sí' if 'carrera' in datos else 'no'}")
+          f"post={'sí' if 'post' in datos else 'no'} carrera={'sí' if 'carrera' in datos else 'no'} "
+          f"vueltas={'sí' if 'vueltas' in datos else 'no'}")
 
 
 if __name__ == "__main__":

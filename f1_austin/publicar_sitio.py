@@ -62,7 +62,8 @@ def main():
     cmd = [sys.executable, str(BASE / "construir_web_mexico.py"), "--salida", str(SITIO / "index.html"),
            "--documento", "--gp", str(PORTADA / "datos_gp.json"), "--live", str(BASE / "live" / "qualy_mexico.json")]
     # evaluación de la qualy y pronóstico de carrera, cuando ya existen
-    for opcion, archivo in (("--post", BASE / "live" / "post_qualy.json"), ("--carrera", PORTADA / "datos_carrera.json")):
+    for opcion, archivo in (("--post", BASE / "live" / "post_qualy.json"), ("--carrera", PORTADA / "datos_carrera.json"),
+                            ("--vueltas", PORTADA / "datos_vueltas.json")):
         if archivo.exists():
             cmd += [opcion, str(archivo)]
     subprocess.run(cmd, check=True)

@@ -1,0 +1,240 @@
+{
+ "protocolo": "Walk-forward 2024-2026 (66 GP): cada GP se calibra sólo con carreras anteriores (corte por inicio del fin de semana) y se simulan 2000 carreras; métricas por GP promediadas. El simulador actual se evalúa en los mismos GP con 20 000 carreras.",
+ "modo_oficial": "anclado",
+ "vueltas_libre": {
+  "ndcg10": 0.8815,
+  "ndcg10_2024": 0.8936,
+  "ndcg10_2025": 0.8856,
+  "ndcg10_2026": 0.8599,
+  "top10_hits": 7.9848,
+  "pos_exact10": 2.3182,
+  "mae_top10": 2.2424,
+  "spearman": 0.7058,
+  "win_acc": 0.5758,
+  "podium_hits": 2.0758,
+  "n_gp": 66
+ },
+ "vueltas_anclado": {
+  "ndcg10": 0.8866,
+  "ndcg10_2024": 0.8972,
+  "ndcg10_2025": 0.888,
+  "ndcg10_2026": 0.8704,
+  "top10_hits": 8.0,
+  "pos_exact10": 2.1818,
+  "mae_top10": 2.25,
+  "spearman": 0.7053,
+  "win_acc": 0.5758,
+  "podium_hits": 2.1061,
+  "n_gp": 66
+ },
+ "actual": {
+  "ndcg10": 0.8898,
+  "ndcg10_2024": 0.8957,
+  "ndcg10_2025": 0.8946,
+  "ndcg10_2026": 0.8755,
+  "top10_hits": 7.9848,
+  "pos_exact10": 2.3333,
+  "mae_top10": 2.2091,
+  "spearman": 0.7081,
+  "win_acc": 0.6212,
+  "podium_hits": 2.0909,
+  "n_gp": 66
+ },
+ "orden_qualy": {
+  "ndcg10": 0.8808,
+  "ndcg10_2024": 0.8893,
+  "ndcg10_2025": 0.8828,
+  "ndcg10_2026": 0.8667,
+  "top10_hits": 8.0152,
+  "pos_exact10": 2.2273,
+  "mae_top10": 2.4,
+  "spearman": 0.6986,
+  "win_acc": 0.6212,
+  "podium_hits": 2.0,
+  "n_gp": 66
+ },
+ "dif_vs_actual_libre": {
+  "media": -0.008273624167626422,
+  "ic90": [
+   -0.014827588246570223,
+   -0.001234331690099844
+  ],
+  "gana": 17,
+  "pierde": 42
+ },
+ "dif_vs_actual_anclado": {
+  "media": -0.0032238751793610553,
+  "ic90": [
+   -0.0063389362216739135,
+   5.6287445655929205e-05
+  ],
+  "gana": 16,
+  "pierde": 28
+ },
+ "mejor_o_igual_que_actual": true,
+ "estrategia": {
+  "n": 956,
+  "acierto_paradas": 0.5439,
+  "acierto_paradas_base_1": 0.478,
+  "paradas_pred_media": 1.4843,
+  "paradas_real_media": 1.681,
+  "mae_primera_parada": 8.0465,
+  "sesgo_primera_parada": -1.7882,
+  "mae_primera_parada_verde": 7.7559,
+  "mae_base_mediana_circuito": 10.0563,
+  "acierto_paradas_base_circuito": 0.3504
+ },
+ "rebases": {
+  "n": 1187,
+  "corr_ganados": 0.2292,
+  "corr_perdidos": 0.3052,
+  "corr_netos": 0.3569,
+  "spearman_netos": 0.3579,
+  "total_pred_medio": 45.6448,
+  "total_real_medio": 41.5,
+  "corr_total_carrera": 0.1988
+ },
+ "duelos": {
+  "n_gp": 52,
+  "real": {
+   "overcut": {
+    "mean": 0.118,
+    "size": 331
+   },
+   "undercut": {
+    "mean": 0.532,
+    "size": 299
+   }
+  },
+  "sim": {
+   "overcut": {
+    "mean": 0.202,
+    "size": 84542
+   },
+   "undercut": {
+    "mean": 0.568,
+    "size": 108347
+   }
+  },
+  "duelos_por_carrera_real": 12.115384615384615,
+  "duelos_por_carrera_sim": 11.085574712643679,
+  "brier_sim": 0.1989395852009344,
+  "brier_tasa_por_tipo": 0.1711064367583972,
+  "n_pares": 538,
+  "acierto_sim": 0.7044609665427509
+ },
+ "variantes_probadas": [
+  {
+   "variante": "v1",
+   "cambio": "base: ruido de ritmo = sd de residuos, rebases sin escalar (300 carreras/GP)",
+   "ndcg10": 0.8758
+  },
+  {
+   "variante": "v2",
+   "cambio": "ruido de ritmo MAD x0.7 y pendiente de rebase x0.6 (calibrados en 2023-2S, fuera de la prueba)",
+   "ndcg10": 0.8775
+  },
+  {
+   "variante": "v3",
+   "cambio": "+ plan de carrera compartido (rho 0.4) + vuelta 1 con P(pole sigue 1.º)",
+   "ndcg10": 0.8745
+  },
+  {
+   "variante": "v4",
+   "cambio": "+ ruido de parada común/propio, cubrir por posición, paradas con SC por tabla histórica, relanzamientos",
+   "ndcg10": 0.8793
+  },
+  {
+   "variante": "v4 anclado",
+   "cambio": "v4 con ritmo efectivo anclado al simulador oficial (300 carreras/GP)",
+   "ndcg10": 0.8834
+  },
+  {
+   "variante": "v4b",
+   "cambio": "+ indicador de pole en el modelo de ritmo (2000 carreras/GP)",
+   "ndcg10": 0.8758
+  },
+  {
+   "variante": "v4b anclado",
+   "cambio": "v4b anclado (2000 carreras/GP)",
+   "ndcg10": 0.8845
+  },
+  {
+   "variante": "v5",
+   "cambio": "+ decisiones correlacionadas bajo SC (rho 0.9), planes casi equivalentes, conformidad por posición",
+   "ndcg10": 0.8791
+  },
+  {
+   "variante": "v6 libre (final)",
+   "cambio": "pendiente de rebase sin escalar y menor intercepto (-0.5) para igualar rebases totales en 2023-2S",
+   "ndcg10": 0.8815
+  },
+  {
+   "variante": "v6 anclado (final)",
+   "cambio": "v6 anclado al simulador oficial (2000 carreras/GP)",
+   "ndcg10": 0.8866
+  }
+ ],
+ "nota": "Ajustes de ruido de ritmo, sensibilidad de rebase, conformidad de plan y vuelta 1 calibrados con 13 carreras de la 2.ª mitad de 2023 (fuera del periodo de prueba) igualando dispersión de posiciones, rebases totales, plan modal y paradas bajo SC (~20 configuraciones probadas ahí); las 10 corridas v1-v6 se compararon mirando este walk-forward (sesgo de selección declarado). El modo anclado usa como objetivo la posición media del simulador oficial, así que su orden no es independiente de él: lo nuevo son estrategias, rebases, duelos, SC y trazas.",
+ "resumen_doc": {
+  "ndcg10": 0.8866,
+  "ndcg10_2024": 0.8972,
+  "ndcg10_2025": 0.888,
+  "ndcg10_2026": 0.8704,
+  "top10_hits": 8.0,
+  "win_acc": 0.576,
+  "podium_hits": 2.11,
+  "n_gp": 66,
+  "modo": "anclado",
+  "ndcg10_libre": 0.8815,
+  "ndcg10_actual": 0.8898,
+  "ndcg10_orden_qualy": 0.8808,
+  "paradas_acierto": 0.544,
+  "paradas_acierto_base_todos_1": 0.478,
+  "primera_parada_mae_vueltas": 8.05,
+  "primera_parada_mae_base_circuito": 10.06,
+  "rebases_corr_netos": 0.357,
+  "rebases_total_pred_vs_real": [
+   45.6,
+   41.5
+  ],
+  "undercut_exito_sim_vs_real": [
+   0.568,
+   0.532
+  ],
+  "overcut_exito_sim_vs_real": [
+   0.202,
+   0.118
+  ],
+  "dif_ndcg10_vs_actual": -0.0032,
+  "dif_ic90": [
+   -0.0063,
+   0.0001
+  ],
+  "ndcg10_por_año": {
+   "anclado": [
+    0.8972,
+    0.888,
+    0.8704
+   ],
+   "libre": [
+    0.8936,
+    0.8856,
+    0.8599
+   ],
+   "actual": [
+    0.8957,
+    0.8946,
+    0.8755
+   ],
+   "orden_qualy": [
+    0.8893,
+    0.8828,
+    0.8667
+   ]
+  },
+  "nota": "Walk-forward 2024-2026: el modo anclado empata con el simulador oficial dentro del ruido (IC90 de la diferencia por GP toca 0) pero acierta menos ganadores; el libre queda por debajo del oficial y apenas arriba del orden de qualy. Estrategia: acierta el número de paradas más que 'todos a 1 parada' y la 1.ª parada mejor que la mediana histórica del circuito; el éxito del undercut está bien calibrado y el del overcut sobrestimado.",
+  "variantes_probadas": 10
+ },
+ "actualizado": "2026-11-01T04:41:39Z"
+}

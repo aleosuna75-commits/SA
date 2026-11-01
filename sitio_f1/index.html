@@ -93,6 +93,8 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
 .hamb[aria-expanded="true"] span:nth-child(1){top:21.5px;transform:rotate(45deg)}
 .hamb[aria-expanded="true"] span:nth-child(2){opacity:0;transform:scaleX(.2)}
 .hamb[aria-expanded="true"] span:nth-child(3){top:21.5px;transform:rotate(-45deg)}
+.nav__links a{white-space:nowrap}
+@media (max-width:1140px){.nav__links{gap:18px}.nav__links a{letter-spacing:.18em}}
 @media (max-width:960px){.nav__links{display:none}}
 @media (max-width:400px){.logo{letter-spacing:.3em;font-size:15px}.nav__der .btn{padding:11px 12px;letter-spacing:.16em}}
 
@@ -668,6 +670,236 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
   .valida .metricas dd{font-size:28px}
 }
 
+/* ---------- La carrera, vuelta a vuelta (doc carrera/vueltas) ---------- */
+.vueltas{position:relative;background:linear-gradient(180deg,var(--noche) 0%,#110e0e 38%,var(--noche) 100%);--g-s:#da291c;--g-m:#ffd12e;--g-h:#ece8e1;--g-i:#43b02a;--g-w:#2b7fd6}
+.vueltas::before{content:"";position:absolute;left:0;right:0;top:0;height:5px;opacity:.3;background:repeating-linear-gradient(90deg,var(--cempa) 0 26px,var(--hueso) 26px 52px)}
+.vv-cab{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:28px clamp(28px,5vw,72px);align-items:start}
+.vv-cab .ceja{margin-bottom:12px}
+.vv-cab .metricas dd{font-size:38px}
+.vv-bloque{margin-top:clamp(72px,9vw,120px);min-width:0}
+.vv-bloque__cab{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,.95fr);gap:12px clamp(28px,5vw,64px);align-items:end;margin-bottom:26px}
+.vv-bloque__cab .ceja{margin-bottom:10px}
+.vv-bloque__cab .txt{font-size:14.5px;justify-self:end}
+.vv-controles{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:14px 24px;margin-bottom:18px}
+.vv-seg{display:inline-flex;align-items:center;gap:10px}
+.vv-seg>span{font:500 9.5px/1.2 var(--f-body);letter-spacing:.22em;text-transform:uppercase;color:var(--humo)}
+.vv-seg__btns{display:inline-flex;border:1px solid var(--linea-2)}
+.vv-seg__btns button{background:transparent;border:0;padding:10px 14px;min-height:38px;font:600 10px/1 var(--f-body);letter-spacing:.2em;text-transform:uppercase;color:var(--ceniza);cursor:pointer;transition:background .3s,color .3s}
+.vv-seg__btns button+button{box-shadow:inset 1px 0 0 var(--linea-2)}
+.vv-seg__btns button:hover{color:var(--hueso);background:rgba(239,231,220,.05)}
+.vv-seg__btns button[aria-pressed="true"]{background:var(--cempa);color:var(--tinta)}
+.vv-ley{display:flex;flex-wrap:wrap;align-items:center;gap:8px 18px;margin:0;font-size:12.5px;color:var(--ceniza)}
+.vv-ley>span{display:inline-flex;align-items:center;gap:8px}
+.vv-ley .m-pit{width:2px;height:16px;background:var(--hueso);box-shadow:0 0 0 2px var(--noche)}
+.vv-ley .m-ven{width:18px;height:12px;background:rgba(255,138,61,.16);border-left:1px solid rgba(255,138,61,.5);border-right:1px solid rgba(255,138,61,.5)}
+.vv-ley .m-sc{width:18px;height:12px;background:rgba(255,213,144,.16);border-left:2px solid var(--vela)}
+.vv-ley .m-l{width:22px;height:0;border-top:2px solid var(--hueso)}
+.vv-ley .m-l.dash{border-top-style:dashed}
+.vv-ley .m-circ{width:9px;height:9px;border-radius:50%;border:2px solid var(--hueso);background:var(--noche)}
+.vv-ley .m-top{width:22px;height:0;border-top:1px dashed var(--cempa)}
+.vv-neum{display:inline-grid;place-items:center;width:1.75em;height:1.75em;border-radius:50%;border:.24em solid var(--g,#777);font:700 11px/1 var(--f-dato);letter-spacing:0;color:var(--hueso);background:#0d0b0b;vertical-align:middle;flex:none;font-style:normal}
+.vv-plan{display:inline-flex;align-items:center;gap:4px;vertical-align:middle}
+.vv-cab dd .vv-neum{font-size:17px}
+.vv-ley .vv-neum{font-size:10.5px}
+.vv-est__alt .vv-neum{font-size:9px}
+/* Mapa de estrategias */
+.vv-eje-fila,.vv-est{display:grid;grid-template-columns:30px 3px minmax(0,148px) minmax(0,1fr) 62px minmax(0,176px);gap:14px;align-items:center}
+.vv-eje-fila{padding:0 0 10px;border-bottom:1px solid var(--linea-2);font:500 9.5px/1.3 var(--f-body);letter-spacing:.18em;text-transform:uppercase;color:var(--humo)}
+.vv-eje-fila>span:nth-child(5){text-align:right}
+.vv-eje{position:relative;height:14px;font:500 11px/14px var(--f-dato);letter-spacing:.04em;color:var(--humo);text-transform:none}
+.vv-eje span{position:absolute;top:0;transform:translateX(-50%);white-space:nowrap}
+.vv-eje span:first-child{transform:none}.vv-eje span:last-child{transform:translateX(-100%)}
+.vv-mapa{list-style:none;margin:0;padding:0}
+.vv-est{padding:9px 0;border-bottom:1px solid var(--linea);transition:background .25s}
+.vv-est:hover{background:rgba(255,138,61,.04)}
+.vv-est__pos{font:600 19px/1 var(--f-dato);font-variant-numeric:tabular-nums;text-align:right;color:var(--hueso)}
+.vv-est__eq{height:28px;background:var(--c,#888)}
+.vv-est__pil{min-width:0;display:grid;gap:3px}
+.vv-est__pil b{font:600 17px/1 var(--f-dato);letter-spacing:.06em}
+.vv-est__pil small{font-size:12px;color:var(--ceniza);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.vv-pista{position:relative;height:18px;background:rgba(239,231,220,.04);border-radius:3px}
+.vv-stint{position:absolute;top:0;bottom:0;background:var(--g,#5a5450);border-radius:3px;display:flex;align-items:center;padding-left:6px;font:700 12px/1 var(--f-dato);letter-spacing:.04em;color:#160c05;overflow:hidden;transform-origin:0 50%;transition:transform 1s var(--ease);transition-delay:calc(var(--i,0)*28ms + var(--j,0)*120ms)}
+.vv-stint.claro{color:#fff}
+.vv-stint.sin{background:repeating-linear-gradient(135deg,rgba(239,231,220,.18) 0 4px,rgba(239,231,220,.06) 4px 8px)}
+.vv-paro{position:absolute;top:-5px;bottom:-5px;width:2px;margin-left:-1px;background:var(--hueso);box-shadow:0 0 0 2px var(--noche);border-radius:1px}
+.rv-pre .vv-stint{transform:scaleX(0)}
+.vv-est__prob{text-align:right;display:grid;gap:4px}
+.vv-est__prob b{font:600 21px/1 var(--f-dato);font-variant-numeric:tabular-nums}
+.vv-est__prob small{font:500 9px/1.2 var(--f-body);letter-spacing:.16em;text-transform:uppercase;color:var(--humo)}
+.vv-est__alt{min-width:0;display:grid;gap:4px;font-size:12.5px;color:var(--ceniza);line-height:1.35}
+.vv-est__alt b{color:var(--hueso);font-weight:500}
+.vv-est__alt span{display:flex;align-items:center;flex-wrap:wrap;gap:3px 5px}
+/* Posiciones vuelta a vuelta */
+.vv-graf{position:relative;touch-action:pan-y;-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent;outline-offset:6px}
+.vv-graf svg{display:block;width:100%;height:auto;overflow:visible}
+.vv-carril{stroke:rgba(239,231,220,.045);stroke-width:1}
+.vv-reja{stroke:rgba(239,231,220,.07);stroke-width:1}
+.vv-base{stroke:rgba(239,231,220,.2);stroke-width:1}
+.vv-corte{stroke:var(--cempa);stroke-width:1;stroke-dasharray:4 4;opacity:.7}
+.vv-corte-t{font:500 9px var(--f-body);letter-spacing:.2em;fill:var(--cempa);paint-order:stroke;stroke:var(--noche);stroke-width:4px}
+.vv-tick{font:500 11px var(--f-dato);letter-spacing:.04em;fill:var(--humo)}
+.vv-tick-t{font:600 9px var(--f-body);letter-spacing:.22em;fill:var(--humo)}
+.vv-ventana{fill:rgba(255,138,61,.075)}
+.vv-ventana-b{stroke:rgba(255,138,61,.4);stroke-width:1}
+.vv-ventana-t{font:600 9px var(--f-body);letter-spacing:.16em;fill:var(--cempa)}
+.vv-sc-b{fill:rgba(255,213,144,.09)}
+.vv-sc-asta{stroke:var(--vela);stroke-width:1.5}
+.vv-sc-flag{fill:var(--vela)}
+.vv-sc-t{font:700 9.5px var(--f-dato);letter-spacing:.08em;fill:var(--tinta)}
+.vv-l{transition:opacity .3s}
+.vv-l .trazo{fill:none;stroke:var(--c);stroke-width:2;stroke-linecap:round;stroke-linejoin:round;transition:stroke-width .25s}
+.vv-l.dash .trazo{stroke-dasharray:7 4}
+.vv-l .hit{fill:none;stroke:transparent;stroke-width:16;stroke-linecap:round;stroke-linejoin:round;pointer-events:stroke;cursor:pointer}
+.vv-l .pit{fill:var(--noche);stroke:var(--c);stroke-width:2}
+.vv-l .ini{fill:var(--c);stroke:var(--noche);stroke-width:2}
+.vv-l .ab{stroke:var(--rosa);stroke-width:2;stroke-linecap:round}
+.vv-l .et{font:600 12.5px var(--f-dato);letter-spacing:.05em;fill:var(--hueso);cursor:pointer}
+.vv-l .et .p{fill:var(--humo);font-weight:500}
+.vv-l .guia{stroke:var(--c);stroke-width:1;opacity:.7}
+.vv-l .fin{transition:opacity .6s}
+.vv-graf.foco .vv-l{opacity:.13}
+.vv-graf.foco .vv-l.on{opacity:1}
+.vv-graf .vv-l.on .trazo{stroke-width:3.2}
+.vv-graf.esperando .vv-l .fin{opacity:0}
+.vv-cruz{stroke:rgba(239,231,220,.55);stroke-width:1;pointer-events:none}
+.vv-cruz-pto{stroke:var(--noche);stroke-width:2;pointer-events:none}
+.vv-tip{position:absolute;z-index:3;top:0;left:0;min-width:136px;max-width:200px;padding:10px 12px 8px;background:rgba(11,10,10,.95);border:1px solid var(--linea-2);box-shadow:0 18px 40px -16px rgba(0,0,0,.9);pointer-events:none;font-size:12px;color:var(--ceniza)}
+.vv-tip[hidden]{display:none}
+.vv-tip__cab{margin:0 0 6px;display:flex;justify-content:space-between;align-items:baseline;gap:10px;font:500 9.5px/1.3 var(--f-body);letter-spacing:.18em;text-transform:uppercase;color:var(--humo)}
+.vv-tip__cab b{font:600 15px/1 var(--f-dato);letter-spacing:.04em;color:var(--hueso);text-transform:none}
+.vv-tip__tags{margin:0 0 6px;display:flex;flex-wrap:wrap;gap:4px}
+.vv-tip__tags span{font:600 8.5px/1 var(--f-body);letter-spacing:.14em;text-transform:uppercase;padding:4px 5px;border:1px solid currentColor}
+.vv-tip__tags .t-pit{color:var(--cempa)}.vv-tip__tags .t-sc{color:var(--vela)}.vv-tip__tags .t-du{color:var(--azul)}
+.vv-tip ol{list-style:none;margin:0;padding:0;display:grid;gap:1px}
+.vv-tip li{display:grid;grid-template-columns:16px 30px minmax(0,1fr) auto;gap:6px;align-items:center;padding:1.5px 3px;line-height:1.25}
+.vv-tip li i{height:0;border-top:2px solid var(--c)}
+.vv-tip li.dash i{border-top-style:dashed}
+.vv-tip li b{font:600 14px/1 var(--f-dato);color:var(--hueso);font-variant-numeric:tabular-nums}
+.vv-tip li span{font:500 12.5px/1 var(--f-dato);letter-spacing:.06em;color:var(--ceniza)}
+.vv-tip li em{font:600 8px/1 var(--f-body);font-style:normal;letter-spacing:.12em;text-transform:uppercase;color:var(--cempa)}
+.vv-tip li.on{background:rgba(239,231,220,.08)}
+.vv-tip li.on span{color:var(--hueso)}
+.vv-pilotos{display:flex;flex-wrap:wrap;gap:6px;margin:18px 0 0;padding:0;list-style:none}
+.vv-pilotos button{display:inline-flex;align-items:center;gap:8px;min-height:36px;padding:8px 11px;background:rgba(20,17,18,.7);border:1px solid var(--linea-2);cursor:pointer;font:600 14px/1 var(--f-dato);letter-spacing:.06em;color:var(--hueso);transition:border-color .25s,background .25s}
+.vv-pilotos button i{width:16px;height:0;border-top:2px solid var(--c)}
+.vv-pilotos button.dash i{border-top-style:dashed}
+.vv-pilotos button small{font:500 11px/1 var(--f-dato);color:var(--humo);letter-spacing:.04em}
+.vv-pilotos button:hover{border-color:var(--hueso)}
+.vv-pilotos button[aria-pressed="true"]{border-color:var(--cempa);background:rgba(255,138,61,.12)}
+.vv-ayuda{margin:12px 0 0;font-size:12.5px;color:var(--humo)}
+.vv-meta{list-style:none;margin:clamp(28px,4vw,40px) 0 0;padding:0;display:grid;grid-template-columns:repeat(10,minmax(0,1fr));gap:6px}
+.vv-meta li{position:relative;display:grid;justify-items:center;gap:5px;padding:12px 2px 10px;border:1px solid var(--linea);background:rgba(20,17,18,.75);min-width:0;text-align:center}
+.vv-meta li::before{content:"";position:absolute;left:-1px;right:-1px;top:-1px;height:2px;background:var(--c,#888)}
+.vv-meta li i{font:500 10px/1 var(--f-dato);font-style:normal;color:var(--humo);letter-spacing:.06em}
+.vv-meta li b{font:600 17px/1 var(--f-dato);letter-spacing:.05em}
+.vv-meta li small{font-size:10.5px;color:var(--humo);white-space:nowrap}
+.vv-meta-cab{margin:clamp(28px,4vw,40px) 0 0;display:flex;flex-wrap:wrap;justify-content:space-between;gap:6px 18px;align-items:baseline}
+.vv-meta-cab+.vv-meta{margin-top:12px}
+/* Duelos de estrategia */
+.vv-glosario{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1px;background:var(--linea);border:1px solid var(--linea);margin:0 0 18px}
+.vv-glosario div{background:rgba(20,17,18,.8);padding:14px 18px;font-size:13px;color:var(--ceniza);line-height:1.5}
+.vv-glosario b{display:block;margin-bottom:4px;font:600 10px/1.2 var(--f-body);letter-spacing:.22em;text-transform:uppercase}
+.vv-glosario .u b{color:var(--cempa)}.vv-glosario .o b{color:var(--azul)}
+.vv-duelos{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,300px),1fr));gap:10px}
+.vv-duelo{background:var(--carbon);border:1px solid var(--linea);padding:clamp(18px,2.4vw,26px);display:grid;gap:16px;align-content:start;min-width:0;transition:background .3s}
+.vv-duelo:hover{background:#1a1516}
+.vv-duelo__top{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.vv-tipo{font:600 9.5px/1 var(--f-body);letter-spacing:.22em;text-transform:uppercase;padding:7px 9px;border:1px solid currentColor;white-space:nowrap}
+.vv-tipo--undercut{color:var(--cempa)}.vv-tipo--overcut{color:var(--azul)}.vv-tipo--otro{color:var(--ceniza)}
+.vv-duelo__v{font:600 14px/1 var(--f-dato);letter-spacing:.08em;color:var(--ceniza)}
+.vv-duelo__vs{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.vv-duelo__p{display:grid;gap:5px;min-width:0}
+.vv-duelo__p b{font:600 32px/1 var(--f-dato);letter-spacing:.06em}
+.vv-duelo__p small{font:500 9px/1.2 var(--f-body);letter-spacing:.2em;text-transform:uppercase;color:var(--humo)}
+.vv-duelo__p::after{content:"";order:-1;height:2px;background:var(--c,#888);box-shadow:0 0 10px var(--c,#888)}
+.vv-duelo__fl{font:300 26px/1 var(--f-body);color:var(--humo);padding-top:10px}
+.vv-duelo__num{display:grid;grid-template-columns:auto minmax(0,1fr);gap:4px 16px;align-items:end}
+.vv-duelo__num>b{font:600 46px/.85 var(--f-dato);color:var(--hueso)}
+.vv-duelo__num>span{font:500 9.5px/1.3 var(--f-body);letter-spacing:.18em;text-transform:uppercase;color:var(--ceniza);padding-bottom:3px}
+.vv-medidor{grid-column:1/-1;height:4px;background:rgba(239,231,220,.08);position:relative;overflow:hidden;margin-top:8px}
+.vv-medidor span{position:absolute;inset:0;transform-origin:0 50%;transform:scaleX(var(--v,0));background:linear-gradient(90deg,#b34d12,var(--cempa));transition:transform 1.2s var(--ease)}
+.vv-duelo--overcut .vv-medidor span{background:linear-gradient(90deg,#4f6a88,var(--azul))}
+.rv-pre .vv-medidor span{transform:scaleX(0)}
+.vv-duelo__gan{margin:0;display:flex;flex-wrap:wrap;gap:6px}
+.vv-duelo .nota-pil{font-size:13px}
+.vv-mas{margin-top:18px}
+/* Rebases + safety car */
+.metricas.vv-val{display:flex;flex-wrap:wrap}
+.metricas.vv-val>div{flex:1 1 150px}
+.vv-dos{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:clamp(40px,6vw,88px);align-items:start;margin-top:clamp(72px,9vw,120px)}
+.vv-dos .vv-bloque{margin-top:0}
+.vv-dos .vv-bloque__cab{grid-template-columns:minmax(0,1fr)}
+.vv-dos .vv-bloque__cab .txt{justify-self:start}
+.vv-total{display:flex;align-items:flex-end;gap:16px;margin:0 0 24px;padding-bottom:20px;border-bottom:1px solid var(--linea-2)}
+.vv-total b{font:600 clamp(72px,9vw,108px)/.78 var(--f-dato);color:var(--cempa);text-shadow:0 0 40px rgba(255,138,61,.35)}
+.vv-total span{font:500 10.5px/1.45 var(--f-body);letter-spacing:.2em;text-transform:uppercase;color:var(--ceniza);padding-bottom:4px;max-width:24ch}
+.vv-reb-cab,.vv-reb li{display:grid;grid-template-columns:24px 3px 76px minmax(0,1fr) 50px;gap:10px;align-items:center}
+.vv-reb-cab{font:500 9px/1.3 var(--f-body);letter-spacing:.18em;text-transform:uppercase;color:var(--humo);padding:0 0 8px}
+.vv-reb-cab span:nth-child(4){display:flex;justify-content:space-between}
+.vv-reb-cab span:nth-child(5){text-align:right}
+.vv-reb{list-style:none;margin:0;padding:0;border-top:1px solid var(--linea-2)}
+.vv-reb li{padding:6px 0;border-bottom:1px solid var(--linea)}
+.vv-reb .pos{font:600 15px/1 var(--f-dato);color:var(--humo);text-align:right;font-variant-numeric:tabular-nums}
+.vv-reb .eq{height:24px;background:var(--c,#888)}
+.vv-reb .pil{display:grid;gap:3px;min-width:0}
+.vv-reb .pil b{font:600 16px/1 var(--f-dato);letter-spacing:.06em}
+.vv-reb .pil small{font:500 11px/1 var(--f-dato);color:var(--humo);letter-spacing:.03em;white-space:nowrap}
+.vv-reb .bar{position:relative;height:12px}
+.vv-reb .bar::before{content:"";position:absolute;left:50%;top:-6px;bottom:-6px;width:1px;background:var(--linea-2)}
+.vv-reb .pe,.vv-reb .ga{position:absolute;top:1px;height:10px;transition:transform 1s var(--ease);transition-delay:calc(var(--i,0)*30ms)}
+.vv-reb .pe{right:calc(50% + 2px);background:var(--rosa);border-radius:4px 0 0 4px;transform-origin:100% 50%;opacity:.85}
+.vv-reb .ga{left:calc(50% + 2px);background:var(--jade);border-radius:0 4px 4px 0;transform-origin:0 50%;opacity:.9}
+.rv-pre .vv-reb .pe,.rv-pre .vv-reb .ga{transform:scaleX(0)}
+.vv-reb .net{text-align:right;font:600 17px/1 var(--f-dato);font-variant-numeric:tabular-nums;white-space:nowrap}
+.vv-reb .net i{font-style:normal;font-size:11px;margin-right:2px}
+.vv-sc{border:1px solid rgba(255,213,144,.32);background:linear-gradient(180deg,rgba(255,213,144,.06),rgba(255,213,144,.015));padding:clamp(20px,3vw,32px);display:grid;gap:20px;min-width:0}
+.vv-sc__top{display:flex;align-items:flex-end;gap:16px}
+.vv-sc__num{font:600 clamp(72px,9vw,104px)/.78 var(--f-dato);color:var(--vela);text-shadow:0 0 40px rgba(255,213,144,.3)}
+.vv-sc__num small{font-size:.4em;margin-left:2px;color:var(--ceniza)}
+.vv-sc__top p{margin:0;font:500 10.5px/1.45 var(--f-body);letter-spacing:.2em;text-transform:uppercase;color:var(--ceniza);padding-bottom:4px;max-width:20ch}
+.vv-sc__pista{position:relative;height:46px;margin:6px 6px 0}
+.vv-sc__pista::before{content:"";position:absolute;left:0;right:0;top:22px;height:2px;background:repeating-linear-gradient(90deg,rgba(239,231,220,.28) 0 6px,transparent 6px 10px)}
+.vv-sc__marca{position:absolute;top:12px;height:22px;min-width:4px;background:var(--vela);border-radius:2px;box-shadow:0 0 16px rgba(255,213,144,.5)}
+.vv-sc__pista span.t{position:absolute;top:36px;transform:translateX(-50%);font:500 10.5px/1 var(--f-dato);color:var(--humo);white-space:nowrap}
+.vv-sc__pista span.t.ini{transform:none}
+.vv-sc__et{margin:0 0 6px;font:500 10px/1.3 var(--f-body);letter-spacing:.22em;text-transform:uppercase;color:var(--ceniza)}
+.vv-sc__pista span.t.fin{transform:translateX(-100%)}
+.vv-sc__laps{display:flex;flex-wrap:wrap;gap:6px;margin:0;padding:0;list-style:none}
+.vv-sc__laps li{font:600 14px/1 var(--f-dato);letter-spacing:.04em;padding:7px 9px;border:1px solid rgba(255,213,144,.45);color:var(--vela)}
+.vv-sc .nota{margin:0}
+@media (min-width:961px){.vv-dos>#vv-sc{position:sticky;top:calc(var(--nav-h) + 32px)}}
+/* Espera: semáforo de salida */
+.espera__icono--luces{height:auto;align-items:center}
+.semaforo{display:grid;grid-template-columns:repeat(5,15px);gap:7px;padding:12px 10px;background:#0d0b0b;border:1px solid var(--linea-2);border-radius:6px}
+.semaforo span{width:15px;height:15px;border-radius:50%;background:#2a1416;box-shadow:inset 0 1px 2px rgba(0,0,0,.6);animation:luz 6s infinite;animation-delay:calc(var(--i)*.55s)}
+@keyframes luz{0%,4%{background:#2a1416;box-shadow:inset 0 1px 2px rgba(0,0,0,.6)}8%,62%{background:#e3192f;box-shadow:0 0 14px rgba(227,25,47,.75)}66%,100%{background:#2a1416;box-shadow:inset 0 1px 2px rgba(0,0,0,.6)}}
+@media (max-width:960px){.vv-cab,.vv-dos{grid-template-columns:minmax(0,1fr)}.vv-dos{gap:clamp(72px,9vw,120px)}}
+@media (max-width:860px){.vv-bloque__cab{grid-template-columns:minmax(0,1fr)}.vv-bloque__cab .txt{justify-self:start}}
+@media (max-width:760px){
+  .vv-eje-fila,.vv-est{grid-template-columns:24px 3px 40px minmax(0,1fr) 44px;gap:6px 9px}
+  .vv-eje-fila>span:nth-child(6){display:none}
+  .vv-est__pil small{display:none}
+  .vv-est__pos{font-size:16px}
+  .vv-est{padding:8px 0}
+  .vv-est__alt{grid-column:4/-1;font-size:12px;display:flex;flex-wrap:wrap;gap:2px 12px}
+  .vv-est__prob b{font-size:18px}
+  .vv-est__prob small{display:none}
+  .vv-eje-fila>span:nth-child(3){visibility:hidden}
+  .vv-meta-cab .sub{font-size:16px!important}
+  .vv-meta{grid-template-columns:repeat(5,minmax(0,1fr))}
+  .vv-glosario{grid-template-columns:minmax(0,1fr)}
+}
+@media (max-width:520px){
+  .vv-cab .metricas dd{font-size:31px}
+  .vv-cab dd .vv-neum{font-size:15px}
+  .vv-duelo__num>b{font-size:40px}
+  .vv-duelo__p b{font-size:28px}
+  .vv-reb-cab,.vv-reb li{grid-template-columns:20px 3px 64px minmax(0,1fr) 44px;gap:8px}
+  .vv-reb .net{font-size:15.5px}
+  .vv-tip{min-width:122px;padding:8px 9px 6px}
+  .vv-tip li{grid-template-columns:12px 26px minmax(0,1fr) auto;gap:5px}
+}
+
 /* ---------- Revelado ---------- */
 .rv{transition:opacity 1s var(--ease),transform 1.1s var(--ease)}
 .rv.rv-pre{opacity:0;transform:translateY(34px)}
@@ -680,6 +912,11 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
   .rv-pre .escalon__bloque{transform:none;opacity:1}
   .rv-pre .pend__l .trazo{stroke-dashoffset:0}
   .cuadros{animation:none}
+  .rv-pre .vv-stint,.rv-pre .vv-reb .pe,.rv-pre .vv-reb .ga{transform:none}
+  .rv-pre .vv-medidor span{transform:scaleX(var(--v,0))}
+  .semaforo span{animation:none}
+  .semaforo span:nth-child(-n+3){background:#e3192f;box-shadow:0 0 10px rgba(227,25,47,.6)}
+  .vv-graf.esperando .vv-l .fin{opacity:1}
 }
 </style>
 
@@ -695,6 +932,7 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
       <li><a href="#burbuja">Burbuja</a></li>
       <li><a href="#en-vivo">En vivo</a></li>
       <li><a href="#carrera">Carrera</a></li>
+      <li><a href="#vueltas">Vueltas</a></li>
       <li><a href="#modelo">Modelo</a></li>
     </ul>
     <div class="nav__der">
@@ -716,9 +954,10 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
       <li class="m-anim" style="--i:5"><a href="#en-vivo"><span class="m-t">En vivo</span><span class="m-d" id="menu-vivo">3:00 PM CDMX</span></a></li>
       <li class="m-anim" style="--i:6"><a href="#revision"><span class="m-t">La qualy, revisada</span><span class="m-d" id="menu-rev">4:00 PM CDMX</span></a></li>
       <li class="m-anim" style="--i:7"><a href="#carrera"><span class="m-t">La carrera</span><span class="m-d">Cómo termina</span></a></li>
-      <li class="m-anim" style="--i:8"><a href="#cambios"><span class="m-t">Tras la FP3</span><span class="m-d">Qué cambió</span></a></li>
-      <li class="m-anim" style="--i:9"><a href="#ofrenda"><span class="m-t">Ofrenda</span><span class="m-d">Poles 2015–2025</span></a></li>
-      <li class="m-anim" style="--i:10"><a href="#modelo"><span class="m-t">El modelo</span><span class="m-d">Cómo funciona</span></a></li>
+      <li class="m-anim" style="--i:8"><a href="#vueltas"><span class="m-t">Vuelta a vuelta</span><span class="m-d" id="menu-vueltas">Pits · rebases</span></a></li>
+      <li class="m-anim" style="--i:9"><a href="#cambios"><span class="m-t">Tras la FP3</span><span class="m-d">Qué cambió</span></a></li>
+      <li class="m-anim" style="--i:10"><a href="#ofrenda"><span class="m-t">Ofrenda</span><span class="m-d">Poles 2015–2025</span></a></li>
+      <li class="m-anim" style="--i:11"><a href="#modelo"><span class="m-t">El modelo</span><span class="m-d">Cómo funciona</span></a></li>
     </ul>
     <div class="menu__lado">
       <div class="m-anim" style="--i:3">
@@ -974,6 +1213,27 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
   </div>
 </section>
 
+<!-- ===================== LA CARRERA, VUELTA A VUELTA (doc carrera/vueltas) ===================== -->
+<section class="vueltas seccion" id="vueltas" aria-labelledby="vueltas-titulo">
+  <div class="wrap">
+    <div class="cab rv">
+      <div><p class="ceja">Domingo · 71 vueltas · pits y pista</p><h2 class="titulo" id="vueltas-titulo">La carrera,<br><em>vuelta a vuelta</em></h2></div>
+      <p class="txt">Cuándo entra cada auto a pits y con qué neumáticos, cómo se mueve el orden en cada vuelta, quién intenta el undercut o el overcut, cuántos rebases hay en pista y cuándo suele salir el safety car.</p>
+    </div>
+    <div id="vueltas-cuerpo">
+      <div class="espera rv">
+        <div class="espera__icono espera__icono--luces" aria-hidden="true"><div class="semaforo"><span style="--i:0"></span><span style="--i:1"></span><span style="--i:2"></span><span style="--i:3"></span><span style="--i:4"></span></div></div>
+        <div class="espera__txt">
+          <p class="ceja">En espera de la simulación vuelta a vuelta</p>
+          <p class="espera__cuando" data-espera-vueltas>Se publica antes del arranque, a las 2:00 PM CDMX</p>
+          <p class="txt">El simulador corre la carrera vuelta por vuelta: en qué vuelta para cada piloto, con qué compuesto sale, quién gana o pierde lugares en pista y cuándo puede neutralizarse la carrera. Si no aparece solo, recarga la página.</p>
+        </div>
+        <ul class="espera__lista" aria-label="Lo que se publicará"><li>Estrategias de pits</li><li>Posiciones por vuelta</li><li>Undercut y overcut</li><li>Rebases</li><li>Safety car</li></ul>
+      </div>
+    </div>
+  </div>
+</section>
+
 <!-- ===================== QUÉ CAMBIÓ ===================== -->
 <section class="seccion" id="cambios">
   <div class="wrap cambios__grid">
@@ -1086,7 +1346,7 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
   </div>
 </footer>
 
-<script type="application/json" id="datos">{"gp":{"actualizado":"2026-10-31T19:04:16Z","fase":"FP3","modelo":"Random Forest","metricas":{"top10_hits":8.27,"top10_hits_2026":8.89,"spearman":0.793,"pole_acc":0.409},"pilotos":[{"acr":"ANT","nombre":"Kimi Antonelli","equipo":"Mercedes","color":"00D7B6","pred":1,"p_q3":0.972,"p_pole":0.411,"p_top3":0.75,"p10":1,"p90":6,"fp1":2,"fp2":4,"fp3":2,"cambio":0},{"acr":"LEC","nombre":"Charles Leclerc","equipo":"Ferrari","color":"ED1131","pred":2,"p_q3":0.969,"p_pole":0.257,"p_top3":0.654,"p10":1,"p90":7,"fp1":1,"fp2":1,"fp3":3,"cambio":0},{"acr":"NOR","nombre":"Lando Norris","equipo":"McLaren","color":"F47600","pred":3,"p_q3":0.953,"p_pole":0.13,"p_top3":0.504,"p10":1,"p90":8,"fp1":null,"fp2":2,"fp3":1,"cambio":2},{"acr":"VER","nombre":"Max Verstappen","equipo":"Red Bull Racing","color":"4781D7","pred":4,"p_q3":0.937,"p_pole":0.08,"p_top3":0.377,"p10":2,"p90":9,"fp1":null,"fp2":5,"fp3":5,"cambio":0},{"acr":"RUS","nombre":"George Russell","equipo":"Mercedes","color":"00D7B6","pred":5,"p_q3":0.9,"p_pole":0.054,"p_top3":0.275,"p10":2,"p90":11,"fp1":null,"fp2":3,"fp3":7,"cambio":-2},{"acr":"PIA","nombre":"Oscar Piastri","equipo":"McLaren","color":"F47600","pred":6,"p_q3":0.853,"p_pole":0.032,"p_top3":0.184,"p10":3,"p90":12,"fp1":8,"fp2":10,"fp3":4,"cambio":1},{"acr":"HAM","nombre":"Lewis Hamilton","equipo":"Ferrari","color":"ED1131","pred":7,"p_q3":0.79,"p_pole":0.012,"p_top3":0.106,"p10":3,"p90":14,"fp1":4,"fp2":11,"fp3":6,"cambio":-1},{"acr":"HAD","nombre":"Isack Hadjar","equipo":"Red Bull Racing","color":"4781D7","pred":8,"p_q3":0.718,"p_pole":0.008,"p_top3":0.058,"p10":4,"p90":15,"fp1":11,"fp2":6,"fp3":8,"cambio":0},{"acr":"LAW","nombre":"Liam Lawson","equipo":"Racing Bulls","color":"6C98FF","pred":9,"p_q3":0.61,"p_pole":0.005,"p_top3":0.027,"p10":5,"p90":16,"fp1":null,"fp2":9,"fp3":9,"cambio":1},{"acr":"LIN","nombre":"Arvid Lindblad","equipo":"Racing Bulls","color":"6C98FF","pred":10,"p_q3":0.509,"p_pole":0.005,"p_top3":0.017,"p10":6,"p90":17,"fp1":10,"fp2":7,"fp3":10,"cambio":1},{"acr":"GAS","nombre":"Pierre Gasly","equipo":"Alpine","color":"00A1E8","pred":11,"p_q3":0.426,"p_pole":0.003,"p_top3":0.016,"p10":7,"p90":17,"fp1":6,"fp2":8,"fp3":13,"cambio":-2},{"acr":"COL","nombre":"Franco Colapinto","equipo":"Alpine","color":"00A1E8","pred":12,"p_q3":0.327,"p_pole":0.001,"p_top3":0.011,"p10":8,"p90":18,"fp1":null,"fp2":16,"fp3":12,"cambio":0},{"acr":"HUL","nombre":"Nico Hulkenberg","equipo":"Audi","color":"F50537","pred":13,"p_q3":0.278,"p_pole":0.002,"p_top3":0.008,"p10":8,"p90":18,"fp1":13,"fp2":15,"fp3":11,"cambio":0},{"acr":"ALO","nombre":"Fernando Alonso","equipo":"Aston Martin","color":"229971","pred":14,"p_q3":0.22,"p_pole":0.001,"p_top3":0.005,"p10":9,"p90":19,"fp1":7,"fp2":12,"fp3":14,"cambio":2},{"acr":"BEA","nombre":"Oliver Bearman","equipo":"Haas F1 Team","color":"9C9FA2","pred":15,"p_q3":0.181,"p_pole":0.0,"p_top3":0.003,"p10":9,"p90":19,"fp1":9,"fp2":14,"fp3":15,"cambio":-1},{"acr":"BOR","nombre":"Gabriel Bortoleto","equipo":"Audi","color":"F50537","pred":16,"p_q3":0.138,"p_pole":0.001,"p_top3":0.003,"p10":10,"p90":19,"fp1":null,"fp2":22,"fp3":null,"cambio":-1},{"acr":"SAI","nombre":"Carlos Sainz","equipo":"Williams","color":"1868DB","pred":17,"p_q3":0.091,"p_pole":0.0,"p_top3":0.002,"p10":11,"p90":20,"fp1":16,"fp2":17,"fp3":16,"cambio":0},{"acr":"HIR","nombre":"Ryo Hirakawa","equipo":"Haas F1 Team","color":"9C9FA2","pred":18,"p_q3":0.061,"p_pole":0.0,"p_top3":0.0,"p10":12,"p90":20,"fp1":15,"fp2":null,"fp3":19,"cambio":0},{"acr":"PER","nombre":"Sergio Perez","equipo":"Cadillac","color":"909090","pred":19,"p_q3":0.038,"p_pole":0.0,"p_top3":0.0,"p10":13,"p90":21,"fp1":18,"fp2":18,"fp3":null,"cambio":0},{"acr":"ALB","nombre":"Alexander Albon","equipo":"Williams","color":"1868DB","pred":20,"p_q3":0.021,"p_pole":0.0,"p_top3":0.0,"p10":14,"p90":21,"fp1":null,"fp2":19,"fp3":17,"cambio":1},{"acr":"STR","nombre":"Lance Stroll","equipo":"Aston Martin","color":"229971","pred":21,"p_q3":0.007,"p_pole":0.0,"p_top3":0.0,"p10":16,"p90":22,"fp1":null,"fp2":20,"fp3":18,"cambio":-1},{"acr":"BOT","nombre":"Valtteri Bottas","equipo":"Cadillac","color":"909090","pred":22,"p_q3":0.0,"p_pole":0.0,"p_top3":0.0,"p10":17,"p90":22,"fp1":null,"fp2":21,"fp3":20,"cambio":0}]},"live":{"actualizado":"2026-10-31T22:09:31.100Z","estado":"terminada","segmento":3,"reloj":"00:00","pilotos":[{"acr":"HAM","num":44,"pos":1,"mejor":"1:16.514","q1":"1:17.341","q2":"1:16.953","q3":"1:16.514","eliminado_en":null,"en_pits":true,"vueltas":20,"dif":null,"neumatico":"SOFT"},{"acr":"RUS","num":63,"pos":2,"mejor":"1:16.523","q1":"1:17.659","q2":"1:17.027","q3":"1:16.523","eliminado_en":null,"en_pits":true,"vueltas":22,"dif":"+0.009","neumatico":"SOFT"},{"acr":"LEC","num":16,"pos":3,"mejor":"1:16.633","q1":"1:17.506","q2":"1:16.944","q3":"1:16.633","eliminado_en":null,"en_pits":false,"vueltas":24,"dif":"+0.119","neumatico":"SOFT"},{"acr":"VER","num":3,"pos":4,"mejor":"1:16.692","q1":"1:17.942","q2":"1:16.876","q3":"1:16.692","eliminado_en":null,"en_pits":false,"vueltas":14,"dif":"+0.178","neumatico":"SOFT"},{"acr":"ANT","num":12,"pos":5,"mejor":"1:16.707","q1":"1:17.918","q2":"1:17.133","q3":"1:16.707","eliminado_en":null,"en_pits":false,"vueltas":24,"dif":"+0.193","neumatico":"SOFT"},{"acr":"NOR","num":1,"pos":6,"mejor":"1:16.824","q1":"1:17.733","q2":"1:16.728","q3":"1:16.824","eliminado_en":null,"en_pits":true,"vueltas":21,"dif":"+0.310","neumatico":"SOFT"},{"acr":"HAD","num":6,"pos":7,"mejor":"1:16.900","q1":"1:17.385","q2":"1:17.047","q3":"1:16.900","eliminado_en":null,"en_pits":true,"vueltas":20,"dif":"+0.386","neumatico":"SOFT"},{"acr":"LAW","num":30,"pos":8,"mejor":"1:17.029","q1":"1:18.097","q2":"1:17.207","q3":"1:17.029","eliminado_en":null,"en_pits":true,"vueltas":21,"dif":"+0.515","neumatico":"SOFT"},{"acr":"LIN","num":41,"pos":9,"mejor":"1:17.117","q1":"1:18.210","q2":"1:17.135","q3":"1:17.117","eliminado_en":null,"en_pits":true,"vueltas":21,"dif":"+0.603","neumatico":"SOFT"},{"acr":"GAS","num":10,"pos":10,"mejor":"1:17.153","q1":"1:18.194","q2":"1:17.278","q3":"1:17.153","eliminado_en":null,"en_pits":false,"vueltas":20,"dif":"+0.639","neumatico":"SOFT"},{"acr":"HUL","num":27,"pos":11,"mejor":"1:17.306","q1":"1:17.868","q2":"1:17.306","q3":null,"eliminado_en":2,"en_pits":true,"vueltas":19,"dif":"+0.578","neumatico":"SOFT"},{"acr":"COL","num":43,"pos":12,"mejor":"1:17.640","q1":"1:18.517","q2":"1:17.640","q3":null,"eliminado_en":2,"en_pits":true,"vueltas":14,"dif":"+0.912","neumatico":"SOFT"},{"acr":"PIA","num":81,"pos":13,"mejor":"1:17.646","q1":"1:17.659","q2":"1:17.646","q3":null,"eliminado_en":2,"en_pits":true,"vueltas":17,"dif":"+0.918","neumatico":"SOFT"},{"acr":"BOR","num":5,"pos":14,"mejor":"1:17.680","q1":"1:17.727","q2":"1:17.680","q3":null,"eliminado_en":2,"en_pits":true,"vueltas":19,"dif":"+0.952","neumatico":"SOFT"},{"acr":"BEA","num":87,"pos":15,"mejor":"1:18.083","q1":"1:18.083","q2":"1:18.083","q3":null,"eliminado_en":2,"en_pits":true,"vueltas":18,"dif":"+1.355","neumatico":"SOFT"},{"acr":"SAI","num":55,"pos":16,"mejor":"1:18.885","q1":"1:18.521","q2":"1:18.885","q3":null,"eliminado_en":2,"en_pits":true,"vueltas":18,"dif":"+2.157","neumatico":"SOFT"},{"acr":"ALB","num":23,"pos":17,"mejor":"1:18.630","q1":"1:18.630","q2":null,"q3":null,"eliminado_en":1,"en_pits":true,"vueltas":12,"dif":"+1.289","neumatico":"SOFT"},{"acr":"ALO","num":14,"pos":18,"mejor":"1:18.908","q1":"1:18.908","q2":null,"q3":null,"eliminado_en":1,"en_pits":true,"vueltas":4,"dif":"+1.567","neumatico":"SOFT"},{"acr":"HIR","num":50,"pos":19,"mejor":"1:18.958","q1":"1:18.958","q2":null,"q3":null,"eliminado_en":1,"en_pits":true,"vueltas":10,"dif":"+1.617","neumatico":"SOFT"},{"acr":"STR","num":18,"pos":20,"mejor":"1:19.072","q1":"1:19.072","q2":null,"q3":null,"eliminado_en":1,"en_pits":true,"vueltas":10,"dif":"+1.731","neumatico":"SOFT"},{"acr":"PER","num":11,"pos":21,"mejor":"1:19.105","q1":"1:19.105","q2":null,"q3":null,"eliminado_en":1,"en_pits":true,"vueltas":9,"dif":"+1.764","neumatico":"SOFT"},{"acr":"BOT","num":77,"pos":22,"mejor":"1:19.852","q1":"1:19.852","q2":null,"q3":null,"eliminado_en":1,"en_pits":true,"vueltas":9,"dif":"+2.511","neumatico":"SOFT"}],"fuente":"F1 Live Timing","detalle":"Qualy terminada (provisional)","sesion":{"key":11400,"nombre":"Qualifying","tipo":"Qualifying","gp":"Mexico City Grand Prix","meeting_key":1298,"estado_feed":"Finished"},"pista":{"estado":"1","mensaje":"AllClear"},"corte":"1:22.754","mensajes":[{"utc":"2026-10-31T22:05:31","texto":"FIA STEWARDS: INCIDENT INVOLVING CAR 6 (HAD) UNDER INVESTIGATION - CROSSING THE LINE AT PIT ENTRY (16:00:40)","bandera":null},{"utc":"2026-10-31T22:06:20","texto":"FIA STEWARDS: REPRIMAND (DRIVING) FOR CAR 6 (HAD) - CROSSING THE LINE AT PIT ENTRY (16:00:40)","bandera":null},{"utc":"2026-10-31T22:08:00","texto":"CHEQUERED FLAG","bandera":"CHEQUERED"},{"utc":"2026-10-31T22:08:40","texto":"FIRST CAR TO TAKE THE FLAG - CAR 12 (ANT)","bandera":null}],"colector":{"conectado":false,"reconexiones":1,"ultimo_dato":"2026-10-31T22:09:29.987Z","mensajes":12881,"errores":0,"version":"1.1"}},"post":{"actualizado":"2026-11-01T02:58:54Z","aciertos_top10":8,"top10_pred":["ANT","LEC","NOR","VER","RUS","PIA","HAM","HAD","LAW","LIN"],"top10_real":["HAM","RUS","LEC","VER","ANT","NOR","HAD","LIN","GAS","HUL"],"pole_pred":"ANT","pole_real":"HAM","acierto_pole":false,"q1_fuera_aciertos":4,"q1_fuera_total":6,"q2_fuera_aciertos":3,"q2_fuera_total":6,"mae":2.82,"spearman":0.808,"exactos":2,"filas":[{"acr":"HAM","nombre":"Lewis Hamilton","equipo":"Ferrari","color":"ED1131","pred":7,"real":1,"dif":6},{"acr":"RUS","nombre":"George Russell","equipo":"Mercedes","color":"00D7B6","pred":5,"real":2,"dif":3},{"acr":"LEC","nombre":"Charles Leclerc","equipo":"Ferrari","color":"ED1131","pred":2,"real":3,"dif":-1},{"acr":"VER","nombre":"Max Verstappen","equipo":"Red Bull Racing","color":"4781D7","pred":4,"real":4,"dif":0},{"acr":"ANT","nombre":"Kimi Antonelli","equipo":"Mercedes","color":"00D7B6","pred":1,"real":5,"dif":-4},{"acr":"NOR","nombre":"Lando Norris","equipo":"McLaren","color":"F47600","pred":3,"real":6,"dif":-3},{"acr":"HAD","nombre":"Isack Hadjar","equipo":"Red Bull Racing","color":"4781D7","pred":8,"real":7,"dif":1},{"acr":"LIN","nombre":"Arvid Lindblad","equipo":"Racing Bulls","color":"6C98FF","pred":10,"real":8,"dif":2},{"acr":"GAS","nombre":"Pierre Gasly","equipo":"Alpine","color":"00A1E8","pred":11,"real":9,"dif":2},{"acr":"HUL","nombre":"Nico Hulkenberg","equipo":"Audi","color":"F50537","pred":13,"real":10,"dif":3},{"acr":"COL","nombre":"Franco Colapinto","equipo":"Alpine","color":"00A1E8","pred":12,"real":11,"dif":1},{"acr":"PIA","nombre":"Oscar Piastri","equipo":"McLaren","color":"F47600","pred":6,"real":12,"dif":-6},{"acr":"BOR","nombre":"Gabriel Bortoleto","equipo":"Audi","color":"F50537","pred":16,"real":13,"dif":3},{"acr":"BEA","nombre":"Oliver Bearman","equipo":"Haas F1 Team","color":"9C9FA2","pred":15,"real":14,"dif":1},{"acr":"SAI","nombre":"Carlos Sainz","equipo":"Williams","color":"1868DB","pred":17,"real":15,"dif":2},{"acr":"ALB","nombre":"Alexander Albon","equipo":"Williams","color":"1868DB","pred":20,"real":16,"dif":4},{"acr":"ALO","nombre":"Fernando Alonso","equipo":"Aston Martin","color":"229971","pred":14,"real":17,"dif":-3},{"acr":"HIR","nombre":"Ryo Hirakawa","equipo":"Haas F1 Team","color":"9C9FA2","pred":18,"real":18,"dif":0},{"acr":"STR","nombre":"Lance Stroll","equipo":"Aston Martin","color":"229971","pred":21,"real":19,"dif":2},{"acr":"PER","nombre":"Sergio Perez","equipo":"Cadillac","color":"909090","pred":19,"real":20,"dif":-1},{"acr":"BOT","nombre":"Valtteri Bottas","equipo":"Cadillac","color":"909090","pred":22,"real":21,"dif":1},{"acr":"LAW","nombre":"Liam Lawson","equipo":"Racing Bulls","color":"6C98FF","pred":9,"real":22,"dif":-13}],"resumen":"En pista, el modelo acertó 9 de los 10 que llegaron a la Q3 (sólo se le escapó Piastri, eliminado en Q2). Tras la descalificación de Lawson (MGU-K en su vuelta de Q2), la clasificación oficial sube a Hülkenberg al Top 10 y el acierto oficial queda en 8 de 10. La pole fue para Hamilton, a quien el modelo veía P7 con 1% de probabilidad. Error medio de 2.82 lugares y correlación de 0.808 contra la clasificación oficial."},"carrera":{"actualizado":"2026-11-01T02:58:35Z","modelo":"Simulador Monte Carlo de carrera (20 000 carreras simuladas: salida, ritmo de tanda larga FP1-FP3, gap de qualy, forma de piloto y equipo, facilidad de rebase del circuito, primera vuelta e incidentes, abandonos)","validacion":{"ndcg10":0.8898,"top10_hits":7.98,"win_acc":0.621,"podium_hits":2.09,"n_gp":66},"parrilla_fuente":"Clasificación oficial de la qualy con penalizaciones: Lawson descalificado de la qualy (MGU-K) y sale último; Verstappen −1 lugar (choque en FP2) y Bottas al fondo (componentes de motor). Lawson conserva su ritmo de qualy (fue P8 en pista) para el simulador.","vueltas":71,"estrategia":{"paradas_tipicas":1.0,"perdida_pit_s":22.4,"nota":"Paradas típicas y pérdida en pits: mediana de 3 edicion(es) anteriores en seco (OpenF1). deg_s_vuelta = degradación de neumáticos en tandas largas de FP1-FP3 relativa al promedio del campo en el mismo compuesto (s/vuelta, corregida por combustible; + = degrada más)."},"pilotos":[{"acr":"HAM","nombre":"Lewis Hamilton","equipo":"Ferrari","color":"ED1131","salida":1,"pred":1,"pos_media":3.88,"p_win":0.329,"p_podio":0.722,"p_top10":0.901,"p_dnf":0.1,"p10":1,"p90":8,"ritmo_rank":8,"deg_s_vuelta":null,"paradas":1,"nota":"favorito"},{"acr":"RUS","nombre":"George Russell","equipo":"Mercedes","color":"00D7B6","salida":2,"pred":2,"pos_media":4.67,"p_win":0.198,"p_podio":0.578,"p_top10":0.889,"p_dnf":0.108,"p10":1,"p90":16,"ritmo_rank":5,"deg_s_vuelta":-0.023,"paradas":1,"nota":""},{"acr":"LEC","nombre":"Charles Leclerc","equipo":"Ferrari","color":"ED1131","salida":3,"pred":3,"pos_media":5.01,"p_win":0.164,"p_podio":0.503,"p_top10":0.887,"p_dnf":0.112,"p10":1,"p90":16,"ritmo_rank":2,"deg_s_vuelta":-0.003,"paradas":1,"nota":""},{"acr":"ANT","nombre":"Kimi Antonelli","equipo":"Mercedes","color":"00D7B6","salida":4,"pred":4,"pos_media":5.7,"p_win":0.105,"p_podio":0.37,"p_top10":0.881,"p_dnf":0.116,"p10":1,"p90":16,"ritmo_rank":6,"deg_s_vuelta":0.018,"paradas":1,"nota":""},{"acr":"VER","nombre":"Max Verstappen","equipo":"Red Bull Racing","color":"4781D7","salida":5,"pred":5,"pos_media":5.73,"p_win":0.113,"p_podio":0.377,"p_top10":0.878,"p_dnf":0.122,"p10":1,"p90":16,"ritmo_rank":1,"deg_s_vuelta":null,"paradas":1,"nota":""},{"acr":"HAD","nombre":"Isack Hadjar","equipo":"Red Bull Racing","color":"4781D7","salida":7,"pred":6,"pos_media":7.05,"p_win":0.048,"p_podio":0.201,"p_top10":0.853,"p_dnf":0.13,"p10":2,"p90":17,"ritmo_rank":3,"deg_s_vuelta":null,"paradas":1,"nota":""},{"acr":"NOR","nombre":"Lando Norris","equipo":"McLaren","color":"F47600","salida":6,"pred":7,"pos_media":7.25,"p_win":0.034,"p_podio":0.172,"p_top10":0.847,"p_dnf":0.133,"p10":3,"p90":17,"ritmo_rank":4,"deg_s_vuelta":0.002,"paradas":1,"nota":""},{"acr":"LIN","nombre":"Arvid Lindblad","equipo":"Racing Bulls","color":"6C98FF","salida":8,"pred":8,"pos_media":9.65,"p_win":0.004,"p_podio":0.03,"p_top10":0.713,"p_dnf":0.138,"p10":5,"p90":18,"ritmo_rank":12,"deg_s_vuelta":-0.002,"paradas":1,"nota":""},{"acr":"PIA","nombre":"Oscar Piastri","equipo":"McLaren","color":"F47600","salida":12,"pred":9,"pos_media":11.14,"p_win":0.002,"p_podio":0.016,"p_top10":0.551,"p_dnf":0.184,"p10":6,"p90":19,"ritmo_rank":9,"deg_s_vuelta":0.045,"paradas":1,"nota":"remonta por ritmo"},{"acr":"GAS","nombre":"Pierre Gasly","equipo":"Alpine","color":"00A1E8","salida":9,"pred":10,"pos_media":11.24,"p_win":0.001,"p_podio":0.009,"p_top10":0.543,"p_dnf":0.184,"p10":6,"p90":19,"ritmo_rank":7,"deg_s_vuelta":-0.02,"paradas":1,"nota":""},{"acr":"HUL","nombre":"Nico Hulkenberg","equipo":"Audi","color":"F50537","salida":10,"pred":11,"pos_media":11.49,"p_win":0.001,"p_podio":0.007,"p_top10":0.493,"p_dnf":0.166,"p10":7,"p90":19,"ritmo_rank":14,"deg_s_vuelta":-0.06,"paradas":1,"nota":"cuida bien los neumáticos"},{"acr":"LAW","nombre":"Liam Lawson","equipo":"Racing Bulls","color":"6C98FF","salida":22,"pred":12,"pos_media":11.57,"p_win":0.001,"p_podio":0.011,"p_top10":0.564,"p_dnf":0.283,"p10":6,"p90":20,"ritmo_rank":11,"deg_s_vuelta":-0.037,"paradas":1,"nota":"remonta tras la penalización"},{"acr":"COL","nombre":"Franco Colapinto","equipo":"Alpine","color":"00A1E8","salida":11,"pred":13,"pos_media":12.95,"p_win":0.0,"p_podio":0.002,"p_top10":0.328,"p_dnf":0.212,"p10":8,"p90":20,"ritmo_rank":13,"deg_s_vuelta":0.031,"paradas":1,"nota":"riesgo de degradación"},{"acr":"BOR","nombre":"Gabriel Bortoleto","equipo":"Audi","color":"F50537","salida":13,"pred":14,"pos_media":13.72,"p_win":0.0,"p_podio":0.001,"p_top10":0.217,"p_dnf":0.194,"p10":9,"p90":20,"ritmo_rank":22,"deg_s_vuelta":null,"paradas":1,"nota":""},{"acr":"BEA","nombre":"Oliver Bearman","equipo":"Haas F1 Team","color":"9C9FA2","salida":14,"pred":15,"pos_media":14.05,"p_win":0.0,"p_podio":0.001,"p_top10":0.188,"p_dnf":0.209,"p10":9,"p90":20,"ritmo_rank":10,"deg_s_vuelta":0.008,"paradas":1,"nota":""},{"acr":"HIR","nombre":"Ryo Hirakawa","equipo":"Haas F1 Team","color":"9C9FA2","salida":18,"pred":16,"pos_media":15.58,"p_win":0.0,"p_podio":0.0,"p_top10":0.076,"p_dnf":0.252,"p10":11,"p90":21,"ritmo_rank":18,"deg_s_vuelta":-0.048,"paradas":1,"nota":"cuida bien los neumáticos"},{"acr":"SAI","nombre":"Carlos Sainz","equipo":"Williams","color":"1868DB","salida":15,"pred":17,"pos_media":15.9,"p_win":0.0,"p_podio":0.0,"p_top10":0.063,"p_dnf":0.249,"p10":11,"p90":21,"ritmo_rank":17,"deg_s_vuelta":-0.051,"paradas":1,"nota":"cuida bien los neumáticos"},{"acr":"ALO","nombre":"Fernando Alonso","equipo":"Aston Martin","color":"229971","salida":17,"pred":18,"pos_media":16.2,"p_win":0.0,"p_podio":0.0,"p_top10":0.051,"p_dnf":0.279,"p10":12,"p90":21,"ritmo_rank":15,"deg_s_vuelta":-0.008,"paradas":1,"nota":""},{"acr":"ALB","nombre":"Alexander Albon","equipo":"Williams","color":"1868DB","salida":16,"pred":19,"pos_media":16.33,"p_win":0.0,"p_podio":0.0,"p_top10":0.051,"p_dnf":0.281,"p10":12,"p90":21,"ritmo_rank":16,"deg_s_vuelta":0.016,"paradas":1,"nota":"pierde posiciones"},{"acr":"STR","nombre":"Lance Stroll","equipo":"Aston Martin","color":"229971","salida":19,"pred":20,"pos_media":17.63,"p_win":0.0,"p_podio":0.0,"p_top10":0.013,"p_dnf":0.328,"p10":13,"p90":22,"ritmo_rank":20,"deg_s_vuelta":null,"paradas":1,"nota":"riesgo de abandono"},{"acr":"PER","nombre":"Sergio Perez","equipo":"Cadillac","color":"909090","salida":20,"pred":21,"pos_media":17.8,"p_win":0.0,"p_podio":0.0,"p_top10":0.009,"p_dnf":0.325,"p10":14,"p90":22,"ritmo_rank":19,"deg_s_vuelta":0.008,"paradas":1,"nota":"riesgo de abandono"},{"acr":"BOT","nombre":"Valtteri Bottas","equipo":"Cadillac","color":"909090","salida":21,"pred":22,"pos_media":18.44,"p_win":0.0,"p_podio":0.0,"p_top10":0.003,"p_dnf":0.351,"p10":15,"p90":22,"ritmo_rank":21,"deg_s_vuelta":0.041,"paradas":1,"nota":"riesgo de degradación"}],"resumen":"El simulador (20 000 carreras) ve a Lewis Hamilton como favorito (33% de victoria); el podio más probable es HAM, RUS, LEC. Estrategia esperada: 1 parada (pérdida en pits ≈ 22 s). Remontan PIA (12.º → 9.º, por ritmo de carrera), LAW (22.º → 12.º, tras su penalización); pierden terreno ALB (16.º → 19.º, por forma reciente). Lawson, descalificado de la qualy, sale P22 pero el simulador lo ve remontar hasta cerca del Top 10."}}</script>
+<script type="application/json" id="datos">{"gp":{"actualizado":"2026-10-31T19:04:16Z","fase":"FP3","modelo":"Random Forest","metricas":{"top10_hits":8.27,"top10_hits_2026":8.89,"spearman":0.793,"pole_acc":0.409},"pilotos":[{"acr":"ANT","nombre":"Kimi Antonelli","equipo":"Mercedes","color":"00D7B6","pred":1,"p_q3":0.972,"p_pole":0.411,"p_top3":0.75,"p10":1,"p90":6,"fp1":2,"fp2":4,"fp3":2,"cambio":0},{"acr":"LEC","nombre":"Charles Leclerc","equipo":"Ferrari","color":"ED1131","pred":2,"p_q3":0.969,"p_pole":0.257,"p_top3":0.654,"p10":1,"p90":7,"fp1":1,"fp2":1,"fp3":3,"cambio":0},{"acr":"NOR","nombre":"Lando Norris","equipo":"McLaren","color":"F47600","pred":3,"p_q3":0.953,"p_pole":0.13,"p_top3":0.504,"p10":1,"p90":8,"fp1":null,"fp2":2,"fp3":1,"cambio":2},{"acr":"VER","nombre":"Max Verstappen","equipo":"Red Bull Racing","color":"4781D7","pred":4,"p_q3":0.937,"p_pole":0.08,"p_top3":0.377,"p10":2,"p90":9,"fp1":null,"fp2":5,"fp3":5,"cambio":0},{"acr":"RUS","nombre":"George Russell","equipo":"Mercedes","color":"00D7B6","pred":5,"p_q3":0.9,"p_pole":0.054,"p_top3":0.275,"p10":2,"p90":11,"fp1":null,"fp2":3,"fp3":7,"cambio":-2},{"acr":"PIA","nombre":"Oscar Piastri","equipo":"McLaren","color":"F47600","pred":6,"p_q3":0.853,"p_pole":0.032,"p_top3":0.184,"p10":3,"p90":12,"fp1":8,"fp2":10,"fp3":4,"cambio":1},{"acr":"HAM","nombre":"Lewis Hamilton","equipo":"Ferrari","color":"ED1131","pred":7,"p_q3":0.79,"p_pole":0.012,"p_top3":0.106,"p10":3,"p90":14,"fp1":4,"fp2":11,"fp3":6,"cambio":-1},{"acr":"HAD","nombre":"Isack Hadjar","equipo":"Red Bull Racing","color":"4781D7","pred":8,"p_q3":0.718,"p_pole":0.008,"p_top3":0.058,"p10":4,"p90":15,"fp1":11,"fp2":6,"fp3":8,"cambio":0},{"acr":"LAW","nombre":"Liam Lawson","equipo":"Racing Bulls","color":"6C98FF","pred":9,"p_q3":0.61,"p_pole":0.005,"p_top3":0.027,"p10":5,"p90":16,"fp1":null,"fp2":9,"fp3":9,"cambio":1},{"acr":"LIN","nombre":"Arvid Lindblad","equipo":"Racing Bulls","color":"6C98FF","pred":10,"p_q3":0.509,"p_pole":0.005,"p_top3":0.017,"p10":6,"p90":17,"fp1":10,"fp2":7,"fp3":10,"cambio":1},{"acr":"GAS","nombre":"Pierre Gasly","equipo":"Alpine","color":"00A1E8","pred":11,"p_q3":0.426,"p_pole":0.003,"p_top3":0.016,"p10":7,"p90":17,"fp1":6,"fp2":8,"fp3":13,"cambio":-2},{"acr":"COL","nombre":"Franco Colapinto","equipo":"Alpine","color":"00A1E8","pred":12,"p_q3":0.327,"p_pole":0.001,"p_top3":0.011,"p10":8,"p90":18,"fp1":null,"fp2":16,"fp3":12,"cambio":0},{"acr":"HUL","nombre":"Nico Hulkenberg","equipo":"Audi","color":"F50537","pred":13,"p_q3":0.278,"p_pole":0.002,"p_top3":0.008,"p10":8,"p90":18,"fp1":13,"fp2":15,"fp3":11,"cambio":0},{"acr":"ALO","nombre":"Fernando Alonso","equipo":"Aston Martin","color":"229971","pred":14,"p_q3":0.22,"p_pole":0.001,"p_top3":0.005,"p10":9,"p90":19,"fp1":7,"fp2":12,"fp3":14,"cambio":2},{"acr":"BEA","nombre":"Oliver Bearman","equipo":"Haas F1 Team","color":"9C9FA2","pred":15,"p_q3":0.181,"p_pole":0.0,"p_top3":0.003,"p10":9,"p90":19,"fp1":9,"fp2":14,"fp3":15,"cambio":-1},{"acr":"BOR","nombre":"Gabriel Bortoleto","equipo":"Audi","color":"F50537","pred":16,"p_q3":0.138,"p_pole":0.001,"p_top3":0.003,"p10":10,"p90":19,"fp1":null,"fp2":22,"fp3":null,"cambio":-1},{"acr":"SAI","nombre":"Carlos Sainz","equipo":"Williams","color":"1868DB","pred":17,"p_q3":0.091,"p_pole":0.0,"p_top3":0.002,"p10":11,"p90":20,"fp1":16,"fp2":17,"fp3":16,"cambio":0},{"acr":"HIR","nombre":"Ryo Hirakawa","equipo":"Haas F1 Team","color":"9C9FA2","pred":18,"p_q3":0.061,"p_pole":0.0,"p_top3":0.0,"p10":12,"p90":20,"fp1":15,"fp2":null,"fp3":19,"cambio":0},{"acr":"PER","nombre":"Sergio Perez","equipo":"Cadillac","color":"909090","pred":19,"p_q3":0.038,"p_pole":0.0,"p_top3":0.0,"p10":13,"p90":21,"fp1":18,"fp2":18,"fp3":null,"cambio":0},{"acr":"ALB","nombre":"Alexander Albon","equipo":"Williams","color":"1868DB","pred":20,"p_q3":0.021,"p_pole":0.0,"p_top3":0.0,"p10":14,"p90":21,"fp1":null,"fp2":19,"fp3":17,"cambio":1},{"acr":"STR","nombre":"Lance Stroll","equipo":"Aston Martin","color":"229971","pred":21,"p_q3":0.007,"p_pole":0.0,"p_top3":0.0,"p10":16,"p90":22,"fp1":null,"fp2":20,"fp3":18,"cambio":-1},{"acr":"BOT","nombre":"Valtteri Bottas","equipo":"Cadillac","color":"909090","pred":22,"p_q3":0.0,"p_pole":0.0,"p_top3":0.0,"p10":17,"p90":22,"fp1":null,"fp2":21,"fp3":20,"cambio":0}]},"live":{"actualizado":"2026-10-31T22:09:31.100Z","estado":"terminada","segmento":3,"reloj":"00:00","pilotos":[{"acr":"HAM","num":44,"pos":1,"mejor":"1:16.514","q1":"1:17.341","q2":"1:16.953","q3":"1:16.514","eliminado_en":null,"en_pits":true,"vueltas":20,"dif":null,"neumatico":"SOFT"},{"acr":"RUS","num":63,"pos":2,"mejor":"1:16.523","q1":"1:17.659","q2":"1:17.027","q3":"1:16.523","eliminado_en":null,"en_pits":true,"vueltas":22,"dif":"+0.009","neumatico":"SOFT"},{"acr":"LEC","num":16,"pos":3,"mejor":"1:16.633","q1":"1:17.506","q2":"1:16.944","q3":"1:16.633","eliminado_en":null,"en_pits":false,"vueltas":24,"dif":"+0.119","neumatico":"SOFT"},{"acr":"VER","num":3,"pos":4,"mejor":"1:16.692","q1":"1:17.942","q2":"1:16.876","q3":"1:16.692","eliminado_en":null,"en_pits":false,"vueltas":14,"dif":"+0.178","neumatico":"SOFT"},{"acr":"ANT","num":12,"pos":5,"mejor":"1:16.707","q1":"1:17.918","q2":"1:17.133","q3":"1:16.707","eliminado_en":null,"en_pits":false,"vueltas":24,"dif":"+0.193","neumatico":"SOFT"},{"acr":"NOR","num":1,"pos":6,"mejor":"1:16.824","q1":"1:17.733","q2":"1:16.728","q3":"1:16.824","eliminado_en":null,"en_pits":true,"vueltas":21,"dif":"+0.310","neumatico":"SOFT"},{"acr":"HAD","num":6,"pos":7,"mejor":"1:16.900","q1":"1:17.385","q2":"1:17.047","q3":"1:16.900","eliminado_en":null,"en_pits":true,"vueltas":20,"dif":"+0.386","neumatico":"SOFT"},{"acr":"LAW","num":30,"pos":8,"mejor":"1:17.029","q1":"1:18.097","q2":"1:17.207","q3":"1:17.029","eliminado_en":null,"en_pits":true,"vueltas":21,"dif":"+0.515","neumatico":"SOFT"},{"acr":"LIN","num":41,"pos":9,"mejor":"1:17.117","q1":"1:18.210","q2":"1:17.135","q3":"1:17.117","eliminado_en":null,"en_pits":true,"vueltas":21,"dif":"+0.603","neumatico":"SOFT"},{"acr":"GAS","num":10,"pos":10,"mejor":"1:17.153","q1":"1:18.194","q2":"1:17.278","q3":"1:17.153","eliminado_en":null,"en_pits":false,"vueltas":20,"dif":"+0.639","neumatico":"SOFT"},{"acr":"HUL","num":27,"pos":11,"mejor":"1:17.306","q1":"1:17.868","q2":"1:17.306","q3":null,"eliminado_en":2,"en_pits":true,"vueltas":19,"dif":"+0.578","neumatico":"SOFT"},{"acr":"COL","num":43,"pos":12,"mejor":"1:17.640","q1":"1:18.517","q2":"1:17.640","q3":null,"eliminado_en":2,"en_pits":true,"vueltas":14,"dif":"+0.912","neumatico":"SOFT"},{"acr":"PIA","num":81,"pos":13,"mejor":"1:17.646","q1":"1:17.659","q2":"1:17.646","q3":null,"eliminado_en":2,"en_pits":true,"vueltas":17,"dif":"+0.918","neumatico":"SOFT"},{"acr":"BOR","num":5,"pos":14,"mejor":"1:17.680","q1":"1:17.727","q2":"1:17.680","q3":null,"eliminado_en":2,"en_pits":true,"vueltas":19,"dif":"+0.952","neumatico":"SOFT"},{"acr":"BEA","num":87,"pos":15,"mejor":"1:18.083","q1":"1:18.083","q2":"1:18.083","q3":null,"eliminado_en":2,"en_pits":true,"vueltas":18,"dif":"+1.355","neumatico":"SOFT"},{"acr":"SAI","num":55,"pos":16,"mejor":"1:18.885","q1":"1:18.521","q2":"1:18.885","q3":null,"eliminado_en":2,"en_pits":true,"vueltas":18,"dif":"+2.157","neumatico":"SOFT"},{"acr":"ALB","num":23,"pos":17,"mejor":"1:18.630","q1":"1:18.630","q2":null,"q3":null,"eliminado_en":1,"en_pits":true,"vueltas":12,"dif":"+1.289","neumatico":"SOFT"},{"acr":"ALO","num":14,"pos":18,"mejor":"1:18.908","q1":"1:18.908","q2":null,"q3":null,"eliminado_en":1,"en_pits":true,"vueltas":4,"dif":"+1.567","neumatico":"SOFT"},{"acr":"HIR","num":50,"pos":19,"mejor":"1:18.958","q1":"1:18.958","q2":null,"q3":null,"eliminado_en":1,"en_pits":true,"vueltas":10,"dif":"+1.617","neumatico":"SOFT"},{"acr":"STR","num":18,"pos":20,"mejor":"1:19.072","q1":"1:19.072","q2":null,"q3":null,"eliminado_en":1,"en_pits":true,"vueltas":10,"dif":"+1.731","neumatico":"SOFT"},{"acr":"PER","num":11,"pos":21,"mejor":"1:19.105","q1":"1:19.105","q2":null,"q3":null,"eliminado_en":1,"en_pits":true,"vueltas":9,"dif":"+1.764","neumatico":"SOFT"},{"acr":"BOT","num":77,"pos":22,"mejor":"1:19.852","q1":"1:19.852","q2":null,"q3":null,"eliminado_en":1,"en_pits":true,"vueltas":9,"dif":"+2.511","neumatico":"SOFT"}],"fuente":"F1 Live Timing","detalle":"Qualy terminada (provisional)","sesion":{"key":11400,"nombre":"Qualifying","tipo":"Qualifying","gp":"Mexico City Grand Prix","meeting_key":1298,"estado_feed":"Finished"},"pista":{"estado":"1","mensaje":"AllClear"},"corte":"1:22.754","mensajes":[{"utc":"2026-10-31T22:05:31","texto":"FIA STEWARDS: INCIDENT INVOLVING CAR 6 (HAD) UNDER INVESTIGATION - CROSSING THE LINE AT PIT ENTRY (16:00:40)","bandera":null},{"utc":"2026-10-31T22:06:20","texto":"FIA STEWARDS: REPRIMAND (DRIVING) FOR CAR 6 (HAD) - CROSSING THE LINE AT PIT ENTRY (16:00:40)","bandera":null},{"utc":"2026-10-31T22:08:00","texto":"CHEQUERED FLAG","bandera":"CHEQUERED"},{"utc":"2026-10-31T22:08:40","texto":"FIRST CAR TO TAKE THE FLAG - CAR 12 (ANT)","bandera":null}],"colector":{"conectado":false,"reconexiones":1,"ultimo_dato":"2026-10-31T22:09:29.987Z","mensajes":12881,"errores":0,"version":"1.1"}},"post":{"actualizado":"2026-11-01T02:58:54Z","aciertos_top10":8,"top10_pred":["ANT","LEC","NOR","VER","RUS","PIA","HAM","HAD","LAW","LIN"],"top10_real":["HAM","RUS","LEC","VER","ANT","NOR","HAD","LIN","GAS","HUL"],"pole_pred":"ANT","pole_real":"HAM","acierto_pole":false,"q1_fuera_aciertos":4,"q1_fuera_total":6,"q2_fuera_aciertos":3,"q2_fuera_total":6,"mae":2.82,"spearman":0.808,"exactos":2,"filas":[{"acr":"HAM","nombre":"Lewis Hamilton","equipo":"Ferrari","color":"ED1131","pred":7,"real":1,"dif":6},{"acr":"RUS","nombre":"George Russell","equipo":"Mercedes","color":"00D7B6","pred":5,"real":2,"dif":3},{"acr":"LEC","nombre":"Charles Leclerc","equipo":"Ferrari","color":"ED1131","pred":2,"real":3,"dif":-1},{"acr":"VER","nombre":"Max Verstappen","equipo":"Red Bull Racing","color":"4781D7","pred":4,"real":4,"dif":0},{"acr":"ANT","nombre":"Kimi Antonelli","equipo":"Mercedes","color":"00D7B6","pred":1,"real":5,"dif":-4},{"acr":"NOR","nombre":"Lando Norris","equipo":"McLaren","color":"F47600","pred":3,"real":6,"dif":-3},{"acr":"HAD","nombre":"Isack Hadjar","equipo":"Red Bull Racing","color":"4781D7","pred":8,"real":7,"dif":1},{"acr":"LIN","nombre":"Arvid Lindblad","equipo":"Racing Bulls","color":"6C98FF","pred":10,"real":8,"dif":2},{"acr":"GAS","nombre":"Pierre Gasly","equipo":"Alpine","color":"00A1E8","pred":11,"real":9,"dif":2},{"acr":"HUL","nombre":"Nico Hulkenberg","equipo":"Audi","color":"F50537","pred":13,"real":10,"dif":3},{"acr":"COL","nombre":"Franco Colapinto","equipo":"Alpine","color":"00A1E8","pred":12,"real":11,"dif":1},{"acr":"PIA","nombre":"Oscar Piastri","equipo":"McLaren","color":"F47600","pred":6,"real":12,"dif":-6},{"acr":"BOR","nombre":"Gabriel Bortoleto","equipo":"Audi","color":"F50537","pred":16,"real":13,"dif":3},{"acr":"BEA","nombre":"Oliver Bearman","equipo":"Haas F1 Team","color":"9C9FA2","pred":15,"real":14,"dif":1},{"acr":"SAI","nombre":"Carlos Sainz","equipo":"Williams","color":"1868DB","pred":17,"real":15,"dif":2},{"acr":"ALB","nombre":"Alexander Albon","equipo":"Williams","color":"1868DB","pred":20,"real":16,"dif":4},{"acr":"ALO","nombre":"Fernando Alonso","equipo":"Aston Martin","color":"229971","pred":14,"real":17,"dif":-3},{"acr":"HIR","nombre":"Ryo Hirakawa","equipo":"Haas F1 Team","color":"9C9FA2","pred":18,"real":18,"dif":0},{"acr":"STR","nombre":"Lance Stroll","equipo":"Aston Martin","color":"229971","pred":21,"real":19,"dif":2},{"acr":"PER","nombre":"Sergio Perez","equipo":"Cadillac","color":"909090","pred":19,"real":20,"dif":-1},{"acr":"BOT","nombre":"Valtteri Bottas","equipo":"Cadillac","color":"909090","pred":22,"real":21,"dif":1},{"acr":"LAW","nombre":"Liam Lawson","equipo":"Racing Bulls","color":"6C98FF","pred":9,"real":22,"dif":-13}],"resumen":"En pista, el modelo acertó 9 de los 10 que llegaron a la Q3 (sólo se le escapó Piastri, eliminado en Q2). Tras la descalificación de Lawson (MGU-K en su vuelta de Q2), la clasificación oficial sube a Hülkenberg al Top 10 y el acierto oficial queda en 8 de 10. La pole fue para Hamilton, a quien el modelo veía P7 con 1% de probabilidad. Error medio de 2.82 lugares y correlación de 0.808 contra la clasificación oficial."},"carrera":{"actualizado":"2026-11-01T02:58:35Z","modelo":"Simulador Monte Carlo de carrera (20 000 carreras simuladas: salida, ritmo de tanda larga FP1-FP3, gap de qualy, forma de piloto y equipo, facilidad de rebase del circuito, primera vuelta e incidentes, abandonos)","validacion":{"ndcg10":0.8898,"top10_hits":7.98,"win_acc":0.621,"podium_hits":2.09,"n_gp":66},"parrilla_fuente":"Clasificación oficial de la qualy con penalizaciones: Lawson descalificado de la qualy (MGU-K) y sale último; Verstappen −1 lugar (choque en FP2) y Bottas al fondo (componentes de motor). Lawson conserva su ritmo de qualy (fue P8 en pista) para el simulador.","vueltas":71,"estrategia":{"paradas_tipicas":1.0,"perdida_pit_s":22.4,"nota":"Paradas típicas y pérdida en pits: mediana de 3 edicion(es) anteriores en seco (OpenF1). deg_s_vuelta = degradación de neumáticos en tandas largas de FP1-FP3 relativa al promedio del campo en el mismo compuesto (s/vuelta, corregida por combustible; + = degrada más)."},"pilotos":[{"acr":"HAM","nombre":"Lewis Hamilton","equipo":"Ferrari","color":"ED1131","salida":1,"pred":1,"pos_media":3.88,"p_win":0.329,"p_podio":0.722,"p_top10":0.901,"p_dnf":0.1,"p10":1,"p90":8,"ritmo_rank":8,"deg_s_vuelta":null,"paradas":1,"nota":"favorito"},{"acr":"RUS","nombre":"George Russell","equipo":"Mercedes","color":"00D7B6","salida":2,"pred":2,"pos_media":4.67,"p_win":0.198,"p_podio":0.578,"p_top10":0.889,"p_dnf":0.108,"p10":1,"p90":16,"ritmo_rank":5,"deg_s_vuelta":-0.023,"paradas":1,"nota":""},{"acr":"LEC","nombre":"Charles Leclerc","equipo":"Ferrari","color":"ED1131","salida":3,"pred":3,"pos_media":5.01,"p_win":0.164,"p_podio":0.503,"p_top10":0.887,"p_dnf":0.112,"p10":1,"p90":16,"ritmo_rank":2,"deg_s_vuelta":-0.003,"paradas":1,"nota":""},{"acr":"ANT","nombre":"Kimi Antonelli","equipo":"Mercedes","color":"00D7B6","salida":4,"pred":4,"pos_media":5.7,"p_win":0.105,"p_podio":0.37,"p_top10":0.881,"p_dnf":0.116,"p10":1,"p90":16,"ritmo_rank":6,"deg_s_vuelta":0.018,"paradas":1,"nota":""},{"acr":"VER","nombre":"Max Verstappen","equipo":"Red Bull Racing","color":"4781D7","salida":5,"pred":5,"pos_media":5.73,"p_win":0.113,"p_podio":0.377,"p_top10":0.878,"p_dnf":0.122,"p10":1,"p90":16,"ritmo_rank":1,"deg_s_vuelta":null,"paradas":1,"nota":""},{"acr":"HAD","nombre":"Isack Hadjar","equipo":"Red Bull Racing","color":"4781D7","salida":7,"pred":6,"pos_media":7.05,"p_win":0.048,"p_podio":0.201,"p_top10":0.853,"p_dnf":0.13,"p10":2,"p90":17,"ritmo_rank":3,"deg_s_vuelta":null,"paradas":1,"nota":""},{"acr":"NOR","nombre":"Lando Norris","equipo":"McLaren","color":"F47600","salida":6,"pred":7,"pos_media":7.25,"p_win":0.034,"p_podio":0.172,"p_top10":0.847,"p_dnf":0.133,"p10":3,"p90":17,"ritmo_rank":4,"deg_s_vuelta":0.002,"paradas":1,"nota":""},{"acr":"LIN","nombre":"Arvid Lindblad","equipo":"Racing Bulls","color":"6C98FF","salida":8,"pred":8,"pos_media":9.65,"p_win":0.004,"p_podio":0.03,"p_top10":0.713,"p_dnf":0.138,"p10":5,"p90":18,"ritmo_rank":12,"deg_s_vuelta":-0.002,"paradas":1,"nota":""},{"acr":"PIA","nombre":"Oscar Piastri","equipo":"McLaren","color":"F47600","salida":12,"pred":9,"pos_media":11.14,"p_win":0.002,"p_podio":0.016,"p_top10":0.551,"p_dnf":0.184,"p10":6,"p90":19,"ritmo_rank":9,"deg_s_vuelta":0.045,"paradas":1,"nota":"remonta por ritmo"},{"acr":"GAS","nombre":"Pierre Gasly","equipo":"Alpine","color":"00A1E8","salida":9,"pred":10,"pos_media":11.24,"p_win":0.001,"p_podio":0.009,"p_top10":0.543,"p_dnf":0.184,"p10":6,"p90":19,"ritmo_rank":7,"deg_s_vuelta":-0.02,"paradas":1,"nota":""},{"acr":"HUL","nombre":"Nico Hulkenberg","equipo":"Audi","color":"F50537","salida":10,"pred":11,"pos_media":11.49,"p_win":0.001,"p_podio":0.007,"p_top10":0.493,"p_dnf":0.166,"p10":7,"p90":19,"ritmo_rank":14,"deg_s_vuelta":-0.06,"paradas":1,"nota":"cuida bien los neumáticos"},{"acr":"LAW","nombre":"Liam Lawson","equipo":"Racing Bulls","color":"6C98FF","salida":22,"pred":12,"pos_media":11.57,"p_win":0.001,"p_podio":0.011,"p_top10":0.564,"p_dnf":0.283,"p10":6,"p90":20,"ritmo_rank":11,"deg_s_vuelta":-0.037,"paradas":1,"nota":"remonta tras la penalización"},{"acr":"COL","nombre":"Franco Colapinto","equipo":"Alpine","color":"00A1E8","salida":11,"pred":13,"pos_media":12.95,"p_win":0.0,"p_podio":0.002,"p_top10":0.328,"p_dnf":0.212,"p10":8,"p90":20,"ritmo_rank":13,"deg_s_vuelta":0.031,"paradas":1,"nota":"riesgo de degradación"},{"acr":"BOR","nombre":"Gabriel Bortoleto","equipo":"Audi","color":"F50537","salida":13,"pred":14,"pos_media":13.72,"p_win":0.0,"p_podio":0.001,"p_top10":0.217,"p_dnf":0.194,"p10":9,"p90":20,"ritmo_rank":22,"deg_s_vuelta":null,"paradas":1,"nota":""},{"acr":"BEA","nombre":"Oliver Bearman","equipo":"Haas F1 Team","color":"9C9FA2","salida":14,"pred":15,"pos_media":14.05,"p_win":0.0,"p_podio":0.001,"p_top10":0.188,"p_dnf":0.209,"p10":9,"p90":20,"ritmo_rank":10,"deg_s_vuelta":0.008,"paradas":1,"nota":""},{"acr":"HIR","nombre":"Ryo Hirakawa","equipo":"Haas F1 Team","color":"9C9FA2","salida":18,"pred":16,"pos_media":15.58,"p_win":0.0,"p_podio":0.0,"p_top10":0.076,"p_dnf":0.252,"p10":11,"p90":21,"ritmo_rank":18,"deg_s_vuelta":-0.048,"paradas":1,"nota":"cuida bien los neumáticos"},{"acr":"SAI","nombre":"Carlos Sainz","equipo":"Williams","color":"1868DB","salida":15,"pred":17,"pos_media":15.9,"p_win":0.0,"p_podio":0.0,"p_top10":0.063,"p_dnf":0.249,"p10":11,"p90":21,"ritmo_rank":17,"deg_s_vuelta":-0.051,"paradas":1,"nota":"cuida bien los neumáticos"},{"acr":"ALO","nombre":"Fernando Alonso","equipo":"Aston Martin","color":"229971","salida":17,"pred":18,"pos_media":16.2,"p_win":0.0,"p_podio":0.0,"p_top10":0.051,"p_dnf":0.279,"p10":12,"p90":21,"ritmo_rank":15,"deg_s_vuelta":-0.008,"paradas":1,"nota":""},{"acr":"ALB","nombre":"Alexander Albon","equipo":"Williams","color":"1868DB","salida":16,"pred":19,"pos_media":16.33,"p_win":0.0,"p_podio":0.0,"p_top10":0.051,"p_dnf":0.281,"p10":12,"p90":21,"ritmo_rank":16,"deg_s_vuelta":0.016,"paradas":1,"nota":"pierde posiciones"},{"acr":"STR","nombre":"Lance Stroll","equipo":"Aston Martin","color":"229971","salida":19,"pred":20,"pos_media":17.63,"p_win":0.0,"p_podio":0.0,"p_top10":0.013,"p_dnf":0.328,"p10":13,"p90":22,"ritmo_rank":20,"deg_s_vuelta":null,"paradas":1,"nota":"riesgo de abandono"},{"acr":"PER","nombre":"Sergio Perez","equipo":"Cadillac","color":"909090","salida":20,"pred":21,"pos_media":17.8,"p_win":0.0,"p_podio":0.0,"p_top10":0.009,"p_dnf":0.325,"p10":14,"p90":22,"ritmo_rank":19,"deg_s_vuelta":0.008,"paradas":1,"nota":"riesgo de abandono"},{"acr":"BOT","nombre":"Valtteri Bottas","equipo":"Cadillac","color":"909090","salida":21,"pred":22,"pos_media":18.44,"p_win":0.0,"p_podio":0.0,"p_top10":0.003,"p_dnf":0.351,"p10":15,"p90":22,"ritmo_rank":21,"deg_s_vuelta":0.041,"paradas":1,"nota":"riesgo de degradación"}],"resumen":"El simulador (20 000 carreras) ve a Lewis Hamilton como favorito (33% de victoria); el podio más probable es HAM, RUS, LEC. Estrategia esperada: 1 parada (pérdida en pits ≈ 22 s). Remontan PIA (12.º → 9.º, por ritmo de carrera), LAW (22.º → 12.º, tras su penalización); pierden terreno ALB (16.º → 19.º, por forma reciente). Lawson, descalificado de la qualy, sale P22 pero el simulador lo ve remontar hasta cerca del Top 10."},"vueltas":{"actualizado":"2026-11-01T04:54:28Z","n_sims":6000,"vueltas":71,"modelo":"Simulador vuelta a vuelta (Monte Carlo, anclado al simulador oficial): ritmo de carrera por piloto, degradación y offset por compuesto, combustible, pits (pérdida del circuito, plan óptimo + ruido calibrado, undercut, cubrir, paradas con SC/VSC), rebases en pista por diferencia de ritmo e intervalo, vuelta 1, SC/VSC y abandonos; calibrado con 84 carreras 2023-2026 de OpenF1.","modo":"anclado","nota_modo":"anclado = el ritmo efectivo de cada piloto se ajusta para que su posición media coincida con la del simulador oficial (prediccion_carrera_mexico_2026.csv); las estrategias, rebases, duelos, SC y trazas salen del modelo vuelta a vuelta. orden_final_libre = mismo simulador con el ritmo sólo de prácticas/qualy/forma (validó peor).","validacion":{"ndcg10":0.8866,"ndcg10_2024":0.8972,"ndcg10_2025":0.888,"ndcg10_2026":0.8704,"top10_hits":8.0,"win_acc":0.576,"podium_hits":2.11,"n_gp":66,"modo":"anclado","ndcg10_libre":0.8815,"ndcg10_actual":0.8898,"ndcg10_orden_qualy":0.8808,"paradas_acierto":0.544,"paradas_acierto_base_todos_1":0.478,"primera_parada_mae_vueltas":8.05,"primera_parada_mae_base_circuito":10.06,"rebases_corr_netos":0.357,"rebases_total_pred_vs_real":[45.6,41.5],"undercut_exito_sim_vs_real":[0.568,0.532],"overcut_exito_sim_vs_real":[0.202,0.118],"dif_ndcg10_vs_actual":-0.0032,"dif_ic90":[-0.0063,0.0001],"ndcg10_por_año":{"anclado":[0.8972,0.888,0.8704],"libre":[0.8936,0.8856,0.8599],"actual":[0.8957,0.8946,0.8755],"orden_qualy":[0.8893,0.8828,0.8667]},"nota":"Walk-forward 2024-2026: el modo anclado empata con el simulador oficial dentro del ruido (IC90 de la diferencia por GP toca 0) pero acierta menos ganadores; el libre queda por debajo del oficial y apenas arriba del orden de qualy. Estrategia: acierta el número de paradas más que 'todos a 1 parada' y la 1.ª parada mejor que la mediana histórica del circuito; el éxito del undercut está bien calibrado y el del overcut sobrestimado.","variantes_probadas":10},"parametros":{"perdida_pit_s":22.9,"perdida_pit_sc_s":14.9,"deg_s_vuelta":{"S":0.06,"M":0.058,"H":0.038},"offset_s":{"S":-0.28,"M":0.0,"H":0.37},"combustible_s_vuelta":-0.047,"max_stint":{"S":36,"M":41,"H":55},"ritmo_ref_s":83.43,"prob_rebase_circuito_vs_global":1.26,"planes_carrera":[{"plan":"M-H","prob":0.171},{"plan":"M-S","prob":0.121},{"plan":"H-M","prob":0.108},{"plan":"S-M","prob":0.088},{"plan":"H-S","prob":0.071},{"plan":"S-M-S","prob":0.064},{"plan":"M-H-H","prob":0.043},{"plan":"M-H-S","prob":0.04}],"ritmo_s_vuelta":{"HAM":-1.179,"RUS":-1.12,"LEC":-1.088,"ANT":-0.981,"VER":-1.019,"NOR":-0.741,"HAD":-0.868,"LIN":-0.304,"GAS":-0.027,"HUL":0.026,"COL":0.233,"PIA":-0.159,"BOR":0.392,"BEA":0.499,"SAI":0.917,"ALB":0.944,"ALO":0.892,"HIR":0.708,"STR":1.28,"PER":1.376,"BOT":1.613,"LAW":-0.647},"ritmo_libre_s_vuelta":{"HAM":-1.106,"RUS":-1.039,"LEC":-1.077,"ANT":-0.997,"VER":-0.958,"NOR":-0.579,"HAD":-0.844,"LIN":-0.321,"GAS":-0.003,"HUL":0.003,"COL":0.116,"PIA":-0.236,"BOR":0.198,"BEA":0.59,"SAI":0.873,"ALB":0.982,"ALO":0.92,"HIR":0.745,"STR":1.09,"PER":1.356,"BOT":1.414,"LAW":-0.382},"nota_ritmo":"s/vuelta vs la mediana del campo; ritmo_s_vuelta es el usado en el modo oficial"},"estrategias":[{"acr":"HAM","nombre":"Lewis Hamilton","equipo":"Ferrari","color":"ED1131","salida":1,"plan":"M-H","paradas":1,"vueltas_parada":[28],"prob_plan":0.16,"alternativas":[{"plan":"M-S","paradas":1,"prob":0.119},{"plan":"H-M","paradas":1,"prob":0.104},{"plan":"S-M","paradas":1,"prob":0.089}],"p_paradas":{"1":0.571,"2":0.4,"3":0.029},"primera_parada_p10_p90":[12,40]},{"acr":"RUS","nombre":"George Russell","equipo":"Mercedes","color":"00D7B6","salida":2,"plan":"M-H","paradas":1,"vueltas_parada":[28],"prob_plan":0.161,"alternativas":[{"plan":"M-S","paradas":1,"prob":0.114},{"plan":"H-M","paradas":1,"prob":0.109},{"plan":"S-M","paradas":1,"prob":0.09}],"p_paradas":{"1":0.577,"2":0.394,"3":0.03},"primera_parada_p10_p90":[12,40]},{"acr":"LEC","nombre":"Charles Leclerc","equipo":"Ferrari","color":"ED1131","salida":3,"plan":"M-H","paradas":1,"vueltas_parada":[28],"prob_plan":0.168,"alternativas":[{"plan":"M-S","paradas":1,"prob":0.119},{"plan":"H-M","paradas":1,"prob":0.104},{"plan":"S-M","paradas":1,"prob":0.094}],"p_paradas":{"1":0.584,"2":0.381,"3":0.035},"primera_parada_p10_p90":[12,40]},{"acr":"VER","nombre":"Max Verstappen","equipo":"Red Bull Racing","color":"4781D7","salida":5,"plan":"M-H","paradas":1,"vueltas_parada":[28],"prob_plan":0.162,"alternativas":[{"plan":"M-S","paradas":1,"prob":0.12},{"plan":"H-M","paradas":1,"prob":0.104},{"plan":"S-M","paradas":1,"prob":0.088}],"p_paradas":{"1":0.573,"2":0.399,"3":0.028},"primera_parada_p10_p90":[12,40]},{"acr":"ANT","nombre":"Kimi Antonelli","equipo":"Mercedes","color":"00D7B6","salida":4,"plan":"M-H","paradas":1,"vueltas_parada":[29],"prob_plan":0.16,"alternativas":[{"plan":"M-S","paradas":1,"prob":0.123},{"plan":"H-M","paradas":1,"prob":0.098},{"plan":"S-M","paradas":1,"prob":0.088}],"p_paradas":{"1":0.567,"2":0.399,"3":0.033},"primera_parada_p10_p90":[12,39]},{"acr":"HAD","nombre":"Isack Hadjar","equipo":"Red Bull Racing","color":"4781D7","salida":7,"plan":"M-H","paradas":1,"vueltas_parada":[28],"prob_plan":0.155,"alternativas":[{"plan":"M-S","paradas":1,"prob":0.124},{"plan":"H-M","paradas":1,"prob":0.107},{"plan":"S-M","paradas":1,"prob":0.096}],"p_paradas":{"1":0.58,"2":0.387,"3":0.033},"primera_parada_p10_p90":[11,41]},{"acr":"NOR","nombre":"Lando Norris","equipo":"McLaren","color":"F47600","salida":6,"plan":"M-H","paradas":1,"vueltas_parada":[28],"prob_plan":0.164,"alternativas":[{"plan":"M-S","paradas":1,"prob":0.112},{"plan":"H-M","paradas":1,"prob":0.1},{"plan":"S-M","paradas":1,"prob":0.091}],"p_paradas":{"1":0.573,"2":0.399,"3":0.028},"primera_parada_p10_p90":[12,39]},{"acr":"LIN","nombre":"Arvid Lindblad","equipo":"Racing Bulls","color":"6C98FF","salida":8,"plan":"M-H","paradas":1,"vueltas_parada":[28],"prob_plan":0.167,"alternativas":[{"plan":"M-S","paradas":1,"prob":0.111},{"plan":"H-M","paradas":1,"prob":0.102},{"plan":"S-M","paradas":1,"prob":0.088}],"p_paradas":{"1":0.569,"2":0.4,"3":0.031},"primera_parada_p10_p90":[12,41]},{"acr":"GAS","nombre":"Pierre Gasly","equipo":"Alpine","color":"00A1E8","salida":9,"plan":"M-H","paradas":1,"vueltas_parada":[28],"prob_plan":0.163,"alternativas":[{"plan":"M-S","paradas":1,"prob":0.121},{"plan":"H-M","paradas":1,"prob":0.1},{"plan":"S-M","paradas":1,"prob":0.091}],"p_paradas":{"1":0.573,"2":0.395,"3":0.033},"primera_parada_p10_p90":[11,41]},{"acr":"PIA","nombre":"Oscar Piastri","equipo":"McLaren","color":"F47600","salida":12,"plan":"M-H","paradas":1,"vueltas_parada":[28],"prob_plan":0.171,"alternativas":[{"plan":"M-S","paradas":1,"prob":0.115},{"plan":"H-M","paradas":1,"prob":0.107},{"plan":"S-M","paradas":1,"prob":0.091}],"p_paradas":{"1":0.578,"2":0.389,"3":0.033},"primera_parada_p10_p90":[11,41]},{"acr":"HUL","nombre":"Nico Hulkenberg","equipo":"Audi","color":"F50537","salida":10,"plan":"M-H","paradas":1,"vueltas_parada":[28],"prob_plan":0.165,"alternativas":[{"plan":"M-S","paradas":1,"prob":0.117},{"plan":"H-M","paradas":1,"prob":0.108},{"plan":"S-M","paradas":1,"prob":0.089}],"p_paradas":{"1":0.583,"2":0.386,"3":0.031},"primera_parada_p10_p90":[12,41]},{"acr":"LAW","nombre":"Liam Lawson","equipo":"Racing Bulls","color":"6C98FF","salida":22,"plan":"M-H","paradas":1,"vueltas_parada":[28],"prob_plan":0.159,"alternativas":[{"plan":"M-S","paradas":1,"prob":0.119},{"plan":"H-M","paradas":1,"prob":0.104},{"plan":"S-M","paradas":1,"prob":0.092}],"p_paradas":{"1":0.578,"2":0.392,"3":0.03},"primera_parada_p10_p90":[10,43]},{"acr":"COL","nombre":"Franco Colapinto","equipo":"Alpine","color":"00A1E8","salida":11,"plan":"M-H","paradas":1,"vueltas_parada":[28],"prob_plan":0.161,"alternativas":[{"plan":"M-S","paradas":1,"prob":0.119},{"plan":"H-M","paradas":1,"prob":0.107},{"plan":"S-M","paradas":1,"prob":0.092}],"p_paradas":{"1":0.588,"2":0.379,"3":0.032},"primera_parada_p10_p90":[11,41]},{"acr":"BOR","nombre":"Gabriel Bortoleto","equipo":"Audi","color":"F50537","salida":13,"plan":"M-H","paradas":1,"vueltas_parada":[28],"prob_plan":0.153,"alternativas":[{"plan":"M-S","paradas":1,"prob":0.119},{"plan":"H-M","paradas":1,"prob":0.117},{"plan":"S-M","paradas":1,"prob":0.09}],"p_paradas":{"1":0.577,"2":0.394,"3":0.029},"primera_parada_p10_p90":[11,42]},{"acr":"BEA","nombre":"Oliver Bearman","equipo":"Haas F1 Team","color":"9C9FA2","salida":14,"plan":"M-H","paradas":1,"vueltas_parada":[28],"prob_plan":0.17,"alternativas":[{"plan":"M-S","paradas":1,"prob":0.112},{"plan":"H-M","paradas":1,"prob":0.103},{"plan":"S-M","paradas":1,"prob":0.091}],"p_paradas":{"1":0.578,"2":0.392,"3":0.03},"primera_parada_p10_p90":[12,42]},{"acr":"HIR","nombre":"Ryo Hirakawa","equipo":"Haas F1 Team","color":"9C9FA2","salida":18,"plan":"M-H","paradas":1,"vueltas_parada":[28],"prob_plan":0.167,"alternativas":[{"plan":"M-S","paradas":1,"prob":0.119},{"plan":"H-M","paradas":1,"prob":0.101},{"plan":"S-M","paradas":1,"prob":0.094}],"p_paradas":{"1":0.58,"2":0.391,"3":0.029},"primera_parada_p10_p90":[10,43]},{"acr":"SAI","nombre":"Carlos Sainz","equipo":"Williams","color":"1868DB","salida":15,"plan":"M-H","paradas":1,"vueltas_parada":[28],"prob_plan":0.155,"alternativas":[{"plan":"M-S","paradas":1,"prob":0.115},{"plan":"H-M","paradas":1,"prob":0.104},{"plan":"S-M","paradas":1,"prob":0.087}],"p_paradas":{"1":0.565,"2":0.404,"3":0.031},"primera_parada_p10_p90":[11,41]},{"acr":"ALO","nombre":"Fernando Alonso","equipo":"Aston Martin","color":"229971","salida":17,"plan":"M-H","paradas":1,"vueltas_parada":[28],"prob_plan":0.164,"alternativas":[{"plan":"M-S","paradas":1,"prob":0.118},{"plan":"H-M","paradas":1,"prob":0.105},{"plan":"S-M","paradas":1,"prob":0.09}],"p_paradas":{"1":0.582,"2":0.388,"3":0.03},"primera_parada_p10_p90":[10,43]},{"acr":"ALB","nombre":"Alexander Albon","equipo":"Williams","color":"1868DB","salida":16,"plan":"M-H","paradas":1,"vueltas_parada":[29],"prob_plan":0.16,"alternativas":[{"plan":"M-S","paradas":1,"prob":0.119},{"plan":"H-M","paradas":1,"prob":0.1},{"plan":"S-M","paradas":1,"prob":0.09}],"p_paradas":{"1":0.576,"2":0.398,"3":0.026},"primera_parada_p10_p90":[10,43]},{"acr":"STR","nombre":"Lance Stroll","equipo":"Aston Martin","color":"229971","salida":19,"plan":"M-H","paradas":1,"vueltas_parada":[29],"prob_plan":0.166,"alternativas":[{"plan":"M-S","paradas":1,"prob":0.118},{"plan":"H-M","paradas":1,"prob":0.109},{"plan":"S-M","paradas":1,"prob":0.086}],"p_paradas":{"1":0.585,"2":0.381,"3":0.034},"primera_parada_p10_p90":[10,43]},{"acr":"PER","nombre":"Sergio Perez","equipo":"Cadillac","color":"909090","salida":20,"plan":"M-H","paradas":1,"vueltas_parada":[29],"prob_plan":0.17,"alternativas":[{"plan":"M-S","paradas":1,"prob":0.118},{"plan":"H-M","paradas":1,"prob":0.103},{"plan":"S-M","paradas":1,"prob":0.097}],"p_paradas":{"1":0.591,"2":0.376,"3":0.033},"primera_parada_p10_p90":[10,43]},{"acr":"BOT","nombre":"Valtteri Bottas","equipo":"Cadillac","color":"909090","salida":21,"plan":"M-H","paradas":1,"vueltas_parada":[28],"prob_plan":0.164,"alternativas":[{"plan":"M-S","paradas":1,"prob":0.122},{"plan":"H-M","paradas":1,"prob":0.103},{"plan":"S-M","paradas":1,"prob":0.085}],"p_paradas":{"1":0.581,"2":0.394,"3":0.025},"primera_parada_p10_p90":[11,43]}],"rebases":{"total_esperado":53.6,"total_p10_p90":[34,78],"por_piloto":[{"acr":"LAW","ganados":7.96,"perdidos":0.88,"netos":7.08,"vuelta1_netos":2.11},{"acr":"HAD","ganados":3.4,"perdidos":1.28,"netos":2.12,"vuelta1_netos":-0.49},{"acr":"VER","ganados":3.11,"perdidos":1.08,"netos":2.03,"vuelta1_netos":-0.47},{"acr":"PIA","ganados":3.5,"perdidos":2.04,"netos":1.46,"vuelta1_netos":-0.26},{"acr":"LEC","ganados":2.58,"perdidos":1.17,"netos":1.41,"vuelta1_netos":-0.68},{"acr":"ANT","ganados":2.62,"perdidos":1.29,"netos":1.34,"vuelta1_netos":-0.65},{"acr":"RUS","ganados":2.29,"perdidos":1.07,"netos":1.22,"vuelta1_netos":-0.79},{"acr":"NOR","ganados":2.76,"perdidos":1.56,"netos":1.2,"vuelta1_netos":-0.51},{"acr":"HAM","ganados":2.01,"perdidos":0.97,"netos":1.04,"vuelta1_netos":-0.73},{"acr":"LIN","ganados":2.55,"perdidos":2.32,"netos":0.23,"vuelta1_netos":-0.32},{"acr":"HUL","ganados":2.5,"perdidos":2.64,"netos":-0.15,"vuelta1_netos":-0.35},{"acr":"GAS","ganados":2.3,"perdidos":2.69,"netos":-0.39,"vuelta1_netos":-0.52},{"acr":"BOR","ganados":2.33,"perdidos":3.09,"netos":-0.76,"vuelta1_netos":-0.18},{"acr":"BEA","ganados":2.29,"perdidos":3.07,"netos":-0.77,"vuelta1_netos":-0.09},{"acr":"HIR","ganados":2.32,"perdidos":3.1,"netos":-0.77,"vuelta1_netos":0.52},{"acr":"COL","ganados":2.23,"perdidos":3.02,"netos":-0.79,"vuelta1_netos":-0.36},{"acr":"ALO","ganados":1.72,"perdidos":3.55,"netos":-1.82,"vuelta1_netos":0.26},{"acr":"SAI","ganados":1.48,"perdidos":3.85,"netos":-2.37,"vuelta1_netos":-0.08},{"acr":"ALB","ganados":1.49,"perdidos":3.86,"netos":-2.37,"vuelta1_netos":0.06},{"acr":"STR","ganados":0.94,"perdidos":3.79,"netos":-2.86,"vuelta1_netos":0.77},{"acr":"PER","ganados":0.82,"perdidos":3.69,"netos":-2.87,"vuelta1_netos":1.18},{"acr":"BOT","ganados":0.43,"perdidos":3.63,"netos":-3.2,"vuelta1_netos":1.58}],"nota":"Rebases en pista con bandera verde desde la vuelta 2 (no cuentan cambios por paradas ni la vuelta 1; vuelta1_netos = lugares ganados en la arrancada)."},"duelos":[{"ataca":"RUS","defiende":"HAM","tipo":"undercut","vuelta":25,"prob_exito":0.485,"prob_exito_sim":0.518,"ganancia_s":1.77,"prob_ocurre":0.065,"nota":"RUS para antes que HAM estando a < 3 s (pasa en 6% de las carreras); le sale 49% de las veces"},{"ataca":"LEC","defiende":"HAM","tipo":"undercut","vuelta":24,"prob_exito":0.526,"prob_exito_sim":0.562,"ganancia_s":2.34,"prob_ocurre":0.065,"nota":"LEC para antes que HAM estando a < 3 s (pasa en 6% de las carreras); le sale 53% de las veces"},{"ataca":"VER","defiende":"LEC","tipo":"undercut","vuelta":24,"prob_exito":0.502,"prob_exito_sim":0.536,"ganancia_s":2.09,"prob_ocurre":0.059,"nota":"VER para antes que LEC estando a < 3 s (pasa en 6% de las carreras); le sale 50% de las veces"},{"ataca":"LEC","defiende":"RUS","tipo":"undercut","vuelta":25,"prob_exito":0.51,"prob_exito_sim":0.545,"ganancia_s":1.99,"prob_ocurre":0.056,"nota":"LEC para antes que RUS estando a < 3 s (pasa en 6% de las carreras); le sale 51% de las veces"},{"ataca":"ANT","defiende":"RUS","tipo":"undercut","vuelta":26,"prob_exito":0.518,"prob_exito_sim":0.553,"ganancia_s":2.39,"prob_ocurre":0.056,"nota":"ANT para antes que RUS estando a < 3 s (pasa en 6% de las carreras); le sale 52% de las veces"},{"ataca":"ANT","defiende":"LEC","tipo":"undercut","vuelta":24,"prob_exito":0.496,"prob_exito_sim":0.529,"ganancia_s":1.66,"prob_ocurre":0.054,"nota":"ANT para antes que LEC estando a < 3 s (pasa en 5% de las carreras); le sale 50% de las veces"},{"ataca":"VER","defiende":"ANT","tipo":"undercut","vuelta":24,"prob_exito":0.541,"prob_exito_sim":0.578,"ganancia_s":2.35,"prob_ocurre":0.051,"nota":"VER para antes que ANT estando a < 3 s (pasa en 5% de las carreras); le sale 54% de las veces"},{"ataca":"HAD","defiende":"NOR","tipo":"undercut","vuelta":24,"prob_exito":0.533,"prob_exito_sim":0.569,"ganancia_s":2.41,"prob_ocurre":0.049,"nota":"HAD para antes que NOR estando a < 3 s (pasa en 5% de las carreras); le sale 53% de las veces"},{"ataca":"LEC","defiende":"HAM","tipo":"overcut","vuelta":26,"prob_exito":0.098,"prob_exito_sim":0.168,"ganancia_s":-2.37,"prob_ocurre":0.046,"nota":"LEC se queda fuera más vueltas que HAM estando a < 3 s detrás (pasa en 5% de las carreras); lo rebasa por estrategia 10% de las veces"},{"ataca":"VER","defiende":"ANT","tipo":"overcut","vuelta":25,"prob_exito":0.147,"prob_exito_sim":0.251,"ganancia_s":-1.68,"prob_ocurre":0.043,"nota":"VER se queda fuera más vueltas que ANT estando a < 3 s detrás (pasa en 4% de las carreras); lo rebasa por estrategia 15% de las veces"},{"ataca":"LEC","defiende":"RUS","tipo":"overcut","vuelta":25,"prob_exito":0.115,"prob_exito_sim":0.198,"ganancia_s":-1.84,"prob_ocurre":0.042,"nota":"LEC se queda fuera más vueltas que RUS estando a < 3 s detrás (pasa en 4% de las carreras); lo rebasa por estrategia 12% de las veces"},{"ataca":"RUS","defiende":"HAM","tipo":"overcut","vuelta":25,"prob_exito":0.158,"prob_exito_sim":0.271,"ganancia_s":-1.83,"prob_ocurre":0.041,"nota":"RUS se queda fuera más vueltas que HAM estando a < 3 s detrás (pasa en 4% de las carreras); lo rebasa por estrategia 16% de las veces"},{"ataca":"PIA","defiende":"HUL","tipo":"undercut","vuelta":24,"prob_exito":0.561,"prob_exito_sim":0.599,"ganancia_s":2.54,"prob_ocurre":0.04,"nota":"PIA para antes que HUL estando a < 3 s (pasa en 4% de las carreras); le sale 56% de las veces"},{"ataca":"LAW","defiende":"BOR","tipo":"undercut","vuelta":26,"prob_exito":0.786,"prob_exito_sim":0.839,"ganancia_s":8.25,"prob_ocurre":0.028,"nota":"LAW para antes que BOR estando a < 3 s (pasa en 3% de las carreras); le sale 79% de las veces"}],"trazas":[{"acr":"HAM","color":"ED1131","salida":1,"posiciones":[1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],"posiciones_mediana":[1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2],"p25":[1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],"p75":[2,2,2,3,4,4,4,4,4,4,4,4,4,4,4]},{"acr":"RUS","color":"00D7B6","salida":2,"posiciones":[2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2],"posiciones_mediana":[2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3],"p25":[2,2,2,2,2,2,2,2,2,2,2,2,2,2,2],"p75":[3,3,3,4,4,5,5,5,5,5,5,5,5,5,5]},{"acr":"LEC","color":"ED1131","salida":3,"posiciones":[3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3],"posiciones_mediana":[3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,4,4,4,4,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3],"p25":[3,2,2,2,2,2,2,2,2,2,2,2,2,2,2],"p75":[4,4,4,5,5,6,5,6,6,5,5,5,5,5,5]},{"acr":"VER","color":"4781D7","salida":5,"posiciones":[5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4],"posiciones_mediana":[5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4],"p25":[4,4,4,3,3,3,3,3,3,3,3,3,3,3,3],"p75":[6,6,6,6,7,7,7,7,6,6,6,6,6,6,6]},{"acr":"ANT","color":"00D7B6","salida":4,"posiciones":[4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5],"posiciones_mediana":[4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4],"p25":[3,3,3,3,3,3,3,3,3,3,3,3,3,3,3],"p75":[5,5,5,6,6,7,6,6,6,6,6,6,6,6,6]},{"acr":"HAD","color":"4781D7","salida":7,"posiciones":[7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6],"posiciones_mediana":[7,7,7,7,7,7,7,7,7,7,7,7,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6],"p25":[6,6,5,5,5,4,4,4,4,4,4,4,4,4,4],"p75":[8,8,8,8,8,8,8,8,8,8,7,7,7,7,7]},{"acr":"NOR","color":"F47600","salida":6,"posiciones":[6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7],"posiciones_mediana":[6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6],"p25":[5,5,5,5,4,4,4,4,4,4,4,4,4,4,4],"p75":[7,7,7,8,8,8,8,8,8,8,8,8,8,7,8]},{"acr":"LIN","color":"6C98FF","salida":8,"posiciones":[8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8],"posiciones_mediana":[8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8],"p25":[7,7,7,6,6,6,6,6,7,7,7,7,7,7,7],"p75":[9,9,9,10,11,11,11,11,10,10,10,10,10,10,10]},{"acr":"GAS","color":"00A1E8","salida":9,"posiciones":[9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9],"posiciones_mediana":[9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10],"p25":[8,8,8,8,7,7,8,8,8,8,8,8,8,8,8],"p75":[10,11,11,11,12,13,13,12,12,12,12,12,12,12,12]},{"acr":"PIA","color":"F47600","salida":12,"posiciones":[12,12,12,12,12,12,12,12,12,12,12,11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10],"posiciones_mediana":[12,12,12,12,12,11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10],"p25":[11,10,9,9,9,8,8,8,8,8,8,8,8,8,8],"p75":[13,13,13,13,14,14,14,13,13,13,13,13,13,13,13]},{"acr":"HUL","color":"F50537","salida":10,"posiciones":[10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,11],"posiciones_mediana":[10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10],"p25":[9,9,8,8,8,8,8,8,8,8,9,9,9,9,9],"p75":[11,11,12,12,13,13,13,13,13,13,13,13,13,13,13]},{"acr":"LAW","color":"6C98FF","salida":22,"posiciones":[22,22,21,20,20,19,19,19,18,17,17,16,16,15,15,15,15,15,15,14,14,14,14,13,13,13,13,13,13,13,13,13,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12],"posiciones_mediana":[20,20,19,19,19,18,18,17,17,16,16,16,15,15,15,14,14,14,14,14,13,13,13,13,13,13,13,12,12,12,12,12,12,11,11,11,11,11,11,11,11,11,11,11,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10],"p25":[19,16,14,12,11,10,9,9,8,8,8,8,8,8,8],"p75":[21,20,18,17,17,16,15,14,14,14,14,15,17,18,18]},{"acr":"COL","color":"00A1E8","salida":11,"posiciones":[11,11,11,11,11,11,11,11,11,11,11,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13],"posiciones_mediana":[11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12],"p25":[10,9,9,9,9,9,9,10,10,10,10,10,10,10,10],"p75":[13,13,13,14,15,15,15,15,15,15,14,14,14,14,15]},{"acr":"BOR","color":"F50537","salida":13,"posiciones":[13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14],"posiciones_mediana":[13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13],"p25":[12,11,11,11,11,11,11,11,11,11,11,11,11,11,11],"p75":[14,14,15,15,16,16,16,16,16,16,15,15,15,15,15]},{"acr":"BEA","color":"9C9FA2","salida":14,"posiciones":[14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,15,15,15,15,15,15,15,15,15,15,15,15,15,15,15,15,15,15,15,15,15,15,15,15,15,15,15,15,15,15,15,15,15,15,15,15,15,15,15,15,15,15,15,15,15,15,15,15,15,15,15,15],"posiciones_mediana":[14,14,14,14,14,14,14,14,14,14,13,14,14,13,13,13,13,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,13,13,13,13,13,13,13,13,13],"p25":[12,12,12,11,11,11,12,12,12,12,12,12,12,12,12],"p75":[16,15,16,16,17,17,17,17,17,16,16,16,16,16,16]},{"acr":"HIR","color":"9C9FA2","salida":18,"posiciones":[18,18,18,18,18,18,18,18,19,19,19,19,19,19,19,19,18,18,18,18,18,18,18,18,18,17,17,17,17,17,17,17,17,17,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16],"posiciones_mediana":[18,17,17,17,17,17,17,17,17,17,17,17,17,17,17,17,17,17,17,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,15,15,15,15,15,15,15,15,15,15,15,15,15,15,15,15,15,15,15,15],"p25":[16,15,15,14,14,14,14,14,14,14,14,13,13,13,13],"p75":[19,19,19,19,19,19,19,18,18,18,18,18,18,18,18]},{"acr":"SAI","color":"1868DB","salida":15,"posiciones":[15,15,15,15,15,15,15,15,15,15,15,15,15,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,17,17,17,17,17,17,17,17,17,17,17,17,17,17,17,17,17,17,17,17,17,17,17,17,17,17,17,17,17,17,17,17,17,17,17,17,17],"posiciones_mediana":[15,15,15,15,15,15,15,15,15,15,15,15,15,15,15,15,15,15,15,15,15,15,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,15,15,15,15,15,15],"p25":[13,13,13,13,13,13,14,14,14,14,14,14,14,14,14],"p75":[17,17,17,18,18,18,18,18,18,18,18,18,18,18,18]},{"acr":"ALO","color":"229971","salida":17,"posiciones":[17,17,17,17,17,17,17,17,17,18,18,18,18,18,18,18,19,19,19,19,19,19,19,19,19,19,19,19,19,19,19,19,19,19,19,19,19,19,19,19,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18],"posiciones_mediana":[17,17,17,17,17,17,17,17,17,17,17,17,17,17,17,17,17,17,17,17,17,17,17,17,17,17,17,17,17,17,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16],"p25":[15,15,14,14,14,14,14,14,14,14,14,14,14,14,14],"p75":[18,19,19,19,19,19,19,19,19,19,19,18,18,18,18]},{"acr":"ALB","color":"1868DB","salida":16,"posiciones":[16,16,16,16,16,16,16,16,16,16,16,17,17,17,17,17,17,17,17,17,17,17,17,17,17,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,19,19,19,19,19,19,19,19,19,19,19,19,19,19,19,19,19,19,19,19,19,19,19,19,19,19,19,19,19,19,19],"posiciones_mediana":[16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16],"p25":[14,14,14,14,14,14,14,14,14,14,14,14,14,14,14],"p75":[18,18,18,19,19,19,19,19,19,19,19,19,19,18,18]},{"acr":"STR","color":"229971","salida":19,"posiciones":[19,19,19,19,19,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20],"posiciones_mediana":[19,19,18,19,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,17,17,17,17,17,17],"p25":[17,16,16,16,16,16,16,16,16,16,16,16,16,16,16],"p75":[20,20,20,20,20,20,20,20,20,20,20,20,19,19,19]},{"acr":"PER","color":"909090","salida":20,"posiciones":[20,20,20,21,21,21,21,21,21,21,21,21,21,21,21,21,21,21,21,21,21,21,21,21,21,21,21,21,21,21,21,21,21,21,21,21,21,21,21,21,21,21,21,21,21,21,21,21,21,21,21,21,21,21,21,21,21,21,21,21,21,21,21,21,21,21,21,21,21,21,21],"posiciones_mediana":[19,19,19,19,19,19,19,19,19,19,19,19,19,19,19,19,19,19,19,19,19,19,19,19,19,19,19,19,19,19,19,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18],"p25":[18,17,17,17,17,17,17,17,16,17,16,16,16,16,16],"p75":[21,21,20,20,20,20,20,20,20,20,20,20,20,20,20]},{"acr":"BOT","color":"909090","salida":21,"posiciones":[21,21,22,22,22,22,22,22,22,22,22,22,22,22,22,22,22,22,22,22,22,22,22,22,22,22,22,22,22,22,22,22,22,22,22,22,22,22,22,22,22,22,22,22,22,22,22,22,22,22,22,22,22,22,22,22,22,22,22,22,22,22,22,22,22,22,22,22,22,22,22],"posiciones_mediana":[20,20,20,20,20,20,20,20,20,20,20,20,19,19,19,19,19,19,19,19,19,19,19,19,19,19,19,19,19,19,19,19,19,19,19,19,19,19,19,19,19,19,19,19,19,19,19,19,19,19,19,19,19,19,19,19,19,19,19,18,18,18,18,18,18,18,18,18,18,18,18],"p25":[18,18,18,18,18,17,18,17,17,17,17,17,17,17,17],"p75":[21,21,21,21,21,21,21,20,20,20,20,20,20,20,20]}],"safety_car":{"prob":0.706,"prob_sc":0.524,"prob_vsc":0.353,"vueltas_tipicas":[2,3],"prob_por_tramo":{"v1-5":0.345,"v6-25":0.227,"v26-50":0.232,"v51-71":0.228},"nota":"SC en la vuelta 1: 24%; después 0.47 SC y 0.47 VSC esperados por carrera (México 4 neutralizaciones en 3 ediciones 2023-2025, contraído hacia la tasa global). Con SC la parada cuesta ≈15 s en lugar de ≈23 s. (Se omite la vuelta 70: es un efecto de recorte de la simulación en las últimas vueltas.)"},"orden_final":[{"acr":"HAM","pred":1,"pos_media":4.24,"p_win":0.346,"p_podio":0.693,"p_top10":0.898,"p_dnf":0.1,"salida":1,"p10":1,"p90":14},{"acr":"RUS","pred":2,"pos_media":4.79,"p_win":0.244,"p_podio":0.604,"p_top10":0.888,"p_dnf":0.11,"salida":2,"p10":1,"p90":17},{"acr":"LEC","pred":3,"pos_media":5.18,"p_win":0.16,"p_podio":0.526,"p_top10":0.885,"p_dnf":0.113,"salida":3,"p10":1,"p90":17},{"acr":"VER","pred":4,"pos_media":5.78,"p_win":0.099,"p_podio":0.391,"p_top10":0.88,"p_dnf":0.117,"salida":5,"p10":2,"p90":18},{"acr":"ANT","pred":5,"pos_media":5.94,"p_win":0.091,"p_podio":0.387,"p_top10":0.874,"p_dnf":0.123,"salida":4,"p10":2,"p90":18},{"acr":"HAD","pred":6,"pos_media":7.06,"p_win":0.031,"p_podio":0.193,"p_top10":0.86,"p_dnf":0.13,"salida":7,"p10":3,"p90":19},{"acr":"NOR","pred":7,"pos_media":7.35,"p_win":0.023,"p_podio":0.156,"p_top10":0.857,"p_dnf":0.133,"salida":6,"p10":3,"p90":19},{"acr":"LIN","pred":8,"pos_media":9.48,"p_win":0.002,"p_podio":0.017,"p_top10":0.768,"p_dnf":0.133,"salida":8,"p10":5,"p90":19},{"acr":"GAS","pred":9,"pos_media":11.21,"p_win":0.001,"p_podio":0.005,"p_top10":0.586,"p_dnf":0.18,"salida":9,"p10":7,"p90":20},{"acr":"PIA","pred":10,"pos_media":11.34,"p_win":0.0,"p_podio":0.005,"p_top10":0.574,"p_dnf":0.194,"salida":12,"p10":7,"p90":20},{"acr":"HUL","pred":11,"pos_media":11.45,"p_win":0.0,"p_podio":0.003,"p_top10":0.534,"p_dnf":0.166,"salida":10,"p10":7,"p90":20},{"acr":"LAW","pred":12,"pos_media":11.7,"p_win":0.003,"p_podio":0.017,"p_top10":0.584,"p_dnf":0.288,"salida":22,"p10":6,"p90":21},{"acr":"COL","pred":13,"pos_media":12.77,"p_win":0.0,"p_podio":0.002,"p_top10":0.34,"p_dnf":0.209,"salida":11,"p10":8,"p90":20},{"acr":"BOR","pred":14,"pos_media":13.51,"p_win":0.0,"p_podio":0.0,"p_top10":0.197,"p_dnf":0.193,"salida":13,"p10":9,"p90":20},{"acr":"BEA","pred":15,"pos_media":14.14,"p_win":0.0,"p_podio":0.0,"p_top10":0.134,"p_dnf":0.213,"salida":14,"p10":10,"p90":20},{"acr":"HIR","pred":16,"pos_media":15.52,"p_win":0.0,"p_podio":0.0,"p_top10":0.052,"p_dnf":0.249,"salida":18,"p10":12,"p90":21},{"acr":"SAI","pred":17,"pos_media":15.83,"p_win":0.0,"p_podio":0.0,"p_top10":0.033,"p_dnf":0.252,"salida":15,"p10":12,"p90":21},{"acr":"ALO","pred":18,"pos_media":16.11,"p_win":0.0,"p_podio":0.0,"p_top10":0.026,"p_dnf":0.278,"salida":17,"p10":12,"p90":21},{"acr":"ALB","pred":19,"pos_media":16.22,"p_win":0.0,"p_podio":0.0,"p_top10":0.021,"p_dnf":0.278,"salida":16,"p10":12,"p90":21},{"acr":"STR","pred":20,"pos_media":17.46,"p_win":0.0,"p_podio":0.0,"p_top10":0.004,"p_dnf":0.327,"salida":19,"p10":14,"p90":21},{"acr":"PER","pred":21,"pos_media":17.66,"p_win":0.0,"p_podio":0.0,"p_top10":0.004,"p_dnf":0.329,"salida":20,"p10":14,"p90":21},{"acr":"BOT","pred":22,"pos_media":18.24,"p_win":0.0,"p_podio":0.0,"p_top10":0.001,"p_dnf":0.353,"salida":21,"p10":15,"p90":21}],"orden_final_libre":[{"acr":"HAM","pred":1,"pos_media":4.33,"p_win":0.323,"p_top10":0.897},{"acr":"RUS","pred":2,"pos_media":4.92,"p_win":0.222,"p_top10":0.887},{"acr":"LEC","pred":3,"pos_media":5.06,"p_win":0.187,"p_top10":0.884},{"acr":"ANT","pred":4,"pos_media":5.67,"p_win":0.122,"p_top10":0.873},{"acr":"VER","pred":5,"pos_media":5.84,"p_win":0.09,"p_top10":0.878},{"acr":"HAD","pred":6,"pos_media":7.01,"p_win":0.036,"p_top10":0.857},{"acr":"NOR","pred":7,"pos_media":7.83,"p_win":0.013,"p_top10":0.843},{"acr":"LIN","pred":8,"pos_media":9.31,"p_win":0.002,"p_top10":0.771},{"acr":"PIA","pred":9,"pos_media":11.01,"p_win":0.001,"p_top10":0.613},{"acr":"GAS","pred":10,"pos_media":11.3,"p_win":0.001,"p_top10":0.564},{"acr":"HUL","pred":11,"pos_media":11.34,"p_win":0.001,"p_top10":0.543},{"acr":"COL","pred":12,"pos_media":12.38,"p_win":0.0,"p_top10":0.404},{"acr":"LAW","pred":13,"pos_media":12.58,"p_win":0.002,"p_top10":0.452},{"acr":"BOR","pred":14,"pos_media":12.85,"p_win":0.0,"p_top10":0.303},{"acr":"BEA","pred":15,"pos_media":14.49,"p_win":0.0,"p_top10":0.101},{"acr":"HIR","pred":16,"pos_media":15.7,"p_win":0.0,"p_top10":0.043},{"acr":"SAI","pred":17,"pos_media":15.77,"p_win":0.0,"p_top10":0.035},{"acr":"ALO","pred":18,"pos_media":16.28,"p_win":0.0,"p_top10":0.022},{"acr":"ALB","pred":19,"pos_media":16.43,"p_win":0.0,"p_top10":0.017},{"acr":"STR","pred":20,"pos_media":17.13,"p_win":0.0,"p_top10":0.01},{"acr":"PER","pred":21,"pos_media":17.74,"p_win":0.0,"p_top10":0.003},{"acr":"BOT","pred":22,"pos_media":18.04,"p_win":0.0,"p_top10":0.001}],"nota_trazas":"posiciones = orden de los pilotos por su posición media en las simulaciones al final de cada vuelta (una posición por piloto; en la vuelta 71 coincide con orden_final). posiciones_mediana = mediana por piloto (puede repetir lugares); p25/p75 cada 5 vueltas.","nota_duelos":"Duelo = el de atrás va a < 3 s y las dos paradas quedan a ≤ 8 vueltas, sin SC/VSC de por medio. prob_exito está calibrada con la validación 2024-2026 (éxito real/simulado por tipo: el overcut crudo sale sobrestimado, ≈20% vs ≈12% real); prob_exito_sim es el valor crudo del simulador. La probabilidad por par no supera a la tasa general del tipo de duelo (Brier 0.199 vs 0.171).","resumen":"El simulador vuelta a vuelta pone a Lewis Hamilton como favorito (35% de ganar) y el podio más probable es HAM, RUS, LEC. Lo más probable es una sola parada (58% de las carreras; plan más común M-H) hacia la vuelta 28, con ≈23 s perdidos en pits, y el undercut más probable es el de RUS sobre HAM cerca de la vuelta 25 (le funciona 48% de las veces); quedarse fuera más vueltas (overcut) casi nunca paga en México (≈13% de éxito). Lawson, descalificado de la qualy, arranca 22.º y remonta hasta el 12.º lugar (posición media 11.7; 58% de llegar a puntos), con unos 8 rebases en pista. Hay safety car o VSC en 71% de las carreras simuladas. El orden final oficial de la página es el del simulador principal (validó mejor); aquí Verstappen/Antonelli y Gasly/Piastri aparecen invertidos porque en ambos modelos son prácticamente empates."}}</script>
 <script>
 (function(){
 "use strict";
@@ -1113,19 +1373,21 @@ function hace(iso){
 }
 
 /* ---------------- Datos ---------------- */
-var GP = null, LIVE = null, POST = null, CARRERA = null;
-var CONEX = {gp:"incrustado", live:"incrustado", post:"incrustado", carrera:"incrustado"};
+var GP = null, LIVE = null, POST = null, CARRERA = null, VUELTAS = null;
+var CONEX = {gp:"incrustado", live:"incrustado", post:"incrustado", carrera:"incrustado", vueltas:"incrustado"};
 try {
   var d0 = JSON.parse($("#datos").textContent || "{}");
   if (validoGP(d0.gp)) GP = d0.gp;
   if (validoLive(d0.live)) LIVE = d0.live;
   if (validoPost(d0.post)) POST = d0.post;
   if (validoCarrera(d0.carrera)) CARRERA = d0.carrera;
+  if (validoVueltas(d0.vueltas)) VUELTAS = d0.vueltas;
 } catch(e) {}
 function validoGP(d){ return d && Array.isArray(d.pilotos) && d.pilotos.length > 0; }
 function validoLive(d){ return d && Array.isArray(d.pilotos); }
 function validoPost(d){ return !!d && typeof d === "object" && ((Array.isArray(d.filas) && d.filas.some(function(f){ return f && f.acr; })) || (Array.isArray(d.top10_real) && d.top10_real.length > 0)); }
 function validoCarrera(d){ return !!d && typeof d === "object" && Array.isArray(d.pilotos) && d.pilotos.some(function(p){ return p && p.acr; }); }
+function validoVueltas(d){ return !!d && typeof d === "object" && ((Array.isArray(d.trazas) && d.trazas.some(function(t){ return t && t.acr && Array.isArray(t.posiciones); })) || (Array.isArray(d.estrategias) && d.estrategias.some(function(e){ return e && e.acr; }))); }
 function pilotos(){ return (GP && GP.pilotos ? GP.pilotos.slice() : []).filter(function(p){ return p && p.acr; }).sort(function(a, b){ return (pos(a.pred) || 99) - (pos(b.pred) || 99); }); }
 function porAcr(){ var m = {}; pilotos().forEach(function(p){ m[p.acr] = p; }); return m; }
 
@@ -1454,6 +1716,8 @@ var revelarListo = false;
 function renderEsperas(){
   var t = Date.now() < FIN_QUALY ? "Se publica al terminar la qualy · ~4:00 PM CDMX" : "La qualy terminó · se publica en unos minutos";
   $$("[data-espera]").forEach(function(el){ if (el.textContent !== t) el.textContent = t; });
+  var tv = Date.now() < INICIO_CARRERA ? "Se publica antes del arranque, a las 2:00 PM CDMX" : "Se publica en unos minutos; si no aparece, recarga la página";
+  $$("[data-espera-vueltas]").forEach(function(el){ if (el.textContent !== tv) el.textContent = tv; });
 }
 function acrs(v){ return Array.isArray(v) ? v.filter(function(x){ return typeof x === "string" && x; }) : []; }
 function fija(v, d){ v = nn(v); return v == null ? "—" : v.toFixed(d); }
@@ -1689,6 +1953,545 @@ function renderCarrera(){
   ponerContenido(box, h.join(""));
 }
 
+/* ---------------- La carrera, vuelta a vuelta (doc carrera/vueltas) ---------------- */
+var INICIO_CARRERA = Date.UTC(2026, 10, 1, 20, 0, 0);
+var GOMAS = {S:{n:"Blando", v:"--g-s", claro:true}, M:{n:"Medio", v:"--g-m"}, H:{n:"Duro", v:"--g-h"}, I:{n:"Intermedio", v:"--g-i"}, W:{n:"Lluvia", v:"--g-w", claro:true}};
+var VV = {D:null, orden:"salida", todos:false, fijo:null, hover:null, k:null, ancho:0, geo:null, io:null, animado:false, docListo:false, espera:0};
+function lista(v){ return Array.isArray(v) ? v : []; }
+function goma(x){
+  x = String(x == null ? "" : x).trim().toUpperCase(); if (!x) return null;
+  var k = {SOFT:"S", MEDIUM:"M", HARD:"H", INTERMEDIATE:"I", INTER:"I", WET:"W", BLANDO:"S", MEDIO:"M", DURO:"H", LLUVIA:"W"}[x] || x.charAt(0);
+  return GOMAS[k] ? k : null;
+}
+function planGomas(plan){ return String(plan == null ? "" : plan).split(/[\s\-–—>→\/,·]+/).filter(Boolean).map(goma); }
+function neum(k){ var g = GOMAS[k]; return '<i class="vv-neum" style="--g:' + (g ? "var(" + g.v + ")" : "#5a5450") + '" title="' + (g ? g.n : "Compuesto sin dato") + '">' + (k || "?") + '</i>'; }
+function planHTML(gs){ return '<span class="vv-plan">' + gs.map(neum).join("") + '</span>'; }
+function planTxt(gs){ return gs.map(function(g){ return GOMAS[g] ? GOMAS[g].n.toLowerCase() : "sin dato"; }).join(" → "); }
+function prob01(v){ v = nn(v); if (v == null) return null; if (v > 1 && v <= 100) v /= 100; return Math.max(0, Math.min(1, v)); }
+function rangoTxt(a, b){ return a === b ? "V" + a : "V" + a + "–" + b; }
+function agrupar(laps){ var r = []; laps.forEach(function(l){ var u = r[r.length - 1]; if (u && l === u[1] + 1) u[1] = l; else r.push([l, l]); }); return r; }
+function percentil(xs, q){ var a = xs.slice().sort(function(x, y){ return x - y; }); if (!a.length) return null; var i = (a.length - 1) * q, lo = Math.floor(i), hi = Math.ceil(i); return a[lo] + (a[hi] - a[lo]) * (i - lo); }
+function miles(n){ return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, " "); }
+function paradasTxt(n){ return n === 0 ? "Sin paradas" : n === 1 ? "1 parada" : n + " paradas"; }
+function fmtPos(v){ return v == null ? "—" : (Math.abs(v - Math.round(v)) < 0.05 ? String(Math.round(v)) : v.toFixed(1)); }
+function fmt1(v){ return v == null ? "—" : v.toFixed(1); }
+
+function datosVueltas(){
+  if (!validoVueltas(VUELTAS)) return null;
+  var V = VUELTAS, info = {};
+  function base(a){ return info[a] || (info[a] = {acr:a}); }
+  pilotos().forEach(function(p){ var o = base(p.acr); o.nombre = p.nombre; o.equipo = p.equipo; o.color = p.color; });
+  pilotosCarrera().forEach(function(p){ var o = base(p.acr); o.nombre = o.nombre || p.nombre; o.equipo = o.equipo || p.equipo; o.color = o.color || p.color; if (p.salida) o.salida = p.salida; });
+  var trRaw = lista(V.trazas).filter(function(t){ return t && t.acr && Array.isArray(t.posiciones); });
+  var N = pn(V.vueltas);
+  if (!N || N < 2) N = Math.max.apply(null, [0].concat(trRaw.map(function(t){ return t.posiciones.length; })));
+  if (!N || N < 2) N = 71;
+  // Estrategias: tandas por compuesto y vueltas de parada
+  var est = lista(V.estrategias).filter(function(e){ return e && e.acr; }).map(function(e){
+    var a = String(e.acr), o = base(a);
+    if (e.nombre) o.nombre = e.nombre; if (e.equipo) o.equipo = e.equipo; if (e.color) o.color = e.color;
+    if (pn(e.salida)) o.salida = pn(e.salida);
+    var gs = planGomas(e.plan);
+    var par = lista(e.vueltas_parada).map(pn).filter(function(v){ return v != null && v >= 1 && v < N; }).sort(function(x, y){ return x - y; });
+    var estimada = false;
+    if (!gs.length) gs = par.map(function(){ return null; }).concat([null]);
+    if (par.length > gs.length - 1) par = par.slice(0, gs.length - 1);
+    else if (par.length < gs.length - 1){ par = []; for (var i = 1; i < gs.length; i++) par.push(Math.round(N * i / gs.length)); estimada = true; }
+    var st = [], ini = 1;
+    gs.forEach(function(g, i){ var fin = i < par.length ? par[i] : N; st.push({g:g, a:ini, b:fin}); ini = fin + 1; });
+    var alts = lista(e.alternativas).filter(function(x){ return x && x.plan; }).map(function(x){
+      var g2 = planGomas(x.plan); return {gs:g2, paradas:pn(x.paradas) != null ? pn(x.paradas) : Math.max(0, g2.length - 1), prob:prob01(x.prob)};
+    }).sort(function(x, y){ return (y.prob || 0) - (x.prob || 0); });
+    return {acr:a, gs:gs, plan:gs.map(function(g){ return g || "?"; }).join("-"), paradas:par, st:st, prob:prob01(e.prob_plan), alts:alts, estimada:estimada};
+  });
+  var estM = {}; est.forEach(function(e){ estM[e.acr] = e; });
+  // Orden final
+  var finM = {};
+  var of = lista(V.orden_final).filter(function(o){ return o && o.acr; }).map(function(o){
+    return {acr:String(o.acr), pred:pn(o.pred), media:nn(o.pos_media), win:prob01(o.p_win), podio:prob01(o.p_podio), top10:prob01(o.p_top10), dnf:prob01(o.p_dnf)};
+  });
+  of.sort(function(x, y){ return (x.pred || 99) - (y.pred || 99) || (x.media == null ? 99 : x.media) - (y.media == null ? 99 : y.media); });
+  of.forEach(function(o, i){ o.fin = i + 1; finM[o.acr] = o.fin; });
+  // Trazas: posición mediana al final de cada vuelta (null = sin dato o abandono)
+  var tr = trRaw.map(function(t){
+    var a = String(t.acr), o = base(a);
+    if (!o.color && t.color) o.color = t.color;
+    var pts = t.posiciones.slice(0, N).map(function(v){ v = nn(v); return v != null && v >= 1 ? v : null; });
+    while (pts.length < N) pts.push(null);
+    var ult = null; for (var k = pts.length - 1; k >= 0; k--) if (pts[k] != null){ ult = k; break; }
+    return {acr:a, c:col(t.color || o.color), pts:pts, salida:o.salida || null, ult:ult, ab:ult != null && ult < N - 1, fin:ult != null ? pts[ult] : null};
+  }).filter(function(t){ return t.ult != null; });
+  if (!of.length){
+    tr.slice().sort(function(x, y){ return (x.ab - y.ab) || x.fin - y.fin; }).forEach(function(t, i){ finM[t.acr] = i + 1; of.push({acr:t.acr, fin:i + 1, pred:i + 1}); });
+  }
+  // Compañeros de equipo: el que sale más adelante va con línea continua, el otro punteada
+  var eqs = {};
+  tr.forEach(function(t){ var k = String(base(t.acr).equipo || t.c).toLowerCase(); (eqs[k] = eqs[k] || []).push(t); });
+  Object.keys(eqs).forEach(function(k){
+    eqs[k].sort(function(x, y){ return (x.salida || 99) - (y.salida || 99) || (x.acr < y.acr ? -1 : 1); }).forEach(function(t, i){ t.dash = i > 0; });
+  });
+  var def = tr.filter(function(t){ var f = finM[t.acr] || (t.ab ? 99 : t.fin); return f <= 10 || t.acr === "LAW" || t.acr === "PIA"; });
+  if (!def.length) def = tr.slice();
+  // Ventanas de pits: 20-80 % de las vueltas de 1.ª y 2.ª parada
+  var ventanas = [];
+  [0, 1].forEach(function(i){
+    var xs = est.filter(function(e){ return !e.estimada && e.paradas.length > i; }).map(function(e){ return e.paradas[i]; });
+    if (xs.length < 3) return;
+    var a = Math.round(percentil(xs, 0.2)), b = Math.round(percentil(xs, 0.8));
+    if (b - a < 2){ a = Math.max(1, a - 1); b = Math.min(N - 1, b + 1); }
+    ventanas.push({i:i, a:a, b:b, n:xs.length});
+  });
+  // Safety car
+  var sc = V.safety_car && typeof V.safety_car === "object" ? V.safety_car : {};
+  var scLaps = lista(sc.vueltas_tipicas).map(pn).filter(function(v, i, arr){ return v != null && v >= 1 && v <= N && arr.indexOf(v) === i; }).sort(function(x, y){ return x - y; });
+  var SC = {prob:prob01(sc.prob), laps:scLaps, rangos:agrupar(scLaps), nota:typeof sc.nota === "string" ? sc.nota.trim() : ""};
+  // Duelos
+  var du = lista(V.duelos).filter(function(d){ return d && d.ataca && d.defiende; }).map(function(d){
+    var t = String(d.tipo || "").toLowerCase();
+    return {ataca:String(d.ataca), defiende:String(d.defiende), tipo:t === "undercut" || t === "overcut" ? t : "otro", v:pn(d.vuelta), prob:prob01(d.prob_exito), gan:nn(d.ganancia_s), nota:typeof d.nota === "string" ? d.nota.trim() : ""};
+  }).sort(function(x, y){ return (x.v || 999) - (y.v || 999) || (y.prob || 0) - (x.prob || 0); });
+  // Rebases en pista
+  var rb = V.rebases && typeof V.rebases === "object" ? V.rebases : {};
+  var reb = lista(rb.por_piloto).filter(function(r){ return r && r.acr; }).map(function(r){
+    var g = nn(r.ganados), p = nn(r.perdidos), n = nn(r.netos);
+    if (n == null && (g != null || p != null)) n = (g || 0) - (p || 0);
+    return {acr:String(r.acr), g:g, p:p, n:n};
+  }).filter(function(r){ return r.n != null; }).sort(function(x, y){ return y.n - x.n || (y.g || 0) - (x.g || 0); });
+  var total = nn(rb.total_esperado);
+  if (total == null && reb.length && reb.some(function(r){ return r.g != null; })) total = reb.reduce(function(s, r){ return s + (r.g || 0); }, 0);
+  return {V:V, N:N, info:info, est:est, estM:estM, of:of, finM:finM, tr:tr, def:def, ventanas:ventanas, SC:SC, du:du, reb:reb, total:total, nPil:Math.max(22, Object.keys(info).length)};
+}
+
+function ejeVueltas(N){
+  var t = [1]; for (var k = 10; k < N - 4; k += 10) t.push(k); t.push(N);
+  return '<span class="vv-eje">' + t.map(function(k, i){ return '<span style="left:' + (i === 0 ? 0 : (k / N * 100).toFixed(3)) + '%">' + (i === 0 ? "V1" : k) + '</span>'; }).join("") + '</span>';
+}
+function filasMapa(D){
+  var N = D.N, es = D.est.slice(), meta = VV.orden === "meta";
+  function sal(e){ return (D.info[e.acr] || {}).salida || 99; }
+  es.sort(meta ? function(a, b){ return (D.finM[a.acr] || 99) - (D.finM[b.acr] || 99) || sal(a) - sal(b); } : function(a, b){ return sal(a) - sal(b); });
+  return es.map(function(e, i){
+    var o = D.info[e.acr] || {}, pos = meta ? D.finM[e.acr] : o.salida;
+    var pista = e.st.map(function(s, j){
+      var g = GOMAS[s.g], w = (s.b - s.a + 1) / N * 100, l = (s.a - 1) / N * 100, ult = j === e.st.length - 1;
+      return '<span class="vv-stint' + (g ? (g.claro ? " claro" : "") : " sin") + '" style="left:' + l.toFixed(3) + '%;width:calc(' + w.toFixed(3) + '% - ' + (ult ? 0 : 2) + 'px);--g:' + (g ? "var(" + g.v + ")" : "transparent") + ';--j:' + j + '">' + (s.b - s.a + 1 >= 9 ? (s.g || "?") : "") + '</span>';
+    }).join("") + e.paradas.map(function(L){ return '<span class="vv-paro" style="left:calc(' + (L / N * 100).toFixed(3) + '% - 1px)"></span>'; }).join("");
+    var alt = e.alts[0];
+    var lect = e.acr + (o.salida ? ", sale P" + o.salida : "") + (D.finM[e.acr] ? ", termina P" + D.finM[e.acr] : "") + ". Plan " + planTxt(e.gs) + (e.paradas.length ? ", para en la vuelta " + e.paradas.join(" y ") : ", sin paradas") + ".";
+    return '<li class="vv-est" data-acr="' + esc(e.acr) + '" style="--c:' + col(o.color) + ';--i:' + i + '">' +
+      '<span class="vv-est__pos">' + (pos || "–") + '</span><span class="vv-est__eq"></span>' +
+      '<span class="vv-est__pil"><b>' + esc(e.acr) + '</b><small>' + esc(o.nombre || "") + '</small></span>' +
+      '<span class="vv-pista"><span class="solo-lector">' + esc(lect) + '</span>' + '<span aria-hidden="true">' + pista + '</span></span>' +
+      '<span class="vv-est__prob"><b>' + pctN(e.prob) + '</b><small>del plan</small></span>' +
+      '<span class="vv-est__alt"><span><b>' + paradasTxt(e.gs.length - 1) + '</b>' + (e.paradas.length ? '· ' + (e.estimada ? "≈" : "") + 'V' + e.paradas.join(" · V") : "") + '</span>' +
+        (alt ? '<span>Alt. ' + planHTML(alt.gs) + ' ' + pctN(alt.prob) + '</span>' : '') + '</span></li>';
+  }).join("");
+}
+function reordenarMapa(){
+  var ol = $("#vv-mapa"); if (!ol || !VV.D) return;
+  var antes = {};
+  $$("li[data-acr]", ol).forEach(function(li){ antes[li.getAttribute("data-acr")] = li.getBoundingClientRect().top; });
+  ol.innerHTML = filasMapa(VV.D);
+  var cab = $("#vv-pos-cab"); if (cab) cab.textContent = VV.orden === "meta" ? "Meta" : "Sale";
+  if (RM.matches || !ol.animate) return;
+  $$("li[data-acr]", ol).forEach(function(li){
+    var a = antes[li.getAttribute("data-acr")]; if (a == null) return;
+    var dy = a - li.getBoundingClientRect().top;
+    if (Math.abs(dy) > 2) li.animate([{transform:"translateY(" + dy + "px)"}, {transform:"none"}], {duration:700, easing:"cubic-bezier(.2,.8,.2,1)"});
+  });
+}
+
+function trazasVisibles(D){ return VV.todos ? D.tr : D.def; }
+function camino(t, X, Y, N){
+  var d = "", pen = false;
+  if (t.salida){ d += "M" + X(0).toFixed(1) + " " + Y(t.salida).toFixed(1); pen = true; }
+  for (var k = 1; k <= N; k++){
+    var v = t.pts[k - 1];
+    if (v == null){ pen = false; continue; }
+    d += (pen ? "L" : "M") + X(k).toFixed(1) + " " + Y(v).toFixed(1); pen = true;
+  }
+  return d;
+}
+function dibujarGrafico(animar){
+  var D = VV.D, graf = $("#vv-graf"); if (!D || !graf) return;
+  animar = !!animar && !RM.matches && "IntersectionObserver" in window;
+  if (VV.io){ VV.io.disconnect(); VV.io = null; }
+  var W = Math.round(graf.clientWidth) || 0; if (W < 240) W = 320;
+  VV.ancho = W;
+  var tr = trazasVisibles(D).slice(), N = D.N, movil = W < 600;
+  var maxP = 10;
+  tr.forEach(function(t){ t.pts.forEach(function(v){ if (v != null) maxP = Math.max(maxP, Math.ceil(v)); }); if (t.salida) maxP = Math.max(maxP, t.salida); });
+  maxP = Math.min(maxP, D.nPil);
+  var fila = movil ? (maxP > 16 ? 15 : 19) : (maxP > 16 ? 21 : 26);
+  var padL = movil ? 54 : 76, padR = movil ? 54 : 76, top = 52, alto = maxP * fila, H = top + alto + 34;
+  var x0 = padL, x1 = W - padR;
+  function X(k){ return x0 + (x1 - x0) * k / N; }
+  function Y(p){ return top + (Math.max(1, Math.min(maxP, p)) - 0.5) * fila; }
+  VV.geo = {x0:x0, x1:x1, top:top, alto:alto, N:N, W:W, H:H, X:X, Y:Y, tr:tr};
+  var s = [], cw = (x1 - x0) + 16;
+  s.push('<svg viewBox="0 0 ' + W + ' ' + H + '" width="' + W + '" height="' + H + '" aria-hidden="true" focusable="false">');
+  s.push('<defs><clipPath id="vv-recorte"><rect x="' + (x0 - 8) + '" y="0" height="' + H + '" width="' + (animar ? 0 : cw) + '">' +
+    (animar ? '<animate id="vv-anim" attributeName="width" from="0" to="' + cw + '" dur="2.6s" begin="indefinite" fill="freeze" calcMode="spline" keyTimes="0;1" keySplines=".3 .1 .2 1"></animate>' : '') + '</rect></clipPath></defs>');
+  for (var p = 1; p <= maxP; p++) s.push('<line class="vv-carril" x1="' + x0 + '" x2="' + x1 + '" y1="' + Y(p) + '" y2="' + Y(p) + '"></line>');
+  var ticks = [0]; for (var k = 10; k < N - 4; k += 10) ticks.push(k); ticks.push(N);
+  ticks.forEach(function(k){
+    s.push('<line class="vv-reja" x1="' + X(k) + '" x2="' + X(k) + '" y1="' + top + '" y2="' + (top + alto) + '"></line>' +
+      '<text class="vv-tick" x="' + X(k) + '" y="' + (top + alto + 19) + '" text-anchor="' + (k === 0 ? "start" : k === N ? "end" : "middle") + '">' + (k === 0 ? (movil ? "S" : "Salida") : k) + '</text>');
+  });
+  s.push('<line class="vv-base" x1="' + x0 + '" x2="' + x1 + '" y1="' + (top + alto) + '" y2="' + (top + alto) + '"></line>' +
+    '<text class="vv-tick-t" x="' + (x0 - 10) + '" y="' + (top + alto + 18) + '" text-anchor="end">VUELTA</text>');
+  // Ventanas de pits (franja naranja) con su etiqueta arriba
+  var prev = null;
+  D.ventanas.forEach(function(v, i){
+    var xa = X(v.a - 1), xb = X(v.b);
+    var t = (movil ? "PITS " : (i === 0 ? "1.ª PARADA · " : "2.ª PARADA · ")) + rangoTxt(v.a, v.b);
+    var tw = t.length * (movil ? 5.4 : 6), cx = Math.max(tw / 2 + 2, Math.min(W - tw / 2 - 2, (xa + xb) / 2));
+    var fy = prev && Math.abs(cx - prev) < tw + 6 ? 12 : 24;
+    prev = cx;
+    s.push('<rect class="vv-ventana" x="' + xa.toFixed(1) + '" y="' + (top - 8) + '" width="' + (xb - xa).toFixed(1) + '" height="' + (alto + 8) + '"></rect>' +
+      '<line class="vv-ventana-b" x1="' + xa.toFixed(1) + '" x2="' + xb.toFixed(1) + '" y1="' + (top - 8) + '" y2="' + (top - 8) + '"></line>' +
+      '<text class="vv-ventana-t" x="' + cx.toFixed(1) + '" y="' + fy + '" text-anchor="middle">' + t + '</text>');
+  });
+  // Safety car probable (franja amarilla + banderín)
+  var ultBand = -99;
+  D.SC.rangos.forEach(function(r){
+    var xa = X(r[0] - 1), xb = X(r[1]);
+    s.push('<rect class="vv-sc-b" x="' + xa.toFixed(1) + '" y="' + top + '" width="' + Math.max(2, xb - xa).toFixed(1) + '" height="' + alto + '"></rect>');
+    if (xa - ultBand < 26) return;
+    ultBand = xa;
+    s.push('<line class="vv-sc-asta" x1="' + xa.toFixed(1) + '" x2="' + xa.toFixed(1) + '" y1="' + (top - 21) + '" y2="' + top + '"></line>' +
+      '<path class="vv-sc-flag" d="M' + xa.toFixed(1) + ' ' + (top - 21) + 'h21l-4 5.5l4 5.5h-21z"></path>' +
+      '<text class="vv-sc-t" x="' + (xa + 3).toFixed(1) + '" y="' + (top - 12.3) + '">SC</text>');
+  });
+  if (maxP > 10) s.push('<line class="vv-corte" x1="' + x0 + '" x2="' + x1 + '" y1="' + (top + 10 * fila) + '" y2="' + (top + 10 * fila) + '"></line>' +
+    '<text class="vv-corte-t" x="' + (x0 + 6) + '" y="' + (top + 10 * fila + 12) + '">TOP 10</text>');
+  // Etiquetas finales sin encimarse: se empujan hacia abajo con una guía hasta la línea
+  var fins = tr.filter(function(t){ return !t.ab; }).map(function(t){ return {t:t, y:Y(t.fin)}; })
+    .sort(function(a, b){ return a.y - b.y || (D.finM[a.t.acr] || 99) - (D.finM[b.t.acr] || 99); });
+  var gap = movil ? 12 : 14;
+  fins.forEach(function(f, i){ f.ly = i ? Math.max(f.y, fins[i - 1].ly + gap) : f.y; });
+  var lim = top + alto - 2;
+  for (var i = fins.length - 1; i >= 0; i--){ fins[i].ly = Math.min(fins[i].ly, lim); lim = fins[i].ly - gap; }
+  var finDe = {}; fins.forEach(function(f){ finDe[f.t.acr] = f; });
+  s.push('<g class="vv-capa">');
+  tr.slice().reverse().forEach(function(t){
+    var e = D.estM[t.acr], d = camino(t, X, Y, N);
+    var g = '<g class="vv-l' + (t.dash ? ' dash' : '') + '" data-acr="' + esc(t.acr) + '" style="--c:' + t.c + '">';
+    g += '<path class="hit" d="' + d + '"></path><g clip-path="url(#vv-recorte)"><path class="trazo" d="' + d + '"></path>';
+    if (e) e.paradas.forEach(function(L){ var v = t.pts[L - 1]; if (v != null) g += '<circle class="pit" cx="' + X(L).toFixed(1) + '" cy="' + Y(v).toFixed(1) + '" r="3.6"></circle>'; });
+    if (t.ab){ var xa = X(t.ult + 1), ya = Y(t.fin); g += '<path class="ab" d="M' + (xa - 4).toFixed(1) + ' ' + (ya - 4).toFixed(1) + 'l8 8m0 -8l-8 8"></path>'; }
+    else g += '<circle class="ini" cx="' + X(N).toFixed(1) + '" cy="' + Y(t.fin).toFixed(1) + '" r="3.5"></circle>';
+    g += '</g>';
+    if (t.salida) g += '<circle class="ini" cx="' + X(0).toFixed(1) + '" cy="' + Y(t.salida).toFixed(1) + '" r="3.5"></circle>' +
+      '<text class="et" x="' + (X(0) - 9).toFixed(1) + '" y="' + (Y(t.salida) + 4).toFixed(1) + '" text-anchor="end">' + esc(t.acr) + ' <tspan class="p">P' + t.salida + '</tspan></text>';
+    var f = finDe[t.acr];
+    if (f){
+      var mov = Math.abs(f.ly - f.y) > 1;
+      g += '<g class="fin">' + (mov ? '<path class="guia" d="M' + (x1 + 4) + ' ' + f.y.toFixed(1) + 'L' + (x1 + 10) + ' ' + f.ly.toFixed(1) + '"></path>' : '') +
+        '<text class="et" x="' + (x1 + (mov ? 13 : 9)) + '" y="' + (f.ly + 4).toFixed(1) + '"><tspan class="p">P' + (D.finM[t.acr] || fmtPos(t.fin)) + '</tspan> ' + esc(t.acr) + '</text></g>';
+    }
+    s.push(g + '</g>');
+  });
+  s.push('</g><g id="vv-cruz"></g></svg>');
+  var viejo = $("svg", graf); if (viejo) graf.removeChild(viejo);
+  graf.insertAdjacentHTML("afterbegin", s.join(""));
+  graf.classList.toggle("esperando", animar);
+  graf.setAttribute("aria-label", "Gráfica de posiciones vuelta por vuelta de " + tr.length + " pilotos (" + tr.map(function(t){ return t.acr; }).join(", ") + "). Usa las flechas izquierda y derecha para recorrer las vueltas; la tabla de posiciones está debajo.");
+  if (VV.fijo && !tr.some(function(t){ return t.acr === VV.fijo; })) VV.fijo = null;
+  leyendaPilotos(tr);
+  pintarFoco();
+  actualizarCruz();
+  if (animar){
+    VV.io = new IntersectionObserver(function(en){
+      if (!en[0].isIntersecting) return;
+      VV.io.disconnect(); VV.io = null; VV.animado = true;
+      graf.classList.remove("esperando");
+      var a = document.getElementById("vv-anim");
+      try { a.beginElement(); } catch(err){ if (a && a.parentNode) a.parentNode.setAttribute("width", a.getAttribute("to")); }
+    }, {threshold:0.2});
+    VV.io.observe(graf);
+  }
+}
+function leyendaPilotos(tr){
+  var ul = $("#vv-pilotos"), D = VV.D; if (!ul || !D) return;
+  ul.innerHTML = tr.slice().sort(function(a, b){ return (D.finM[a.acr] || 99) - (D.finM[b.acr] || 99); }).map(function(t){
+    return '<li><button type="button" class="' + (t.dash ? 'dash' : '') + '" data-acr="' + esc(t.acr) + '" aria-pressed="' + (VV.fijo === t.acr) + '" style="--c:' + t.c + '"><i aria-hidden="true"></i>' + esc(t.acr) +
+      (D.finM[t.acr] ? '<small>P' + D.finM[t.acr] + '</small>' : '') + '</button></li>';
+  }).join("");
+}
+function pintarFoco(){
+  var graf = $("#vv-graf"); if (!graf) return;
+  var act = VV.hover || VV.fijo;
+  graf.classList.toggle("foco", !!act);
+  $$(".vv-l", graf).forEach(function(g){
+    var on = g.getAttribute("data-acr") === act;
+    g.classList.toggle("on", on);
+    if (on && g.parentNode.lastElementChild !== g) g.parentNode.appendChild(g);
+  });
+  $$("#vv-pilotos button").forEach(function(b){ b.setAttribute("aria-pressed", String(b.getAttribute("data-acr") === VV.fijo)); });
+  pintarTip();
+}
+function filasEn(k){
+  var G = VV.geo; if (!G) return [];
+  return G.tr.map(function(t){ return {t:t, v:k === 0 ? t.salida : t.pts[k - 1]}; }).filter(function(f){ return f.v != null; })
+    .sort(function(a, b){ return a.v - b.v || (VV.D.finM[a.t.acr] || 99) - (VV.D.finM[b.t.acr] || 99); });
+}
+function actualizarCruz(){
+  var G = VV.geo, cz = $("#vv-cruz"); if (!G || !cz) return;
+  var k = VV.k;
+  if (k == null){ cz.innerHTML = ""; pintarTip(); return; }
+  var x = G.X(k).toFixed(1), h = '<line class="vv-cruz" x1="' + x + '" x2="' + x + '" y1="' + (G.top - 8) + '" y2="' + (G.top + G.alto) + '"></line>';
+  filasEn(k).forEach(function(f){ h += '<circle class="vv-cruz-pto" cx="' + x + '" cy="' + G.Y(f.v).toFixed(1) + '" r="4" fill="' + f.t.c + '"></circle>'; });
+  cz.innerHTML = h;
+  pintarTip();
+}
+function pintarTip(){
+  var G = VV.geo, D = VV.D, tip = $("#vv-tip"), k = VV.k; if (!tip) return;
+  if (!G || !D || k == null){ tip.hidden = true; return; }
+  var act = VV.hover || VV.fijo, tags = [];
+  if (k > 0 && D.ventanas.some(function(v){ return k >= v.a && k <= v.b; })) tags.push('<span class="t-pit">Ventana de pits</span>');
+  if (k > 0 && D.SC.laps.indexOf(k) >= 0) tags.push('<span class="t-sc">Safety car probable</span>');
+  D.du.filter(function(d){ return d.v === k; }).forEach(function(d){ tags.push('<span class="t-du">' + esc(d.ataca) + ' ' + (d.tipo === "otro" ? "vs." : d.tipo) + ' ' + esc(d.defiende) + '</span>'); });
+  tip.innerHTML = '<p class="vv-tip__cab"><b>' + (k === 0 ? "Salida" : "Vuelta " + k) + '</b><span>' + (k === 0 ? "Parrilla" : "de " + G.N) + '</span></p>' +
+    (tags.length ? '<p class="vv-tip__tags">' + tags.join("") + '</p>' : '') +
+    '<ol>' + filasEn(k).map(function(f){
+      var e = D.estM[f.t.acr], pit = k > 0 && e && e.paradas.indexOf(k) >= 0;
+      return '<li class="' + (f.t.dash ? 'dash' : '') + (f.t.acr === act ? ' on' : '') + '" style="--c:' + f.t.c + '"><i></i><b>P' + fmtPos(f.v) + '</b><span>' + esc(f.t.acr) + '</span>' + (pit ? '<em>Pits</em>' : '') + '</li>';
+    }).join("") + '</ol>';
+  tip.hidden = false;
+  var x = G.X(k), tw = tip.offsetWidth, th = tip.offsetHeight;
+  var izq = x + 16 + tw > G.W ? x - 16 - tw : x + 16;
+  izq = Math.max(0, Math.min(G.W - tw, izq));
+  var arriba = Math.max(0, Math.min(G.H - th, G.top));
+  tip.style.transform = "translate(" + Math.round(izq) + "px," + Math.round(arriba) + "px)";
+}
+function anunciar(){
+  var voz = $("#vv-voz"), k = VV.k; if (!voz || k == null) return;
+  voz.textContent = (k === 0 ? "Salida: " : "Vuelta " + k + ": ") + filasEn(k).map(function(f){ return "P" + fmtPos(f.v) + " " + f.t.acr; }).join(", ");
+}
+function eventosGrafico(){
+  var graf = $("#vv-graf"), ul = $("#vv-pilotos");
+  if (graf){
+    var lapDe = function(e){
+      var G = VV.geo; if (!G) return null;
+      var r = graf.getBoundingClientRect(), x = (e.clientX - r.left) * (G.W / (r.width || G.W));
+      return Math.max(0, Math.min(G.N, Math.round((x - G.x0) / (G.x1 - G.x0) * G.N)));
+    };
+    var lineaDe = function(e){ var g = e.target && e.target.closest ? e.target.closest(".vv-l") : null; return g ? g.getAttribute("data-acr") : null; };
+    graf.addEventListener("pointermove", function(e){
+      VV.k = lapDe(e);
+      if (e.pointerType === "mouse"){ var a = lineaDe(e); if (a !== VV.hover){ VV.hover = a; pintarFoco(); } }
+      actualizarCruz();
+    });
+    graf.addEventListener("pointerdown", function(e){ VV.k = lapDe(e); actualizarCruz(); });
+    graf.addEventListener("pointerleave", function(e){
+      if (e.pointerType !== "mouse") return;
+      VV.k = null; if (VV.hover){ VV.hover = null; pintarFoco(); } actualizarCruz();
+    });
+    graf.addEventListener("click", function(e){ var a = lineaDe(e); if (!a) return; VV.fijo = VV.fijo === a ? null : a; pintarFoco(); });
+    graf.addEventListener("keydown", function(e){
+      var G = VV.geo; if (!G) return;
+      var k = VV.k == null ? G.N : VV.k;
+      if (e.key === "ArrowRight") k = Math.min(G.N, k + (e.shiftKey ? 10 : 1));
+      else if (e.key === "ArrowLeft") k = Math.max(0, k - (e.shiftKey ? 10 : 1));
+      else if (e.key === "Home") k = 0;
+      else if (e.key === "End") k = G.N;
+      else if (e.key === "Escape"){ VV.k = null; VV.fijo = null; pintarFoco(); actualizarCruz(); return; }
+      else return;
+      e.preventDefault(); VV.k = k; actualizarCruz(); anunciar();
+    });
+    graf.addEventListener("focus", function(){ if (VV.k == null && VV.geo){ VV.k = VV.geo.N; actualizarCruz(); anunciar(); } });
+    graf.addEventListener("blur", function(){ VV.k = null; actualizarCruz(); });
+  }
+  if (ul){
+    var botonDe = function(e){ var b = e.target && e.target.closest ? e.target.closest("button[data-acr]") : null; return b ? b.getAttribute("data-acr") : null; };
+    ul.addEventListener("click", function(e){ var a = botonDe(e); if (!a) return; VV.fijo = VV.fijo === a ? null : a; pintarFoco(); });
+    ul.addEventListener("pointerover", function(e){ if (e.pointerType !== "mouse") return; var a = botonDe(e); if (a !== VV.hover){ VV.hover = a; pintarFoco(); } });
+    ul.addEventListener("pointerleave", function(){ if (VV.hover){ VV.hover = null; pintarFoco(); } });
+    ul.addEventListener("focusin", function(e){ var a = botonDe(e); if (a && a !== VV.hover){ VV.hover = a; pintarFoco(); } });
+    ul.addEventListener("focusout", function(){ if (VV.hover){ VV.hover = null; pintarFoco(); } });
+  }
+  if (!VV.docListo){
+    VV.docListo = true;
+    document.addEventListener("pointerdown", function(e){ var g = $("#vv-graf"); if (g && VV.k != null && !g.contains(e.target)){ VV.k = null; actualizarCruz(); } }, {passive:true});
+    window.addEventListener("resize", function(){
+      clearTimeout(VV.espera);
+      VV.espera = setTimeout(function(){ var g = $("#vv-graf"); if (g && VV.D && Math.abs(g.clientWidth - VV.ancho) > 2) dibujarGrafico(false); }, 160);
+    });
+  }
+}
+
+function metaFinal(D){
+  var t = D.of.slice(0, 10); if (!t.length) return "";
+  return '<div class="vv-meta-cab"><h4 class="sub" style="font-size:19px">Bandera a cuadros · vuelta ' + D.N + '</h4><p class="meta"><span>Orden final de esta simulación</span></p></div>' +
+    '<ol class="vv-meta" aria-label="Orden final de la simulación vuelta a vuelta">' + t.map(function(o){
+      var i = D.info[o.acr] || {};
+      return '<li style="--c:' + col(i.color) + '"><i>P' + o.fin + '</i><b>' + esc(o.acr) + '</b><small>' + (i.salida ? 'sale P' + i.salida : '&nbsp;') + '</small></li>';
+    }).join("") + '</ol>';
+}
+function tablaPosiciones(D){
+  var N = D.N, cols = [0]; for (var k = 10; k < N - 4; k += 10) cols.push(k); cols.push(N);
+  function opc(j){ return j > 0 && j < cols.length - 1 && j % 2 ? " opc" : ""; }
+  var tr = D.tr.slice().sort(function(a, b){ return (D.finM[a.acr] || 99) - (D.finM[b.acr] || 99); });
+  var cab = '<tr><th>Piloto</th>' + cols.map(function(k, j){ return '<th class="num' + opc(j) + '">' + (k === 0 ? "Salida" : k === N ? "Meta" : "V" + k) + '</th>'; }).join("") + '<th>Plan · paradas</th></tr>';
+  var filas = tr.map(function(t){
+    var e = D.estM[t.acr], i = D.info[t.acr] || {};
+    return '<tr style="--c:' + t.c + '"><td><div class="pil"><i></i><div><b>' + esc(t.acr) + '</b><span>' + esc(i.nombre || "") + '</span></div></div></td>' +
+      cols.map(function(k, j){ var v = k === 0 ? t.salida : t.pts[k - 1]; return '<td class="num' + opc(j) + '">' + (v == null ? (k > t.ult + 1 ? 'Ab.' : '—') : fmtPos(v)) + '</td>'; }).join("") +
+      '<td>' + (e ? planHTML(e.gs) + (e.paradas.length ? ' <span class="dato">V' + e.paradas.join(" · V") + '</span>' : '') : '—') + '</td></tr>';
+  });
+  return '<details class="todos" id="vv-tabla"><summary class="btn btn--fantasma btn--chico">Ver la tabla de posiciones</summary>' +
+    '<div class="tabla-caja"><table class="t22"><thead>' + cab + '</thead><tbody>' + filas.join("") + '</tbody></table></div>' +
+    '<p class="nota">Posición mediana al cerrar cada vuelta. Ab.: abandono.</p></details>';
+}
+function tarjetaDuelo(D){
+  return function(d){
+    var a = D.info[d.ataca] || {}, b = D.info[d.defiende] || {};
+    var tipo = d.tipo === "undercut" ? "Undercut" : d.tipo === "overcut" ? "Overcut" : "Estrategia";
+    return '<li class="vv-duelo vv-duelo--' + d.tipo + '">' +
+      '<div class="vv-duelo__top"><span class="vv-tipo vv-tipo--' + d.tipo + '">' + tipo + '</span><span class="vv-duelo__v">' + (d.v ? "Vuelta " + d.v : "Vuelta por definir") + '</span></div>' +
+      '<div class="vv-duelo__vs"><span class="vv-duelo__p" style="--c:' + col(a.color) + '"><b>' + esc(d.ataca) + '</b><small>Ataca</small></span><span class="vv-duelo__fl" aria-hidden="true">→</span>' +
+        '<span class="vv-duelo__p" style="--c:' + col(b.color) + '"><b>' + esc(d.defiende) + '</b><small>Defiende</small></span></div>' +
+      '<div class="vv-duelo__num"><b>' + pctN(d.prob) + '</b><span>Probabilidad<br>de que le salga</span><span class="vv-medidor" aria-hidden="true"><span style="--v:' + (d.prob || 0).toFixed(3) + '"></span></span></div>' +
+      (d.gan != null ? '<p class="vv-duelo__gan det"><span>Ganancia si sale <b>' + (d.gan > 0 ? "+" : d.gan < 0 ? "−" : "") + Math.abs(d.gan).toFixed(1) + ' s</b></span></p>' : '') +
+      (d.nota ? '<p class="nota-pil">' + esc(d.nota) + '</p>' : '') + '</li>';
+  };
+}
+function bloqueRebases(D){
+  var max = 0; D.reb.forEach(function(r){ max = Math.max(max, r.g || 0, r.p || 0); }); if (!max) max = 1;
+  return '<div class="vv-bloque rv" id="vv-rebases"><div class="vv-bloque__cab"><div><p class="ceja">04 · Rebases</p><h3 class="sub">Lugares ganados en pista</h3></div>' +
+      '<p class="txt">Rebases esperados por piloto en la pista; no cuenta los lugares que cambian por las paradas. Netos = ganados − perdidos.</p></div>' +
+    '<div class="vv-total"><b>' + (D.total == null ? "—" : Math.round(D.total)) + '</b><span>Rebases en pista esperados en las ' + D.N + ' vueltas</span></div>' +
+    '<div class="vv-reb-cab" aria-hidden="true"><span></span><span></span><span>Gan. / perd.</span><span><span>◂ Perdidos</span><span>Ganados ▸</span></span><span>Netos</span></div>' +
+    '<ol class="vv-reb" aria-label="Rebases netos esperados por piloto">' + D.reb.map(function(r, i){
+      var o = D.info[r.acr] || {}, n = r.n, dir = n > 0.05 ? "sube" : n < -0.05 ? "baja" : "igual";
+      var lect = r.acr + ": " + fmt1(r.g) + " ganados, " + fmt1(r.p) + " perdidos, " + (n > 0 ? "+" : "") + n.toFixed(1) + " netos";
+      return '<li style="--c:' + col(o.color) + ';--i:' + i + '"><span class="solo-lector">' + esc(lect) + '</span>' +
+        '<span class="pos" aria-hidden="true">' + (i + 1) + '</span><span class="eq" aria-hidden="true"></span>' +
+        '<span class="pil" aria-hidden="true"><b>' + esc(r.acr) + '</b><small>' + fmt1(r.g) + ' / ' + fmt1(r.p) + '</small></span>' +
+        '<span class="bar" aria-hidden="true">' + (r.p ? '<span class="pe" style="width:' + (r.p / max * 48).toFixed(2) + '%"></span>' : '') + (r.g ? '<span class="ga" style="width:' + (r.g / max * 48).toFixed(2) + '%"></span>' : '') + '</span>' +
+        '<span class="net" aria-hidden="true"><i class="' + dir + '">' + (dir === "sube" ? "▲" : dir === "baja" ? "▼" : "=") + '</i>' + (n > 0.05 ? "+" : n < -0.05 ? "−" : "") + Math.abs(n).toFixed(1) + '</span></li>';
+    }).join("") + '</ol></div>';
+}
+function bloqueSC(D){
+  var S = D.SC, N = D.N;
+  var marcas = S.rangos.map(function(r){ return '<span class="vv-sc__marca" style="left:' + ((r[0] - 1) / N * 100).toFixed(2) + '%;width:' + ((r[1] - r[0] + 1) / N * 100).toFixed(2) + '%"></span>'; }).join("");
+  return '<div class="vv-bloque rv" id="vv-sc"><div class="vv-bloque__cab"><div><p class="ceja">05 · Safety car</p><h3 class="sub">La neutralización</h3></div>' +
+      '<p class="txt">Un safety car en plena ventana de paradas abarata la entrada a pits de quien todavía no ha parado y puede voltear los duelos de estrategia.</p></div>' +
+    '<div class="vv-sc"><div class="vv-sc__top"><span class="vv-sc__num">' + (S.prob == null ? "—" : Math.round(S.prob * 100) + '<small>%</small>') + '</span><p>Probabilidad de al menos un safety car</p></div>' +
+    (S.rangos.length ? '<div><p class="vv-sc__et">Vueltas en que suele salir</p><div class="vv-sc__pista" aria-hidden="true">' + marcas +
+        '<span class="t ini" style="left:0">V1</span><span class="t" style="left:50%">V' + Math.round(N / 2) + '</span><span class="t fin" style="left:100%">V' + N + '</span></div></div>' +
+      '<ul class="vv-sc__laps" aria-label="Vueltas típicas del safety car">' + S.rangos.map(function(r){ return '<li>' + rangoTxt(r[0], r[1]) + '</li>'; }).join("") + '</ul>' : '') +
+    (S.nota ? '<p class="nota">' + esc(S.nota) + '</p>' : '') + '</div></div>';
+}
+var ETQ_VAL = {
+  n_gp:["Carreras validadas"], n_carreras:["Carreras validadas"],
+  plan_acierto:["Plan acertado", "%", "Pilotos con el plan de paradas correcto"], acierto_plan:["Plan acertado", "%", "Pilotos con el plan de paradas correcto"],
+  paradas_acierto:["Paradas acertadas", "%", "Número de paradas correcto"], acierto_paradas:["Paradas acertadas", "%", "Número de paradas correcto"],
+  mae_vuelta_parada:["Error en la vuelta de parada", "v", "Vueltas de diferencia, en promedio"], mae_parada:["Error en la vuelta de parada", "v", "Vueltas de diferencia, en promedio"],
+  rebases_mae:["Error en rebases", "", "Por piloto, en promedio"], mae_rebases:["Error en rebases", "", "Por piloto, en promedio"],
+  rebases_corr:["Rebases: correlación", "", "Con los rebases reales (1 = perfecto)"], sc_brier:["Safety car (Brier)", "", "0 = perfecto"],
+  ndcg10:["NDCG@10", "", "Calidad del orden del Top 10"], top10_hits:["Top 10 acertado", "/10"], win_acc:["Ganador acertado", "%"],
+  podium_hits:["Podio acertado", "/3"], spearman:["Orden completo", "", "Spearman con el resultado real"], mae_pos:["Error de posición", "lug.", "Lugares por piloto, en promedio"]
+};
+function bloqueValidacion(D){
+  var v = D.V.validacion, tiles = [];
+  if (v && typeof v === "object"){
+    Object.keys(v).forEach(function(k){
+      var x = v[k]; if (typeof x !== "number" || !isFinite(x) || tiles.length >= 4) return;
+      var e = ETQ_VAL[k] || [k.replace(/_/g, " ").replace(/^./, function(c){ return c.toUpperCase(); })];
+      var u = e[1] != null ? e[1] : (/(acc|acierto|tasa|pct)/i.test(k) && x <= 1 ? "%" : "");
+      var val = u === "%" ? (x <= 1 ? x * 100 : x).toFixed(0) : Number.isInteger(x) ? String(x) : Math.abs(x) < 1 ? x.toFixed(2) : x.toFixed(1);
+      tiles.push(tile(esc(e[0]), val, u, e[2] || ""));
+    });
+  }
+  var nota = v && typeof v.nota === "string" && v.nota.trim() ? v.nota.trim() : "";
+  if (!tiles.length && !nota && !D.V.modelo) return "";
+  return '<div class="valida rv"><div><p class="ceja">El simulador vuelta a vuelta</p><p class="txt" style="font-size:14px">' + esc(nota || "Cómo le fue a esta simulación contra carreras reales anteriores.") + '</p>' +
+    '<p class="meta" style="margin-top:14px">' + (D.V.modelo ? '<span>Modelo: ' + esc(D.V.modelo) + '</span>' : '') + (pn(D.V.n_sims) ? '<span>' + miles(pn(D.V.n_sims)) + ' carreras simuladas</span>' : '') + (D.V.actualizado ? '<span>Actualizado: ' + esc(hora(D.V.actualizado)) + '</span>' : '') + '</p></div>' +
+    (tiles.length ? '<dl class="metricas vv-val">' + tiles.join("") + '</dl>' : '<div></div>') + '</div>';
+}
+
+function renderVueltas(){
+  var box = $("#vueltas-cuerpo"), D = datosVueltas();
+  if (!box || !D) return;
+  VV.D = D; VV.k = null; VV.hover = null;
+  var V = D.V, N = D.N, h = [];
+  // Cabecera: resumen + cuatro cifras
+  var cuenta = {}; D.est.forEach(function(e){ cuenta[e.plan] = (cuenta[e.plan] || 0) + 1; });
+  var comun = Object.keys(cuenta).sort(function(a, b){ return cuenta[b] - cuenta[a]; })[0];
+  var comunE = comun ? D.est.filter(function(e){ return e.plan === comun; })[0] : null;
+  var v1 = D.ventanas[0];
+  var res = typeof V.resumen === "string" && V.resumen.trim() ? V.resumen.trim() :
+    (comunE ? "El plan más común es " + planTxt(comunE.gs) + "." : "") + (D.total != null ? " Se esperan unos " + Math.round(D.total) + " rebases en pista." : "") + (D.SC.prob != null ? " Safety car: " + Math.round(D.SC.prob * 100) + "%." : "");
+  h.push('<div class="vv-cab rv"><div><p class="ceja">' + (pn(V.n_sims) ? miles(pn(V.n_sims)) + " carreras simuladas" : "La carrera simulada") + '</p>' +
+      '<p class="resumen__cita">' + esc(res) + '</p>' + (V.actualizado ? '<p class="meta" style="margin-top:16px"><span>Actualizado: ' + esc(hora(V.actualizado)) + '</span></p>' : '') + '</div>' +
+    '<dl class="metricas">' +
+      tile("Rebases en pista", D.total == null ? "—" : String(Math.round(D.total)), "", "Esperados en " + N + " vueltas, sin contar los cambios por pits") +
+      tile("Safety car", D.SC.prob == null ? "—" : String(Math.round(D.SC.prob * 100)), "%", D.SC.rangos.length ? "Suele salir en " + D.SC.rangos.slice(0, 3).map(function(r){ return rangoTxt(r[0], r[1]); }).join(", ") : "Probabilidad de al menos uno") +
+      tile("Plan más común", comunE ? planHTML(comunE.gs) : "—", "", comunE ? cuenta[comun] + " de " + D.est.length + " pilotos · " + paradasTxt(comunE.gs.length - 1).toLowerCase() : "Sin estrategias publicadas") +
+      tile("Ventana de pits", v1 ? rangoTxt(v1.a, v1.b) : "—", "", v1 ? "Donde se concentra la 1.ª parada" : "Sin paradas en los planes") +
+    '</dl></div>');
+  // 01 · Mapa de estrategias
+  if (D.est.length){
+    var usados = {S:1, M:1, H:1};
+    D.est.forEach(function(e){ e.gs.concat(e.alts.length ? e.alts[0].gs : []).forEach(function(g){ if (g) usados[g] = 1; }); });
+    h.push('<div class="vv-bloque rv" id="vv-estrategias"><div class="vv-bloque__cab"><div><p class="ceja">01 · Estrategias</p><h3 class="sub">El mapa de paradas</h3></div>' +
+        '<p class="txt">Cada barra es la carrera de un piloto, de la vuelta 1 a la ' + N + ': el color es el compuesto de cada tanda y la marca blanca, la vuelta en que entra a pits. A la derecha, qué tan seguido eligió el simulador ese plan y su alternativa principal.</p></div>' +
+      '<div class="vv-controles"><p class="vv-ley">' + ["S", "M", "H", "I", "W"].filter(function(g){ return usados[g]; }).map(function(g){ return '<span>' + neum(g) + GOMAS[g].n + '</span>'; }).join("") + '<span><i class="m-pit"></i>Parada en pits</span></p>' +
+        '<div class="vv-seg" role="group" aria-label="Ordenar el mapa de paradas"><span>Ordenar por</span><div class="vv-seg__btns"><button type="button" data-orden="salida" aria-pressed="' + (VV.orden === "salida") + '">Salida</button><button type="button" data-orden="meta" aria-pressed="' + (VV.orden === "meta") + '">Meta</button></div></div></div>' +
+      '<div class="vv-eje-fila" aria-hidden="true"><span id="vv-pos-cab">' + (VV.orden === "meta" ? "Meta" : "Sale") + '</span><span></span><span>Piloto</span>' + ejeVueltas(N) + '<span>Plan</span><span>Paradas · alternativa</span></div>' +
+      '<ol class="vv-mapa" id="vv-mapa" aria-label="Estrategia de pits por piloto">' + filasMapa(D) + '</ol></div>');
+  }
+  // 02 · Posiciones vuelta a vuelta
+  if (D.tr.length){
+    var hayMas = D.tr.length > D.def.length;
+    h.push('<div class="vv-bloque rv" id="vv-posiciones"><div class="vv-bloque__cab"><div><p class="ceja">02 · Posiciones</p><h3 class="sub">El orden, vuelta por vuelta</h3></div>' +
+        '<p class="txt">Posición mediana de cada piloto al cerrar cada vuelta' + (pn(V.n_sims) ? ' en las ' + miles(pn(V.n_sims)) + ' carreras simuladas' : '') + '. Los círculos huecos son sus paradas; la franja naranja, la ventana de pits, y la amarilla, cuándo suele salir el safety car.</p></div>' +
+      '<div class="vv-controles"><p class="vv-ley"><span><i class="m-l"></i>Piloto</span><span><i class="m-l dash"></i>Compañero de equipo</span><span><i class="m-circ"></i>Parada</span>' +
+        (D.ventanas.length ? '<span><i class="m-ven"></i>Ventana de pits</span>' : '') + (D.SC.rangos.length ? '<span><i class="m-sc"></i>Safety car probable</span>' : '') + '<span><i class="m-top"></i>Corte del Top 10</span></p>' +
+        (hayMas ? '<div class="vv-seg" role="group" aria-label="Pilotos en la gráfica"><span>Mostrar</span><div class="vv-seg__btns"><button type="button" data-todos="0" aria-pressed="' + !VV.todos + '">Top 10 + LAW y PIA</button><button type="button" data-todos="1" aria-pressed="' + VV.todos + '">Los ' + D.tr.length + '</button></div></div>' : '') + '</div>' +
+      '<div class="vv-graf" id="vv-graf" tabindex="0" role="group" aria-describedby="vv-ayuda"><div class="vv-tip" id="vv-tip" hidden></div></div>' +
+      '<p class="solo-lector" id="vv-voz" aria-live="polite"></p>' +
+      '<ul class="vv-pilotos" id="vv-pilotos" aria-label="Resaltar un piloto en la gráfica"></ul>' +
+      '<p class="vv-ayuda" id="vv-ayuda">Pasa el cursor o desliza el dedo sobre la gráfica para ver cada vuelta; toca un piloto para resaltarlo. Con teclado: flechas izquierda y derecha.</p>' +
+      metaFinal(D) + tablaPosiciones(D) + '</div>');
+  }
+  // 03 · Duelos de estrategia
+  if (D.du.length){
+    var td = tarjetaDuelo(D), vis = D.du.slice(0, 9), resto = D.du.slice(9);
+    h.push('<div class="vv-bloque rv" id="vv-duelos"><div class="vv-bloque__cab"><div><p class="ceja">03 · Duelos de estrategia</p><h3 class="sub">Undercut y overcut</h3></div>' +
+        '<p class="txt">Los cruces en pits que el simulador ve con más posibilidades de cambiar el orden: quién ataca, a quién, en qué vuelta y qué tan seguido le sale.</p></div>' +
+      '<div class="vv-glosario"><div class="u"><b>Undercut</b>Entrar a pits antes que el rival y usar la goma nueva para quedar delante cuando él pare.</div>' +
+        '<div class="o"><b>Overcut</b>Quedarse más tiempo en pista, con aire limpio, y salir de pits delante del rival que ya paró.</div></div>' +
+      '<ul class="vv-duelos" aria-label="Duelos de estrategia en orden de vuelta">' + vis.map(td).join("") + '</ul>' +
+      (resto.length ? '<details class="todos vv-mas"><summary class="btn btn--fantasma btn--chico">Ver ' + resto.length + ' duelos más</summary><ul class="vv-duelos">' + resto.map(td).join("") + '</ul></details>' : '') + '</div>');
+  }
+  // 04 · Rebases y 05 · Safety car
+  var rebH = D.reb.length ? bloqueRebases(D) : "", scH = D.SC.prob != null || D.SC.laps.length ? bloqueSC(D) : "";
+  if (rebH || scH) h.push('<div class="vv-dos">' + rebH + scH + '</div>');
+  h.push(bloqueValidacion(D));
+  ponerContenido(box, h.join(""));
+  // Controles
+  $$("#vueltas-cuerpo [data-orden]").forEach(function(b){
+    b.addEventListener("click", function(){
+      if (VV.orden === b.getAttribute("data-orden")) return;
+      VV.orden = b.getAttribute("data-orden");
+      $$("#vueltas-cuerpo [data-orden]").forEach(function(x){ x.setAttribute("aria-pressed", String(x === b)); });
+      reordenarMapa();
+    });
+  });
+  $$("#vueltas-cuerpo [data-todos]").forEach(function(b){
+    b.addEventListener("click", function(){
+      var t = b.getAttribute("data-todos") === "1"; if (VV.todos === t) return;
+      VV.todos = t;
+      $$("#vueltas-cuerpo [data-todos]").forEach(function(x){ x.setAttribute("aria-pressed", String(x === b)); });
+      dibujarGrafico(false);
+    });
+  });
+  if ($("#vv-graf")){ eventosGrafico(); dibujarGrafico(!VV.animado); }
+}
+
 /* ---------------- Aviso bajo el héroe ---------------- */
 function renderAvisoPost(){
   var a = $("#aviso-post"); if (!a) return;
@@ -1705,7 +2508,7 @@ function renderAvisoPost(){
 
 /* ---------------- Render global ---------------- */
 function renderGP(){ if (!GP) return; renderFicha(); renderMetricas(); renderParrilla(); renderCasas(); renderTabla(); renderBurbuja(); renderCambios(); renderVivo(); }
-renderGP(); renderVivo(); renderPost(); renderCarrera(); renderAvisoPost(); renderEsperas(); tic(); setInterval(cadaSegundo, 1000);
+renderGP(); renderVivo(); renderPost(); renderCarrera(); renderVueltas(); renderAvisoPost(); renderEsperas(); tic(); setInterval(cadaSegundo, 1000);
 
 /* ---------------- Base de datos en vivo (Artifact) ---------------- */
 function suscribir(db, ruta, clave){
@@ -1721,6 +2524,7 @@ function suscribir(db, ruta, clave){
       else if (clave === "live" && validoLive(d)){ LIVE = d; renderVivo(); tic(); }
       else if (clave === "post" && validoPost(d)){ POST = d; renderPost(); renderAvisoPost(); }
       else if (clave === "carrera" && validoCarrera(d)){ CARRERA = d; renderCarrera(); renderAvisoPost(); }
+      else if (clave === "vueltas" && validoVueltas(d)){ VUELTAS = d; renderVueltas(); }
       CONEX[clave] = snap.metadata.fromCache ? (confirmado ? "vivo" : "cache") : "vivo";
       renderConexion();
     }, function(err){
@@ -1739,6 +2543,7 @@ function suscribir(db, ruta, clave){
     suscribir(db, "live/qualy", "live");
     suscribir(db, "post/qualy", "post");
     suscribir(db, "carrera/mexico2026", "carrera");
+    suscribir(db, "carrera/vueltas", "vueltas");
   }, function(){ CONEX.live = "incrustado"; renderConexion(); });
 })();
 

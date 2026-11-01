@@ -80,6 +80,10 @@ con --post/--carrera, republicar Artifact y publicar_sitio.py.
 Workflow w6x89rhce: `sim_vueltas.py` (simulador vuelta a vuelta calibrado con 88 carreras; validación walk-forward vs simulador actual
 0.8898) → web_mexico/datos_vueltas.json (doc "carrera/vueltas"); sección "La carrera, vuelta a vuelta" en la página
 (construir_web_mexico.py --vueltas); verificación adversarial (hora límite 13:00 UTC).
-- [ ] Integrar: elegir orden final (sim vuelta a vuelta si valida ≥ actual; si no, el actual), db carrera/vueltas (+ carrera/mexico2026
+- [x] Integrar: elegir orden final (sim vuelta a vuelta si valida ≥ actual; si no, el actual), db carrera/vueltas (+ carrera/mexico2026
       si cambia, if_version 3), construir_web_mexico.py con --post --carrera --vueltas, republicar Artifact, publicar_sitio.py, commit
 - [ ] 15:30 UTC: revisión final de parrilla (programada)
+05:10 UTC: simulador vuelta a vuelta integrado (Artifact v18; db carrera/vueltas v1). Orden final oficial = simulador actual
+(vuelta a vuelta anclado 0.8866 vs 0.8898, Wilcoxon p=0.015 a favor del actual); vuelta a vuelta aporta estrategias (1 parada 58%, M-H
+~v28, pit 22.9 s), duelos (undercut RUS→HAM v25 48%), rebases (~54), SC/VSC 71%, trazas. Regenerar: `python3 sim_vueltas.py mexico --sims 6000`
+(si cambia la parrilla: primero modelo_carrera_austin.py --parrilla, luego sim_vueltas.py, luego construir_web_mexico.py con --vueltas).
