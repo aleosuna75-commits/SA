@@ -75,3 +75,11 @@ PENDIENTE: decisión de comisarios sobre la Q1 (HAM, BOR, BOT, PER: tiempo delta
 con --post/--carrera, republicar Artifact y publicar_sitio.py.
 23:31 UTC: qualy oficial de OpenF1 = la del live timing (22/22 idénticas). Parrilla de Crash.net = la usada. Sin decisión publicada sobre la Q1 (HAM/BOR/BOT/PER) ni sobre el MGU-K de Lawson (GPblog): sin cambios. Revisión final programada 2026-11-01 15:30 UTC (OpenF1 starting_grid 11404 + prensa).
 02:59 UTC 1/11: Lawson descalificado de la qualy (MGU-K) → sale P22 (BOT P21). Parrilla: HAM RUS LEC ANT VER NOR HAD LIN GAS HUL COL PIA BOR BEA SAI ALB ALO HIR STR PER BOT LAW. post/qualy v2 (oficial 8/10; en pista 9/10), carrera v3, Artifact v17. Pronóstico: HAM RUS LEC ANT VER HAD NOR LIN PIA GAS (LAW ~P12).
+
+## Fase 4 (pedido 03:00 UTC 1/11): resultado final de la carrera vuelta a vuelta (rebases, undercut/overcut, estrategias)
+Workflow w6x89rhce: `sim_vueltas.py` (simulador vuelta a vuelta calibrado con 88 carreras; validación walk-forward vs simulador actual
+0.8898) → web_mexico/datos_vueltas.json (doc "carrera/vueltas"); sección "La carrera, vuelta a vuelta" en la página
+(construir_web_mexico.py --vueltas); verificación adversarial (hora límite 13:00 UTC).
+- [ ] Integrar: elegir orden final (sim vuelta a vuelta si valida ≥ actual; si no, el actual), db carrera/vueltas (+ carrera/mexico2026
+      si cambia, if_version 3), construir_web_mexico.py con --post --carrera --vueltas, republicar Artifact, publicar_sitio.py, commit
+- [ ] 15:30 UTC: revisión final de parrilla (programada)
