@@ -492,6 +492,14 @@ def seccion(id_, num, titulo, sub, *hijos, extra=None):
         *hijos], id=id_, className="bloque")
 
 
+def multi(id_, opciones, valor, nombre, prefijo=""):
+    """Selector múltiple con 'Seleccionar todos', igual al de años."""
+    return dcc.Dropdown(id=id_, options=[{"label": f"{prefijo}{o}", "value": o} for o in opciones], value=valor,
+                        multi=True, clearable=False, searchable=False, placeholder=f"Elige {nombre}",
+                        labels={"select_all": "Seleccionar todos", "deselect_all": "Quitar todos",
+                                "selected_count": "{num_selected} " + nombre})
+
+
 def grupo(titulo, *hijos):
     return html.Div([html.Div(titulo, className="f-lbl"), *hijos], className="f-blk")
 
@@ -585,13 +593,29 @@ main = html.Main([
             ], className="ctls")),
 
     seccion("conceptos", "04", "Conceptos", "Los cuatro cálculos de la reserva lado a lado: RCONT, RFV bruto, RFV IRR y RFV neto.",
-            panel("Comparativo de conceptos", "Cada línea es un concepto; la etiqueta final muestra su último valor.",
-                  grafica("g-conc", 360), id_titulo="t-conc")),
+            panel("Comparativo de conceptos", "", dcc.Graph(id="g-conc", config=GRAPH_CFG), id_titulo="t-conc",
+                  id_ayuda="a-conc"),
+            extra=html.Div([
+                html.Div([html.Label("CONCEPTOS"), multi("conc-conceptos", conceptos0, conceptos0, "conceptos")], className="ctl"),
+                html.Div([html.Label("RAMOS"), multi("conc-ramos", ramos0, ramos0, "ramos", prefijo="Ramo ")], className="ctl"),
+                html.Div([html.Label("VER RAMOS"),
+                          dcc.Dropdown(id="conc-vista", options=[{"label": "Juntos (suma de ramos)", "value": "juntos"},
+                                                                 {"label": "Por separado (un panel por ramo)", "value": "separado"}],
+                                       value="juntos", clearable=False, searchable=False)], className="ctl"),
+            ], className="ctls")),
 
     seccion("ramos", "05", "Detalle por ramo", "Evolución de cada variable, separada por ramo.",
+            html.Div(id="ramo-leyenda", className="leyenda leyenda-sec"),
             html.Div([panel(VARIABLES[v], "", grafica(f"g-v{i}", 250), cls="mini-panel") for i, v in enumerate(DETALLE)],
                      className="grid g-3"),
-            extra=html.Div(id="ramo-leyenda", className="leyenda")),
+            extra=html.Div([
+                html.Div([html.Label("CONCEPTOS"), multi("det-conceptos", conceptos0, [CONCEPTO0], "conceptos")], className="ctl"),
+                html.Div([html.Label("RAMOS"), multi("det-ramos", ramos0, ramos0, "ramos", prefijo="Ramo ")], className="ctl"),
+                html.Div([html.Label("VER RAMOS"),
+                          dcc.Dropdown(id="det-vista", options=[{"label": "Por separado (una línea por ramo)", "value": "separado"},
+                                                                {"label": "Juntos (suma de ramos)", "value": "juntos"}],
+                                       value="separado", clearable=False, searchable=False)], className="ctl"),
+            ], className="ctls")),
 
     seccion("tabla-sec", "06", "Tabla mensualizada", "Los números detrás de las gráficas. El Excel trae una pestaña por sección.",
             html.Div(id="tabla", className="card tabla-wrap"), dcc.Download(id="dl"),
@@ -741,6 +765,8 @@ table.lect th:first-child, table.lect td:first-child { text-align:left; font-wei
 .lect-nota { color:var(--tx3); font-size:12px; line-height:1.5; margin-top:12px; }
 .leyenda { display:flex; gap:14px; margin-left:auto; flex-wrap:wrap; font-size:12.5px; color:var(--tx2); }
 .leyenda span { display:flex; align-items:center; }
+.leyenda-sec { margin:-4px 0 12px; justify-content:flex-end; }
+.dash-ln { display:inline-block; width:22px; height:0; border-top:2.5px solid var(--tx2); margin-right:7px; }
 /* tabla */
 .btn-pri { margin-left:auto; display:flex; align-items:center; gap:7px; background:var(--acc); color:#fff; border:0; border-radius:999px;
   padding:10px 18px; font:inherit; font-size:13px; font-weight:650; cursor:pointer; }
@@ -822,8 +848,7 @@ def _alpha(hex_color, a):
     Output("kpis", "children"),
     Output("t-mens", "children"), Output("a-mens", "children"), Output("g-mens", "figure"),
     Output("t-ramo", "children"), Output("g-ramo", "figure"), Output("g-mom", "figure"),
-    Output("t-conc", "children"), Output("g-conc", "figure"),
-    *[Output(f"g-v{i}", "figure") for i in range(6)], Output("ramo-leyenda", "children"), Output("tabla", "children"),
+    Output("tabla", "children"),
     *ENTRADAS)
 def actualizar(concepto, var, ramos, anios, meses, unidad, _ver):
     df = ESTADO["df"]
@@ -843,8 +868,7 @@ def actualizar(concepto, var, ramos, anios, meses, unidad, _ver):
               ("Año", per_txt), ("Mes", m_txt), ("En", unidad)]]
     if not (ramos and anios and meses and concepto):
         v = vacia()
-        return (chips, aviso, fuente, pie, [], lbl, "", v, "Por ramo", v, v, "Comparativo de conceptos", v,
-                *[v] * 6, None, html.Div("Sin datos", className="ayuda", style={"padding": "16px"}))
+        return (chips, aviso, fuente, pie, [], lbl, "", v, "Por ramo", v, v, html.Div("Sin datos", className="ayuda", style={"padding": "16px"}))
 
     # --- KPIs ---
     kpis = []
@@ -938,38 +962,6 @@ def actualizar(concepto, var, ramos, anios, meses, unidad, _ver):
     estilo(fig, 250, "pp" if ratio else unidad, leyenda=False, ytick=",.1f")
     g_mom = fig
 
-    # --- Conceptos ---
-    fig = go.Figure()
-    for c in [c for c in CONCEPTOS_ORDEN if c in set(df["CONCEPTO"])]:
-        s = serie(df, c, var, ramos, anios, meses).sort_values("FECHA")
-        y = s["VALOR"] if ratio else s["VALOR"] / div
-        col = T["conceptos"].get(c, T["text3"])
-        fig.add_scatter(x=s["FECHA"], y=y, name=c, mode="lines", line=dict(color=col, width=3.5 if c == concepto else 2),
-                        hovertemplate=("%{y:.1%}" if ratio else "%{y:,.1f}" + suf))
-        if len(s) and pd.notna(y.iloc[-1]):
-            fig.add_annotation(x=s["FECHA"].iloc[-1], y=y.iloc[-1], xanchor="left", xshift=8, showarrow=False,
-                               text=f"<b>{c}</b>  {fmt(s['VALOR'].iloc[-1], unidad, ratio)}", font=dict(color=col, size=12))
-    estilo(fig, 360, None if ratio else yu, ratio, leyenda=False)
-    fig.update_layout(margin=dict(l=8, r=180, t=10, b=8))
-    g_conc = fig
-
-    # --- Detalle por ramo ---
-    peq = []
-    for v in DETALLE:
-        r_ = v in RATIOS
-        fig = go.Figure()
-        for r in ramos:
-            s = serie(df, concepto, v, [r], anios, meses)
-            if s["VALOR"].fillna(0).abs().sum() == 0:
-                continue
-            fig.add_scatter(x=s["FECHA"], y=s["VALOR"] if r_ else s["VALOR"] / div, name=f"Ramo {r}", mode="lines",
-                            line=dict(color=color_ramo(r, ramos_todos), width=2.2),
-                            hovertemplate="%{y:.1%}" if r_ else "%{y:,.1f}" + suf)
-        estilo(fig, 250, None, r_, leyenda=False, compacto=True)
-        peq.append(fig)
-    leyenda = [html.Span([html.I(className="dot", style={"background": color_ramo(r, ramos_todos)}), f"Ramo {r}"])
-               for r in ramos]
-
     # --- Tabla ---
     tab = tabla_mensual(df, concepto, var, ramos, anios, meses)
     vista = tab * 100 if ratio else tab / div
@@ -980,8 +972,135 @@ def actualizar(concepto, var, ramos, anios, meses, unidad, _ver):
                                                                for c in vista.columns])),
                         html.Tbody(filas)], className="t")
 
-    return (chips, aviso, fuente, pie, kpis, f"{lbl} por mes · {concepto}", a_mens, g_mens, t_ramo, g_ramo, g_mom,
-            f"{lbl} por concepto", g_conc, *peq, leyenda, tabla)
+    return (chips, aviso, fuente, pie, kpis, f"{lbl} por mes · {concepto}", a_mens, g_mens, t_ramo, g_ramo, g_mom, tabla)
+
+
+# ---- Conceptos y Detalle por ramo (con sus propios filtros) ----------------------------
+DASH_CONCEPTO = {"RCONT": "dot", "RFV BRUTO": "dash", "RFV IRR": "dashdot", "RFV NETO": "solid"}
+
+
+@app.callback(Output("conc-conceptos", "options"), Output("conc-conceptos", "value"),
+              Output("det-conceptos", "options"), Output("det-conceptos", "value"),
+              Output("conc-ramos", "options"), Output("conc-ramos", "value"),
+              Output("det-ramos", "options"), Output("det-ramos", "value"),
+              Input("f-concepto", "value"), Input("f-ramo", "value"), Input("version", "data"), prevent_initial_call=True)
+def _sincronizar(concepto, ramos, _ver):
+    """Los filtros generales (panel Filtros) ponen el punto de partida; luego cada sección se ajusta sola."""
+    conceptos, ramos_todos, _ = catalogos(ESTADO["df"])
+    oc = [{"label": c, "value": c} for c in conceptos]
+    orr = [{"label": f"Ramo {r}", "value": r} for r in ramos_todos]
+    ramos = [r for r in (ramos or []) if r in ramos_todos] or ramos_todos
+    t = ctx.triggered_id
+    return (oc, conceptos if t == "version" else no_update, oc, [concepto] if concepto else no_update,
+            orr, ramos, orr, ramos)
+
+
+@app.callback(Output("t-conc", "children"), Output("a-conc", "children"), Output("g-conc", "figure"),
+              Input("f-var", "value"), Input("f-anio", "value"), Input("f-mes", "value"), Input("f-unidad", "value"),
+              Input("conc-conceptos", "value"), Input("conc-ramos", "value"), Input("conc-vista", "value"),
+              Input("version", "data"))
+def conceptos_cb(var, anios, meses, unidad, conceptos, ramos, vista, _ver):
+    df = ESTADO["df"]
+    anios, meses, ramos = sorted(anios or []), sorted(meses or []), sorted(ramos or [])
+    conceptos = [c for c in CONCEPTOS_ORDEN if c in (conceptos or [])] + [c for c in (conceptos or []) if c not in CONCEPTOS_ORDEN]
+    lbl = VARIABLES[var]
+    if not (anios and meses and ramos and conceptos):
+        return f"{lbl} por concepto", "", vacia("Elige al menos un concepto y un ramo arriba", h=360)
+    div, suf = UNIDADES[unidad]
+    ratio = var in RATIOS
+    yu = f"{unidad} de pesos" if unidad != "Pesos" else "Pesos"
+    hov = "%{y:.1%}" if ratio else "%{y:,.1f}" + suf
+    if vista == "separado" and len(ramos) > 1:
+        sin_monto = [r for r in ramos if all(serie(df, c, var, [r], anios, meses)["VALOR"].fillna(0).abs().sum() == 0
+                                              for c in conceptos)]
+        ramos = [r for r in ramos if r not in sin_monto] or ramos
+        ncol = 3 if len(ramos) > 4 else 2
+        nfil = -(-len(ramos) // ncol)
+        fig = make_subplots(rows=nfil, cols=ncol, subplot_titles=[f"<b>Ramo {r}</b>" for r in ramos],
+                            horizontal_spacing=0.06, vertical_spacing=0.16 if nfil > 1 else 0.1)
+        for k, r in enumerate(ramos):
+            fi, co = k // ncol + 1, k % ncol + 1
+            for c in conceptos:
+                s = serie(df, c, var, [r], anios, meses).sort_values("FECHA")
+                fig.add_scatter(x=s["FECHA"], y=s["VALOR"] if ratio else s["VALOR"] / div, name=c, legendgroup=c,
+                                showlegend=k == 0, mode="lines", line=dict(color=T["conceptos"].get(c, T["text3"]), width=2.4),
+                                hovertemplate=hov, row=fi, col=co)
+        estilo(fig, 290 * nfil + 40, None, ratio, compacto=True, ytick=".1%" if ratio else ",.2~f")
+        fig.update_layout(legend=dict(yanchor="bottom", y=1.02 + 0.02 * nfil, xanchor="left", x=0, font=dict(size=12)),
+                          margin=dict(l=8, r=12, t=60, b=8))
+        fig.update_annotations(font=dict(size=13, color=T["text"]))
+        ayuda = (f"Un panel por ramo; cada línea es un concepto. {lbl} en "
+                 + ("%." if ratio else f"{unidad.lower()} de pesos.") + " Cada panel tiene su propia escala."
+                 + (f" Sin monto (no se muestra): ramo {', '.join(sin_monto)}." if sin_monto else ""))
+        return f"{lbl} por concepto y ramo", ayuda, fig
+    fig = go.Figure()
+    for c in conceptos:
+        s = serie(df, c, var, ramos, anios, meses).sort_values("FECHA")
+        y = s["VALOR"] if ratio else s["VALOR"] / div
+        col = T["conceptos"].get(c, T["text3"])
+        fig.add_scatter(x=s["FECHA"], y=y, name=c, mode="lines", line=dict(color=col, width=2.8), hovertemplate=hov)
+        if len(s) and pd.notna(y.iloc[-1]):
+            fig.add_annotation(x=s["FECHA"].iloc[-1], y=y.iloc[-1], xanchor="left", xshift=8, showarrow=False,
+                               text=f"<b>{c}</b>  {fmt(s['VALOR'].iloc[-1], unidad, ratio)}", font=dict(color=col, size=12))
+    estilo(fig, 360, None if ratio else yu, ratio, leyenda=False)
+    fig.update_layout(margin=dict(l=8, r=180, t=10, b=8))
+    txt_r = "todos los ramos" if len(ramos) == len(catalogos(df)[1]) else "ramos " + ", ".join(ramos)
+    return (f"{lbl} por concepto", f"Cada línea es un concepto ({txt_r} sumados); la etiqueta final muestra su último valor.",
+            fig)
+
+
+@app.callback(*[Output(f"g-v{i}", "figure") for i in range(6)], Output("ramo-leyenda", "children"),
+              Input("f-anio", "value"), Input("f-mes", "value"), Input("f-unidad", "value"),
+              Input("det-conceptos", "value"), Input("det-ramos", "value"), Input("det-vista", "value"),
+              Input("version", "data"))
+def detalle_cb(anios, meses, unidad, conceptos, ramos, vista, _ver):
+    df = ESTADO["df"]
+    _, ramos_todos, _ = catalogos(df)
+    anios, meses, ramos = sorted(anios or []), sorted(meses or []), sorted(ramos or [])
+    conceptos = [c for c in CONCEPTOS_ORDEN if c in (conceptos or [])] + [c for c in (conceptos or []) if c not in CONCEPTOS_ORDEN]
+    if not (anios and meses and ramos and conceptos):
+        v = vacia("Elige al menos un concepto y un ramo arriba", h=250)
+        return (*[v] * 6, None)
+    div, suf = UNIDADES[unidad]
+    varios = len(conceptos) > 1
+    figs = []
+    for v in DETALLE:
+        r_ = v in RATIOS
+        hov = "%{y:.1%}" if r_ else "%{y:,.1f}" + suf
+        fig = go.Figure()
+        for c in conceptos:
+            estilo_linea = DASH_CONCEPTO.get(c, "solid") if varios else "solid"
+            if vista == "juntos":
+                s = serie(df, c, v, ramos, anios, meses)
+                fig.add_scatter(x=s["FECHA"], y=s["VALOR"] if r_ else s["VALOR"] / div, name=c, mode="lines",
+                                line=dict(color=T["conceptos"].get(c, T["navy"]) if varios else T["navy"], width=2.4),
+                                hovertemplate=hov)
+            else:
+                for r in ramos:
+                    s = serie(df, c, v, [r], anios, meses)
+                    if s["VALOR"].fillna(0).abs().sum() == 0:
+                        continue
+                    fig.add_scatter(x=s["FECHA"], y=s["VALOR"] if r_ else s["VALOR"] / div,
+                                    name=f"Ramo {r}" + (f" · {c}" if varios else ""), mode="lines",
+                                    line=dict(color=color_ramo(r, ramos_todos), width=2.2, dash=estilo_linea),
+                                    hovertemplate=hov)
+        estilo(fig, 250, None, r_, leyenda=False, compacto=True)
+        figs.append(fig)
+    if vista == "juntos":
+        leyenda = [html.Span("Suma de ramos " + ", ".join(ramos), style={"color": T["text3"]})] + (
+            [html.Span([html.I(className="dot", style={"background": T["conceptos"].get(c, T["navy"])}), c]) for c in conceptos]
+            if varios else [html.Span([html.I(className="dot", style={"background": T["navy"]}), conceptos[0]])])
+    else:
+        leyenda = [html.Span([html.I(className="dot", style={"background": color_ramo(r, ramos_todos)}), f"Ramo {r}"])
+                   for r in ramos]
+        if varios:
+            leyenda += [html.Span([html.I(className="dash-ln", style={"borderTopStyle": {"solid": "solid", "dash": "dashed",
+                                                                                         "dot": "dotted", "dashdot": "dashed"}
+                                                                                        [DASH_CONCEPTO.get(c, "solid")]}), c])
+                        for c in conceptos]
+        else:
+            leyenda = [html.Span(conceptos[0], style={"color": T["text3"], "fontWeight": 600})] + leyenda
+    return (*figs, leyenda)
 
 
 # ---- Estacionalidad -------------------------------------------------------------------
@@ -1082,99 +1201,75 @@ def estacionalidad(concepto, var, ramos, meses, unidad, anios, prima, anio_ramo,
     return t_comp, a_comp, lbl, lblp, g_comp, stats, t_anios, g_anios, t_heat, g_heat, fig
 
 
-# ---- Descarga a Excel: el mismo tablero en un libro, una pestaña por sección ---------
+# ---- Descarga a Excel: tablero vivo (fórmulas + panel de control), una pestaña por sección ----
 XL = dict(bg="#E9EAEF", navy="#2F3A5F", card="#FFFFFF", tx="#1F2433", tx2="#5B6275", tx3="#8B90A0",
           acc="#F08A3C", acc_s="#F8C9A2", pos="#2E9E6B", pos_s="#E3F4EC", neg="#D64545", neg_s="#FBE7E7",
-          nav_s="#ECEEF5", linea="#E3E5EC", grid="#EEF0F4", zebra="#F7F8FA")
+          nav_s="#ECEEF5", linea="#E3E5EC", grid="#EEF0F4", zebra="#F7F8FA", aa="#9AA3C0")
 XL_FUENTE = "Segoe UI"
 XL_SECCIONES = [("01 Resumen", "⌂  Resumen"), ("02 Mes a mes", "▮  Mes a mes"), ("03 Estacionalidad", "∿  Estacionalidad"),
                 ("04 Conceptos", "≋  Conceptos"), ("05 Detalle por ramo", "▦  Detalle por ramo"),
                 ("06 Tabla mensualizada", "☰  Tabla mensualizada")]
 XL_C0, XL_C1 = 3, 26          # columnas de contenido: D … AA (24 columnas de 64 px)
 XL_COLPX, XL_ROWPX = 64, 20
+KPI_VARS = ["RAM", "PRIMA 24M", "PR 24M", "MA", "RFV MA", "CESION", "PT"]
 
 
 def libro_excel(concepto, var, ramos, anios, meses, unidad, est_anios, prima, anio_ramo=None):
-    """Arma el libro con el mismo diseño del tablero. Devuelve una función que escribe el .xlsx en un buffer."""
+    """Libro de Excel 'vivo': un panel de control (listas desplegables) y fórmulas sobre la base oculta.
+    Al cambiar concepto, variable, año, unidades, prima o ramos, todo el libro se recalcula en Excel."""
     import xlsxwriter
-    from xlsxwriter.utility import xl_rowcol_to_cell
+    from xlsxwriter.utility import xl_rowcol_to_cell as celda, xl_col_to_name as col_l
 
     df = ESTADO["df"]
-    conceptos_todos, ramos_todos, anios_todos = catalogos(df)
-    ramos, anios, meses = sorted(ramos or []), sorted(anios or []), sorted(meses or [])
-    est_anios = sorted(est_anios or anios_todos)
-    a_r = anio_ramo if anio_ramo in anios_todos else anios_todos[-1]
-    div, suf = UNIDADES[unidad]
-    ratio = var in RATIOS
-    lbl, lblp = VARIABLES[var], PRIMAS[prima]
-    per_txt = f"{anios[0]}–{anios[-1]}" if len(anios) > 1 else str(anios[0])
-    m_txt = "Todos" if len(meses) == 12 else ", ".join(MESES[m - 1] for m in meses)
-    xm = [MESES[m - 1] for m in meses]
-    nf = "0.0%" if ratio else "#,##0.0"               # formato de la variable elegida
-    esc = (lambda x: x) if ratio else (lambda x: x / div)
-    unidad_txt = "%" if ratio else f"{unidad.lower()} de pesos"
-    filtros = (f"Concepto {concepto}  ·  Variable {lbl}  ·  Ramos {', '.join(ramos)}  ·  Año {per_txt}  ·  "
-               f"Mes {m_txt}  ·  En {unidad}")
-
-    # ---------- cálculos: los mismos del tablero ----------
-    kp = datos_kpis(df, concepto, ramos, anios, meses)
-    tot = serie(df, concepto, var, ramos, anios, meses, por=("PERIODO",)).sort_values("PERIODO").reset_index(drop=True)
-    comp, t_ramo = datos_por_ramo(df, concepto, var, ramos, anios, meses, per_txt)
-    iv = indice(df, concepto, var, ramos, est_anios, meses)
-    ip = indice(df, concepto, prima, ramos, est_anios, meses)
-    lect = datos_lectura(iv, ip, meses)
-    hs = serie(df, concepto, var, ramos, est_anios, meses, por=("ANIO", "MES"))
-    heat = hs.pivot(index="ANIO", columns="MES", values="VALOR").reindex(index=est_anios, columns=meses)
-    ir_ramo = {r: indice(df, concepto, var, [r], [a_r], meses) for r in ramos}
-    conc_lista = [c for c in CONCEPTOS_ORDEN if c in set(df["CONCEPTO"])]
-    conc = {c: serie(df, c, var, ramos, anios, meses, por=("PERIODO",)).set_index("PERIODO")["VALOR"] for c in conc_lista}
-    det = {v: tabla_mensual(df, concepto, v, ramos, anios, meses) for v in DETALLE}
-    tm = tabla_mensual(df, concepto, var, ramos, anios, meses)
-    hero = serie(df, concepto, "RAM", ramos, anios, meses, por=("PERIODO",)).sort_values("PERIODO")
+    conceptos, ramos_todos, anios_todos = catalogos(df)
+    ramos_xl = ramos_todos[:5]                       # el panel admite hasta 5 ramos
+    anio0 = max(anios) if anios else anios_todos[-1]
+    ramos_on = set(ramos or ramos_todos)
+    base = df.drop(columns="FECHA").copy()
+    base["RAMO_N"] = pd.to_numeric(base["RAMO"], errors="coerce")
+    base = base[["CONCEPTO", "PERIODO", "ANIO", "MES", "RAMO_N", "VARIABLE", "VALOR"]]
+    base["VARIABLE_NOMBRE"] = base["VARIABLE"].map(VARIABLES)
+    n_bd = len(base)
     logo_badge = base64.b64decode(LOGO_BADGE_B64)
 
     def escribir(buf):
-        wb = xlsxwriter.Workbook(buf, {"in_memory": True, "nan_inf_to_errors": True})
-        wb.set_properties({"title": "PRISMA · Proyección de reservas FCST 2027", "author": "PRISMA"})
+        wb = xlsxwriter.Workbook(buf, {"in_memory": True})
+        wb.set_properties({"title": "PRISMA · Proyección de reservas FCST 2027", "author": "PRISMA",
+                           "comments": "Tablero vivo: cambia los filtros en '01 Resumen' › Panel de control."})
         cache = {}
 
         def F(**kw):
-            """Formato con caché. Claves cortas: bg, c (color de letra), b (negrita), s (tamaño), nf, al, va, wr, it."""
             k = tuple(sorted(kw.items()))
             if k not in cache:
                 d = {"font_name": XL_FUENTE, "font_size": kw.get("s", 10), "font_color": kw.get("c", XL["tx"]),
                      "valign": kw.get("va", "vcenter")}
-                if "bg" in kw: d["bg_color"] = kw["bg"]; d["pattern"] = 1
+                if "bg" in kw: d.update(bg_color=kw["bg"], pattern=1)
                 if kw.get("b"): d["bold"] = True
                 if kw.get("it"): d["italic"] = True
                 if "nf" in kw: d["num_format"] = kw["nf"]
                 if "al" in kw: d["align"] = kw["al"]
                 if kw.get("wr"): d["text_wrap"] = True
                 if kw.get("ind"): d["indent"] = kw["ind"]
-                if "bt" in kw: d["top"] = 1; d["top_color"] = kw["bt"]
-                if "bb" in kw: d["bottom"] = 1; d["bottom_color"] = kw["bb"]
+                if "bt" in kw: d.update(top=1, top_color=kw["bt"])
+                if "bb" in kw: d.update(bottom=1, bottom_color=kw["bb"])
+                if "box" in kw: d.update(border=1, border_color=kw["box"])
                 cache[k] = wb.add_format(d)
             return cache[k]
 
-        # ---------- hoja oculta con los datos de todas las gráficas ----------
-        pendientes = []          # bloques para la hoja oculta Datos_graficas (se escribe al final)
-        cur = {"r": 0}
+        dxf = lambda **kw: wb.add_format(kw)
+        PCT, PP = dxf(num_format="0.0%"), dxf(num_format='+0.0" pp";-0.0" pp"')
+        ES_RATIO = "=sel_ratio"
 
-        def bloque(titulo, columnas, filas, formatos=None):
-            """Escribe un bloque en Datos_graficas y devuelve una función ref(col) para las series."""
-            r0 = cur["r"]
-            pendientes.append((r0, titulo, list(columnas), [list(f) for f in filas], formatos or {}))
-            r1, r2 = r0 + 2, r0 + 1 + len(filas)
-            cur["r"] = r2 + 3
-            return lambda col: ["Datos_graficas", r1, columnas.index(col), r2, columnas.index(col)]
+        # ======================= hojas visibles (se crean primero para el orden de pestañas) ==========
+        hojas = {}
 
-        # ---------- piezas de diseño ----------
         def hoja(idx, titulo, sub):
             nombre = XL_SECCIONES[idx][0]
             ws = wb.add_worksheet(nombre)
+            hojas[idx] = ws
             ws.hide_gridlines(2)
             ws.set_zoom(80)
-            ws.set_default_row(15)          # 20 px
+            ws.set_default_row(15)
             ws.set_landscape()
             ws.fit_to_pages(1, 0)
             fondo = F(bg=XL["bg"])
@@ -1186,7 +1281,6 @@ def libro_excel(concepto, var, ramos, anios, meses, unidad, est_anios, prima, an
             ws.set_column_pixels(XL_C1 + 2, 60, XL_COLPX, fondo)
             for r, px in [(0, 12), (1, 32), (2, 30), (3, 18), (4, 30), (5, 20), (6, 10)]:
                 ws.set_row_pixels(r, px)
-            # encabezado tipo píldora
             nv = F(bg=XL["navy"])
             for r in (1, 2):
                 for c in range(XL_C0, XL_C1 + 1):
@@ -1196,420 +1290,749 @@ def libro_excel(concepto, var, ramos, anios, meses, unidad, est_anios, prima, an
             ws.merge_range(1, XL_C0 + 1, 1, XL_C0 + 5, "PRISMA", F(bg=XL["navy"], c="#FFFFFF", b=True, s=18, va="bottom"))
             ws.merge_range(2, XL_C0 + 1, 2, XL_C0 + 5, "Proyección de reservas · FCST 2027",
                            F(bg=XL["navy"], c="#C9CEDD", s=9, va="top"))
-            ws.merge_range(1, XL_C0 + 6, 2, XL_C1 - 3, filtros, F(bg=XL["navy"], c="#FFFFFF", s=9, al="right", wr=True))
-            ws.merge_range(1, XL_C1 - 2, 2, XL_C1, f"Excel · {datetime.now():%d/%m/%Y}",
-                           F(bg=XL["acc"], c="#FFFFFF", b=True, s=10, al="center"))
-            # riel de navegación (azul marino) con enlaces a cada pestaña
-            for r in range(4, 80):
+            ws.merge_range(1, XL_C0 + 6, 2, XL_C1 - 3, "", F(bg=XL["navy"], c="#FFFFFF", s=9, al="right", wr=True))
+            ws.write_formula(1, XL_C0 + 6, "=sel_txt", F(bg=XL["navy"], c="#FFFFFF", s=9, al="right", wr=True))
+            ws.merge_range(1, XL_C1 - 2, 2, XL_C1, "", F(bg=XL["acc"], c="#FFFFFF", b=True, s=10, al="center"))
+            ws.write_url(1, XL_C1 - 2, "internal:'01 Resumen'!D11",
+                         F(bg=XL["acc"], c="#FFFFFF", b=True, s=10, al="center"), string="⚙  Cambiar filtros")
+            for r in range(4, 160):
                 ws.write_blank(r, 1, None, nv)
-            for k, (hoja_dest, etiqueta) in enumerate(XL_SECCIONES):
-                r = 8 + k * 2
+            for k, (dest, etiqueta) in enumerate(XL_SECCIONES):
                 activo = k == idx
-                ws.write_url(r, 1, f"internal:'{hoja_dest}'!A1",
-                             F(bg=XL["navy"], c=XL["acc"] if activo else "#FFFFFF", b=activo, s=10, ind=1),
-                             string=etiqueta)
-            ws.write(8 + len(XL_SECCIONES) * 2 + 1, 1, "Base de datos en", F(bg=XL["navy"], c="#AEB5CB", s=8, ind=1))
-            ws.write(8 + len(XL_SECCIONES) * 2 + 2, 1, "pestañas ocultas", F(bg=XL["navy"], c="#AEB5CB", s=8, ind=1))
-            # título de la sección
+                ws.write_url(8 + k * 2, 1, f"internal:'{dest}'!A1",
+                             F(bg=XL["navy"], c=XL["acc"] if activo else "#FFFFFF", b=activo, s=10, ind=1), string=etiqueta)
+            r_n = 8 + len(XL_SECCIONES) * 2 + 1
+            ws.write_url(r_n, 1, "internal:'01 Resumen'!D11", F(bg=XL["navy"], c="#F8C9A2", b=True, s=10, ind=1),
+                         string="⚙  Panel de control")
+            ws.write(r_n + 2, 1, "Base y cálculos en", F(bg=XL["navy"], c="#AEB5CB", s=8, ind=1))
+            ws.write(r_n + 3, 1, "pestañas ocultas", F(bg=XL["navy"], c="#AEB5CB", s=8, ind=1))
             ws.write(4, XL_C0, f"{idx + 1:02d}", F(bg=XL["navy"], c="#FFFFFF", b=True, s=11, al="center"))
             ws.merge_range(4, XL_C0 + 1, 4, XL_C0 + 12, titulo, F(bg=XL["bg"], b=True, s=15, ind=1))
             ws.merge_range(5, XL_C0 + 1, 5, XL_C1, sub, F(bg=XL["bg"], c=XL["tx3"], s=10, ind=1))
+            ws.freeze_panes(4, 0)
             return ws
 
-        def tarjeta(ws, r1, c1, r2, c2, titulo=None, ayuda=None, oscuro=False):
+        def tarjeta(ws, r1, c1, r2, c2, titulo=None, ayuda=None, oscuro=False, f_titulo=None):
             bgc = XL["navy"] if oscuro else XL["card"]
             for r in range(r1, r2 + 1):
                 for c in range(c1, c2 + 1):
                     ws.write_blank(r, c, None, F(bg=bgc))
-            if titulo:
-                ws.merge_range(r1, c1, r1, c2, titulo, F(bg=bgc, b=True, s=11, c="#FFFFFF" if oscuro else XL["tx"], ind=1, va="bottom"))
+            ft = F(bg=bgc, b=True, s=11, c="#FFFFFF" if oscuro else XL["tx"], ind=1, va="bottom")
+            if f_titulo:
+                ws.merge_range(r1, c1, r1, c2, "", ft)
+                ws.write_formula(r1, c1, f_titulo, ft)
+            elif titulo:
+                ws.merge_range(r1, c1, r1, c2, titulo, ft)
             if ayuda:
                 ws.merge_range(r1 + 1, c1, r1 + 1, c2, ayuda, F(bg=bgc, s=9, c="#C9CEDD" if oscuro else XL["tx3"], ind=1, va="top"))
 
         def colocar(ws, ch, r1, c1, r2, c2, top=2):
-            """Inserta la gráfica dentro de la tarjeta (debajo del título)."""
-            w = (c2 - c1 + 1) * XL_COLPX - 16
-            h = (r2 - (r1 + top) + 1) * XL_ROWPX - 8
-            ch.set_size({"width": w, "height": h})
+            ch.set_size({"width": (c2 - c1 + 1) * XL_COLPX - 16, "height": (r2 - (r1 + top) + 1) * XL_ROWPX - 8})
             ws.insert_chart(r1 + top, c1, ch, {"x_offset": 8, "y_offset": 2, "object_position": 3})
 
         def estilo_ch(ch, leyenda=False, y_fmt="#,##0", y_min=None, y_max=None, oscuro=False, barra=False,
                       x_visible=True, y_visible=True):
+            ch.set_title({"none": True})
             ch.set_chartarea({"border": {"none": True}, "fill": {"color": XL["navy"] if oscuro else XL["card"]}})
             ch.set_plotarea({"border": {"none": True}, "fill": {"none": True}})
             ch.set_legend({"position": "top", "font": {"name": XL_FUENTE, "size": 9, "color": XL["tx2"]}} if leyenda
                           else {"none": True})
             cat = {"num_font": {"name": XL_FUENTE, "size": 9, "color": XL["tx3"]}, "line": {"color": XL["linea"]},
-                   "major_tick_mark": "none", "visible": x_visible}
+                   "major_tick_mark": "none", "visible": x_visible, "label_position": "low"}
             val = {"num_font": {"name": XL_FUENTE, "size": 9, "color": XL["tx3"]}, "num_format": y_fmt,
                    "line": {"none": True}, "major_tick_mark": "none", "visible": y_visible,
                    "major_gridlines": {"visible": y_visible, "line": {"color": XL["grid"]}}}
             if y_min is not None: val["min"] = y_min
             if y_max is not None: val["max"] = y_max
-            ch.set_title({"none": True})
-            if barra:   # en barras horizontales Excel usa x = valores (horizontal) y y = categorías (vertical)
-                cat.update({"line": {"none": True}, "num_font": {"name": XL_FUENTE, "size": 10, "color": XL["tx"]}})
+            if barra:
+                cat.update({"line": {"none": True}, "reverse": True, "num_font": {"name": XL_FUENTE, "size": 10, "color": XL["tx"]}})
                 ch.set_x_axis(val)
                 ch.set_y_axis(cat)
             else:
                 ch.set_x_axis(cat)
                 ch.set_y_axis(val)
 
-        etiqueta = lambda nfmt, color=None, pos="outside_end": {
-            "value": True, "num_format": nfmt, "position": pos,
-            "font": {"name": XL_FUENTE, "size": 8, "color": color or XL["tx2"]}}
+        def etq(nfmt, color=None, pos="outside_end"):
+            return {"value": True, "num_format": nfmt, "position": pos,
+                    "font": {"name": XL_FUENTE, "size": 8, "color": color or XL["tx2"]}}
 
-        def badge(ws, r, c1, c2, variacion, es_ratio, oscuro=False):
-            if variacion is None:
-                ws.merge_range(r, c1, r, c2, "sin comparativo", F(bg=XL["navy"] if oscuro else XL["card"], c=XL["tx3"], s=9))
-                return
-            dv = variacion * 100
-            sube = dv >= 0
-            txt = f"{'▲' if sube else '▼'} {abs(dv):.1f}{' pp' if es_ratio else '%'}"
-            ws.merge_range(r, c1, r, c2, txt, F(bg=XL["pos_s"] if sube else XL["neg_s"], c=XL["pos"] if sube else XL["neg"],
-                                               b=True, s=9, al="center"))
+        def encabezado(ws, r, c, texto, w=1, al="right", formula=False):
+            f = F(bg=XL["navy"], c="#FFFFFF", b=True, s=9, al=al, ind=1, wr=True)
+            if w > 1:
+                ws.merge_range(r, c, r, c + w - 1, "", f)
+            (ws.write_formula if formula else ws.write)(r, c, texto, f)
 
-        def tabla(ws, r, c1, columnas, filas, anchos, formatos, total_col=None):
-            """Tabla con encabezado azul marino y renglones cebra. anchos = nº de columnas de Excel por campo."""
-            c = c1
-            for col, w in zip(columnas, anchos):
-                al = "left" if col == columnas[0] else "right"
-                f = F(bg=XL["navy"], c="#FFFFFF", b=True, s=9, al=al, ind=1)
-                (ws.merge_range(r, c, r, c + w - 1, col, f) if w > 1 else ws.write(r, c, col, f))
-                c += w
-            for i, fila in enumerate(filas, start=1):
-                bgc = XL["card"] if i % 2 else XL["zebra"]
-                c = c1
-                for col, w, v in zip(columnas, anchos, fila):
-                    es_tot = col == total_col
-                    f = F(bg=bgc, s=10, al="left" if col == columnas[0] else "right", ind=1, b=es_tot or col == columnas[0],
-                          c=XL["navy"] if es_tot else XL["tx"], nf=formatos.get(col, "General"), bb=XL["linea"])
-                    if v is None or (isinstance(v, float) and np.isnan(v)):
-                        v = "N/A"
-                    (ws.merge_range(r + i, c, r + i, c + w - 1, v, f) if w > 1 else ws.write(r + i, c, v, f))
-                    c += w
-            return r + len(filas)
+        def celda_tabla(ws, r, c, valor, w=1, nf="#,##0.0", zebra=False, b=False, color=None, al="right", formula=True):
+            f = F(bg=XL["zebra"] if zebra else XL["card"], s=10, al=al, ind=1, b=b, c=color or XL["tx"], nf=nf, bb=XL["linea"])
+            if w > 1:
+                ws.merge_range(r, c, r, c + w - 1, "", f)
+            if formula and isinstance(valor, str) and valor.startswith("="):
+                ws.write_formula(r, c, valor, f)
+            else:
+                ws.write(r, c, valor, f)
 
-        # =================== 01 RESUMEN ===================
-        ws = hoja(0, "Resumen", "Cifras clave al cierre del periodo filtrado y su cambio contra el año anterior (AA).")
+        def fmt_ratio(ws, rng):        # muestra % cuando la variable elegida es Cesión
+            ws.conditional_format(*rng, {"type": "formula", "criteria": ES_RATIO, "format": PCT})
+
+        for i, (t, s_) in enumerate([("Resumen", "Cifras clave al cierre del año elegido y su cambio contra el año anterior (AA)."),
+                                     ("Mes a mes", "Cómo se reparte el monto en cada mes del año elegido, contra el año anterior y por ramo."),
+                                     ("Estacionalidad", "¿En qué meses el monto está por arriba o por abajo de lo normal, y se parece a la prima?"),
+                                     ("Conceptos", "Los cuatro cálculos de la reserva lado a lado: RCONT, RFV bruto, RFV IRR y RFV neto."),
+                                     ("Detalle por ramo", "Evolución mensual de cada variable, separada por ramo (concepto y año del panel)."),
+                                     ("Tabla mensualizada", "Mensualización por ramo con resumen anual. Lista para copiar a otros reportes.")]):
+            hoja(i, t, s_)
+        wc = wb.add_worksheet("Calculos")
+        wl = wb.add_worksheet("Listas")
+        wbd = wb.add_worksheet("BD_Proyeccion")
+
+        # ======================= Listas (catálogos de las listas desplegables) =======================
+        listas = {"lst_conc": ("Conceptos", conceptos), "lst_var_lbl": ("Variable", list(VARIABLES.values())),
+                  "lst_var_clave": ("Clave", list(VARIABLES.keys())), "lst_uni_lbl": ("Unidades", list(UNIDADES)),
+                  "lst_uni_div": ("Divisor", [v[0] for v in UNIDADES.values()]), "lst_pri_lbl": ("Prima", list(PRIMAS.values())),
+                  "lst_pri_clave": ("Clave prima", list(PRIMAS.keys())), "lst_anios": ("Años", anios_todos),
+                  "lst_sino": ("Incluir", ["Sí", "No"]), "lst_meses": ("Meses", MESES)}
+        for j, (nombre, (titulo, valores)) in enumerate(listas.items()):
+            wl.write(0, j, titulo, F(b=True, c="#FFFFFF", bg=XL["navy"]))
+            for i, v in enumerate(valores, start=1):
+                wl.write(i, j, v)
+            wb.define_name(nombre, f"=Listas!${col_l(j)}$2:${col_l(j)}${len(valores) + 1}")
+        wl.set_column(0, len(listas), 18)
+        wl.hide()
+
+        # ======================= Base de datos (oculta) =======================
+        cols_bd = ["CONCEPTO", "PERIODO", "AÑO", "MES", "RAMO", "CLAVE", "VALOR (pesos)", "VARIABLE"]
+        datos_bd = [[None if (isinstance(x, float) and np.isnan(x)) else (x.item() if hasattr(x, "item") else x)
+                     for x in fila] for fila in base.itertuples(index=False)]
+        wbd.add_table(0, 0, n_bd, len(cols_bd) - 1,
+                      {"data": datos_bd, "name": "BD_Proyeccion", "style": "Table Style Medium 2",
+                       "columns": [({"header": c, "format": F(nf="#,##0.00")} if c.startswith("VALOR") else {"header": c})
+                                   for c in cols_bd]})
+        wbd.set_column(0, 7, 15)
+        wbd.freeze_panes(1, 0)
+        for nombre, letra in [("bd_conc", "A"), ("bd_per", "B"), ("bd_ramo", "E"), ("bd_clave", "F"), ("bd_val", "G")]:
+            wb.define_name(nombre, f"=BD_Proyeccion!${letra}$2:${letra}${n_bd + 1}")
+        wbd.hide()
+
+        # ======================= 01 RESUMEN: panel de control =======================
+        ws = hojas[0]
+        PANEL_R = 10                                   # renglón (0-based) de las celdas editables
+        tarjeta(ws, 7, XL_C0, 11, XL_C1, "⚙  Panel de control",
+                "Elige de las listas y todo el libro se recalcula: cifras, tablas y gráficas de todas las pestañas.")
+        campos = [("CONCEPTO", 0, 3, "sel_conc", "lst_conc", concepto),
+                  ("VARIABLE", 3, 3, "sel_var", "lst_var_lbl", VARIABLES[var]),
+                  ("AÑO", 6, 2, "sel_anio", "lst_anios", anio0),
+                  ("UNIDADES", 8, 2, "sel_uni", "lst_uni_lbl", unidad),
+                  ("PRIMA A COMPARAR", 10, 3, "sel_pri", "lst_pri_lbl", PRIMAS[prima])]
+        f_in = F(bg=XL["nav_s"], b=True, s=11, c=XL["navy"], al="center", box="#9BA5CF")
+        for lbl_, off, w, nombre, lista, valor in campos:
+            c = XL_C0 + off
+            ws.merge_range(PANEL_R - 1, c, PANEL_R - 1, c + w - 1, lbl_, F(bg=XL["card"], c=XL["tx3"], b=True, s=8, ind=1, va="bottom"))
+            ws.merge_range(PANEL_R, c, PANEL_R, c + w - 1, valor, f_in)
+            ws.data_validation(PANEL_R, c, PANEL_R, c, {"validate": "list", "source": f"={lista}",
+                                                       "input_title": lbl_.title(), "input_message": "Elige de la lista ▾"})
+            wb.define_name(nombre, f"='01 Resumen'!${col_l(c)}${PANEL_R + 1}")
+        ws.set_row_pixels(PANEL_R, 28)
+        celdas_ramo = []
+        for k, r in enumerate(ramos_xl):
+            c = XL_C0 + 13 + k * 2
+            ws.merge_range(PANEL_R - 1, c, PANEL_R - 1, c + 1, f"RAMO {r}", F(bg=XL["card"], c=XL["tx3"], b=True, s=8, al="center", va="bottom"))
+            ws.merge_range(PANEL_R, c, PANEL_R, c + 1, "Sí" if r in ramos_on else "No", f_in)
+            ws.data_validation(PANEL_R, c, PANEL_R, c, {"validate": "list", "source": "=lst_sino",
+                                                       "input_title": f"Ramo {r}", "input_message": "Sí = incluir · No = excluir"})
+            ws.conditional_format(PANEL_R, c, PANEL_R, c + 1, {"type": "cell", "criteria": "==", "value": '"No"',
+                                                              "format": dxf(font_color=XL["tx3"], bg_color="#F4F5F8")})
+            celdas_ramo.append(f"'01 Resumen'!${col_l(c)}${PANEL_R + 1}")
+
+        # ======================= CALCULOS (oculta): parámetros y bloque mensual =======================
+        wc.set_column(0, 0, 26)
+        wc.set_column(1, 120, 13)
+        params = [("Clave de la variable", "=INDEX(lst_var_clave,MATCH(sel_var,lst_var_lbl,0))", "sel_clave"),
+                  ("¿Es porcentaje?", '=sel_clave="CESION"', "sel_ratio"),
+                  ("Divisor de unidades", "=INDEX(lst_uni_div,MATCH(sel_uni,lst_uni_lbl,0))", "sel_div"),
+                  ("Clave de la prima", "=INDEX(lst_pri_clave,MATCH(sel_pri,lst_pri_lbl,0))", "sel_prima"),
+                  ("Año anterior", "=sel_anio-1", "sel_ant")]
+        for i, (t, f, n) in enumerate(params):
+            wc.write(i, 0, t)
+            wc.write_formula(i, 1, f)
+            wb.define_name(n, f"=Calculos!$B${i + 1}")
+        # ramos
+        wc.write(0, 3, "Ramo", F(b=True)); wc.write(0, 4, "Incluir", F(b=True))
+        for k, r in enumerate(ramos_xl):
+            wc.write_number(k + 1, 3, int(r))
+            wc.write_formula(k + 1, 4, f'=IF({celdas_ramo[k]}="Sí",1,0)')
+        n_r = len(ramos_xl)
+        wb.define_name("f_ramos", f"=Calculos!$D$2:$D${n_r + 1}")
+        wb.define_name("f_incl", f"=Calculos!$E$2:$E${n_r + 1}")
+        txt_ramos = "&".join(f'IF(Calculos!$E${k + 2}=1,"{r} ","")' for k, r in enumerate(ramos_xl))
+        wc.write(6, 0, "Texto de filtros")
+        wc.write_formula(6, 1, '="Concepto "&sel_conc&"   ·   Variable "&sel_var&"   ·   Año "&sel_anio&" (AA "&sel_ant&")'
+                               f'   ·   Ramos "&TRIM({txt_ramos})&"   ·   En "&IF(sel_ratio,"%",sel_uni)')
+        wb.define_name("sel_txt", "=Calculos!$B$7")
+
+        # --- generadores de fórmulas ---
+        def S(c, k, p):
+            return f"SUMPRODUCT(SUMIFS(bd_val,bd_conc,{c},bd_clave,{k},bd_per,{p},bd_ramo,f_ramos)*f_incl)"
+
+        def W(c, p):
+            return (f'IFERROR(SUMPRODUCT(SUMIFS(bd_val,bd_conc,{c},bd_clave,"CESION",bd_per,{p},bd_ramo,f_ramos)'
+                    f'*SUMIFS(bd_val,bd_conc,{c},bd_clave,"RAM",bd_per,{p},bd_ramo,f_ramos)*f_incl)/{S(c, chr(34) + "RAM" + chr(34), p)},NA())')
+
+        def Gsel(c, p):
+            return f"IF(sel_ratio,{W(c, p)},{S(c, 'sel_clave', p)}/sel_div)"
+
+        def Gfix(c, k, p):
+            return W(c, p) if k == "CESION" else f'{S(c, chr(34) + k + chr(34), p)}/sel_div'
+
+        def R1(c, k, p, r):
+            return f"SUMIFS(bd_val,bd_conc,{c},bd_clave,{k},bd_per,{p},bd_ramo,{r})"
+
+        H, R0 = 10, 11                                 # encabezado y primer renglón del bloque mensual
+        RN = R0 + 11
+        cols = {}
+
+        def nueva(nombre, encabezado_txt=None):
+            j = len(cols)
+            cols[nombre] = j
+            t = encabezado_txt if encabezado_txt is not None else nombre
+            (wc.write_formula if str(t).startswith("=") else wc.write)(H, j, t, F(b=True, c="#FFFFFF", bg=XL["navy"]))
+            return j
+
+        def rng(nombre, hoja_="Calculos"):
+            j = cols[nombre]
+            return [hoja_, R0, j, RN, j]
+
+        def ref(nombre, i=None, abs_=True):
+            j = cols[nombre]
+            if i is None:
+                return f"Calculos!${col_l(j)}${R0 + 1}:${col_l(j)}${RN + 1}"
+            return f"Calculos!${col_l(j)}${R0 + 1 + i}" if abs_ else f"Calculos!{col_l(j)}{R0 + 1 + i}"
+
+        conc_q = {c: f'"{c}"' for c in conceptos}
+        for nombre in ["Mes", "PerY", "PerA"]:
+            nueva(nombre)
+        nueva("SelY", '=sel_anio&""'); nueva("SelA", '="AA "&sel_ant'); nueva("Prom", "Promedio")
+        nueva("Cambio"); nueva("Sube"); nueva("Baja"); nueva("VsAA")
+        nueva("LblY", "Etiqueta año"); nueva("LblSube", "Etiqueta sube"); nueva("LblBaja", "Etiqueta baja")
+        for c in conceptos:
+            nueva(f"C_{c}", c); nueva(f"CA_{c}", f"{c} AA")
+        for r in ramos_xl:
+            nueva(f"R_{r}", f"Ramo {r}")
+        for k in KPI_VARS:
+            nueva(f"K_{k}"); nueva(f"KA_{k}")
+        for a in anios_todos:
+            nueva(f"V_{a}", f"Var {a}"); nueva(f"P_{a}", f"Prima {a}")
+        for a in anios_todos:
+            nueva(f"IV_{a}", f"Índice var {a}"); nueva(f"IP_{a}", f"Índice prima {a}")
+        nueva("Base1", "1.00")
+        for r in ramos_xl:
+            nueva(f"IR_{r}", f"Índice ramo {r}")
+        for v in DETALLE:
+            for r in ramos_xl:
+                nueva(f"D_{v}_{r}", f"{VARIABLES[v]} · {r}")
+            nueva(f"DT_{v}", f"{VARIABLES[v]} · Total")
+
+        for i in range(12):
+            rr = R0 + i
+            pY, pA = f"$B{rr + 1}", f"$C{rr + 1}"
+            fila = {
+                "Mes": MESES[i], "PerY": f"=sel_anio*100+{i + 1}", "PerA": f"=sel_ant*100+{i + 1}",
+                "SelY": "=" + Gsel("sel_conc", pY), "SelA": "=" + Gsel("sel_conc", pA),
+                "Prom": f"=AVERAGE({ref('SelY')})",
+                "Cambio": "=NA()" if i == 0 else f"={col_l(cols['SelY'])}{rr + 1}-{col_l(cols['SelY'])}{rr}",
+                "Sube": f"=IF(ISNUMBER({col_l(cols['Cambio'])}{rr + 1}),IF({col_l(cols['Cambio'])}{rr + 1}>=0,{col_l(cols['Cambio'])}{rr + 1},NA()),NA())",
+                "Baja": f"=IF(ISNUMBER({col_l(cols['Cambio'])}{rr + 1}),IF({col_l(cols['Cambio'])}{rr + 1}<0,{col_l(cols['Cambio'])}{rr + 1},NA()),NA())",
+                "VsAA": f"=IFERROR(IF(sel_ratio,{col_l(cols['SelY'])}{rr + 1}-{col_l(cols['SelA'])}{rr + 1},"
+                        f"{col_l(cols['SelY'])}{rr + 1}/{col_l(cols['SelA'])}{rr + 1}-1),NA())",
+                "Base1": 1.0,
+                "LblY": f'=IFERROR(TEXT({col_l(cols["SelY"])}{rr + 1},IF(sel_ratio,"0.0%","#,##0.0")),"")',
+                "LblSube": f'=IF(ISNUMBER({col_l(cols["Sube"])}{rr + 1}),TEXT({col_l(cols["Sube"])}{rr + 1},IF(sel_ratio,"+0.00%","+#,##0.0")),"")',
+                "LblBaja": f'=IF(ISNUMBER({col_l(cols["Baja"])}{rr + 1}),TEXT({col_l(cols["Baja"])}{rr + 1},IF(sel_ratio,"-0.00%;-0.00%","-#,##0.0;-#,##0.0")),"")',
+            }
+            for c in conceptos:
+                fila[f"C_{c}"] = "=" + Gsel(conc_q[c], pY)
+                fila[f"CA_{c}"] = "=" + Gsel(conc_q[c], pA)
+            for k_, r in enumerate(ramos_xl):
+                rr_ = R1("sel_conc", "sel_clave", pY, int(r))
+                fila[f"R_{r}"] = f"=IF(Calculos!$E${k_ + 2}=1,IF(sel_ratio,{rr_},{rr_}/sel_div),NA())"
+            for k in KPI_VARS:
+                fila[f"K_{k}"] = "=" + Gfix("sel_conc", k, pY)
+                fila[f"KA_{k}"] = "=" + Gfix("sel_conc", k, pA)
+            for a in anios_todos:
+                pa = f"{a * 100 + i + 1}"
+                fila[f"V_{a}"] = "=" + Gsel("sel_conc", pa)
+                fila[f"P_{a}"] = f"={S('sel_conc', 'sel_prima', pa)}/sel_div"
+                fila[f"IV_{a}"] = f"=IFERROR({col_l(cols[f'V_{a}'])}{rr + 1}/AVERAGE({ref(f'V_{a}')}),NA())"
+                fila[f"IP_{a}"] = f"=IFERROR({col_l(cols[f'P_{a}'])}{rr + 1}/AVERAGE({ref(f'P_{a}')}),NA())"
+            for r in ramos_xl:
+                fila[f"IR_{r}"] = f"=IFERROR({col_l(cols[f'R_{r}'])}{rr + 1}/AVERAGE({ref(f'R_{r}')}),NA())"
+            for v in DETALLE:
+                for k_, r in enumerate(ramos_xl):
+                    rr_ = R1("sel_conc", f'"{v}"', pY, int(r))
+                    fila[f"D_{v}_{r}"] = f"=IF(Calculos!$E${k_ + 2}=1,{rr_ if v in RATIOS else rr_ + '/sel_div'},NA())"
+                fila[f"DT_{v}"] = "=" + Gfix("sel_conc", v, pY)
+            for nombre, j in cols.items():
+                val = fila[nombre]
+                if isinstance(val, str) and val.startswith("="):
+                    wc.write_formula(rr, j, val)
+                else:
+                    wc.write(rr, j, val)
+
+        # --- bloques auxiliares (debajo del mensual) ---
+        def ultimo(rango_):          # último valor numérico de un rango (cierre)
+            return f"IFERROR(LOOKUP(2,1/ISNUMBER({rango_}),{rango_}),NA())"
+
+        B_KPI = RN + 3
+        for j, t in enumerate(["Indicador", "Actual", "AA", "Variación", "Referencia"]):
+            wc.write(B_KPI, j, t, F(b=True, c="#FFFFFF", bg=XL["navy"]))
+        kpi_cel = {}
+        for i, k in enumerate(KPI_VARS):
+            r = B_KPI + 1 + i
+            act = f"SUM({ref(f'K_{k}')})" if k in FLUJOS else ultimo(ref(f"K_{k}"))
+            ant = f"SUM({ref(f'KA_{k}')})" if k in FLUJOS else ultimo(ref(f"KA_{k}"))
+            wc.write(r, 0, VARIABLES[k])
+            wc.write_formula(r, 1, "=" + act)
+            wc.write_formula(r, 2, "=" + ant)
+            wc.write_formula(r, 3, f"=IFERROR({'B{0}-C{0}'.format(r + 1) if k in RATIOS else 'B{0}/C{0}-1'.format(r + 1)},NA())")
+            if k in FLUJOS:
+                wc.write_formula(r, 4, '="Acumulado "&sel_anio')
+            else:
+                rg = ref(f"K_{k}")
+                wc.write_formula(r, 4, f'=IFERROR("Saldo al cierre de "&INDEX(lst_meses,LOOKUP(2,1/ISNUMBER({rg}),ROW({rg})-ROW(INDEX({rg},1))+1))&" "&sel_anio,"Sin dato")')
+            kpi_cel[k] = {n_: f"Calculos!${col_l(j)}${r + 1}" for n_, j in [("act", 1), ("ant", 2), ("var", 3), ("ref", 4)]}
+
+        B_RAMO = B_KPI + len(KPI_VARS) + 3
+        for j, t in enumerate(["Ramo", "Cierre", "% del total", "Etiqueta"]):
+            wc.write(B_RAMO, j, t, F(b=True, c="#FFFFFF", bg=XL["navy"]))
+        for i, r in enumerate(ramos_xl):
+            rr = B_RAMO + 1 + i
+            wc.write(rr, 0, f"Ramo {r}")
+            rg = ref(f"R_{r}")
+            wc.write_formula(rr, 1, f'=IF(Calculos!$E${i + 2}=0,NA(),IF(sel_clave="PT",SUM({rg}),{ultimo(rg)}))')
+            wc.write_formula(rr, 2, f"=IF(sel_ratio,NA(),IFERROR(B{rr + 1}/SUMIF($B${B_RAMO + 2}:$B${B_RAMO + 1 + n_r},\">=0\"),NA()))")
+            wc.write_formula(rr, 3, f'=IFERROR(IF(sel_ratio,TEXT(B{rr + 1},"0.0%"),TEXT(B{rr + 1},"#,##0.0")&"  ·  "&TEXT(C{rr + 1},"0.0%")),"")')
+        ramo_rng = lambda j: ["Calculos", B_RAMO + 1, j, B_RAMO + n_r, j]
+
+        B_LECT = B_RAMO + n_r + 3
+        for j, t in enumerate(["Año", "Correlación", "Pico variable", "Pico prima", "Amplitud variable", "Amplitud prima"]):
+            wc.write(B_LECT, j, t, F(b=True, c="#FFFFFF", bg=XL["navy"]))
+        for i, a in enumerate(anios_todos):
+            rr = B_LECT + 1 + i
+            iv_, ip_ = ref(f"IV_{a}"), ref(f"IP_{a}")
+            wc.write_number(rr, 0, a)
+            wc.write_formula(rr, 1, f"=IFERROR(CORREL({iv_},{ip_}),NA())")
+            wc.write_formula(rr, 2, f'=IFERROR(INDEX(lst_meses,MATCH(MAX({iv_}),{iv_},0)),"—")')
+            wc.write_formula(rr, 3, f'=IFERROR(INDEX(lst_meses,MATCH(MAX({ip_}),{ip_},0)),"—")')
+            wc.write_formula(rr, 4, f"=IFERROR(MAX({iv_})-MIN({iv_}),NA())")
+            wc.write_formula(rr, 5, f"=IFERROR(MAX({ip_})-MIN({ip_}),NA())")
+        wc.hide()
+
+        # ======================= 01 RESUMEN: tarjetas de indicadores =======================
         iconos = {"RAM": "🛡", "PRIMA 24M": "◷", "PR 24M": "◔", "MA": "▣", "RFV MA": "↗", "CESION": "⇄", "PT": "$"}
-        # tarjeta principal (Reserva)
-        k0 = kp[0]
-        tarjeta(ws, 7, XL_C0, 21, XL_C0 + 5, oscuro=True)
-        ws.merge_range(7, XL_C0, 7, XL_C0 + 5, f"{iconos['RAM']}  {k0['nombre']}", F(bg=XL["navy"], c="#C9CEDD", s=11, ind=1))
-        ws.set_row_pixels(8, 30); ws.set_row_pixels(9, 26)
-        ws.merge_range(8, XL_C0, 9, XL_C0 + 5, fmt(k0["actual"], unidad), F(bg=XL["navy"], c="#FFFFFF", b=True, s=28, ind=1))
-        ws.merge_range(10, XL_C0, 10, XL_C0 + 2, f"AA: {fmt(k0['anterior'], unidad)}", F(bg=XL["navy"], c="#C9CEDD", s=9, ind=1))
-        badge(ws, 10, XL_C0 + 3, XL_C0 + 4, k0["variacion"], False, oscuro=True)
-        ws.merge_range(12, XL_C0, 12, XL_C0 + 5, "Tendencia del periodo filtrado", F(bg=XL["navy"], c="#AEB5CB", s=9, ind=1))
-        ws.merge_range(21, XL_C0, 21, XL_C0 + 5, k0["referencia"], F(bg=XL["navy"], c="#AEB5CB", s=9, ind=1, bt="#56607F"))
-        ref = bloque("Tendencia de la reserva (tarjeta principal)", ["Mes", "Reserva"],
-                     [[mes_txt(p), v / div] for p, v in zip(hero["PERIODO"], hero["VALOR"])])
+        fmt_uni = {"Millones": '"$"#,##0.0" M"', "Miles": '"$"#,##0.0" K"', "Pesos": '"$"#,##0'}
+
+        def valor_kpi(ws, r1, c1, r2, c2, k, s, color, bg):
+            f = F(bg=bg, c=color, b=True, s=s, ind=1, nf=fmt_uni["Millones"])
+            ws.merge_range(r1, c1, r2, c2, "", f)
+            ws.write_formula(r1, c1, f"={kpi_cel[k]['act']}", f)
+            if k in RATIOS:
+                ws.conditional_format(r1, c1, r2, c2, {"type": "no_errors", "format": PCT})
+            else:
+                for u, nfm in fmt_uni.items():
+                    ws.conditional_format(r1, c1, r2, c2, {"type": "formula", "criteria": f'=sel_uni="{u}"',
+                                                          "format": dxf(num_format=nfm)})
+
+        def aa_kpi(ws, r, c1, c2, k, color, bg):
+            f = F(bg=bg, c=color, s=9, ind=1)
+            ws.merge_range(r, c1, r, c2, "", f)
+            if k in RATIOS:
+                ws.write_formula(r, c1, f'=IFERROR("AA: "&TEXT({kpi_cel[k]["ant"]},"0.0%"),"AA: N/A")', f)
+            else:
+                ws.write_formula(r, c1, f'=IFERROR("AA: $"&TEXT({kpi_cel[k]["ant"]},"#,##0.0")&IF(sel_uni="Millones"," M",IF(sel_uni="Miles"," K","")),"AA: N/A")', f)
+
+        def badge_kpi(ws, r, c1, c2, k):
+            nfm = '"▲ "0.0" pp";"▼ "0.0" pp"' if k in RATIOS else '"▲ "0.0%;"▼ "0.0%'
+            f = F(bg=XL["pos_s"], c=XL["pos"], b=True, s=9, al="center", nf=nfm)
+            ws.merge_range(r, c1, r, c2, "", f)
+            ws.write_formula(r, c1, f"=IFERROR({kpi_cel[k]['var']}{'*100' if k in RATIOS else ''},\"sin comparativo\")", f)
+            ws.conditional_format(r, c1, r, c2, {"type": "cell", "criteria": "<", "value": 0,
+                                                 "format": dxf(font_color=XL["neg"], bg_color=XL["neg_s"])})
+
+        R_K = 13
+        tarjeta(ws, R_K, XL_C0, R_K + 14, XL_C0 + 5, oscuro=True)
+        ws.merge_range(R_K, XL_C0, R_K, XL_C0 + 5, f"{iconos['RAM']}  Reserva", F(bg=XL["navy"], c="#C9CEDD", s=11, ind=1))
+        ws.set_row_pixels(R_K + 1, 30); ws.set_row_pixels(R_K + 2, 26)
+        valor_kpi(ws, R_K + 1, XL_C0, R_K + 2, XL_C0 + 5, "RAM", 28, "#FFFFFF", XL["navy"])
+        aa_kpi(ws, R_K + 3, XL_C0, XL_C0 + 2, "RAM", "#C9CEDD", XL["navy"])
+        badge_kpi(ws, R_K + 3, XL_C0 + 3, XL_C0 + 4, "RAM")
+        ws.merge_range(R_K + 5, XL_C0, R_K + 5, XL_C0 + 5, "Tendencia del año elegido", F(bg=XL["navy"], c="#AEB5CB", s=9, ind=1))
+        f_ref = F(bg=XL["navy"], c="#AEB5CB", s=9, ind=1, bt="#56607F")
+        ws.merge_range(R_K + 14, XL_C0, R_K + 14, XL_C0 + 5, "", f_ref)
+        ws.write_formula(R_K + 14, XL_C0, f"={kpi_cel['RAM']['ref']}", f_ref)
         ch = wb.add_chart({"type": "area"})
-        ch.add_series({"categories": ref("Mes"), "values": ref("Reserva"), "name": "Reserva",
+        ch.add_series({"categories": rng("Mes"), "values": rng("K_RAM"), "name": "Reserva",
                        "fill": {"color": "#FFFFFF", "transparency": 88}, "line": {"color": XL["acc"], "width": 2.25}})
-        vmin = hero["VALOR"].min() / div if len(hero) else 0
-        estilo_ch(ch, oscuro=True, x_visible=False, y_visible=False, y_min=vmin * 0.9)
-        colocar(ws, ch, 13, XL_C0, 20, XL_C0 + 5, top=0)
-        # 6 tarjetas blancas (3 × 2)
-        posiciones = [(7, XL_C0 + 6), (7, XL_C0 + 12), (7, XL_C0 + 18), (14, XL_C0 + 6), (14, XL_C0 + 12), (14, XL_C0 + 18)]
-        for k, (r, c) in zip(kp[1:], posiciones):
-            r2 = 21 if r == 14 else r + 5
+        estilo_ch(ch, oscuro=True, x_visible=False, y_visible=False)
+        colocar(ws, ch, R_K + 6, XL_C0, R_K + 13, XL_C0 + 5, top=0)
+        posiciones = [(R_K, XL_C0 + 6), (R_K, XL_C0 + 12), (R_K, XL_C0 + 18),
+                      (R_K + 7, XL_C0 + 6), (R_K + 7, XL_C0 + 12), (R_K + 7, XL_C0 + 18)]
+        for k, (r, c) in zip(KPI_VARS[1:], posiciones):
+            r2 = R_K + 14 if r > R_K else r + 5
             tarjeta(ws, r, c, r2, c + 5)
-            ws.merge_range(r, c, r, c + 5, f"{iconos[k['variable']]}  {k['nombre']}", F(bg=XL["card"], c=XL["tx2"], s=10, ind=1))
-            ws.merge_range(r + 1, c, r + 2, c + 5, fmt(k["actual"], unidad, k["ratio"]), F(bg=XL["card"], b=True, s=18, ind=1))
-            ws.merge_range(r + 3, c, r + 3, c + 2, f"AA: {fmt(k['anterior'], unidad, k['ratio'])}",
-                           F(bg=XL["card"], c=XL["tx3"], s=9, ind=1))
-            badge(ws, r + 3, c + 3, c + 4, k["variacion"], k["ratio"])
-            ws.merge_range(r2, c, r2, c + 5, k["referencia"], F(bg=XL["card"], c=XL["tx3"], s=9, ind=1, bt=XL["linea"]))
-        # filtros y guía
-        tarjeta(ws, 23, XL_C0, 31, XL_C0 + 11, "Filtros aplicados", "Así se generó este libro desde PRISMA.")
-        items = [("Concepto", concepto), ("Variable", lbl), ("Ramos", ", ".join(ramos)), ("Años", per_txt),
-                 ("Meses", m_txt), ("Unidades", unidad), ("Estacionalidad", f"Años {', '.join(map(str, est_anios))} · vs. {lblp}")]
-        for i, (k_, v_) in enumerate(items):
-            ws.merge_range(25 + i, XL_C0, 25 + i, XL_C0 + 2, k_, F(bg=XL["card"], c=XL["tx3"], s=10, ind=1))
-            ws.merge_range(25 + i, XL_C0 + 3, 25 + i, XL_C0 + 11, v_, F(bg=XL["card"], b=True, s=10))
-        tarjeta(ws, 23, XL_C0 + 12, 31, XL_C1, "Cómo leer este libro", "Cada pestaña es una sección del tablero.")
-        guia = ["Usa el menú azul de la izquierda para cambiar de sección.",
-                "AA = mismo mes del año anterior. Verde: subió · Rojo: bajó.",
-                "Montos en " + unidad.lower() + " de pesos; Cesión en %.",
-                "Índice estacional 1.00 = mes promedio de su año.",
-                "Datos de las gráficas: pestaña oculta Datos_graficas.",
-                "Base completa: pestaña oculta BD_Proyeccion.",
-                "Para verlas: clic derecho en una pestaña › Mostrar."]
-        for i, g in enumerate(guia):
-            ws.merge_range(25 + i, XL_C0 + 12, 25 + i, XL_C1, "•  " + g, F(bg=XL["card"], c=XL["tx2"], s=10, ind=1))
+            ws.merge_range(r, c, r, c + 5, f"{iconos[k]}  {VARIABLES[k]}", F(bg=XL["card"], c=XL["tx2"], s=10, ind=1))
+            valor_kpi(ws, r + 1, c, r + 2, c + 5, k, 18, XL["tx"], XL["card"])
+            aa_kpi(ws, r + 3, c, c + 2, k, XL["tx3"], XL["card"])
+            badge_kpi(ws, r + 3, c + 3, c + 4, k)
+            f_r = F(bg=XL["card"], c=XL["tx3"], s=9, ind=1, bt=XL["linea"])
+            ws.merge_range(r2, c, r2, c + 5, "", f_r)
+            ws.write_formula(r2, c, f"={kpi_cel[k]['ref']}", f_r)
+
+        R_G = R_K + 16
+        tarjeta(ws, R_G, XL_C0, R_G + 9, XL_C0 + 11, "Cómo usar este libro", "Funciona solo en Excel, sin el tablero web.")
+        pasos = ["1. Cambia Concepto, Variable, Año, Unidades o Prima en el Panel de control (arriba).",
+                 "2. Escribe Sí / No en cada ramo para incluirlo o excluirlo de los totales.",
+                 "3. Recorre las secciones con el menú azul de la izquierda.",
+                 "4. AA = mismo mes del año anterior. Verde: subió · Rojo: bajó.",
+                 "5. Las tablas son fórmulas: puedes copiarlas o enlazarlas a otros archivos.",
+                 "6. Para volver al panel usa '⚙ Cambiar filtros' (arriba a la derecha)."]
+        for i, p_ in enumerate(pasos):
+            ws.merge_range(R_G + 2 + i, XL_C0, R_G + 2 + i, XL_C0 + 11, p_, F(bg=XL["card"], c=XL["tx2"], s=10, ind=1))
+        tarjeta(ws, R_G, XL_C0 + 12, R_G + 9, XL_C1, "Qué hay detrás", "Pestañas ocultas: clic derecho en una pestaña › Mostrar.")
+        notas = [("BD_Proyeccion", f"Base completa en pesos ({n_bd:,} renglones), como tabla filtrable."),
+                 ("Calculos", "Fórmulas SUMIFS que alimentan cada cifra y gráfica."),
+                 ("Listas", "Catálogos de las listas desplegables."),
+                 ("Cesión", "Promedio ponderado por la reserva de los ramos incluidos."),
+                 ("Índice", "Mes ÷ promedio de su año (1.00 = mes promedio).")]
+        for i, (k_, v_) in enumerate(notas):
+            ws.merge_range(R_G + 2 + i, XL_C0 + 12, R_G + 2 + i, XL_C0 + 15, k_, F(bg=XL["card"], b=True, s=10, ind=1))
+            ws.merge_range(R_G + 2 + i, XL_C0 + 16, R_G + 2 + i, XL_C1, v_, F(bg=XL["card"], c=XL["tx2"], s=10))
         ws.activate()
+        ws.set_first_sheet()
 
-        # =================== 02 MES A MES ===================
-        ws = hoja(1, "Mes a mes", "Cómo se reparte el monto en cada mes y qué ramos lo explican.")
-        tarjeta(ws, 7, XL_C0, 27, XL_C0 + 16, f"{lbl} por mes · {concepto}",
-                "Cada barra es el total del mes. La línea naranja punteada es el promedio."
-                + (" Más oscuro = año más reciente." if len(anios) > 1 else ""))
-        prom = esc(tot["VALOR"]).mean() if len(tot) else np.nan
-        cols = ["Mes"] + [str(a) for a in anios] + ["Promedio"]
-        filas = []
-        for p, v in zip(tot["PERIODO"], tot["VALOR"]):
-            filas.append([mes_txt(p)] + [esc(v) if p // 100 == a else None for a in anios] + [prom])
-        ref = bloque(f"{lbl} por mes", cols, filas, {c: ("0.0000" if ratio else "#,##0.0") for c in cols[1:]})
-        if ratio:
-            ch = wb.add_chart({"type": "line"})
-            for a in anios:
-                ser = {"name": str(a), "categories": ref("Mes"), "values": ref(str(a)),
-                       "line": {"color": color_anio(a, anios), "width": 2.5},
-                       "marker": {"type": "circle", "size": 6, "fill": {"color": color_anio(a, anios)},
-                                  "border": {"color": color_anio(a, anios)}}}
-                if len(tot) <= 12:
-                    ser["data_labels"] = etiqueta("0.0%", pos="above")
-                ch.add_series(ser)
-            base_ch = ch
-        else:
-            ch = wb.add_chart({"type": "column"})
-            for a in anios:
-                ser = {"name": str(a), "categories": ref("Mes"), "values": ref(str(a)),
-                       "fill": {"color": color_anio(a, anios)}, "border": {"none": True}, "gap": 45, "overlap": 100}
-                if len(tot) <= 24:
-                    ser["data_labels"] = etiqueta("#,##0.0")
-                ch.add_series(ser)
-            base_ch = ch
+        # ======================= 02 MES A MES =======================
+        ws = hojas[1]
+        tarjeta(ws, 7, XL_C0, 27, XL_C0 + 16, f_titulo='=sel_var&" por mes · "&sel_conc&" · "&sel_anio',
+                ayuda="Barras: año elegido. Línea gris: año anterior (AA). Línea naranja punteada: promedio del año.")
+        ch = wb.add_chart({"type": "column"})
+        ch.add_series({"name": ["Calculos", H, cols["SelY"]], "categories": rng("Mes"), "values": rng("SelY"),
+                       "fill": {"color": XL["navy"]}, "border": {"none": True}, "gap": 55,
+                       "data_labels": {"custom": [{"value": "=" + ref("LblY", i)} for i in range(12)], "position": "outside_end",
+                                       "font": {"name": XL_FUENTE, "size": 8, "color": XL["tx2"]}}})
         ln = wb.add_chart({"type": "line"})
-        ln.add_series({"name": "Promedio", "categories": ref("Mes"), "values": ref("Promedio"),
+        ln.add_series({"name": ["Calculos", H, cols["SelA"]], "categories": rng("Mes"), "values": rng("SelA"),
+                       "line": {"color": XL["aa"], "width": 2}, "marker": {"type": "circle", "size": 5,
+                                                                         "fill": {"color": XL["aa"]}, "border": {"color": XL["aa"]}}})
+        ln.add_series({"name": "Promedio", "categories": rng("Mes"), "values": rng("Prom"),
                        "line": {"color": XL["acc"], "width": 1.75, "dash_type": "dash"}, "marker": {"type": "none"}})
-        base_ch.combine(ln)
-        estilo_ch(base_ch, leyenda=True, y_fmt="0.0%" if ratio else "#,##0", y_min=None if ratio else 0)
-        colocar(ws, base_ch, 7, XL_C0, 27, XL_C0 + 16)
+        ch.combine(ln)
+        estilo_ch(ch, leyenda=True, y_fmt="#,##0.0##")
+        colocar(ws, ch, 7, XL_C0, 27, XL_C0 + 16)
 
-        tarjeta(ws, 7, XL_C0 + 17, 27, XL_C1, t_ramo, "Cuánto aporta cada ramo y qué % representa del total.")
-        filas = [["Ramo " + r, esc(v), p] for r, v, p in zip(comp["RAMO"], comp["VALOR"], comp["PART"])]
-        ref = bloque(t_ramo, ["Ramo", "Monto", "% del total"], filas, {"Monto": "0.0000" if ratio else "#,##0.0", "% del total": "0.0%"})
+        tarjeta(ws, 7, XL_C0 + 17, 27, XL_C1, "Por ramo · cierre del año", "Monto de cada ramo incluido y su % del total.")
         ch = wb.add_chart({"type": "bar"})
-        etiquetas_ramo = [{"value": (f"{v * 100:.1f}%" if ratio else f"{v:,.1f}{suf}  ·  {(p if pd.notna(p) else 0) * 100:.1f}%")}
-                          for _, v, p in filas]
-        ch.add_series({"name": "Por ramo", "categories": ref("Ramo"), "values": ref("Monto"),
+        ch.add_series({"name": "Por ramo", "categories": ramo_rng(0), "values": ramo_rng(1),
                        "fill": {"color": XL["navy"]}, "border": {"none": True}, "gap": 70,
-                       "data_labels": {"custom": etiquetas_ramo, "position": "outside_end",
-                                       "font": {"name": XL_FUENTE, "size": 9, "color": XL["tx"]}}})
-        mx = max([v for _, v, _ in filas] or [1])
-        estilo_ch(ch, barra=True, y_fmt=nf, y_min=0, y_max=mx * 1.75, y_visible=False)
+                       "data_labels": {"custom": [{"value": f"=Calculos!$D${B_RAMO + 2 + i}"} for i in range(n_r)],
+                                       "position": "outside_end", "font": {"name": XL_FUENTE, "size": 9, "color": XL["tx"]}}})
+        estilo_ch(ch, barra=True, y_fmt="#,##0", y_min=0, y_visible=False)
         colocar(ws, ch, 7, XL_C0 + 17, 27, XL_C1)
 
-        tarjeta(ws, 29, XL_C0, 43, XL_C1, "Cambio contra el mes anterior", "Verde: el monto subió. Rojo: bajó.")
-        delta = esc(tot["VALOR"]).diff() * (100 if ratio else 1)
-        filas = [[mes_txt(p), d if (pd.notna(d) and d >= 0) else None, d if (pd.notna(d) and d < 0) else None]
-                 for p, d in zip(tot["PERIODO"], delta)]
-        ref = bloque("Cambio contra el mes anterior" + (" (pp)" if ratio else f" ({unidad})"), ["Mes", "Sube", "Baja"], filas)
+        tarjeta(ws, 29, XL_C0, 42, XL_C1, "Cambio contra el mes anterior", "Verde: el monto subió. Rojo: bajó.")
         ch = wb.add_chart({"type": "column"})
-        for nombre_s, col in (("Sube", XL["pos"]), ("Baja", XL["neg"])):
-            ser = {"name": nombre_s, "categories": ref("Mes"), "values": ref(nombre_s), "fill": {"color": col},
-                   "border": {"none": True}, "gap": 60, "overlap": 100}
-            if len(filas) <= 24:
-                ser["data_labels"] = etiqueta("+#,##0.0;-#,##0.0")
-            ch.add_series(ser)
-        estilo_ch(ch, y_fmt="#,##0.0")
-        ch.set_x_axis({"num_font": {"name": XL_FUENTE, "size": 9, "color": XL["tx3"]}, "line": {"color": XL["linea"]},
-                       "major_tick_mark": "none", "label_position": "low"})
-        colocar(ws, ch, 29, XL_C0, 43, XL_C1)
+        for nm, col in (("Sube", XL["pos"]), ("Baja", XL["neg"])):
+            ch.add_series({"name": nm, "categories": rng("Mes"), "values": rng(nm), "fill": {"color": col},
+                           "border": {"none": True}, "gap": 60, "overlap": 100,
+                           "data_labels": {"custom": [{"value": "=" + ref("Lbl" + nm, i)} for i in range(12)],
+                                           "position": "outside_end", "font": {"name": XL_FUENTE, "size": 8, "color": XL["tx2"]}}})
+        estilo_ch(ch, y_fmt="#,##0.0##")
+        colocar(ws, ch, 29, XL_C0, 42, XL_C1)
 
-        n = len(tot)
-        tarjeta(ws, 45, XL_C0, 45 + n + 3, XL_C0 + 11, "Datos del mes", f"{lbl} y cambio contra el mes anterior ({unidad_txt}).")
-        tabla(ws, 47, XL_C0, ["Mes", lbl, "Cambio"], [[mes_txt(p), esc(v), d] for p, v, d in zip(tot["PERIODO"], tot["VALOR"], delta / (100 if ratio else 1))],
-              [4, 4, 4], {lbl: nf, "Cambio": ("+0.00%;-0.00%" if ratio else "+#,##0.0;-#,##0.0")})
-        tarjeta(ws, 45, XL_C0 + 12, 45 + len(comp) + 3, XL_C1, "Datos por ramo", t_ramo)
-        if ratio:
-            tabla(ws, 47, XL_C0 + 12, ["Ramo", lbl], [["Ramo " + r, v] for r, v in zip(comp["RAMO"][::-1], comp["VALOR"][::-1])],
-                  [6, 7], {lbl: nf})
-        else:
-            tabla(ws, 47, XL_C0 + 12, ["Ramo", lbl, "% del total"],
-                  [["Ramo " + r, esc(v), p] for r, v, p in zip(comp["RAMO"][::-1], comp["VALOR"][::-1], comp["PART"][::-1])],
-                  [4, 4, 5], {lbl: nf, "% del total": "0.0%"})
+        R_T = 44
+        tarjeta(ws, R_T, XL_C0, R_T + 20, XL_C1, f_titulo='="Datos del mes · "&sel_var&" ("&IF(sel_ratio,"%",sel_uni)&")"',
+                ayuda="Variación vs. AA: % para montos, puntos porcentuales para Cesión. Todo se recalcula con el panel.")
+        heads = [("Mes", 3, None), ('=sel_anio&""', 4, "SelY"), ('="AA "&sel_ant', 4, "SelA"), ("Variación vs. AA", 4, "VsAA"),
+                 ("Cambio vs. mes anterior", 5, "Cambio"), ("Promedio del año", 4, "Prom")]
+        c = XL_C0
+        for t, w, _ in heads:
+            encabezado(ws, R_T + 2, c, t, w, al="left" if t == "Mes" else "right", formula=t.startswith("="))
+            c += w
+        for i in range(12):
+            r = R_T + 3 + i
+            c = XL_C0
+            for t, w, key in heads:
+                z = i % 2 == 1
+                if key is None:
+                    celda_tabla(ws, r, c, MESES[i], w, zebra=z, b=True, al="left")
+                else:
+                    nfm = '+0.0%;-0.0%' if key == "VsAA" else "#,##0.0"
+                    celda_tabla(ws, r, c, f'=IFERROR({ref(key, i)},"—")', w, nf=nfm, zebra=z, b=key == "SelY",
+                                color=XL["navy"] if key == "SelY" else None)
+                    if key == "VsAA":
+                        ws.conditional_format(r, c, r, c + w - 1, {"type": "formula", "criteria": ES_RATIO,
+                                                                  "format": dxf(num_format='+0.00" pp";-0.00" pp"')})
+                        ws.conditional_format(r, c, r, c + w - 1, {"type": "cell", "criteria": "<", "value": 0,
+                                                                  "format": dxf(font_color=XL["neg"])})
+                        ws.conditional_format(r, c, r, c + w - 1, {"type": "cell", "criteria": ">=", "value": 0,
+                                                                  "format": dxf(font_color=XL["pos"])})
+                    elif key == "Cambio":
+                        ws.conditional_format(r, c, r, c + w - 1, {"type": "formula", "criteria": ES_RATIO,
+                                                                  "format": dxf(num_format='+0.00%;-0.00%')})
+                    else:
+                        fmt_ratio(ws, (r, c, r, c + w - 1))
+                c += w
+        r = R_T + 16
+        resumen_f = [("Cierre / acumulado", f'=IF(sel_clave="PT",SUM({ref("SelY")}),{ultimo(ref("SelY"))})',
+                      f'=IF(sel_clave="PT",SUM({ref("SelA")}),{ultimo(ref("SelA"))})'),
+                     ("Promedio", f"=AVERAGE({ref('SelY')})", f"=AVERAGE({ref('SelA')})"),
+                     ("Máximo", f"=MAX({ref('SelY')})", f"=MAX({ref('SelA')})"),
+                     ("Mínimo", f"=MIN({ref('SelY')})", f"=MIN({ref('SelA')})")]
+        for i, (t, fy, fa) in enumerate(resumen_f):
+            celda_tabla(ws, r + i, XL_C0, t, 3, b=True, al="left", zebra=True)
+            celda_tabla(ws, r + i, XL_C0 + 3, f"=IFERROR({fy[1:]},\"—\")", 4, b=True, color=XL["navy"], zebra=True)
+            celda_tabla(ws, r + i, XL_C0 + 7, f"=IFERROR({fa[1:]},\"—\")", 4, zebra=True)
+            fmt_ratio(ws, (r + i, XL_C0 + 3, r + i, XL_C0 + 10))
+            celda_tabla(ws, r + i, XL_C0 + 11, "", 13, zebra=True, formula=False)
 
-        # =================== 03 ESTACIONALIDAD ===================
-        ws = hoja(2, "Estacionalidad", f"¿En qué meses el monto está por arriba o por abajo de lo normal? Años "
-                                       f"{', '.join(map(str, est_anios))} · comparado con {lblp.lower()}.")
-        tarjeta(ws, 7, XL_C0, 26, XL_C1, f"{lbl} vs. {lblp}, año por año",
-                f"Un panel por año. Barras naranjas: {lblp.lower()}. Línea azul: {lbl.lower()}. "
-                "Arriba de 1.00 el mes está por encima del promedio de su año; abajo, por debajo.")
-        cols = ["Mes"] + [f"{lbl} {a}" for a in est_anios] + [f"Prima {a}" for a in est_anios] + ["Base 1.00"]
-        filas = [[xm[j]] + [iv.loc[a].iloc[j] for a in est_anios] + [ip.loc[a].iloc[j] for a in est_anios] + [1.0]
-                 for j in range(len(meses))]
-        ref = bloque(f"Índice estacional · {lbl} y {lblp}", cols, filas)
-        tope = np.nanmax(np.concatenate([iv.values.ravel(), ip.values.ravel(), [1.2]]))
-        tope = float(np.ceil(tope * 5) / 5)
-
-        def piso(*arrs):
-            vals = np.concatenate([np.asarray(a_, dtype=float).ravel() for a_ in arrs] + [np.array([1.0])])
-            return float(np.floor((np.nanmin(vals) - 0.03) * 20) / 20)
-        n_a = len(est_anios)
+        # ======================= 03 ESTACIONALIDAD =======================
+        ws = hojas[2]
+        tarjeta(ws, 7, XL_C0, 26, XL_C1, f_titulo='=sel_var&" vs. "&sel_pri&", año por año · "&sel_conc',
+                ayuda="Un panel por año. Barras naranjas: prima. Línea azul: variable elegida. "
+                      "Arriba de 1.00 el mes está por encima del promedio de su año; abajo, por debajo.")
+        n_a = len(anios_todos)
         ancho = (XL_C1 - XL_C0 + 1) // n_a
-        for i, a in enumerate(est_anios):
+        for i, a in enumerate(anios_todos):
             ch = wb.add_chart({"type": "column"})
-            ch.add_series({"name": lblp, "categories": ref("Mes"), "values": ref(f"Prima {a}"),
+            ch.add_series({"name": "Prima", "categories": rng("Mes"), "values": rng(f"IP_{a}"),
                            "fill": {"color": XL["acc_s"]}, "border": {"none": True}, "gap": 40})
             ln = wb.add_chart({"type": "line"})
-            ln.add_series({"name": lbl, "categories": ref("Mes"), "values": ref(f"{lbl} {a}"),
+            ln.add_series({"name": "Variable", "categories": rng("Mes"), "values": rng(f"IV_{a}"),
                            "line": {"color": XL["navy"], "width": 2.75},
                            "marker": {"type": "circle", "size": 5, "fill": {"color": XL["navy"]}, "border": {"color": "#FFFFFF"}}})
-            ln.add_series({"name": "Promedio (1.00)", "categories": ref("Mes"), "values": ref("Base 1.00"),
+            ln.add_series({"name": "1.00", "categories": rng("Mes"), "values": rng("Base1"),
                            "line": {"color": XL["tx3"], "width": 1, "dash_type": "round_dot"}, "marker": {"type": "none"}})
             ch.combine(ln)
-            estilo_ch(ch, leyenda=(i == 0), y_fmt="0.00", y_min=0, y_max=tope)
+            estilo_ch(ch, leyenda=(i == 0), y_fmt="0.00", y_min=0)
             ch.set_title({"name": str(a), "name_font": {"name": XL_FUENTE, "size": 12, "bold": True, "color": XL["tx"]},
                           "overlay": False})
             c1 = XL_C0 + i * ancho
             colocar(ws, ch, 7, c1, 26, c1 + ancho - 1)
 
-        tarjeta(ws, 28, XL_C0, 42, XL_C0 + 10, "Lectura por año",
+        tarjeta(ws, 28, XL_C0, 40, XL_C0 + 10, "Lectura por año",
                 "Correlación cercana a +1: se mueve igual que la prima. Amplitud = índice más alto − más bajo.")
-        tabla(ws, 30, XL_C0, ["Año", "Correlación", "Pico var.", "Pico prima", "Amp. var.", "Amp. prima"],
-              [[int(r["Año"]), r["Correlación"], r["Mes pico variable"], r["Mes pico prima"], r["Amplitud variable"],
-                r["Amplitud prima"]] for _, r in lect.iterrows()],
-              [1, 2, 2, 2, 2, 2], {"Correlación": "+0.00;-0.00", "Amp. var.": "0.00", "Amp. prima": "0.00", "Año": "0"})
-        ws.merge_range(31 + len(lect) + 1, XL_C0, 31 + len(lect) + 3, XL_C0 + 10,
-                       "Una reserva es un saldo: normalmente se mueve menos que la prima del mes, por eso su amplitud es menor.",
-                       F(bg=XL["card"], c=XL["tx3"], s=9, wr=True, ind=1, va="top"))
+        enc = [("Año", 1), ("Correlación", 2), ("Pico var.", 2), ("Pico prima", 2), ("Amp. var.", 2), ("Amp. prima", 2)]
+        c = XL_C0
+        for t, w in enc:
+            encabezado(ws, 30, c, t, w, al="left" if t == "Año" else "right")
+            c += w
+        nfs = ["0", "+0.00;-0.00", "@", "@", "0.00", "0.00"]
+        for i, a in enumerate(anios_todos):
+            c = XL_C0
+            for j, (t, w) in enumerate(enc):
+                celda_tabla(ws, 31 + i, c, f"=Calculos!{col_l(j)}{B_LECT + 2 + i}", w, nf=nfs[j], zebra=i % 2 == 1,
+                            b=j == 0, al="left" if j == 0 else "right")
+                c += w
+            ws.conditional_format(31 + i, XL_C0, 31 + i, XL_C0 + 10, {"type": "formula", "criteria": f"=$D${32 + i}=sel_anio",
+                                                                     "format": dxf(bold=True, font_color=XL["navy"])})
+        ws.merge_range(31 + n_a + 1, XL_C0, 31 + n_a + 3, XL_C0 + 10,
+                       "Una reserva es un saldo: normalmente se mueve menos que la prima del mes, por eso su amplitud es menor. "
+                       "El año elegido en el panel aparece resaltado.", F(bg=XL["card"], c=XL["tx3"], s=9, wr=True, ind=1, va="top"))
 
-        tarjeta(ws, 28, XL_C0 + 11, 42, XL_C1, f"Comparación entre años · {lbl}",
-                "Mismo índice de la variable, un color por año (más oscuro = más reciente).")
+        tarjeta(ws, 28, XL_C0 + 11, 40, XL_C1, f_titulo='="Comparación entre años · "&sel_var',
+                ayuda="Mismo índice de la variable, un color por año (más oscuro = más reciente).")
         ch = wb.add_chart({"type": "line"})
-        for a in est_anios:
-            col = color_anio(a, est_anios)
-            ch.add_series({"name": str(a), "categories": ref("Mes"), "values": ref(f"{lbl} {a}"),
-                           "line": {"color": col, "width": 2.75 if a == est_anios[-1] else 2},
+        for a in anios_todos:
+            col = color_anio(a, anios_todos)
+            ch.add_series({"name": str(a), "categories": rng("Mes"), "values": rng(f"IV_{a}"),
+                           "line": {"color": col, "width": 2.75 if a == anios_todos[-1] else 2},
                            "marker": {"type": "circle", "size": 5, "fill": {"color": col}, "border": {"color": col}}})
-        ch.add_series({"name": "1.00", "categories": ref("Mes"), "values": ref("Base 1.00"),
+        ch.add_series({"name": "1.00", "categories": rng("Mes"), "values": rng("Base1"),
                        "line": {"color": XL["tx3"], "width": 1, "dash_type": "round_dot"}, "marker": {"type": "none"}})
-        estilo_ch(ch, leyenda=True, y_fmt="0.00", y_min=piso(iv.values))
-        colocar(ws, ch, 28, XL_C0 + 11, 42, XL_C1)
+        estilo_ch(ch, leyenda=True, y_fmt="0.00")
+        colocar(ws, ch, 28, XL_C0 + 11, 40, XL_C1)
 
-        r_h = 44
-        tarjeta(ws, r_h, XL_C0, r_h + len(est_anios) + 4, XL_C0 + 13,
-                f"{lbl} por mes y año" + ("" if ratio else f" ({unidad.lower()})"), "Entre más oscuro el color, mayor el monto.")
-        ws.write(r_h + 2, XL_C0, "Año", F(bg=XL["card"], c=XL["tx3"], b=True, s=9, al="center"))
-        for j, m in enumerate(xm):
-            ws.write(r_h + 2, XL_C0 + 1 + j, m, F(bg=XL["card"], c=XL["tx3"], b=True, s=9, al="center"))
-        hz = heat if ratio else heat / div
-        for i, a in enumerate(est_anios):
-            ws.set_row_pixels(r_h + 3 + i, 34)
-            ws.write(r_h + 3 + i, XL_C0, a, F(bg=XL["card"], b=True, s=10, al="center"))
-            for j in range(len(meses)):
-                v = hz.loc[a].iloc[j]
-                f = F(bg="#F3F4F8", s=10, al="center", nf="0.0%" if ratio else "#,##0")
-                if pd.isna(v):
-                    ws.write_blank(r_h + 3 + i, XL_C0 + 1 + j, None, f)
-                else:
-                    ws.write_number(r_h + 3 + i, XL_C0 + 1 + j, float(v), f)
-        rng = (r_h + 3, XL_C0 + 1, r_h + 2 + len(est_anios), XL_C0 + len(meses))
-        ws.conditional_format(*rng, {"type": "3_color_scale", "min_color": "#F3F4F8", "mid_color": "#9BA5CF", "max_color": XL["navy"]})
-        valores = hz.values[~np.isnan(hz.values)] if hz.size else np.array([])
-        if valores.size:
-            corte = float(np.percentile(valores, 55))
-            ws.conditional_format(*rng, {"type": "cell", "criteria": ">=", "value": corte,
-                                         "format": wb.add_format({"font_color": "#FFFFFF", "bold": True})})
+        R_H = 42
+        tarjeta(ws, R_H, XL_C0, R_H + n_a + 4, XL_C0 + 13,
+                f_titulo='=sel_var&" por mes y año ("&IF(sel_ratio,"%",LOWER(sel_uni))&")"',
+                ayuda="Mapa de calor: entre más oscuro, mayor el monto.")
+        ws.write(R_H + 2, XL_C0, "Año", F(bg=XL["card"], c=XL["tx3"], b=True, s=9, al="center"))
+        for j, m in enumerate(MESES):
+            ws.write(R_H + 2, XL_C0 + 1 + j, m, F(bg=XL["card"], c=XL["tx3"], b=True, s=9, al="center"))
+        f_h = F(bg="#F3F4F8", s=10, al="center", nf="#,##0.0")
+        for i, a in enumerate(anios_todos):
+            ws.set_row_pixels(R_H + 3 + i, 34)
+            ws.write(R_H + 3 + i, XL_C0, a, F(bg=XL["card"], b=True, s=10, al="center"))
+            for j in range(12):
+                ws.write_formula(R_H + 3 + i, XL_C0 + 1 + j, f'=IFERROR({ref(f"V_{a}", j)},"")', f_h)
+        hrng = (R_H + 3, XL_C0 + 1, R_H + 2 + n_a, XL_C0 + 12)
+        ws.conditional_format(*hrng, {"type": "3_color_scale", "min_color": "#F3F4F8", "mid_color": "#9BA5CF",
+                                      "max_color": XL["navy"]})
+        a1 = celda(hrng[0], hrng[1], row_abs=True, col_abs=True)
+        a2 = celda(hrng[2], hrng[3], row_abs=True, col_abs=True)
+        tl = celda(hrng[0], hrng[1])
+        ws.conditional_format(*hrng, {"type": "formula", "criteria": f"={tl}>=PERCENTILE({a1}:{a2},0.55)",
+                                      "format": dxf(font_color="#FFFFFF", bold=True)})
+        fmt_ratio(ws, hrng)
 
-        tarjeta(ws, r_h, XL_C0 + 14, r_h + 16, XL_C1, f"Estacionalidad por ramo · {a_r}",
-                "Patrón mensual de cada ramo en el año elegido (1.00 = mes promedio).")
-        cols = ["Mes"] + [f"Ramo {r}" for r in ramos] + ["Base 1.00"]
-        filas = [[xm[j]] + [(ir_ramo[r].iloc[0].iloc[j] if not ir_ramo[r].empty else None) for r in ramos] + [1.0]
-                 for j in range(len(meses))]
-        ref = bloque(f"Estacionalidad por ramo · {a_r}", cols, filas)
+        tarjeta(ws, R_H, XL_C0 + 14, R_H + 16, XL_C1, f_titulo='="Estacionalidad por ramo · "&sel_anio',
+                ayuda="Patrón mensual de cada ramo incluido (1.00 = mes promedio).")
         ch = wb.add_chart({"type": "line"})
-        for r in ramos:
-            if ir_ramo[r].empty or ir_ramo[r].iloc[0].isna().all():
-                continue
+        for r in ramos_xl:
             col = color_ramo(r, ramos_todos)
-            ch.add_series({"name": f"Ramo {r}", "categories": ref("Mes"), "values": ref(f"Ramo {r}"),
+            ch.add_series({"name": f"Ramo {r}", "categories": rng("Mes"), "values": rng(f"IR_{r}"),
                            "line": {"color": col, "width": 2}, "marker": {"type": "circle", "size": 4,
                                                                           "fill": {"color": col}, "border": {"color": col}}})
-        ch.add_series({"name": "1.00", "categories": ref("Mes"), "values": ref("Base 1.00"),
+        ch.add_series({"name": "1.00", "categories": rng("Mes"), "values": rng("Base1"),
                        "line": {"color": XL["tx3"], "width": 1, "dash_type": "round_dot"}, "marker": {"type": "none"}})
-        estilo_ch(ch, leyenda=True, y_fmt="0.00",
-                  y_min=piso(*[ir_ramo[r].values for r in ramos if not ir_ramo[r].empty]))
-        colocar(ws, ch, r_h, XL_C0 + 14, r_h + 16, XL_C1)
+        estilo_ch(ch, leyenda=True, y_fmt="0.00")
+        colocar(ws, ch, R_H, XL_C0 + 14, R_H + 16, XL_C1)
 
-        # =================== 04 CONCEPTOS ===================
-        ws = hoja(3, "Conceptos", "Los cuatro cálculos de la reserva lado a lado: RCONT, RFV bruto, RFV IRR y RFV neto.")
-        tarjeta(ws, 7, XL_C0, 28, XL_C1, f"{lbl} por concepto",
-                f"Cada línea es un concepto; la más gruesa es el concepto filtrado ({concepto}).")
-        periodos = sorted(set().union(*[set(s.index) for s in conc.values()])) if conc else []
-        cols = ["Mes"] + conc_lista
-        filas = [[mes_txt(p)] + [esc(conc[c].get(p, np.nan)) for c in conc_lista] for p in periodos]
-        ref = bloque(f"{lbl} por concepto", cols, filas)
+        # ======================= 04 CONCEPTOS =======================
+        ws = hojas[3]
+        tarjeta(ws, 7, XL_C0, 27, XL_C1, f_titulo='=sel_var&" por concepto · "&sel_anio',
+                ayuda="Cada línea es un concepto, con la suma de los ramos incluidos en el panel.")
         ch = wb.add_chart({"type": "line"})
-        for c in conc_lista:
+        for c in conceptos:
             col = T["conceptos"].get(c, XL["tx3"])
-            ch.add_series({"name": c, "categories": ref("Mes"), "values": ref(c),
-                           "line": {"color": col, "width": 3.5 if c == concepto else 2}, "marker": {"type": "none"}})
-        estilo_ch(ch, leyenda=True, y_fmt="0.0%" if ratio else "#,##0")
-        colocar(ws, ch, 7, XL_C0, 28, XL_C1)
-        tarjeta(ws, 30, XL_C0, 30 + len(filas) + 3, XL_C1, "Datos por concepto", f"{lbl} en {unidad_txt}.")
-        tabla(ws, 32, XL_C0, cols, filas, [4, 5, 5, 5, 5][:len(cols)] if len(cols) <= 5 else [4] + [4] * (len(cols) - 1),
-              {c: nf for c in conc_lista}, total_col=concepto)
+            ch.add_series({"name": c, "categories": rng("Mes"), "values": rng(f"C_{c}"),
+                           "line": {"color": col, "width": 2.75}, "marker": {"type": "circle", "size": 4,
+                                                                             "fill": {"color": col}, "border": {"color": col}}})
+        estilo_ch(ch, leyenda=True, y_fmt="#,##0.0##")
+        colocar(ws, ch, 7, XL_C0, 27, XL_C1)
+        R_T = 29
+        n_c = len(conceptos)
+        wcol = max(3, (24 - 3) // max(n_c, 1))
+        tarjeta(ws, R_T, XL_C0, R_T + 20, XL_C1, f_titulo='="Datos por concepto · "&sel_var&" ("&IF(sel_ratio,"%",sel_uni)&")"',
+                ayuda="El concepto elegido en el panel aparece resaltado. Al final: cierre, AA y variación.")
+        encabezado(ws, R_T + 2, XL_C0, "Mes", 3, al="left")
+        for k, c in enumerate(conceptos):
+            encabezado(ws, R_T + 2, XL_C0 + 3 + k * wcol, c, wcol)
+        for i in range(12):
+            celda_tabla(ws, R_T + 3 + i, XL_C0, MESES[i], 3, zebra=i % 2 == 1, b=True, al="left")
+            for k, c in enumerate(conceptos):
+                cc = XL_C0 + 3 + k * wcol
+                celda_tabla(ws, R_T + 3 + i, cc, f'=IFERROR({ref(f"C_{c}", i)},"—")', wcol, zebra=i % 2 == 1)
+        extra = [("Cierre / acumulado", "C_"), ("AA", "CA_"), ("Variación vs. AA", None)]
+        for j, (t, pre) in enumerate(extra):
+            r = R_T + 15 + j
+            celda_tabla(ws, r, XL_C0, t, 3, b=True, al="left", zebra=True)
+            for k, c in enumerate(conceptos):
+                cc = XL_C0 + 3 + k * wcol
+                if pre:
+                    rg = ref(pre + c)
+                    celda_tabla(ws, r, cc, f'=IFERROR(IF(sel_clave="PT",SUM({rg}),{ultimo(rg)}),"—")', wcol, b=True, zebra=True)
+                else:
+                    a_, b_ = celda(R_T + 15, cc), celda(R_T + 16, cc)
+                    celda_tabla(ws, r, cc, f'=IFERROR(IF(sel_ratio,{a_}-{b_},{a_}/{b_}-1),"—")', wcol, nf="+0.0%;-0.0%",
+                                b=True, zebra=True)
+                    ws.conditional_format(r, cc, r, cc + wcol - 1, {"type": "formula", "criteria": ES_RATIO,
+                                                                   "format": dxf(num_format='+0.00%;-0.00%')})
+                    ws.conditional_format(r, cc, r, cc + wcol - 1, {"type": "cell", "criteria": "<", "value": 0,
+                                                                   "format": dxf(font_color=XL["neg"])})
+                    ws.conditional_format(r, cc, r, cc + wcol - 1, {"type": "cell", "criteria": ">=", "value": 0,
+                                                                   "format": dxf(font_color=XL["pos"])})
+        cuerpo = (R_T + 3, XL_C0 + 3, R_T + 16, XL_C0 + 2 + n_c * wcol)
+        fmt_ratio(ws, cuerpo)
+        for k, c in enumerate(conceptos):
+            cc = XL_C0 + 3 + k * wcol
+            ws.conditional_format(R_T + 3, cc, R_T + 17, cc + wcol - 1,
+                                  {"type": "formula", "criteria": f'=sel_conc="{c}"', "format": dxf(bold=True, font_color=XL["navy"],
+                                                                                                   bg_color=XL["nav_s"])})
 
-        # =================== 05 DETALLE POR RAMO ===================
-        ws = hoja(4, "Detalle por ramo", "Evolución de cada variable, separada por ramo.")
-        for i, r in enumerate(ramos):
-            ws.merge_range(4, XL_C1 - 2 * (len(ramos) - i) + 1, 4, XL_C1 - 2 * (len(ramos) - i) + 2, f"● Ramo {r}",
+        # ======================= 05 DETALLE POR RAMO =======================
+        ws = hojas[4]
+        for i, r in enumerate(ramos_xl):
+            ws.merge_range(4, XL_C1 - 2 * (n_r - i) + 1, 4, XL_C1 - 2 * (n_r - i) + 2, f"● Ramo {r}",
                            F(bg=XL["bg"], c=color_ramo(r, ramos_todos), b=True, s=10, al="center"))
         cajas = [(7, XL_C0), (7, XL_C0 + 8), (7, XL_C0 + 16), (23, XL_C0), (23, XL_C0 + 8), (23, XL_C0 + 16)]
         for v, (r1, c1) in zip(DETALLE, cajas):
             es_r = v in RATIOS
-            tv = det[v]
-            tarjeta(ws, r1, c1, r1 + 14, c1 + 7, VARIABLES[v], "%" if es_r else f"{unidad} de pesos")
-            cols = ["Mes"] + [f"Ramo {r}" for r in ramos]
-            filas = [[mes_txt(p)] + [(row.get(f"Ramo {r}", np.nan) if es_r else row.get(f"Ramo {r}", np.nan) / div)
-                                     for r in ramos] for p, row in tv.iterrows()]
-            ref = bloque(f"Detalle por ramo · {VARIABLES[v]}", cols, filas)
+            tarjeta(ws, r1, c1, r1 + 14, c1 + 7, VARIABLES[v], "%" if es_r else None)
+            if not es_r:
+                ws.merge_range(r1 + 1, c1, r1 + 1, c1 + 7, "", F(bg=XL["card"], s=9, c=XL["tx3"], ind=1, va="top"))
+                ws.write_formula(r1 + 1, c1, '=sel_uni&" de pesos · "&sel_conc&" · "&sel_anio',
+                                 F(bg=XL["card"], s=9, c=XL["tx3"], ind=1, va="top"))
             ch = wb.add_chart({"type": "line"})
-            for j, r in enumerate(ramos):
-                vals = [f_[1 + j] for f_ in filas]
-                if np.nansum(np.abs(np.array(vals, dtype=float))) == 0:
-                    continue
-                ch.add_series({"name": f"Ramo {r}", "categories": ref("Mes"), "values": ref(f"Ramo {r}"),
+            for r in ramos_xl:
+                ch.add_series({"name": f"Ramo {r}", "categories": rng("Mes"), "values": rng(f"D_{v}_{r}"),
                                "line": {"color": color_ramo(r, ramos_todos), "width": 2}, "marker": {"type": "none"}})
-            estilo_ch(ch, y_fmt="0%" if es_r else "#,##0")
+            estilo_ch(ch, y_fmt="0%" if es_r else "#,##0.0##")
             colocar(ws, ch, r1, c1, r1 + 14, c1 + 7)
+        R_T = 39
+        ws.merge_range(R_T, XL_C0, R_T, XL_C1, "Tablas por variable", F(bg=XL["bg"], b=True, s=13, ind=1))
+        w_m, w_r = 3, 3
+        w_t = (XL_C1 - XL_C0 + 1) - w_m - w_r * n_r
+        for n_v, v in enumerate(DETALLE):
+            es_r = v in RATIOS
+            nfv = "0.0%" if es_r else "#,##0.0"
+            fila_t = R_T + 2 + n_v * 18
+            tarjeta(ws, fila_t, XL_C0, fila_t + 16, XL_C1, VARIABLES[v] + (" (%)" if es_r else ""))
+            if not es_r:
+                f_s = F(bg=XL["card"], s=9, c=XL["tx3"], ind=1, va="top")
+                ws.merge_range(fila_t + 1, XL_C0, fila_t + 1, XL_C1, "", f_s)
+                ws.write_formula(fila_t + 1, XL_C0, '="En "&LOWER(sel_uni)&" de pesos · "&sel_conc&" · "&sel_anio', f_s)
+            encabezado(ws, fila_t + 2, XL_C0, "Mes", w_m, al="left")
+            for k, r in enumerate(ramos_xl):
+                encabezado(ws, fila_t + 2, XL_C0 + w_m + k * w_r, f"Ramo {r}", w_r)
+            encabezado(ws, fila_t + 2, XL_C0 + w_m + n_r * w_r, "Total" + (" ponderado" if es_r else ""), w_t)
+            for i in range(12):
+                z = i % 2 == 1
+                celda_tabla(ws, fila_t + 3 + i, XL_C0, MESES[i], w_m, zebra=z, b=True, al="left")
+                for k, r in enumerate(ramos_xl):
+                    celda_tabla(ws, fila_t + 3 + i, XL_C0 + w_m + k * w_r, f'=IFERROR({ref(f"D_{v}_{r}", i)},"—")', w_r,
+                                nf=nfv, zebra=z)
+                celda_tabla(ws, fila_t + 3 + i, XL_C0 + w_m + n_r * w_r, f'=IFERROR({ref(f"DT_{v}", i)},"—")', w_t,
+                            nf=nfv, zebra=z, b=True, color=XL["navy"])
 
-        # =================== 06 TABLA MENSUALIZADA ===================
-        ws = hoja(5, "Tabla mensualizada", "Los números detrás de las gráficas.")
-        vista = tm if ratio else tm / div
-        cols = ["Mes"] + [f"{c} ({'%' if ratio else unidad})" for c in vista.columns]
-        n_c = len(cols)
-        anchos = [3] + [max(2, (XL_C1 - XL_C0 + 1 - 3) // (n_c - 1))] * (n_c - 1)
-        tarjeta(ws, 7, XL_C0, 7 + len(vista) + 3, XL_C0 + sum(anchos) - 1, f"{lbl} · {concepto}",
-                f"Mensualización por ramo en {unidad_txt}. Total en azul.")
-        tabla(ws, 9, XL_C0, cols, [[mes_txt(p)] + list(row.values) for p, row in vista.iterrows()], anchos,
-              {c: nf for c in cols[1:]}, total_col=cols[-1])
-
-        # =================== HOJAS OCULTAS ===================
-        wd = wb.add_worksheet("Datos_graficas")
-        wd.set_column(0, 0, 26)
-        wd.set_column(1, 30, 14)
-        for r0, titulo, columnas, filas, formatos in pendientes:
-            wd.write(r0, 0, titulo, F(b=True, c=XL["navy"], s=11))
-            for j, c in enumerate(columnas):
-                wd.write(r0 + 1, j, c, F(b=True, c="#FFFFFF", bg=XL["navy"]))
-            for i, fila in enumerate(filas, start=r0 + 2):
-                for j, v in enumerate(fila):
-                    if v is None or (isinstance(v, float) and np.isnan(v)):
-                        wd.write_blank(i, j, None)
-                    elif isinstance(v, (int, float, np.integer, np.floating)):
-                        wd.write_number(i, j, float(v), F(nf=formatos.get(columnas[j], "#,##0.00")))
-                    else:
-                        wd.write(i, j, str(v))
-        wd.hide()
-        wb_bd = wb.add_worksheet("BD_Proyeccion")
-        base = df.drop(columns="FECHA").assign(VARIABLE_NOMBRE=lambda d: d["VARIABLE"].map(VARIABLES))
-        base = base[["CONCEPTO", "PERIODO", "ANIO", "MES", "RAMO", "VARIABLE", "VARIABLE_NOMBRE", "VALOR"]]
-        datos_bd = [[None if (isinstance(x, float) and np.isnan(x)) else (x.item() if hasattr(x, "item") else x)
-                     for x in fila] for fila in base.itertuples(index=False)]
-        wb_bd.add_table(0, 0, len(datos_bd), len(base.columns) - 1,
-                        {"data": datos_bd, "name": "BD_Proyeccion", "style": "Table Style Medium 2",
-                         "columns": [({"header": c, "format": F(nf="#,##0.00")} if c.startswith("VALOR") else {"header": c})
-                                     for c in ["CONCEPTO", "PERIODO", "AÑO", "MES", "RAMO", "CLAVE", "VARIABLE", "VALOR (pesos)"]]})
-        wb_bd.set_column(0, 6, 14)
-        wb_bd.set_column(7, 7, 20)
-        wb_bd.freeze_panes(1, 0)
-        wb_bd.hide()
+        # ======================= 06 TABLA MENSUALIZADA =======================
+        ws = hojas[5]
+        w_v = max(2, (24 - 3) // (n_r + 1))
+        tarjeta(ws, 7, XL_C0, 7 + 25, XL_C0 + 3 + (n_r + 1) * w_v - 1,
+                f_titulo='=sel_var&" · "&sel_conc&" · "&sel_anio&" ("&IF(sel_ratio,"%",sel_uni)&")"',
+                ayuda="Mensualización por ramo; Total en azul. Los ramos excluidos en el panel aparecen como —.")
+        encabezado(ws, 9, XL_C0, "Mes", 3, al="left")
+        for k, r in enumerate(ramos_xl):
+            encabezado(ws, 9, XL_C0 + 3 + k * w_v, f"Ramo {r}", w_v)
+        encabezado(ws, 9, XL_C0 + 3 + n_r * w_v, "Total", w_v)
+        for i in range(12):
+            z = i % 2 == 1
+            celda_tabla(ws, 10 + i, XL_C0, MESES[i], 3, zebra=z, b=True, al="left")
+            for k, r in enumerate(ramos_xl):
+                celda_tabla(ws, 10 + i, XL_C0 + 3 + k * w_v, f'=IFERROR({ref(f"R_{r}", i)},"—")', w_v, zebra=z)
+            celda_tabla(ws, 10 + i, XL_C0 + 3 + n_r * w_v, f'=IFERROR({ref("SelY", i)},"—")', w_v, zebra=z, b=True,
+                        color=XL["navy"])
+        resumen = [("Promedio", "AVERAGE"), ("Mínimo", "MIN"), ("Máximo", "MAX")]
+        for j, (t, fn) in enumerate(resumen):
+            r = 23 + j
+            celda_tabla(ws, r, XL_C0, t, 3, b=True, al="left", zebra=True)
+            for k in range(n_r + 1):
+                cc = XL_C0 + 3 + k * w_v
+                a1_, a2_ = celda(10, cc), celda(21, cc)
+                celda_tabla(ws, r, cc, f'=IFERROR({fn}({a1_}:{a2_}),"—")', w_v, b=True, zebra=True)
+        r = 26
+        celda_tabla(ws, r, XL_C0, "Cierre / acumulado", 3, b=True, al="left", zebra=True)
+        for k in range(n_r + 1):
+            cc = XL_C0 + 3 + k * w_v
+            rg_ = f"{celda(10, cc, True, True)}:{celda(21, cc, True, True)}"
+            celda_tabla(ws, r, cc, f'=IFERROR(IF(sel_clave="PT",SUM({rg_}),{ultimo(rg_)}),"—")', w_v, b=True, zebra=True,
+                        color=XL["navy"])
+        celda_tabla(ws, 27, XL_C0, "AA", 3, b=True, al="left", zebra=True)
+        celda_tabla(ws, 28, XL_C0, "Variación vs. AA", 3, b=True, al="left", zebra=True)
+        for k in range(n_r + 1):
+            cc = XL_C0 + 3 + k * w_v
+            if k < n_r:
+                r_ = ramos_xl[k]
+                aa = f'IFERROR(IF(Calculos!$E${k + 2}=0,NA(),IF(sel_ratio,1,1/sel_div)*IF(sel_clave="PT",SUMPRODUCT(SUMIFS(bd_val,bd_conc,sel_conc,bd_clave,sel_clave,bd_per,{ref("PerA")},bd_ramo,{int(r_)})),SUMIFS(bd_val,bd_conc,sel_conc,bd_clave,sel_clave,bd_per,sel_ant*100+12,bd_ramo,{int(r_)}))),"—")'
+            else:
+                aa = f'IFERROR(IF(sel_clave="PT",SUM({ref("SelA")}),{ultimo(ref("SelA"))}),"—")'
+            celda_tabla(ws, 27, cc, "=" + aa, w_v, zebra=True)
+            a_, b_ = celda(26, cc), celda(27, cc)
+            celda_tabla(ws, 28, cc, f'=IFERROR(IF(sel_ratio,{a_}-{b_},{a_}/{b_}-1),"—")', w_v, nf="+0.0%;-0.0%", b=True, zebra=True)
+            ws.conditional_format(28, cc, 28, cc + w_v - 1, {"type": "formula", "criteria": ES_RATIO,
+                                                            "format": dxf(num_format='+0.00%;-0.00%')})
+            ws.conditional_format(28, cc, 28, cc + w_v - 1, {"type": "cell", "criteria": "<", "value": 0,
+                                                            "format": dxf(font_color=XL["neg"])})
+            ws.conditional_format(28, cc, 28, cc + w_v - 1, {"type": "cell", "criteria": ">=", "value": 0,
+                                                            "format": dxf(font_color=XL["pos"])})
+        fmt_ratio(ws, (10, XL_C0 + 3, 27, XL_C0 + 2 + (n_r + 1) * w_v))
         wb.close()
 
     return escribir
