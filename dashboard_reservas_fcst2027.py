@@ -1,11 +1,11 @@
 # -*- coding: utf-8 -*-
 """
-Dashboard de Proyección de Reservas · FCST 2027   (Plotly Dash)
-===============================================================
+PRISMA · Proyección de Reservas FCST 2027   (Plotly Dash)
+=========================================================
 Lee BD_RFV_Proyeccion (hoja BD_Montos_RRC_SONR) y muestra la mensualización,
-la estacionalidad (vs. la estacionalidad de la prima) y los montos, con filtros
-en el menú de la izquierda: Concepto, Variable (Reserva, Prima 24M, PR 24M, MA,
-RFV MA, Cesión, PT), Ramo, Año, Mes y Unidades.
+la estacionalidad (comparada con la de la prima, año por año) y los montos.
+Los filtros (Concepto, Variable, Ramo, Año, Mes, Unidades) están en un panel
+que se abre con el botón "Filtros".
 
 CÓMO EJECUTARLO DESDE VS CODE
     1) Abre este archivo en VS Code.
@@ -21,7 +21,7 @@ import subprocess
 import sys
 
 # --------------------------------------------------------------------------------------
-# 1) Paquetería: se instala sola si falta (Dash 4 o superior, por el tema oscuro)
+# 1) Paquetería: se instala sola si falta (Dash 4 o superior)
 # --------------------------------------------------------------------------------------
 def _instalar(*paquetes):
     print(f"Instalando: {', '.join(paquetes)} ...")
@@ -53,6 +53,7 @@ import re
 import threading
 import webbrowser
 from datetime import datetime
+from urllib.parse import quote
 
 import numpy as np
 import pandas as pd
@@ -68,32 +69,38 @@ PUERTO = 8050
 
 # ---- Catálogos ------------------------------------------------------------------------
 VARIABLES = {  # prefijo de la columna en la BD -> etiqueta en pantalla
-    "RAM": "Reserva (monto)",
+    "RAM": "Reserva",
     "PRIMA 24M": "Prima 24M",
     "PR 24M": "PR 24M",
-    "MA": "MA (monto afianzado)",
+    "MA": "Monto afianzado (MA)",
     "RFV MA": "RFV MA",
     "CESION": "Cesión",
-    "PT": "PT (prima del mes)",
+    "PT": "Prima del mes (PT)",
 }
-PRIMAS = {"PT": "Prima tomada del mes (PT)", "PRIMA 24M": "Prima 24M"}
+PRIMAS = {"PT": "Prima del mes (PT)", "PRIMA 24M": "Prima 24M"}
 FLUJOS = {"PT"}            # se acumulan en el año; el resto son saldos (se toma el cierre)
 RATIOS = {"CESION"}        # porcentajes: promedio ponderado por la reserva
-
 MESES = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"]
 UNIDADES = {"Pesos": (1, ""), "Miles": (1e3, " K"), "Millones": (1e6, " M")}
 
-# Paleta categórica fija (validada para fondo oscuro y daltonismo); el color sigue a la entidad
-COL_RAMO = {"130": "#3987e5", "140": "#d95926", "150": "#199e70", "160": "#c98500", "170": "#d55181"}
-COL_CONCEPTO = {"RCONT": "#3987e5", "RFV BRUTO": "#d95926", "RFV IRR": "#199e70", "RFV NETO": "#c98500"}
-COL_ANIO_LISTA = ["#199e70", "#d95926", "#3987e5", "#d55181", "#9085e9"]
-SEQ_AZUL = ["#cde2fb", "#9ec5f4", "#6da7ec", "#3987e5", "#256abf", "#184f95", "#0d366b"]
-POS, NEG = "#3987e5", "#e66767"
-
-BG, SIDE, CARD = "#0d0d0d", "#141413", "#1a1a19"
-BORDE = "rgba(255,255,255,0.10)"
-TXT, TXT2, TXT3 = "#ffffff", "#c3c2b7", "#898781"
-GRID = "rgba(255,255,255,0.07)"
+# ---- Temas (oscuro verde agua / claro naranja). Paletas categóricas validadas para daltonismo.
+TEMAS = {
+    "oscuro": dict(
+        bg="#0a0f14", card="#101920", text="#e9f2f3", text2="#a9b7bf", text3="#6f7f8a",
+        grid="rgba(255,255,255,0.06)", linea="#22313b", accent="#2dd4bf", pos="#34d399", neg="#f87171",
+        anios=["#2dd4bf", "#f5a524", "#8ea0b5", "#d55181"],
+        ramos=["#3987e5", "#d95926", "#199e70", "#c98500", "#d55181"],
+        heat=["#0f2a2e", "#115e59", "#0f766e", "#14b8a6", "#5eead4"],
+        hover_bg="#15232c"),
+    "claro": dict(
+        bg="#f4f1ec", card="#ffffff", text="#1d232b", text2="#4b5563", text3="#8b919a",
+        grid="rgba(0,0,0,0.06)", linea="#e6e1d9", accent="#ea6a1f", pos="#16a34a", neg="#dc2626",
+        anios=["#ea6a1f", "#2a78d6", "#8b95a1", "#d55181"],
+        ramos=["#2a78d6", "#eb6834", "#1baf7a", "#eda100", "#e87ba4"],
+        heat=["#fff4ec", "#fed7aa", "#fb923c", "#ea580c", "#9a3412"],
+        hover_bg="#ffffff"),
+}
+CONCEPTOS_ORDEN = ["RCONT", "RFV BRUTO", "RFV IRR", "RFV NETO"]
 
 
 # ---- Carga de datos -------------------------------------------------------------------
@@ -140,12 +147,13 @@ if _arch:
         ESTADO["df"] = cargar(fh.read())
     ESTADO["origen"] = os.path.basename(_arch)
 else:
-    ESTADO["error"] = f"No encontré un archivo con el patrón {PATRON} en: {CARPETA}. Cárgalo desde el menú izquierdo."
+    ESTADO["error"] = f"No encontré un archivo con el patrón {PATRON} en: {CARPETA}. Cárgalo desde Filtros › Archivo."
     ESTADO["df"] = pd.DataFrame(columns=["CONCEPTO", "PERIODO", "VALOR", "VARIABLE", "RAMO", "ANIO", "MES", "FECHA"])
 
 
 def catalogos(df):
-    conceptos = list(dict.fromkeys(df["CONCEPTO"]))
+    presentes = list(dict.fromkeys(df["CONCEPTO"]))
+    conceptos = [c for c in CONCEPTOS_ORDEN if c in presentes] + [c for c in presentes if c not in CONCEPTOS_ORDEN]
     return conceptos, sorted(df["RAMO"].unique()), sorted(int(a) for a in df["ANIO"].unique())
 
 
@@ -172,7 +180,7 @@ def serie(df, conc, variable, ramos, anios, meses, por=("FECHA",)):
 def indice(df, conc, variable, ramos, anios, meses):
     """Índice estacional: cada mes ÷ promedio de los meses filtrados de su año. Filas = año."""
     s = serie(df, conc, variable, ramos, anios, meses, por=("ANIO", "MES"))
-    piv = s.pivot(index="ANIO", columns="MES", values="VALOR").reindex(columns=meses)
+    piv = s.pivot(index="ANIO", columns="MES", values="VALOR").reindex(index=anios, columns=meses)
     prom = piv.mean(axis=1).replace(0, np.nan)
     return piv.div(prom, axis=0)
 
@@ -186,36 +194,39 @@ def fmt(v, unidad, ratio=False, dec=1):
     return f"${v / div:,.{dec if unidad != 'Pesos' else 0}f}{suf}"
 
 
-def color_anio(a, anios_todos):
-    return COL_ANIO_LISTA[anios_todos.index(a) % len(COL_ANIO_LISTA)] if a in anios_todos else TXT2
+def color_anio(a, todos, T):
+    """El año más reciente toma el color de acento; los anteriores, colores fijos."""
+    orden = sorted(todos, reverse=True)
+    return T["anios"][min(orden.index(a), len(T["anios"]) - 1)] if a in orden else T["text3"]
+
+
+def color_ramo(r, ramos_todos, T):
+    return T["ramos"][ramos_todos.index(r) % len(T["ramos"])] if r in ramos_todos else T["text3"]
 
 
 # ---- Estilo de gráficas ---------------------------------------------------------------
-GRAPH_CFG = {"displaylogo": False, "modeBarButtonsToRemove": ["lasso2d", "select2d", "autoScale2d"],
+GRAPH_CFG = {"displaylogo": False, "displayModeBar": "hover",
+             "modeBarButtonsToRemove": ["lasso2d", "select2d", "autoScale2d", "zoomIn2d", "zoomOut2d"],
              "toImageButtonOptions": {"format": "png", "scale": 2}}
 
 
-def estilo(fig, h=340, titulo=None, ytitle=None, ratio=False, leyenda=True, ytick=None, compacto=False):
+def estilo(fig, T, h, ytitle=None, ratio=False, leyenda=True, ytick=None, compacto=False):
     fig.update_layout(
-        height=h, paper_bgcolor=CARD, plot_bgcolor=CARD,
-        font=dict(family='system-ui, -apple-system, "Segoe UI", sans-serif', color=TXT2, size=12),
-        margin=dict(l=12, r=12, t=48 if titulo else 16, b=8),
-        title=dict(text=titulo, font=dict(color=TXT, size=14), x=0.015, y=0.97) if titulo else None,
+        height=h, paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+        font=dict(family="Inter, system-ui, -apple-system, 'Segoe UI', sans-serif", color=T["text2"], size=12),
+        margin=dict(l=8, r=12, t=30 if leyenda else 8, b=8),
         hovermode="x unified", showlegend=leyenda,
-        legend=dict(orientation="h", yanchor="bottom", y=1.0, xanchor="right", x=1, font=dict(color=TXT2, size=11),
+        legend=dict(orientation="h", yanchor="bottom", y=1.0, xanchor="left", x=0, font=dict(color=T["text2"], size=11),
                     traceorder="normal", bgcolor="rgba(0,0,0,0)"),
-        hoverlabel=dict(bgcolor="#262624", font=dict(color=TXT), bordercolor="#3a3a37"),
-        bargap=0.28,
+        hoverlabel=dict(bgcolor=T["hover_bg"], font=dict(color=T["text"]), bordercolor=T["linea"]),
+        bargap=0.3, uniformtext=dict(minsize=9, mode="hide"),
     )
-    fig.update_xaxes(showgrid=False, linecolor="#2c2c2a", tickfont=dict(color=TXT3), zeroline=False)
-    fig.update_yaxes(gridcolor=GRID, zeroline=False, tickfont=dict(color=TXT3), title=ytitle,
-                     title_font=dict(color=TXT3, size=11),
-                     tickformat=ytick or (".0%" if ratio else ",.0f"))
+    fig.update_xaxes(showgrid=False, linecolor=T["linea"], tickfont=dict(color=T["text3"]), zeroline=False,
+                     fixedrange=True)
+    fig.update_yaxes(gridcolor=T["grid"], zeroline=False, tickfont=dict(color=T["text3"]), title=ytitle,
+                     title_font=dict(color=T["text3"], size=11), fixedrange=True,
+                     tickformat=ytick if ytick is not None else (".1%" if ratio else ",.0f"))
     _meses_es(fig, 4 if compacto else 15)
-    if compacto:
-        fig.update_layout(legend=dict(yanchor="top", y=-0.16, xanchor="center", x=0.5, font=dict(size=10)),
-                          margin=dict(l=8, r=8, t=40, b=8))
-        fig.update_xaxes(tickangle=0)
     return fig
 
 
@@ -229,74 +240,151 @@ def _meses_es(fig, max_ticks=15):
     if fechas:
         fechas = sorted(fechas)
         vals = fechas[::max(1, -(-len(fechas) // max_ticks))]
-        fig.update_xaxes(tickvals=vals, ticktext=[f"{MESES[f.month - 1]}<br>{f.year}" for f in vals])
+        fig.update_xaxes(tickvals=vals, ticktext=[f"{MESES[f.month - 1]}<br>{f.year}" for f in vals], tickangle=0)
 
 
-def vacia(msg="Selecciona al menos un ramo, un año y un mes", h=340):
+def vacia(T, msg="Selecciona al menos un ramo, un año y un mes en Filtros", h=320):
     fig = go.Figure()
-    fig.add_annotation(text=msg, showarrow=False, font=dict(color=TXT3, size=13))
-    fig.update_layout(height=h, paper_bgcolor=CARD, plot_bgcolor=CARD, margin=dict(l=10, r=10, t=10, b=10))
+    fig.add_annotation(text=msg, showarrow=False, font=dict(color=T["text3"], size=13))
+    fig.update_layout(height=h, paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+                      margin=dict(l=10, r=10, t=10, b=10))
     fig.update_xaxes(visible=False)
     fig.update_yaxes(visible=False)
     return fig
 
 
-def tarjeta(id_, h=340):
-    return html.Div(dcc.Graph(id=id_, config=GRAPH_CFG, style={"height": f"{h}px"}), className="card graf")
+# ---- Íconos (trazos tipo Feather, MIT) -------------------------------------------------
+_ICONOS = {
+    "home": '<path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>',
+    "barras": '<line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/>',
+    "onda": '<polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>',
+    "capas": '<polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/>',
+    "grid": '<rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>',
+    "tabla": '<line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/>',
+    "filtro": '<polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/>',
+    "luna": '<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>',
+    "bajar": '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>',
+    "x": '<line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>',
+    "escudo": '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>',
+    "reloj": '<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>',
+    "pie": '<path d="M21.21 15.89A10 10 0 1 1 8 2.83"/><path d="M22 12A10 10 0 0 0 12 2v10z"/>',
+    "maletin": '<rect x="2" y="7" width="20" height="14" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/>',
+    "sube": '<polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/>',
+    "cesion": '<polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/>',
+    "peso": '<line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>',
+    "subir": '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>',
+}
+CSS_ICONOS = "\n".join(
+    ".ic-%s{-webkit-mask:url(\"data:image/svg+xml,%s\") center/contain no-repeat;mask:url(\"data:image/svg+xml,%s\") center/contain no-repeat;}"
+    % (k, q, q) for k, q in ((k, quote("<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' "
+                                       "stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'>"
+                                       + v + "</svg>")) for k, v in _ICONOS.items()))
+
+
+def ic(nombre, cls=""):
+    return html.I(className=f"ic ic-{nombre} {cls}")
 
 
 # ---- Layout ---------------------------------------------------------------------------
 conceptos0, ramos0, anios0 = catalogos(ESTADO["df"])
+CONCEPTO0 = "RFV NETO" if "RFV NETO" in conceptos0 else (conceptos0 or [None])[0]
 
 
-def bloque(titulo, *hijos):
-    return html.Div([html.Div(titulo, className="side-lbl"), *hijos], className="side-blk")
+def grafica(id_, h):
+    return dcc.Graph(id=id_, config=GRAPH_CFG, style={"height": f"{h}px"})
 
 
-sidebar = html.Aside([
-    html.Div([html.Span("▤", className="logo"), html.Div([html.Div("Reservas", className="brand"),
-                                                         html.Div("FCST 2027", className="brand-sub")])],
-             className="brand-row"),
-    bloque("Concepto", dcc.RadioItems(id="f-concepto", options=conceptos0,
-                                      value="RFV NETO" if "RFV NETO" in conceptos0 else (conceptos0 or [None])[0],
-                                      className="lista")),
-    bloque("Variable", dcc.RadioItems(id="f-var", options=[{"label": v, "value": k} for k, v in VARIABLES.items()],
-                                      value="RAM", className="lista")),
-    bloque("Ramo", dcc.Checklist(id="f-ramo", options=[{"label": f"Ramo {r}", "value": r} for r in ramos0],
-                                 value=ramos0, className="pills")),
-    bloque("Año", dcc.Checklist(id="f-anio", options=anios0, value=anios0[-1:], className="pills")),
-    bloque("Mes", dcc.Checklist(id="f-mes", options=[{"label": m, "value": i + 1} for i, m in enumerate(MESES)],
-                                value=list(range(1, 13)), className="pills meses"),
-           html.Div([html.Button("Todos", id="btn-mes-todos", className="mini"),
-                     html.Button("Ninguno", id="btn-mes-nada", className="mini")], className="mini-row")),
-    bloque("Unidades", dcc.RadioItems(id="f-unidad", options=list(UNIDADES), value="Millones", className="pills")),
-    bloque("Archivo", dcc.Upload(id="upload", children=html.Div(["Arrastra o ", html.B("elige"), " otra versión"]),
-                                 className="upload", accept=".xlsx,.xlsm,.xls"),
-           html.Div(id="fuente", className="fuente")),
-], className="sidebar")
+def panel(titulo, ayuda, cuerpo, extra=None, cls="", id_titulo=None, id_ayuda=None):
+    t = html.H3(titulo, id=id_titulo) if id_titulo else html.H3(titulo)
+    a = html.P(ayuda, className="ayuda", id=id_ayuda) if id_ayuda else html.P(ayuda, className="ayuda")
+    return html.Div([html.Div([html.Div([t, a]), extra], className="panel-head"), cuerpo], className=f"card panel {cls}")
 
-NAV = [("mens", "Mensualización"), ("est", "Estacionalidad"), ("conc", "Conceptos"),
-       ("vars", "Variables por ramo"), ("tabla-sec", "Tabla")]
+
+def seccion(id_, num, titulo, sub, *hijos, extra=None):
+    return html.Section([
+        html.Div([html.Span(num, className="num"),
+                  html.Div([html.H2(titulo), html.P(sub, className="sec-sub")]), extra], className="sec-head"),
+        *hijos], id=id_, className="bloque")
+
+
+def grupo(titulo, *hijos):
+    return html.Div([html.Div(titulo, className="f-lbl"), *hijos], className="f-blk")
+
+
+NAV = [("resumen", "home", "Resumen"), ("mensual", "barras", "Mes a mes"), ("estacional", "onda", "Estacionalidad"),
+       ("conceptos", "capas", "Conceptos"), ("ramos", "grid", "Por ramo"), ("tabla-sec", "tabla", "Tabla")]
+
+rail = html.Nav([
+    html.A(html.Span("P", className="mark"), href="#resumen", className="rail-logo", title="PRISMA"),
+    html.Div([html.A([ic(i), html.Span(t, className="tip")], href=f"#{s}", className="rail-btn") for s, i, t in NAV],
+             className="rail-nav"),
+    html.Div([
+        html.Button([ic("filtro"), html.Span("Filtros", className="tip")], id="rail-filtros", className="rail-btn"),
+        html.Button([ic("luna"), html.Span("Tema claro / oscuro", className="tip")], id="btn-tema", className="rail-btn"),
+    ], className="rail-foot"),
+], className="rail")
+
+drawer = html.Aside([
+    html.Div([html.Div([ic("filtro"), html.Span("Filtros")], className="dr-title"),
+              html.Button(ic("x"), id="btn-cerrar", className="icon-btn", title="Cerrar")], className="dr-head"),
+    html.P("Los cambios se aplican al instante en todo el tablero.", className="dr-sub"),
+    grupo("Concepto", dcc.RadioItems(id="f-concepto", options=conceptos0, value=CONCEPTO0, className="seg")),
+    grupo("Variable", dcc.RadioItems(id="f-var", options=[{"label": v, "value": k} for k, v in VARIABLES.items()],
+                                     value="RAM", className="lista")),
+    grupo("Ramo", dcc.Checklist(id="f-ramo", options=[{"label": r, "value": r} for r in ramos0],
+                                value=ramos0, className="pills")),
+    grupo("Año", dcc.Checklist(id="f-anio", options=anios0, value=anios0[-1:], className="pills")),
+    grupo("Mes", dcc.Checklist(id="f-mes", options=[{"label": m, "value": i + 1} for i, m in enumerate(MESES)],
+                               value=list(range(1, 13)), className="pills meses"),
+          html.Div([html.Button("Todos", id="btn-mes-todos", className="mini"),
+                    html.Button("Ninguno", id="btn-mes-nada", className="mini")], className="mini-row")),
+    grupo("Unidades", dcc.RadioItems(id="f-unidad", options=list(UNIDADES), value="Millones", className="pills")),
+    grupo("Archivo", dcc.Upload(id="upload", children=html.Div([ic("subir"), " Cargar otra versión"]),
+                                className="upload", accept=".xlsx,.xlsm,.xls"),
+          html.Div(id="fuente", className="fuente")),
+    html.Button("Restablecer filtros", id="btn-reset", className="btn-sec"),
+], id="drawer", className="drawer")
 
 main = html.Main([
     html.Header([
-        html.Div([html.H1("Proyección de Reservas · FCST 2027"),
-                  html.Div(id="chips", className="chips")]),
-        html.Nav([html.A(t, href=f"#{i}") for i, t in NAV], className="secs"),
+        html.Div([html.Div("PRISMA", className="brand"),
+                  html.Div("Proyección de reservas · FCST 2027", className="brand-sub")], className="brand-box"),
+        html.Div([html.Div(id="chips", className="chips", n_clicks=0, title="Abrir filtros"),
+                  html.Button([ic("filtro"), html.Span("Filtros")], id="btn-filtros", className="btn-filtros")],
+                 className="top-right"),
     ], className="top"),
     html.Div(id="aviso"),
-    html.Div(id="kpis", className="grid kpis"),
 
-    html.Section([
-        html.Div([html.H2("Mensualización"), html.Span(id="sub-mens", className="sub")], className="sec-head"),
-        html.Div([tarjeta("g-mens", 420), tarjeta("g-donut", 420)], className="grid g-2-1"),
-        tarjeta("g-mom", 300),
-    ], id="mens", className="bloque"),
+    seccion("resumen", "01", "Resumen", "Cifras clave al cierre del periodo filtrado y su cambio contra el año anterior (AA).",
+            html.Div(id="kpis", className="kpis")),
 
-    html.Section([
-        html.Div([
-            html.H2("Estacionalidad"), html.Span("índice = mes ÷ promedio de su año", className="sub"),
+    seccion("mensual", "02", "Mes a mes", "Cómo se reparte el monto en cada mes y qué ramos lo explican.",
             html.Div([
+                panel("Monto por mes", "Cada barra es el total del mes. La línea punteada es el promedio; "
+                      "el color distingue el año.", grafica("g-mens", 380), id_titulo="t-mens"),
+                panel("Por ramo", "Cuánto aporta cada ramo y qué porcentaje representa del total.",
+                      grafica("g-ramo", 380), id_titulo="t-ramo"),
+            ], className="grid g-2-1"),
+            panel("Cambio contra el mes anterior", "Barras verdes: el monto subió; rojas: bajó.",
+                  grafica("g-mom", 250))),
+
+    seccion("estacional", "03", "Estacionalidad",
+            "¿En qué meses el monto está por arriba o por abajo de lo normal? Comparado año contra año y contra la prima.",
+            html.Div([
+                panel("Estacionalidad vs. prima", "", grafica("g-comp", 400), id_titulo="t-comp", id_ayuda="a-comp"),
+                panel("Lectura por año", "Correlación cercana a +1: se mueve igual que la prima. "
+                      "Amplitud: índice más alto − más bajo (qué tan marcada es la estacionalidad).",
+                      html.Div(id="est-stats")),
+            ], className="grid g-2-1"),
+            html.Div([
+                panel("Monto por mes y año", "Mapa de calor: entre más intenso el color, mayor el monto.",
+                      grafica("g-heat", 300), id_titulo="t-heat"),
+                panel("Estacionalidad por ramo", "Patrón mensual de cada ramo en el año elegido.",
+                      grafica("g-ramo-est", 300),
+                      extra=html.Div(dcc.Dropdown(id="est-ramo-anio", options=anios0, value=(anios0 or [None])[-1],
+                                                  clearable=False, searchable=False), className="ctl ctl-sm")),
+            ], className="grid g-2"),
+            extra=html.Div([
                 html.Div([html.Label("AÑOS"),
                           dcc.Dropdown(id="est-anios", options=[{"label": str(a), "value": a} for a in anios0],
                                        value=anios0, multi=True, clearable=False, searchable=False,
@@ -306,190 +394,279 @@ main = html.Main([
                 html.Div([html.Label("PRIMA A COMPARAR"),
                           dcc.Dropdown(id="est-prima", options=[{"label": v, "value": k} for k, v in PRIMAS.items()],
                                        value="PT", clearable=False, searchable=False)], className="ctl"),
-            ], className="ctls"),
-        ], className="sec-head"),
-        html.Div([tarjeta("g-heat", 340), tarjeta("g-idx", 340)], className="grid g-2"),
-        html.H3("Estacionalidad vs. prima", className="med"),
-        html.Div([tarjeta("g-idx-var", 330), tarjeta("g-idx-prima", 330)], className="grid g-2"),
-        html.Div([tarjeta("g-comp", 340), html.Div(id="comp-kpis", className="card comp")], className="grid g-2-1"),
-        tarjeta("g-idx-ramo", 330),
-    ], id="est", className="bloque"),
+            ], className="ctls")),
 
-    html.Section([
-        html.Div([html.H2("Conceptos"), html.Span("RCONT · RFV BRUTO · RFV IRR · RFV NETO", className="sub")],
-                 className="sec-head"),
-        tarjeta("g-conc", 400),
-    ], id="conc", className="bloque"),
+    seccion("conceptos", "04", "Conceptos", "Los cuatro cálculos de la reserva lado a lado: RCONT, RFV bruto, RFV IRR y RFV neto.",
+            panel("Comparativo de conceptos", "Cada línea es un concepto; la etiqueta final muestra su último valor.",
+                  grafica("g-conc", 360), id_titulo="t-conc")),
 
-    html.Section([
-        html.Div([html.H2("Variables por ramo"), html.Span(id="sub-vars", className="sub")], className="sec-head"),
-        html.Div([tarjeta(f"g-v{i}", 310) for i in range(6)], className="grid g-3"),
-    ], id="vars", className="bloque"),
+    seccion("ramos", "05", "Detalle por ramo", "Evolución de cada variable, separada por ramo.",
+            html.Div([panel(t, "", grafica(f"g-v{i}", 250), id_titulo=f"t-v{i}", cls="mini-panel")
+                      for i, t in enumerate(["Reserva", "Prima 24M", "PR 24M", "Monto afianzado (MA)", "RFV MA", "Cesión"])],
+                     className="grid g-3"),
+            extra=html.Div(id="ramo-leyenda", className="leyenda")),
 
-    html.Section([
-        html.Div([html.H2("Tabla mensualizada"), html.Span(id="sub-tabla", className="sub"),
-                  html.Button("⬇ Descargar a Excel", id="btn-xls", className="btn")], className="sec-head"),
-        html.Div(id="tabla", className="card tabla-wrap"),
-        dcc.Download(id="dl"),
-    ], id="tabla-sec", className="bloque"),
+    seccion("tabla-sec", "06", "Tabla mensualizada", "Los números detrás de las gráficas, listos para descargar.",
+            html.Div(id="tabla", className="card tabla-wrap"), dcc.Download(id="dl"),
+            extra=html.Button([ic("bajar"), html.Span("Descargar Excel")], id="btn-xls", className="btn-pri")),
+    html.Footer(id="pie", className="pie"),
 ], className="main")
 
-app = Dash(__name__, title="Reservas FCST 2027", update_title=None)
-app.layout = html.Div([dcc.Store(id="version", data=0), sidebar, main], className="app")
+app = Dash(__name__, title="PRISMA · Reservas FCST 2027", update_title=None)
+app.layout = html.Div([
+    dcc.Store(id="version", data=0), dcc.Store(id="tema", data="oscuro", storage_type="local"),
+    rail, html.Div(id="overlay", className="overlay", n_clicks=0), drawer, main,
+], id="app", className="app tema-oscuro")
 
 app.index_string = """<!DOCTYPE html>
 <html lang="es"><head>{%metas%}<title>{%title%}</title>{%favicon%}{%css%}
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
-:root { color-scheme: dark;
-  --Dash-Fill-Inverse-Strong:#1f1f1d; --Dash-Fill-Interactive-Strong:#3987e5; --Dash-Fill-Interactive-Weak:rgba(57,135,229,.12);
-  --Dash-Fill-Primary-Hover:rgba(255,255,255,.06); --Dash-Fill-Primary-Active:rgba(57,135,229,.18);
-  --Dash-Fill-Disabled:rgba(255,255,255,.06); --Dash-Stroke-Strong:rgba(255,255,255,.22); --Dash-Stroke-Weak:rgba(255,255,255,.10);
-  --Dash-Text-Primary:#ffffff; --Dash-Text-Strong:#ffffff; --Dash-Text-Weak:#c3c2b7; --Dash-Text-Disabled:#898781;
-  --Dash-Shading-Strong:rgba(0,0,0,.6); --Dash-Shading-Weak:rgba(0,0,0,.4); }
+.tema-oscuro { --bg:#0a0f14; --bg2:#0d151b; --card:rgba(18,28,36,.78); --card-solid:#101920; --borde:rgba(45,212,191,.16);
+  --borde2:rgba(255,255,255,.07); --tx:#e9f2f3; --tx2:#a9b7bf; --tx3:#6f7f8a; --acc:#2dd4bf; --acc-soft:rgba(45,212,191,.14);
+  --pos:#34d399; --pos-soft:rgba(52,211,153,.14); --neg:#f87171; --neg-soft:rgba(248,113,113,.14); --sombra:0 8px 30px rgba(0,0,0,.35);
+  --glow:radial-gradient(1200px 500px at 10% -10%, rgba(45,212,191,.10), transparent 60%), radial-gradient(900px 400px at 100% 0%, rgba(56,135,229,.07), transparent 60%);
+  color-scheme:dark; }
+.tema-claro { --bg:#f4f1ec; --bg2:#ece7df; --card:#ffffff; --card-solid:#ffffff; --borde:rgba(234,106,31,.18);
+  --borde2:rgba(0,0,0,.07); --tx:#1d232b; --tx2:#4b5563; --tx3:#8b919a; --acc:#ea6a1f; --acc-soft:rgba(234,106,31,.12);
+  --pos:#16a34a; --pos-soft:rgba(22,163,74,.12); --neg:#dc2626; --neg-soft:rgba(220,38,38,.10); --sombra:0 6px 22px rgba(60,40,20,.08);
+  --glow:radial-gradient(1200px 500px at 10% -10%, rgba(234,106,31,.07), transparent 60%);
+  color-scheme:light; }
+.app { --Dash-Fill-Inverse-Strong:var(--card-solid); --Dash-Fill-Interactive-Strong:var(--acc); --Dash-Fill-Interactive-Weak:var(--acc-soft);
+  --Dash-Fill-Primary-Hover:var(--acc-soft); --Dash-Fill-Primary-Active:var(--acc-soft); --Dash-Fill-Disabled:var(--borde2);
+  --Dash-Stroke-Strong:var(--borde); --Dash-Stroke-Weak:var(--borde2); --Dash-Text-Primary:var(--tx); --Dash-Text-Strong:var(--tx);
+  --Dash-Text-Weak:var(--tx2); --Dash-Text-Disabled:var(--tx3); }
 * { box-sizing:border-box; }
 html { scroll-behavior:smooth; }
-body { margin:0; background:#0d0d0d; color:#fff; font-family:system-ui,-apple-system,"Segoe UI",sans-serif; }
-.app { display:flex; min-height:100vh; }
-/* --- menú izquierdo --- */
-.sidebar { position:sticky; top:0; height:100vh; overflow-y:auto; width:268px; flex:0 0 268px; background:#141413;
-  border-right:1px solid rgba(255,255,255,.08); padding:20px 18px 28px; }
-.brand-row { display:flex; gap:10px; align-items:center; margin-bottom:14px; }
-.logo { width:34px; height:34px; border-radius:9px; background:rgba(57,135,229,.18); color:#9ec5f4; display:inline-flex;
-  align-items:center; justify-content:center; font-size:18px; }
-.brand { font-weight:700; font-size:16px; } .brand-sub { color:#898781; font-size:12px; }
-.side-blk { padding:14px 0 12px; border-top:1px solid rgba(255,255,255,.07); }
-.side-lbl { font-size:11px; font-weight:650; letter-spacing:.08em; text-transform:uppercase; color:#9ec5f4; margin-bottom:9px; }
-.lista label { display:flex !important; align-items:center; gap:8px; padding:5px 8px; border-radius:7px; color:#c3c2b7;
+body { margin:0; font-family:Inter,system-ui,-apple-system,"Segoe UI",sans-serif; -webkit-font-smoothing:antialiased; }
+.app { min-height:100vh; background:var(--glow), var(--bg); background-attachment:fixed; color:var(--tx); }
+.ic { display:inline-block; width:18px; height:18px; background:currentColor; flex:0 0 auto; }
+%%ICONOS%%
+/* --- riel izquierdo --- */
+.rail { position:fixed; left:0; top:0; bottom:0; width:68px; z-index:40; display:flex; flex-direction:column; align-items:center;
+  padding:16px 0; background:var(--bg2); border-right:1px solid var(--borde2); }
+.rail-logo { text-decoration:none; margin-bottom:22px; }
+.mark { width:38px; height:38px; border-radius:11px; display:flex; align-items:center; justify-content:center; font-weight:800;
+  font-size:18px; color:var(--bg); background:linear-gradient(135deg,var(--acc),#5eead4); }
+.tema-claro .mark { background:linear-gradient(135deg,var(--acc),#f6a15e); color:#fff; }
+.rail-nav { display:flex; flex-direction:column; gap:6px; }
+.rail-foot { margin-top:auto; display:flex; flex-direction:column; gap:6px; }
+.rail-btn { position:relative; width:42px; height:42px; border-radius:11px; display:flex; align-items:center; justify-content:center;
+  color:var(--tx3); background:none; border:0; cursor:pointer; text-decoration:none; }
+.rail-btn:hover { color:var(--acc); background:var(--acc-soft); }
+.tip { position:absolute; left:52px; white-space:nowrap; background:var(--card-solid); color:var(--tx); border:1px solid var(--borde);
+  font-size:12px; padding:5px 9px; border-radius:7px; opacity:0; pointer-events:none; transform:translateX(-4px); transition:.15s; box-shadow:var(--sombra); }
+.rail-btn:hover .tip { opacity:1; transform:none; }
+/* --- panel de filtros --- */
+.overlay { position:fixed; inset:0; background:rgba(0,0,0,.35); opacity:0; pointer-events:none; transition:.2s; z-index:45; }
+.overlay.abierto { opacity:1; pointer-events:auto; }
+.drawer { position:fixed; top:0; bottom:0; left:68px; width:300px; z-index:50; overflow-y:auto; padding:18px 18px 26px;
+  background:var(--card-solid); border-right:1px solid var(--borde); box-shadow:var(--sombra);
+  transform:translateX(calc(-100% - 90px)); visibility:hidden; transition:transform .25s ease, visibility .25s; }
+.drawer.abierto { transform:none; visibility:visible; }
+.dr-head { display:flex; align-items:center; justify-content:space-between; }
+.dr-title { display:flex; gap:8px; align-items:center; font-weight:700; font-size:15px; color:var(--acc); }
+.dr-sub { color:var(--tx3); font-size:12px; margin:6px 0 10px; }
+.icon-btn { background:none; border:0; color:var(--tx3); cursor:pointer; padding:6px; border-radius:8px; display:flex; }
+.icon-btn:hover { color:var(--tx); background:var(--acc-soft); }
+.f-blk { padding:13px 0; border-top:1px solid var(--borde2); }
+.f-lbl { font-size:10.5px; font-weight:700; letter-spacing:.09em; text-transform:uppercase; color:var(--tx3); margin-bottom:9px; }
+.lista label { display:flex !important; align-items:center; gap:8px; padding:6px 9px; border-radius:8px; color:var(--tx2);
   font-size:13px; cursor:pointer; margin:1px 0; }
-.lista label:hover { background:rgba(255,255,255,.05); }
-.lista label:has(input:checked) { background:rgba(57,135,229,.16); color:#fff; }
-.lista input { accent-color:#3987e5; margin:0; }
-.pills { display:flex; flex-wrap:wrap; gap:6px; }
-.pills label { display:inline-flex !important; align-items:center; padding:5px 11px; border-radius:999px; font-size:12.5px;
-  color:#c3c2b7; border:1px solid rgba(255,255,255,.12); cursor:pointer; user-select:none; margin:0; }
-.pills label:hover { background:rgba(255,255,255,.06); }
-.pills label:has(input:checked) { background:rgba(57,135,229,.20); border-color:rgba(57,135,229,.55); color:#fff; }
-.pills input { position:absolute; opacity:0; width:0; height:0; }
-.pills.meses label { width:calc(25% - 5px); justify-content:center; padding:5px 0; }
+.lista label:hover { background:var(--acc-soft); }
+.lista label:has(input:checked) { background:var(--acc-soft); color:var(--tx); font-weight:600; }
+.lista input { accent-color:var(--acc); margin:0; }
+.pills, .seg { display:flex; flex-wrap:wrap; gap:6px; }
+.pills label, .seg label { display:inline-flex !important; align-items:center; justify-content:center; padding:5px 11px; border-radius:999px;
+  font-size:12.5px; color:var(--tx2); border:1px solid var(--borde2); cursor:pointer; user-select:none; margin:0; }
+.seg label { border-radius:8px; flex:1 1 calc(50% - 6px); }
+.pills label:hover, .seg label:hover { border-color:var(--borde); }
+.pills label:has(input:checked), .seg label:has(input:checked) { background:var(--acc-soft); border-color:var(--acc); color:var(--tx); font-weight:600; }
+.pills input, .seg input { position:absolute; opacity:0; width:0; height:0; }
+.pills.meses label { width:calc(25% - 5px); padding:5px 0; }
 .mini-row { display:flex; gap:6px; margin-top:8px; }
-.mini { background:none; border:1px solid rgba(255,255,255,.12); color:#898781; border-radius:6px; font-size:11.5px;
-  padding:3px 9px; cursor:pointer; } .mini:hover { color:#fff; }
-.upload { border:1px dashed rgba(255,255,255,.2); border-radius:9px; padding:10px; text-align:center; font-size:12px;
-  color:#898781; cursor:pointer; } .upload:hover { border-color:#3987e5; color:#c3c2b7; }
-.fuente { color:#898781; font-size:11.5px; margin-top:8px; word-break:break-all; }
+.mini { background:none; border:1px solid var(--borde2); color:var(--tx3); border-radius:6px; font-size:11.5px; padding:3px 9px; cursor:pointer; }
+.mini:hover { color:var(--tx); }
+.upload { display:flex; gap:6px; align-items:center; justify-content:center; border:1px dashed var(--borde); border-radius:9px; padding:10px;
+  font-size:12.5px; color:var(--tx2); cursor:pointer; } .upload:hover { border-color:var(--acc); color:var(--acc); }
+.fuente { color:var(--tx3); font-size:11.5px; margin-top:8px; word-break:break-all; }
+.btn-sec { width:100%; margin-top:14px; padding:9px; border-radius:9px; border:1px solid var(--borde2); background:none; color:var(--tx2); cursor:pointer; font:inherit; font-size:12.5px; }
+.btn-sec:hover { border-color:var(--acc); color:var(--acc); }
 /* --- contenido --- */
-.main { flex:1; min-width:0; padding:0 28px 40px; }
-header.top { position:sticky; top:0; z-index:20; background:rgba(13,13,13,.94); backdrop-filter:blur(4px); display:flex;
-  align-items:center; gap:14px; flex-wrap:wrap; padding:16px 0 12px; border-bottom:1px solid #2c2c2a; margin-bottom:18px; }
-h1 { font-size:20px; font-weight:650; margin:0 0 6px; }
-.chips { display:flex; gap:6px; flex-wrap:wrap; }
-.chip { font-size:11.5px; color:#c3c2b7; border:1px solid rgba(255,255,255,.12); border-radius:999px; padding:2px 9px; }
-nav.secs { display:flex; gap:4px; margin-left:auto; flex-wrap:wrap; }
-nav.secs a { color:#c3c2b7; text-decoration:none; font-size:12.5px; padding:5px 11px; border-radius:999px; }
-nav.secs a:hover { background:rgba(255,255,255,.06); color:#fff; }
-section.bloque { margin-top:30px; scroll-margin-top:90px; }
-.sec-head { display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:12px; }
-.sec-head h2 { font-size:17px; font-weight:650; margin:0; }
-.sub { color:#898781; font-size:12.5px; }
-h3.med { font-size:12.5px; font-weight:650; color:#9ec5f4; letter-spacing:.06em; text-transform:uppercase; margin:20px 0 10px; }
-.grid { display:grid; gap:14px; margin-bottom:14px; }
-.kpis { grid-template-columns:repeat(7,minmax(0,1fr)); }
-@media (max-width:1500px) { .kpis { grid-template-columns:repeat(4,minmax(0,1fr)); } }
-.kpi .v { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.g-2 { grid-template-columns:1fr 1fr; } .g-2-1 { grid-template-columns:2fr 1fr; } .g-3 { grid-template-columns:repeat(3,1fr); }
-@media (max-width:1250px) { .g-2,.g-2-1,.g-3 { grid-template-columns:1fr; } }
-.card { background:#1a1a19; border:1px solid rgba(255,255,255,.10); border-radius:12px; }
-.graf { padding:6px; overflow:hidden; }
-.kpi { padding:15px 17px; }
-.kpi .t { color:#c3c2b7; font-size:12px; margin-bottom:8px; display:flex; align-items:center; gap:7px; }
-.kpi .t i { width:22px; height:22px; border-radius:6px; display:inline-flex; align-items:center; justify-content:center;
-  font-style:normal; font-size:12px; background:rgba(57,135,229,.16); color:#9ec5f4; }
-.kpi .v { font-size:clamp(17px,1.45vw,24px); font-weight:650; letter-spacing:-.02em; }
-.kpi .d { font-size:12px; margin-top:7px; color:#898781; }
-b.up,b.down,b.neu { font-weight:600; padding:2px 7px; border-radius:999px; font-size:11.5px; margin-right:4px; }
-.up { color:#7dd87d; background:rgba(12,163,12,.14); } .down { color:#f09a9a; background:rgba(208,59,59,.16); }
-.neu { color:#898781; background:rgba(137,135,129,.15); }
+.main { margin-left:68px; padding:0 34px 40px; max-width:1680px; }
+header.top { position:sticky; top:0; z-index:30; display:flex; align-items:center; gap:18px; padding:16px 0 14px; margin-bottom:6px;
+  background:linear-gradient(var(--bg) 70%, transparent); }
+.brand { font-size:28px; font-weight:800; letter-spacing:.14em; line-height:1;
+  background:linear-gradient(90deg,var(--acc),#5eead4 60%,#7cc4ff); -webkit-background-clip:text; background-clip:text; color:transparent; }
+.tema-claro .brand { background:linear-gradient(90deg,#c2410c,var(--acc) 50%,#f6a15e); -webkit-background-clip:text; background-clip:text; }
+.brand-sub { color:var(--tx3); font-size:12.5px; margin-top:5px; letter-spacing:.02em; }
+.top-right { margin-left:auto; display:flex; align-items:center; gap:10px; flex-wrap:wrap; justify-content:flex-end; }
+.chips { display:flex; gap:6px; flex-wrap:wrap; cursor:pointer; justify-content:flex-end; }
+.chip { font-size:11.5px; color:var(--tx2); background:var(--card); border:1px solid var(--borde2); border-radius:999px; padding:4px 10px; }
+.chip b { color:var(--tx3); font-weight:500; margin-right:4px; }
+.btn-filtros { display:flex; align-items:center; gap:7px; padding:8px 14px; border-radius:10px; font:inherit; font-size:13px; font-weight:600;
+  color:var(--acc); background:var(--acc-soft); border:1px solid var(--borde); cursor:pointer; }
+.btn-filtros:hover { border-color:var(--acc); }
+section.bloque { margin-top:30px; scroll-margin-top:86px; }
+.sec-head { display:flex; align-items:center; gap:14px; flex-wrap:wrap; margin-bottom:14px; }
+.num { font-size:12px; font-weight:700; color:var(--acc); background:var(--acc-soft); border:1px solid var(--borde); border-radius:8px; padding:5px 8px; }
+.sec-head h2 { font-size:19px; font-weight:700; margin:0; letter-spacing:-.01em; }
+.sec-sub { color:var(--tx3); font-size:13px; margin:3px 0 0; }
+.grid { display:grid; gap:16px; margin-bottom:16px; }
+.g-2 { grid-template-columns:1fr 1fr; } .g-2-1 { grid-template-columns:minmax(0,2fr) minmax(0,1fr); } .g-3 { grid-template-columns:repeat(3,minmax(0,1fr)); }
+@media (max-width:1200px) { .g-2,.g-2-1,.g-3 { grid-template-columns:1fr; } }
+.card { position:relative; background:var(--card); border:1px solid var(--borde); border-radius:16px; box-shadow:var(--sombra);
+  backdrop-filter:blur(6px); }
+.panel { padding:16px 18px 10px; min-width:0; }
+.panel-head { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; margin-bottom:4px; }
+.panel h3 { font-size:14.5px; font-weight:650; margin:0; color:var(--tx); }
+.ayuda { color:var(--tx3); font-size:12px; margin:4px 0 0; line-height:1.45; }
+.mini-panel .ayuda { display:none; }
+/* KPIs */
+.kpis { display:grid; gap:16px; grid-template-columns:minmax(0,1.35fr) repeat(3,minmax(0,1fr)); grid-template-rows:auto auto; }
+@media (max-width:1200px) { .kpis { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+.kpi { padding:16px 18px; overflow:hidden; }
+.kpi::after { content:""; position:absolute; top:-1px; right:-1px; width:26px; height:26px; border-top-right-radius:16px;
+  background:linear-gradient(225deg,var(--acc) 50%,transparent 51%); opacity:.9; }
+.kpi .t { display:flex; align-items:center; gap:9px; color:var(--tx2); font-size:12.5px; font-weight:500; }
+.kpi .t .ico { width:28px; height:28px; border-radius:8px; display:flex; align-items:center; justify-content:center; background:var(--acc-soft); color:var(--acc); }
+.kpi .t .ico .ic { width:15px; height:15px; }
+.kpi .v { font-size:clamp(20px,1.8vw,28px); font-weight:750; letter-spacing:-.02em; margin:12px 0 6px; white-space:nowrap; font-variant-numeric:tabular-nums; }
+.kpi .aa { font-size:12px; color:var(--tx3); display:flex; gap:6px; align-items:center; flex-wrap:wrap; }
+.kpi .pie-k { font-size:11.5px; color:var(--tx3); margin-top:8px; padding-top:8px; border-top:1px dashed var(--borde2); }
+.kpi.hero { grid-row:span 2; display:flex; flex-direction:column; }
+.kpi.hero .v { font-size:clamp(28px,2.6vw,40px); }
+.kpi.hero .spark { margin-top:auto; }
+.badge { font-weight:650; padding:2px 8px; border-radius:999px; font-size:11.5px; }
+.badge.up { color:var(--pos); background:var(--pos-soft); } .badge.down { color:var(--neg); background:var(--neg-soft); }
+.badge.neu { color:var(--tx3); background:var(--borde2); }
+/* controles */
 .ctls { display:flex; gap:12px; margin-left:auto; flex-wrap:wrap; }
-.ctl { display:flex; flex-direction:column; gap:4px; min-width:230px; }
-.ctl label { font-size:10.5px; letter-spacing:.08em; color:#898781; font-weight:650; }
-.comp { padding:18px 20px; display:flex; flex-direction:column; gap:14px; justify-content:center; }
-.comp .row { display:flex; justify-content:space-between; align-items:baseline; border-bottom:1px solid rgba(255,255,255,.07);
-  padding-bottom:10px; } .comp .row:last-child { border:0; }
-.comp .k { color:#c3c2b7; font-size:12.5px; } .comp .n { font-size:20px; font-weight:650; }
-.comp .note { color:#898781; font-size:12px; line-height:1.45; }
-.btn { margin-left:auto; background:rgba(57,135,229,.16); color:#9ec5f4; border:1px solid rgba(57,135,229,.4);
-  border-radius:8px; padding:7px 14px; font-size:12.5px; cursor:pointer; } .btn:hover { background:rgba(57,135,229,.28); }
-.tabla-wrap { overflow:auto; max-height:640px; }
-table.t { border-collapse:collapse; width:100%; font-size:12.5px; font-variant-numeric:tabular-nums; }
-table.t th { position:sticky; top:0; background:#222220; color:#c3c2b7; font-weight:600; text-align:right; padding:9px 14px;
-  border-bottom:1px solid rgba(255,255,255,.12); }
+.ctl { display:flex; flex-direction:column; gap:5px; min-width:220px; }
+.ctl-sm { min-width:110px; }
+.ctl label { font-size:10.5px; letter-spacing:.09em; color:var(--tx3); font-weight:700; }
+/* lectura por año */
+table.lect { width:100%; border-collapse:collapse; font-size:12.5px; margin-top:10px; font-variant-numeric:tabular-nums; }
+table.lect th { text-align:right; color:var(--tx3); font-weight:600; font-size:11px; letter-spacing:.04em; padding:6px 6px; border-bottom:1px solid var(--borde2); }
+table.lect td { text-align:right; padding:10px 6px; border-bottom:1px solid var(--borde2); color:var(--tx); }
+table.lect th:first-child, table.lect td:first-child { text-align:left; }
+.dot { display:inline-block; width:9px; height:9px; border-radius:50%; margin-right:7px; }
+.lect-nota { color:var(--tx3); font-size:12px; line-height:1.5; margin-top:12px; }
+.lect-nota b { color:var(--tx); }
+.leyenda { display:flex; gap:14px; margin-left:auto; flex-wrap:wrap; font-size:12px; color:var(--tx2); }
+.leyenda span { display:flex; align-items:center; }
+/* tabla */
+.btn-pri { margin-left:auto; display:flex; align-items:center; gap:7px; background:var(--acc); color:var(--bg); border:0; border-radius:10px;
+  padding:9px 15px; font:inherit; font-size:13px; font-weight:650; cursor:pointer; }
+.tema-claro .btn-pri { color:#fff; }
+.btn-pri:hover { filter:brightness(1.08); }
+.tabla-wrap { overflow:auto; max-height:620px; }
+table.t { border-collapse:collapse; width:100%; font-size:13px; font-variant-numeric:tabular-nums; }
+table.t th { position:sticky; top:0; background:var(--card-solid); color:var(--tx3); font-weight:600; text-align:right; padding:12px 16px;
+  border-bottom:1px solid var(--borde); font-size:12px; }
 table.t th:first-child, table.t td:first-child { text-align:left; }
-table.t td { padding:7px 14px; text-align:right; border-bottom:1px solid rgba(255,255,255,.05); color:#e9e8e3; }
-table.t tr:hover td { background:rgba(255,255,255,.03); }
-table.t td.tot, table.t th.tot { font-weight:650; color:#fff; background:rgba(57,135,229,.07); }
-.aviso { background:rgba(250,178,25,.12); color:#fab219; border:1px solid rgba(250,178,25,.3); border-radius:10px;
-  padding:10px 14px; margin-bottom:14px; font-size:13px; }
+table.t td { padding:9px 16px; text-align:right; border-bottom:1px solid var(--borde2); color:var(--tx); }
+table.t tr:hover td { background:var(--acc-soft); }
+table.t .tot { font-weight:700; color:var(--acc); }
+.aviso { background:rgba(250,178,25,.12); color:#d99a12; border:1px solid rgba(250,178,25,.35); border-radius:10px; padding:10px 14px; margin:8px 0; font-size:13px; }
+.pie { color:var(--tx3); font-size:11.5px; margin-top:28px; text-align:center; }
 </style></head>
-<body>{%app_entry%}<footer>{%config%}{%scripts%}{%renderer%}</footer></body></html>"""
+<body>{%app_entry%}<footer>{%config%}{%scripts%}{%renderer%}</footer></body></html>""".replace("%%ICONOS%%", CSS_ICONOS)
 
 
-# ---- Callbacks ------------------------------------------------------------------------
+# ---- Callbacks de interfaz (en el navegador) ------------------------------------------
+app.clientside_callback(
+    """function(a, b, c, d, e, cls) {
+        const t = (dash_clientside.callback_context.triggered[0] || {}).prop_id || '';
+        const cerrar = t.startsWith('btn-cerrar') || t.startsWith('overlay');
+        const abrir = !cerrar && !(cls || '').includes('abierto');
+        return [abrir ? 'drawer abierto' : 'drawer', abrir ? 'overlay abierto' : 'overlay'];
+    }""",
+    Output("drawer", "className"), Output("overlay", "className"),
+    Input("btn-filtros", "n_clicks"), Input("rail-filtros", "n_clicks"), Input("btn-cerrar", "n_clicks"),
+    Input("overlay", "n_clicks"), Input("chips", "n_clicks"), State("drawer", "className"), prevent_initial_call=True)
+
+app.clientside_callback(
+    """function(n, tema) { return n ? (tema === 'claro' ? 'oscuro' : 'claro') : (tema || 'oscuro'); }""",
+    Output("tema", "data"), Input("btn-tema", "n_clicks"), State("tema", "data"))
+
+app.clientside_callback("""function(tema) { return 'app tema-' + (tema || 'oscuro'); }""",
+                        Output("app", "className"), Input("tema", "data"))
+
+
 @app.callback(Output("f-mes", "value"), Input("btn-mes-todos", "n_clicks"), Input("btn-mes-nada", "n_clicks"),
               prevent_initial_call=True)
 def _meses_rapidos(_a, _b):
     return list(range(1, 13)) if ctx.triggered_id == "btn-mes-todos" else []
 
 
+@app.callback(Output("f-concepto", "value"), Output("f-var", "value"), Output("f-ramo", "value", allow_duplicate=True),
+              Output("f-anio", "value", allow_duplicate=True), Output("f-mes", "value", allow_duplicate=True),
+              Output("f-unidad", "value"), Input("btn-reset", "n_clicks"), prevent_initial_call=True)
+def _reset(_n):
+    _, ramos, anios = catalogos(ESTADO["df"])
+    conceptos = catalogos(ESTADO["df"])[0]
+    return ("RFV NETO" if "RFV NETO" in conceptos else conceptos[0]), "RAM", ramos, anios[-1:], list(range(1, 13)), "Millones"
+
+
 @app.callback(Output("version", "data"), Output("f-concepto", "options"), Output("f-ramo", "options"),
               Output("f-ramo", "value"), Output("f-anio", "options"), Output("f-anio", "value"),
               Output("est-anios", "options"), Output("est-anios", "value"),
+              Output("est-ramo-anio", "options"), Output("est-ramo-anio", "value"),
               Input("upload", "contents"), State("upload", "filename"), State("version", "data"),
               prevent_initial_call=True)
 def _subir(contents, nombre, ver):
     if not contents:
-        return (no_update,) * 8
+        return (no_update,) * 10
     try:
         df = cargar(base64.b64decode(contents.split(",", 1)[1]))
     except Exception as e:  # archivo con otro formato
         ESTADO["error"] = f"No pude leer {nombre}: {e}"
-        return (ver + 1,) + (no_update,) * 7
+        return (ver + 1,) + (no_update,) * 9
     ESTADO.update(df=df, origen=nombre, error="")
     conceptos, ramos, anios = catalogos(df)
-    return (ver + 1, conceptos, [{"label": f"Ramo {r}", "value": r} for r in ramos], ramos, anios, anios[-1:],
-            [{"label": str(a), "value": a} for a in anios], anios)
+    return (ver + 1, conceptos, [{"label": r, "value": r} for r in ramos], ramos, anios, anios[-1:],
+            [{"label": str(a), "value": a} for a in anios], anios, anios, anios[-1])
 
 
 ENTRADAS = [Input("f-concepto", "value"), Input("f-var", "value"), Input("f-ramo", "value"),
-            Input("f-anio", "value"), Input("f-mes", "value"), Input("f-unidad", "value"), Input("version", "data")]
+            Input("f-anio", "value"), Input("f-mes", "value"), Input("f-unidad", "value"),
+            Input("version", "data"), Input("tema", "data")]
 
 
+# ---- Callback principal ---------------------------------------------------------------
 @app.callback(
-    Output("chips", "children"), Output("aviso", "children"), Output("fuente", "children"), Output("kpis", "children"),
-    Output("sub-mens", "children"), Output("g-mens", "figure"), Output("g-donut", "figure"), Output("g-mom", "figure"),
-    Output("g-conc", "figure"), Output("sub-vars", "children"),
-    *[Output(f"g-v{i}", "figure") for i in range(6)],
-    Output("sub-tabla", "children"), Output("tabla", "children"),
+    Output("chips", "children"), Output("aviso", "children"), Output("fuente", "children"), Output("pie", "children"),
+    Output("kpis", "children"),
+    Output("t-mens", "children"), Output("g-mens", "figure"), Output("t-ramo", "children"), Output("g-ramo", "figure"),
+    Output("g-mom", "figure"), Output("t-conc", "children"), Output("g-conc", "figure"),
+    *[Output(f"g-v{i}", "figure") for i in range(6)], Output("ramo-leyenda", "children"), Output("tabla", "children"),
     *ENTRADAS)
-def actualizar(concepto, var, ramos, anios, meses, unidad, _ver):
+def actualizar(concepto, var, ramos, anios, meses, unidad, _ver, tema):
+    T = TEMAS.get(tema or "oscuro", TEMAS["oscuro"])
     df = ESTADO["df"]
+    _, ramos_todos, anios_todos = catalogos(df)
     ramos, anios, meses = sorted(ramos or []), sorted(anios or []), sorted(meses or [])
     div, suf = UNIDADES[unidad]
     ratio = var in RATIOS
     lbl = VARIABLES[var]
+    yu = f"{unidad} de pesos" if unidad != "Pesos" else "Pesos"
     aviso = html.Div(ESTADO["error"], className="aviso") if ESTADO["error"] else None
     fuente = f"Fuente: {ESTADO['origen']}" if ESTADO["origen"] else ""
+    pie = f"PRISMA · {ESTADO['origen'] or 'sin archivo'} · actualizado {datetime.now():%d/%m/%Y %H:%M}"
     per_txt = (f"{anios[0]}–{anios[-1]}" if len(anios) > 1 else str(anios[0])) if anios else "—"
-    chips = [html.Span(t, className="chip") for t in
-             [concepto, lbl, "Ramos " + (", ".join(ramos) if ramos else "—"), per_txt, unidad]]
+    mes_txt = "Todos" if len(meses) == 12 else (", ".join(MESES[m - 1] for m in meses) if meses else "—")
+    chips = [html.Span([html.B(k), v], className="chip") for k, v in
+             [("Concepto", concepto), ("Variable", lbl), ("Ramos", ", ".join(ramos) if ramos else "—"),
+              ("Año", per_txt), ("Mes", mes_txt), ("En", unidad)]]
     if not (ramos and anios and meses and concepto):
-        v = vacia()
-        return (chips, aviso, fuente, [], "", v, v, v, v, "", *[v] * 6, "", html.Div("Sin datos", className="sub"))
-
-    todos = sorted(df["ANIO"].unique())
-    yu = f"{unidad} MXN"
+        v = vacia(T)
+        return (chips, aviso, fuente, pie, [], lbl, v, "Por ramo", v, v, "Comparativo de conceptos", v,
+                *[v] * 6, None, html.Div("Sin datos", className="ayuda", style={"padding": "16px"}))
 
     # --- KPIs ---
-    def kpi(variable, icono):
+    def kpi(variable, icono, hero=False):
         r = variable in RATIOS
         if variable in FLUJOS:
             act = serie(df, concepto, variable, ramos, anios[-1:], meses)["VALOR"].sum()
@@ -497,91 +674,136 @@ def actualizar(concepto, var, ramos, anios, meses, unidad, _ver):
             prev = prev_s["VALOR"].sum() if not prev_s.empty else None
             det = f"Acumulado {anios[-1]}"
         else:
-            s = serie(df, concepto, variable, ramos, todos, list(range(1, 13)), por=("PERIODO",))
+            s = serie(df, concepto, variable, ramos, anios_todos, list(range(1, 13)), por=("PERIODO",))
             s = s.dropna(subset=["VALOR"]).set_index("PERIODO")["VALOR"]
             dentro = [p for p in s.index if p // 100 in anios and p % 100 in meses]
-            if not dentro:
-                act = prev = None
-                det = "Sin dato"
-            else:
+            act = prev = None
+            det = "Sin dato"
+            if dentro:
                 p = max(dentro)
                 act, prev = s.get(p), s.get(p - 100)
-                det = f"Cierre {MESES[p % 100 - 1]} {p // 100}"
-        badge = html.B("s/c", className="neu")
-        if act is not None and prev not in (None, 0) and not pd.isna(prev):
+                det = f"Saldo al cierre de {MESES[p % 100 - 1]} {p // 100}"
+        badge, aa = html.Span("sin comparativo", className="badge neu"), "AA: N/A"
+        if act is not None and prev is not None and not pd.isna(prev) and prev != 0:
             dv = (act - prev) * 100 if r else (act / prev - 1) * 100
-            badge = html.B(f"{'+' if dv >= 0 else '−'}{abs(dv):.1f}{' pp' if r else '%'}",
-                           className="up" if dv >= 0 else "down")
-        corto = {"MA": "MA", "PT": "PT del mes", "RAM": "Reserva"}.get(variable, VARIABLES[variable])
-        return html.Div([html.Div([html.I(icono), corto], className="t"),
-                         html.Div(fmt(act, unidad, r), className="v"),
-                         html.Div([badge, f"vs año ant. · {det}"], className="d")], className="card kpi")
+            badge = html.Span(f"{'▲' if dv >= 0 else '▼'} {abs(dv):.1f}{' pp' if r else '%'}",
+                              className="badge " + ("up" if dv >= 0 else "down"))
+            aa = f"AA: {fmt(prev, unidad, r)}"
+        hijos = [html.Div([html.Span(ic(icono), className="ico"), VARIABLES[variable]], className="t"),
+                 html.Div(fmt(act, unidad, r), className="v"),
+                 html.Div([html.Span(aa), badge], className="aa"),
+                 html.Div(det, className="pie-k")]
+        if hero:
+            s = serie(df, concepto, variable, ramos, anios, meses).sort_values("FECHA")
+            f = go.Figure(go.Scatter(x=s["FECHA"], y=s["VALOR"] / div, mode="lines", fill="tozeroy",
+                                     line=dict(color=T["accent"], width=2.5, shape="spline"),
+                                     hovertemplate="%{x|%m/%Y}: %{y:,.1f}" + suf + "<extra></extra>"))
+            f.update_traces(fillcolor=_alpha(T["accent"], 0.15))
+            f.update_layout(height=120, margin=dict(l=0, r=0, t=6, b=0), paper_bgcolor="rgba(0,0,0,0)",
+                            plot_bgcolor="rgba(0,0,0,0)", showlegend=False, hovermode="x")
+            f.update_xaxes(visible=False, fixedrange=True)
+            f.update_yaxes(visible=False, fixedrange=True, range=[s["VALOR"].min() / div * 0.9, s["VALOR"].max() / div * 1.04]
+                           if s["VALOR"].notna().any() else None)
+            hijos.insert(3, html.Div([html.Div("Tendencia del periodo filtrado", className="ayuda"),
+                                      dcc.Graph(figure=f, config={"displayModeBar": False}, style={"height": "120px"})],
+                                     className="spark"))
+        return html.Div(hijos, className="card kpi" + (" hero" if hero else ""))
 
-    kpis = [kpi(v, i) for v, i in [("RAM", "◆"), ("PRIMA 24M", "◷"), ("PR 24M", "◔"), ("MA", "▣"),
-                                    ("RFV MA", "◈"), ("CESION", "⇄"), ("PT", "＄")]]
+    kpis = [kpi("RAM", "escudo", hero=True), kpi("PRIMA 24M", "reloj"), kpi("PR 24M", "pie"), kpi("MA", "maletin"),
+            kpi("RFV MA", "sube"), kpi("CESION", "cesion"), kpi("PT", "peso")]
 
-    # --- Mensualización ---
+    # --- Monto por mes ---
+    tot = serie(df, concepto, var, ramos, anios, meses).sort_values("FECHA")
+    yv = tot["VALOR"] if ratio else tot["VALOR"] / div
     fig = go.Figure()
-    tot = serie(df, concepto, var, ramos, anios, meses)
-    if ratio:
-        for r in ramos:
-            s = serie(df, concepto, var, [r], anios, meses)
-            fig.add_scatter(x=s["FECHA"], y=s["VALOR"], name=f"Ramo {r}", mode="lines+markers",
-                            line=dict(color=COL_RAMO.get(r), width=2), marker=dict(size=7),
-                            hovertemplate="%{y:.1%}")
-        fig.add_scatter(x=tot["FECHA"], y=tot["VALOR"], name="Total ponderado", mode="lines",
-                        line=dict(color=TXT, width=2, dash="dot"), hovertemplate="%{y:.1%}")
-    else:
-        for r in ramos:
-            s = serie(df, concepto, var, [r], anios, meses)
-            fig.add_bar(x=s["FECHA"], y=s["VALOR"] / div, name=f"Ramo {r}", marker_color=COL_RAMO.get(r),
-                        marker_line=dict(color=CARD, width=1), hovertemplate="%{y:,.1f}" + suf)
-        fig.add_scatter(x=tot["FECHA"], y=tot["VALOR"] / div, mode="text", showlegend=False, name="Total",
-                        text=[f"{v:,.0f}" if len(tot) <= 15 else "" for v in tot["VALOR"] / div],
-                        textposition="top center", textfont=dict(color=TXT2, size=10),
-                        hovertemplate="<b>Total %{y:,.1f}" + suf + "</b>")
-        fig.update_layout(barmode="stack")
-    estilo(fig, 420, f"{lbl} mensual por ramo", None if ratio else yu, ratio)
+    etiquetas = [(f"{v * 100:.1f}%" if ratio else f"{v:,.1f}") if pd.notna(v) else "" for v in yv]
+    etiquetas = [e if len(tot) <= (24 if not ratio else 12) else "" for e in etiquetas]
+    for a in anios:
+        m = tot["FECHA"].dt.year == a
+        if ratio:
+            fig.add_scatter(x=tot.loc[m, "FECHA"], y=yv[m], name=str(a), mode="lines+markers+text",
+                            line=dict(color=color_anio(a, anios_todos, T), width=2.5), marker=dict(size=8),
+                            text=[e for e, k in zip(etiquetas, m) if k], textposition="top center",
+                            textfont=dict(color=T["text2"], size=10), hovertemplate="%{y:.2%}<extra>" + str(a) + "</extra>")
+        else:
+            fig.add_bar(x=tot.loc[m, "FECHA"], y=yv[m], name=str(a), marker_color=color_anio(a, anios_todos, T),
+                        marker_cornerradius=5, text=[e for e, k in zip(etiquetas, m) if k], textposition="outside",
+                        textfont=dict(color=T["text2"], size=10), cliponaxis=False,
+                        hovertemplate="%{y:,.1f}" + suf + "<extra>" + str(a) + "</extra>")
+    if yv.notna().any():
+        prom = yv.mean()
+        fig.add_hline(y=prom, line=dict(color=T["text3"], width=1.2, dash="dash"),
+                      annotation_text=f"Promedio {prom * 100:.1f}%" if ratio else f"Promedio {prom:,.1f}{suf}",
+                      annotation_position="right", annotation_font=dict(color=T["text"], size=11),
+                      annotation_bgcolor=T["card"], annotation_bordercolor=T["linea"], annotation_borderpad=4)
+    estilo(fig, T, 380, None if ratio else yu, ratio, leyenda=len(anios) > 1)
+    fig.update_layout(margin=dict(r=118))
+    if not ratio and yv.notna().any():
+        fig.update_yaxes(range=[0, yv.max() * 1.15])
     g_mens = fig
+    t_mens = f"{lbl} por mes · {concepto}"
 
-    base = filtrar(df, concepto, "RAM" if ratio else var, ramos, anios, meses)
-    if var in FLUJOS:
-        comp, sub = base.groupby("RAMO", as_index=False)["VALOR"].sum(), "Acumulado"
+    # --- Por ramo (barras horizontales) ---
+    base = filtrar(df, concepto, var, ramos, anios, meses)
+    if ratio:
+        pmax = base["PERIODO"].max()
+        comp = serie(df, concepto, var, ramos, anios, meses, por=("PERIODO", "RAMO"))
+        comp = comp[comp["PERIODO"] == pmax][["RAMO", "VALOR"]]
+        t_ramo = f"Por ramo · cierre {MESES[pmax % 100 - 1]} {pmax // 100}" if pd.notna(pmax) else "Por ramo"
+    elif var in FLUJOS:
+        comp = base.groupby("RAMO", as_index=False)["VALOR"].sum()
+        t_ramo = f"Por ramo · acumulado {per_txt}"
     else:
         pmax = base["PERIODO"].max()
         comp = base[base["PERIODO"] == pmax].groupby("RAMO", as_index=False)["VALOR"].sum()
-        sub = f"Cierre {MESES[pmax % 100 - 1]} {pmax // 100}" if pd.notna(pmax) else ""
-    comp = comp[comp["VALOR"] > 0]
-    fig = go.Figure(go.Pie(labels=["Ramo " + r for r in comp["RAMO"]], values=comp["VALOR"] / div, hole=0.64,
-                           marker=dict(colors=[COL_RAMO.get(r) for r in comp["RAMO"]], line=dict(color=CARD, width=2)),
-                           sort=False, textinfo="percent", textposition="inside", textfont=dict(color="#fff"),
-                           insidetextorientation="horizontal",
-                           hovertemplate="%{label}: %{value:,.1f}" + suf + " (%{percent})<extra></extra>"))
-    fig.add_annotation(text=f"<b>{fmt(comp['VALOR'].sum(), unidad)}</b><br><span style='font-size:11px;color:{TXT3}'>"
-                            f"{sub}</span>", showarrow=False, font=dict(color=TXT, size=17))
-    estilo(fig, 420, "Composición por ramo" + (" · reserva" if ratio else ""))
-    fig.update_layout(hovermode="closest", legend=dict(orientation="h", y=-0.08, x=0.5, xanchor="center", yanchor="top"))
-    g_donut = fig
+        t_ramo = f"Por ramo · cierre {MESES[pmax % 100 - 1]} {pmax // 100}" if pd.notna(pmax) else "Por ramo"
+    comp = comp.dropna().sort_values("VALOR")
+    total_c = comp["VALOR"].sum()
+    if ratio:
+        txt = [f"{v * 100:.1f}%" for v in comp["VALOR"]]
+        xv = comp["VALOR"]
+    else:
+        txt = [f"{v / div:,.1f}{suf} · {v / total_c * 100:.1f}%" if total_c else "" for v in comp["VALOR"]]
+        xv = comp["VALOR"] / div
+    fig = go.Figure(go.Bar(y=["Ramo " + r for r in comp["RAMO"]], x=xv, orientation="h", text=txt,
+                           textposition="outside", cliponaxis=False, textfont=dict(color=T["text2"], size=11),
+                           marker=dict(color=[color_ramo(r, ramos_todos, T) for r in comp["RAMO"]], cornerradius=5),
+                           hovertemplate="%{y}: %{text}<extra></extra>"))
+    estilo(fig, T, 380, leyenda=False, ratio=ratio)
+    fig.update_layout(hovermode="closest", margin=dict(l=8, r=8, t=8, b=8), bargap=0.35)
+    fig.update_xaxes(showticklabels=False, showgrid=False, range=[0, (xv.max() if len(xv) else 1) * 1.6])
+    fig.update_yaxes(gridcolor="rgba(0,0,0,0)", tickfont=dict(color=T["text"], size=12))
+    g_ramo = fig
 
-    t = tot.sort_values("FECHA").copy()
+    # --- Cambio vs mes anterior ---
+    t = tot.copy()
     t["DELTA"] = t["VALOR"].diff() * (100 if ratio else 1 / div)
-    fig = go.Figure(go.Bar(x=t["FECHA"], y=t["DELTA"], name="Variación",
-                           marker_color=[POS if v >= 0 else NEG for v in t["DELTA"].fillna(0)],
+    fig = go.Figure(go.Bar(x=t["FECHA"], y=t["DELTA"], marker_cornerradius=4,
+                           marker_color=[T["pos"] if v >= 0 else T["neg"] for v in t["DELTA"].fillna(0)],
+                           text=[("" if pd.isna(v) else (f"{v:+.2f}" if ratio else f"{v:+,.1f}")) if len(t) <= 24 else ""
+                                 for v in t["DELTA"]], textposition="outside", cliponaxis=False,
+                           textfont=dict(color=T["text2"], size=10),
                            hovertemplate=("%{y:+.2f} pp" if ratio else "%{y:+,.1f}" + suf) + "<extra></extra>"))
-    estilo(fig, 300, f"Variación mes contra mes · {lbl}", "pp" if ratio else unidad, leyenda=False, ytick=",.1f")
+    estilo(fig, T, 250, "pp" if ratio else unidad, leyenda=False, ytick=",.1f")
     g_mom = fig
 
     # --- Conceptos ---
     fig = go.Figure()
-    for c in [c for c in COL_CONCEPTO if c in set(df["CONCEPTO"])]:
-        s = serie(df, c, var, ramos, anios, meses)
-        fig.add_scatter(x=s["FECHA"], y=s["VALOR"] if ratio else s["VALOR"] / div, name=c, mode="lines+markers",
-                        line=dict(color=COL_CONCEPTO[c], width=3 if c == concepto else 2), marker=dict(size=6),
-                        hovertemplate="%{y:.1%}" if ratio else "%{y:,.1f}" + suf)
-    estilo(fig, 400, f"{lbl} por concepto", None if ratio else yu, ratio)
+    for i, c in enumerate([c for c in CONCEPTOS_ORDEN if c in set(df["CONCEPTO"])]):
+        s = serie(df, c, var, ramos, anios, meses).sort_values("FECHA")
+        y = s["VALOR"] if ratio else s["VALOR"] / div
+        col = T["ramos"][i % len(T["ramos"])]
+        fig.add_scatter(x=s["FECHA"], y=y, name=c, mode="lines", line=dict(color=col, width=3.5 if c == concepto else 2),
+                        hovertemplate=("%{y:.1%}" if ratio else "%{y:,.1f}" + suf))
+        if len(s) and pd.notna(y.iloc[-1]):
+            fig.add_annotation(x=s["FECHA"].iloc[-1], y=y.iloc[-1], xanchor="left", xshift=8, showarrow=False,
+                               text=f"<b>{c}</b> {fmt(s['VALOR'].iloc[-1], unidad, ratio)}", font=dict(color=col, size=11))
+    estilo(fig, T, 360, None if ratio else yu, ratio, leyenda=False)
+    fig.update_layout(margin=dict(l=8, r=170, t=10, b=8))
     g_conc = fig
+    t_conc = f"{lbl} por concepto"
 
-    # --- Variables por ramo (small multiples) ---
+    # --- Detalle por ramo (small multiples) ---
     peq = []
     for v in ["RAM", "PRIMA 24M", "PR 24M", "MA", "RFV MA", "CESION"]:
         r_ = v in RATIOS
@@ -591,10 +813,12 @@ def actualizar(concepto, var, ramos, anios, meses, unidad, _ver):
             if s["VALOR"].fillna(0).abs().sum() == 0:
                 continue
             fig.add_scatter(x=s["FECHA"], y=s["VALOR"] if r_ else s["VALOR"] / div, name=f"Ramo {r}", mode="lines",
-                            line=dict(color=COL_RAMO.get(r), width=2),
+                            line=dict(color=color_ramo(r, ramos_todos, T), width=2),
                             hovertemplate="%{y:.1%}" if r_ else "%{y:,.1f}" + suf)
-        estilo(fig, 310, VARIABLES[v], None if r_ else yu, r_, compacto=True)
+        estilo(fig, T, 250, None, r_, leyenda=False, compacto=True)
         peq.append(fig)
+    leyenda = [html.Span([html.I(className="dot", style={"background": color_ramo(r, ramos_todos, T)}), f"Ramo {r}"])
+               for r in ramos]
 
     # --- Tabla ---
     d = filtrar(df, concepto, var, ramos, anios, meses)
@@ -606,125 +830,114 @@ def actualizar(concepto, var, ramos, anios, meses, unidad, _ver):
     filas = [html.Tr([html.Td(f"{MESES[p % 100 - 1]} {p // 100}")] +
                      [html.Td(f_(row[c]), className="tot" if c == "Total" else None) for c in vista.columns])
              for p, row in vista.iterrows()]
-    tabla = html.Table([html.Thead(html.Tr([html.Th("Mes")] + [html.Th(c, className="tot" if c == "Total" else None)
+    tabla = html.Table([html.Thead(html.Tr([html.Th("Mes")] + [html.Th(c + (" (%)" if ratio else f" ({unidad})"),
+                                                                       className="tot" if c == "Total" else None)
                                                                for c in vista.columns])),
                         html.Tbody(filas)], className="t")
 
-    return (chips, aviso, fuente, kpis,
-            f"{concepto} · {lbl} · {'%' if ratio else yu}", g_mens, g_donut, g_mom,
-            g_conc, f"Concepto {concepto} · Cesión en % (total ponderado por reserva)", *peq,
-            f"{lbl} · {concepto} · {'%' if ratio else yu}" + (" · total ponderado" if ratio else ""), tabla)
+    return (chips, aviso, fuente, pie, kpis, t_mens, g_mens, t_ramo, g_ramo, g_mom, t_conc, g_conc, *peq, leyenda, tabla)
 
 
+def _alpha(hex_color, a):
+    h = hex_color.lstrip("#")
+    return f"rgba({int(h[0:2], 16)},{int(h[2:4], 16)},{int(h[4:6], 16)},{a})"
+
+
+# ---- Estacionalidad -------------------------------------------------------------------
 @app.callback(
-    Output("g-heat", "figure"), Output("g-idx", "figure"), Output("g-idx-var", "figure"),
-    Output("g-idx-prima", "figure"), Output("g-comp", "figure"), Output("comp-kpis", "children"),
-    Output("g-idx-ramo", "figure"),
+    Output("t-comp", "children"), Output("a-comp", "children"), Output("g-comp", "figure"),
+    Output("est-stats", "children"), Output("t-heat", "children"), Output("g-heat", "figure"),
+    Output("g-ramo-est", "figure"),
     Input("f-concepto", "value"), Input("f-var", "value"), Input("f-ramo", "value"), Input("f-mes", "value"),
-    Input("f-unidad", "value"), Input("est-anios", "value"), Input("est-prima", "value"), Input("version", "data"))
-def estacionalidad(concepto, var, ramos, meses, unidad, anios, prima, _ver):
+    Input("f-unidad", "value"), Input("est-anios", "value"), Input("est-prima", "value"),
+    Input("est-ramo-anio", "value"), Input("version", "data"), Input("tema", "data"))
+def estacionalidad(concepto, var, ramos, meses, unidad, anios, prima, anio_ramo, _ver, tema):
+    T = TEMAS.get(tema or "oscuro", TEMAS["oscuro"])
     df = ESTADO["df"]
+    _, ramos_todos, anios_todos = catalogos(df)
     ramos, meses, anios = sorted(ramos or []), sorted(meses or []), sorted(anios or [])
+    lbl, lblp = VARIABLES[var], PRIMAS[prima]
     if not (ramos and meses and anios and concepto):
-        v = vacia("Selecciona ramos, meses y al menos un año")
-        return v, v, v, v, v, [], v
+        v = vacia(T, "Elige al menos un año arriba y revisa los filtros")
+        return "Estacionalidad vs. prima", "", v, None, "Monto por mes y año", v, v
     div, suf = UNIDADES[unidad]
     ratio = var in RATIOS
-    lbl, lblp = VARIABLES[var], PRIMAS[prima]
-    todos = sorted(int(a) for a in df["ANIO"].unique())
     xm = [MESES[m - 1] for m in meses]
-    rango_txt = ", ".join(map(str, anios))
+
+    # Variable vs prima, año por año en la misma gráfica
+    iv = indice(df, concepto, var, ramos, anios, meses)
+    ip = indice(df, concepto, prima, ramos, anios, meses)
+    fig = go.Figure()
+    for a in anios:
+        col = color_anio(a, anios_todos, T)
+        fig.add_scatter(x=xm, y=iv.loc[a].values, name=f"{a} · {lbl}", legendgroup=str(a), mode="lines+markers",
+                        line=dict(color=col, width=3), marker=dict(size=8, line=dict(color=T["card"], width=1.5)),
+                        hovertemplate="%{y:.2f}")
+        if prima != var:
+            fig.add_scatter(x=xm, y=ip.loc[a].values, name=f"{a} · {lblp}", legendgroup=str(a), mode="lines+markers",
+                            line=dict(color=col, width=1.8, dash="dot"),
+                            marker=dict(size=7, symbol="circle-open", line=dict(width=1.8)), hovertemplate="%{y:.2f}")
+    fig.add_hline(y=1, line=dict(color=T["text3"], width=1, dash="dash"),
+                  annotation_text="1.00 = mes promedio", annotation_position="bottom right",
+                  annotation_font=dict(color=T["text3"], size=10))
+    estilo(fig, T, 400, "Índice estacional", ytick=".2f")
+    fig.update_layout(legend=dict(y=1.02))
+    g_comp = fig
+    t_comp = f"Estacionalidad: {lbl} vs. {lblp}"
+    a_comp = (f"Línea continua: {lbl} · línea punteada: {lblp}. Cada color es un año. "
+              "Índice 1.10 = ese mes está 10% arriba del promedio de su año.")
+
+    # Lectura por año
+    filas = []
+    for a in anios:
+        v_, p_ = iv.loc[a], ip.loc[a]
+        ok = v_.notna() & p_.notna()
+        corr = v_[ok].corr(p_[ok]) if ok.sum() > 2 else np.nan
+        pico_v = xm[int(np.nanargmax(v_.values))] if v_.notna().any() else "—"
+        pico_p = xm[int(np.nanargmax(p_.values))] if p_.notna().any() else "—"
+        amp = lambda s: f"{s.max() - s.min():.2f}" if s.notna().any() else "—"
+        filas.append(html.Tr([html.Td([html.Span(className="dot", style={"background": color_anio(a, anios_todos, T)}), str(a)]),
+                              html.Td("—" if pd.isna(corr) else f"{corr:+.2f}"),
+                              html.Td(f"{pico_v} / {pico_p}"), html.Td(amp(v_)), html.Td(amp(p_))]))
+    stats = [html.Table([html.Thead(html.Tr([html.Th("Año"), html.Th("Correlación"), html.Th("Mes pico"),
+                                             html.Th("Amplitud var."), html.Th("Amplitud prima")])),
+                         html.Tbody(filas)], className="lect"),
+             html.Div(["Mes pico = mes con el índice más alto (", html.B(lbl), " / ", html.B(lblp), "). "
+                       "Una reserva es un saldo y suele moverse menos que la prima del mes."], className="lect-nota")]
 
     # Mapa de calor
     s = serie(df, concepto, var, ramos, anios, meses, por=("ANIO", "MES"))
-    piv = s.pivot(index="ANIO", columns="MES", values="VALOR").reindex(columns=meses)
+    piv = s.pivot(index="ANIO", columns="MES", values="VALOR").reindex(index=anios, columns=meses)
     z = piv.values * (100 if ratio else 1 / div)
     fig = go.Figure(go.Heatmap(
-        z=z, x=xm, y=[str(a) for a in piv.index],
-        colorscale=[[i / (len(SEQ_AZUL) - 1), c] for i, c in enumerate(SEQ_AZUL)],
+        z=z, x=xm, y=[str(a) for a in piv.index], colorscale=[[i / (len(T["heat"]) - 1), c] for i, c in enumerate(T["heat"])],
         text=[["" if pd.isna(v) else (f"{v:.1f}%" if ratio else f"{v:,.0f}") for v in row] for row in z],
-        texttemplate="%{text}", textfont=dict(size=10), xgap=3, ygap=3,
-        hovertemplate="%{y} %{x}: %{text}" + ("" if ratio else suf) + "<extra></extra>",
-        colorbar=dict(thickness=8, outlinewidth=0, tickfont=dict(color=TXT3))))
-    estilo(fig, 340, f"Mapa de calor año × mes · {lbl}", leyenda=False, ytick="")
+        texttemplate="%{text}", textfont=dict(size=11), xgap=4, ygap=4, showscale=False,
+        hovertemplate="%{x} %{y}: %{text}" + ("" if ratio else suf) + "<extra></extra>"))
+    estilo(fig, T, 300, leyenda=False, ytick="")
     fig.update_layout(hovermode="closest")
-    fig.update_yaxes(type="category", gridcolor=CARD)
+    fig.update_yaxes(type="category", gridcolor="rgba(0,0,0,0)", tickfont=dict(color=T["text"], size=12))
     g_heat = fig
+    t_heat = f"{lbl} por mes y año" + ("" if ratio else f" ({unidad.lower()})")
 
-    # Índices
-    iv = indice(df, concepto, var, ramos, anios, meses)
-    ip = indice(df, concepto, prima, ramos, anios, meses)
-
-    def fig_idx(piv_idx, titulo, h=340, rango=None):
-        f = go.Figure()
-        for a in piv_idx.index:
-            f.add_scatter(x=xm, y=piv_idx.loc[a].values, name=str(a), mode="lines+markers",
-                          line=dict(color=color_anio(a, todos), width=2.5 if a == max(anios) else 2),
-                          marker=dict(size=7), hovertemplate="%{y:.3f}")
-        f.add_hline(y=1, line=dict(color=TXT3, width=1, dash="dash"))
-        estilo(f, h, titulo, "Índice", ytick=".2f")
-        if rango:
-            f.update_yaxes(range=rango)
-        return f
-
-    g_idx = fig_idx(iv, f"Índice estacional · {lbl} · {rango_txt}")
-    lo = np.nanmin([np.nanmin(iv.values) if iv.size else 1, np.nanmin(ip.values) if ip.size else 1])
-    hi = np.nanmax([np.nanmax(iv.values) if iv.size else 1, np.nanmax(ip.values) if ip.size else 1])
-    pad = (hi - lo) * 0.08 if np.isfinite(hi - lo) and hi > lo else 0.1
-    rango = [lo - pad, hi + pad] if np.isfinite(lo) and np.isfinite(hi) else None
-    g_iv = fig_idx(iv, f"{lbl} · índice estacional", 330, rango)
-    g_ip = fig_idx(ip, f"{lblp} · índice estacional", 330, rango)
-
-    # Perfil promedio de los años elegidos: variable vs prima
-    pv, pp = iv.mean(axis=0), ip.mean(axis=0)
+    # Estacionalidad por ramo en el año elegido
     fig = go.Figure()
-    fig.add_bar(x=xm, y=pp.values, name=lblp, marker_color="#5f6b84", marker_line=dict(color=CARD, width=1),
-                hovertemplate="%{y:.3f}")
-    fig.add_scatter(x=xm, y=pv.values, name=lbl, mode="lines+markers", line=dict(color="#3987e5", width=3),
-                    marker=dict(size=8, line=dict(color=CARD, width=2)), hovertemplate="%{y:.3f}")
-    fig.add_hline(y=1, line=dict(color=TXT3, width=1, dash="dash"))
-    titulo = f"Perfil estacional {'promedio ' + rango_txt if len(anios) > 1 else rango_txt}: {lbl} vs. prima"
-    estilo(fig, 340, titulo, "Índice", ytick=".2f")
-    g_comp = fig
-
-    ok = pv.notna() & pp.notna()
-    corr = pv[ok].corr(pp[ok]) if ok.sum() > 2 else np.nan
-    amp_v = (pv.max() - pv.min()) if pv.notna().any() else np.nan
-    amp_p = (pp.max() - pp.min()) if pp.notna().any() else np.nan
-    mx_v = xm[int(np.nanargmax(pv.values))] if pv.notna().any() else "—"
-    mx_p = xm[int(np.nanargmax(pp.values))] if pp.notna().any() else "—"
-
-    def fila(k, n):
-        return html.Div([html.Span(k, className="k"), html.Span(n, className="n")], className="row")
-
-    comp_kpis = [
-        fila("Correlación de perfiles", "N/A" if pd.isna(corr) else f"{corr:+.2f}"),
-        fila(f"Amplitud {lbl}", "N/A" if pd.isna(amp_v) else f"{amp_v:.2f}"),
-        fila(f"Amplitud {lblp}", "N/A" if pd.isna(amp_p) else f"{amp_p:.2f}"),
-        fila("Mes pico (variable / prima)", f"{mx_v} / {mx_p}"),
-        html.Div("Correlación cercana a +1: la variable sigue el patrón mensual de la prima. Amplitud = índice máximo − "
-                 "mínimo; una reserva de saldo suele ser más estable que la prima mensual.", className="note"),
-    ]
-
-    # Índice por ramo (perfil promedio de los años elegidos)
-    fig = go.Figure()
+    a_r = anio_ramo if anio_ramo in anios_todos else (anios_todos or [None])[-1]
     for r in ramos:
-        ir = indice(df, concepto, var, [r], anios, meses)
-        if ir.dropna(how="all").empty:
+        ir = indice(df, concepto, var, [r], [a_r], meses)
+        if ir.empty or ir.iloc[0].isna().all():
             continue
-        prof = ir.mean(axis=0)
-        if prof.isna().all():
-            continue
-        fig.add_scatter(x=xm, y=prof.values, name=f"Ramo {r}", mode="lines+markers",
-                        line=dict(color=COL_RAMO.get(r), width=2), marker=dict(size=7), hovertemplate="%{y:.3f}")
-    fig.add_hline(y=1, line=dict(color=TXT3, width=1, dash="dash"))
-    estilo(fig, 330, f"Índice estacional por ramo · {lbl} · "
-                     f"{'promedio ' + rango_txt if len(anios) > 1 else rango_txt}", "Índice", ytick=".2f")
-    return g_heat, g_idx, g_iv, g_ip, g_comp, comp_kpis, fig
+        fig.add_scatter(x=xm, y=ir.iloc[0].values, name=f"Ramo {r}", mode="lines+markers",
+                        line=dict(color=color_ramo(r, ramos_todos, T), width=2.2), marker=dict(size=6),
+                        hovertemplate="%{y:.2f}")
+    fig.add_hline(y=1, line=dict(color=T["text3"], width=1, dash="dash"))
+    estilo(fig, T, 300, "Índice", ytick=".2f")
+    return t_comp, a_comp, g_comp, stats, t_heat, g_heat, fig
 
 
-@app.callback(Output("dl", "data"), Input("btn-xls", "n_clicks"), *[State(i.component_id, i.component_property)
-                                                                     for i in ENTRADAS[:6]], prevent_initial_call=True)
+# ---- Descarga a Excel -----------------------------------------------------------------
+@app.callback(Output("dl", "data"), Input("btn-xls", "n_clicks"),
+              *[State(i.component_id, i.component_property) for i in ENTRADAS[:6]], prevent_initial_call=True)
 def descargar(_n, concepto, var, ramos, anios, meses, unidad):
     df = ESTADO["df"]
     ramos, anios, meses = sorted(ramos or []), sorted(anios or []), sorted(meses or [])
@@ -740,13 +953,13 @@ def descargar(_n, concepto, var, ramos, anios, meses, unidad):
             tab.to_excel(xw, sheet_name="Mensualizacion")
             base.to_excel(xw, sheet_name="Base_filtrada", index=False)
 
-    return dcc.send_bytes(escribir, f"Dashboard_Reservas_{datetime.now():%Y%m%d}.xlsx")
+    return dcc.send_bytes(escribir, f"PRISMA_Reservas_{datetime.now():%Y%m%d}.xlsx")
 
 
 # --------------------------------------------------------------------------------------
 if __name__ == "__main__":
     url = f"http://127.0.0.1:{PUERTO}"
-    print(f"\nDashboard listo en {url}  (Ctrl + C para detener)\n")
+    print(f"\nPRISMA listo en {url}  (Ctrl + C para detener)\n")
     if not os.environ.get("RFV_NO_BROWSER"):
         threading.Timer(1.5, lambda: webbrowser.open(url)).start()
     app.run(debug=False, port=PUERTO, host="127.0.0.1")
