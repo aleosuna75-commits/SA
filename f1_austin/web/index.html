@@ -933,7 +933,8 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
 .menu__gp--archivo b{font-size:16px}
 /* Telón al cambiar de GP */
 .telon{position:fixed;inset:0;z-index:130;display:grid;place-items:center;background:var(--noche);opacity:0;visibility:hidden;pointer-events:none;transition:opacity .45s var(--ease),visibility 0s linear .45s;padding-left:var(--gut-i);padding-right:var(--gut-d)}
-.telon.activo{opacity:1;visibility:visible;transition:opacity .3s var(--ease),visibility 0s}
+.telon.activo{opacity:1;visibility:visible;transition:opacity .3s var(--ease),visibility 0s;animation:telon-seguro .45s var(--ease) 4s forwards}
+@keyframes telon-seguro{to{opacity:0;visibility:hidden}}
 .telon__in{display:grid;gap:14px;justify-items:center;text-align:center}
 .telon__in .ceja{margin:0}
 .telon__t{margin:0;font-family:var(--f-display);font-weight:var(--t-peso);text-transform:uppercase;letter-spacing:var(--t-esp);font-size:clamp(40px,8vw,104px);line-height:1;color:var(--hueso);text-wrap:balance}
@@ -3699,17 +3700,17 @@ window.addEventListener("resize", function(){
 });
 
 /* ---------------- Render global y GP mostrado ---------------- */
-function renderGP(){ renderFicha(); renderMetricas(); renderParrilla(); renderCasas(); renderTabla(); renderBurbuja(); renderCambios(); renderOfrenda(); renderVivo(); }
-function renderTodo(){ renderGP(); renderPost(); renderCarrera(); renderVueltas(); renderPostCarrera(); renderTrayecto(); renderEvolucion(); renderAvisoPost(); renderBotones(); renderEsperas(); tic(); }
+/* Cada bloque se dibuja aislado: si uno falla (dato raro, API que falte en algún navegador) los demás siguen
+   y el cambio de GP termina igual. El error queda en la consola. */
+function seguro(fn){ try { fn(); } catch(e){ try { console.error("[render] " + (fn && fn.name || "?") + " (" + SLUG + "):", e); } catch(_){} } }
+function cadaUno(fns){ for (var i = 0; i < fns.length; i++) seguro(fns[i]); }
+function renderGP(){ cadaUno([renderFicha, renderMetricas, renderParrilla, renderCasas, renderTabla, renderBurbuja, renderCambios, renderOfrenda, renderVivo]); }
+function renderTodo(){ cadaUno([renderGP, renderPost, renderCarrera, renderVueltas, renderPostCarrera, renderTrayecto, renderEvolucion, renderAvisoPost, renderBotones, renderEsperas, tic]); }
 function renderDoc(k){
-  renderBotones();
-  if (k === "gp"){ renderGP(); renderPost(); renderCarrera(); renderPostCarrera(); renderTrayecto(); renderAvisoPost(); }
-  else if (k === "live"){ renderVivo(); tic(); }
-  else if (k === "postqualy"){ renderPost(); renderTrayecto(); renderEvolucion(); renderAvisoPost(); tic(); }
-  else if (k === "carrera"){ renderCarrera(); renderVueltas(); renderPostCarrera(); renderTrayecto(); renderAvisoPost(); }
-  else if (k === "vueltas"){ renderVueltas(); renderPostCarrera(); }
-  else if (k === "postcarrera"){ renderPostCarrera(); renderTrayecto(); renderEvolucion(); renderAvisoPost(); tic(); }
-  else if (k === "historial"){ renderTrayecto(); }
+  var F = {gp:[renderGP, renderPost, renderCarrera, renderPostCarrera, renderTrayecto, renderAvisoPost], live:[renderVivo, tic],
+    postqualy:[renderPost, renderTrayecto, renderEvolucion, renderAvisoPost, tic], carrera:[renderCarrera, renderVueltas, renderPostCarrera, renderTrayecto, renderAvisoPost],
+    vueltas:[renderVueltas, renderPostCarrera], postcarrera:[renderPostCarrera, renderTrayecto, renderEvolucion, renderAvisoPost, tic], historial:[renderTrayecto]};
+  cadaUno([renderBotones].concat(F[k] || []));
 }
 function infoDe(slug){
   var c = DATOS.catalogo[slug] || {}, m = metaDe(slug), i = {};
@@ -3736,12 +3737,26 @@ function renderMenuGPs(){
   $("#pie-gps").innerHTML = ls.map(function(sl){ var i = infoDe(sl); return '<li><a href="#' + esc(sl) + '" data-gp="' + esc(sl) + '">' + esc(i.nombre || i.nombre_corto) + '</a>' + (sl === SLUG ? ' · aquí' : '') + '</li>'; }).join("") +
     '<li><a href="austin/qualy.html">Austin 2026 · Qualy</a></li><li><a href="austin/carrera.html">Austin 2026 · Carrera</a></li>';
 }
+/* Telón al cambiar de GP. Se quita pase lo que pase: al terminar (finally), con un temporizador de seguridad y,
+   si el JS se detuviera, con la animación CSS .telon.activo (se desvanece sola a los 4 s). DESTINO = GP en camino:
+   evita aplicar dos veces el mismo cambio (clic del menú + hashchange) y deja cancelar uno pendiente. */
+var DESTINO = null, TELON_T = 0, TELON_SEG = 0;
+function quitarTelon(){
+  clearTimeout(TELON_SEG); TELON_SEG = 0;
+  var t = document.getElementById("telon"); if (t) t.classList.remove("activo");
+}
 function cambiarGP(slug, op){
   op = op || {};
   if (!slugValido(slug) || listaGPs().indexOf(slug) < 0) return;
-  if (slug === SLUG && !op.forzar) return;
+  if (slug === DESTINO && !op.forzar) return;
+  if (slug === SLUG && !op.forzar){
+    if (DESTINO){ clearTimeout(TELON_T); DESTINO = null; quitarTelon(); }
+    return;
+  }
   var telon = $("#telon");
+  clearTimeout(TELON_T); DESTINO = null;
   function aplicar(){
+    DESTINO = null;
     SLUG = slug; INFO = infoDe(slug);
     TEMA = DATOS.temas[INFO.tema] || DATOS.temas.generico || {};
     QUALY = sesionGP(slug, "Q"); FIN_QUALY = QUALY ? QUALY + 60 * 6e4 : 0;
@@ -3750,19 +3765,26 @@ function cambiarGP(slug, op){
     parrillaLista = false; ultimoAciertos = null;
     VV.D = null; VV.animado = false; VV.fijo = null; VV.hover = null; VV.k = null; VV.todos = false;
     ["rev-cuerpo", "carrera-cuerpo", "vueltas-cuerpo", "postcar-cuerpo", "trayecto-cuerpo"].forEach(function(id){ var el = document.getElementById(id); if (el && el.getAttribute("data-lleno") === "1") el.setAttribute("data-lleno", "0"); });
-    aplicarTema(); textosGP(); renderTodo(); renderMenuGPs(); renderConexion();
-    if (typeof LIENZO === "object" && LIENZO.modo) LIENZO.modo(TEMA.lienzo || {});
-    suscribirGP();
-    if (op.arriba) window.scrollTo(0, 0);
-    if (revelarListo) prepararRevelado();
-    requestAnimationFrame(alScroll);
+    cadaUno([aplicarTema, textosGP, renderTodo, renderMenuGPs, renderConexion,
+      function lienzo(){ if (typeof LIENZO === "object" && LIENZO.modo) LIENZO.modo(TEMA.lienzo || {}); },
+      suscribirGP,
+      function arriba(){ if (op.arriba) window.scrollTo(0, 0); },
+      function revelado(){ if (revelarListo) prepararRevelado(); },
+      function scroll(){ requestAnimationFrame(alScroll); }]);
   }
   if (op.animar && !RM.matches && telon){
-    $("#telon-t").textContent = infoDe(slug).nombre_corto;
-    $("#telon-ceja").textContent = infoDe(slug).circuito || "Gran Premio";
-    telon.classList.add("activo");
-    setTimeout(function(){ aplicar(); setTimeout(function(){ telon.classList.remove("activo"); }, 380); }, 330);
-  } else aplicar();
+    DESTINO = slug;
+    try { $("#telon-t").textContent = infoDe(slug).nombre_corto; $("#telon-ceja").textContent = infoDe(slug).circuito || "Gran Premio"; } catch(e){}
+    telon.classList.remove("activo"); void telon.offsetWidth; telon.classList.add("activo");
+    clearTimeout(TELON_SEG); TELON_SEG = setTimeout(function(){ if (DESTINO === slug){ clearTimeout(TELON_T); DESTINO = null; seguro(aplicar); } quitarTelon(); }, 2500);
+    TELON_T = setTimeout(function(){
+      try { aplicar(); } catch(e){ try { console.error("[cambiarGP]", e); } catch(_){} }
+      finally { setTimeout(quitarTelon, 380); }
+    }, 330);
+  } else {
+    quitarTelon();
+    try { aplicar(); } catch(e){ try { console.error("[cambiarGP]", e); } catch(_){} }
+  }
 }
 
 /* ---------------- Base de datos en vivo (Artifact) ---------------- */
@@ -3847,10 +3869,17 @@ document.addEventListener("keydown", function(e){
 });
 $("#nav-gp").addEventListener("click", function(){ if (menu.classList.contains("abierto")) cerrarMenu(); else { menuEnGPs = true; abrirMenu(); } });
 /* Cambiar de GP: con el menú, con el pie o con el hash (#brasil2026). Los enlaces a secciones no tocan el hash. */
+function enIframe(){ try { return window.self !== window.top; } catch(e){ return true; } }
+function ponerHash(sl){
+  if (enIframe()) return;                     // en el visor de Claude el hash no sirve (no se comparte) y navegar el iframe puede trabarlo
+  try { if (location.hash === "#" + sl) return; } catch(e){ return; }
+  try { if (window.history && history.pushState){ history.pushState(null, "", "#" + sl); return; } } catch(e){}
+  try { location.hash = sl; } catch(e){}
+}
 function irAGP(sl){
   ELEGIDO = true;
   cambiarGP(sl, {animar:true, arriba:true});
-  try { if (location.hash !== "#" + sl) location.hash = sl; } catch(e){}
+  ponerHash(sl);
 }
 function irASeccion(id){
   var t = document.getElementById(id); if (!t) return false;
@@ -3874,10 +3903,14 @@ document.addEventListener("click", function(e){
   if (a.hasAttribute("data-gp")){ e.preventDefault(); if (id !== SLUG) irAGP(id); else window.scrollTo({top:0, behavior: RM.matches ? "auto" : "smooth"}); return; }
   if (id && irASeccion(id)) e.preventDefault();
 });
-window.addEventListener("hashchange", function(){
+function alCambiarHash(){
   var h = (location.hash || "").slice(1);
   if (slugValido(h) && listaGPs().indexOf(h) >= 0 && h !== SLUG){ ELEGIDO = true; cambiarGP(h, {animar:true, arriba:true}); }
-});
+  else if (!h && ELEGIDO){ var a = slugActual(); if (a && a !== SLUG) cambiarGP(a, {animar:true, arriba:true}); }   // atrás hasta la entrada sin hash
+}
+window.addEventListener("hashchange", alCambiarHash);
+window.addEventListener("popstate", alCambiarHash);
+window.addEventListener("pageshow", function(e){ if (e && e.persisted){ clearTimeout(TELON_T); DESTINO = null; quitarTelon(); } });
 
 /* ---------------- Scroll: progreso, nav, parallax, sección activa ---------------- */
 var prog = $("#progreso"), heroeFoto = $("#heroe-foto"), pars = $$("[data-par]");

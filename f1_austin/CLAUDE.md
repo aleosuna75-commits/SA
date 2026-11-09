@@ -55,4 +55,7 @@ Modelos de predicción por GP con datos de OpenF1 (2023+) y Jolpica (2018+), y r
 - Validación: walk-forward (cada GP sólo con GPs anteriores); comparar siempre contra baselines (orden de FP / qualy / parrilla).
 - Elegir hiperparámetros o variantes mirando el mismo walk-forward sesga el resultado: decirlo cuando se haga.
 - Carrera: el pronóstico oficial es el simulador Monte Carlo (`sim_carrera.py`), no el orden de qualy.
+- Página (web/plantilla.html): dentro del visor de Claude (iframe) no se toca `location.hash`; el telón de cambio de GP se quita
+  siempre (finally + temporizador + animación CSS) y cada render va aislado con `seguro()` (en iPhone se quedaba trabado en Las Vegas).
+  Probar cambios de GP también en WebKit, no sólo en Chromium.
 - Temas visuales: `reporte_html.py` (Texas), `reporte_carrera_html.py` (Texas carrera), `reporte_mexico_html.py` (Día de Muertos).
