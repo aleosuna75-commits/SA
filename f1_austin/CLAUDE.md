@@ -18,6 +18,11 @@ Modelos de predicción por GP con datos de OpenF1 (2023+) y Jolpica (2018+), y r
 - Config automática desde OpenF1/Jolpica en `gps/<slug>/config.json` (los GPs nuevos se agregan solos a `GPS`; 1297/1298 fijos).
   Sustituciones, parrilla o penalizaciones y fuentes: `gps/<slug>/ajustes.json` (a mano; post_qualy se repite si cambia).
 - Sin fugas: los modelos reciben `F1_CORTE` (inicio de la sesión siguiente) y ocultan resultados/pilotos/vueltas posteriores.
+- OpenF1 en 401 (sesión en vivo): `descarga_datos.py gp` no toca la cache (comprueba antes y aparta en vez de borrar;
+  restaura si falla a medias) y `auto` devuelve `reintentar` (paso, error, `reintentar_utc` = +30 min hasta la sesión
+  que corta el paso): reprogramar `auto` a esa hora. La FP3 sólo tiene respaldo si el colector se lanzó (corrida de
+  `auto` en FP3−12 min). meta.json nunca se reescribe vacío. meta/página: sólo GPs desde México (1308 = GP de Baréin
+  corrido en Sepang, antes de México: no va).
 - Archivos → docs del Artifact: gp.json→gp/<slug>, live_qualy.json→live/<slug>, post_qualy.json→postqualy/<slug>,
   carrera.json→carrera/<slug>, vueltas.json→vueltas/<slug>, post_carrera.json→postcarrera/<slug>, gps/meta.json→meta/actual.
 

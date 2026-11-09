@@ -1,5 +1,5 @@
 {
- "actualizado": "2026-11-09T02:08:55Z",
+ "actualizado": "2026-11-09T02:19:02Z",
  "actual": "brasil2026",
  "gps": [
   {
@@ -298,9 +298,9 @@
   },
   {
    "slug": "abudhabi2026",
-   "nombre": "Gran Premio de Abu Dhabi",
+   "nombre": "Gran Premio de Abu Dabi",
    "circuito": "Circuito de Yas Marina",
-   "ciudad": "Abu Dhabi, Emiratos Árabes Unidos",
+   "ciudad": "Abu Dabi, Emiratos Árabes Unidos",
    "fecha_texto": "Domingo 6 de diciembre de 2026",
    "estado": "proximo",
    "fases": [

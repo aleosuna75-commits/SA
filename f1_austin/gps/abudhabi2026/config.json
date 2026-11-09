@@ -3,11 +3,11 @@
  "year": 2026,
  "slug": "abudhabi2026",
  "slug_modelo": "abudhabi",
- "nombre": "Gran Premio de Abu Dhabi",
+ "nombre": "Gran Premio de Abu Dabi",
  "nombre_en": "Abu Dhabi Grand Prix",
  "circuito": "Circuito de Yas Marina",
  "circuito_corto": "Yas Marina",
- "ciudad": "Abu Dhabi, Emiratos Árabes Unidos",
+ "ciudad": "Abu Dabi, Emiratos Árabes Unidos",
  "pais": "United Arab Emirates",
  "circuit_key": 70,
  "circuito_jolpica": "yas_marina",
@@ -71,5 +71,5 @@
    "hora_local": "5:00 PM"
   }
  ],
- "generado": "2026-11-09T01:47:19Z"
+ "generado": "2026-11-09T02:18:42Z"
 }

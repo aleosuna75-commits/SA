@@ -22,6 +22,8 @@ def get(url, nombre, pausa=0.6):
     for intento in range(8):
         try:
             r = requests.get(url, timeout=120)
+            if r.status_code in (401, 403):   # OpenF1 bloqueado (sesión en vivo / sin acceso): no insistir 8 veces
+                raise RuntimeError(f"{url}: OpenF1 respondió {r.status_code}")
             if r.status_code == 429:
                 time.sleep(5 * (intento + 1)); continue
             if r.status_code == 404:
@@ -80,17 +82,43 @@ def descargar_circuito(circuito):
             break
 
 
+RESPALDO = CACHE / "_respaldo_refresco"
+
+
 def refrescar_temporada(año, meeting_key):
-    """Borra la cache de la temporada en curso y del GP objetivo para volver a bajarla con lo más reciente."""
-    for p in [f"sessions_{año}", f"results_{año}", f"drivers_{año}"]:
-        (CACHE / f"{p}.json").unlink(missing_ok=True)
-    for p in CACHE.glob(f"jolpica_*_{año}_*.json"):
-        p.unlink()
-    ses = get(f"{OPENF1}/sessions?meeting_key={meeting_key}", f"tmp_sessions_{meeting_key}")
-    (CACHE / f"tmp_sessions_{meeting_key}.json").unlink(missing_ok=True)
+    """Aparta (no borra) la cache de la temporada en curso y del GP objetivo para volver a bajarla con lo más reciente.
+    Antes comprueba que OpenF1 responde: con 401/403 (sesión en vivo) no se toca nada. Lo apartado queda en
+    cache/_respaldo_refresco/ y restaurar_respaldo() lo devuelve si la descarga falla a medias."""
+    r = requests.get(f"{OPENF1}/sessions?meeting_key={meeting_key}", timeout=60)
+    ses = r.json() if r.status_code == 200 else None
+    if not isinstance(ses, list) or not ses:
+        raise SystemExit(f"OpenF1 respondió {r.status_code} para el meeting {meeting_key}: no se toca la cache "
+                         "(reintentar más tarde)")
+    restaurar_respaldo()          # restos de un refresco anterior que falló
+    RESPALDO.mkdir(exist_ok=True)
+    apartar = [CACHE / f"{p}.json" for p in (f"sessions_{año}", f"results_{año}", f"drivers_{año}")]
+    apartar += list(CACHE.glob(f"jolpica_*_{año}_*.json"))
     for s in ses:
-        for p in CACHE.glob(f"*_{s['session_key']}.json"):
+        apartar += list(CACHE.glob(f"*_{s['session_key']}.json"))
+    for p in apartar:
+        if p.exists():
+            p.replace(RESPALDO / p.name)
+
+
+def restaurar_respaldo(devolver=True):
+    """devolver=True (la descarga falló): devuelve a la cache lo apartado que no se pudo volver a bajar.
+    devolver=False (salió bien): descarta lo apartado, como el borrado original. Devuelve cuántos volvieron."""
+    if not RESPALDO.exists():
+        return 0
+    n = 0
+    for p in RESPALDO.glob("*.json"):
+        if devolver and not (CACHE / p.name).exists():
+            p.replace(CACHE / p.name)
+            n += 1
+        else:
             p.unlink()
+    RESPALDO.rmdir()
+    return n
 
 
 def descargar_jolpica(desde=2018, hasta=2026):
@@ -114,7 +142,12 @@ if __name__ == "__main__":
         # python3 descarga_datos.py gp <año> <meeting_key> <circuito_jolpica>
         año, mk, circ = int(sys.argv[2]), int(sys.argv[3]), sys.argv[4]
         refrescar_temporada(año, mk)
-        descargar()
-        descargar_circuito(circ)
+        try:
+            descargar()
+            descargar_circuito(circ)
+        except BaseException:     # falló a medias (p. ej. 401): vuelve lo que no se pudo bajar de nuevo
+            print(f"  restaurados {restaurar_respaldo()} archivos de cache que no se pudieron volver a bajar")
+            raise
+        restaurar_respaldo(devolver=False)
     else:
         descargar([int(x) for x in sys.argv[1:]])

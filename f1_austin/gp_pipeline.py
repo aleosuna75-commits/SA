@@ -24,6 +24,8 @@ Pasos (idempotentes; cada uno sólo usa lo que existía antes de su sesión: F1_
 
 Uso (desde f1_austin/):
   python3 gp_pipeline.py auto [--ahora ISO] [--simular]   # decide qué toca por hora UTC y estado; resumen JSON
+                                  # (gps/ultimo_auto.json; si toca colector, gps/colector_ahora.json se escribe ANTES de
+                                  # correr modelos; si un paso falla, 'reintentar' dice cuándo volver a correr auto)
   python3 gp_pipeline.py retro 1299                       # todos los pasos en orden para un GP ya corrido
   python3 gp_pipeline.py paso <paso> <meeting> [--forzar] # un paso suelto
   python3 gp_pipeline.py config <meeting>                 # sólo config.json (+ ajustes.json si no existe)
@@ -67,7 +69,7 @@ NOMBRE_ES = {
     "Mexico City Grand Prix": "Gran Premio de la Ciudad de México", "São Paulo Grand Prix": "Gran Premio de São Paulo",
     "Sao Paulo Grand Prix": "Gran Premio de São Paulo", "Brazilian Grand Prix": "Gran Premio de Brasil",
     "Las Vegas Grand Prix": "Gran Premio de Las Vegas", "Qatar Grand Prix": "Gran Premio de Qatar",
-    "Abu Dhabi Grand Prix": "Gran Premio de Abu Dhabi", "United States Grand Prix": "Gran Premio de Estados Unidos",
+    "Abu Dhabi Grand Prix": "Gran Premio de Abu Dabi", "United States Grand Prix": "Gran Premio de Estados Unidos",
     "Miami Grand Prix": "Gran Premio de Miami", "Canadian Grand Prix": "Gran Premio de Canadá",
     "Spanish Grand Prix": "Gran Premio de España", "Barcelona-Catalunya Grand Prix": "Gran Premio de Barcelona-Cataluña",
     "Madrid Grand Prix": "Gran Premio de Madrid", "Monaco Grand Prix": "Gran Premio de Mónaco",
@@ -86,10 +88,16 @@ CIRCUITO_ES = {   # circuit_short_name de OpenF1 -> (nombre del circuito, nombre
     "Lusail": ("Circuito Internacional de Lusail", "Lusail"),
     "Yas Marina Circuit": ("Circuito de Yas Marina", "Yas Marina"),
     "Austin": ("Circuit of the Americas", "Austin"),
+    "Kuala Lumpur": ("Circuito Internacional de Sepang", "Sepang"),
 }
 CIUDAD_ES = {"Mexico City": "Ciudad de México", "São Paulo": "São Paulo, Brasil", "Las Vegas": "Las Vegas, Nevada",
-             "Lusail": "Lusail, Qatar", "Yas Marina": "Abu Dhabi, Emiratos Árabes Unidos", "Yas Island": "Abu Dhabi, Emiratos Árabes Unidos",
-             "Austin": "Austin, Texas"}
+             "Lusail": "Lusail, Qatar", "Yas Marina": "Abu Dabi, Emiratos Árabes Unidos", "Yas Island": "Abu Dabi, Emiratos Árabes Unidos",
+             "Austin": "Austin, Texas", "Kuala Lumpur": "Sepang (Kuala Lumpur), Malasia"}
+# GPs trasladados: OpenF1 conserva el país/nombre del GP original (1308 = "Bahrain Grand Prix", country_name "Bahrain")
+# pero meeting_official_name dice dónde se corre ("... BAHRAIN GRAND PRIX IN MALAYSIA 2026", circuit_key 12 = Sepang).
+PAIS_ES = {"MALAYSIA": "Malasia", "BAHRAIN": "Baréin", "SAUDI ARABIA": "Arabia Saudita", "QATAR": "Qatar",
+           "PORTUGAL": "Portugal", "TURKEY": "Turquía", "GERMANY": "Alemania", "FRANCE": "Francia", "SPAIN": "España",
+           "ITALY": "Italia", "UNITED ARAB EMIRATES": "Emiratos Árabes Unidos", "SOUTH AFRICA": "Sudáfrica"}
 SLUG_PAIS = {"Mexico": "mexico", "Brazil": "brasil", "Qatar": "qatar", "United Arab Emirates": "abudhabi"}
 TEMA = {"mexico": "muertos", "brasil": "brasil", "lasvegas": "lasvegas", "qatar": "qatar", "abudhabi": "abudhabi"}
 CIRCUITO_JOLPICA = {9: "americas", 65: "rodriguez", 14: "interlagos", 152: "vegas", 150: "losail", 70: "yas_marina"}
@@ -260,6 +268,12 @@ def config_gp(mk, escribir=True):
     off = _offset(gmt)
     nombre_en = info.get("meeting_name") or f"{s0.get('country_name', '')} Grand Prix"
     nombre = NOMBRE_ES.get(nombre_en) or ("Gran Premio de " + nombre_en.replace(" Grand Prix", ""))
+    import re
+    sede = re.search(r"GRAND PRIX IN ([A-Z ]+?)\s+\d{4}\s*$", str(info.get("meeting_official_name") or "").upper())
+    pais_sede = None
+    if sede:                       # GP trasladado: se dice dónde se corre ("pais" queda en inglés, como OpenF1)
+        pais_sede = sede.group(1).strip().title()
+        nombre = f"{nombre} (en {PAIS_ES.get(sede.group(1).strip(), pais_sede)})"
     corto = s0.get("circuit_short_name", "")
     circ, circ_corto = CIRCUITO_ES.get(corto, (info.get("circuit_short_name") or corto, corto))
     ciudad = CIUDAD_ES.get(s0.get("location", ""), f"{s0.get('location', '')}, {s0.get('country_name', '')}")
@@ -281,7 +295,7 @@ def config_gp(mk, escribir=True):
         slug_m = Q.GPS[mk]["slug"]
     cfg = {
         "meeting_key": mk, "year": año, "slug": slug, "slug_modelo": slug_m, "nombre": nombre, "nombre_en": nombre_en,
-        "circuito": circ, "circuito_corto": circ_corto, "ciudad": ciudad, "pais": s0.get("country_name"),
+        "circuito": circ, "circuito_corto": circ_corto, "ciudad": ciudad, "pais": pais_sede or s0.get("country_name"),
         "circuit_key": s0.get("circuit_key"),
         "circuito_jolpica": circuito_jolpica(s0.get("circuit_key"), r["inicio_utc"] if r else s0["date_start"], año),
         "gmt_offset": gmt, "utc_texto": _utc_txt(gmt),
@@ -1018,6 +1032,10 @@ def generar_meta(ahora=None, escribir=True):
                     "qualy_texto": f"{cfg['fecha_texto']}, {cfg['hora_texto']}".strip(", "),
                     "carrera_texto": f"{cfg['fecha_texto_carrera']}, {cfg['hora_texto_carrera']}".strip(", "),
                     "pasos": {p: est[p]["hecho"] for p in PASOS if p in est}, "docs": docs})
+    viejo = leer_json(GPS_DIR / "meta.json", {}) or {}
+    if not gps and viejo.get("gps"):     # sin calendario (cache de sesiones perdida / OpenF1 401): no pisar el meta bueno
+        print("  AVISO: sin calendario de OpenF1; meta.json se deja como estaba")
+        return viejo, False
     en_curso = [g for g in gps if g["estado"] == "en_curso"]
     terminados = [g for g in gps if g["estado"] == "terminado"]
     proximos = [g for g in gps if g["estado"] == "proximo"]
@@ -1030,7 +1048,6 @@ def generar_meta(ahora=None, escribir=True):
     else:
         actual = gps[-1]["slug"] if gps else None
     meta = {"actualizado": iso(ahora), "actual": actual, "gps": gps}
-    viejo = leer_json(GPS_DIR / "meta.json", {}) or {}
     cambio = {k: v for k, v in viejo.items() if k != "actualizado"} != {k: v for k, v in meta.items() if k != "actualizado"}
     if cambio and escribir:
         escribir_json(GPS_DIR / "meta.json", meta)
@@ -1083,6 +1100,28 @@ def ejecutar(cfg, paso, retro=False, forzar=False):
                 "archivos_cambiados": [], "docs": []}
 
 
+def reintentos(acciones, ahora):
+    """Pasos que fallaron (p. ej. OpenF1 en 401 tras la FP2) -> cuándo volver a correr 'auto': cada 30 min, pero
+    nunca después del inicio de la sesión que corta ese paso (ahí ya lo recoge la corrida programada siguiente)."""
+    out = []
+    for a in acciones:
+        if a.get("ok") is not False or not a.get("slug"):
+            continue
+        cfg = leer_json(GPS_DIR / a["slug"] / "config.json")
+        limite = None
+        if cfg:
+            limite = {"pre_qualy": corte_de(cfg, "fp3", "sq", "q"), "fp3": corte_de(cfg, "q"),
+                      "post_qualy": corte_de(cfg, "r")}.get(a["paso"])
+        t = ahora + timedelta(minutes=30)
+        if limite and t >= ts(limite) - timedelta(minutes=15):
+            t = None
+        out.append({"slug": a["slug"], "paso": a["paso"], "error": a.get("error"),
+                    "reintentar_utc": iso(t) if t else None,
+                    "nota": ("reprogramar 'auto' a esa hora (la cache no se borra si OpenF1 responde 401)" if t else
+                             "ya no da tiempo antes de la sesión siguiente: lo recoge la próxima corrida programada")})
+    return out
+
+
 def modo_auto(simular=False):
     ahora = ahora_utc()
     acciones, comandos = [], []
@@ -1097,6 +1136,9 @@ def modo_auto(simular=False):
             if c and s and ts(c["lanzar_utc"]) - timedelta(minutes=30) <= ahora <= ts(s["fin_utc"]):
                 comandos.append({"slug": cfg["slug"], "sesion": clave, **c})
                 print(f"COLECTOR {cfg['slug']} {clave} (lanzar {c['lanzar_utc']}): {c['comando']}", flush=True)
+        if comandos and not simular:
+            # antes de los modelos (un fp3/pre_qualy atrasado tarda ~10 min): el colector no puede esperar al resumen
+            escribir_json(GPS_DIR / "colector_ahora.json", {"ahora": iso(ahora), "comandos_colector": comandos})
         for paso in pendientes(cfg, ahora):
             if simular:
                 acciones.append({"slug": cfg["slug"], "paso": paso, "ok": None, "simulado": True})
@@ -1110,7 +1152,8 @@ def modo_auto(simular=False):
         acciones.append({"slug": None, "paso": "meta", "ok": True, "archivos_cambiados": ["gps/meta.json"],
                          "docs": [{"coleccion": "meta", "doc_id": "actual", "archivo": "gps/meta.json"}]})
     resumen = {"ahora": iso(ahora), "actual": meta["actual"], "acciones": acciones, "comandos_colector": comandos,
-               "docs_a_publicar": [x for a in acciones for x in a.get("docs", [])]}
+               "docs_a_publicar": [x for a in acciones for x in a.get("docs", [])],
+               "reintentar": reintentos(acciones, ahora)}
     if not simular:
         escribir_json(GPS_DIR / "ultimo_auto.json", resumen)
     print(json.dumps(resumen, ensure_ascii=False, indent=1))

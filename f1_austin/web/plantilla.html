@@ -34,6 +34,7 @@
   color-scheme:dark;
 }
 *,*::before,*::after{box-sizing:border-box}
+[hidden]{display:none!important}   /* .recta (grid) y .parrilla__pie (flex) pisaban el atributo hidden en los GP sin pronóstico */
 html{-webkit-text-size-adjust:100%;scroll-behavior:smooth;scroll-padding-top:calc(var(--nav-h) + env(safe-area-inset-top,0px) + 12px);background:var(--noche)}
 body{margin:0;background:var(--noche);color:var(--hueso);font:300 16px/1.65 var(--f-body);-webkit-font-smoothing:antialiased;overflow-x:hidden}
 main,section,header,footer{overflow-x:clip}
@@ -1423,6 +1424,8 @@ function hora(iso){
   try { return new Intl.DateTimeFormat("es-MX", {timeZone:INFO.tz || "UTC", hour:"numeric", minute:"2-digit"}).format(d) + " " + (INFO.etq || "UTC"); }
   catch(e){ return d.toISOString().slice(11,16) + " UTC"; }
 }
+/* Sello "Actualizado": con fecha (la página guarda GP pasados y corridas en retrospectiva; sólo la hora confundía) */
+function fechaHora(iso){ var f = fecha(iso, false), h = hora(iso); return f ? f + ", " + h : h; }
 function horaUTC(iso){ var d = new Date(iso); return isNaN(d) ? "" : d.toISOString().slice(11,16) + " UTC"; }
 function fecha(iso, conDia){
   var d = new Date(iso); if (isNaN(d)) return "";
@@ -1662,7 +1665,7 @@ function renderMetricas(){
   var fase = !GP ? "Sin pronóstico aún" : GP.fase === "FP3" ? "Con FP1 + FP2 + FP3" : GP.fase === "FP1" ? "Con FP1" : "Con FP1 + FP2";
   $("#pill-fase").textContent = fase;
   $("#paso-modelo").textContent = "Se probaron diez modelos y ganó " + (GP && GP.modelo ? GP.modelo : "un Random Forest") + ". Luego simula la qualy 20 000 veces, sumando al pronóstico los errores que tuvo en la validación; de ahí salen las probabilidades de Q3, Top 3 y pole.";
-  $("#pie-act").textContent = "Pronóstico actualizado: " + (GP && GP.actualizado ? hora(GP.actualizado) : "—") + " · " + fase;
+  $("#pie-act").textContent = "Pronóstico actualizado: " + (GP && GP.actualizado ? fechaHora(GP.actualizado) : "—") + " · " + fase;
 }
 function setNum(sel, v, dec){ var el = $(sel); if (!el) return; el.dataset.valor = v; el.dataset.dec = dec; if (!el.dataset.animando) el.textContent = Number(v).toFixed(dec); }
 
@@ -2117,7 +2120,7 @@ function renderPost(){
   });
   h.push('<div class="rev__grid">' +
     '<aside class="resumen rv"><p class="ceja">El veredicto</p><p class="resumen__cita">' + esc(res) + '</p>' +
-      '<p class="meta"><span>Resultado oficial</span>' + (POST.actualizado ? '<span>Actualizado: ' + esc(hora(POST.actualizado)) + '</span>' : '') + '</p></aside>' +
+      '<p class="meta"><span>Resultado oficial</span>' + (POST.actualizado ? '<span>Actualizado: ' + esc(fechaHora(POST.actualizado)) + '</span>' : '') + '</p></aside>' +
     (filas.length ? '<div class="rev__tabla rv"><div class="rev-cab" aria-hidden="true"><span>Real</span><span></span><span>Piloto</span><span>Pron.</span><span>Dif.</span><span>Pronóstico → real</span></div>' +
       '<ol class="rev-lista" aria-label="Qualy real contra el pronóstico">' + filas.join("") + '</ol>' +
       '<div class="leyenda"><span><i class="m-pr"></i>Pronóstico</span><span><i class="m-re"></i>Resultado</span><span><b class="sube">▲</b> mejor que lo pronosticado · <b class="baja">▼</b> peor</span></div></div>' : '') +
@@ -2237,7 +2240,7 @@ function renderCarrera(){
   var wa = nn(v.win_acc); if (wa != null && wa <= 1) wa *= 100;
   var ngp = pn(v.n_gp);
   h.push('<div class="valida rv"><div><p class="ceja">El simulador, puesto a prueba</p><p class="txt" style="font-size:14px">Promedios en ' + (ngp ? ngp + ' carreras' : 'carreras anteriores') + ' con validación walk-forward: cada GP se pronosticó sólo con datos de las carreras previas.</p>' +
-    '<p class="meta" style="margin-top:14px">' + (CARRERA.modelo ? '<span>Modelo: ' + esc(CARRERA.modelo) + '</span>' : '') + (CARRERA.parrilla_fuente ? '<span>Parrilla: ' + esc(CARRERA.parrilla_fuente) + '</span>' : '') + (CARRERA.actualizado ? '<span>Actualizado: ' + esc(hora(CARRERA.actualizado)) + '</span>' : '') + '</p></div>' +
+    '<p class="meta" style="margin-top:14px">' + (CARRERA.modelo ? '<span>Modelo: ' + esc(CARRERA.modelo) + '</span>' : '') + (CARRERA.parrilla_fuente ? '<span>Parrilla: ' + esc(CARRERA.parrilla_fuente) + '</span>' : '') + (CARRERA.actualizado ? '<span>Actualizado: ' + esc(fechaHora(CARRERA.actualizado)) + '</span>' : '') + '</p></div>' +
     '<dl class="metricas">' +
       tile("Top 10 acertado", fija(v.top10_hits, 1), "/10", "Pilotos del Top 10 pronosticado que terminan ahí") +
       tile("Ganador acertado", wa == null ? "—" : wa.toFixed(0), "%", "Carreras en que el favorito ganó") +
@@ -2720,7 +2723,7 @@ function bloqueValidacion(D){
   var nota = v && typeof v.nota === "string" && v.nota.trim() ? v.nota.trim() : "";
   if (!tiles.length && !nota && !D.V.modelo) return "";
   return '<div class="valida rv"><div><p class="ceja">El simulador vuelta a vuelta</p><p class="txt" style="font-size:14px">' + esc(nota || "Cómo le fue a esta simulación contra carreras reales anteriores.") + '</p>' +
-    '<p class="meta" style="margin-top:14px">' + (D.V.modelo ? '<span>Modelo: ' + esc(D.V.modelo) + '</span>' : '') + (pn(D.V.n_sims) ? '<span>' + miles(pn(D.V.n_sims)) + ' carreras simuladas</span>' : '') + (D.V.actualizado ? '<span>Actualizado: ' + esc(hora(D.V.actualizado)) + '</span>' : '') + '</p></div>' +
+    '<p class="meta" style="margin-top:14px">' + (D.V.modelo ? '<span>Modelo: ' + esc(D.V.modelo) + '</span>' : '') + (pn(D.V.n_sims) ? '<span>' + miles(pn(D.V.n_sims)) + ' carreras simuladas</span>' : '') + (D.V.actualizado ? '<span>Actualizado: ' + esc(fechaHora(D.V.actualizado)) + '</span>' : '') + '</p></div>' +
     (tiles.length ? '<dl class="metricas vv-val">' + tiles.join("") + '</dl>' : '<div></div>') + '</div>';
 }
 
@@ -2738,7 +2741,7 @@ function renderVueltas(){
   var res = typeof V.resumen === "string" && V.resumen.trim() ? V.resumen.trim() :
     (comunE ? "El plan más común es " + planTxt(comunE.gs) + "." : "") + (D.total != null ? " Se esperan unos " + Math.round(D.total) + " rebases en pista." : "") + (D.SC.prob != null ? " Safety car: " + Math.round(D.SC.prob * 100) + "%." : "");
   h.push('<div class="vv-cab rv"><div><p class="ceja">' + (pn(V.n_sims) ? miles(pn(V.n_sims)) + " carreras simuladas" : "La carrera simulada") + '</p>' +
-      '<p class="resumen__cita">' + esc(res) + '</p>' + (V.actualizado ? '<p class="meta" style="margin-top:16px"><span>Actualizado: ' + esc(hora(V.actualizado)) + '</span></p>' : '') + '</div>' +
+      '<p class="resumen__cita">' + esc(res) + '</p>' + (V.actualizado ? '<p class="meta" style="margin-top:16px"><span>Actualizado: ' + esc(fechaHora(V.actualizado)) + '</span></p>' : '') + '</div>' +
     '<dl class="metricas">' +
       tile("Rebases en pista", D.total == null ? "—" : String(Math.round(D.total)), "", "Esperados en " + N + " vueltas, sin contar los cambios por pits") +
       tile("Safety car", D.SC.prob == null ? "—" : String(Math.round(D.SC.prob * 100)), "%", D.SC.rangos.length ? "Suele salir en " + D.SC.rangos.slice(0, 3).map(function(r){ return rangoTxt(r[0], r[1]); }).join(", ") : "Probabilidad de al menos uno") +
@@ -2884,7 +2887,7 @@ function renderPostCarrera(){
   });
   h.push('<div class="rev__grid">' +
     '<aside class="resumen rv"><p class="ceja">El veredicto</p><p class="resumen__cita">' + esc(res) + '</p>' +
-      '<p class="meta"><span>Resultado oficial</span>' + (P.actualizado ? '<span>Actualizado: ' + esc(hora(P.actualizado)) + '</span>' : '') + '</p></aside>' +
+      '<p class="meta"><span>Resultado oficial</span>' + (P.actualizado ? '<span>Actualizado: ' + esc(fechaHora(P.actualizado)) + '</span>' : '') + '</p></aside>' +
     (filas.length ? '<div class="rev__tabla rv"><div class="rev-cab" aria-hidden="true"><span>Meta</span><span></span><span>Piloto</span><span>Pron.</span><span>Dif.</span><span>Pronóstico → real</span></div>' +
       '<ol class="rev-lista" aria-label="Resultado de la carrera contra el pronóstico">' + filas.join("") + '</ol>' +
       '<div class="leyenda"><span><i class="m-pr"></i>Pronóstico</span><span><i class="m-re"></i>Resultado</span><span><b class="sube">▲</b> mejor que lo pronosticado · <b class="baja">▼</b> peor</span><span>AB: abandono · DSQ: descalificado</span></div></div>' : '') +

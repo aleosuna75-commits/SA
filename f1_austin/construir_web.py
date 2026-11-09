@@ -156,7 +156,9 @@ def catalogo(gps_dir, meta, poles):
     for g in (meta or {}).get("gps", []):
         if isinstance(g, dict) and SLUG_OK.match(str(g.get("slug", ""))) and g["slug"] not in slugs:
             slugs.append(g["slug"])
-    for p in sorted(gps_dir.glob("*/")):
+    # carpetas gps/<slug>/ sólo si meta.json no trae calendario: meta (gp_pipeline.py) ya lista los GPs desde México;
+    # una carpeta suelta (p. ej. una config de un GP anterior) no debe aparecer en el menú
+    for p in (sorted(gps_dir.glob("*/")) if not slugs else []):
         if SLUG_OK.match(p.name) and p.name not in slugs and (p / "config.json").exists():
             slugs.append(p.name)
     for s in CURADO:
