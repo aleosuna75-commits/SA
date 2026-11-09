@@ -1,0 +1,56 @@
+{
+ "actualizado": "2026-11-09T04:52:34Z",
+ "tareas": {
+  "qualy_fp1": {
+   "vigente": "base",
+   "historial": [
+    {
+     "variante": "base",
+     "desde": "2000-01-01T00:00:00Z",
+     "config": {
+      "seleccion": "auto"
+     }
+    }
+   ]
+  },
+  "qualy_fp2": {
+   "vigente": "base",
+   "historial": [
+    {
+     "variante": "base",
+     "desde": "2000-01-01T00:00:00Z",
+     "config": {
+      "seleccion": "auto"
+     }
+    }
+   ]
+  },
+  "qualy_fp3": {
+   "vigente": "base",
+   "historial": [
+    {
+     "variante": "base",
+     "desde": "2000-01-01T00:00:00Z",
+     "config": {
+      "seleccion": "auto"
+     }
+    }
+   ]
+  },
+  "carrera": {
+   "vigente": "base",
+   "historial": [
+    {
+     "variante": "base",
+     "desde": "2000-01-01T00:00:00Z",
+     "config": {
+      "mc_var": {
+       "is26": false,
+       "gn_inter": true
+      }
+     }
+    }
+   ]
+  }
+ }
+}

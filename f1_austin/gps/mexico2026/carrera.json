@@ -435,5 +435,6 @@
    "nota": "riesgo de degradación"
   }
  ],
- "resumen": "El simulador (20 000 carreras) ve a Lewis Hamilton como favorito (33% de victoria); el podio más probable es HAM, RUS, LEC. Estrategia esperada: 1 parada (pérdida en pits ≈ 22 s). Remontan PIA (12.º → 9.º, por ritmo de carrera), LAW (22.º → 12.º, tras su penalización); pierden terreno ALB (16.º → 19.º, por forma reciente). Lawson, descalificado de la qualy, sale P22 pero el simulador lo ve remontar hasta cerca del Top 10."
+ "resumen": "El simulador (20 000 carreras) ve a Lewis Hamilton como favorito (33% de victoria); el podio más probable es HAM, RUS, LEC. Estrategia esperada: 1 parada (pérdida en pits ≈ 22 s). Remontan PIA (12.º → 9.º, por ritmo de carrera), LAW (22.º → 12.º, tras su penalización); pierden terreno ALB (16.º → 19.º, por forma reciente). Lawson, descalificado de la qualy, sale P22 pero el simulador lo ve remontar hasta cerca del Top 10.",
+ "preliminar": false
 }

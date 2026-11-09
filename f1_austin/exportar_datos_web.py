@@ -5,7 +5,7 @@ previo (.pkl del mismo tipo o prediccion_qualy_*.csv) para calcular 'cambio' = p
 (positivo = el piloto sube en el pronóstico).
 
 Salida (por defecto web_<slug>/datos_gp.json):
-  { actualizado: ISO-UTC, fase: "FP2"|"FP3", modelo: str,
+  { actualizado: ISO-UTC, fase: "FP1"|"FP2"|"FP3", modelo: str,
     metricas: {top10_hits, top10_hits_2026, spearman, pole_acc},
     pilotos: [ {acr, nombre, equipo, color, pred, p_q3, p_pole, p_top3, p10, p90, fp1, fp2, fp3, cambio} ] }
 
@@ -137,7 +137,7 @@ def construir(ruta_resultado, previo=None):
 
 def validar(doc):
     assert set(doc) == {"actualizado", "fase", "modelo", "metricas", "pilotos"}
-    assert doc["fase"] in ("FP2", "FP3")
+    assert doc["fase"] in ("FP1", "FP2", "FP3")
     assert set(doc["metricas"]) == {"top10_hits", "top10_hits_2026", "spearman", "pole_acc"}
     claves = {"acr", "nombre", "equipo", "color", "pred", "p_q3", "p_pole", "p_top3", "p10", "p90",
               "fp1", "fp2", "fp3", "cambio"}

@@ -43,7 +43,63 @@ Resultados retro/evaluación: Brasil qualy 6/10 (pole NOR; modelo ANT), carrera 
 
 ## Mejora continua (pedido 9/11 ~02:45 UTC): "que mejore automáticamente tras cada sesión"
 Workflow wf6fu1mrp (hora límite 06:30 + verificación 07:30 UTC): paso post_fp1 + pronóstico preliminar de carrera tras cada práctica
-(historial.json por GP), ciclo campeón/retador `mejora_modelos.py ciclo` tras cada carrera (adopta sólo si mejora > 1 EE pareado y no
+(historial.json por GP), ciclo campeón/retador `mejora_modelos.py ciclo` tras cada carrera (adopta sólo si mejora > z_crit EE [corregido: era 1 EE] y no
 empeora en los últimos 8 GP; bitácora en modelos/bitacora.json → doc bitacora/actual), sección "Evolución del modelo" en la página.
-- [ ] Integrar: reglas db nuevas (historial, bitacora), publicar, runbook RB-0 (post-FP1) y RB-7 (mejora tras carrera),
-      tareas nuevas: post-FP1 (LV 20/11 01:50, QAT 27/11 15:00, ABU 04/12 11:00 UTC) y RB-7 (después de cada RB-6)
+- [x] Integrar: reglas db nuevas (historial, bitacora), publicar, runbook RB-0 (post-FP1) y RB-7 (mejora tras carrera),
+      tareas nuevas: post-FP1 (LV 20/11 01:50, QAT 27/11 14:50, ABU 04/12 10:50 UTC) y RB-7 (LV 22/11 08:00, QAT 29/11
+      20:00, ABU 06/12 17:00 UTC); RB-6 pasa a `F1_SIN_MEJORA=1 ... auto`
+
+## Mejora continua tras cada sesión (pedido 9/11/2026: "que mejore automáticamente tras cada sesión")
+- [x] Paso `post_fp1` (qualy sólo con FP1 + historial, `--fp1`) y carrera PRELIMINAR en post_fp1/pre_qualy/fp3 (parrilla =
+      qualy pronosticada; `preliminar: true`); post_qualy la reemplaza. `historial.json` por GP (fases FP1/FP2/FP3/Q y cambios).
+- [x] `mejora_modelos.py` (campeón/retador; modelos/registro.json, config_activa.json, bitacora.json, cache/) y paso `mejora`
+      en `auto` tras post_carrera (una vez por GP).
+- [x] México y Brasil: historial.json rellenado en retro sin fugas (`gp_pipeline.py historial <mk>`).
+- [ ] Artifact: agregar reglas db para las colecciones nuevas `historial` y `bitacora` y sembrar historial/mexico2026,
+      historial/brasil2026, bitacora/actual (+ republicar carrera/mexico2026, carrera/brasil2026 con `preliminar: false`,
+      y meta/actual). La página ya los muestra (#trayecto "Cómo cambió el pronóstico" y #evolucion "Evolución del modelo").
+- [x] Tareas programadas RB-0 (post-FP1) — sugeridas, UTC: Las Vegas 20/11 01:50 · Qatar 27/11 14:50 · Abu Dabi 04/12 10:50.
+      Sin RB-0, la RB-1 corre post_fp1 + pre_qualy juntos (≈ +8 min; historial igual completo).
+
+Verificación adversarial (9/11 04:30–05:15 UTC): sin fugas (filas de los 89 GP previos idénticas con y sin los datos de
+Brasil; FP1/FP2/FP3 preliminares sólo con su corte), México FP2/FP3 y Brasil FP3/carrera se reproducen idénticos. La regla
+"> 1 EE" adoptaba ruido (RF idéntico con otra semilla: 7/30 pasaban; Monte Carlo: 4/12) -> regla corregida (abajo); las
+adopciones rf_fijo del primer ciclo (qualy FP1 y FP3, z 1,42 y 2,05: dentro del ruido de semilla) se revirtieron (ningún
+pronóstico publicado las usó) y el ciclo se rehizo: 0 adopciones, racecraft_form3 descartado. auto: mejora va al final;
+F1_SIN_MEJORA; post_fp1 tardío ya no pisa carrera.json de una fase posterior. Página: lista de candidatos rota a 390 px
+(columna de nombre de 20 px) corregida.
+
+Cambios al RUNBOOK (verificados 9/11 ~05 UTC; además de lo anterior):
+- TODAS las corridas de `auto` con modelos (RB-0, RB-1, RB-3, fin de RB-4, RB-7) van con run_in_background y se espera a que
+  termine (pre_qualy ≈ 8 min + carrera preliminar ≈ 2 min + descarga: pasa el tope de 10 min de una llamada en primer plano).
+- RB-0 post-FP1 (nuevo; fin de FP1 + 20 min. UTC: Las Vegas 20/11 01:50 · Qatar 27/11 14:50 · Abu Dabi 04/12 10:50):
+  `python3 gp_pipeline.py auto` en segundo plano (post_fp1: descarga + `modelo_qualy_austin.py <mk> --fp1` + carrera
+  PRELIMINAR; ≈ 10–12 min con la selección automática; la FP2 empieza 2 h 30 después del fin de la FP1). Leer `gps/ultimo_auto.json`. Si trae
+  `reintentar` con hora, send_later con este RB-0 a esa hora; si `reintentar_utc` es null lo recoge RB-1 (post_fp1 no
+  bloquea a pre_qualy). Publicar `docs_a_publicar` (gp/<slug> fase FP1, carrera/<slug> con preliminar: true,
+  historial/<slug>, meta/actual) igual que RB-1 (docs + construir_web + Artifact + publicar_sitio + commit). Avisar corto:
+  Top 10 de qualy con sólo la FP1 y ganador PRELIMINAR (parrilla = qualy pronosticada).
+- RB-1 / RB-3: además de gp publican carrera (preliminar) e historial. Avisar qué cambió (historial.fases[-1].cambios).
+- RB-4: post_qualy publica también historial (fase Q: carrera con la parrilla real, preliminar: false). `auto` sólo corre
+  post_qualy desde fin de qualy + 10 min (LV 05:10 UTC): si se llama antes y no aparece post_qualy, repetir a esa hora.
+- RB-6 (carrera + 2 h 15): `F1_SIN_MEJORA=1 python3 gp_pipeline.py auto` (sólo post_carrera, ~1 min; el ciclo de mejora
+  NO corre aquí). Publicar y avisar como antes. Si OpenF1 aún no tiene el resultado: reintento +1 h (igual).
+- RB-7 mejora (nuevo; carrera + 4 h, para que Jolpica ya tenga la carrera. UTC: Las Vegas 22/11 08:00 · Qatar 29/11 20:00 ·
+  Abu Dabi 06/12 17:00): `python3 gp_pipeline.py auto` en segundo plano (timeout 2 h): repite post_carrera ("sin
+  cambios") y corre `mejora` (descarga, `mejora_modelos.py ciclo`, presupuesto F1_PRESUPUESTO_MEJORA = 40 min; normal
+  5–10 min porque la cache sólo recalcula el GP nuevo). Leer `gps/ultimo_auto.json`: publicar bitacora/actual
+  (modelos/bitacora.json; leer versión y pasar if_version) + meta si cambió; construir_web + Artifact + publicar_sitio +
+  commit. Avisar: adopciones nuevas (bitacora.cambios con fecha de hoy: tarea, de → a, diferencia, EE, z) o "sin
+  cambios: el modelo vigente sigue siendo el mejor" (+ 1 línea con aciertos del GP de bitacora.evolucion). Si la acción
+  mejora falló o `ultimo_ciclo.sin_tiempo` no está vacío: un reintento con `python3 gp_pipeline.py paso mejora <mk>
+  --forzar` en segundo plano 2 h después (antes de la FP1 del GP siguiente − 2 h); si no hubo carrera en Jolpica, la tarea
+  carrera la toma el ciclo siguiente. `mejora` es una vez por GP y en `auto` corre siempre al final (después de los pasos
+  de un GP en curso).
+- Regla de adopción (corregida en la verificación): mejora > z_crit EE con z_crit = max(2, Bonferroni unilateral 10 % sobre
+  los k retadores; 2,33 con 10, 2,47 con 15), sin empeorar en los últimos 8 GP, y confirmada con 3 semillas (campeón:
+  producción + 1, 2; retador: producción + 3, 4; en carrera el EE suma el ruido de semilla del Monte Carlo).
+- Un agente puede proponer variantes: `python3 mejora_modelos.py agregar-candidato '<json>'` (se evalúan en el próximo
+  ciclo y sólo se adoptan si pasan esa regla).
+05:15 UTC 9/11: Artifact v20 (9 reglas db), docs historial/{mexico2026,brasil2026}, bitacora/actual v1, carrera/mexico2026 v5,
+carrera/brasil2026 v2, meta/actual v2. Tareas nuevas: RB-0 LV 20/11 01:50 · QAT 27/11 14:50 · ABU 04/12 10:50; RB-7 LV 22/11 08:00 ·
+QAT 29/11 20:00 · ABU 06/12 17:00 (UTC). Total 24 tareas programadas. Primer ciclo de mejora (regla corregida): 0 adopciones.

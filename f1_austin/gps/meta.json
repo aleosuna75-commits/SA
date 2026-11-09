@@ -1,5 +1,5 @@
 {
- "actualizado": "2026-11-09T02:19:02Z",
+ "actualizado": "2026-11-09T04:52:34Z",
  "actual": "brasil2026",
  "gps": [
   {
@@ -67,6 +67,7 @@
    "qualy_texto": "Sábado 31 de octubre de 2026, 3:00 PM (hora local, UTC−6)",
    "carrera_texto": "Domingo 1 de noviembre de 2026, 2:00 PM (hora local, UTC−6)",
    "pasos": {
+    "post_fp1": "2026-11-09T03:51:10Z",
     "pre_qualy": "2026-10-31T16:21:46Z",
     "fp3": "2026-10-31T19:04:16Z",
     "qualy_en_vivo": "2026-10-31T22:09:31Z",
@@ -79,7 +80,8 @@
     "postqualy": "postqualy/mexico2026",
     "carrera": "carrera/mexico2026",
     "vueltas": "vueltas/mexico2026",
-    "postcarrera": "postcarrera/mexico2026"
+    "postcarrera": "postcarrera/mexico2026",
+    "historial": "historial/mexico2026"
    }
   },
   {
@@ -147,11 +149,13 @@
    "qualy_texto": "Sábado 7 de noviembre de 2026, 3:00 PM (hora local, UTC−3)",
    "carrera_texto": "Domingo 8 de noviembre de 2026, 2:00 PM (hora local, UTC−3)",
    "pasos": {
+    "post_fp1": "2026-11-09T04:28:23Z",
     "pre_qualy": "2026-11-09T01:56:06Z",
     "fp3": "2026-11-09T01:57:41Z",
     "qualy_en_vivo": "2026-11-09T02:08:55Z",
     "post_qualy": "2026-11-09T02:07:39Z",
-    "post_carrera": "2026-11-09T02:07:40Z"
+    "post_carrera": "2026-11-09T02:07:40Z",
+    "mejora": "2026-11-09T04:52:34Z"
    },
    "docs": {
     "gp": "gp/brasil2026",
@@ -159,7 +163,8 @@
     "postqualy": "postqualy/brasil2026",
     "carrera": "carrera/brasil2026",
     "vueltas": "vueltas/brasil2026",
-    "postcarrera": "postcarrera/brasil2026"
+    "postcarrera": "postcarrera/brasil2026",
+    "historial": "historial/brasil2026"
    }
   },
   {

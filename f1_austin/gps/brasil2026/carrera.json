@@ -435,5 +435,6 @@
    "nota": "riesgo de abandono"
   }
  ],
- "resumen": "El simulador (20 000 carreras) ve a Lando Norris como favorito (37% de victoria); el podio más probable es NOR, ANT, HAD. Estrategia esperada: 3 paradas (pérdida en pits ≈ 22 s). Remontan LEC (14.º → 7.º, tras su penalización), VER (21.º → 8.º, tras su penalización), HAM (20.º → 9.º, tras su penalización); pierden terreno BEA (6.º → 10.º, por ritmo de carrera), ALO (8.º → 12.º, por ritmo de carrera)."
+ "resumen": "El simulador (20 000 carreras) ve a Lando Norris como favorito (37% de victoria); el podio más probable es NOR, ANT, HAD. Estrategia esperada: 3 paradas (pérdida en pits ≈ 22 s). Remontan LEC (14.º → 7.º, tras su penalización), VER (21.º → 8.º, tras su penalización), HAM (20.º → 9.º, tras su penalización); pierden terreno BEA (6.º → 10.º, por ritmo de carrera), ALO (8.º → 12.º, por ritmo de carrera).",
+ "preliminar": false
 }

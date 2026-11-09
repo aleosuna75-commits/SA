@@ -1,0 +1,2158 @@
+{
+ "actualizado": "2026-11-09T04:52:34Z",
+ "ventana_reciente": 8,
+ "regla": "Se adopta un retador sólo si su diferencia media pareada por GP en la métrica principal (qualy: aciertos en el Top 10; carrera: NDCG@10) supera 1 error estándar pareado sobre todos los GP del walk-forward y no es negativa en los últimos 8 GP.",
+ "tareas": {
+  "qualy_fp1": {
+   "metrica": "top10_hits",
+   "campeon": "base",
+   "desde": "2000-01-01T00:00:00Z",
+   "variantes": {
+    "base": {
+     "descripcion": "Configuración original: el walk-forward compara el catálogo (baselines, Ridge, RF, ET, GB, XGBoost, LightGBM, rankers y 2 ensambles) y usa el mejor por aciertos en el Top 10",
+     "config": {
+      "seleccion": "auto"
+     },
+     "estado": "campeon",
+     "origen": "predefinido",
+     "agregado": "2026-11-09T03:27:13Z",
+     "evaluacion": {
+      "fecha": "2026-11-09T04:52:25Z",
+      "modelo_hoy": "selección automática (hoy elige Ridge)",
+      "top10_hits": 8.0588,
+      "n_gp": 68,
+      "top10_hits_reciente": 8.25,
+      "pole": 0.353,
+      "mae": 2.999,
+      "spearman": 0.7566,
+      "top3_hits": 1.676
+     }
+    },
+    "rf_fijo": {
+     "descripcion": "Random Forest fijo (sin selección automática del modelo)",
+     "config": {
+      "seleccion": "fijo",
+      "fijo": "Random Forest"
+     },
+     "estado": "retador",
+     "origen": "predefinido",
+     "agregado": "2026-11-09T03:27:13Z",
+     "evaluacion": {
+      "fecha": "2026-11-09T04:52:25Z",
+      "modelo_hoy": "Random Forest",
+      "top10_hits": 8.1176,
+      "n_gp": 68,
+      "top10_hits_reciente": 8.25,
+      "pole": 0.309,
+      "mae": 2.956,
+      "spearman": 0.762,
+      "top3_hits": 1.721,
+      "vs_campeon": {
+       "metrica": "top10_hits",
+       "antes": 8.0588,
+       "despues": 8.1176,
+       "diferencia": 0.0588,
+       "ee": 0.0413,
+       "ee_pareado": 0.0413,
+       "ee_semilla": 0.0,
+       "n_gp": 68,
+       "z": 1.42,
+       "z_critico": 2.33,
+       "ventana_reciente": {
+        "n_gp": 8,
+        "antes": 8.25,
+        "despues": 8.25,
+        "diferencia": 0.0
+       },
+       "pasa_regla": false
+      }
+     }
+    },
+    "ens_arboles_fijo": {
+     "descripcion": "Ensamble de árboles fijo (RF+ET+GB+XGB+LGB, promedio de rankings)",
+     "config": {
+      "seleccion": "fijo",
+      "fijo": "Ensamble árboles (RF+ET+GB+XGB+LGB)"
+     },
+     "estado": "retador",
+     "origen": "predefinido",
+     "agregado": "2026-11-09T03:27:13Z",
+     "evaluacion": {
+      "fecha": "2026-11-09T04:52:26Z",
+      "modelo_hoy": "Ensamble árboles (RF+ET+GB+XGB+LGB)",
+      "top10_hits": 8.0441,
+      "n_gp": 68,
+      "top10_hits_reciente": 8.125,
+      "pole": 0.221,
+      "mae": 2.995,
+      "spearman": 0.7588,
+      "top3_hits": 1.618,
+      "vs_campeon": {
+       "metrica": "top10_hits",
+       "antes": 8.0588,
+       "despues": 8.0441,
+       "diferencia": -0.0147,
+       "ee": 0.0611,
+       "ee_pareado": 0.0611,
+       "ee_semilla": 0.0,
+       "n_gp": 68,
+       "z": -0.24,
+       "z_critico": 2.33,
+       "ventana_reciente": {
+        "n_gp": 8,
+        "antes": 8.25,
+        "despues": 8.125,
+        "diferencia": -0.125
+       },
+       "pasa_regla": false
+      }
+     }
+    },
+    "ens_rf_et_ridge": {
+     "descripcion": "Ensamble RF+ET+Ridge (promedio de rankings)",
+     "config": {
+      "seleccion": "fijo",
+      "fijo": "Ensamble RF+ET+Ridge",
+      "ensambles": {
+       "Ensamble RF+ET+Ridge": [
+        "Random Forest",
+        "Extra Trees",
+        "Ridge"
+       ]
+      }
+     },
+     "estado": "retador",
+     "origen": "predefinido",
+     "agregado": "2026-11-09T03:27:13Z",
+     "evaluacion": {
+      "fecha": "2026-11-09T04:52:26Z",
+      "modelo_hoy": "Ensamble RF+ET+Ridge",
+      "top10_hits": 8.1176,
+      "n_gp": 68,
+      "top10_hits_reciente": 8.25,
+      "pole": 0.309,
+      "mae": 2.945,
+      "spearman": 0.7646,
+      "top3_hits": 1.721,
+      "vs_campeon": {
+       "metrica": "top10_hits",
+       "antes": 8.0588,
+       "despues": 8.1176,
+       "diferencia": 0.0588,
+       "ee": 0.0508,
+       "ee_pareado": 0.0508,
+       "ee_semilla": 0.0,
+       "n_gp": 68,
+       "z": 1.16,
+       "z_critico": 2.33,
+       "ventana_reciente": {
+        "n_gp": 8,
+        "antes": 8.25,
+        "despues": 8.25,
+        "diferencia": 0.0
+       },
+       "pasa_regla": false
+      }
+     }
+    },
+    "ens_rf_rankers": {
+     "descripcion": "Ensamble RF+ET+LambdaRank+XGBoost Ranker (regresión + ranking)",
+     "config": {
+      "seleccion": "fijo",
+      "fijo": "Ensamble RF+ET+rankers",
+      "ensambles": {
+       "Ensamble RF+ET+rankers": [
+        "Random Forest",
+        "Extra Trees",
+        "LightGBM LambdaRank",
+        "XGBoost Ranker"
+       ]
+      }
+     },
+     "estado": "retador",
+     "origen": "predefinido",
+     "agregado": "2026-11-09T03:27:13Z",
+     "evaluacion": {
+      "fecha": "2026-11-09T04:52:26Z",
+      "modelo_hoy": "Ensamble RF+ET+rankers",
+      "top10_hits": 8.0735,
+      "n_gp": 68,
+      "top10_hits_reciente": 8.125,
+      "pole": 0.338,
+      "mae": 3.005,
+      "spearman": 0.7576,
+      "top3_hits": 1.676,
+      "vs_campeon": {
+       "metrica": "top10_hits",
+       "antes": 8.0588,
+       "despues": 8.0735,
+       "diferencia": 0.0147,
+       "ee": 0.0574,
+       "ee_pareado": 0.0574,
+       "ee_semilla": 0.0,
+       "n_gp": 68,
+       "z": 0.26,
+       "z_critico": 2.33,
+       "ventana_reciente": {
+        "n_gp": 8,
+        "antes": 8.25,
+        "despues": 8.125,
+        "diferencia": -0.125
+       },
+       "pasa_regla": false
+      }
+     }
+    },
+    "rf_hojas2": {
+     "descripcion": "Random Forest con hojas más chicas (min_samples_leaf=2, max_features=0.3)",
+     "config": {
+      "seleccion": "fijo",
+      "fijo": "Random Forest",
+      "hiper": {
+       "Random Forest": {
+        "min_samples_leaf": 2,
+        "max_features": 0.3
+       }
+      }
+     },
+     "estado": "retador",
+     "origen": "predefinido",
+     "agregado": "2026-11-09T03:27:13Z",
+     "evaluacion": {
+      "fecha": "2026-11-09T04:52:26Z",
+      "modelo_hoy": "Random Forest",
+      "top10_hits": 8.0441,
+      "n_gp": 68,
+      "top10_hits_reciente": 8.125,
+      "pole": 0.265,
+      "mae": 2.95,
+      "spearman": 0.7616,
+      "top3_hits": 1.676,
+      "vs_campeon": {
+       "metrica": "top10_hits",
+       "antes": 8.0588,
+       "despues": 8.0441,
+       "diferencia": -0.0147,
+       "ee": 0.0534,
+       "ee_pareado": 0.0534,
+       "ee_semilla": 0.0,
+       "n_gp": 68,
+       "z": -0.28,
+       "z_critico": 2.33,
+       "ventana_reciente": {
+        "n_gp": 8,
+        "antes": 8.25,
+        "despues": 8.125,
+        "diferencia": -0.125
+       },
+       "pasa_regla": false
+      }
+     }
+    },
+    "rf_recencia_fuerte": {
+     "descripcion": "Random Forest con más peso a lo reciente (2026 x6, 2025 x2, antes x1)",
+     "config": {
+      "seleccion": "fijo",
+      "fijo": "Random Forest",
+      "pesos": {
+       "2026": 6.0,
+       "2025": 2.0,
+       "otros": 1.0
+      }
+     },
+     "estado": "retador",
+     "origen": "predefinido",
+     "agregado": "2026-11-09T03:27:13Z",
+     "evaluacion": {
+      "fecha": "2026-11-09T04:52:26Z",
+      "modelo_hoy": "Random Forest",
+      "top10_hits": 8.0882,
+      "n_gp": 68,
+      "top10_hits_reciente": 8.125,
+      "pole": 0.324,
+      "mae": 2.942,
+      "spearman": 0.7631,
+      "top3_hits": 1.691,
+      "vs_campeon": {
+       "metrica": "top10_hits",
+       "antes": 8.0588,
+       "despues": 8.0882,
+       "diferencia": 0.0294,
+       "ee": 0.0467,
+       "ee_pareado": 0.0467,
+       "ee_semilla": 0.0,
+       "n_gp": 68,
+       "z": 0.63,
+       "z_critico": 2.33,
+       "ventana_reciente": {
+        "n_gp": 8,
+        "antes": 8.25,
+        "despues": 8.125,
+        "diferencia": -0.125
+       },
+       "pasa_regla": false
+      }
+     }
+    },
+    "rf_pesos_planos": {
+     "descripcion": "Random Forest sin pesos por recencia (todos x1)",
+     "config": {
+      "seleccion": "fijo",
+      "fijo": "Random Forest",
+      "pesos": {
+       "2026": 1.0,
+       "2025": 1.0,
+       "otros": 1.0
+      }
+     },
+     "estado": "retador",
+     "origen": "predefinido",
+     "agregado": "2026-11-09T03:27:13Z",
+     "evaluacion": {
+      "fecha": "2026-11-09T04:52:26Z",
+      "modelo_hoy": "Random Forest",
+      "top10_hits": 8.0882,
+      "n_gp": 68,
+      "top10_hits_reciente": 8.25,
+      "pole": 0.324,
+      "mae": 2.966,
+      "spearman": 0.7604,
+      "top3_hits": 1.676,
+      "vs_campeon": {
+       "metrica": "top10_hits",
+       "antes": 8.0588,
+       "despues": 8.0882,
+       "diferencia": 0.0294,
+       "ee": 0.0512,
+       "ee_pareado": 0.0512,
+       "ee_semilla": 0.0,
+       "n_gp": 68,
+       "z": 0.57,
+       "z_critico": 2.33,
+       "ventana_reciente": {
+        "n_gp": 8,
+        "antes": 8.25,
+        "despues": 8.25,
+        "diferencia": 0.0
+       },
+       "pasa_regla": false
+      }
+     }
+    },
+    "rf_sin_circuito": {
+     "descripcion": "Random Forest sin el historial del piloto en el circuito (h_circ_*)",
+     "config": {
+      "seleccion": "fijo",
+      "fijo": "Random Forest",
+      "quitar": [
+       "h_circ_*"
+      ]
+     },
+     "estado": "retador",
+     "origen": "predefinido",
+     "agregado": "2026-11-09T03:27:13Z",
+     "evaluacion": {
+      "fecha": "2026-11-09T04:52:27Z",
+      "modelo_hoy": "Random Forest",
+      "top10_hits": 8.0882,
+      "n_gp": 68,
+      "top10_hits_reciente": 8.25,
+      "pole": 0.309,
+      "mae": 2.956,
+      "spearman": 0.7612,
+      "top3_hits": 1.676,
+      "vs_campeon": {
+       "metrica": "top10_hits",
+       "antes": 8.0588,
+       "despues": 8.0882,
+       "diferencia": 0.0294,
+       "ee": 0.0553,
+       "ee_pareado": 0.0553,
+       "ee_semilla": 0.0,
+       "n_gp": 68,
+       "z": 0.53,
+       "z_critico": 2.33,
+       "ventana_reciente": {
+        "n_gp": 8,
+        "antes": 8.25,
+        "despues": 8.25,
+        "diferencia": 0.0
+       },
+       "pasa_regla": false
+      }
+     }
+    },
+    "rf_sin_sectores": {
+     "descripcion": "Random Forest sin sectores ni velocidades punta (menos variables ruidosas)",
+     "config": {
+      "seleccion": "fijo",
+      "fijo": "Random Forest",
+      "quitar": [
+       "*_s1_gap",
+       "*_s2_gap",
+       "*_s3_gap",
+       "*_trap_delta",
+       "*_i1_delta",
+       "*_i2_delta"
+      ]
+     },
+     "estado": "retador",
+     "origen": "predefinido",
+     "agregado": "2026-11-09T03:27:13Z",
+     "evaluacion": {
+      "fecha": "2026-11-09T04:52:27Z",
+      "modelo_hoy": "Random Forest",
+      "top10_hits": 8.0735,
+      "n_gp": 68,
+      "top10_hits_reciente": 8.25,
+      "pole": 0.265,
+      "mae": 2.975,
+      "spearman": 0.7599,
+      "top3_hits": 1.735,
+      "vs_campeon": {
+       "metrica": "top10_hits",
+       "antes": 8.0588,
+       "despues": 8.0735,
+       "diferencia": 0.0147,
+       "ee": 0.0392,
+       "ee_pareado": 0.0392,
+       "ee_semilla": 0.0,
+       "n_gp": 68,
+       "z": 0.38,
+       "z_critico": 2.33,
+       "ventana_reciente": {
+        "n_gp": 8,
+        "antes": 8.25,
+        "despues": 8.25,
+        "diferencia": 0.0
+       },
+       "pasa_regla": false
+      }
+     }
+    },
+    "rf_debutantes_equipo": {
+     "descripcion": "Random Forest con prior de debutantes por escudería (forma de qualy del equipo + 2)",
+     "config": {
+      "seleccion": "fijo",
+      "fijo": "Random Forest",
+      "debutantes": "equipo"
+     },
+     "estado": "retador",
+     "origen": "predefinido",
+     "agregado": "2026-11-09T03:27:13Z",
+     "evaluacion": {
+      "fecha": "2026-11-09T04:52:27Z",
+      "modelo_hoy": "Random Forest",
+      "top10_hits": 8.0882,
+      "n_gp": 68,
+      "top10_hits_reciente": 8.25,
+      "pole": 0.309,
+      "mae": 2.949,
+      "spearman": 0.7621,
+      "top3_hits": 1.706,
+      "vs_campeon": {
+       "metrica": "top10_hits",
+       "antes": 8.0588,
+       "despues": 8.0882,
+       "diferencia": 0.0294,
+       "ee": 0.0512,
+       "ee_pareado": 0.0512,
+       "ee_semilla": 0.0,
+       "n_gp": 68,
+       "z": 0.57,
+       "z_critico": 2.33,
+       "ventana_reciente": {
+        "n_gp": 8,
+        "antes": 8.25,
+        "despues": 8.25,
+        "diferencia": 0.0
+       },
+       "pasa_regla": false
+      }
+     }
+    }
+   },
+   "modelo_hoy": "selección automática (hoy elige Ridge)"
+  },
+  "qualy_fp2": {
+   "metrica": "top10_hits",
+   "campeon": "base",
+   "desde": "2000-01-01T00:00:00Z",
+   "variantes": {
+    "base": {
+     "descripcion": "Configuración original: el walk-forward compara el catálogo (baselines, Ridge, RF, ET, GB, XGBoost, LightGBM, rankers y 2 ensambles) y usa el mejor por aciertos en el Top 10",
+     "config": {
+      "seleccion": "auto"
+     },
+     "estado": "campeon",
+     "origen": "predefinido",
+     "agregado": "2026-11-09T03:27:13Z",
+     "evaluacion": {
+      "fecha": "2026-11-09T04:52:27Z",
+      "modelo_hoy": "selección automática (hoy elige Random Forest)",
+      "top10_hits": 8.2059,
+      "n_gp": 68,
+      "top10_hits_reciente": 8.375,
+      "pole": 0.338,
+      "mae": 2.844,
+      "spearman": 0.7777,
+      "top3_hits": 1.794
+     }
+    },
+    "rf_fijo": {
+     "descripcion": "Random Forest fijo (sin selección automática del modelo)",
+     "config": {
+      "seleccion": "fijo",
+      "fijo": "Random Forest"
+     },
+     "estado": "retador",
+     "origen": "predefinido",
+     "agregado": "2026-11-09T03:27:13Z",
+     "evaluacion": {
+      "fecha": "2026-11-09T04:52:27Z",
+      "modelo_hoy": "Random Forest",
+      "top10_hits": 8.2059,
+      "n_gp": 68,
+      "top10_hits_reciente": 8.375,
+      "pole": 0.338,
+      "mae": 2.844,
+      "spearman": 0.7777,
+      "top3_hits": 1.794,
+      "vs_campeon": {
+       "metrica": "top10_hits",
+       "antes": 8.2059,
+       "despues": 8.2059,
+       "diferencia": 0.0,
+       "ee": 0.0,
+       "ee_pareado": 0.0,
+       "ee_semilla": 0.0,
+       "n_gp": 68,
+       "z": null,
+       "z_critico": 2.33,
+       "ventana_reciente": {
+        "n_gp": 8,
+        "antes": 8.375,
+        "despues": 8.375,
+        "diferencia": 0.0
+       },
+       "pasa_regla": false
+      }
+     }
+    },
+    "ens_arboles_fijo": {
+     "descripcion": "Ensamble de árboles fijo (RF+ET+GB+XGB+LGB, promedio de rankings)",
+     "config": {
+      "seleccion": "fijo",
+      "fijo": "Ensamble árboles (RF+ET+GB+XGB+LGB)"
+     },
+     "estado": "retador",
+     "origen": "predefinido",
+     "agregado": "2026-11-09T03:27:13Z",
+     "evaluacion": {
+      "fecha": "2026-11-09T04:52:27Z",
+      "modelo_hoy": "Ensamble árboles (RF+ET+GB+XGB+LGB)",
+      "top10_hits": 8.1618,
+      "n_gp": 68,
+      "top10_hits_reciente": 8.25,
+      "pole": 0.353,
+      "mae": 2.881,
+      "spearman": 0.7728,
+      "top3_hits": 1.765,
+      "vs_campeon": {
+       "metrica": "top10_hits",
+       "antes": 8.2059,
+       "despues": 8.1618,
+       "diferencia": -0.0441,
+       "ee": 0.0441,
+       "ee_pareado": 0.0441,
+       "ee_semilla": 0.0,
+       "n_gp": 68,
+       "z": -1.0,
+       "z_critico": 2.33,
+       "ventana_reciente": {
+        "n_gp": 8,
+        "antes": 8.375,
+        "despues": 8.25,
+        "diferencia": -0.125
+       },
+       "pasa_regla": false
+      }
+     }
+    },
+    "ens_rf_et_ridge": {
+     "descripcion": "Ensamble RF+ET+Ridge (promedio de rankings)",
+     "config": {
+      "seleccion": "fijo",
+      "fijo": "Ensamble RF+ET+Ridge",
+      "ensambles": {
+       "Ensamble RF+ET+Ridge": [
+        "Random Forest",
+        "Extra Trees",
+        "Ridge"
+       ]
+      }
+     },
+     "estado": "retador",
+     "origen": "predefinido",
+     "agregado": "2026-11-09T03:27:13Z",
+     "evaluacion": {
+      "fecha": "2026-11-09T04:52:27Z",
+      "modelo_hoy": "Ensamble RF+ET+Ridge",
+      "top10_hits": 8.1765,
+      "n_gp": 68,
+      "top10_hits_reciente": 8.375,
+      "pole": 0.338,
+      "mae": 2.835,
+      "spearman": 0.7789,
+      "top3_hits": 1.765,
+      "vs_campeon": {
+       "metrica": "top10_hits",
+       "antes": 8.2059,
+       "despues": 8.1765,
+       "diferencia": -0.0294,
+       "ee": 0.0417,
+       "ee_pareado": 0.0417,
+       "ee_semilla": 0.0,
+       "n_gp": 68,
+       "z": -0.7,
+       "z_critico": 2.33,
+       "ventana_reciente": {
+        "n_gp": 8,
+        "antes": 8.375,
+        "despues": 8.375,
+        "diferencia": 0.0
+       },
+       "pasa_regla": false
+      }
+     }
+    },
+    "ens_rf_rankers": {
+     "descripcion": "Ensamble RF+ET+LambdaRank+XGBoost Ranker (regresión + ranking)",
+     "config": {
+      "seleccion": "fijo",
+      "fijo": "Ensamble RF+ET+rankers",
+      "ensambles": {
+       "Ensamble RF+ET+rankers": [
+        "Random Forest",
+        "Extra Trees",
+        "LightGBM LambdaRank",
+        "XGBoost Ranker"
+       ]
+      }
+     },
+     "estado": "retador",
+     "origen": "predefinido",
+     "agregado": "2026-11-09T03:27:13Z",
+     "evaluacion": {
+      "fecha": "2026-11-09T04:52:28Z",
+      "modelo_hoy": "Ensamble RF+ET+rankers",
+      "top10_hits": 8.2059,
+      "n_gp": 68,
+      "top10_hits_reciente": 8.375,
+      "pole": 0.309,
+      "mae": 2.847,
+      "spearman": 0.7771,
+      "top3_hits": 1.809,
+      "vs_campeon": {
+       "metrica": "top10_hits",
+       "antes": 8.2059,
+       "despues": 8.2059,
+       "diferencia": 0.0,
+       "ee": 0.0468,
+       "ee_pareado": 0.0468,
+       "ee_semilla": 0.0,
+       "n_gp": 68,
+       "z": 0.0,
+       "z_critico": 2.33,
+       "ventana_reciente": {
+        "n_gp": 8,
+        "antes": 8.375,
+        "despues": 8.375,
+        "diferencia": 0.0
+       },
+       "pasa_regla": false
+      }
+     }
+    },
+    "rf_hojas2": {
+     "descripcion": "Random Forest con hojas más chicas (min_samples_leaf=2, max_features=0.3)",
+     "config": {
+      "seleccion": "fijo",
+      "fijo": "Random Forest",
+      "hiper": {
+       "Random Forest": {
+        "min_samples_leaf": 2,
+        "max_features": 0.3
+       }
+      }
+     },
+     "estado": "retador",
+     "origen": "predefinido",
+     "agregado": "2026-11-09T03:27:13Z",
+     "evaluacion": {
+      "fecha": "2026-11-09T04:52:28Z",
+      "modelo_hoy": "Random Forest",
+      "top10_hits": 8.1765,
+      "n_gp": 68,
+      "top10_hits_reciente": 8.5,
+      "pole": 0.368,
+      "mae": 2.867,
+      "spearman": 0.7773,
+      "top3_hits": 1.779,
+      "vs_campeon": {
+       "metrica": "top10_hits",
+       "antes": 8.2059,
+       "despues": 8.1765,
+       "diferencia": -0.0294,
+       "ee": 0.0361,
+       "ee_pareado": 0.0361,
+       "ee_semilla": 0.0,
+       "n_gp": 68,
+       "z": -0.81,
+       "z_critico": 2.33,
+       "ventana_reciente": {
+        "n_gp": 8,
+        "antes": 8.375,
+        "despues": 8.5,
+        "diferencia": 0.125
+       },
+       "pasa_regla": false
+      }
+     }
+    },
+    "rf_recencia_fuerte": {
+     "descripcion": "Random Forest con más peso a lo reciente (2026 x6, 2025 x2, antes x1)",
+     "config": {
+      "seleccion": "fijo",
+      "fijo": "Random Forest",
+      "pesos": {
+       "2026": 6.0,
+       "2025": 2.0,
+       "otros": 1.0
+      }
+     },
+     "estado": "retador",
+     "origen": "predefinido",
+     "agregado": "2026-11-09T03:27:13Z",
+     "evaluacion": {
+      "fecha": "2026-11-09T04:52:28Z",
+      "modelo_hoy": "Random Forest",
+      "top10_hits": 8.1618,
+      "n_gp": 68,
+      "top10_hits_reciente": 8.25,
+      "pole": 0.382,
+      "mae": 2.846,
+      "spearman": 0.7787,
+      "top3_hits": 1.765,
+      "vs_campeon": {
+       "metrica": "top10_hits",
+       "antes": 8.2059,
+       "despues": 8.1618,
+       "diferencia": -0.0441,
+       "ee": 0.0251,
+       "ee_pareado": 0.0251,
+       "ee_semilla": 0.0,
+       "n_gp": 68,
+       "z": -1.76,
+       "z_critico": 2.33,
+       "ventana_reciente": {
+        "n_gp": 8,
+        "antes": 8.375,
+        "despues": 8.25,
+        "diferencia": -0.125
+       },
+       "pasa_regla": false
+      }
+     }
+    },
+    "rf_pesos_planos": {
+     "descripcion": "Random Forest sin pesos por recencia (todos x1)",
+     "config": {
+      "seleccion": "fijo",
+      "fijo": "Random Forest",
+      "pesos": {
+       "2026": 1.0,
+       "2025": 1.0,
+       "otros": 1.0
+      }
+     },
+     "estado": "retador",
+     "origen": "predefinido",
+     "agregado": "2026-11-09T03:27:13Z",
+     "evaluacion": {
+      "fecha": "2026-11-09T04:52:28Z",
+      "modelo_hoy": "Random Forest",
+      "top10_hits": 8.1618,
+      "n_gp": 68,
+      "top10_hits_reciente": 8.375,
+      "pole": 0.353,
+      "mae": 2.856,
+      "spearman": 0.7771,
+      "top3_hits": 1.794,
+      "vs_campeon": {
+       "metrica": "top10_hits",
+       "antes": 8.2059,
+       "despues": 8.1618,
+       "diferencia": -0.0441,
+       "ee": 0.0388,
+       "ee_pareado": 0.0388,
+       "ee_semilla": 0.0,
+       "n_gp": 68,
+       "z": -1.14,
+       "z_critico": 2.33,
+       "ventana_reciente": {
+        "n_gp": 8,
+        "antes": 8.375,
+        "despues": 8.375,
+        "diferencia": 0.0
+       },
+       "pasa_regla": false
+      }
+     }
+    },
+    "rf_sin_circuito": {
+     "descripcion": "Random Forest sin el historial del piloto en el circuito (h_circ_*)",
+     "config": {
+      "seleccion": "fijo",
+      "fijo": "Random Forest",
+      "quitar": [
+       "h_circ_*"
+      ]
+     },
+     "estado": "retador",
+     "origen": "predefinido",
+     "agregado": "2026-11-09T03:27:13Z",
+     "evaluacion": {
+      "fecha": "2026-11-09T04:52:28Z",
+      "modelo_hoy": "Random Forest",
+      "top10_hits": 8.1765,
+      "n_gp": 68,
+      "top10_hits_reciente": 8.5,
+      "pole": 0.397,
+      "mae": 2.863,
+      "spearman": 0.7758,
+      "top3_hits": 1.75,
+      "vs_campeon": {
+       "metrica": "top10_hits",
+       "antes": 8.2059,
+       "despues": 8.1765,
+       "diferencia": -0.0294,
+       "ee": 0.0417,
+       "ee_pareado": 0.0417,
+       "ee_semilla": 0.0,
+       "n_gp": 68,
+       "z": -0.7,
+       "z_critico": 2.33,
+       "ventana_reciente": {
+        "n_gp": 8,
+        "antes": 8.375,
+        "despues": 8.5,
+        "diferencia": 0.125
+       },
+       "pasa_regla": false
+      }
+     }
+    },
+    "rf_sin_sectores": {
+     "descripcion": "Random Forest sin sectores ni velocidades punta (menos variables ruidosas)",
+     "config": {
+      "seleccion": "fijo",
+      "fijo": "Random Forest",
+      "quitar": [
+       "*_s1_gap",
+       "*_s2_gap",
+       "*_s3_gap",
+       "*_trap_delta",
+       "*_i1_delta",
+       "*_i2_delta"
+      ]
+     },
+     "estado": "retador",
+     "origen": "predefinido",
+     "agregado": "2026-11-09T03:27:13Z",
+     "evaluacion": {
+      "fecha": "2026-11-09T04:52:28Z",
+      "modelo_hoy": "Random Forest",
+      "top10_hits": 8.1765,
+      "n_gp": 68,
+      "top10_hits_reciente": 8.25,
+      "pole": 0.338,
+      "mae": 2.857,
+      "spearman": 0.7773,
+      "top3_hits": 1.765,
+      "vs_campeon": {
+       "metrica": "top10_hits",
+       "antes": 8.2059,
+       "despues": 8.1765,
+       "diferencia": -0.0294,
+       "ee": 0.0361,
+       "ee_pareado": 0.0361,
+       "ee_semilla": 0.0,
+       "n_gp": 68,
+       "z": -0.81,
+       "z_critico": 2.33,
+       "ventana_reciente": {
+        "n_gp": 8,
+        "antes": 8.375,
+        "despues": 8.25,
+        "diferencia": -0.125
+       },
+       "pasa_regla": false
+      }
+     }
+    },
+    "rf_debutantes_equipo": {
+     "descripcion": "Random Forest con prior de debutantes por escudería (forma de qualy del equipo + 2)",
+     "config": {
+      "seleccion": "fijo",
+      "fijo": "Random Forest",
+      "debutantes": "equipo"
+     },
+     "estado": "retador",
+     "origen": "predefinido",
+     "agregado": "2026-11-09T03:27:13Z",
+     "evaluacion": {
+      "fecha": "2026-11-09T04:52:29Z",
+      "modelo_hoy": "Random Forest",
+      "top10_hits": 8.1324,
+      "n_gp": 68,
+      "top10_hits_reciente": 8.25,
+      "pole": 0.353,
+      "mae": 2.83,
+      "spearman": 0.7798,
+      "top3_hits": 1.794,
+      "vs_campeon": {
+       "metrica": "top10_hits",
+       "antes": 8.2059,
+       "despues": 8.1324,
+       "diferencia": -0.0735,
+       "ee": 0.0319,
+       "ee_pareado": 0.0319,
+       "ee_semilla": 0.0,
+       "n_gp": 68,
+       "z": -2.31,
+       "z_critico": 2.33,
+       "ventana_reciente": {
+        "n_gp": 8,
+        "antes": 8.375,
+        "despues": 8.25,
+        "diferencia": -0.125
+       },
+       "pasa_regla": false
+      }
+     }
+    }
+   },
+   "modelo_hoy": "selección automática (hoy elige Random Forest)"
+  },
+  "qualy_fp3": {
+   "metrica": "top10_hits",
+   "campeon": "base",
+   "desde": "2000-01-01T00:00:00Z",
+   "variantes": {
+    "base": {
+     "descripcion": "Configuración original: el walk-forward compara el catálogo (baselines, Ridge, RF, ET, GB, XGBoost, LightGBM, rankers y 2 ensambles) y usa el mejor por aciertos en el Top 10",
+     "config": {
+      "seleccion": "auto"
+     },
+     "estado": "campeon",
+     "origen": "predefinido",
+     "agregado": "2026-11-09T03:27:13Z",
+     "evaluacion": {
+      "fecha": "2026-11-09T04:52:29Z",
+      "modelo_hoy": "selección automática (hoy elige Random Forest)",
+      "top10_hits": 8.1765,
+      "n_gp": 68,
+      "top10_hits_reciente": 8.5,
+      "pole": 0.368,
+      "mae": 2.791,
+      "spearman": 0.7862,
+      "top3_hits": 1.75
+     }
+    },
+    "rf_fijo": {
+     "descripcion": "Random Forest fijo (sin selección automática del modelo)",
+     "config": {
+      "seleccion": "fijo",
+      "fijo": "Random Forest"
+     },
+     "estado": "retador",
+     "origen": "predefinido",
+     "agregado": "2026-11-09T03:27:13Z",
+     "evaluacion": {
+      "fecha": "2026-11-09T04:52:29Z",
+      "modelo_hoy": "Random Forest",
+      "top10_hits": 8.2353,
+      "n_gp": 68,
+      "top10_hits_reciente": 8.5,
+      "pole": 0.397,
+      "mae": 2.751,
+      "spearman": 0.7906,
+      "top3_hits": 1.765,
+      "vs_campeon": {
+       "metrica": "top10_hits",
+       "antes": 8.1765,
+       "despues": 8.2353,
+       "diferencia": 0.0588,
+       "ee": 0.0287,
+       "ee_pareado": 0.0287,
+       "ee_semilla": 0.0,
+       "n_gp": 68,
+       "z": 2.05,
+       "z_critico": 2.33,
+       "ventana_reciente": {
+        "n_gp": 8,
+        "antes": 8.5,
+        "despues": 8.5,
+        "diferencia": 0.0
+       },
+       "pasa_regla": false
+      }
+     }
+    },
+    "ens_arboles_fijo": {
+     "descripcion": "Ensamble de árboles fijo (RF+ET+GB+XGB+LGB, promedio de rankings)",
+     "config": {
+      "seleccion": "fijo",
+      "fijo": "Ensamble árboles (RF+ET+GB+XGB+LGB)"
+     },
+     "estado": "retador",
+     "origen": "predefinido",
+     "agregado": "2026-11-09T03:27:13Z",
+     "evaluacion": {
+      "fecha": "2026-11-09T04:52:29Z",
+      "modelo_hoy": "Ensamble árboles (RF+ET+GB+XGB+LGB)",
+      "top10_hits": 8.2353,
+      "n_gp": 68,
+      "top10_hits_reciente": 8.5,
+      "pole": 0.382,
+      "mae": 2.759,
+      "spearman": 0.7893,
+      "top3_hits": 1.75,
+      "vs_campeon": {
+       "metrica": "top10_hits",
+       "antes": 8.1765,
+       "despues": 8.2353,
+       "diferencia": 0.0588,
+       "ee": 0.0413,
+       "ee_pareado": 0.0413,
+       "ee_semilla": 0.0,
+       "n_gp": 68,
+       "z": 1.42,
+       "z_critico": 2.33,
+       "ventana_reciente": {
+        "n_gp": 8,
+        "antes": 8.5,
+        "despues": 8.5,
+        "diferencia": 0.0
+       },
+       "pasa_regla": false
+      }
+     }
+    },
+    "ens_rf_et_ridge": {
+     "descripcion": "Ensamble RF+ET+Ridge (promedio de rankings)",
+     "config": {
+      "seleccion": "fijo",
+      "fijo": "Ensamble RF+ET+Ridge",
+      "ensambles": {
+       "Ensamble RF+ET+Ridge": [
+        "Random Forest",
+        "Extra Trees",
+        "Ridge"
+       ]
+      }
+     },
+     "estado": "retador",
+     "origen": "predefinido",
+     "agregado": "2026-11-09T03:27:13Z",
+     "evaluacion": {
+      "fecha": "2026-11-09T04:52:29Z",
+      "modelo_hoy": "Ensamble RF+ET+Ridge",
+      "top10_hits": 8.2059,
+      "n_gp": 68,
+      "top10_hits_reciente": 8.5,
+      "pole": 0.441,
+      "mae": 2.73,
+      "spearman": 0.793,
+      "top3_hits": 1.868,
+      "vs_campeon": {
+       "metrica": "top10_hits",
+       "antes": 8.1765,
+       "despues": 8.2059,
+       "diferencia": 0.0294,
+       "ee": 0.0417,
+       "ee_pareado": 0.0417,
+       "ee_semilla": 0.0,
+       "n_gp": 68,
+       "z": 0.7,
+       "z_critico": 2.33,
+       "ventana_reciente": {
+        "n_gp": 8,
+        "antes": 8.5,
+        "despues": 8.5,
+        "diferencia": 0.0
+       },
+       "pasa_regla": false
+      }
+     }
+    },
+    "ens_rf_rankers": {
+     "descripcion": "Ensamble RF+ET+LambdaRank+XGBoost Ranker (regresión + ranking)",
+     "config": {
+      "seleccion": "fijo",
+      "fijo": "Ensamble RF+ET+rankers",
+      "ensambles": {
+       "Ensamble RF+ET+rankers": [
+        "Random Forest",
+        "Extra Trees",
+        "LightGBM LambdaRank",
+        "XGBoost Ranker"
+       ]
+      }
+     },
+     "estado": "retador",
+     "origen": "predefinido",
+     "agregado": "2026-11-09T03:27:13Z",
+     "evaluacion": {
+      "fecha": "2026-11-09T04:52:29Z",
+      "modelo_hoy": "Ensamble RF+ET+rankers",
+      "top10_hits": 8.1912,
+      "n_gp": 68,
+      "top10_hits_reciente": 8.5,
+      "pole": 0.471,
+      "mae": 2.761,
+      "spearman": 0.7875,
+      "top3_hits": 1.765,
+      "vs_campeon": {
+       "metrica": "top10_hits",
+       "antes": 8.1765,
+       "despues": 8.1912,
+       "diferencia": 0.0147,
+       "ee": 0.0331,
+       "ee_pareado": 0.0331,
+       "ee_semilla": 0.0,
+       "n_gp": 68,
+       "z": 0.44,
+       "z_critico": 2.33,
+       "ventana_reciente": {
+        "n_gp": 8,
+        "antes": 8.5,
+        "despues": 8.5,
+        "diferencia": 0.0
+       },
+       "pasa_regla": false
+      }
+     }
+    },
+    "rf_hojas2": {
+     "descripcion": "Random Forest con hojas más chicas (min_samples_leaf=2, max_features=0.3)",
+     "config": {
+      "seleccion": "fijo",
+      "fijo": "Random Forest",
+      "hiper": {
+       "Random Forest": {
+        "min_samples_leaf": 2,
+        "max_features": 0.3
+       }
+      }
+     },
+     "estado": "retador",
+     "origen": "predefinido",
+     "agregado": "2026-11-09T03:27:13Z",
+     "evaluacion": {
+      "fecha": "2026-11-09T04:52:29Z",
+      "modelo_hoy": "Random Forest",
+      "top10_hits": 8.1765,
+      "n_gp": 68,
+      "top10_hits_reciente": 8.5,
+      "pole": 0.426,
+      "mae": 2.767,
+      "spearman": 0.7905,
+      "top3_hits": 1.765,
+      "vs_campeon": {
+       "metrica": "top10_hits",
+       "antes": 8.1765,
+       "despues": 8.1765,
+       "diferencia": 0.0,
+       "ee": 0.0468,
+       "ee_pareado": 0.0468,
+       "ee_semilla": 0.0,
+       "n_gp": 68,
+       "z": 0.0,
+       "z_critico": 2.33,
+       "ventana_reciente": {
+        "n_gp": 8,
+        "antes": 8.5,
+        "despues": 8.5,
+        "diferencia": 0.0
+       },
+       "pasa_regla": false
+      }
+     }
+    },
+    "rf_recencia_fuerte": {
+     "descripcion": "Random Forest con más peso a lo reciente (2026 x6, 2025 x2, antes x1)",
+     "config": {
+      "seleccion": "fijo",
+      "fijo": "Random Forest",
+      "pesos": {
+       "2026": 6.0,
+       "2025": 2.0,
+       "otros": 1.0
+      }
+     },
+     "estado": "retador",
+     "origen": "predefinido",
+     "agregado": "2026-11-09T03:27:13Z",
+     "evaluacion": {
+      "fecha": "2026-11-09T04:52:30Z",
+      "modelo_hoy": "Random Forest",
+      "top10_hits": 8.1765,
+      "n_gp": 68,
+      "top10_hits_reciente": 8.5,
+      "pole": 0.382,
+      "mae": 2.763,
+      "spearman": 0.7911,
+      "top3_hits": 1.735,
+      "vs_campeon": {
+       "metrica": "top10_hits",
+       "antes": 8.1765,
+       "despues": 8.1765,
+       "diferencia": 0.0,
+       "ee": 0.0419,
+       "ee_pareado": 0.0419,
+       "ee_semilla": 0.0,
+       "n_gp": 68,
+       "z": 0.0,
+       "z_critico": 2.33,
+       "ventana_reciente": {
+        "n_gp": 8,
+        "antes": 8.5,
+        "despues": 8.5,
+        "diferencia": 0.0
+       },
+       "pasa_regla": false
+      }
+     }
+    },
+    "rf_pesos_planos": {
+     "descripcion": "Random Forest sin pesos por recencia (todos x1)",
+     "config": {
+      "seleccion": "fijo",
+      "fijo": "Random Forest",
+      "pesos": {
+       "2026": 1.0,
+       "2025": 1.0,
+       "otros": 1.0
+      }
+     },
+     "estado": "retador",
+     "origen": "predefinido",
+     "agregado": "2026-11-09T03:27:13Z",
+     "evaluacion": {
+      "fecha": "2026-11-09T04:52:30Z",
+      "modelo_hoy": "Random Forest",
+      "top10_hits": 8.2059,
+      "n_gp": 68,
+      "top10_hits_reciente": 8.5,
+      "pole": 0.382,
+      "mae": 2.764,
+      "spearman": 0.7894,
+      "top3_hits": 1.794,
+      "vs_campeon": {
+       "metrica": "top10_hits",
+       "antes": 8.1765,
+       "despues": 8.2059,
+       "diferencia": 0.0294,
+       "ee": 0.0361,
+       "ee_pareado": 0.0361,
+       "ee_semilla": 0.0,
+       "n_gp": 68,
+       "z": 0.81,
+       "z_critico": 2.33,
+       "ventana_reciente": {
+        "n_gp": 8,
+        "antes": 8.5,
+        "despues": 8.5,
+        "diferencia": 0.0
+       },
+       "pasa_regla": false
+      }
+     }
+    },
+    "rf_sin_circuito": {
+     "descripcion": "Random Forest sin el historial del piloto en el circuito (h_circ_*)",
+     "config": {
+      "seleccion": "fijo",
+      "fijo": "Random Forest",
+      "quitar": [
+       "h_circ_*"
+      ]
+     },
+     "estado": "retador",
+     "origen": "predefinido",
+     "agregado": "2026-11-09T03:27:13Z",
+     "evaluacion": {
+      "fecha": "2026-11-09T04:52:30Z",
+      "modelo_hoy": "Random Forest",
+      "top10_hits": 8.2059,
+      "n_gp": 68,
+      "top10_hits_reciente": 8.5,
+      "pole": 0.412,
+      "mae": 2.764,
+      "spearman": 0.7897,
+      "top3_hits": 1.75,
+      "vs_campeon": {
+       "metrica": "top10_hits",
+       "antes": 8.1765,
+       "despues": 8.2059,
+       "diferencia": 0.0294,
+       "ee": 0.0467,
+       "ee_pareado": 0.0467,
+       "ee_semilla": 0.0,
+       "n_gp": 68,
+       "z": 0.63,
+       "z_critico": 2.33,
+       "ventana_reciente": {
+        "n_gp": 8,
+        "antes": 8.5,
+        "despues": 8.5,
+        "diferencia": 0.0
+       },
+       "pasa_regla": false
+      }
+     }
+    },
+    "rf_sin_sectores": {
+     "descripcion": "Random Forest sin sectores ni velocidades punta (menos variables ruidosas)",
+     "config": {
+      "seleccion": "fijo",
+      "fijo": "Random Forest",
+      "quitar": [
+       "*_s1_gap",
+       "*_s2_gap",
+       "*_s3_gap",
+       "*_trap_delta",
+       "*_i1_delta",
+       "*_i2_delta"
+      ]
+     },
+     "estado": "retador",
+     "origen": "predefinido",
+     "agregado": "2026-11-09T03:27:13Z",
+     "evaluacion": {
+      "fecha": "2026-11-09T04:52:30Z",
+      "modelo_hoy": "Random Forest",
+      "top10_hits": 8.2206,
+      "n_gp": 68,
+      "top10_hits_reciente": 8.5,
+      "pole": 0.368,
+      "mae": 2.742,
+      "spearman": 0.7897,
+      "top3_hits": 1.824,
+      "vs_campeon": {
+       "metrica": "top10_hits",
+       "antes": 8.1765,
+       "despues": 8.2206,
+       "diferencia": 0.0441,
+       "ee": 0.0531,
+       "ee_pareado": 0.0531,
+       "ee_semilla": 0.0,
+       "n_gp": 68,
+       "z": 0.83,
+       "z_critico": 2.33,
+       "ventana_reciente": {
+        "n_gp": 8,
+        "antes": 8.5,
+        "despues": 8.5,
+        "diferencia": 0.0
+       },
+       "pasa_regla": false
+      }
+     }
+    },
+    "rf_debutantes_equipo": {
+     "descripcion": "Random Forest con prior de debutantes por escudería (forma de qualy del equipo + 2)",
+     "config": {
+      "seleccion": "fijo",
+      "fijo": "Random Forest",
+      "debutantes": "equipo"
+     },
+     "estado": "retador",
+     "origen": "predefinido",
+     "agregado": "2026-11-09T03:27:13Z",
+     "evaluacion": {
+      "fecha": "2026-11-09T04:52:30Z",
+      "modelo_hoy": "Random Forest",
+      "top10_hits": 8.1618,
+      "n_gp": 68,
+      "top10_hits_reciente": 8.5,
+      "pole": 0.397,
+      "mae": 2.757,
+      "spearman": 0.7914,
+      "top3_hits": 1.765,
+      "vs_campeon": {
+       "metrica": "top10_hits",
+       "antes": 8.1765,
+       "despues": 8.1618,
+       "diferencia": -0.0147,
+       "ee": 0.0444,
+       "ee_pareado": 0.0444,
+       "ee_semilla": 0.0,
+       "n_gp": 68,
+       "z": -0.33,
+       "z_critico": 2.33,
+       "ventana_reciente": {
+        "n_gp": 8,
+        "antes": 8.5,
+        "despues": 8.5,
+        "diferencia": 0.0
+       },
+       "pasa_regla": false
+      }
+     }
+    }
+   },
+   "modelo_hoy": "selección automática (hoy elige Random Forest)"
+  },
+  "carrera": {
+   "metrica": "ndcg10",
+   "campeon": "base",
+   "desde": "2000-01-01T00:00:00Z",
+   "variantes": {
+    "base": {
+     "descripcion": "Simulador original: salida, ritmo de tanda larga, gap de qualy, forma de piloto/equipo con interacción por posición de salida, facilidad de rebase, ruido de 1.ª vuelta y abandonos",
+     "config": {
+      "mc_var": {
+       "is26": false,
+       "gn_inter": true
+      }
+     },
+     "estado": "campeon",
+     "origen": "predefinido",
+     "agregado": "2026-11-09T03:27:13Z",
+     "evaluacion": {
+      "fecha": "2026-11-09T04:52:30Z",
+      "modelo_hoy": "Simulador Monte Carlo",
+      "ndcg10": 0.8902,
+      "n_gp": 68,
+      "ndcg10_reciente": 0.9067,
+      "top10_hits": 8.0,
+      "ganador": 0.618,
+      "podio": 2.074,
+      "mae_top10": 2.226,
+      "spearman": 0.7108
+     }
+    },
+    "pace_deg": {
+     "descripcion": "Ritmo de tanda larga corregido por degradación x largo de stint",
+     "config": {
+      "mc_var": {
+       "is26": false,
+       "gn_inter": true,
+       "pace_deg": true
+      }
+     },
+     "estado": "retador",
+     "origen": "predefinido",
+     "agregado": "2026-11-09T03:27:13Z",
+     "evaluacion": {
+      "fecha": "2026-11-09T04:52:31Z",
+      "modelo_hoy": "Simulador Monte Carlo",
+      "ndcg10": 0.8846,
+      "n_gp": 68,
+      "ndcg10_reciente": 0.8927,
+      "top10_hits": 7.926,
+      "ganador": 0.588,
+      "podio": 2.044,
+      "mae_top10": 2.257,
+      "spearman": 0.705,
+      "vs_campeon": {
+       "metrica": "ndcg10",
+       "antes": 0.8902,
+       "despues": 0.8846,
+       "diferencia": -0.0055,
+       "ee": 0.0028,
+       "ee_pareado": 0.0026,
+       "ee_semilla": 0.001,
+       "n_gp": 68,
+       "z": -2.0,
+       "z_critico": 2.5,
+       "ventana_reciente": {
+        "n_gp": 8,
+        "antes": 0.9067,
+        "despues": 0.8927,
+        "diferencia": -0.014
+       },
+       "pasa_regla": false
+      }
+     }
+    },
+    "deg_sig_par": {
+     "descripcion": "Degradación de prácticas + ruido según paradas típicas del circuito",
+     "config": {
+      "mc_var": {
+       "is26": false,
+       "gn_inter": true,
+       "deg": true,
+       "sig_par": true
+      }
+     },
+     "estado": "retador",
+     "origen": "predefinido",
+     "agregado": "2026-11-09T03:27:13Z",
+     "evaluacion": {
+      "fecha": "2026-11-09T04:52:31Z",
+      "modelo_hoy": "Simulador Monte Carlo",
+      "ndcg10": 0.89,
+      "n_gp": 68,
+      "ndcg10_reciente": 0.9012,
+      "top10_hits": 7.985,
+      "ganador": 0.618,
+      "podio": 2.088,
+      "mae_top10": 2.228,
+      "spearman": 0.7112,
+      "vs_campeon": {
+       "metrica": "ndcg10",
+       "antes": 0.8902,
+       "despues": 0.89,
+       "diferencia": -0.0002,
+       "ee": 0.0014,
+       "ee_pareado": 0.001,
+       "ee_semilla": 0.001,
+       "n_gp": 68,
+       "z": -0.13,
+       "z_critico": 2.5,
+       "ventana_reciente": {
+        "n_gp": 8,
+        "antes": 0.9067,
+        "despues": 0.9012,
+        "diferencia": -0.0055
+       },
+       "pasa_regla": false
+      }
+     }
+    },
+    "deg_hist": {
+     "descripcion": "Degradación observada en carreras previas del piloto",
+     "config": {
+      "mc_var": {
+       "is26": false,
+       "gn_inter": true,
+       "deg_hist": true
+      }
+     },
+     "estado": "retador",
+     "origen": "predefinido",
+     "agregado": "2026-11-09T03:27:13Z",
+     "evaluacion": {
+      "fecha": "2026-11-09T04:52:31Z",
+      "modelo_hoy": "Simulador Monte Carlo",
+      "ndcg10": 0.8901,
+      "n_gp": 68,
+      "ndcg10_reciente": 0.9073,
+      "top10_hits": 8.015,
+      "ganador": 0.618,
+      "podio": 2.074,
+      "mae_top10": 2.234,
+      "spearman": 0.7097,
+      "vs_campeon": {
+       "metrica": "ndcg10",
+       "antes": 0.8902,
+       "despues": 0.8901,
+       "diferencia": -0.0001,
+       "ee": 0.001,
+       "ee_pareado": 0.0003,
+       "ee_semilla": 0.001,
+       "n_gp": 68,
+       "z": -0.06,
+       "z_critico": 2.5,
+       "ventana_reciente": {
+        "n_gp": 8,
+        "antes": 0.9067,
+        "despues": 0.9073,
+        "diferencia": 0.0005
+       },
+       "pasa_regla": false
+      }
+     }
+    },
+    "racecraft": {
+     "descripcion": "Habilidad de remontada: posiciones ganadas en las últimas 10 carreras y en el circuito",
+     "config": {
+      "mc_var": {
+       "is26": false,
+       "gn_inter": true,
+       "racecraft": true
+      }
+     },
+     "estado": "retador",
+     "origen": "predefinido",
+     "agregado": "2026-11-09T03:27:13Z",
+     "evaluacion": {
+      "fecha": "2026-11-09T04:52:32Z",
+      "modelo_hoy": "Simulador Monte Carlo",
+      "ndcg10": 0.8861,
+      "n_gp": 68,
+      "ndcg10_reciente": 0.9076,
+      "top10_hits": 7.985,
+      "ganador": 0.574,
+      "podio": 2.029,
+      "mae_top10": 2.278,
+      "spearman": 0.7079,
+      "vs_campeon": {
+       "metrica": "ndcg10",
+       "antes": 0.8902,
+       "despues": 0.8861,
+       "diferencia": -0.0041,
+       "ee": 0.002,
+       "ee_pareado": 0.0018,
+       "ee_semilla": 0.001,
+       "n_gp": 68,
+       "z": -2.02,
+       "z_critico": 2.5,
+       "ventana_reciente": {
+        "n_gp": 8,
+        "antes": 0.9067,
+        "despues": 0.9076,
+        "diferencia": 0.0008
+       },
+       "pasa_regla": false
+      }
+     }
+    },
+    "form3": {
+     "descripcion": "Forma de las últimas 3 carreras (además de las últimas 10)",
+     "config": {
+      "mc_var": {
+       "is26": false,
+       "gn_inter": true,
+       "form3": true
+      }
+     },
+     "estado": "retador",
+     "origen": "predefinido",
+     "agregado": "2026-11-09T03:27:13Z",
+     "evaluacion": {
+      "fecha": "2026-11-09T04:52:32Z",
+      "modelo_hoy": "Simulador Monte Carlo",
+      "ndcg10": 0.8876,
+      "n_gp": 68,
+      "ndcg10_reciente": 0.9063,
+      "top10_hits": 7.985,
+      "ganador": 0.588,
+      "podio": 2.074,
+      "mae_top10": 2.269,
+      "spearman": 0.7074,
+      "vs_campeon": {
+       "metrica": "ndcg10",
+       "antes": 0.8902,
+       "despues": 0.8876,
+       "diferencia": -0.0025,
+       "ee": 0.0014,
+       "ee_pareado": 0.001,
+       "ee_semilla": 0.001,
+       "n_gp": 68,
+       "z": -1.82,
+       "z_critico": 2.5,
+       "ventana_reciente": {
+        "n_gp": 8,
+        "antes": 0.9067,
+        "despues": 0.9063,
+        "diferencia": -0.0005
+       },
+       "pasa_regla": false
+      }
+     }
+    },
+    "teamlong": {
+     "descripcion": "Ritmo de tanda larga del mejor auto del equipo",
+     "config": {
+      "mc_var": {
+       "is26": false,
+       "gn_inter": true,
+       "teamlong": true
+      }
+     },
+     "estado": "retador",
+     "origen": "predefinido",
+     "agregado": "2026-11-09T03:27:13Z",
+     "evaluacion": {
+      "fecha": "2026-11-09T04:52:32Z",
+      "modelo_hoy": "Simulador Monte Carlo",
+      "ndcg10": 0.8901,
+      "n_gp": 68,
+      "ndcg10_reciente": 0.9071,
+      "top10_hits": 8.0,
+      "ganador": 0.603,
+      "podio": 2.088,
+      "mae_top10": 2.228,
+      "spearman": 0.7095,
+      "vs_campeon": {
+       "metrica": "ndcg10",
+       "antes": 0.8902,
+       "despues": 0.8901,
+       "diferencia": -0.0001,
+       "ee": 0.0023,
+       "ee_pareado": 0.0021,
+       "ee_semilla": 0.001,
+       "n_gp": 68,
+       "z": -0.05,
+       "z_critico": 2.5,
+       "ventana_reciente": {
+        "n_gp": 8,
+        "antes": 0.9067,
+        "despues": 0.9071,
+        "diferencia": 0.0003
+       },
+       "pasa_regla": false
+      }
+     }
+    },
+    "front": {
+     "descripcion": "Efectos de primera fila / pole",
+     "config": {
+      "mc_var": {
+       "is26": false,
+       "gn_inter": true,
+       "front": true
+      }
+     },
+     "estado": "retador",
+     "origen": "predefinido",
+     "agregado": "2026-11-09T03:27:13Z",
+     "evaluacion": {
+      "fecha": "2026-11-09T04:52:32Z",
+      "modelo_hoy": "Simulador Monte Carlo",
+      "ndcg10": 0.8877,
+      "n_gp": 68,
+      "ndcg10_reciente": 0.8935,
+      "top10_hits": 7.971,
+      "ganador": 0.603,
+      "podio": 2.118,
+      "mae_top10": 2.256,
+      "spearman": 0.7084,
+      "vs_campeon": {
+       "metrica": "ndcg10",
+       "antes": 0.8902,
+       "despues": 0.8877,
+       "diferencia": -0.0025,
+       "ee": 0.0024,
+       "ee_pareado": 0.0022,
+       "ee_semilla": 0.001,
+       "n_gp": 68,
+       "z": -1.04,
+       "z_critico": 2.5,
+       "ventana_reciente": {
+        "n_gp": 8,
+        "antes": 0.9067,
+        "despues": 0.8935,
+        "diferencia": -0.0132
+       },
+       "pasa_regla": false
+      }
+     }
+    },
+    "gn_mob": {
+     "descripcion": "Interacción ritmo/forma x posición x facilidad de rebase",
+     "config": {
+      "mc_var": {
+       "is26": false,
+       "gn_inter": true,
+       "gn_mob": true
+      }
+     },
+     "estado": "retador",
+     "origen": "predefinido",
+     "agregado": "2026-11-09T03:27:13Z",
+     "evaluacion": {
+      "fecha": "2026-11-09T04:52:32Z",
+      "modelo_hoy": "Simulador Monte Carlo",
+      "ndcg10": 0.891,
+      "n_gp": 68,
+      "ndcg10_reciente": 0.9067,
+      "top10_hits": 8.015,
+      "ganador": 0.603,
+      "podio": 2.059,
+      "mae_top10": 2.234,
+      "spearman": 0.7098,
+      "vs_campeon": {
+       "metrica": "ndcg10",
+       "antes": 0.8902,
+       "despues": 0.891,
+       "diferencia": 0.0008,
+       "ee": 0.0019,
+       "ee_pareado": 0.0016,
+       "ee_semilla": 0.001,
+       "n_gp": 68,
+       "z": 0.43,
+       "z_critico": 2.5,
+       "ventana_reciente": {
+        "n_gp": 8,
+        "antes": 0.9067,
+        "despues": 0.9067,
+        "diferencia": 0.0
+       },
+       "pasa_regla": false
+      }
+     }
+    },
+    "corr": {
+     "descripcion": "Correlación parrilla-resultado histórica del circuito",
+     "config": {
+      "mc_var": {
+       "is26": false,
+       "gn_inter": true,
+       "corr": true
+      }
+     },
+     "estado": "retador",
+     "origen": "predefinido",
+     "agregado": "2026-11-09T03:27:13Z",
+     "evaluacion": {
+      "fecha": "2026-11-09T04:52:33Z",
+      "modelo_hoy": "Simulador Monte Carlo",
+      "ndcg10": 0.8893,
+      "n_gp": 68,
+      "ndcg10_reciente": 0.901,
+      "top10_hits": 7.985,
+      "ganador": 0.618,
+      "podio": 2.074,
+      "mae_top10": 2.237,
+      "spearman": 0.7102,
+      "vs_campeon": {
+       "metrica": "ndcg10",
+       "antes": 0.8902,
+       "despues": 0.8893,
+       "diferencia": -0.0009,
+       "ee": 0.0013,
+       "ee_pareado": 0.0007,
+       "ee_semilla": 0.001,
+       "n_gp": 68,
+       "z": -0.72,
+       "z_critico": 2.5,
+       "ventana_reciente": {
+        "n_gp": 8,
+        "antes": 0.9067,
+        "despues": 0.901,
+        "diferencia": -0.0057
+       },
+       "pasa_regla": false
+      }
+     }
+    },
+    "is26": {
+     "descripcion": "Pendientes propias de 2026 (reglamento nuevo) para ritmo y forma",
+     "config": {
+      "mc_var": {
+       "is26": true,
+       "gn_inter": true
+      }
+     },
+     "estado": "retador",
+     "origen": "predefinido",
+     "agregado": "2026-11-09T03:27:13Z",
+     "evaluacion": {
+      "fecha": "2026-11-09T04:52:33Z",
+      "modelo_hoy": "Simulador Monte Carlo",
+      "ndcg10": 0.8881,
+      "n_gp": 68,
+      "ndcg10_reciente": 0.8989,
+      "top10_hits": 8.0,
+      "ganador": 0.618,
+      "podio": 2.088,
+      "mae_top10": 2.244,
+      "spearman": 0.7082,
+      "vs_campeon": {
+       "metrica": "ndcg10",
+       "antes": 0.8902,
+       "despues": 0.8881,
+       "diferencia": -0.0021,
+       "ee": 0.0017,
+       "ee_pareado": 0.0014,
+       "ee_semilla": 0.001,
+       "n_gp": 68,
+       "z": -1.19,
+       "z_critico": 2.5,
+       "ventana_reciente": {
+        "n_gp": 8,
+        "antes": 0.9067,
+        "despues": 0.8989,
+        "diferencia": -0.0078
+       },
+       "pasa_regla": false
+      }
+     }
+    },
+    "w26_5": {
+     "descripcion": "Más peso a 2026 en el ajuste (x5 en vez de x3)",
+     "config": {
+      "mc_var": {
+       "is26": false,
+       "gn_inter": true,
+       "w26": 5.0
+      }
+     },
+     "estado": "retador",
+     "origen": "predefinido",
+     "agregado": "2026-11-09T03:27:13Z",
+     "evaluacion": {
+      "fecha": "2026-11-09T04:52:33Z",
+      "modelo_hoy": "Simulador Monte Carlo",
+      "ndcg10": 0.8903,
+      "n_gp": 68,
+      "ndcg10_reciente": 0.908,
+      "top10_hits": 8.0,
+      "ganador": 0.618,
+      "podio": 2.074,
+      "mae_top10": 2.225,
+      "spearman": 0.7108,
+      "vs_campeon": {
+       "metrica": "ndcg10",
+       "antes": 0.8902,
+       "despues": 0.8903,
+       "diferencia": 0.0002,
+       "ee": 0.001,
+       "ee_pareado": 0.0001,
+       "ee_semilla": 0.001,
+       "n_gp": 68,
+       "z": 0.15,
+       "z_critico": 2.5,
+       "ventana_reciente": {
+        "n_gp": 8,
+        "antes": 0.9067,
+        "despues": 0.908,
+        "diferencia": 0.0013
+       },
+       "pasa_regla": false
+      }
+     }
+    },
+    "w26_1_5": {
+     "descripcion": "Menos peso a 2026 en el ajuste (x1.5 en vez de x3)",
+     "config": {
+      "mc_var": {
+       "is26": false,
+       "gn_inter": true,
+       "w26": 1.5
+      }
+     },
+     "estado": "retador",
+     "origen": "predefinido",
+     "agregado": "2026-11-09T03:27:13Z",
+     "evaluacion": {
+      "fecha": "2026-11-09T04:52:33Z",
+      "modelo_hoy": "Simulador Monte Carlo",
+      "ndcg10": 0.889,
+      "n_gp": 68,
+      "ndcg10_reciente": 0.8983,
+      "top10_hits": 7.985,
+      "ganador": 0.618,
+      "podio": 2.074,
+      "mae_top10": 2.225,
+      "spearman": 0.71,
+      "vs_campeon": {
+       "metrica": "ndcg10",
+       "antes": 0.8902,
+       "despues": 0.889,
+       "diferencia": -0.0012,
+       "ee": 0.0013,
+       "ee_pareado": 0.0008,
+       "ee_semilla": 0.001,
+       "n_gp": 68,
+       "z": -0.92,
+       "z_critico": 2.5,
+       "ventana_reciente": {
+        "n_gp": 8,
+        "antes": 0.9067,
+        "despues": 0.8983,
+        "diferencia": -0.0085
+       },
+       "pasa_regla": false
+      }
+     }
+    },
+    "alpha_10": {
+     "descripcion": "Regresión más regularizada (Ridge alpha=10)",
+     "config": {
+      "mc_var": {
+       "is26": false,
+       "gn_inter": true,
+       "alpha": 10.0
+      }
+     },
+     "estado": "retador",
+     "origen": "predefinido",
+     "agregado": "2026-11-09T03:27:13Z",
+     "evaluacion": {
+      "fecha": "2026-11-09T04:52:33Z",
+      "modelo_hoy": "Simulador Monte Carlo",
+      "ndcg10": 0.8902,
+      "n_gp": 68,
+      "ndcg10_reciente": 0.9065,
+      "top10_hits": 8.0,
+      "ganador": 0.618,
+      "podio": 2.074,
+      "mae_top10": 2.226,
+      "spearman": 0.7108,
+      "vs_campeon": {
+       "metrica": "ndcg10",
+       "antes": 0.8902,
+       "despues": 0.8902,
+       "diferencia": -0.0,
+       "ee": 0.001,
+       "ee_pareado": 0.0001,
+       "ee_semilla": 0.001,
+       "n_gp": 68,
+       "z": -0.01,
+       "z_critico": 2.5,
+       "ventana_reciente": {
+        "n_gp": 8,
+        "antes": 0.9067,
+        "despues": 0.9065,
+        "diferencia": -0.0002
+       },
+       "pasa_regla": false
+      }
+     }
+    },
+    "ruido_t5": {
+     "descripcion": "Ruido de carrera con colas pesadas (t de Student, 5 g.l.)",
+     "config": {
+      "mc_var": {
+       "is26": false,
+       "gn_inter": true,
+       "df": 5
+      }
+     },
+     "estado": "retador",
+     "origen": "predefinido",
+     "agregado": "2026-11-09T03:27:13Z",
+     "evaluacion": {
+      "fecha": "2026-11-09T04:52:33Z",
+      "modelo_hoy": "Simulador Monte Carlo",
+      "ndcg10": 0.8902,
+      "n_gp": 68,
+      "ndcg10_reciente": 0.9071,
+      "top10_hits": 8.0,
+      "ganador": 0.618,
+      "podio": 2.074,
+      "mae_top10": 2.231,
+      "spearman": 0.7103,
+      "vs_campeon": {
+       "metrica": "ndcg10",
+       "antes": 0.8902,
+       "despues": 0.8902,
+       "diferencia": -0.0,
+       "ee": 0.001,
+       "ee_pareado": 0.0002,
+       "ee_semilla": 0.001,
+       "n_gp": 68,
+       "z": -0.01,
+       "z_critico": 2.5,
+       "ventana_reciente": {
+        "n_gp": 8,
+        "antes": 0.9067,
+        "despues": 0.9071,
+        "diferencia": 0.0003
+       },
+       "pasa_regla": false
+      }
+     }
+    },
+    "mediana": {
+     "descripcion": "Pronóstico = mediana de la posición simulada (en vez de la media)",
+     "config": {
+      "mc_var": {
+       "is26": false,
+       "gn_inter": true,
+       "resumen": "median"
+      }
+     },
+     "estado": "retador",
+     "origen": "predefinido",
+     "agregado": "2026-11-09T03:27:13Z",
+     "evaluacion": {
+      "fecha": "2026-11-09T04:52:34Z",
+      "modelo_hoy": "Simulador Monte Carlo",
+      "ndcg10": 0.8901,
+      "n_gp": 68,
+      "ndcg10_reciente": 0.9072,
+      "top10_hits": 8.0,
+      "ganador": 0.618,
+      "podio": 2.074,
+      "mae_top10": 2.228,
+      "spearman": 0.7106,
+      "vs_campeon": {
+       "metrica": "ndcg10",
+       "antes": 0.8902,
+       "despues": 0.8901,
+       "diferencia": -0.0001,
+       "ee": 0.001,
+       "ee_pareado": 0.0002,
+       "ee_semilla": 0.001,
+       "n_gp": 68,
+       "z": -0.11,
+       "z_critico": 2.5,
+       "ventana_reciente": {
+        "n_gp": 8,
+        "antes": 0.9067,
+        "despues": 0.9072,
+        "diferencia": 0.0004
+       },
+       "pasa_regla": false
+      }
+     }
+    },
+    "racecraft_form3": {
+     "descripcion": "Remontada histórica + forma de las últimas 3 carreras (propuesto por agente antes del primer ciclo)",
+     "config": {
+      "mc_var": {
+       "is26": false,
+       "gn_inter": true,
+       "racecraft": true,
+       "form3": true
+      }
+     },
+     "estado": "descartado",
+     "origen": "agente",
+     "agregado": "2026-11-09T03:39:52Z",
+     "evaluacion": {
+      "fecha": "2026-11-09T04:52:34Z",
+      "modelo_hoy": "Simulador Monte Carlo",
+      "ndcg10": 0.884,
+      "n_gp": 68,
+      "ndcg10_reciente": 0.9079,
+      "top10_hits": 7.941,
+      "ganador": 0.588,
+      "podio": 2.029,
+      "mae_top10": 2.3,
+      "spearman": 0.7058,
+      "vs_campeon": {
+       "metrica": "ndcg10",
+       "antes": 0.8902,
+       "despues": 0.884,
+       "diferencia": -0.0062,
+       "ee": 0.0023,
+       "ee_pareado": 0.002,
+       "ee_semilla": 0.001,
+       "n_gp": 68,
+       "z": -2.75,
+       "z_critico": 2.5,
+       "ventana_reciente": {
+        "n_gp": 8,
+        "antes": 0.9067,
+        "despues": 0.9079,
+        "diferencia": 0.0012
+       },
+       "pasa_regla": false
+      }
+     },
+     "descartado": "2026-11-09T04:52:34Z"
+    }
+   },
+   "modelo_hoy": "Simulador Monte Carlo"
+  }
+ }
+}

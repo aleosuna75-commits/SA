@@ -1,0 +1,288 @@
+[2026-11-09T03:42:16Z] brasil2026: post_fp1 (retro)
+  [  133 s] modelo_carrera_austin.py 1299 ... -> post_fp1.log (rc=0)
+  [  151 s] modelo_carrera_austin.py 1299 ... -> historial.log (rc=0)
+  [  129 s] modelo_carrera_austin.py 1299 ... -> historial.log (rc=0)
+brasil2026 fases: [{'slug': 'brasil2026', 'paso': 'post_fp1', 'ok': True, 'segundos': 133, 'archivos_cambiados': ['gps/brasil2026/historial.json'], 'docs': [{'coleccion': 'historial', 'doc_id': 'brasil2026', 'archivo': 'gps/brasil2026/historial.json'}]}, 'FP2', 'FP3', 'Q']
+{
+ "actualizado": "2026-11-09T03:49:08Z",
+ "fases": [
+  {
+   "fase": "FP1",
+   "actualizado": "2026-11-09T03:44:29Z",
+   "qualy": {
+    "top10": [
+     "ANT",
+     "VER",
+     "NOR",
+     "HAM",
+     "LEC",
+     "RUS",
+     "PIA",
+     "HAD",
+     "LAW",
+     "GAS"
+    ],
+    "pole": "ANT",
+    "modelo": "Ridge"
+   },
+   "carrera": {
+    "top10": [
+     "ANT",
+     "VER",
+     "HAM",
+     "NOR",
+     "LEC",
+     "RUS",
+     "HAD",
+     "PIA",
+     "LAW",
+     "LIN"
+    ],
+    "ganador": "ANT",
+    "preliminar": true,
+    "parrilla_fuente": "pronóstico de qualy (FP1)"
+   },
+   "cambios": {
+    "qualy": [],
+    "carrera": []
+   }
+  },
+  {
+   "fase": "FP2",
+   "actualizado": "2026-11-09T03:47:00Z",
+   "qualy": {
+    "top10": [
+     "ANT",
+     "VER",
+     "NOR",
+     "LEC",
+     "RUS",
+     "HAM",
+     "PIA",
+     "HAD",
+     "GAS",
+     "BOR"
+    ],
+    "pole": "ANT",
+    "modelo": "Random Forest"
+   },
+   "carrera": {
+    "top10": [
+     "ANT",
+     "VER",
+     "LEC",
+     "NOR",
+     "HAM",
+     "RUS",
+     "HAD",
+     "PIA",
+     "LAW",
+     "BOR"
+    ],
+    "ganador": "ANT",
+    "preliminar": true,
+    "parrilla_fuente": "pronóstico de qualy (FP2)"
+   },
+   "cambios": {
+    "qualy": [
+     {
+      "acr": "LEC",
+      "de": 5,
+      "a": 4
+     },
+     {
+      "acr": "RUS",
+      "de": 6,
+      "a": 5
+     },
+     {
+      "acr": "HAM",
+      "de": 4,
+      "a": 6
+     },
+     {
+      "acr": "GAS",
+      "de": 10,
+      "a": 9
+     },
+     {
+      "acr": "BOR",
+      "de": 12,
+      "a": 10
+     },
+     {
+      "acr": "LAW",
+      "de": 9,
+      "a": 11
+     }
+    ],
+    "carrera": [
+     {
+      "acr": "LEC",
+      "de": 5,
+      "a": 3
+     },
+     {
+      "acr": "HAM",
+      "de": 3,
+      "a": 5
+     },
+     {
+      "acr": "BOR",
+      "de": 12,
+      "a": 10
+     },
+     {
+      "acr": "LIN",
+      "de": 10,
+      "a": 12
+     }
+    ]
+   }
+  },
+  {
+   "fase": "FP3",
+   "actualizado": "2026-11-09T03:49:08Z",
+   "qualy": {
+    "top10": [
+     "ANT",
+     "VER",
+     "NOR",
+     "LEC",
+     "RUS",
+     "PIA",
+     "HAM",
+     "HAD",
+     "LAW",
+     "LIN"
+    ],
+    "pole": "ANT",
+    "modelo": "Random Forest"
+   },
+   "carrera": {
+    "top10": [
+     "ANT",
+     "VER",
+     "LEC",
+     "NOR",
+     "RUS",
+     "HAM",
+     "HAD",
+     "PIA",
+     "LAW",
+     "LIN"
+    ],
+    "ganador": "ANT",
+    "preliminar": true,
+    "parrilla_fuente": "pronóstico de qualy (FP3)"
+   },
+   "cambios": {
+    "qualy": [
+     {
+      "acr": "PIA",
+      "de": 7,
+      "a": 6
+     },
+     {
+      "acr": "HAM",
+      "de": 6,
+      "a": 7
+     },
+     {
+      "acr": "LAW",
+      "de": 11,
+      "a": 9
+     },
+     {
+      "acr": "LIN",
+      "de": 13,
+      "a": 10
+     },
+     {
+      "acr": "GAS",
+      "de": 9,
+      "a": 11
+     },
+     {
+      "acr": "BOR",
+      "de": 10,
+      "a": 12
+     }
+    ],
+    "carrera": [
+     {
+      "acr": "RUS",
+      "de": 6,
+      "a": 5
+     },
+     {
+      "acr": "HAM",
+      "de": 5,
+      "a": 6
+     },
+     {
+      "acr": "LIN",
+      "de": 12,
+      "a": 10
+     },
+     {
+      "acr": "BOR",
+      "de": 10,
+      "a": 12
+     }
+    ]
+   }
+  },
+  {
+   "fase": "Q",
+   "actualizado": "2026-11-09T03:49:08Z",
+   "qualy": null,
+   "carrera": {
+    "top10": [
+     "NOR",
+     "ANT",
+     "HAD",
+     "LAW",
+     "RUS",
+     "HUL",
+     "LEC",
+     "VER",
+     "HAM",
+     "BEA"
+    ],
+    "ganador": "NOR",
+    "preliminar": false,
+    "parrilla_fuente": "Parrilla oficial (OpenF1 starting_grid) (cambios respecto a la qualy: RUS 2.º → 7.º, LEC 4.º → 14.º, HAM 11.º → 20.º, LIN 14.º → 18.º, VER 16.º → 21.º)"
+   },
+   "cambios": {
+    "qualy": [],
+    "carrera": [
+     {
+      "acr": "NOR",
+      "de": 4,
+      "a": 1
+     },
+     {
+      "acr": "ANT",
+      "de": 1,
+      "a": 2
+     },
+     {
+      "acr": "HAD",
+      "de": 7,
+      "a": 3
+     },
+     {
+      "acr": "LAW",
+      "de": 9,
+      "a": 4
+     },
+     {
+      "acr": "HUL",
+      "de": 11,
+      "a": 6
+     },
+     {
+      "acr": "LEC",
+      "de": 3,
+

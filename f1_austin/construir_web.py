@@ -1,14 +1,15 @@
 """Construye la página única de pronósticos (todos los GP) a partir de web/plantilla.html.
 
 La página muestra el GP 'actual' de meta.json (o el del hash: #brasil2026) y cambia de GP con el menú. Con base de datos
-(Artifact de claude.ai) lee en vivo meta/actual y gp|live|postqualy|carrera|vueltas|postcarrera/<slug>; sin base (Netlify,
-archivo local, viewer sin sesión) usa el respaldo que este script incrusta en <script type="application/json" id="datos">:
+(Artifact de claude.ai) lee en vivo meta/actual, bitacora/actual y gp|live|postqualy|carrera|vueltas|postcarrera|historial/<slug>;
+sin base (Netlify, archivo local, viewer sin sesión) usa el respaldo que este script incrusta en <script type="application/json" id="datos">:
 
     {"meta": gps/meta.json,
      "catalogo": {slug: {nombre, nombre_corto, circuito, circuito_corto, ciudad, pais, tema, tz, etq, vueltas,
                          sesiones: {FP1, FP2, FP3, Q, R: ISO UTC}, historial: [{anio, acr, equipo}]}},
      "temas": {tema: web/temas/<tema>.json},
-     "gps": {slug: {gp, live, postqualy, carrera, vueltas, postcarrera}}}   # desde gps/<slug>/*.json (contrato multi-GP)
+     "gps": {slug: {gp, live, postqualy, carrera, vueltas, postcarrera, historial}},   # desde gps/<slug>/*.json (contrato multi-GP)
+     "bitacora": modelos/bitacora.json}   # mejora continua: campeones, evolución por GP, cambios adoptados, candidatos
 
 El catálogo junta: CURADO (abajo: zona horaria, etiqueta de hora, vueltas, nombre corto), gps/<slug>/config.json,
 meta.json, cache/sessions_<año>.json (horarios de OpenF1) y el historial de poles del circuito (cache de Jolpica).
@@ -19,6 +20,7 @@ Uso:
   python3 construir_web.py --salida ../sitio_f1/index.html --documento      # Netlify (con doctype)
   python3 construir_web.py --gps /ruta/a/gps --salida /tmp/prueba.html      # otra carpeta de datos (pruebas)
   python3 construir_web.py --actual lasvegas2026             # fuerza el GP inicial del respaldo (meta.actual)
+  python3 construir_web.py --gps X/gps --bitacora X/modelos/bitacora.json   # bitácora: por defecto <carpeta de --gps>/../modelos/
 Imágenes: web/img/<tema>/ (rutas relativas img/<tema>/…); publicar la carpeta web/img junto a la página.
 """
 import argparse
@@ -57,7 +59,7 @@ CURADO = {
 }
 # Archivo de gps/<slug>/ -> clave del doc (gp/<slug>, live/<slug>, ...)
 ARCHIVOS = {"gp": "gp.json", "live": "live_qualy.json", "postqualy": "post_qualy.json", "carrera": "carrera.json",
-            "vueltas": "vueltas.json", "postcarrera": "post_carrera.json"}
+            "vueltas": "vueltas.json", "postcarrera": "post_carrera.json", "historial": "historial.json"}
 SESIONES_OPENF1 = {"Practice 1": "FP1", "Practice 2": "FP2", "Practice 3": "FP3", "Qualifying": "Q", "Race": "R",
                    "Sprint": "SPR", "Sprint Qualifying": "SQ", "Sprint Shootout": "SQ"}
 SLUG_OK = re.compile(r"^[a-z0-9-]{2,40}$")
@@ -82,7 +84,15 @@ VALIDOS = {
     "carrera": lambda d: _con_acr(d.get("pilotos")),
     "vueltas": lambda d: _con_acr(d.get("trazas")) or _con_acr(d.get("estrategias")),
     "postcarrera": lambda d: _con_acr(d.get("filas")) or bool(d.get("top10_real")),
+    "historial": lambda d: isinstance(d.get("fases"), list) and any(isinstance(f, dict) and f.get("fase") for f in d["fases"]),
 }
+
+
+def bitacora_valida(d):
+    """modelos/bitacora.json (doc bitacora/actual): basta con que traiga alguna de sus partes con forma."""
+    return isinstance(d, dict) and (
+        isinstance(d.get("campeones"), dict) or isinstance(d.get("evolucion"), list)
+        or isinstance(d.get("cambios"), list) or isinstance(d.get("candidatos"), list))
 
 
 def docs_gp(carpeta):
@@ -227,7 +237,7 @@ def css_tema(t):
     return ":root{" + ";".join(v).replace("</", "") + "}"
 
 
-def construir(plantilla, gps_dir, actual=None):
+def construir(plantilla, gps_dir, actual=None, bitacora=None):
     meta = leer(gps_dir / "meta.json")
     if not isinstance(meta, dict):
         meta = {"actualizado": None, "actual": None, "gps": []}
@@ -241,7 +251,10 @@ def construir(plantilla, gps_dir, actual=None):
         d = docs_gp(gps_dir / s)
         if d:
             gps[s] = d
+    bit = leer(bitacora if bitacora else gps_dir.parent / "modelos" / "bitacora.json")
     datos = {"meta": meta, "catalogo": cat, "temas": tms, "gps": gps}
+    if bitacora_valida(bit):
+        datos["bitacora"] = bit
     js = json.dumps(datos, ensure_ascii=False, separators=(",", ":")).replace("</", "<\\/")
     html = plantilla
     patron = re.compile(r'(<script type="application/json" id="datos">)(.*?)(</script>)', re.S)
@@ -256,6 +269,9 @@ def construir(plantilla, gps_dir, actual=None):
     if url and url.startswith("https://fonts.googleapis.com/css2?"):
         html = re.sub(r'(<link rel="stylesheet" id="fuentes-tema" href=")[^"]*(")', lambda m: m.group(1) + url.replace("&", "&amp;") + m.group(2), html, count=1)
     resumen = {s: sorted(d) for s, d in gps.items()}
+    if "bitacora" in datos:
+        resumen["(bitácora)"] = [f"{len(bit.get('evolucion') or [])} GP evaluados", f"{len(bit.get('cambios') or [])} cambios adoptados",
+                                 f"{len(bit.get('candidatos') or [])} candidatos"]
     return html, ini, resumen, sorted(tms)
 
 
@@ -265,12 +281,14 @@ def main():
     ap.add_argument("--gps", default=str(BASE / "gps"), help="carpeta con meta.json y <slug>/*.json")
     ap.add_argument("--salida", default=str(WEB / "index.html"))
     ap.add_argument("--actual", help="slug del GP inicial del respaldo (por defecto meta.actual)")
+    ap.add_argument("--bitacora", help="bitácora de mejora continua (por defecto <carpeta de --gps>/../modelos/bitacora.json)")
     ap.add_argument("--documento", action="store_true",
                     help="envuelve en <!doctype html><html><head>…<body> (Netlify); el Artifact se publica SIN envolver")
     a = ap.parse_args()
     if a.actual and not SLUG_OK.match(a.actual):
         raise SystemExit("--actual: sólo letras minúsculas, dígitos y guiones")
-    html, ini, resumen, tms = construir(Path(a.plantilla).read_text(encoding="utf-8"), Path(a.gps), a.actual)
+    html, ini, resumen, tms = construir(Path(a.plantilla).read_text(encoding="utf-8"), Path(a.gps), a.actual,
+                                        Path(a.bitacora) if a.bitacora else None)
     if a.documento:
         html = ('<!doctype html><html lang="es"><head><meta charset="utf-8">'
                 '<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"></head><body>'

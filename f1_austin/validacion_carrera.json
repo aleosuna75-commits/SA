@@ -177,17 +177,17 @@
    "gn_inter": true
   },
   "metricas": {
-   "ndcg10": 0.889776845084359,
-   "ndcg10_2024": 0.8956974586853387,
-   "ndcg10_2025": 0.8945772330711268,
-   "ndcg10_2026": 0.8754821763006959,
-   "ndcg10_2024_25": 0.8951373458782328,
-   "top10_hits": 7.984848484848484,
-   "win_acc": 0.6212121212121212,
-   "podium_hits": 2.090909090909091,
-   "pos_exact10": 2.3333333333333335,
-   "spearman": 0.708109701130296,
-   "n_gp": 66.0
+   "ndcg10": 0.890176,
+   "ndcg10_2024": 0.895697,
+   "ndcg10_2025": 0.894577,
+   "ndcg10_2026": 0.878269,
+   "top10_hits": 8.0,
+   "pos_exact10": 2.308824,
+   "mae_top10": 2.226471,
+   "spearman": 0.710814,
+   "win_acc": 0.617647,
+   "podium_hits": 2.073529,
+   "n_gp": 68.0
   }
  },
  "duelo_vs_base": {
@@ -231,5 +231,7 @@
    "spearman_medio": 0.05818854456829254,
    "pct_positivos": 0.631578947368421
   }
- }
+ },
+ "oficial_actualizado": "2026-11-09T04:52:34Z",
+ "oficial_nota": "bloque 'oficial' recalculado por mejora_modelos.py (campeón vigente, walk-forward a hoy)"
 }

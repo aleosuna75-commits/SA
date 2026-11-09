@@ -3,3 +3,6 @@ cache/
 *.pkl
 # datasets por GP de gp_pipeline.py (se regeneran)
 dataset_qualy_[a-eg-z]*.csv
+# post-FP1 y carreras preliminares por fase (se regeneran)
+dataset_qualy_fp1.csv
+gps/*/trabajo_carrera*/dataset_carrera.csv

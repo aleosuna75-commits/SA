@@ -1,0 +1,281 @@
+[2026-11-09T03:49:11Z] mexico2026: post_fp1 (retro)
+  [  119 s] modelo_carrera_austin.py 1298 ... -> post_fp1.log (rc=0)
+  [  117 s] modelo_carrera_austin.py 1298 ... -> historial.log (rc=0)
+  [  120 s] modelo_carrera_austin.py 1298 ... -> historial.log (rc=0)
+mexico2026 fases: [{'slug': 'mexico2026', 'paso': 'post_fp1', 'ok': True, 'segundos': 119, 'archivos_cambiados': ['gps/mexico2026/historial.json'], 'docs': [{'coleccion': 'historial', 'doc_id': 'mexico2026', 'archivo': 'gps/mexico2026/historial.json'}]}, 'FP2', 'FP3', 'Q']
+{
+ "actualizado": "2026-11-09T03:55:07Z",
+ "fases": [
+  {
+   "fase": "FP1",
+   "actualizado": "2026-11-09T03:51:10Z",
+   "qualy": {
+    "top10": [
+     "ANT",
+     "LEC",
+     "HAM",
+     "VER",
+     "RUS",
+     "PIA",
+     "NOR",
+     "HAD",
+     "GAS",
+     "LAW"
+    ],
+    "pole": "ANT",
+    "modelo": "Ridge"
+   },
+   "carrera": {
+    "top10": [
+     "ANT",
+     "LEC",
+     "HAM",
+     "VER",
+     "RUS",
+     "PIA",
+     "HAD",
+     "NOR",
+     "LAW",
+     "GAS"
+    ],
+    "ganador": "ANT",
+    "preliminar": true,
+    "parrilla_fuente": "pronóstico de qualy (FP1)"
+   },
+   "cambios": {
+    "qualy": [],
+    "carrera": []
+   }
+  },
+  {
+   "fase": "FP2",
+   "actualizado": "2026-11-09T03:53:07Z",
+   "qualy": {
+    "top10": [
+     "ANT",
+     "LEC",
+     "RUS",
+     "VER",
+     "NOR",
+     "HAM",
+     "PIA",
+     "HAD",
+     "GAS",
+     "LAW"
+    ],
+    "pole": "ANT",
+    "modelo": "Random Forest"
+   },
+   "carrera": {
+    "top10": [
+     "ANT",
+     "LEC",
+     "VER",
+     "RUS",
+     "NOR",
+     "HAM",
+     "HAD",
+     "PIA",
+     "LAW",
+     "LIN"
+    ],
+    "ganador": "ANT",
+    "preliminar": true,
+    "parrilla_fuente": "pronóstico de qualy (FP2)"
+   },
+   "cambios": {
+    "qualy": [
+     {
+      "acr": "RUS",
+      "de": 5,
+      "a": 3
+     },
+     {
+      "acr": "NOR",
+      "de": 7,
+      "a": 5
+     },
+     {
+      "acr": "HAM",
+      "de": 3,
+      "a": 6
+     },
+     {
+      "acr": "PIA",
+      "de": 6,
+      "a": 7
+     }
+    ],
+    "carrera": [
+     {
+      "acr": "VER",
+      "de": 4,
+      "a": 3
+     },
+     {
+      "acr": "RUS",
+      "de": 5,
+      "a": 4
+     },
+     {
+      "acr": "NOR",
+      "de": 8,
+      "a": 5
+     },
+     {
+      "acr": "HAM",
+      "de": 3,
+      "a": 6
+     },
+     {
+      "acr": "PIA",
+      "de": 6,
+      "a": 8
+     },
+     {
+      "acr": "LIN",
+      "de": 11,
+      "a": 10
+     },
+     {
+      "acr": "GAS",
+      "de": 10,
+      "a": 11
+     }
+    ]
+   }
+  },
+  {
+   "fase": "FP3",
+   "actualizado": "2026-11-09T03:55:07Z",
+   "qualy": {
+    "top10": [
+     "ANT",
+     "LEC",
+     "NOR",
+     "VER",
+     "RUS",
+     "PIA",
+     "HAM",
+     "HAD",
+     "LAW",
+     "LIN"
+    ],
+    "pole": "ANT",
+    "modelo": "Random Forest"
+   },
+   "carrera": {
+    "top10": [
+     "ANT",
+     "LEC",
+     "VER",
+     "NOR",
+     "RUS",
+     "HAD",
+     "HAM",
+     "PIA",
+     "LAW",
+     "LIN"
+    ],
+    "ganador": "ANT",
+    "preliminar": true,
+    "parrilla_fuente": "pronóstico de qualy (FP3)"
+   },
+   "cambios": {
+    "qualy": [
+     {
+      "acr": "NOR",
+      "de": 5,
+      "a": 3
+     },
+     {
+      "acr": "RUS",
+      "de": 3,
+      "a": 5
+     },
+     {
+      "acr": "PIA",
+      "de": 7,
+      "a": 6
+     },
+     {
+      "acr": "HAM",
+      "de": 6,
+      "a": 7
+     },
+     {
+      "acr": "LAW",
+      "de": 10,
+      "a": 9
+     },
+     {
+      "acr": "LIN",
+      "de": 11,
+      "a": 10
+     },
+     {
+      "acr": "GAS",
+      "de": 9,
+      "a": 11
+     }
+    ],
+    "carrera": [
+     {
+      "acr": "NOR",
+      "de": 5,
+      "a": 4
+     },
+     {
+      "acr": "RUS",
+      "de": 4,
+      "a": 5
+     },
+     {
+      "acr": "HAD",
+      "de": 7,
+      "a": 6
+     },
+     {
+      "acr": "HAM",
+      "de": 6,
+      "a": 7
+     }
+    ]
+   }
+  },
+  {
+   "fase": "Q",
+   "actualizado": "2026-11-09T03:55:07Z",
+   "qualy": null,
+   "carrera": {
+    "top10": [
+     "HAM",
+     "RUS",
+     "LEC",
+     "ANT",
+     "VER",
+     "HAD",
+     "NOR",
+     "LIN",
+     "PIA",
+     "GAS"
+    ],
+    "ganador": "HAM",
+    "preliminar": false,
+    "parrilla_fuente": "Clasificación oficial de la qualy con penalizaciones: Lawson descalificado de la qualy (MGU-K) y sale último; Verstappen −1 lugar (choque en FP2) y Bottas al fondo (componentes de motor). Lawson conserva su ritmo de qualy (fue P8 en pista) para el simulador."
+   },
+   "cambios": {
+    "qualy": [],
+    "carrera": [
+     {
+      "acr": "HAM",
+      "de": 7,
+      "a": 1
+     },
+     {
+      "acr": "RUS",
+      "de": 5,
+      "a": 2
+     },
+     {
+  

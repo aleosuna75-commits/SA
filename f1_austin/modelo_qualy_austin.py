@@ -25,6 +25,11 @@ Uso:  python3 modelo_qualy_austin.py [meeting_key]     (1297 = Austin, 1298 = M�
           tocar el pronóstico FP1/FP2. --jobs (o F1_N_JOBS) limita los hilos de RF/ET/XGB/LGB.
           En el walk-forward los GPs sprint (sin FP3) se predicen con las variables FP1/FP2, como en vivo.
           Si la FP3 del GP objetivo no está en cache (<10 pilotos), aborta sin escribir el pronóstico.
+      python3 modelo_qualy_austin.py 1300 --fp1 [--jobs 2]
+          versión post-FP1 (viernes): sólo FP1 + historial (FEATURES_FP1), archivos *_fp1. Titulares: si del GP sólo
+          existe la FP1 (con novatos), la lista del GP anterior + sustituciones de ajustes.json.
+      Variante (pesos, variables, hiperparámetros, selección de modelo): la vigente en modelos/config_activa.json
+      (config_modelos.py; la cambia sólo mejora_modelos.py). Sin archivo = comportamiento original.
       python3 modelo_qualy_austin.py html <slug>[_fp3]  -> regenera sólo el HTML desde el .pkl
 """
 import json
@@ -43,6 +48,8 @@ from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
 import lightgbm as lgb
 import xgboost as xgb
+
+import config_modelos as CM
 
 warnings.filterwarnings("ignore")
 BASE = Path(__file__).parent
@@ -350,9 +357,23 @@ def tabla_cota(circuito="americas"):
 # ----------------------------------------------------------------------------------------
 # 4. Dataset piloto-fin de semana
 # ----------------------------------------------------------------------------------------
-def construir_dataset(con_fp3=False):
+def lineup_previo(pil, ses, fecha):
+    """Titulares del último GP anterior a 'fecha' (lista de su qualy/FP3/FP2). Para un GP del que sólo se conoce la FP1
+    (pronóstico post-FP1): la lista de la FP1 trae novatos en lugar de titulares. Sustituciones: ajustes.json."""
+    prev = ses[(ses.date_start < fecha) & ses.session_name.isin(["Qualifying", "Practice 3", "Practice 2"])]
+    orden = {"Qualifying": 0, "Practice 3": 1, "Practice 2": 2}
+    prev = prev.assign(_o=prev.session_name.map(orden)).sort_values(["date_start"])
+    for mk in prev.meeting_key.drop_duplicates()[::-1]:
+        for sk in prev[prev.meeting_key == mk].sort_values("_o").session_key:
+            if (pil.session_key == sk).any():
+                return pil[pil.session_key == sk]
+    return None
+
+
+def construir_dataset(con_fp3=False, solo_fp1=False):
     """con_fp3=True agrega variables de la FP3 (sábado, antes de la qualy) y combinadas FP1-3.
-    En fines de semana sprint no hay FP3: fp3_* queda NaN y las combinadas usan FP1/FP2."""
+    En fines de semana sprint no hay FP3: fp3_* queda NaN y las combinadas usan FP1/FP2.
+    solo_fp1=True: versión post-FP1 (sólo FP1 + historial; fp2_* queda NaN y las combinadas salen de la FP1)."""
     ses = tabla_sesiones()
     res = tabla_resultados()
     pil = tabla_pilotos()
@@ -382,11 +403,15 @@ def construir_dataset(con_fp3=False):
             if pd.notna(sk) and (pil.session_key == sk).any():
                 dq = pil[pil.session_key == sk]
                 break
+        else:                                   # sólo FP1 (GP objetivo tras la FP1): titulares del GP anterior
+            lp = lineup_previo(pil, ses, m.date)
+            if lp is not None:
+                dq = lp
         dq = dq.drop_duplicates("driver_number")
         base = dq[["driver_number", "name_acronym", "full_name", "team", "team_name", "team_colour"]].copy()
         base = aplicar_sustituciones(base.reset_index(drop=True), pil, m.meeting_key)
         f1 = features_practica(int(m.fp1), "fp1")
-        f2 = features_practica(int(m.fp2), "fp2") if pd.notna(m.fp2) else pd.DataFrame()
+        f2 = features_practica(int(m.fp2), "fp2") if (pd.notna(m.fp2) and not solo_fp1) else pd.DataFrame()
         if f1.empty and f2.empty:
             continue
         df = base.merge(f1, on="driver_number", how="left") if not f1.empty else base
@@ -541,6 +566,9 @@ FEATURES = [
     "year_idx", "is_2026_regs",
 ]
 
+# Versión post-FP1 (viernes, tras la FP1): FP1 + combinadas (que salen sólo de la FP1) + historial
+FEATURES_FP1 = [f for f in FEATURES if not f.startswith("fp2_") and f != "fp_improve"]
+
 # Versión sábado (después de la FP3): todo lo anterior + FP3 + combinadas FP1-FP3
 FEATURES_FP3 = FEATURES + [
     # FP3
@@ -556,9 +584,14 @@ FEATURES_FP3 = FEATURES + [
 # ----------------------------------------------------------------------------------------
 # 5. Modelos
 # ----------------------------------------------------------------------------------------
+PESOS_BASE = {"2026": 3.0, "2025": 1.5, "otros": 1.0}
+_PESOS = dict(PESOS_BASE)
+_HIPER = {}
+
+
 def pesos(df):
-    # Más peso a lo reciente (2026 = nuevo reglamento)
-    return np.where(df.year >= 2026, 3.0, np.where(df.year == 2025, 1.5, 1.0))
+    # Más peso a lo reciente (2026 = nuevo reglamento); configurable (config_modelos: 'pesos')
+    return np.where(df.year >= 2026, _PESOS["2026"], np.where(df.year == 2025, _PESOS["2025"], _PESOS["otros"]))
 
 
 def relevancia(pos):
@@ -592,7 +625,7 @@ class Modelo:
         return -p if self.tipo == "rank" else p
 
 
-def catalogo(con_fp3=False):
+def catalogo(con_fp3=False, fase=None):
     imp = lambda: SimpleImputer(strategy="median")
     nj = N_JOBS
     xgb_jobs = 4 if nj < 0 else nj
@@ -624,7 +657,64 @@ def catalogo(con_fp3=False):
     if con_fp3:
         cat = {"Baseline: rank FP3 (o FP2/FP1)": lambda: Modelo("b3", "baseline", "main3_rank"),
                "Baseline: mejor vuelta FP1-FP3": lambda: Modelo("b4", "baseline", "c3_rank"), **cat}
+    if fase == "FP1":           # sin FP2 los dos baselines son el mismo orden (FP1)
+        cat.pop("Baseline: rank FP2 (o FP1)")
+        cat.pop("Baseline: mejor vuelta FP1+FP2")
+        cat = {"Baseline: rank FP1": lambda: Modelo("b0", "baseline", "fp1_rank"), **cat}
+    for n, params in (_HIPER or {}).items():    # hiperparámetros de la variante vigente (config_modelos: 'hiper')
+        if n in cat and params:
+            def con_hiper(fab=cat[n], params=params):
+                m = fab()
+                est = m.est.steps[-1][1] if hasattr(m.est, "steps") else m.est
+                est.set_params(**params)
+                return m
+            cat[n] = con_hiper
     return cat
+
+
+# ----------------------------------------------------------------------------------------
+# Variante vigente (config_modelos.py / modelos/config_activa.json; la elige mejora_modelos.py)
+# ----------------------------------------------------------------------------------------
+def tarea_de(con_fp3=False, con_fp1=False):
+    return "qualy_fp3" if con_fp3 else "qualy_fp1" if con_fp1 else "qualy_fp2"
+
+
+def features_variante(feats, cfg):
+    """Quita variables según cfg['quitar'] (nombre exacto o patrón con '*' al principio o al final)."""
+    quitar = list((cfg or {}).get("quitar") or [])
+    def fuera(f):
+        for q in quitar:
+            if q.endswith("*") and f.startswith(q[:-1]):
+                return True
+            if q.startswith("*") and f.endswith(q[1:]):
+                return True
+            if q == f:
+                return True
+        return False
+    return [f for f in feats if not fuera(f)]
+
+
+def datos_variante(data, cfg):
+    """Transformaciones del dataset de la variante (sólo con información previa a cada GP)."""
+    if (cfg or {}).get("debutantes") == "equipo":
+        # prior de debutantes por escudería: forma de qualy de su equipo (últimos 5 GPs) + 2 lugares, en vez del
+        # promedio de debutantes anteriores (el compañero suele ir por delante del novato)
+        data = data.copy()
+        deb = data.h_experience == 0
+        prior = (data.loc[deb, "h_team_q_mean5"] + 2).clip(upper=20)
+        for c in ("h_q_last", "h_q_mean3", "h_q_mean5", "h_q_mean10", "h_q_season"):
+            data.loc[deb, c] = prior.fillna(data.loc[deb, c])
+    return data
+
+
+def aplicar_config(cfg):
+    """Fija pesos, hiperparámetros y ensambles extra de la variante (estado del módulo)."""
+    global _PESOS, _HIPER
+    cfg = cfg or {}
+    _PESOS = {**PESOS_BASE, **{str(k): float(v) for k, v in (cfg.get("pesos") or {}).items()}}
+    _HIPER = dict(cfg.get("hiper") or {})
+    for n, miembros in (cfg.get("ensambles") or {}).items():
+        ENSAMBLES[n] = list(miembros)
 
 
 def metricas(df_pred, col):
@@ -645,13 +735,14 @@ def metricas(df_pred, col):
     return pd.DataFrame(out)
 
 
-def walk_forward(data, desde=2024, features=None, con_fp3=False, nombres=None):
+def walk_forward(data, desde=2024, features=None, con_fp3=False, nombres=None, feats_sin_fp3=None, fase=None):
     """Entrena con pilotos con tiempo de qualy; evalúa con TODOS los inscritos (sin tiempo = al fondo).
     features: lista de variables (default FEATURES); nombres: subconjunto del catálogo (default todo).
     con_fp3: en los GPs sin FP3 (sprint) los modelos usan FEATURES (FP1/FP2), igual que se haría en
     vivo: ese sábado no hay información nueva antes de la qualy. Los baselines usan sus columnas."""
     features = FEATURES if features is None else features
-    cat = catalogo(con_fp3)
+    feats_sin_fp3 = FEATURES if feats_sin_fp3 is None else feats_sin_fp3
+    cat = catalogo(con_fp3, fase)
     if nombres is not None:
         cat = {n: cat[n] for n in nombres}
     entrenables = data.dropna(subset=["q_pos"])
@@ -665,7 +756,7 @@ def walk_forward(data, desde=2024, features=None, con_fp3=False, nombres=None):
         sin_fp3 = con_fp3 and not te.fp3_best.notna().any()
         for nombre, fab in cat.items():
             m = fab()
-            f = FEATURES if (sin_fp3 and m.tipo != "baseline") else features
+            f = feats_sin_fp3 if (sin_fp3 and m.tipo != "baseline") else features
             m.fit(tr[f], tr.q_pos.values, pesos(tr), grupos)
             p = te[["meeting_key", "driver_number", "q_pos", "year"]].copy()
             p["pred"] = m.predict(te[f])
@@ -698,14 +789,15 @@ ENSAMBLES = {
     "Ensamble total (Ridge+árboles+rankers)": ["Ridge", "Random Forest", "Extra Trees", "Gradient Boosting",
                                                "XGBoost", "LightGBM", "LightGBM LambdaRank", "XGBoost Ranker"],
 }
+ENSAMBLES_BASE = {k: list(v) for k, v in ENSAMBLES.items()}
 
 
-def ajustar_final(nombre, train, features=None, con_fp3=False):
+def ajustar_final(nombre, train, features=None, con_fp3=False, fase=None):
     features = FEATURES if features is None else features
     train = train.sort_values(["meeting_key", "driver_number"])
     grupos = train.groupby("meeting_key", sort=False).size().loc[train.meeting_key.unique()].values
     miembros = ENSAMBLES.get(nombre, [nombre])
-    cat = catalogo(con_fp3)
+    cat = catalogo(con_fp3, fase)
     modelos = [cat[n]().fit(train[features], train.q_pos.values, pesos(train), grupos) for n in miembros]
 
     def predecir(X):
@@ -761,15 +853,28 @@ def generar_reporte(resultado):
     generar_html(resultado, BASE / f"reporte_qualy_{gp['slug']}{sufijo}_2026.html")
 
 
-def main(meeting=OBJETIVO_MEETING, con_fp3=False, nombres_modelos=None):
+def main(meeting=OBJETIVO_MEETING, con_fp3=False, nombres_modelos=None, con_fp1=False):
     """con_fp3=True: versión del sábado con FP3; escribe archivos *_fp3 (no pisa el pronóstico FP1/FP2).
-    nombres_modelos: lista de nombres del catálogo para el walk-forward (default: todos; más rápido con uno solo)."""
+    con_fp1=True: versión post-FP1 (sólo FP1 + historial); escribe archivos *_fp1.
+    nombres_modelos: lista de nombres del catálogo para el walk-forward (default: todos; más rápido con uno solo).
+    La variante (pesos, variables, hiperparámetros, selección) es la vigente en config_modelos.py (default: la original)."""
     gp = {**GPS[meeting], "meeting_key": meeting}
-    feats = FEATURES_FP3 if con_fp3 else FEATURES
-    sufijo = "_fp3" if con_fp3 else ""
-    print(f"GP objetivo: {gp['nombre']} (meeting {meeting})" + ("  [con FP3]" if con_fp3 else ""))
+    fase = "FP3" if con_fp3 else "FP1" if con_fp1 else "FP2"
+    tarea = tarea_de(con_fp3, con_fp1)
+    variante, cfg = CM.config_vigente(tarea)
+    aplicar_config(cfg)
+    feats = features_variante(FEATURES_FP3 if con_fp3 else FEATURES_FP1 if con_fp1 else FEATURES, cfg)
+    feats_sin_fp3 = features_variante(FEATURES, cfg)
+    sufijo = "_fp3" if con_fp3 else "_fp1" if con_fp1 else ""
+    print(f"GP objetivo: {gp['nombre']} (meeting {meeting})" + ("  [con FP3]" if con_fp3 else "  [sólo FP1]" if con_fp1 else ""))
+    print(f"Variante vigente ({tarea}): {variante} {json.dumps(cfg, ensure_ascii=False)}")
+    if cfg.get("seleccion") == "fijo" and cfg.get("fijo"):
+        nombres_modelos = nombres_modelos or ENSAMBLES.get(cfg["fijo"], [cfg["fijo"]])
+    elif cfg.get("modelos"):
+        nombres_modelos = nombres_modelos or list(cfg["modelos"])
     print("Construyendo dataset...")
-    data, meetings = construir_dataset(con_fp3=con_fp3)
+    data, meetings = construir_dataset(con_fp3=con_fp3, solo_fp1=con_fp1)
+    data = datos_variante(data, cfg)
     # Austin/México conservan sus nombres (archivos versionados); los GPs de gp_pipeline.py escriben el suyo
     nombre_ds = f"dataset_qualy{sufijo}.csv" if meeting in (1297, 1298) else f"dataset_qualy_{gp['slug']}{sufijo}.csv"
     data.to_csv(BASE / nombre_ds, index=False)
@@ -779,14 +884,19 @@ def main(meeting=OBJETIVO_MEETING, con_fp3=False, nombres_modelos=None):
         # sin FP3 la versión sábado no aporta nada (y no se debe publicar como "FP3")
         raise SystemExit(f"ERROR: la FP3 del GP objetivo tiene datos de sólo {obj.fp3_best.notna().sum()} pilotos. "
                          "Bájala primero: python3 descarga_datos.py <session_key_fp3> (México: 11399)")
+    if con_fp1 and obj.fp1_best.notna().sum() < 10:
+        raise SystemExit(f"ERROR: la FP1 del GP objetivo tiene datos de sólo {obj.fp1_best.notna().sum()} pilotos.")
     historia = data[(data.meeting_key != meeting) & (data.date < obj.date.min()) & data.q_eval.notna()]
     train = historia[historia.q_pos.notna()]
     print(f"Filas de entrenamiento: {len(train)}  | GPs: {train.meeting_key.nunique()}  | Features: {len(feats)}")
 
     print("Validación walk-forward 2024-2026...")
-    tabla, preds = walk_forward(historia, features=feats, con_fp3=con_fp3, nombres=nombres_modelos)
+    tabla, preds = walk_forward(historia, features=feats, con_fp3=con_fp3, nombres=nombres_modelos,
+                                feats_sin_fp3=feats_sin_fp3, fase=fase)
     print(tabla.to_string(index=False))
     mejor = tabla.modelo.iloc[0]
+    if cfg.get("seleccion") == "fijo" and cfg.get("fijo") in set(tabla.modelo):
+        mejor = cfg["fijo"]
     print("Mejor modelo:", mejor)
 
     p = preds[mejor].copy()
@@ -798,11 +908,11 @@ def main(meeting=OBJETIVO_MEETING, con_fp3=False, nombres_modelos=None):
     print("Por año (" + mejor + "):")
     print(por_gp.groupby("year")[["top10_hits", "spearman", "pole_hit"]].mean().round(3).to_string())
 
-    predecir, modelos = ajustar_final(mejor, train, feats, con_fp3)
+    predecir, modelos = ajustar_final(mejor, train, feats, con_fp3, fase)
     if not importancias(modelos, feats).empty:
         imp = importancias(modelos, feats)
     else:
-        _, mods_imp = ajustar_final("Ensamble árboles (RF+ET+GB+XGB+LGB)", train, feats, con_fp3)
+        _, mods_imp = ajustar_final("Ensamble árboles (RF+ET+GB+XGB+LGB)", train, feats, con_fp3, fase)
         imp = importancias(mods_imp, feats)
 
     obj = obj.reset_index(drop=True)
@@ -814,7 +924,8 @@ def main(meeting=OBJETIVO_MEETING, con_fp3=False, nombres_modelos=None):
     circ = tabla_cota(gp["circuito_jolpica"])
     resultado = {"tabla": tabla, "mejor": mejor, "obj": obj, "imp": imp, "por_gp": por_gp, "cota": circ, "circ": circ,
                  "train": train, "residuos": p, "n_vars": len(feats), "gp": gp,
-                 "fase": "FP3" if con_fp3 else "FP2", "con_fp3": con_fp3, "sufijo": sufijo, "features": list(feats),
+                 "fase": fase, "con_fp3": con_fp3, "sufijo": sufijo, "features": list(feats),
+                 "variante": variante, "config_variante": cfg, "corte": os.environ.get("F1_CORTE"),
                  "generado": pd.Timestamp.now(tz="UTC").strftime("%Y-%m-%dT%H:%M:%SZ")}
     obj.to_csv(BASE / f"prediccion_qualy_{gp['slug']}{sufijo}_2026.csv", index=False)
     pd.to_pickle(resultado, BASE / f"resultado_qualy_{gp['slug']}{sufijo}.pkl")   # para regenerar el HTML sin reentrenar
@@ -825,7 +936,7 @@ def main(meeting=OBJETIVO_MEETING, con_fp3=False, nombres_modelos=None):
         if not con_fp3:
             raise
     print("\nPREDICCIÓN TOP 10:")
-    cols = ["pred_rank", "name_acronym", "team_name", "fp1_rank", "fp2_rank"] + (["fp3_rank"] if con_fp3 else []) + ["p_q3", "p_pole"]
+    cols = ["pred_rank", "name_acronym", "team_name", "fp1_rank"] + ([] if con_fp1 else ["fp2_rank"]) + (["fp3_rank"] if con_fp3 else []) + ["p_q3", "p_pole"]
     print(obj[cols].head(12).to_string(index=False))
     return resultado
 
@@ -839,6 +950,7 @@ if __name__ == "__main__":
         generar_reporte(pd.read_pickle(BASE / f"resultado_qualy_{args[1]}.pkl"))
     else:
         con_fp3 = "--fp3" in args
+        con_fp1 = "--fp1" in args
         if "--jobs" in args:
             N_JOBS = int(args[args.index("--jobs") + 1])
             args.pop(args.index("--jobs") + 1)
@@ -846,4 +958,5 @@ if __name__ == "__main__":
         if "--modelos" in args:          # p. ej. --modelos "Random Forest"  (separados por coma)
             modelos = [m.strip() for m in args.pop(args.index("--modelos") + 1).split(",")]
         posicionales = [a for a in args if not a.startswith("--")]
-        main(int(posicionales[0]) if posicionales else OBJETIVO_MEETING, con_fp3=con_fp3, nombres_modelos=modelos)
+        main(int(posicionales[0]) if posicionales else OBJETIVO_MEETING, con_fp3=con_fp3, nombres_modelos=modelos,
+             con_fp1=con_fp1)

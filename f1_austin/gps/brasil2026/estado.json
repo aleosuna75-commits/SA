@@ -88,6 +88,50 @@
    "archivos": [
     "post_carrera.json"
    ]
+  },
+  "post_fp1": {
+   "hecho": "2026-11-09T04:28:23Z",
+   "corte": "2026-11-06T19:00:00Z",
+   "modelo": "Ridge",
+   "top10": [
+    "ANT",
+    "VER",
+    "NOR",
+    "HAM",
+    "LEC",
+    "RUS",
+    "PIA",
+    "HAD",
+    "LAW",
+    "GAS"
+   ],
+   "top10_carrera": [
+    "ANT",
+    "VER",
+    "HAM",
+    "NOR",
+    "LEC",
+    "RUS",
+    "HAD",
+    "PIA",
+    "LAW",
+    "LIN"
+   ],
+   "archivos": [
+    "historial.json"
+   ]
+  },
+  "mejora": {
+   "hecho": "2026-11-09T04:52:34Z",
+   "adoptados": {
+    "qualy_fp1": null,
+    "qualy_fp2": null,
+    "qualy_fp3": null,
+    "carrera": null
+   },
+   "archivos": [
+    "@bitacora"
+   ]
   }
  }
 }

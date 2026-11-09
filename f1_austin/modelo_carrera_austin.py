@@ -37,6 +37,7 @@ import numpy as np
 import pandas as pd
 from scipy.stats import spearmanr
 
+import config_modelos as CM
 import degradacion as D
 import modelo_qualy_austin as Q
 from sim_carrera import Simulador, X_media, prep
@@ -205,7 +206,9 @@ def construir_dataset_carrera(meeting=OBJETIVO_MEETING, qualy=None, parrilla=Non
         if "Sprint" in nombres:
             sp = res[res.session_key == nombres["Sprint"]][["driver_number", "position"]]
             base = base.merge(sp.rename(columns={"position": "sprint_pos"}), on="driver_number", how="left")
-        dg = D.deg_gp([(nombres.get(s), s) for s in ("Practice 1", "Practice 2", "Practice 3")])
+        # sin fugas: sólo prácticas anteriores a F1_CORTE (carrera preliminar tras FP1/FP2/FP3 en retro)
+        dg = D.deg_gp([(nombres.get(s), s) for s in ("Practice 1", "Practice 2", "Practice 3")
+                       if nombres.get(s) not in Q.sesiones_futuras()])
         if len(dg):
             base = base.merge(dg[["driver_number", "deg_rel", "deg_abs", "deg_laps", "deg_gp_med"]], on="driver_number", how="left")
         rk = nombres.get("Race")
@@ -651,8 +654,14 @@ def paradas_piloto(obj, est):
 # Main
 # ----------------------------------------------------------------------------------------
 def main(meeting=OBJETIVO_MEETING, penalizaciones=None, qualy_archivo=None, parrilla_manual=None,
-         completo=False, prueba=None, n_sims=N_SIMS, sin_validacion=False):
+         completo=False, prueba=None, n_sims=N_SIMS, sin_validacion=False, sin_qualy=False, preliminar=None):
+    """sin_qualy: no usar ninguna qualy del GP objetivo (pronóstico PRELIMINAR antes de la qualy, con la parrilla =
+    orden de qualy pronosticado en --parrilla); preliminar: texto de la fuente de esa parrilla."""
+    global MC_VAR
     t0 = time.time()
+    variante, cfg = CM.config_vigente("carrera")          # variante vigente (mejora_modelos.py); default la original
+    MC_VAR = dict(cfg.get("mc_var") or MC_VAR_BASE)
+    print(f"Variante vigente del simulador: {variante} {json.dumps(MC_VAR)}")
     gp = {**Q.GPS.get(meeting, {"slug": str(meeting)}), "meeting_key": meeting}
     slug = gp["slug"]
     salida_dir = Path(prueba) if prueba else BASE
@@ -666,12 +675,24 @@ def main(meeting=OBJETIVO_MEETING, penalizaciones=None, qualy_archivo=None, parr
         if s in sk_obj and (pil.session_key == sk_obj[s]).any():
             titulares = pil[pil.session_key == sk_obj[s]]
             break
+    else:                       # sólo FP1 (pronóstico preliminar post-FP1): titulares del GP anterior, como en la qualy
+        lp = Q.lineup_previo(pil, ses, ses[ses.meeting_key == meeting].date_start.min())
+        if lp is not None:
+            titulares = lp
     titulares = titulares.drop_duplicates("driver_number")
     if hasattr(Q, "aplicar_sustituciones"):        # p. ej. OCO -> HIR en México 2026 (GPS[...]["sustituciones"])
         cols = ["driver_number", "name_acronym", "full_name", "team", "team_name", "team_colour"]
         titulares = Q.aplicar_sustituciones(titulares[cols].reset_index(drop=True), pil, meeting)
     titulares = titulares[["driver_number", "name_acronym"]]
+    if sin_qualy and parrilla_manual:       # preliminar: titulares que falten en el pronóstico, al fondo
+        acrs = list(titulares.name_acronym)
+        pm = {a: v for a, v in parrilla_manual.items() if a in acrs}
+        orden = sorted(pm, key=lambda a: pm[a]) + [a for a in acrs if a not in pm]
+        parrilla_manual = {a: i + 1 for i, a in enumerate(orden)}
     qualy, parrilla, fuente = resolver_parrilla(meeting, titulares, qualy_archivo, penalizaciones, parrilla_manual)
+    if sin_qualy:               # sin fugas: la qualy real (cache/qualy_real_<mk>.json) no se usa antes de la qualy
+        qualy = None
+        fuente = preliminar or "pronóstico de qualy"
     if parrilla is None:
         raise SystemExit(f"No hay parrilla para {meeting}: falta cache/qualy_real_{meeting}.json "
                          "(o pasar --qualy-archivo / --parrilla).")
@@ -733,7 +754,9 @@ def main(meeting=OBJETIVO_MEETING, penalizaciones=None, qualy_archivo=None, parr
     csv = salida_dir / f"prediccion_carrera_{slug}_2026.csv"
     obj.to_csv(csv, index=False)
 
-    doc = doc_carrera(obj, meeting, val, fuente, est, VARIANTE_NOMBRE)
+    doc = doc_carrera(obj, meeting, val, fuente, est, VARIANTE_NOMBRE + ("" if variante == "base" else f"; variante {variante}"))
+    doc["preliminar"] = bool(sin_qualy)
+    doc["variante"] = variante
     web_dir = BASE / f"web_{slug}"
     ruta_json = (salida_dir / "datos_carrera.json") if prueba else (
         web_dir / "datos_carrera.json" if web_dir.exists() else BASE / f"datos_carrera_{slug}.json")
@@ -762,6 +785,8 @@ if __name__ == "__main__":
     ap.add_argument("--sin-validacion", action="store_true", help="usa la validación guardada en validacion_carrera.json")
     ap.add_argument("--sims", type=int, default=N_SIMS)
     ap.add_argument("--solo-dataset", action="store_true", help="sólo reconstruye dataset_carrera.csv (sin parrilla ni pronóstico)")
+    ap.add_argument("--sin-qualy", action="store_true", help="preliminar: ignora la qualy real (parrilla = --parrilla pronosticada)")
+    ap.add_argument("--preliminar", default=None, help="texto de la fuente de la parrilla preliminar")
     a = ap.parse_args()
     if a.solo_dataset:
         d, _ = construir_dataset_carrera(a.meeting)
@@ -769,4 +794,5 @@ if __name__ == "__main__":
         print("Escrito", BASE / "dataset_carrera.csv", len(d), "filas")
         raise SystemExit
     main(a.meeting, json.loads(a.penalizaciones) if a.penalizaciones else None, a.qualy_archivo,
-         json.loads(a.parrilla) if a.parrilla else None, a.completo, a.prueba, a.sims, a.sin_validacion)
+         json.loads(a.parrilla) if a.parrilla else None, a.completo, a.prueba, a.sims, a.sin_validacion,
+         a.sin_qualy, a.preliminar)

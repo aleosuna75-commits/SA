@@ -39,6 +39,38 @@
    "archivos": [
     "post_carrera.json"
    ]
+  },
+  "post_fp1": {
+   "hecho": "2026-11-09T03:51:10Z",
+   "corte": "2026-10-30T22:00:00Z",
+   "modelo": "Ridge",
+   "top10": [
+    "ANT",
+    "LEC",
+    "HAM",
+    "VER",
+    "RUS",
+    "PIA",
+    "NOR",
+    "HAD",
+    "GAS",
+    "LAW"
+   ],
+   "top10_carrera": [
+    "ANT",
+    "LEC",
+    "HAM",
+    "VER",
+    "RUS",
+    "PIA",
+    "HAD",
+    "NOR",
+    "LAW",
+    "GAS"
+   ],
+   "archivos": [
+    "historial.json"
+   ]
   }
  }
 }

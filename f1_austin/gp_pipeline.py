@@ -2,31 +2,43 @@
 """Orquestador genérico por GP (meeting_key de OpenF1): todo lo que se hizo a mano para México, paso a paso y solo.
 
 Archivos por GP en gps/<slug>/ (slug = p. ej. "brasil2026") y doc de la base de datos del Artifact que les corresponde:
-  gp.json           -> gp/<slug>           pronóstico de qualy (FP2 y luego FP3, con 'cambio')
+  gp.json           -> gp/<slug>           pronóstico de qualy (FP1, FP2 y luego FP3, con 'cambio')
+  historial.json    -> historial/<slug>    cómo se movió el pronóstico (qualy y carrera) fase tras fase
   live_qualy.json   -> live/<slug>         snapshot del colector en vivo (live_qualy.py)
   post_qualy.json   -> postqualy/<slug>    cómo le fue al modelo en la qualy
   carrera.json      -> carrera/<slug>      pronóstico del orden final (simulador Monte Carlo oficial)
   vueltas.json      -> vueltas/<slug>      simulador vuelta a vuelta anclado (estrategias, undercut, rebases, SC)
   post_carrera.json -> postcarrera/<slug>  cómo le fue al modelo en la carrera (orden y estrategia)
   gps/meta.json     -> meta/actual         calendario, estado de cada GP y GP actual
+  modelos/bitacora.json -> bitacora/actual mejora continua: campeones, evolución por GP, cambios, candidatos
 Además: config.json (generado), ajustes.json (editable a mano: sustituciones, parrilla/penalizaciones, notas),
 estado.json (pasos hechos, firmas de entrada, archivos) y logs/.
 
 Pasos (idempotentes; cada uno sólo usa lo que existía antes de su sesión: F1_CORTE en los modelos):
+  post_fp1      tras la FP1: modelo de qualy sólo con FP1 + historial (--fp1; corte = inicio de la FP2) -> gp.json;
+                carrera PRELIMINAR (parrilla = orden de qualy pronosticado)       -> carrera.json (preliminar: true)
+                (fines de semana sprint: no aplica, pre_qualy corre tras la FP1)
   pre_qualy     tras la FP2: refresca datos, modelo de qualy FP1/FP2 (corte = inicio de la FP3)       -> gp.json
+                + carrera preliminar con la parrilla pronosticada (FP2)
   fp3           tras la FP3: FP3 de OpenF1 o, si responde 401, reconstruida de live/crudo_fp3_<slug>.jsonl
                 (fp3_desde_live.py); modelo --fp3 (corte = inicio de la qualy)                           -> gp.json (cambio)
+                + carrera preliminar (FP3)
   qualy_en_vivo imprime el comando exacto del colector (el relevo de live/<slug> lo hace el orquestador)
   post_qualy    qualy oficial (OpenF1) o último snapshot del colector; parrilla = ajustes.parrilla > OpenF1
                 starting_grid > qualy + ajustes.penalizaciones; modelo de carrera (corte = inicio de la carrera);
                 sim_vueltas anclado                                  -> post_qualy.json, carrera.json, vueltas.json
   post_carrera  resultado oficial de la carrera (OpenF1) + evaluación de estrategia -> post_carrera.json
+  mejora        tras post_carrera (una vez por GP): mejora_modelos.py ciclo (campeón/retador; config de modelos en
+                modelos/config_activa.json; recalibra sim_vueltas)                -> modelos/bitacora.json (bitacora/actual)
+Cada paso con pronóstico agrega su fase (FP1, FP2, FP3, Q) a historial.json con los cambios respecto a la fase anterior;
+la carrera preliminar se guarda también como carrera_<fase>.json y sólo pisa carrera.json si aún no hubo post_qualy.
 
 Uso (desde f1_austin/):
   python3 gp_pipeline.py auto [--ahora ISO] [--simular]   # decide qué toca por hora UTC y estado; resumen JSON
                                   # (gps/ultimo_auto.json; si toca colector, gps/colector_ahora.json se escribe ANTES de
                                   # correr modelos; si un paso falla, 'reintentar' dice cuándo volver a correr auto)
   python3 gp_pipeline.py retro 1299                       # todos los pasos en orden para un GP ya corrido
+  python3 gp_pipeline.py historial <meeting>               # completa historial.json de un GP corrido (FP1..Q, sin fugas)
   python3 gp_pipeline.py paso <paso> <meeting> [--forzar] # un paso suelto
   python3 gp_pipeline.py config <meeting>                 # sólo config.json (+ ajustes.json si no existe)
   python3 gp_pipeline.py meta                             # sólo gps/meta.json
@@ -59,8 +71,13 @@ N_JOBS = "2"
 PRIMER_MEETING = 1298            # la temporada multi-GP empieza en México 2026
 
 DOCS = {"gp.json": "gp", "live_qualy.json": "live", "post_qualy.json": "postqualy", "carrera.json": "carrera",
-        "vueltas.json": "vueltas", "post_carrera.json": "postcarrera"}
-PASOS = ["pre_qualy", "fp3", "qualy_en_vivo", "post_qualy", "post_carrera"]
+        "vueltas.json": "vueltas", "post_carrera.json": "postcarrera", "historial.json": "historial"}
+PASOS = ["post_fp1", "pre_qualy", "fp3", "qualy_en_vivo", "post_qualy", "post_carrera", "mejora"]
+PASOS_RETRO = [p for p in PASOS if p != "mejora"]      # 'mejora' es por temporada: en retro sólo con --pasos mejora
+FASES = ["FP1", "FP2", "FP3", "Q"]
+BITACORA = BASE / "modelos" / "bitacora.json"           # doc bitacora/actual (mejora_modelos.py)
+PRESUPUESTO_MEJORA = os.environ.get("F1_PRESUPUESTO_MEJORA", "40")   # minutos del ciclo campeón/retador tras cada GP
+SIN_MEJORA = os.environ.get("F1_SIN_MEJORA") == "1"     # auto sin el paso mejora (RB-6 rápido; el ciclo va en RB-7)
 
 # ------------------------------------------------------------------------------------------------
 # Textos en español
@@ -462,6 +479,136 @@ def _spearman(a, b):
 
 
 # ------------------------------------------------------------------------------------------------
+# Historial por fase y carrera preliminar
+# ------------------------------------------------------------------------------------------------
+def _orden_doc(doc):
+    """[acr] en el orden pronosticado (pred 1..N) de un gp.json o carrera.json."""
+    if not doc or not doc.get("pilotos"):
+        return []
+    return [p["acr"] for p in sorted(doc["pilotos"], key=lambda p: p["pred"])]
+
+
+def _cambios(antes, despues):
+    """Movimientos de los pilotos del Top 10 (antes o después): [{acr, de, a}] (posiciones 1..N; None = no estaba)."""
+    if not antes or not despues:
+        return []
+    pa = {a: i + 1 for i, a in enumerate(antes)}
+    pd_ = {a: i + 1 for i, a in enumerate(despues)}
+    union = list(dict.fromkeys(despues[:10] + antes[:10]))
+    out = [{"acr": a, "de": pa.get(a), "a": pd_.get(a)} for a in union if pa.get(a) != pd_.get(a)]
+    return sorted(out, key=lambda x: (x["a"] is None, x["a"] or 99, x["de"] or 99))
+
+
+def _fuente_doc(cfg, fase, tipo):
+    """Doc fuente de una fase ya registrada (para calcular cambios): gp_<fase>.json / carrera_<fase>.json / carrera.json."""
+    d = GPS_DIR / cfg["slug"]
+    if tipo == "qualy":
+        return leer_json(d / f"gp_{fase.lower()}.json") if fase != "Q" else None
+    if fase == "Q":
+        c = leer_json(d / "carrera.json")
+        return c if c and not c.get("preliminar") else None
+    return leer_json(d / f"carrera_{fase.lower()}.json")
+
+
+def actualizar_historial(cfg, fase, gp_doc=None, carrera_doc=None):
+    """Agrega (o reemplaza) la fase en gps/<slug>/historial.json con los cambios respecto a la fase anterior que tenga
+    pronóstico del mismo tipo."""
+    d = directorio(cfg)
+    h = leer_json(d / "historial.json", {}) or {}
+    fases = {f["fase"]: f for f in h.get("fases", [])}
+    ent = {"fase": fase, "actualizado": iso(ahora_utc()), "qualy": None, "carrera": None,
+           "cambios": {"qualy": [], "carrera": []}}
+    if gp_doc:
+        o = _orden_doc(gp_doc)
+        ent["qualy"] = {"top10": o[:10], "pole": o[0] if o else None, "modelo": str(gp_doc.get("modelo"))}
+    if carrera_doc:
+        o = _orden_doc(carrera_doc)
+        ent["carrera"] = {"top10": o[:10], "ganador": o[0] if o else None,
+                          "preliminar": bool(carrera_doc.get("preliminar")),
+                          "parrilla_fuente": str(carrera_doc.get("parrilla_fuente") or "")}
+    fases[fase] = ent
+    orden = [f for f in FASES if f in fases]
+    for i, f in enumerate(orden):          # cambios de cada fase vs la anterior con el mismo tipo de pronóstico
+        for tipo in ("qualy", "carrera"):
+            if not fases[f][tipo]:
+                fases[f]["cambios"][tipo] = []
+                continue
+            prev = next((g for g in reversed(orden[:i]) if fases[g][tipo]), None)
+            fases[f]["cambios"][tipo] = _cambios(_orden_doc(_fuente_doc(cfg, prev, tipo)) if prev else [],
+                                                 _orden_doc(_fuente_doc(cfg, f, tipo)))
+    escribir_json(d / "historial.json", {"actualizado": iso(ahora_utc()), "fases": [fases[f] for f in orden]})
+    return "historial.json"
+
+
+def carrera_preliminar(cfg, fase, gp_doc, corte, log):
+    """Pronóstico PRELIMINAR de carrera con la parrilla = orden de qualy pronosticado en la fase (sin la qualy real:
+    --sin-qualy; F1_CORTE = corte de la fase). Escribe carrera_<fase>.json y, si aún no hubo post_qualy, carrera.json.
+    Devuelve (doc, archivos publicables)."""
+    d = directorio(cfg)
+    fuente = f"pronóstico de qualy ({fase})"
+    parrilla = {p["acr"]: p["pred"] for p in gp_doc["pilotos"]}
+    trabajo = d / f"trabajo_carrera_{fase.lower()}"
+    try:
+        correr([PY, "modelo_carrera_austin.py", cfg["meeting_key"], "--prueba", trabajo, "--parrilla", json.dumps(parrilla),
+                "--sin-qualy", "--preliminar", fuente], log, {"F1_CORTE": corte})
+    except Exception as e:
+        print(f"  AVISO: carrera preliminar ({fase}) falló: {e}")
+        return None, []
+    dc = leer_json(trabajo / "datos_carrera.json")
+    if not dc:
+        return None, []
+    dc["preliminar"] = True
+    dc["parrilla_fuente"] = fuente
+    dc["resumen"] = (f"Preliminar: la parrilla es el orden de qualy pronosticado tras la {fase}; se reemplaza con la "
+                     "parrilla real después de la qualy. " + (dc.get("resumen") or ""))
+    escribir_json(d / f"carrera_{fase.lower()}.json", dc)
+    # carrera.json sólo si ningún paso POSTERIOR ya la escribió (post_fp1 no bloquea: un reintento suyo tras pre_qualy/fp3
+    # no debe volver el pronóstico publicado a una fase anterior)
+    siguientes = {"FP1": (["pre_qualy"] if sesion(cfg, "fp2") else []) + ["fp3"], "FP2": ["fp3"]}.get(fase, [])
+    if any(hecho(cfg, p) for p in siguientes + ["post_qualy"]):
+        return dc, []
+    escribir_json(d / "carrera.json", dc)
+    return dc, ["carrera.json"]
+
+
+# ------------------------------------------------------------------------------------------------
+# Paso 0: post_fp1 (tras la FP1)
+# ------------------------------------------------------------------------------------------------
+def paso_post_fp1(cfg, retro=False, forzar=False):
+    d = directorio(cfg)
+    log = d / "logs" / "post_fp1.log"
+    mk, sm = cfg["meeting_key"], cfg["slug_modelo"]
+    s1, s2 = sesion(cfg, "fp1"), sesion(cfg, "fp2")
+    if not s1 or not s2:
+        marcar(cfg, "post_fp1", nota="fin de semana sin FP2 (sprint): tras la FP1 corre pre_qualy", archivos=[])
+        return []
+    if not retro:
+        refrescar_datos(cfg, log)
+    if not laps_validas(s1["session_key"]):
+        raise RuntimeError("sin vueltas de la FP1 en cache (OpenF1 aún no las publica o respondió 401)")
+    corte = s2["inicio_utc"]
+    pkl = BASE / f"resultado_qualy_{sm}_fp1.pkl"
+    reusar = False
+    if retro and pkl.exists() and not forzar:    # ya corrido con el mismo corte (p. ej. relleno del historial)
+        import pandas as pd
+        reusar = (pd.read_pickle(pkl).get("corte") or "") == corte
+    if not reusar:
+        correr([PY, "modelo_qualy_austin.py", mk, "--fp1", "--jobs", N_JOBS], log, {"F1_CORTE": corte, "F1_SIN_HTML": "1"})
+    import exportar_datos_web as E
+    doc, R = E.construir(pkl)
+    escribir_json(d / "gp_fp1.json", doc)
+    archivos = []
+    if not hecho(cfg, "pre_qualy"):
+        E.escribir(doc, d / "gp.json")
+        archivos.append("gp.json")
+    dc, arch = carrera_preliminar(cfg, "FP1", doc, corte, log)
+    archivos += arch + [actualizar_historial(cfg, "FP1", doc, dc)]
+    marcar(cfg, "post_fp1", corte=corte, modelo=doc["modelo"], top10=[p["acr"] for p in doc["pilotos"][:10]],
+           top10_carrera=_orden_doc(dc)[:10] if dc else None, archivos=archivos)
+    return archivos
+
+
+# ------------------------------------------------------------------------------------------------
 # Paso 1: pre_qualy (tras la FP2)
 # ------------------------------------------------------------------------------------------------
 def corte_de(cfg, *claves):
@@ -485,12 +632,19 @@ def paso_pre_qualy(cfg, retro=False, forzar=False):
     corte = corte_de(cfg, "fp3", "sq", "q")
     correr([PY, "modelo_qualy_austin.py", mk, "--jobs", N_JOBS], log, {"F1_CORTE": corte, "F1_SIN_HTML": "1"})
     import exportar_datos_web as E
-    doc, R = E.construir(BASE / f"resultado_qualy_{sm}.pkl")
+    previo = d / "gp_fp1.json"
+    doc, R = E.construir(BASE / f"resultado_qualy_{sm}.pkl", previo if previo.exists() else None)
     escribir_json(d / "gp_fp2.json", doc)
     E.escribir(doc, d / "gp.json")
+    archivos = ["gp.json"]
+    fase = "FP2" if sesion(cfg, "fp2") else "FP1"         # sprint: pre_qualy corre tras la FP1
+    dc, arch = carrera_preliminar(cfg, fase, doc, corte, log)
+    if fase == "FP1":
+        escribir_json(d / "gp_fp1.json", doc)
+    archivos += arch + [actualizar_historial(cfg, fase, doc, dc)]
     marcar(cfg, "pre_qualy", corte=corte, modelo=doc["modelo"], top10=[p["acr"] for p in doc["pilotos"][:10]],
-           archivos=["gp.json"])
-    return ["gp.json"]
+           top10_carrera=_orden_doc(dc)[:10] if dc else None, archivos=archivos)
+    return archivos
 
 
 # ------------------------------------------------------------------------------------------------
@@ -547,9 +701,13 @@ def paso_fp3(cfg, retro=False, forzar=False):
     doc, R = E.construir(BASE / f"resultado_qualy_{sm}_fp3.pkl", previo if previo.exists() else None)
     escribir_json(d / "gp_fp3.json", doc)
     E.escribir(doc, d / "gp.json")
+    archivos = ["gp.json"]
+    dc, arch = carrera_preliminar(cfg, "FP3", doc, corte, log)
+    archivos += arch + [actualizar_historial(cfg, "FP3", doc, dc)]
     marcar(cfg, "fp3", corte=corte, fuente=fuente, modelo=doc["modelo"],
-           top10=[p["acr"] for p in doc["pilotos"][:10]], archivos=["gp.json"])
-    return ["gp.json"]
+           top10=[p["acr"] for p in doc["pilotos"][:10]], top10_carrera=_orden_doc(dc)[:10] if dc else None,
+           archivos=archivos)
+    return archivos
 
 
 # ------------------------------------------------------------------------------------------------
@@ -813,12 +971,14 @@ def paso_post_qualy(cfg, retro=False, forzar=False):
     corte = corte_de(cfg, "r")
     correr([PY, "modelo_carrera_austin.py", mk, "--prueba", trabajo] + args, log, {"F1_CORTE": corte})
     dc = leer_json(trabajo / "datos_carrera.json")
+    dc["preliminar"] = False
     dc["parrilla_fuente"] = nota_parrilla(dc, qualy, pil, aj)
     notas = [n for n in aj.get("notas", []) if n]
     if notas:
         dc["parrilla_fuente"] = f"{dc.get('parrilla_fuente') or fuente_p}. " + " ".join(notas)
     escribir_json(d / "carrera.json", dc)
     cambiados.append("carrera.json")
+    cambiados.append(actualizar_historial(cfg, "Q", None, dc))
     # 4) vuelta a vuelta anclado al orden oficial
     try:
         correr([PY, "sim_vueltas.py", "gp", "--meeting", mk, "--dataset", trabajo / "dataset_carrera.csv",
@@ -966,14 +1126,83 @@ def paso_post_carrera(cfg, retro=False, forzar=False):
     n2a = {k: v["acr"] for k, v in pil.items()}
     est = evaluar_estrategia(cfg, leer_json(d / "vueltas.json"), r["session_key"], n2a)
     doc = doc_post_carrera(cfg, carrera_doc, resultado, n2a, est)
+    if carrera_doc.get("preliminar"):     # post_qualy no llegó a correr: se evalúa el pronóstico preliminar
+        doc["resumen"] = ("Evaluado contra el pronóstico PRELIMINAR (parrilla = qualy pronosticada; post_qualy no corrió). "
+                          + doc["resumen"])
     escribir_json(d / "post_carrera.json", doc)
     marcar(cfg, "post_carrera", firma=fir, aciertos_top10=doc["aciertos_top10"], ganador_real=doc["ganador_real"],
            archivos=["post_carrera.json"])
     return ["post_carrera.json"]
 
 
-FUNCIONES = {"pre_qualy": paso_pre_qualy, "fp3": paso_fp3, "qualy_en_vivo": paso_qualy_en_vivo,
-             "post_qualy": paso_post_qualy, "post_carrera": paso_post_carrera}
+# ------------------------------------------------------------------------------------------------
+# Paso 6: mejora (tras post_carrera, una vez por GP)
+# ------------------------------------------------------------------------------------------------
+def paso_mejora(cfg, retro=False, forzar=False):
+    """Ciclo campeón/retador de mejora_modelos.py con todos los GP corridos hasta hoy (incluye éste) -> bitacora."""
+    log = directorio(cfg) / "logs" / "mejora.log"
+    if not retro:     # resultados oficiales de la qualy (OpenF1) y de la carrera (Jolpica) del GP recién corrido
+        try:
+            refrescar_datos(cfg, log)
+        except Exception as e:
+            print("  AVISO: no se pudieron refrescar los datos antes del ciclo:", e)
+    correr([PY, "mejora_modelos.py", "ciclo", "--presupuesto-min", PRESUPUESTO_MEJORA], log,
+           timeout=int(float(PRESUPUESTO_MEJORA) * 60) + 2400)
+    b = leer_json(BITACORA, {}) or {}
+    marcar(cfg, "mejora", adoptados=(b.get("ultimo_ciclo") or {}).get("adoptados"), archivos=["@bitacora"])
+    return ["@bitacora"]
+
+
+def completar_historial(cfg, forzar=False):
+    """Rellena historial.json de un GP ya corrido (retro, sin fugas): FP1 con post_fp1 (modelo --fp1 con corte = inicio
+    de la FP2), FP2/FP3 con los pronósticos de qualy guardados (gp_fp2/gp_fp3.json, o el .pkl de la corrida en vivo)
+    + carrera preliminar con su corte, y Q con carrera.json. Nunca pisa gp.json ni carrera.json finales."""
+    d = directorio(cfg)
+    sm = cfg["slug_modelo"]
+    hechos = []
+    if sesion(cfg, "fp1") and sesion(cfg, "fp2") and (forzar or not (d / "gp_fp1.json").exists()
+                                                      or not (d / "carrera_fp1.json").exists()):
+        a = ejecutar(cfg, "post_fp1", retro=True, forzar=False)
+        hechos.append(a)
+    import exportar_datos_web as E
+    for fase, corte in (("FP2", corte_de(cfg, "fp3", "sq", "q")), ("FP3", corte_de(cfg, "q"))):
+        if fase == "FP3" and not sesion(cfg, "fp3"):
+            continue
+        gp_doc = leer_json(d / f"gp_{fase.lower()}.json")
+        if not gp_doc:
+            g = leer_json(d / "gp.json")
+            if g and g.get("fase") == fase:
+                gp_doc = g
+            else:
+                pkl = BASE / f"resultado_qualy_{sm}{'_fp3' if fase == 'FP3' else ''}.pkl"
+                if pkl.exists():
+                    import pandas as pd
+                    R = pd.read_pickle(pkl)
+                    # sólo la corrida de esa fase con ese corte (o la corrida en vivo de México, antes de F1_CORTE)
+                    if R.get("corte") == corte or (cfg["meeting_key"] == 1298 and R.get("corte") is None):
+                        gp_doc, _ = E.construir(pkl)
+            if gp_doc:
+                escribir_json(d / f"gp_{fase.lower()}.json", gp_doc)
+        if not gp_doc:
+            print(f"  {cfg['slug']}: sin pronóstico de qualy {fase} guardado; se omite esa fase")
+            continue
+        dc = leer_json(d / f"carrera_{fase.lower()}.json")
+        if forzar or not dc:
+            dc, _ = carrera_preliminar(cfg, fase, gp_doc, corte, d / "logs" / "historial.log")
+        actualizar_historial(cfg, fase, gp_doc, dc)
+        hechos.append(fase)
+    c = leer_json(d / "carrera.json")
+    if c and hecho(cfg, "post_qualy"):
+        if "preliminar" not in c:
+            c["preliminar"] = False
+            escribir_json(d / "carrera.json", c)
+        actualizar_historial(cfg, "Q", None, c)
+        hechos.append("Q")
+    return hechos
+
+
+FUNCIONES = {"post_fp1": paso_post_fp1, "pre_qualy": paso_pre_qualy, "fp3": paso_fp3, "qualy_en_vivo": paso_qualy_en_vivo,
+             "post_qualy": paso_post_qualy, "post_carrera": paso_post_carrera, "mejora": paso_mejora}
 
 
 # ------------------------------------------------------------------------------------------------
@@ -1066,6 +1295,10 @@ def pendientes(cfg, ahora):
     out = []
     ult_fp = next((c for c in ("fp2", "fp1") if sesion(cfg, c)), None)
     q, r = ini("q"), ini("r")
+    # post_fp1 (sólo si hay FP2; en sprint lo cubre pre_qualy) se pone al día mientras no empiece la qualy
+    if (sesion(cfg, "fp1") and sesion(cfg, "fp2") and ahora >= fin("fp1") + timedelta(minutes=15)
+            and "post_fp1" not in est and (q is None or ahora < q - timedelta(minutes=45))):
+        out.append("post_fp1")
     # pre_qualy y fp3 se ponen al día aunque se haya pasado su ventana (F1_CORTE evita usar datos posteriores)
     if ult_fp and ahora >= fin(ult_fp) + timedelta(minutes=15) and "pre_qualy" not in est:
         out.append("pre_qualy")
@@ -1078,10 +1311,15 @@ def pendientes(cfg, ahora):
         # se repite (si cambian sus entradas: qualy oficial, parrilla, ajustes) hasta que arranca la carrera
         if pq is None or (r is not None and ahora < r):
             out.append("post_qualy")
-    if r and ahora >= fin("r") + timedelta(minutes=30):
+    # fin de la carrera + 10 min (la RB-6 corre a carrera + 2 h 15 = fin programado + 15 min; si OpenF1 aún no tiene
+    # el resultado, el paso falla y 'reintentar' dice cuándo volver)
+    if r and ahora >= fin("r") + timedelta(minutes=10):
         pc = est.get("post_carrera")
         if pc is None or ahora < fin("r") + timedelta(hours=36):
             out.append("post_carrera")
+        # mejora: una vez por GP, después de post_carrera (si éste falla, no corre), hasta 7 días después de la carrera
+        if "mejora" not in est and (pc is not None or "post_carrera" in out) and ahora < fin("r") + timedelta(days=7):
+            out.append("mejora")
     return out
 
 
@@ -1090,10 +1328,13 @@ def ejecutar(cfg, paso, retro=False, forzar=False):
     print(f"[{iso(ahora_utc())}] {cfg['slug']}: {paso}{' (retro)' if retro else ''}", flush=True)
     try:
         arch = FUNCIONES[paso](cfg, retro=retro, forzar=forzar) or []
+        arch = list(dict.fromkeys(arch))
+        docs = [{"coleccion": DOCS[a], "doc_id": cfg["slug"], "archivo": f"gps/{cfg['slug']}/{a}"} for a in arch if a in DOCS]
+        if "@bitacora" in arch:
+            docs.append({"coleccion": "bitacora", "doc_id": "actual", "archivo": "modelos/bitacora.json"})
         return {"slug": cfg["slug"], "paso": paso, "ok": True, "segundos": round(time.time() - t0),
-                "archivos_cambiados": [f"gps/{cfg['slug']}/{a}" for a in arch],
-                "docs": [{"coleccion": DOCS[a], "doc_id": cfg["slug"], "archivo": f"gps/{cfg['slug']}/{a}"}
-                         for a in arch if a in DOCS]}
+                "archivos_cambiados": [f"gps/{cfg['slug']}/{a}" if a != "@bitacora" else "modelos/bitacora.json"
+                                       for a in arch], "docs": docs}
     except Exception as e:
         print(f"  ERROR en {paso}: {e}", flush=True)
         return {"slug": cfg["slug"], "paso": paso, "ok": False, "error": str(e), "segundos": round(time.time() - t0),
@@ -1110,7 +1351,7 @@ def reintentos(acciones, ahora):
         cfg = leer_json(GPS_DIR / a["slug"] / "config.json")
         limite = None
         if cfg:
-            limite = {"pre_qualy": corte_de(cfg, "fp3", "sq", "q"), "fp3": corte_de(cfg, "q"),
+            limite = {"post_fp1": corte_de(cfg, "fp2"), "pre_qualy": corte_de(cfg, "fp3", "sq", "q"), "fp3": corte_de(cfg, "q"),
                       "post_qualy": corte_de(cfg, "r")}.get(a["paso"])
         t = ahora + timedelta(minutes=30)
         if limite and t >= ts(limite) - timedelta(minutes=15):
@@ -1124,7 +1365,7 @@ def reintentos(acciones, ahora):
 
 def modo_auto(simular=False):
     ahora = ahora_utc()
-    acciones, comandos = [], []
+    acciones, comandos, diferidos = [], [], []
     for mk in meetings_temporada():
         cfg = config_gp(mk)
         if estado_gp(cfg, ahora) == "proximo":
@@ -1140,13 +1381,24 @@ def modo_auto(simular=False):
             # antes de los modelos (un fp3/pre_qualy atrasado tarda ~10 min): el colector no puede esperar al resumen
             escribir_json(GPS_DIR / "colector_ahora.json", {"ahora": iso(ahora), "comandos_colector": comandos})
         for paso in pendientes(cfg, ahora):
+            if paso == "mejora" and SIN_MEJORA:
+                continue              # F1_SIN_MEJORA=1: el ciclo lo corre otra tarea (RB-7) en segundo plano
             if simular:
                 acciones.append({"slug": cfg["slug"], "paso": paso, "ok": None, "simulado": True})
                 continue
+            if paso == "mejora":
+                diferidos.append(cfg)     # al final: nunca antes de los pasos de un GP en curso (puede tardar 40+ min)
+                continue
             a = ejecutar(cfg, paso)
             acciones.append(a)
-            if not a["ok"]:
-                break                 # los pasos siguientes dependen de éste
+            if not a["ok"] and paso != "post_fp1":
+                break                 # los pasos siguientes dependen de éste (post_fp1 no bloquea)
+    for cfg in diferidos:
+        if any(x["paso"] == "mejora" and x.get("ok") for x in acciones):
+            # un ciclo cubre todos los GP corridos: no se repite en la misma corrida
+            marcar(cfg, "mejora", nota="cubierto por el ciclo de esta misma corrida", archivos=[])
+            continue
+        acciones.append(ejecutar(cfg, "mejora"))
     meta, cambio = generar_meta(ahora, escribir=not simular)
     if cambio:
         acciones.append({"slug": None, "paso": "meta", "ok": True, "archivos_cambiados": ["gps/meta.json"],
@@ -1169,7 +1421,7 @@ def modo_retro(mk, forzar=False, refrescar=True, pasos=None):
         refrescar_datos(cfg, directorio(cfg) / "logs" / "descarga.log")
         marcar(cfg, "descarga", archivos=[])
     acciones = []
-    for paso in (pasos or PASOS):
+    for paso in (pasos or PASOS_RETRO):
         if hecho(cfg, paso) and not forzar and paso not in ("post_qualy", "post_carrera"):
             print(f"{cfg['slug']}: {paso} ya hecho (usa --forzar para repetir)")
             continue
@@ -1177,6 +1429,8 @@ def modo_retro(mk, forzar=False, refrescar=True, pasos=None):
         acciones.append(a)
         if not a["ok"]:
             break
+    if not pasos and all(a["ok"] for a in acciones):
+        completar_historial(cfg)          # fases que falten (pasos hechos antes de que existiera historial.json)
     meta, _ = generar_meta()
     print(json.dumps({"slug": cfg["slug"], "acciones": acciones}, ensure_ascii=False, indent=1))
     return acciones
@@ -1230,7 +1484,7 @@ def migrar_mexico():
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("accion", choices=["auto", "retro", "paso", "config", "meta", "migrar_mexico", "comandos"])
+    ap.add_argument("accion", choices=["auto", "retro", "paso", "config", "meta", "migrar_mexico", "comandos", "historial"])
     ap.add_argument("args", nargs="*")
     ap.add_argument("--forzar", action="store_true")
     ap.add_argument("--simular", action="store_true", help="auto: sólo dice qué pasos tocarían")
@@ -1259,6 +1513,11 @@ def main():
         print(json.dumps(meta, ensure_ascii=False, indent=1)[:3000], "\ncambió:", cambio)
     elif a.accion == "migrar_mexico":
         migrar_mexico()
+        generar_meta()
+    elif a.accion == "historial":
+        cfg = config_gp(int(a.args[0]))
+        print(cfg["slug"], "fases:", completar_historial(cfg, forzar=a.forzar))
+        print(json.dumps(leer_json(GPS_DIR / cfg["slug"] / "historial.json"), ensure_ascii=False, indent=1)[:4000])
         generar_meta()
     elif a.accion == "comandos":
         print(json.dumps(comandos_colector(config_gp(int(a.args[0]))), ensure_ascii=False, indent=1))
