@@ -40,3 +40,10 @@ Publicar = docs (batch) + `python3 construir_web.py` + Artifact publish de f1_au
  Abu Dabi:  RB-1 04/12 14:40 · RB-2 05/12 10:18 · RB-3 05/12 11:50 · RB-4 05/12 13:48 · RB-5 06/12 10:00 · RB-6 06/12 15:15
 Resultados retro/evaluación: Brasil qualy 6/10 (pole NOR; modelo ANT), carrera 9/10 con ganador NOR ✓ y podio 2/3; México carrera 7/10
 (ganó VER; modelo HAM), podio 1/3.
+
+## Mejora continua (pedido 9/11 ~02:45 UTC): "que mejore automáticamente tras cada sesión"
+Workflow wf6fu1mrp (hora límite 06:30 + verificación 07:30 UTC): paso post_fp1 + pronóstico preliminar de carrera tras cada práctica
+(historial.json por GP), ciclo campeón/retador `mejora_modelos.py ciclo` tras cada carrera (adopta sólo si mejora > 1 EE pareado y no
+empeora en los últimos 8 GP; bitácora en modelos/bitacora.json → doc bitacora/actual), sección "Evolución del modelo" en la página.
+- [ ] Integrar: reglas db nuevas (historial, bitacora), publicar, runbook RB-0 (post-FP1) y RB-7 (mejora tras carrera),
+      tareas nuevas: post-FP1 (LV 20/11 01:50, QAT 27/11 15:00, ABU 04/12 11:00 UTC) y RB-7 (después de cada RB-6)
