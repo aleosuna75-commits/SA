@@ -1,0 +1,57 @@
+{
+  "nombre": "Interlagos bajo la garoa",
+  "logo": ["POLE", "BR"],
+  "colores": {
+    "noche": "#070d0c", "hondo": "#050a09", "noche-2": "#0b1412", "carbon": "#0f1a17", "carbon-2": "#16241f",
+    "hueso": "#eef1e6", "hueso-2": "#cfd8cb", "ceniza": "#9fb0a6", "humo": "#66786f",
+    "cempa": "#f2c94c", "cempa-2": "#f7d978", "cempa-osc": "#9a7a12", "vela": "#ffe9a8", "azul": "#6fa0e0",
+    "rosa": "#ef6b6b", "jade": "#3fbf7f", "tinta": "#101006", "frio": "#2c5f8a"
+  },
+  "fuentes": {
+    "url": "https://fonts.googleapis.com/css2?family=Bodoni+Moda:ital,wght@0,400;0,500;0,600;1,400;1,500&family=Manrope:wght@300;400;500;600&family=Saira+Condensed:wght@400;500;600;700&display=swap",
+    "display": "\"Bodoni Moda\",\"Didot\",\"Bodoni 72\",\"Times New Roman\",serif",
+    "body": "\"Manrope\",\"Avenir Next\",\"Segoe UI\",system-ui,sans-serif",
+    "dato": "\"Saira Condensed\",\"Arial Narrow\",\"Roboto Condensed\",system-ui,sans-serif",
+    "t_peso": 400, "t_esp": ".05em", "t_em": "italic"
+  },
+  "lienzo": {"modo": "lluvia", "colores": ["#cfe3ff", "#f2c94c"], "estelas": true},
+  "imagenes": {
+    "heroe": {"src": "img/brasil/heroe-reta-2022.jpg", "alt": "La recta principal de Interlagos con la tribuna llena durante el Gran Premio de São Paulo 2022", "pos": "50% 55%", "espejo": false},
+    "menu": {"src": "img/brasil/reta-2023.jpg"},
+    "interludio": {"src": "img/brasil/interlagos-aerea.jpg"},
+    "casas": [
+      {"src": "img/brasil/bandera-2022.jpg", "alt": "Un Mercedes recibe la bandera a cuadros en Interlagos", "pie": "Bandera a cuadros · GP de São Paulo 2022"},
+      {"src": "img/brasil/ferrari-parrilla-2019.jpg", "alt": "Mecánicos de Ferrari junto al auto en la parrilla de Interlagos", "pie": "Ferrari en la parrilla · GP de Brasil 2019"},
+      {"src": "img/brasil/recta-2019.jpg", "alt": "Un monoplaza en la recta principal de Interlagos frente a la tribuna", "pie": "En la recta principal · GP de Brasil 2019"}
+    ],
+    "vivo": {"src": "img/brasil/s-do-senna-2022.jpg"},
+    "carrera": {"src": "img/brasil/heroe-reta-2022.jpg"},
+    "cambios": {"src": "img/brasil/s-do-senna-2022.jpg", "alt": "Vista aérea de los autos en el S do Senna", "pie": "El S do Senna, primera curva de Interlagos."},
+    "ofrenda": {"src": "img/brasil/interlagos-aerea.jpg"}
+  },
+  "textos": {
+    "menu_inicio": "Terra da garoa",
+    "heroe_ceja": "Interlagos · São Paulo, la tierra de la garoa",
+    "heroe_titular": "Garoa<br>sobre<br>Interlagos",
+    "heroe_edicion": "Pronóstico de qualy y carrera · Edición Interlagos.",
+    "parrilla_titulo": "La parrilla<br><em>bajo la garoa</em>",
+    "interludio_ceja": "Vista aérea · Autódromo José Carlos Pace",
+    "interludio_titulo": "Interlagos<br><em>escucha.</em>",
+    "interludio_txt": "La bajada al S do Senna, la subida hasta la meta y una nube que puede cambiar la sesión en cinco minutos.",
+    "casas_apodos": {"Mercedes": "Flecha de plata", "Ferrari": "Rosso corsa", "McLaren": "Papaya bajo la lluvia", "Red Bull Racing": "El toro", "*": "Los retadores"},
+    "burbuja_titulo": "En el filo<br><em>del S</em>",
+    "ofrenda_ceja": "Memoria de Interlagos",
+    "ofrenda_titulo": "Las poles<br><em>de Interlagos</em>",
+    "estrategia_lugar": "en Interlagos",
+    "riesgos": [
+      ["Lluvia", "Interlagos es de las pistas donde más llueve en fin de semana de carrera: un chubasco cambia el orden y la estrategia en una vuelta."],
+      ["Safety car", "Las salidas de pista en el S do Senna y en la Junção traen auto de seguridad con frecuencia."],
+      ["Subida a la meta", "Del Juncão a la línea es todo subida a fondo: el rebufo hace comunes los rebases en la curva 1."]
+    ]
+  },
+  "creditos": [
+    "Recta principal (2022), vista aérea, bandera a cuadros (2022), Ferrari en la parrilla (2019), recta principal (2019) y S do Senna (2022): Governo do Estado de São Paulo · <a href=\"https://creativecommons.org/licenses/by/2.0/\" target=\"_blank\" rel=\"noopener\">CC BY 2.0</a> · <a href=\"https://commons.wikimedia.org/wiki/File:F%C3%B3rmula_1_Heineken_Grande_Pr%C3%AAmio_de_S%C3%A3o_Paulo_2022_(52497099897).jpg\" target=\"_blank\" rel=\"noopener\">1</a>, <a href=\"https://commons.wikimedia.org/wiki/File:Grande_Pr%C3%AAmio_S%C3%A3o_Paulo_de_F%C3%B3rmula_1_(52497080967).jpg\" target=\"_blank\" rel=\"noopener\">2</a>, <a href=\"https://commons.wikimedia.org/wiki/File:F%C3%B3rmula_1_Heineken_Grande_Pr%C3%AAmio_de_S%C3%A3o_Paulo_2022_(52497580456).jpg\" target=\"_blank\" rel=\"noopener\">3</a>, <a href=\"https://commons.wikimedia.org/wiki/File:F%C3%B3rmula_1_%E2%80%93_Grande_Pr%C3%AAmio_do_Brasil_de_F1_2019_(49080268437).jpg\" target=\"_blank\" rel=\"noopener\">4</a>, <a href=\"https://commons.wikimedia.org/wiki/File:F%C3%B3rmula_1_%E2%80%93_Grande_Pr%C3%AAmio_do_Brasil_de_F1_2019_(49080061616).jpg\" target=\"_blank\" rel=\"noopener\">5</a>, <a href=\"https://commons.wikimedia.org/wiki/File:F%C3%B3rmula_1_Heineken_Grande_Pr%C3%AAmio_de_S%C3%A3o_Paulo_2022_(52498140708).jpg\" target=\"_blank\" rel=\"noopener\">6</a>",
+    "Recta de Interlagos, diciembre de 2023: Boaventuravinicius · <a href=\"https://creativecommons.org/licenses/by-sa/4.0/\" target=\"_blank\" rel=\"noopener\">CC BY-SA 4.0</a> · <a href=\"https://commons.wikimedia.org/wiki/File:Aut%C3%B3dromo_de_Interlagos_em_Dezembro_de_2023.jpg\" target=\"_blank\" rel=\"noopener\">archivo</a>",
+    "Fotos recortadas, reducidas y con ajuste de color. Las versiones derivadas de obras CC BY-SA se comparten bajo la misma licencia."
+  ]
+}

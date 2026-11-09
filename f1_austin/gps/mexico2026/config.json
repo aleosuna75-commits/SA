@@ -1,0 +1,75 @@
+{
+ "meeting_key": 1298,
+ "year": 2026,
+ "slug": "mexico2026",
+ "slug_modelo": "mexico",
+ "nombre": "Gran Premio de la Ciudad de México",
+ "nombre_en": "Mexico City Grand Prix",
+ "circuito": "Autódromo Hermanos Rodríguez",
+ "circuito_corto": "México",
+ "ciudad": "Ciudad de México",
+ "pais": "Mexico",
+ "circuit_key": 65,
+ "circuito_jolpica": "rodriguez",
+ "gmt_offset": "-06:00:00",
+ "utc_texto": "UTC−6",
+ "fecha_texto": "Sábado 31 de octubre de 2026",
+ "hora_texto": "3:00 PM (hora local, UTC−6)",
+ "fecha_texto_carrera": "Domingo 1 de noviembre de 2026",
+ "hora_texto_carrera": "2:00 PM (hora local, UTC−6)",
+ "tema": "muertos",
+ "sprint": false,
+ "sesiones": [
+  {
+   "clave": "fp1",
+   "nombre": "Práctica 1",
+   "nombre_en": "Practice 1",
+   "session_key": 11397,
+   "inicio_utc": "2026-10-30T18:30:00Z",
+   "fin_utc": "2026-10-30T19:30:00Z",
+   "fecha_local": "Viernes 30 de octubre",
+   "hora_local": "12:30 PM"
+  },
+  {
+   "clave": "fp2",
+   "nombre": "Práctica 2",
+   "nombre_en": "Practice 2",
+   "session_key": 11398,
+   "inicio_utc": "2026-10-30T22:00:00Z",
+   "fin_utc": "2026-10-30T23:00:00Z",
+   "fecha_local": "Viernes 30 de octubre",
+   "hora_local": "4:00 PM"
+  },
+  {
+   "clave": "fp3",
+   "nombre": "Práctica 3",
+   "nombre_en": "Practice 3",
+   "session_key": 11399,
+   "inicio_utc": "2026-10-31T17:30:00Z",
+   "fin_utc": "2026-10-31T18:30:00Z",
+   "fecha_local": "Sábado 31 de octubre",
+   "hora_local": "11:30 AM"
+  },
+  {
+   "clave": "q",
+   "nombre": "Clasificación",
+   "nombre_en": "Qualifying",
+   "session_key": 11400,
+   "inicio_utc": "2026-10-31T21:00:00Z",
+   "fin_utc": "2026-10-31T22:00:00Z",
+   "fecha_local": "Sábado 31 de octubre",
+   "hora_local": "3:00 PM"
+  },
+  {
+   "clave": "r",
+   "nombre": "Carrera",
+   "nombre_en": "Race",
+   "session_key": 11404,
+   "inicio_utc": "2026-11-01T20:00:00Z",
+   "fin_utc": "2026-11-01T22:00:00Z",
+   "fecha_local": "Domingo 1 de noviembre",
+   "hora_local": "2:00 PM"
+  }
+ ],
+ "generado": "2026-11-09T01:48:35Z"
+}

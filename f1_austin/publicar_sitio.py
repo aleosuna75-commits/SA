@@ -1,24 +1,31 @@
 """Arma la carpeta del sitio estático para Netlify (../sitio_f1) a partir de los reportes generados.
 
 Estructura publicada:
-    sitio_f1/index.html            -> página en vivo de México (web_mexico/) + img/
-    sitio_f1/<slug>/qualy.html     -> pronóstico de qualy de cada GP
-    sitio_f1/<slug>/carrera.html   -> pronóstico de carrera (si existe)
+    sitio_f1/index.html            -> página única de todos los GP (web/plantilla.html vía construir_web.py): muestra el GP
+                                      actual de gps/meta.json, cambia de GP con el menú o con el hash (#brasil2026) y lleva
+                                      incrustados meta.json y los JSON de todos los gps/<slug>/
+    sitio_f1/img/<tema>/           -> fotos de cada tema (web/img/)
+    sitio_f1/<slug>/qualy.html     -> páginas de archivo (reportes anteriores: Austin, México)
+    sitio_f1/<slug>/carrera.html   -> pronóstico de carrera de archivo (si existe)
 
 Cada página recibe una barra de navegación común. Despliegue: arrastrar la carpeta sitio_f1 a Netlify
 (app.netlify.com/drop) o conectar el repo (netlify.toml en la raíz ya apunta a sitio_f1). Ver PUBLICAR_NETLIFY.md.
 
-Uso:  python3 publicar_sitio.py
+Uso:  python3 publicar_sitio.py                       # -> ../sitio_f1 con los datos de gps/
+      python3 publicar_sitio.py --sitio /tmp/prueba --gps /ruta/a/gps   # otra salida u otros datos (pruebas)
 """
+import argparse
 import shutil
 from pathlib import Path
 
 BASE = Path(__file__).parent
 SITIO = BASE.parent / "sitio_f1"
 
-# Portada: página en vivo de México (web_mexico/, la misma que se publica como Artifact). Se copia completa,
-# con doctype (construir_web_mexico.py --documento) y sus imágenes; no recibe barra: trae su propio menú.
-PORTADA = BASE / "web_mexico"
+# Portada: página única multi-GP (web/, la misma que se publica como Artifact). Se construye con doctype
+# (construir_web.py --documento) y se copian sus imágenes; no recibe barra: trae su propio menú con todos los GP.
+# La página vieja de México (web_mexico/ + construir_web_mexico.py) sigue intacta y reproducible, pero ya no es la portada.
+WEB = BASE / "web"
+GPS_DIR = BASE / "gps"
 
 # (slug, etiqueta, archivo qualy, archivo carrera) — páginas de archivo con barra común
 PAGINAS = [
@@ -38,7 +45,7 @@ padding:8px 16px;background:#0b0b0f;border-bottom:1px solid rgba(255,255,255,.12
 
 
 def nav(actual, prefijo):
-    links = [f'<a href="{prefijo}index.html">Inicio · En vivo</a>']
+    links = [f'<a href="{prefijo}index.html">Inicio · Todos los GP</a>']
     for i, (slug, etiqueta, q, c) in enumerate(PAGINAS):
         href_q = f"{prefijo}{slug}/qualy.html"
         links.append(f'<a class="{"on" if actual == (slug, "qualy") else ""}" href="{href_q}">{etiqueta} · Qualy</a>')
@@ -55,20 +62,21 @@ def inyectar(html, barra):
 
 
 def main():
+    global SITIO, GPS_DIR
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--sitio", default=str(SITIO), help="carpeta de salida (se borra y se rehace)")
+    ap.add_argument("--gps", default=str(GPS_DIR), help="carpeta con meta.json y <slug>/*.json")
+    a = ap.parse_args()
+    SITIO, GPS_DIR = Path(a.sitio), Path(a.gps)
     if SITIO.exists():
         shutil.rmtree(SITIO)
     SITIO.mkdir()
     import subprocess, sys
-    cmd = [sys.executable, str(BASE / "construir_web_mexico.py"), "--salida", str(SITIO / "index.html"),
-           "--documento", "--gp", str(PORTADA / "datos_gp.json"), "--live", str(BASE / "live" / "qualy_mexico.json")]
-    # evaluación de la qualy y pronóstico de carrera, cuando ya existen
-    for opcion, archivo in (("--post", BASE / "live" / "post_qualy.json"), ("--carrera", PORTADA / "datos_carrera.json"),
-                            ("--vueltas", PORTADA / "datos_vueltas.json")):
-        if archivo.exists():
-            cmd += [opcion, str(archivo)]
+    cmd = [sys.executable, str(BASE / "construir_web.py"), "--salida", str(SITIO / "index.html"), "--documento",
+           "--gps", str(GPS_DIR)]
     subprocess.run(cmd, check=True)
-    shutil.copytree(PORTADA / "img", SITIO / "img")
-    print("->", (SITIO / "index.html").relative_to(SITIO.parent), "(página en vivo) + img/")
+    shutil.copytree(WEB / "img", SITIO / "img")
+    print("->", (SITIO / "index.html").relative_to(SITIO.parent), "(página de todos los GP) + img/<tema>/")
     for i, (slug, etiqueta, q, c) in enumerate(PAGINAS):
         for tipo, archivo in (("qualy", q), ("carrera", c)):
             if not archivo or not (BASE / archivo).exists():

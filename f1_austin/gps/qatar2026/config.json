@@ -1,0 +1,75 @@
+{
+ "meeting_key": 1301,
+ "year": 2026,
+ "slug": "qatar2026",
+ "slug_modelo": "qatar",
+ "nombre": "Gran Premio de Qatar",
+ "nombre_en": "Qatar Grand Prix",
+ "circuito": "Circuito Internacional de Lusail",
+ "circuito_corto": "Lusail",
+ "ciudad": "Lusail, Qatar",
+ "pais": "Qatar",
+ "circuit_key": 150,
+ "circuito_jolpica": "losail",
+ "gmt_offset": "03:00:00",
+ "utc_texto": "UTC+3",
+ "fecha_texto": "Sábado 28 de noviembre de 2026",
+ "hora_texto": "9:00 PM (hora local, UTC+3)",
+ "fecha_texto_carrera": "Domingo 29 de noviembre de 2026",
+ "hora_texto_carrera": "7:00 PM (hora local, UTC+3)",
+ "tema": "qatar",
+ "sprint": false,
+ "sesiones": [
+  {
+   "clave": "fp1",
+   "nombre": "Práctica 1",
+   "nombre_en": "Practice 1",
+   "session_key": 11421,
+   "inicio_utc": "2026-11-27T13:30:00Z",
+   "fin_utc": "2026-11-27T14:30:00Z",
+   "fecha_local": "Viernes 27 de noviembre",
+   "hora_local": "4:30 PM"
+  },
+  {
+   "clave": "fp2",
+   "nombre": "Práctica 2",
+   "nombre_en": "Practice 2",
+   "session_key": 11422,
+   "inicio_utc": "2026-11-27T17:00:00Z",
+   "fin_utc": "2026-11-27T18:00:00Z",
+   "fecha_local": "Viernes 27 de noviembre",
+   "hora_local": "8:00 PM"
+  },
+  {
+   "clave": "fp3",
+   "nombre": "Práctica 3",
+   "nombre_en": "Practice 3",
+   "session_key": 11423,
+   "inicio_utc": "2026-11-28T14:30:00Z",
+   "fin_utc": "2026-11-28T15:30:00Z",
+   "fecha_local": "Sábado 28 de noviembre",
+   "hora_local": "5:30 PM"
+  },
+  {
+   "clave": "q",
+   "nombre": "Clasificación",
+   "nombre_en": "Qualifying",
+   "session_key": 11424,
+   "inicio_utc": "2026-11-28T18:00:00Z",
+   "fin_utc": "2026-11-28T19:00:00Z",
+   "fecha_local": "Sábado 28 de noviembre",
+   "hora_local": "9:00 PM"
+  },
+  {
+   "clave": "r",
+   "nombre": "Carrera",
+   "nombre_en": "Race",
+   "session_key": 11428,
+   "inicio_utc": "2026-11-29T16:00:00Z",
+   "fin_utc": "2026-11-29T18:00:00Z",
+   "fecha_local": "Domingo 29 de noviembre",
+   "hora_local": "7:00 PM"
+  }
+ ],
+ "generado": "2026-11-09T01:47:18Z"
+}

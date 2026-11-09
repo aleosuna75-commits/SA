@@ -52,6 +52,8 @@ G_MAX = 2.0          # intervalo máximo (s) para intentar rebase en una vuelta
 VERSION_HIST = 5
 # predicciones walk-forward del simulador actual (sim_carrera.py), para comparar por GP sin recalcularlas
 WF_ACTUAL = CACHE / "wf_sim_carrera_actual.csv"
+# GP del pronóstico en curso (textos): México por defecto; gp_pipeline.py lo cambia por GP
+CTX = {"meeting": 1298, "lugar": "México"}
 
 
 # ========================================================================================
@@ -386,9 +388,43 @@ def preparar(forzar=False):
     res = {}
     t0 = time.time()
     for r in car[car.tiene_vueltas].itertuples():
-        c = procesar_carrera(r.session_key)
+        c = _procesar_completa(r.session_key)
         if c is None:
             continue
+        res[r.session_key] = c
+        fit = c["fit"]
+        print(f"  carrera {r.session_key} ({r.circuito} {r.year}) n={fit['n'] if fit else 0} "
+              f"({time.time() - t0:.0f} s)", flush=True)
+    h = {"version": VERSION_HIST, "carreras": car, "datos": res}
+    HIST_PKL.write_bytes(pickle.dumps(h))
+    return h
+
+
+def actualizar_hist():
+    """Agrega al histórico (cache/vueltas_hist.pkl) las carreras con vueltas y race_control en cache que falten
+    (p. ej. el GP recién corrido), sin reprocesar las demás. No hay fuga: calibrar() sólo usa carreras anteriores al
+    fin de semana objetivo. Devuelve (h, session_keys agregadas)."""
+    h = preparar()
+    car = tabla_carreras()
+    nuevas = []
+    for r in car[car.tiene_vueltas].itertuples():
+        if r.session_key in h["datos"] or not (CACHE / f"race_rc_{r.session_key}.json").exists():
+            continue
+        c = _procesar_completa(r.session_key)
+        if c is not None:
+            h["datos"][r.session_key] = c
+            nuevas.append(r.session_key)
+    if nuevas or len(car) != len(h["carreras"]):
+        h["carreras"] = car
+        HIST_PKL.write_bytes(pickle.dumps(h))
+    return h, nuevas
+
+
+def _procesar_completa(sk):
+    c = procesar_carrera(sk)
+    if c is None:
+        return None
+    if True:
         fit = ajustar_vueltas(c)
         c["fit"] = fit
         if fit is not None:
@@ -404,12 +440,7 @@ def preparar(forzar=False):
         o1 = orden_vuelta(c["T"], 1)
         c["orden1"] = [c["drivers"][i] for i in o1]
         c["gaps1"] = np.diff(c["T"][o1, 1]).tolist()
-        res[r.session_key] = c
-        print(f"  carrera {r.session_key} ({r.circuito} {r.year}) n={fit['n'] if fit else 0} "
-              f"({time.time() - t0:.0f} s)", flush=True)
-    h = {"version": VERSION_HIST, "carreras": car, "datos": res}
-    HIST_PKL.write_bytes(pickle.dumps(h))
-    return h
+    return c
 
 
 # ========================================================================================
@@ -1690,15 +1721,16 @@ def construir_salidas(r, obj, cal, pdnf, val, n_sims, fuente_parrilla=""):
     p_vsc = float((ne == 2).any(1).mean())
     inicio = (ne > 0) & ~np.c_[np.zeros((S, 1), bool), ne[:, :-1] > 0]
     pk = inicio.mean(0)
-    tipicas = [int(k + 1) for k in np.argsort(-pk)[:3]]
+    # las 2 últimas vueltas se omiten: efecto de recorte de la simulación (en México se quitó la v70 a mano)
+    tipicas = [int(k + 1) for k in np.argsort(-pk)[:3] if k + 1 < L - 1]
     tramos = {}
     for a, b in ((1, 5), (6, 25), (26, 50), (51, L)):
         tramos[f"v{a}-{b}"] = _r(float(inicio[:, a - 1:b].any(1).mean()))
     sc = {"prob": _r(float((ne > 0).any(1).mean())), "prob_sc": _r(p_sc), "prob_vsc": _r(p_vsc),
           "vueltas_tipicas": sorted(tipicas), "prob_por_tramo": tramos,
           "nota": (f"SC en la vuelta 1: {cal['sc_p1'] * 100:.0f}%; después {cal['sc_por_carrera']:.2f} SC y "
-                   f"{cal['vsc_por_carrera']:.2f} VSC esperados por carrera (México {cal['sc_circ_eventos']} neutralizaciones en "
-                   f"{cal['sc_circ_n']} ediciones 2023-2025, contraído hacia la tasa global). Con SC la parada cuesta "
+                   f"{cal['vsc_por_carrera']:.2f} VSC esperados por carrera ({CTX['lugar']} {cal['sc_circ_eventos']} neutralizaciones en "
+                   f"{cal['sc_circ_n']} ediciones {'2023-2025' if CTX['meeting'] == 1298 else 'anteriores (OpenF1)'}, contraído hacia la tasa global). Con SC la parada cuesta "
                    f"≈{cal['pit'] * cal['pit_ratio_sc']:.0f} s en lugar de ≈{cal['pit']:.0f} s.")}
     # --- orden final ---
     p_dnf_sim = 1 - viv.mean(0)
@@ -1812,11 +1844,18 @@ def resumen_texto(sal, obj, cal):
                f"(le funciona {d['prob_exito'] * 100:.0f}% de las veces)")
     d_oc = [d for d in sal["duelos"] if d["tipo"] == "overcut" and d.get("prob_exito") is not None]
     if d_oc:
-        r2 += (f"; quedarse fuera más vueltas (overcut) casi nunca paga en México "
+        r2 += (f"; quedarse fuera más vueltas (overcut) casi nunca paga en {CTX['lugar']} "
                f"(≈{np.mean([d['prob_exito'] for d in d_oc]) * 100:.0f}% de éxito)")
     r2 += "."
-    law = next((x for x in of if x["acr"] == "LAW"), None)
+    law = next((x for x in of if x["acr"] == "LAW"), None) if CTX["meeting"] == 1298 else None
     r3 = ""
+    if CTX["meeting"] != 1298:            # genérico: la mayor remontada desde el fondo de la parrilla
+        cand = [x for x in of if x["salida"] >= 12 and x["salida"] - x["pred"] >= 3]
+        if cand:
+            x = max(cand, key=lambda x: x["salida"] - x["pred"])
+            reb = next((y for y in sal["rebases"]["por_piloto"] if y["acr"] == x["acr"]), {"ganados": 0})
+            r3 = (f"{nom[x['acr']]} arranca {x['salida']}.º y remonta hasta el {x['pred']}.º lugar (posición media "
+                  f"{x['pos_media']:.1f}; {x['p_top10'] * 100:.0f}% de llegar a puntos), con unos {reb['ganados']:.0f} rebases en pista.")
     if law:
         reb = next(x for x in sal["rebases"]["por_piloto"] if x["acr"] == "LAW")
         r3 = (f"Lawson, descalificado de la qualy, arranca 22.º y remonta hasta el {law['pred']}.º lugar (posición media {law['pos_media']:.1f}; "
@@ -1825,20 +1864,25 @@ def resumen_texto(sal, obj, cal):
     return " ".join(x for x in (r1, r2, r3, r4) if x)
 
 
-def objetivo_actual(obj, meeting=1298):
+def objetivo_actual(obj, meeting=1298, ruta=None):
     """Posición media por piloto del simulador actual (pronóstico oficial publicado: prediccion_carrera_<slug>_2026.csv)."""
-    f = BASE / "prediccion_carrera_mexico_2026.csv"
+    f = Path(ruta) if ruta else BASE / "prediccion_carrera_mexico_2026.csv"
     pc = pd.read_csv(f).set_index("name_acronym")
     return obj.name_acronym.map(pc.pos_media).values, f.name
 
 
-def pronostico(meeting=1298, n_sims=4000, var=None, din=None, escribir_carrera=False, seed=2026):
+def pronostico(meeting=1298, n_sims=4000, var=None, din=None, escribir_carrera=False, seed=2026,
+               dataset=None, objetivo=None, salida=None, lugar=None, ancla_it=None):
+    """dataset/objetivo/salida: rutas (default México: dataset_carrera.csv, prediccion_carrera_mexico_2026.csv,
+    web_mexico/datos_vueltas.json). lugar: nombre corto del GP para los textos."""
+    CTX["meeting"], CTX["lugar"] = meeting, (lugar or ("México" if meeting == 1298 else "este circuito"))
     h = preparar()
-    data = pd.read_csv(BASE / "dataset_carrera.csv")
+    data = pd.read_csv(dataset or (BASE / "dataset_carrera.csv"))
     var = VAR_OFICIAL if var is None else var
     din = DIN_OFICIAL if din is None else din
     obj = data[data.meeting_key == meeting].sort_values("grid").reset_index(drop=True)
-    hist = data[data.meeting_key != meeting]
+    # sólo GPs anteriores (al reproducir un GP pasado el dataset ya trae carreras posteriores)
+    hist = data[(data.meeting_key != meeting) & (pd.to_datetime(data.date, utc=True) < pd.to_datetime(obj.date, utc=True).min())]
     C = Calibracion(h, hist, var)
     cal = C.calibrar(meeting, obj)
     pdnf = p_dnf_modelo(hist, meeting, obj)
@@ -1851,8 +1895,8 @@ def pronostico(meeting=1298, n_sims=4000, var=None, din=None, escribir_carrera=F
     # 2) anclado: ritmo efectivo ajustado para reproducir la posición media del simulador oficial
     cal_a = dict(cal)
     cal_a["ritmo_mu"] = cal["ritmo_mu"].copy()
-    tgt, fuente_tgt = objetivo_actual(obj, meeting)
-    anclar(cal_a, obj, pdnf, tgt, n_it=ANCLA_IT, eta=ANCLA_ETA, n_sims=ANCLA_SIMS, seed=seed + 1, din=din)
+    tgt, fuente_tgt = objetivo_actual(obj, meeting, objetivo)
+    anclar(cal_a, obj, pdnf, tgt, n_it=ancla_it or ANCLA_IT, eta=ANCLA_ETA, n_sims=ANCLA_SIMS, seed=seed + 1, din=din)
     r_anc = simular(cal_a, obj, pdnf, n_sims=n_sims, seed=seed, din=din)
     print(f"{2 * n_sims} carreras simuladas (+ anclaje) en {time.time() - t0:.0f} s")
     r, cal_u = (r_anc, cal_a) if modo == "anclado" else (r_libre, cal)
@@ -1869,7 +1913,8 @@ def pronostico(meeting=1298, n_sims=4000, var=None, din=None, escribir_carrera=F
         "modelo": ("Simulador vuelta a vuelta (Monte Carlo, " + ("anclado al simulador oficial" if modo == "anclado" else "libre") +
                    "): ritmo de carrera por piloto, degradación y offset por compuesto, combustible, pits (pérdida del circuito, "
                    "plan óptimo + ruido calibrado, undercut, cubrir, paradas con SC/VSC), rebases en pista por diferencia de ritmo e "
-                   "intervalo, vuelta 1, SC/VSC y abandonos; calibrado con 84 carreras 2023-2026 de OpenF1."),
+                   "intervalo, vuelta 1, SC/VSC y abandonos; calibrado con " + (
+                       "84 carreras 2023-2026" if meeting == 1298 else f"{cal['n_train']} carreras anteriores") + " de OpenF1."),
         "modo": modo,
         "nota_modo": ("anclado = el ritmo efectivo de cada piloto se ajusta para que su posición media coincida con la del simulador "
                       "oficial (" + fuente_tgt + "); las estrategias, rebases, duelos, SC y trazas salen del modelo vuelta a vuelta. "
@@ -1887,7 +1932,7 @@ def pronostico(meeting=1298, n_sims=4000, var=None, din=None, escribir_carrera=F
         "estrategias": sal["estrategias"], "rebases": sal["rebases"], "duelos": sal["duelos"], "trazas": sal["trazas"],
         "safety_car": sal["safety_car"], "orden_final": sal["orden_final"], "orden_final_libre": orden_libre,
         "nota_trazas": ("posiciones = orden de los pilotos por su posición media en las simulaciones al final de cada vuelta "
-                        "(una posición por piloto; en la vuelta 71 coincide con orden_final). posiciones_mediana = mediana "
+                        "(una posición por piloto; en la vuelta " + str(int(cal["L"])) + " coincide con orden_final). posiciones_mediana = mediana "
                         "por piloto (puede repetir lugares); p25/p75 cada 5 vueltas."),
         "nota_duelos": ("Duelo = el de atrás va a < 3 s y las dos paradas quedan a ≤ 8 vueltas, sin SC/VSC de por medio. "
                         "prob_exito está calibrada con la validación 2024-2026 (éxito real/simulado por tipo: el overcut "
@@ -1897,7 +1942,8 @@ def pronostico(meeting=1298, n_sims=4000, var=None, din=None, escribir_carrera=F
                         f"{val.get('duelos', {}).get('brier_tasa_por_tipo', float('nan')):.3f})."),
     }
     doc["resumen"] = resumen_texto(sal, obj, cal_u)
-    ruta = BASE / "web_mexico" / "datos_vueltas.json"
+    ruta = Path(salida) if salida else BASE / "web_mexico" / "datos_vueltas.json"
+    ruta.parent.mkdir(parents=True, exist_ok=True)
     ruta.write_text(json.dumps(doc, ensure_ascii=False, indent=1))
     print("Escrito", ruta)
     if escribir_carrera and not val.get("mejor_o_igual_que_actual", False):
@@ -2082,7 +2128,13 @@ def escribir_validacion(res_libre, res_anc, duelos, n_sims):
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("accion", choices=["preparar", "validar", "mexico"])
+    ap.add_argument("accion", choices=["preparar", "validar", "mexico", "gp", "actualizar"])
+    ap.add_argument("--meeting", type=int, default=None, help="gp: meeting_key del GP")
+    ap.add_argument("--dataset", default=None, help="gp: dataset_carrera.csv del modelo de carrera")
+    ap.add_argument("--objetivo", default=None, help="gp: prediccion_carrera_<slug>_2026.csv (posición media oficial)")
+    ap.add_argument("--salida", default=None, help="gp: ruta del JSON (forma de datos_vueltas.json)")
+    ap.add_argument("--lugar", default=None, help="gp: nombre corto del GP para los textos (p. ej. Interlagos)")
+    ap.add_argument("--ancla-it", type=int, default=None, help="gp: iteraciones del anclaje (default ANCLA_IT)")
     ap.add_argument("--sims", type=int, default=None)
     ap.add_argument("--carrera", action="store_true", help="también escribe datos_carrera_vueltas.json (scratchpad)")
     a = ap.parse_args()
@@ -2095,5 +2147,12 @@ if __name__ == "__main__":
         du = validar_duelos(n_sims=300, var=VAR_OFICIAL, din=DIN_OFICIAL)
         doc = escribir_validacion(res_l, res_a, du, ns)
         print(json.dumps(doc["resumen_doc"], indent=1, ensure_ascii=False))
+    elif a.accion == "actualizar":
+        _, nuevas = actualizar_hist()
+        print("carreras agregadas al histórico:", nuevas)
+    elif a.accion == "gp":
+        actualizar_hist()
+        pronostico(a.meeting, n_sims=a.sims or 4000, dataset=a.dataset, objetivo=a.objetivo, salida=a.salida, lugar=a.lugar,
+                   ancla_it=a.ancla_it)
     else:
         pronostico(1298, n_sims=a.sims or 4000, escribir_carrera=a.carrera)

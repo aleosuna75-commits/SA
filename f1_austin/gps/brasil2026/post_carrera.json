@@ -1,0 +1,296 @@
+{
+ "actualizado": "2026-11-09T02:07:40Z",
+ "aciertos_top10": 9,
+ "top10_pred": [
+  "NOR",
+  "ANT",
+  "HAD",
+  "LAW",
+  "RUS",
+  "HUL",
+  "LEC",
+  "VER",
+  "HAM",
+  "BEA"
+ ],
+ "top10_real": [
+  "NOR",
+  "VER",
+  "HAD",
+  "RUS",
+  "ANT",
+  "PIA",
+  "LAW",
+  "LEC",
+  "HAM",
+  "HUL"
+ ],
+ "ganador_pred": "NOR",
+ "ganador_real": "NOR",
+ "acierto_ganador": true,
+ "podio_pred": [
+  "NOR",
+  "ANT",
+  "HAD"
+ ],
+ "podio_real": [
+  "NOR",
+  "VER",
+  "HAD"
+ ],
+ "aciertos_podio": 2,
+ "exactos": 4,
+ "mae": 3.0,
+ "spearman": 0.806,
+ "filas": [
+  {
+   "acr": "NOR",
+   "nombre": "Lando Norris",
+   "equipo": "McLaren",
+   "color": "F47600",
+   "salida": 1,
+   "pred": 1,
+   "real": 1,
+   "dif": 0,
+   "estado": "Terminó"
+  },
+  {
+   "acr": "VER",
+   "nombre": "Max Verstappen",
+   "equipo": "Red Bull Racing",
+   "color": "4781D7",
+   "salida": 21,
+   "pred": 8,
+   "real": 2,
+   "dif": 6,
+   "estado": "Terminó"
+  },
+  {
+   "acr": "HAD",
+   "nombre": "Isack Hadjar",
+   "equipo": "Red Bull Racing",
+   "color": "4781D7",
+   "salida": 5,
+   "pred": 3,
+   "real": 3,
+   "dif": 0,
+   "estado": "Terminó"
+  },
+  {
+   "acr": "RUS",
+   "nombre": "George Russell",
+   "equipo": "Mercedes",
+   "color": "00D7B6",
+   "salida": 7,
+   "pred": 5,
+   "real": 4,
+   "dif": 1,
+   "estado": "Terminó"
+  },
+  {
+   "acr": "ANT",
+   "nombre": "Kimi Antonelli",
+   "equipo": "Mercedes",
+   "color": "00D7B6",
+   "salida": 2,
+   "pred": 2,
+   "real": 5,
+   "dif": -3,
+   "estado": "Terminó"
+  },
+  {
+   "acr": "PIA",
+   "nombre": "Oscar Piastri",
+   "equipo": "McLaren",
+   "color": "F47600",
+   "salida": 10,
+   "pred": 11,
+   "real": 6,
+   "dif": 5,
+   "estado": "Terminó"
+  },
+  {
+   "acr": "LAW",
+   "nombre": "Liam Lawson",
+   "equipo": "Racing Bulls",
+   "color": "6C98FF",
+   "salida": 3,
+   "pred": 4,
+   "real": 7,
+   "dif": -3,
+   "estado": "Terminó"
+  },
+  {
+   "acr": "LEC",
+   "nombre": "Charles Leclerc",
+   "equipo": "Ferrari",
+   "color": "ED1131",
+   "salida": 14,
+   "pred": 7,
+   "real": 8,
+   "dif": -1,
+   "estado": "Terminó"
+  },
+  {
+   "acr": "HAM",
+   "nombre": "Lewis Hamilton",
+   "equipo": "Ferrari",
+   "color": "ED1131",
+   "salida": 20,
+   "pred": 9,
+   "real": 9,
+   "dif": 0,
+   "estado": "Terminó"
+  },
+  {
+   "acr": "HUL",
+   "nombre": "Nico Hulkenberg",
+   "equipo": "Audi",
+   "color": "F50537",
+   "salida": 4,
+   "pred": 6,
+   "real": 10,
+   "dif": -4,
+   "estado": "Terminó"
+  },
+  {
+   "acr": "LIN",
+   "nombre": "Arvid Lindblad",
+   "equipo": "Racing Bulls",
+   "color": "6C98FF",
+   "salida": 18,
+   "pred": 15,
+   "real": 11,
+   "dif": 4,
+   "estado": "Terminó"
+  },
+  {
+   "acr": "ALO",
+   "nombre": "Fernando Alonso",
+   "equipo": "Aston Martin",
+   "color": "229971",
+   "salida": 8,
+   "pred": 12,
+   "real": 12,
+   "dif": 0,
+   "estado": "Terminó"
+  },
+  {
+   "acr": "COL",
+   "nombre": "Franco Colapinto",
+   "equipo": "Alpine",
+   "color": "00A1E8",
+   "salida": 13,
+   "pred": 18,
+   "real": 13,
+   "dif": 5,
+   "estado": "Terminó"
+  },
+  {
+   "acr": "GAS",
+   "nombre": "Pierre Gasly",
+   "equipo": "Alpine",
+   "color": "00A1E8",
+   "salida": 15,
+   "pred": 17,
+   "real": 14,
+   "dif": 3,
+   "estado": "Terminó"
+  },
+  {
+   "acr": "ALB",
+   "nombre": "Alexander Albon",
+   "equipo": "Williams",
+   "color": "1868DB",
+   "salida": 9,
+   "pred": 13,
+   "real": 15,
+   "dif": -2,
+   "estado": "Terminó"
+  },
+  {
+   "acr": "BOR",
+   "nombre": "Gabriel Bortoleto",
+   "equipo": "Audi",
+   "color": "F50537",
+   "salida": 19,
+   "pred": 19,
+   "real": 16,
+   "dif": 3,
+   "estado": "Terminó"
+  },
+  {
+   "acr": "BEA",
+   "nombre": "Oliver Bearman",
+   "equipo": "Haas F1 Team",
+   "color": "9C9FA2",
+   "salida": 6,
+   "pred": 10,
+   "real": 17,
+   "dif": -7,
+   "estado": "Terminó"
+  },
+  {
+   "acr": "PER",
+   "nombre": "Sergio Perez",
+   "equipo": "Cadillac",
+   "color": "909090",
+   "salida": 22,
+   "pred": 22,
+   "real": 18,
+   "dif": 4,
+   "estado": "Terminó"
+  },
+  {
+   "acr": "SAI",
+   "nombre": "Carlos Sainz",
+   "equipo": "Williams",
+   "color": "1868DB",
+   "salida": 12,
+   "pred": 16,
+   "real": 19,
+   "dif": -3,
+   "estado": "Terminó"
+  },
+  {
+   "acr": "CAM",
+   "nombre": "Rafael Camara",
+   "equipo": "Haas F1 Team",
+   "color": "9C9FA2",
+   "salida": 11,
+   "pred": 14,
+   "real": 20,
+   "dif": -6,
+   "estado": "Terminó"
+  },
+  {
+   "acr": "STR",
+   "nombre": "Lance Stroll",
+   "equipo": "Aston Martin",
+   "color": "229971",
+   "salida": 16,
+   "pred": 20,
+   "real": null,
+   "dif": null,
+   "estado": "Abandonó"
+  },
+  {
+   "acr": "BOT",
+   "nombre": "Valtteri Bottas",
+   "equipo": "Cadillac",
+   "color": "909090",
+   "salida": 17,
+   "pred": 21,
+   "real": null,
+   "dif": null,
+   "estado": "Abandonó"
+  }
+ ],
+ "estrategia": {
+  "paradas_acierto": 0.0,
+  "mae_vuelta_parada": 16.3,
+  "rebases_reales": 35,
+  "nota": "Paradas: el plan más probable del simulador acertó el número de paradas de 0/20 pilotos que terminaron; lo más común en la carrera fue 3 paradas. Primera parada: error medio de 16.3 vueltas (20 pilotos). Rebases en pista: 35 reales vs 69.9 esperados (rango simulado 49-95). Carrera con lluvia (intermedios): el simulador asume carrera seca, así que la comparación de paradas no es representativa."
+ },
+ "resumen": "El simulador acertó 9 de los 10 que sumaron puntos y 2 de 3 en el podio. Acertó al ganador: Lando Norris. Fuera de la clasificación: STR, BOT. Error medio de 3.00 lugares y correlación de 0.806 entre los clasificados. Paradas: el plan más probable del simulador acertó el número de paradas de 0/20 pilotos que terminaron; lo más común en la carrera fue 3 paradas. Primera parada: error medio de 16.3 vueltas (20 pilotos). Rebases en pista: 35 reales vs 69.9 esperados (rango simulado 49-95). Carrera con lluvia (intermedios): el simulador asume carrera seca, así que la comparación de paradas no es representativa."
+}

@@ -1,0 +1,75 @@
+{
+ "meeting_key": 1300,
+ "year": 2026,
+ "slug": "lasvegas2026",
+ "slug_modelo": "lasvegas",
+ "nombre": "Gran Premio de Las Vegas",
+ "nombre_en": "Las Vegas Grand Prix",
+ "circuito": "Circuito urbano de Las Vegas (Las Vegas Strip)",
+ "circuito_corto": "Las Vegas",
+ "ciudad": "Las Vegas, Nevada",
+ "pais": "United States",
+ "circuit_key": 152,
+ "circuito_jolpica": "vegas",
+ "gmt_offset": "-08:00:00",
+ "utc_texto": "UTC−8",
+ "fecha_texto": "Viernes 20 de noviembre de 2026",
+ "hora_texto": "8:00 PM (hora local, UTC−8)",
+ "fecha_texto_carrera": "Sábado 21 de noviembre de 2026",
+ "hora_texto_carrera": "8:00 PM (hora local, UTC−8)",
+ "tema": "lasvegas",
+ "sprint": false,
+ "sesiones": [
+  {
+   "clave": "fp1",
+   "nombre": "Práctica 1",
+   "nombre_en": "Practice 1",
+   "session_key": 11413,
+   "inicio_utc": "2026-11-20T00:30:00Z",
+   "fin_utc": "2026-11-20T01:30:00Z",
+   "fecha_local": "Jueves 19 de noviembre",
+   "hora_local": "4:30 PM"
+  },
+  {
+   "clave": "fp2",
+   "nombre": "Práctica 2",
+   "nombre_en": "Practice 2",
+   "session_key": 11414,
+   "inicio_utc": "2026-11-20T04:00:00Z",
+   "fin_utc": "2026-11-20T05:00:00Z",
+   "fecha_local": "Jueves 19 de noviembre",
+   "hora_local": "8:00 PM"
+  },
+  {
+   "clave": "fp3",
+   "nombre": "Práctica 3",
+   "nombre_en": "Practice 3",
+   "session_key": 11415,
+   "inicio_utc": "2026-11-21T00:30:00Z",
+   "fin_utc": "2026-11-21T01:30:00Z",
+   "fecha_local": "Viernes 20 de noviembre",
+   "hora_local": "4:30 PM"
+  },
+  {
+   "clave": "q",
+   "nombre": "Clasificación",
+   "nombre_en": "Qualifying",
+   "session_key": 11416,
+   "inicio_utc": "2026-11-21T04:00:00Z",
+   "fin_utc": "2026-11-21T05:00:00Z",
+   "fecha_local": "Viernes 20 de noviembre",
+   "hora_local": "8:00 PM"
+  },
+  {
+   "clave": "r",
+   "nombre": "Carrera",
+   "nombre_en": "Race",
+   "session_key": 11420,
+   "inicio_utc": "2026-11-22T04:00:00Z",
+   "fin_utc": "2026-11-22T06:00:00Z",
+   "fecha_local": "Sábado 21 de noviembre",
+   "hora_local": "8:00 PM"
+  }
+ ],
+ "generado": "2026-11-09T01:47:18Z"
+}

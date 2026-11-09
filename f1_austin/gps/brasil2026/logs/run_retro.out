@@ -1,0 +1,65 @@
+brasil2026: pre_qualy ya hecho (usa --forzar para repetir)
+brasil2026: fp3 ya hecho (usa --forzar para repetir)
+[2026-11-09T01:57:50Z] brasil2026: qualy_en_vivo (retro)
+[2026-11-09T01:57:50Z] brasil2026: post_qualy (retro)
+  [   99 s] modelo_carrera_austin.py 1299 ... -> post_qualy.log (rc=0)
+  [   23 s] sim_vueltas.py gp ... -> post_qualy.log (rc=0)
+[2026-11-09T01:59:55Z] brasil2026: post_carrera (retro)
+  [    1 s] descarga_carreras.py ... -> post_carrera.log (rc=0)
+{
+ "slug": "brasil2026",
+ "acciones": [
+  {
+   "slug": "brasil2026",
+   "paso": "qualy_en_vivo",
+   "ok": true,
+   "segundos": 0,
+   "archivos_cambiados": [],
+   "docs": []
+  },
+  {
+   "slug": "brasil2026",
+   "paso": "post_qualy",
+   "ok": true,
+   "segundos": 125,
+   "archivos_cambiados": [
+    "gps/brasil2026/post_qualy.json",
+    "gps/brasil2026/carrera.json",
+    "gps/brasil2026/vueltas.json"
+   ],
+   "docs": [
+    {
+     "coleccion": "postqualy",
+     "doc_id": "brasil2026",
+     "archivo": "gps/brasil2026/post_qualy.json"
+    },
+    {
+     "coleccion": "carrera",
+     "doc_id": "brasil2026",
+     "archivo": "gps/brasil2026/carrera.json"
+    },
+    {
+     "coleccion": "vueltas",
+     "doc_id": "brasil2026",
+     "archivo": "gps/brasil2026/vueltas.json"
+    }
+   ]
+  },
+  {
+   "slug": "brasil2026",
+   "paso": "post_carrera",
+   "ok": true,
+   "segundos": 1,
+   "archivos_cambiados": [
+    "gps/brasil2026/post_carrera.json"
+   ],
+   "docs": [
+    {
+     "coleccion": "postcarrera",
+     "doc_id": "brasil2026",
+     "archivo": "gps/brasil2026/post_carrera.json"
+    }
+   ]
+  }
+ ]
+}

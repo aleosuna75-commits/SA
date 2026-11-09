@@ -1,0 +1,44 @@
+{
+ "slug": "mexico2026",
+ "meeting_key": 1298,
+ "pasos": {
+  "pre_qualy": {
+   "hecho": "2026-10-31T16:21:46Z",
+   "nota": "migrado (corrida manual)",
+   "archivos": []
+  },
+  "fp3": {
+   "hecho": "2026-10-31T19:04:16Z",
+   "nota": "migrado: FP3 reconstruida del live timing",
+   "archivos": [
+    "gp.json"
+   ]
+  },
+  "qualy_en_vivo": {
+   "hecho": "2026-10-31T22:09:31Z",
+   "nota": "migrado",
+   "archivos": [
+    "live_qualy.json"
+   ]
+  },
+  "post_qualy": {
+   "hecho": "2026-11-01T02:58:54Z",
+   "nota": "migrado (parrilla con DSQ de Lawson)",
+   "oficial": true,
+   "archivos": [
+    "post_qualy.json",
+    "carrera.json",
+    "vueltas.json"
+   ]
+  },
+  "post_carrera": {
+   "hecho": "2026-11-09T01:49:22Z",
+   "firma": "c20e0a8c50d7",
+   "aciertos_top10": 7,
+   "ganador_real": "VER",
+   "archivos": [
+    "post_carrera.json"
+   ]
+  }
+ }
+}

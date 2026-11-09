@@ -1,0 +1,296 @@
+{
+ "actualizado": "2026-11-09T01:49:22Z",
+ "aciertos_top10": 7,
+ "top10_pred": [
+  "HAM",
+  "RUS",
+  "LEC",
+  "ANT",
+  "VER",
+  "HAD",
+  "NOR",
+  "LIN",
+  "PIA",
+  "GAS"
+ ],
+ "top10_real": [
+  "VER",
+  "HAM",
+  "ANT",
+  "LEC",
+  "NOR",
+  "RUS",
+  "LAW",
+  "BOR",
+  "HAD",
+  "HIR"
+ ],
+ "ganador_pred": "HAM",
+ "ganador_real": "VER",
+ "acierto_ganador": false,
+ "podio_pred": [
+  "HAM",
+  "RUS",
+  "LEC"
+ ],
+ "podio_real": [
+  "VER",
+  "HAM",
+  "ANT"
+ ],
+ "aciertos_podio": 1,
+ "exactos": 0,
+ "mae": 3.94,
+ "spearman": 0.689,
+ "filas": [
+  {
+   "acr": "VER",
+   "nombre": "Max Verstappen",
+   "equipo": "Red Bull Racing",
+   "color": "4781D7",
+   "salida": 5,
+   "pred": 5,
+   "real": 1,
+   "dif": 4,
+   "estado": "Terminó"
+  },
+  {
+   "acr": "HAM",
+   "nombre": "Lewis Hamilton",
+   "equipo": "Ferrari",
+   "color": "ED1131",
+   "salida": 1,
+   "pred": 1,
+   "real": 2,
+   "dif": -1,
+   "estado": "Terminó"
+  },
+  {
+   "acr": "ANT",
+   "nombre": "Kimi Antonelli",
+   "equipo": "Mercedes",
+   "color": "00D7B6",
+   "salida": 4,
+   "pred": 4,
+   "real": 3,
+   "dif": 1,
+   "estado": "Terminó"
+  },
+  {
+   "acr": "LEC",
+   "nombre": "Charles Leclerc",
+   "equipo": "Ferrari",
+   "color": "ED1131",
+   "salida": 3,
+   "pred": 3,
+   "real": 4,
+   "dif": -1,
+   "estado": "Terminó"
+  },
+  {
+   "acr": "NOR",
+   "nombre": "Lando Norris",
+   "equipo": "McLaren",
+   "color": "F47600",
+   "salida": 6,
+   "pred": 7,
+   "real": 5,
+   "dif": 2,
+   "estado": "Terminó"
+  },
+  {
+   "acr": "RUS",
+   "nombre": "George Russell",
+   "equipo": "Mercedes",
+   "color": "00D7B6",
+   "salida": 2,
+   "pred": 2,
+   "real": 6,
+   "dif": -4,
+   "estado": "Terminó"
+  },
+  {
+   "acr": "LAW",
+   "nombre": "Liam Lawson",
+   "equipo": "Racing Bulls",
+   "color": "6C98FF",
+   "salida": 22,
+   "pred": 12,
+   "real": 7,
+   "dif": 5,
+   "estado": "Terminó"
+  },
+  {
+   "acr": "BOR",
+   "nombre": "Gabriel Bortoleto",
+   "equipo": "Audi",
+   "color": "F50537",
+   "salida": 13,
+   "pred": 14,
+   "real": 8,
+   "dif": 6,
+   "estado": "Terminó"
+  },
+  {
+   "acr": "HAD",
+   "nombre": "Isack Hadjar",
+   "equipo": "Red Bull Racing",
+   "color": "4781D7",
+   "salida": 7,
+   "pred": 6,
+   "real": 9,
+   "dif": -3,
+   "estado": "Terminó"
+  },
+  {
+   "acr": "HIR",
+   "nombre": "Ryo Hirakawa",
+   "equipo": "Haas F1 Team",
+   "color": "9C9FA2",
+   "salida": 18,
+   "pred": 16,
+   "real": 10,
+   "dif": 6,
+   "estado": "Terminó"
+  },
+  {
+   "acr": "ALB",
+   "nombre": "Alexander Albon",
+   "equipo": "Williams",
+   "color": "1868DB",
+   "salida": 16,
+   "pred": 19,
+   "real": 11,
+   "dif": 8,
+   "estado": "Terminó"
+  },
+  {
+   "acr": "SAI",
+   "nombre": "Carlos Sainz",
+   "equipo": "Williams",
+   "color": "1868DB",
+   "salida": 15,
+   "pred": 17,
+   "real": 12,
+   "dif": 5,
+   "estado": "Terminó"
+  },
+  {
+   "acr": "PIA",
+   "nombre": "Oscar Piastri",
+   "equipo": "McLaren",
+   "color": "F47600",
+   "salida": 12,
+   "pred": 9,
+   "real": 13,
+   "dif": -4,
+   "estado": "Terminó"
+  },
+  {
+   "acr": "HUL",
+   "nombre": "Nico Hulkenberg",
+   "equipo": "Audi",
+   "color": "F50537",
+   "salida": 10,
+   "pred": 11,
+   "real": 14,
+   "dif": -3,
+   "estado": "Terminó"
+  },
+  {
+   "acr": "COL",
+   "nombre": "Franco Colapinto",
+   "equipo": "Alpine",
+   "color": "00A1E8",
+   "salida": 11,
+   "pred": 13,
+   "real": 15,
+   "dif": -2,
+   "estado": "Terminó"
+  },
+  {
+   "acr": "PER",
+   "nombre": "Sergio Perez",
+   "equipo": "Cadillac",
+   "color": "909090",
+   "salida": 20,
+   "pred": 21,
+   "real": 16,
+   "dif": 5,
+   "estado": "Terminó"
+  },
+  {
+   "acr": "GAS",
+   "nombre": "Pierre Gasly",
+   "equipo": "Alpine",
+   "color": "00A1E8",
+   "salida": 9,
+   "pred": 10,
+   "real": 17,
+   "dif": -7,
+   "estado": "Terminó"
+  },
+  {
+   "acr": "LIN",
+   "nombre": "Arvid Lindblad",
+   "equipo": "Racing Bulls",
+   "color": "6C98FF",
+   "salida": 8,
+   "pred": 8,
+   "real": null,
+   "dif": null,
+   "estado": "Abandonó"
+  },
+  {
+   "acr": "BEA",
+   "nombre": "Oliver Bearman",
+   "equipo": "Haas F1 Team",
+   "color": "9C9FA2",
+   "salida": 14,
+   "pred": 15,
+   "real": null,
+   "dif": null,
+   "estado": "Abandonó"
+  },
+  {
+   "acr": "ALO",
+   "nombre": "Fernando Alonso",
+   "equipo": "Aston Martin",
+   "color": "229971",
+   "salida": 17,
+   "pred": 18,
+   "real": null,
+   "dif": null,
+   "estado": "Abandonó"
+  },
+  {
+   "acr": "STR",
+   "nombre": "Lance Stroll",
+   "equipo": "Aston Martin",
+   "color": "229971",
+   "salida": 19,
+   "pred": 20,
+   "real": null,
+   "dif": null,
+   "estado": "Abandonó"
+  },
+  {
+   "acr": "BOT",
+   "nombre": "Valtteri Bottas",
+   "equipo": "Cadillac",
+   "color": "909090",
+   "salida": 21,
+   "pred": 22,
+   "real": null,
+   "dif": null,
+   "estado": "Abandonó"
+  }
+ ],
+ "estrategia": {
+  "paradas_acierto": 0.235,
+  "mae_vuelta_parada": 7.59,
+  "rebases_reales": 30,
+  "nota": "Paradas: el plan más probable del simulador acertó el número de paradas de 4/17 pilotos que terminaron; lo más común en la carrera fue 2 paradas. Primera parada: error medio de 7.6 vueltas (17 pilotos). Rebases en pista: 30 reales vs 53.6 esperados (rango simulado 34-78). Hubo bandera roja: los cambios de neumático con la roja no cuentan como parada. Neutralizaciones (SC/VSC): 2."
+ },
+ "resumen": "El simulador acertó 7 de los 10 que sumaron puntos y 1 de 3 en el podio. Ganó Max Verstappen (salía 5.º; el pronóstico lo tenía P5); el favorito del modelo, Lewis Hamilton, terminó P2. Fuera de la clasificación: LIN, BEA, ALO, STR, BOT. Error medio de 3.94 lugares y correlación de 0.689 entre los clasificados. Paradas: el plan más probable del simulador acertó el número de paradas de 4/17 pilotos que terminaron; lo más común en la carrera fue 2 paradas. Primera parada: error medio de 7.6 vueltas (17 pilotos). Rebases en pista: 30 reales vs 53.6 esperados (rango simulado 34-78). Hubo bandera roja: los cambios de neumático con la roja no cuentan como parada. Neutralizaciones (SC/VSC): 2."
+}

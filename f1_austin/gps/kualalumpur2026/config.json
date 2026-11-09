@@ -1,0 +1,75 @@
+{
+ "meeting_key": 1308,
+ "year": 2026,
+ "slug": "kualalumpur2026",
+ "slug_modelo": "kualalumpur",
+ "nombre": "Gran Premio de Baréin",
+ "nombre_en": "Bahrain Grand Prix",
+ "circuito": "Kuala Lumpur",
+ "circuito_corto": "Kuala Lumpur",
+ "ciudad": "Kuala Lumpur, Bahrain",
+ "pais": "Bahrain",
+ "circuit_key": 12,
+ "circuito_jolpica": "sepang",
+ "gmt_offset": "08:00:00",
+ "utc_texto": "UTC+8",
+ "fecha_texto": "Sábado 3 de octubre de 2026",
+ "hora_texto": "4:00 PM (hora local, UTC+8)",
+ "fecha_texto_carrera": "Domingo 4 de octubre de 2026",
+ "hora_texto_carrera": "3:00 PM (hora local, UTC+8)",
+ "tema": "generico",
+ "sprint": false,
+ "sesiones": [
+  {
+   "clave": "fp1",
+   "nombre": "Práctica 1",
+   "nombre_en": "Practice 1",
+   "session_key": 11727,
+   "inicio_utc": "2026-10-02T04:30:00Z",
+   "fin_utc": "2026-10-02T05:30:00Z",
+   "fecha_local": "Viernes 2 de octubre",
+   "hora_local": "12:30 PM"
+  },
+  {
+   "clave": "fp2",
+   "nombre": "Práctica 2",
+   "nombre_en": "Practice 2",
+   "session_key": 11728,
+   "inicio_utc": "2026-10-02T08:00:00Z",
+   "fin_utc": "2026-10-02T09:00:00Z",
+   "fecha_local": "Viernes 2 de octubre",
+   "hora_local": "4:00 PM"
+  },
+  {
+   "clave": "fp3",
+   "nombre": "Práctica 3",
+   "nombre_en": "Practice 3",
+   "session_key": 11729,
+   "inicio_utc": "2026-10-03T04:30:00Z",
+   "fin_utc": "2026-10-03T05:30:00Z",
+   "fecha_local": "Sábado 3 de octubre",
+   "hora_local": "12:30 PM"
+  },
+  {
+   "clave": "q",
+   "nombre": "Clasificación",
+   "nombre_en": "Qualifying",
+   "session_key": 11730,
+   "inicio_utc": "2026-10-03T08:00:00Z",
+   "fin_utc": "2026-10-03T09:00:00Z",
+   "fecha_local": "Sábado 3 de octubre",
+   "hora_local": "4:00 PM"
+  },
+  {
+   "clave": "r",
+   "nombre": "Carrera",
+   "nombre_en": "Race",
+   "session_key": 11731,
+   "inicio_utc": "2026-10-04T07:00:00Z",
+   "fin_utc": "2026-10-04T09:00:00Z",
+   "fecha_local": "Domingo 4 de octubre",
+   "hora_local": "3:00 PM"
+  }
+ ],
+ "generado": "2026-11-09T01:56:07Z"
+}

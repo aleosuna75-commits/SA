@@ -1,0 +1,61 @@
+{
+  "nombre": "Día de Muertos",
+  "logo": ["POLE", "MX"],
+  "colores": {
+    "noche": "#0b0a0a", "hondo": "#090808", "noche-2": "#100e0e", "carbon": "#141112", "carbon-2": "#1d1819",
+    "hueso": "#efe7dc", "hueso-2": "#d4cbc1", "ceniza": "#a89f97", "humo": "#746c66",
+    "cempa": "#ff8a3d", "cempa-2": "#ffad5c", "cempa-osc": "#b34d12", "vela": "#ffd590", "azul": "#8fa9c6",
+    "rosa": "#ef5a7e", "jade": "#74d6a8", "tinta": "#160c05", "frio": "#3c5a82"
+  },
+  "fuentes": {
+    "url": "https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;500;600;700&family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=Jost:wght@300;400;500;600&display=swap",
+    "display": "\"Cormorant Garamond\",\"Cormorant\",Garamond,\"Times New Roman\",serif",
+    "body": "\"Jost\",\"Avenir Next\",\"Futura\",\"Segoe UI\",system-ui,sans-serif",
+    "dato": "\"Barlow Condensed\",\"Arial Narrow\",\"Roboto Condensed\",system-ui,sans-serif",
+    "t_peso": 300, "t_esp": ".07em", "t_em": "italic"
+  },
+  "lienzo": {"modo": "petalos", "colores": ["#ff8a3d", "#ff9d2f", "#ffb347", "#f2741c", "#ffc566", "#e8641a"], "estelas": true},
+  "imagenes": {
+    "heroe": {"src": "img/muertos/foro-sol-atardecer.jpg", "alt": "Silueta de la tribuna del Foro Sol al atardecer, en el Autódromo Hermanos Rodríguez", "pos": "50% 42%", "espejo": true},
+    "menu": {"src": "img/muertos/ofrenda-arocutin.jpg"},
+    "interludio": {"src": "img/muertos/aficion-foro-sol.jpg"},
+    "casas": [
+      {"src": "img/muertos/arte-huichol.jpg", "alt": "Monoplaza de exhibición cubierto de chaquira huichol en la zona de aficionados del Gran Premio de México", "pie": "Monoplaza con chaquira huichol · GP de México 2016"},
+      {"src": "img/muertos/ferrari-mexico.jpg", "alt": "Un Ferrari rojo pasa junto a la pianola en el Autódromo Hermanos Rodríguez", "pie": "Ferrari en la pista · GP de México 2016"},
+      {"src": "img/muertos/red-bull-mexico.jpg", "alt": "Un Red Bull en la recta del Autódromo Hermanos Rodríguez", "pie": "Red Bull en la pista · GP de México 2017"}
+    ],
+    "vivo": {"src": "img/muertos/noche-pacanda.jpg"},
+    "carrera": {"src": "img/muertos/ferrari-mexico.jpg"},
+    "cambios": {"src": "img/muertos/cempasuchil.jpg", "alt": "Flores de cempasúchil", "pie": "Cempasúchil: la flor que guía el camino."},
+    "ofrenda": {"src": "img/muertos/altar-arocutin.jpg"}
+  },
+  "textos": {
+    "menu_inicio": "Día de Muertos",
+    "heroe_ceja": "Sobre el Autódromo · la pista más alta del calendario",
+    "heroe_titular": "Donde<br>las velas<br>aceleran",
+    "heroe_edicion": "Pronóstico de qualy · Edición Día de Muertos.",
+    "parrilla_titulo": "La parrilla<br><em>de las ánimas</em>",
+    "parrilla_txt": "Así saldrían los diez primeros si la qualy se corriera con lo que sabemos hoy. La pole va adelante a la izquierda y el resto se escalona, como en la recta del Autódromo.",
+    "interludio_ceja": "Sección del estadio · Foro Sol",
+    "interludio_titulo": "El Foro Sol<br><em>espera.</em>",
+    "interludio_txt": "La recta, el estadio y una ciudad que esta noche pone ofrenda. Por la tarde, 22 autos y una sola vuelta que cuenta.",
+    "casas_apodos": {"Mercedes": "Flecha de plata", "Ferrari": "Rojo de altar", "*": "Los retadores"},
+    "burbuja_titulo": "Velas<br><em>que tiemblan</em>",
+    "burbuja_q3_txt": "Probabilidad de entrar a la Q3. La llama crece con la probabilidad.",
+    "ofrenda_ceja": "Ofrenda",
+    "ofrenda_titulo": "Las poles<br><em>del Autódromo</em>",
+    "ofrenda_txt": "Las qualys desde el regreso de la Fórmula 1 a México en 2015 (no hubo GP en 2020). Una vela por cada pole; las más altas son las más recientes.",
+    "estrategia_lugar": "en el Autódromo",
+    "riesgos": [
+      ["Safety car", "Un auto de seguridad en el momento justo abarata la parada de quien todavía no ha entrado y revuelve el orden."],
+      ["Lluvia", "El pronóstico supone pista seca. Con lluvia, el orden pierde casi todo su valor."],
+      ["Curva 1", "La recta de salida es de las más largas del calendario: los autos llegan en paralelo a la primera frenada y los toques son frecuentes."]
+    ]
+  },
+  "creditos": [
+    "Foro Sol al atardecer, monoplaza con chaquira huichol, Ferrari (2016), Red Bull y afición en el Foro Sol (2017): Gobierno CDMX · CC0, dominio público · <a href=\"https://commons.wikimedia.org/wiki/File:Formula_1_2016_-i---i-_(30607375021).jpg\" target=\"_blank\" rel=\"noopener\">1</a>, <a href=\"https://commons.wikimedia.org/wiki/File:Formula_1_2016_-i---i-_(30562016801).jpg\" target=\"_blank\" rel=\"noopener\">2</a>, <a href=\"https://commons.wikimedia.org/wiki/File:Formula_1_2016_-i---i-_(30063717774).jpg\" target=\"_blank\" rel=\"noopener\">3</a>, <a href=\"https://commons.wikimedia.org/wiki/File:F1_2017_-i---i-_(26299298269).jpg\" target=\"_blank\" rel=\"noopener\">4</a>, <a href=\"https://commons.wikimedia.org/wiki/File:F1_2017_-i---i-_(24222724938).jpg\" target=\"_blank\" rel=\"noopener\">5</a>",
+    "Noche de Muertos en Arócutin (2 fotos) e Isla Pacanda, Michoacán: LBM1948 · <a href=\"https://creativecommons.org/licenses/by-sa/4.0/\" target=\"_blank\" rel=\"noopener\">CC BY-SA 4.0</a> · <a href=\"https://commons.wikimedia.org/wiki/File:Ar%C3%B3cutin,_Noche_de_Muertos_15.jpg\" target=\"_blank\" rel=\"noopener\">1</a>, <a href=\"https://commons.wikimedia.org/wiki/File:Ar%C3%B3cutin,_Noche_de_Muertos_13.jpg\" target=\"_blank\" rel=\"noopener\">2</a>, <a href=\"https://commons.wikimedia.org/wiki/File:Isla_Pacanda,_Noche_de_Muertos_13.jpg\" target=\"_blank\" rel=\"noopener\">3</a>",
+    "Cempasúchil (<i>Tagetes erecta</i>): Wotancito · <a href=\"https://creativecommons.org/licenses/by/4.0/\" target=\"_blank\" rel=\"noopener\">CC BY 4.0</a> · <a href=\"https://commons.wikimedia.org/wiki/File:Tagetes_erecta_mexicana_02.jpg\" target=\"_blank\" rel=\"noopener\">archivo</a>",
+    "Fotos recortadas, reducidas y con ajuste de color. Las versiones derivadas de obras CC BY-SA se comparten bajo la misma licencia."
+  ]
+}

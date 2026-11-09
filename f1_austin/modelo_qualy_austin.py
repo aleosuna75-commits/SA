@@ -62,6 +62,71 @@ GPS = {
 }
 
 
+GPS_DIR = BASE / "gps"
+
+
+def cargar_gps_auto():
+    """Agrega a GPS los GPs configurados por gp_pipeline.py (gps/<slug>/config.json + ajustes.json editable a mano).
+    Las entradas fijas (1297 Austin, 1298 México) no se tocan, para que sigan reproduciéndose igual."""
+    for f in sorted(GPS_DIR.glob("*/config.json")):
+        try:
+            c = json.loads(f.read_text())
+            mk = int(c["meeting_key"])
+        except Exception:
+            continue
+        if mk in GPS:
+            continue
+        aj_f = f.parent / "ajustes.json"
+        try:
+            aj = json.loads(aj_f.read_text()) if aj_f.exists() else {}
+        except Exception:
+            aj = {}
+        GPS[mk] = {k: c.get(k) for k in ("nombre", "circuito", "ciudad", "circuito_jolpica", "fecha_texto", "hora_texto", "tema")}
+        GPS[mk]["slug"] = c.get("slug_modelo") or c["slug"]
+        GPS[mk]["slug_web"] = c["slug"]
+        GPS[mk]["sustituciones"] = dict(aj.get("sustituciones") or {})
+
+
+cargar_gps_auto()
+
+
+# ----------------------------------------------------------------------------------------
+# Corte temporal (modo retro de gp_pipeline.py): F1_CORTE=<ISO UTC> oculta todo lo que empezó en o después del corte
+# (resultados, pilotos y vueltas de sesiones OpenF1; resultados de Jolpica por fecha+hora de la carrera). El calendario
+# (sessions_<año>) se mantiene: se conoce de antemano.
+# ----------------------------------------------------------------------------------------
+def corte_utc():
+    c = os.environ.get("F1_CORTE")
+    if not c:
+        return None
+    t = pd.Timestamp(c)
+    return t.tz_localize("UTC") if t.tzinfo is None else t.tz_convert("UTC")
+
+
+_FUTURAS = None
+
+
+def sesiones_futuras():
+    global _FUTURAS
+    if _FUTURAS is None:
+        _FUTURAS = set()
+        c = corte_utc()
+        if c is not None:
+            for a in AÑOS:
+                for s in cargar(f"sessions_{a}"):
+                    if pd.Timestamp(s["date_start"]) >= c:
+                        _FUTURAS.add(s["session_key"])
+    return _FUTURAS
+
+
+def jolpica_antes_del_corte(df, col_dt="dt"):
+    """Filtra filas de Jolpica (columna dt = fecha+hora de la carrera, ISO) anteriores a F1_CORTE."""
+    c = corte_utc()
+    if c is not None and len(df):
+        df = df[pd.to_datetime(df[col_dt], utc=True) < c]
+    return df.drop(columns=[col_dt])
+
+
 def imputar_debutantes(data):
     """Pilotos sin ninguna qualy previa: en vez de la mediana (que los trata como pilotos de media parrilla), su
     historial de qualy toma el promedio de los debutantes ANTERIORES (sólo pasado; 16 si no hay). Desde 2023 los
@@ -130,7 +195,10 @@ def tabla_resultados():
     filas = []
     for a in AÑOS:
         filas += cargar(f"results_{a}")
-    return pd.DataFrame(filas)
+    df = pd.DataFrame(filas)
+    if sesiones_futuras():
+        df = df[~df.session_key.isin(sesiones_futuras())]
+    return df
 
 
 def tabla_pilotos():
@@ -139,6 +207,8 @@ def tabla_pilotos():
         filas += cargar(f"drivers_{a}")
     d = pd.DataFrame(filas)[["session_key", "meeting_key", "driver_number", "name_acronym",
                              "full_name", "team_name", "team_colour"]]
+    if sesiones_futuras():
+        d = d[~d.session_key.isin(sesiones_futuras())]
     d["team"] = d["team_name"].map(lambda t: EQUIPO_CANON.get(t, t))
     return d
 
@@ -148,7 +218,7 @@ def tabla_pilotos():
 # ----------------------------------------------------------------------------------------
 def features_practica(sk, pref):
     laps_f, st_f = CACHE / f"laps_{sk}.json", CACHE / f"stints_{sk}.json"
-    if not laps_f.exists():
+    if not laps_f.exists() or sk in sesiones_futuras():
         return pd.DataFrame()
     laps = pd.DataFrame(json.loads(laps_f.read_text()))
     if laps.empty:
@@ -257,8 +327,9 @@ def tabla_jolpica(tipo):
                     "team": q["Constructor"]["name"],
                     "points": float(q.get("points", 0) or 0),
                     "status": q.get("status", ""),
+                    "dt": r["date"] + "T" + (r.get("time") or "23:59:59Z"),
                 })
-    df = pd.DataFrame(filas).drop_duplicates(["season", "round", "driverId"])
+    df = jolpica_antes_del_corte(pd.DataFrame(filas)).drop_duplicates(["season", "round", "driverId"])
     df["date"] = pd.to_datetime(df["date"])
     return df
 
@@ -679,6 +750,8 @@ def montecarlo(pred_rank, residuos, n=20000, seed=SEED):
 # 6. Main
 # ----------------------------------------------------------------------------------------
 def generar_reporte(resultado):
+    if os.environ.get("F1_SIN_HTML"):          # gp_pipeline.py: la página multi-GP sustituye al reporte HTML
+        return
     gp = resultado["gp"]
     if gp["tema"] == "muertos":
         from reporte_mexico_html import generar_html
@@ -697,7 +770,9 @@ def main(meeting=OBJETIVO_MEETING, con_fp3=False, nombres_modelos=None):
     print(f"GP objetivo: {gp['nombre']} (meeting {meeting})" + ("  [con FP3]" if con_fp3 else ""))
     print("Construyendo dataset...")
     data, meetings = construir_dataset(con_fp3=con_fp3)
-    data.to_csv(BASE / f"dataset_qualy{sufijo}.csv", index=False)
+    # Austin/México conservan sus nombres (archivos versionados); los GPs de gp_pipeline.py escriben el suyo
+    nombre_ds = f"dataset_qualy{sufijo}.csv" if meeting in (1297, 1298) else f"dataset_qualy_{gp['slug']}{sufijo}.csv"
+    data.to_csv(BASE / nombre_ds, index=False)
     obj = data[data.meeting_key == meeting].copy()
     print(f"Pilotos del GP objetivo: {len(obj)}")
     if con_fp3 and obj.fp3_best.notna().sum() < 10:

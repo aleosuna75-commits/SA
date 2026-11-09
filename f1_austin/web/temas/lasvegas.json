@@ -1,0 +1,62 @@
+{
+  "nombre": "Neón del Strip",
+  "logo": ["POLE", "LV"],
+  "colores": {
+    "noche": "#07060d", "hondo": "#05040a", "noche-2": "#0c0a16", "carbon": "#12101f", "carbon-2": "#1b1830",
+    "hueso": "#f3eefc", "hueso-2": "#d6cfe8", "ceniza": "#a59fbf", "humo": "#6e6888",
+    "cempa": "#ff3ea5", "cempa-2": "#ff74c0", "cempa-osc": "#9c1764", "vela": "#ffd36b", "azul": "#48e0ff",
+    "rosa": "#ff5577", "jade": "#4cf2b0", "tinta": "#14030c", "frio": "#5a2cc9"
+  },
+  "fuentes": {
+    "url": "https://fonts.googleapis.com/css2?family=Tilt+Neon&family=Outfit:wght@300;400;500;600&family=Oxanium:wght@400;500;600;700&display=swap",
+    "display": "\"Tilt Neon\",\"Avenir Next\",\"Segoe UI\",system-ui,sans-serif",
+    "body": "\"Outfit\",\"Avenir Next\",\"Segoe UI\",system-ui,sans-serif",
+    "dato": "\"Oxanium\",\"Arial Narrow\",\"Roboto Condensed\",system-ui,sans-serif",
+    "t_peso": 400, "t_esp": ".06em", "t_em": "normal"
+  },
+  "lienzo": {"modo": "neon", "colores": ["#ff3ea5", "#48e0ff", "#ffd36b", "#a259ff"], "estelas": true},
+  "imagenes": {
+    "heroe": {"src": "img/lasvegas/strip-noche.jpg", "alt": "El Strip de Las Vegas de noche, con el haz de luz del Luxor", "pos": "50% 60%", "espejo": false},
+    "menu": {"src": "img/lasvegas/strip-helicoptero.jpg"},
+    "interludio": {"src": "img/lasvegas/sphere-gp-2024.jpg"},
+    "casas": [
+      {"src": "img/lasvegas/red-bull-vegas.jpg", "alt": "Un Red Bull con decoración especial en el circuito del Strip", "pie": "Red Bull en el Strip · GP de Las Vegas"},
+      {"src": "img/lasvegas/williams-vegas.jpg", "alt": "Un Williams en el circuito callejero de Las Vegas", "pie": "Williams en el Strip · GP de Las Vegas"},
+      {"src": "img/lasvegas/sauber-vegas.jpg", "alt": "Un Sauber verde a toda velocidad en Las Vegas", "pie": "Sauber en el Strip · GP de Las Vegas"}
+    ],
+    "vivo": {"src": "img/lasvegas/bellagio-fuente.jpg"},
+    "carrera": {"src": "img/lasvegas/alpine-vegas.jpg"},
+    "cambios": {"src": "img/lasvegas/luces-freno.jpg", "alt": "Luces de freno de autos en el Strip de Las Vegas de noche", "pie": "Luces de freno en el Strip."},
+    "ofrenda": {"src": "img/lasvegas/strip-helicoptero.jpg"}
+  },
+  "textos": {
+    "menu_inicio": "Sábado de neón",
+    "heroe_ceja": "Las Vegas Strip Circuit · la qualy de medianoche",
+    "heroe_titular": "Neón<br>a 340<br>por hora",
+    "heroe_edicion": "Pronóstico de qualy y carrera · Edición Strip.",
+    "parrilla_titulo": "La parrilla<br><em>bajo el neón</em>",
+    "interludio_ceja": "La Esfera · Sphere Zone",
+    "interludio_titulo": "La Esfera<br><em>mira.</em>",
+    "interludio_txt": "La recta del Strip, la Esfera encendida y una qualy de medianoche con el asfalto frío.",
+    "casas_apodos": {"*": "Los que apuestan"},
+    "burbuja_titulo": "Todo<br><em>al rojo</em>",
+    "ofrenda_ceja": "Historia corta",
+    "ofrenda_titulo": "Las poles<br><em>de Las Vegas</em>",
+    "ofrenda_txt": "Las {n} qualys desde que la Fórmula 1 volvió a Las Vegas en 2023. Una luz por cada pole; las más altas son las más recientes.",
+    "estrategia_lugar": "en el Strip",
+    "riesgos": [
+      ["Asfalto frío", "De noche y en noviembre la pista está fría: calentar las gomas cuesta y el graining decide la estrategia."],
+      ["Safety car", "Muros cerca en toda la vuelta: un toque trae auto de seguridad y abarata la parada de quien no ha entrado."],
+      ["Rebufo", "La recta del Strip mide casi dos kilómetros: con DRS los rebases son frecuentes y el orden se mueve."]
+    ]
+  },
+  "creditos": [
+    "Red Bull, Williams, Sauber y Alpine en el Strip: Departamento de Seguridad Nacional de EE. UU. (DHS) · dominio público (obra del gobierno de EE. UU.) · <a href=\"https://commons.wikimedia.org/wiki/File:Las_Vegas_Grand_Prix_(54941205802).jpg\" target=\"_blank\" rel=\"noopener\">1</a>, <a href=\"https://commons.wikimedia.org/wiki/File:Las_Vegas_Grand_Prix_(54942077386).jpg\" target=\"_blank\" rel=\"noopener\">2</a>, <a href=\"https://commons.wikimedia.org/wiki/File:Las_Vegas_Grand_Prix_(54942338669).jpg\" target=\"_blank\" rel=\"noopener\">3</a>, <a href=\"https://commons.wikimedia.org/wiki/File:Las_Vegas_Grand_Prix_(54942281143).jpg\" target=\"_blank\" rel=\"noopener\">4</a>",
+    "La Esfera durante el GP de Las Vegas 2024: Nascar9919 · <a href=\"https://creativecommons.org/licenses/by/4.0/\" target=\"_blank\" rel=\"noopener\">CC BY 4.0</a> · <a href=\"https://commons.wikimedia.org/wiki/File:2024_Las_Vegas_Grand_Prix_at_the_Sphere_-_Saturday,_November_23,_Orbi.jpg\" target=\"_blank\" rel=\"noopener\">archivo</a>",
+    "Las Vegas de noche: André D Conrad · <a href=\"https://creativecommons.org/licenses/by-sa/3.0/de/deed.es\" target=\"_blank\" rel=\"noopener\">CC BY-SA 3.0 DE</a> · <a href=\"https://commons.wikimedia.org/wiki/File:Las_vegas_bei_nacht.jpg\" target=\"_blank\" rel=\"noopener\">archivo</a>",
+    "Fuente del Bellagio: Eric Kilby · <a href=\"https://creativecommons.org/licenses/by-sa/2.0/\" target=\"_blank\" rel=\"noopener\">CC BY-SA 2.0</a> · <a href=\"https://commons.wikimedia.org/wiki/File:Bellagio_Fountain_and_Center_Strip_View.jpg\" target=\"_blank\" rel=\"noopener\">archivo</a>",
+    "Luces de freno en el Strip: Coolcaesar · <a href=\"https://creativecommons.org/licenses/by-sa/4.0/\" target=\"_blank\" rel=\"noopener\">CC BY-SA 4.0</a> · <a href=\"https://commons.wikimedia.org/wiki/File:Brake_lights_on_the_Las_Vegas_Strip.jpg\" target=\"_blank\" rel=\"noopener\">archivo</a>",
+    "Las Vegas desde un helicóptero: Salvaje Model Photographer · <a href=\"https://creativecommons.org/licenses/by/3.0/\" target=\"_blank\" rel=\"noopener\">CC BY 3.0</a> · <a href=\"https://commons.wikimedia.org/wiki/File:Vegas_From_Helicopter_(183959411).jpeg\" target=\"_blank\" rel=\"noopener\">archivo</a>",
+    "Fotos recortadas, reducidas y con ajuste de color. Las versiones derivadas de obras CC BY-SA se comparten bajo la misma licencia."
+  ]
+}

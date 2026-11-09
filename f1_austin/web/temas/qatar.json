@@ -1,0 +1,62 @@
+{
+  "nombre": "Desierto nocturno",
+  "logo": ["POLE", "QA"],
+  "colores": {
+    "noche": "#0a0807", "hondo": "#070505", "noche-2": "#110d0b", "carbon": "#17120f", "carbon-2": "#211a15",
+    "hueso": "#f4ece0", "hueso-2": "#ddd0bd", "ceniza": "#b0a291", "humo": "#7a6c5c",
+    "cempa": "#e6b566", "cempa-2": "#f1cd8d", "cempa-osc": "#8f6a2c", "vela": "#fff1cf", "azul": "#8db5d9",
+    "rosa": "#d9506f", "jade": "#79d3a6", "tinta": "#1a1206", "frio": "#6b4f3a"
+  },
+  "fuentes": {
+    "url": "https://fonts.googleapis.com/css2?family=Reem+Kufi:wght@400;500;600;700&family=Readex+Pro:wght@300;400;500;600&family=Barlow+Semi+Condensed:wght@400;500;600;700&display=swap",
+    "display": "\"Reem Kufi\",\"Avenir Next\",\"Segoe UI\",system-ui,sans-serif",
+    "body": "\"Readex Pro\",\"Avenir Next\",\"Segoe UI\",system-ui,sans-serif",
+    "dato": "\"Barlow Semi Condensed\",\"Arial Narrow\",\"Roboto Condensed\",system-ui,sans-serif",
+    "t_peso": 400, "t_esp": ".1em", "t_em": "normal"
+  },
+  "lienzo": {"modo": "arena", "colores": ["#e6b566", "#f1cd8d", "#c9a46b", "#fff1cf"], "estelas": true},
+  "imagenes": {
+    "heroe": {"src": "img/qatar/lusail-reflectores.jpg", "alt": "Reflectores encendidos sobre la recta del Circuito de Lusail de noche", "pos": "50% 45%", "espejo": false},
+    "menu": {"src": "img/qatar/doha-dhow-noche.jpg"},
+    "interludio": {"src": "img/qatar/duna-ocaso.jpg"},
+    "casas": [
+      {"src": "img/qatar/tribuna-noche.jpg", "alt": "La tribuna principal de Lusail iluminada de noche y llena de público", "pie": "Tribuna principal de noche · Lusail"},
+      {"src": "img/qatar/arco-lusail.jpg", "alt": "El arco con el nombre del Circuito Internacional de Lusail, de noche", "pie": "El arco de Lusail"},
+      {"src": "img/qatar/wtcc-noche.jpg", "alt": "Autos de turismo en carrera nocturna frente a los boxes de Lusail", "pie": "Carrera nocturna en Lusail · WTCC 2016"}
+    ],
+    "vivo": {"src": "img/qatar/doha-dhow-noche.jpg"},
+    "carrera": {"src": "img/qatar/tribuna-noche.jpg"},
+    "cambios": {"src": "img/qatar/dunas-khor.jpg", "alt": "Dunas de arena en Khor al Udeid, al sur de Qatar", "pie": "Dunas de Khor al Udeid, al sur de Qatar."},
+    "ofrenda": {"src": "img/qatar/duna-ocaso.jpg"}
+  },
+  "textos": {
+    "menu_inicio": "Noche en Lusail",
+    "heroe_ceja": "Circuito Internacional de Lusail · bajo los reflectores",
+    "heroe_titular": "Arena,<br>luz y<br>vuelta rápida",
+    "heroe_edicion": "Pronóstico de qualy y carrera · Edición Lusail.",
+    "parrilla_titulo": "La parrilla<br><em>bajo los reflectores</em>",
+    "interludio_ceja": "El desierto · Qatar",
+    "interludio_titulo": "El desierto<br><em>enfría.</em>",
+    "interludio_txt": "Cuando cae el sol baja la temperatura de la pista y la qualy se corre de noche, con el circuito encendido en medio del desierto.",
+    "casas_apodos": {"*": "Los retadores"},
+    "burbuja_titulo": "Al borde<br><em>de la duna</em>",
+    "ofrenda_ceja": "Historia de Lusail",
+    "ofrenda_titulo": "Las poles<br><em>de Lusail</em>",
+    "ofrenda_txt": "Las {n} qualys de la Fórmula 1 en Lusail desde 2021. Una luz por cada pole; las más altas son las más recientes.",
+    "estrategia_lugar": "en Lusail",
+    "riesgos": [
+      ["Desgaste", "Curvas rápidas encadenadas y pianos agresivos: el desgaste de neumáticos puede forzar más paradas de lo normal."],
+      ["Safety car", "Con poca grava y mucho asfalto en las escapatorias, un auto detenido suele traer auto de seguridad virtual."],
+      ["Humedad", "Aunque se corre de noche, el calor húmedo pesa en los pilotos y en la degradación de la segunda mitad."]
+    ]
+  },
+  "creditos": [
+    "Reflectores de Lusail (MotoGP 2010): daly3d abd · <a href=\"https://creativecommons.org/licenses/by/2.0/\" target=\"_blank\" rel=\"noopener\">CC BY 2.0</a> · <a href=\"https://commons.wikimedia.org/wiki/File:Qatar_MotoGP_2010.jpg\" target=\"_blank\" rel=\"noopener\">archivo</a>",
+    "Tribuna principal y arco de Lusail: Trinidade · <a href=\"https://creativecommons.org/licenses/by-sa/3.0/\" target=\"_blank\" rel=\"noopener\">CC BY-SA 3.0</a> · <a href=\"https://commons.wikimedia.org/wiki/File:Grand_Stand.JPG\" target=\"_blank\" rel=\"noopener\">1</a>, <a href=\"https://commons.wikimedia.org/wiki/File:Title_board_LIS.JPG\" target=\"_blank\" rel=\"noopener\">2</a>",
+    "WTCC 2016 en Lusail: Dmitry Racer · <a href=\"https://creativecommons.org/licenses/by-sa/4.0/\" target=\"_blank\" rel=\"noopener\">CC BY-SA 4.0</a> · <a href=\"https://commons.wikimedia.org/wiki/File:WTCC_2016,_Qatar.jpg\" target=\"_blank\" rel=\"noopener\">archivo</a>",
+    "Atardecer en el desierto: Peter Dowley · <a href=\"https://creativecommons.org/licenses/by/2.0/\" target=\"_blank\" rel=\"noopener\">CC BY 2.0</a> · <a href=\"https://commons.wikimedia.org/wiki/File:Sunset_on_Qatar_(3210537282).jpg\" target=\"_blank\" rel=\"noopener\">archivo</a>",
+    "Dunas de Khor al Udeid: LBM1948 · <a href=\"https://creativecommons.org/licenses/by-sa/4.0/\" target=\"_blank\" rel=\"noopener\">CC BY-SA 4.0</a> · <a href=\"https://commons.wikimedia.org/wiki/File:Khor_al-Udeid_08.jpg\" target=\"_blank\" rel=\"noopener\">archivo</a>",
+    "Doha de noche desde el puerto: Zairon · <a href=\"https://creativecommons.org/licenses/by/4.0/\" target=\"_blank\" rel=\"noopener\">CC BY 4.0</a> · <a href=\"https://commons.wikimedia.org/wiki/File:Doha_Dhow_Harbour_Skyline_View_at_Night_01.jpg\" target=\"_blank\" rel=\"noopener\">archivo</a>",
+    "Fotos recortadas, reducidas y con ajuste de color. Las versiones derivadas de obras CC BY-SA se comparten bajo la misma licencia."
+  ]
+}

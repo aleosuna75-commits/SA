@@ -1,0 +1,93 @@
+{
+ "slug": "brasil2026",
+ "meeting_key": 1299,
+ "pasos": {
+  "descarga": {
+   "hecho": "2026-11-09T01:47:26Z",
+   "nota": "descarga_datos.py gp 2026 1299 interlagos + descarga_carreras.py + race_control (01:40 UTC 9/11)",
+   "archivos": []
+  },
+  "pre_qualy": {
+   "hecho": "2026-11-09T01:56:06Z",
+   "corte": "2026-11-07T14:30:00Z",
+   "modelo": "Random Forest",
+   "top10": [
+    "ANT",
+    "VER",
+    "NOR",
+    "LEC",
+    "RUS",
+    "HAM",
+    "PIA",
+    "HAD",
+    "GAS",
+    "BOR"
+   ],
+   "archivos": [
+    "gp.json"
+   ]
+  },
+  "fp3": {
+   "hecho": "2026-11-09T01:57:41Z",
+   "corte": "2026-11-07T18:00:00Z",
+   "fuente": "OpenF1 (cache)",
+   "modelo": "Random Forest",
+   "top10": [
+    "ANT",
+    "VER",
+    "NOR",
+    "LEC",
+    "RUS",
+    "PIA",
+    "HAM",
+    "HAD",
+    "LAW",
+    "LIN"
+   ],
+   "archivos": [
+    "gp.json"
+   ]
+  },
+  "qualy_en_vivo": {
+   "hecho": "2026-11-09T02:08:55Z",
+   "nota": "retro: snapshot final armado con la clasificación oficial de OpenF1",
+   "archivos": [
+    "live_qualy.json"
+   ]
+  },
+  "post_qualy": {
+   "hecho": "2026-11-09T02:07:39Z",
+   "firma": "d7e0880b9af8",
+   "fuente_qualy": "OpenF1 session_result (oficial)",
+   "fuente_parrilla": "Parrilla oficial (OpenF1 starting_grid) (cambios respecto a la qualy: RUS 2.º → 7.º, LEC 4.º → 14.º, HAM 11.º → 20.º, LIN 14.º → 18.º, VER 16.º → 21.º)",
+   "oficial": true,
+   "corte": "2026-11-08T17:00:00Z",
+   "top10_carrera": [
+    "NOR",
+    "ANT",
+    "HAD",
+    "LAW",
+    "RUS",
+    "HUL",
+    "LEC",
+    "VER",
+    "HAM",
+    "BEA"
+   ],
+   "archivos": [
+    "post_qualy.json",
+    "carrera.json",
+    "vueltas.json"
+   ]
+  },
+  "post_carrera": {
+   "hecho": "2026-11-09T02:07:40Z",
+   "firma": "02e1011a2a29",
+   "aciertos_top10": 9,
+   "ganador_real": "NOR",
+   "archivos": [
+    "post_carrera.json"
+   ]
+  }
+ }
+}

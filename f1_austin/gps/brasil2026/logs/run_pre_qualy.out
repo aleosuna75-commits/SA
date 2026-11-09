@@ -1,0 +1,18 @@
+[2026-11-09T01:47:54Z] brasil2026: pre_qualy (retro)
+  [  492 s] modelo_qualy_austin.py 1299 ... -> pre_qualy.log (rc=0)
+{
+ "slug": "brasil2026",
+ "paso": "pre_qualy",
+ "ok": true,
+ "segundos": 492,
+ "archivos_cambiados": [
+  "gps/brasil2026/gp.json"
+ ],
+ "docs": [
+  {
+   "coleccion": "gp",
+   "doc_id": "brasil2026",
+   "archivo": "gps/brasil2026/gp.json"
+  }
+ ]
+}

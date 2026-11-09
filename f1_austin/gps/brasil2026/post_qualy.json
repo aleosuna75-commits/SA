@@ -1,0 +1,239 @@
+{
+ "actualizado": "2026-11-09T02:05:38Z",
+ "aciertos_top10": 6,
+ "top10_pred": [
+  "ANT",
+  "VER",
+  "NOR",
+  "LEC",
+  "RUS",
+  "PIA",
+  "HAM",
+  "HAD",
+  "LAW",
+  "LIN"
+ ],
+ "top10_real": [
+  "NOR",
+  "RUS",
+  "ANT",
+  "LEC",
+  "LAW",
+  "HUL",
+  "HAD",
+  "BEA",
+  "ALO",
+  "ALB"
+ ],
+ "pole_pred": "ANT",
+ "pole_real": "NOR",
+ "acierto_pole": false,
+ "q1_fuera_aciertos": 3,
+ "q1_fuera_total": 6,
+ "q2_fuera_aciertos": 1,
+ "q2_fuera_total": 6,
+ "mae": 4.55,
+ "spearman": 0.592,
+ "exactos": 2,
+ "filas": [
+  {
+   "acr": "NOR",
+   "nombre": "Lando Norris",
+   "equipo": "McLaren",
+   "color": "F47600",
+   "pred": 3,
+   "real": 1,
+   "dif": 2
+  },
+  {
+   "acr": "RUS",
+   "nombre": "George Russell",
+   "equipo": "Mercedes",
+   "color": "00D7B6",
+   "pred": 5,
+   "real": 2,
+   "dif": 3
+  },
+  {
+   "acr": "ANT",
+   "nombre": "Kimi Antonelli",
+   "equipo": "Mercedes",
+   "color": "00D7B6",
+   "pred": 1,
+   "real": 3,
+   "dif": -2
+  },
+  {
+   "acr": "LEC",
+   "nombre": "Charles Leclerc",
+   "equipo": "Ferrari",
+   "color": "ED1131",
+   "pred": 4,
+   "real": 4,
+   "dif": 0
+  },
+  {
+   "acr": "LAW",
+   "nombre": "Liam Lawson",
+   "equipo": "Racing Bulls",
+   "color": "6C98FF",
+   "pred": 9,
+   "real": 5,
+   "dif": 4
+  },
+  {
+   "acr": "HUL",
+   "nombre": "Nico Hulkenberg",
+   "equipo": "Audi",
+   "color": "F50537",
+   "pred": 13,
+   "real": 6,
+   "dif": 7
+  },
+  {
+   "acr": "HAD",
+   "nombre": "Isack Hadjar",
+   "equipo": "Red Bull Racing",
+   "color": "4781D7",
+   "pred": 8,
+   "real": 7,
+   "dif": 1
+  },
+  {
+   "acr": "BEA",
+   "nombre": "Oliver Bearman",
+   "equipo": "Haas F1 Team",
+   "color": "9C9FA2",
+   "pred": 15,
+   "real": 8,
+   "dif": 7
+  },
+  {
+   "acr": "ALO",
+   "nombre": "Fernando Alonso",
+   "equipo": "Aston Martin",
+   "color": "229971",
+   "pred": 17,
+   "real": 9,
+   "dif": 8
+  },
+  {
+   "acr": "ALB",
+   "nombre": "Alexander Albon",
+   "equipo": "Williams",
+   "color": "1868DB",
+   "pred": 19,
+   "real": 10,
+   "dif": 9
+  },
+  {
+   "acr": "HAM",
+   "nombre": "Lewis Hamilton",
+   "equipo": "Ferrari",
+   "color": "ED1131",
+   "pred": 7,
+   "real": 11,
+   "dif": -4
+  },
+  {
+   "acr": "PIA",
+   "nombre": "Oscar Piastri",
+   "equipo": "McLaren",
+   "color": "F47600",
+   "pred": 6,
+   "real": 12,
+   "dif": -6
+  },
+  {
+   "acr": "CAM",
+   "nombre": "Rafael Camara",
+   "equipo": "Haas F1 Team",
+   "color": "9C9FA2",
+   "pred": 16,
+   "real": 13,
+   "dif": 3
+  },
+  {
+   "acr": "LIN",
+   "nombre": "Arvid Lindblad",
+   "equipo": "Racing Bulls",
+   "color": "6C98FF",
+   "pred": 10,
+   "real": 14,
+   "dif": -4
+  },
+  {
+   "acr": "SAI",
+   "nombre": "Carlos Sainz",
+   "equipo": "Williams",
+   "color": "1868DB",
+   "pred": 18,
+   "real": 15,
+   "dif": 3
+  },
+  {
+   "acr": "VER",
+   "nombre": "Max Verstappen",
+   "equipo": "Red Bull Racing",
+   "color": "4781D7",
+   "pred": 2,
+   "real": 16,
+   "dif": -14
+  },
+  {
+   "acr": "COL",
+   "nombre": "Franco Colapinto",
+   "equipo": "Alpine",
+   "color": "00A1E8",
+   "pred": 14,
+   "real": 17,
+   "dif": -3
+  },
+  {
+   "acr": "GAS",
+   "nombre": "Pierre Gasly",
+   "equipo": "Alpine",
+   "color": "00A1E8",
+   "pred": 11,
+   "real": 18,
+   "dif": -7
+  },
+  {
+   "acr": "STR",
+   "nombre": "Lance Stroll",
+   "equipo": "Aston Martin",
+   "color": "229971",
+   "pred": 20,
+   "real": 19,
+   "dif": 1
+  },
+  {
+   "acr": "BOT",
+   "nombre": "Valtteri Bottas",
+   "equipo": "Cadillac",
+   "color": "909090",
+   "pred": 22,
+   "real": 20,
+   "dif": 2
+  },
+  {
+   "acr": "PER",
+   "nombre": "Sergio Perez",
+   "equipo": "Cadillac",
+   "color": "909090",
+   "pred": 21,
+   "real": 21,
+   "dif": 0
+  },
+  {
+   "acr": "BOR",
+   "nombre": "Gabriel Bortoleto",
+   "equipo": "Audi",
+   "color": "F50537",
+   "pred": 12,
+   "real": 22,
+   "dif": -10
+  }
+ ],
+ "resumen": "El modelo (FP3) acertó 6 de los 10 que llegaron a la Q3. La pole fue para Lando Norris, a quien el modelo veía P3 con 13% de probabilidad. La mayor sorpresa: Max Verstappen (pronóstico P2, real P16). Error medio de 4.55 lugares y correlación de 0.592."
+}

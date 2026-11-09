@@ -549,7 +549,12 @@ def main(argv=None):
     ap.add_argument("crudos", nargs="+", help="grabaciones jsonl en orden cronológico")
     ap.add_argument("--salida", required=True)
     ap.add_argument("--validar", action="store_true")
+    ap.add_argument("--sk", type=int, default=None, help="session_key de la sesión grabada (default 11399, FP3 México)")
+    ap.add_argument("--mk", type=int, default=None, help="meeting_key (default 1298, México)")
     args = ap.parse_args(argv)
+    global SK, MK
+    SK = args.sk or SK
+    MK = args.mk or MK
     salida = Path(args.salida)
     salida.mkdir(parents=True, exist_ok=True)
 

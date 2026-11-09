@@ -1,0 +1,36 @@
+{
+ "sustituciones": {
+  "OCO": "HIR"
+ },
+ "parrilla": {
+  "HAM": 1,
+  "RUS": 2,
+  "LEC": 3,
+  "ANT": 4,
+  "VER": 5,
+  "HAD": 7,
+  "NOR": 6,
+  "LIN": 8,
+  "PIA": 12,
+  "GAS": 9,
+  "HUL": 10,
+  "LAW": 22,
+  "COL": 11,
+  "BOR": 13,
+  "BEA": 14,
+  "HIR": 18,
+  "SAI": 15,
+  "ALO": 17,
+  "ALB": 16,
+  "STR": 19,
+  "PER": 20,
+  "BOT": 21
+ },
+ "penalizaciones": {},
+ "notas": [],
+ "fuentes": [
+  "Hirakawa (#50) reemplaza a Ocon en Haas desde la FP3: Haas vía The Race / Sky / RaceFans (31/10/2026)",
+  "Parrilla: clasificación oficial + Lawson descalificado de la qualy (MGU-K) -> P22; Verstappen -1 lugar (choque en FP2); Bottas al fondo (componentes de motor). Crash.net / FIA (1/11/2026). Ver ESTADO_MEXICO.md"
+ ],
+ "nota_parrilla": "parrilla = la usada en el pronóstico publicado (carrera.json, salida por piloto)"
+}

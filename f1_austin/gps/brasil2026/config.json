@@ -1,0 +1,75 @@
+{
+ "meeting_key": 1299,
+ "year": 2026,
+ "slug": "brasil2026",
+ "slug_modelo": "brasil",
+ "nombre": "Gran Premio de São Paulo",
+ "nombre_en": "São Paulo Grand Prix",
+ "circuito": "Autódromo José Carlos Pace (Interlagos)",
+ "circuito_corto": "Interlagos",
+ "ciudad": "São Paulo, Brasil",
+ "pais": "Brazil",
+ "circuit_key": 14,
+ "circuito_jolpica": "interlagos",
+ "gmt_offset": "-03:00:00",
+ "utc_texto": "UTC−3",
+ "fecha_texto": "Sábado 7 de noviembre de 2026",
+ "hora_texto": "3:00 PM (hora local, UTC−3)",
+ "fecha_texto_carrera": "Domingo 8 de noviembre de 2026",
+ "hora_texto_carrera": "2:00 PM (hora local, UTC−3)",
+ "tema": "brasil",
+ "sprint": false,
+ "sesiones": [
+  {
+   "clave": "fp1",
+   "nombre": "Práctica 1",
+   "nombre_en": "Practice 1",
+   "session_key": 11405,
+   "inicio_utc": "2026-11-06T15:30:00Z",
+   "fin_utc": "2026-11-06T16:30:00Z",
+   "fecha_local": "Viernes 6 de noviembre",
+   "hora_local": "12:30 PM"
+  },
+  {
+   "clave": "fp2",
+   "nombre": "Práctica 2",
+   "nombre_en": "Practice 2",
+   "session_key": 11406,
+   "inicio_utc": "2026-11-06T19:00:00Z",
+   "fin_utc": "2026-11-06T20:00:00Z",
+   "fecha_local": "Viernes 6 de noviembre",
+   "hora_local": "4:00 PM"
+  },
+  {
+   "clave": "fp3",
+   "nombre": "Práctica 3",
+   "nombre_en": "Practice 3",
+   "session_key": 11407,
+   "inicio_utc": "2026-11-07T14:30:00Z",
+   "fin_utc": "2026-11-07T15:30:00Z",
+   "fecha_local": "Sábado 7 de noviembre",
+   "hora_local": "11:30 AM"
+  },
+  {
+   "clave": "q",
+   "nombre": "Clasificación",
+   "nombre_en": "Qualifying",
+   "session_key": 11408,
+   "inicio_utc": "2026-11-07T18:00:00Z",
+   "fin_utc": "2026-11-07T19:00:00Z",
+   "fecha_local": "Sábado 7 de noviembre",
+   "hora_local": "3:00 PM"
+  },
+  {
+   "clave": "r",
+   "nombre": "Carrera",
+   "nombre_en": "Race",
+   "session_key": 11412,
+   "inicio_utc": "2026-11-08T17:00:00Z",
+   "fin_utc": "2026-11-08T19:00:00Z",
+   "fecha_local": "Domingo 8 de noviembre",
+   "hora_local": "2:00 PM"
+  }
+ ],
+ "generado": "2026-11-09T01:47:17Z"
+}

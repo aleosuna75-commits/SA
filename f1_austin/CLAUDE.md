@@ -11,6 +11,16 @@ Modelos de predicción por GP con datos de OpenF1 (2023+) y Jolpica (2018+), y r
 4. Sitio: añadir el GP a `PAGINAS` en `publicar_sitio.py` (el primero es la portada) y correr `python3 publicar_sitio.py`.
    Publicación y dominio propio: `PUBLICAR_NETLIFY.md`.
 
+## Flujo automático multi-GP (desde Brasil 2026): `gp_pipeline.py`
+- `python3 gp_pipeline.py auto` decide por hora UTC y `gps/<slug>/estado.json` qué paso toca (pre_qualy tras FP2, fp3 tras FP3,
+  qualy_en_vivo = comando del colector, post_qualy, post_carrera), lo corre y escribe `gps/ultimo_auto.json` con los docs a publicar.
+- `python3 gp_pipeline.py retro <meeting>` reproduce un GP ya corrido; `paso <paso> <meeting> [--forzar]` corre uno suelto.
+- Config automática desde OpenF1/Jolpica en `gps/<slug>/config.json` (los GPs nuevos se agregan solos a `GPS`; 1297/1298 fijos).
+  Sustituciones, parrilla o penalizaciones y fuentes: `gps/<slug>/ajustes.json` (a mano; post_qualy se repite si cambia).
+- Sin fugas: los modelos reciben `F1_CORTE` (inicio de la sesión siguiente) y ocultan resultados/pilotos/vueltas posteriores.
+- Archivos → docs del Artifact: gp.json→gp/<slug>, live_qualy.json→live/<slug>, post_qualy.json→postqualy/<slug>,
+  carrera.json→carrera/<slug>, vueltas.json→vueltas/<slug>, post_carrera.json→postcarrera/<slug>, gps/meta.json→meta/actual.
+
 ## Reglas aprendidas (no romper)
 - El historial se corta por el INICIO del fin de semana (FP1), nunca por fecha de carrera entre fuentes (fuga en Las Vegas 2024).
 - Variables por equipo que usan resultados (p. ej. `h_fp_to_q_team`) se calculan por GP, no por fila.

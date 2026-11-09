@@ -1,0 +1,367 @@
+{
+ "actualizado": "2026-11-09T02:08:55Z",
+ "actual": "brasil2026",
+ "gps": [
+  {
+   "slug": "mexico2026",
+   "nombre": "Gran Premio de la Ciudad de México",
+   "circuito": "Autódromo Hermanos Rodríguez",
+   "ciudad": "Ciudad de México",
+   "fecha_texto": "Domingo 1 de noviembre de 2026",
+   "estado": "terminado",
+   "fases": [
+    {
+     "clave": "fp1",
+     "nombre": "Práctica 1",
+     "session_key": 11397,
+     "inicio_utc": "2026-10-30T18:30:00Z",
+     "fin_utc": "2026-10-30T19:30:00Z",
+     "fecha_local": "Viernes 30 de octubre",
+     "hora_local": "12:30 PM",
+     "estado": "terminado"
+    },
+    {
+     "clave": "fp2",
+     "nombre": "Práctica 2",
+     "session_key": 11398,
+     "inicio_utc": "2026-10-30T22:00:00Z",
+     "fin_utc": "2026-10-30T23:00:00Z",
+     "fecha_local": "Viernes 30 de octubre",
+     "hora_local": "4:00 PM",
+     "estado": "terminado"
+    },
+    {
+     "clave": "fp3",
+     "nombre": "Práctica 3",
+     "session_key": 11399,
+     "inicio_utc": "2026-10-31T17:30:00Z",
+     "fin_utc": "2026-10-31T18:30:00Z",
+     "fecha_local": "Sábado 31 de octubre",
+     "hora_local": "11:30 AM",
+     "estado": "terminado"
+    },
+    {
+     "clave": "q",
+     "nombre": "Clasificación",
+     "session_key": 11400,
+     "inicio_utc": "2026-10-31T21:00:00Z",
+     "fin_utc": "2026-10-31T22:00:00Z",
+     "fecha_local": "Sábado 31 de octubre",
+     "hora_local": "3:00 PM",
+     "estado": "terminado"
+    },
+    {
+     "clave": "r",
+     "nombre": "Carrera",
+     "session_key": 11404,
+     "inicio_utc": "2026-11-01T20:00:00Z",
+     "fin_utc": "2026-11-01T22:00:00Z",
+     "fecha_local": "Domingo 1 de noviembre",
+     "hora_local": "2:00 PM",
+     "estado": "terminado"
+    }
+   ],
+   "meeting_key": 1298,
+   "tema": "muertos",
+   "pais": "Mexico",
+   "qualy_texto": "Sábado 31 de octubre de 2026, 3:00 PM (hora local, UTC−6)",
+   "carrera_texto": "Domingo 1 de noviembre de 2026, 2:00 PM (hora local, UTC−6)",
+   "pasos": {
+    "pre_qualy": "2026-10-31T16:21:46Z",
+    "fp3": "2026-10-31T19:04:16Z",
+    "qualy_en_vivo": "2026-10-31T22:09:31Z",
+    "post_qualy": "2026-11-01T02:58:54Z",
+    "post_carrera": "2026-11-09T01:49:22Z"
+   },
+   "docs": {
+    "gp": "gp/mexico2026",
+    "live": "live/mexico2026",
+    "postqualy": "postqualy/mexico2026",
+    "carrera": "carrera/mexico2026",
+    "vueltas": "vueltas/mexico2026",
+    "postcarrera": "postcarrera/mexico2026"
+   }
+  },
+  {
+   "slug": "brasil2026",
+   "nombre": "Gran Premio de São Paulo",
+   "circuito": "Autódromo José Carlos Pace (Interlagos)",
+   "ciudad": "São Paulo, Brasil",
+   "fecha_texto": "Domingo 8 de noviembre de 2026",
+   "estado": "terminado",
+   "fases": [
+    {
+     "clave": "fp1",
+     "nombre": "Práctica 1",
+     "session_key": 11405,
+     "inicio_utc": "2026-11-06T15:30:00Z",
+     "fin_utc": "2026-11-06T16:30:00Z",
+     "fecha_local": "Viernes 6 de noviembre",
+     "hora_local": "12:30 PM",
+     "estado": "terminado"
+    },
+    {
+     "clave": "fp2",
+     "nombre": "Práctica 2",
+     "session_key": 11406,
+     "inicio_utc": "2026-11-06T19:00:00Z",
+     "fin_utc": "2026-11-06T20:00:00Z",
+     "fecha_local": "Viernes 6 de noviembre",
+     "hora_local": "4:00 PM",
+     "estado": "terminado"
+    },
+    {
+     "clave": "fp3",
+     "nombre": "Práctica 3",
+     "session_key": 11407,
+     "inicio_utc": "2026-11-07T14:30:00Z",
+     "fin_utc": "2026-11-07T15:30:00Z",
+     "fecha_local": "Sábado 7 de noviembre",
+     "hora_local": "11:30 AM",
+     "estado": "terminado"
+    },
+    {
+     "clave": "q",
+     "nombre": "Clasificación",
+     "session_key": 11408,
+     "inicio_utc": "2026-11-07T18:00:00Z",
+     "fin_utc": "2026-11-07T19:00:00Z",
+     "fecha_local": "Sábado 7 de noviembre",
+     "hora_local": "3:00 PM",
+     "estado": "terminado"
+    },
+    {
+     "clave": "r",
+     "nombre": "Carrera",
+     "session_key": 11412,
+     "inicio_utc": "2026-11-08T17:00:00Z",
+     "fin_utc": "2026-11-08T19:00:00Z",
+     "fecha_local": "Domingo 8 de noviembre",
+     "hora_local": "2:00 PM",
+     "estado": "terminado"
+    }
+   ],
+   "meeting_key": 1299,
+   "tema": "brasil",
+   "pais": "Brazil",
+   "qualy_texto": "Sábado 7 de noviembre de 2026, 3:00 PM (hora local, UTC−3)",
+   "carrera_texto": "Domingo 8 de noviembre de 2026, 2:00 PM (hora local, UTC−3)",
+   "pasos": {
+    "pre_qualy": "2026-11-09T01:56:06Z",
+    "fp3": "2026-11-09T01:57:41Z",
+    "qualy_en_vivo": "2026-11-09T02:08:55Z",
+    "post_qualy": "2026-11-09T02:07:39Z",
+    "post_carrera": "2026-11-09T02:07:40Z"
+   },
+   "docs": {
+    "gp": "gp/brasil2026",
+    "live": "live/brasil2026",
+    "postqualy": "postqualy/brasil2026",
+    "carrera": "carrera/brasil2026",
+    "vueltas": "vueltas/brasil2026",
+    "postcarrera": "postcarrera/brasil2026"
+   }
+  },
+  {
+   "slug": "lasvegas2026",
+   "nombre": "Gran Premio de Las Vegas",
+   "circuito": "Circuito urbano de Las Vegas (Las Vegas Strip)",
+   "ciudad": "Las Vegas, Nevada",
+   "fecha_texto": "Sábado 21 de noviembre de 2026",
+   "estado": "proximo",
+   "fases": [
+    {
+     "clave": "fp1",
+     "nombre": "Práctica 1",
+     "session_key": 11413,
+     "inicio_utc": "2026-11-20T00:30:00Z",
+     "fin_utc": "2026-11-20T01:30:00Z",
+     "fecha_local": "Jueves 19 de noviembre",
+     "hora_local": "4:30 PM",
+     "estado": "proximo"
+    },
+    {
+     "clave": "fp2",
+     "nombre": "Práctica 2",
+     "session_key": 11414,
+     "inicio_utc": "2026-11-20T04:00:00Z",
+     "fin_utc": "2026-11-20T05:00:00Z",
+     "fecha_local": "Jueves 19 de noviembre",
+     "hora_local": "8:00 PM",
+     "estado": "proximo"
+    },
+    {
+     "clave": "fp3",
+     "nombre": "Práctica 3",
+     "session_key": 11415,
+     "inicio_utc": "2026-11-21T00:30:00Z",
+     "fin_utc": "2026-11-21T01:30:00Z",
+     "fecha_local": "Viernes 20 de noviembre",
+     "hora_local": "4:30 PM",
+     "estado": "proximo"
+    },
+    {
+     "clave": "q",
+     "nombre": "Clasificación",
+     "session_key": 11416,
+     "inicio_utc": "2026-11-21T04:00:00Z",
+     "fin_utc": "2026-11-21T05:00:00Z",
+     "fecha_local": "Viernes 20 de noviembre",
+     "hora_local": "8:00 PM",
+     "estado": "proximo"
+    },
+    {
+     "clave": "r",
+     "nombre": "Carrera",
+     "session_key": 11420,
+     "inicio_utc": "2026-11-22T04:00:00Z",
+     "fin_utc": "2026-11-22T06:00:00Z",
+     "fecha_local": "Sábado 21 de noviembre",
+     "hora_local": "8:00 PM",
+     "estado": "proximo"
+    }
+   ],
+   "meeting_key": 1300,
+   "tema": "lasvegas",
+   "pais": "United States",
+   "qualy_texto": "Viernes 20 de noviembre de 2026, 8:00 PM (hora local, UTC−8)",
+   "carrera_texto": "Sábado 21 de noviembre de 2026, 8:00 PM (hora local, UTC−8)",
+   "pasos": {},
+   "docs": {}
+  },
+  {
+   "slug": "qatar2026",
+   "nombre": "Gran Premio de Qatar",
+   "circuito": "Circuito Internacional de Lusail",
+   "ciudad": "Lusail, Qatar",
+   "fecha_texto": "Domingo 29 de noviembre de 2026",
+   "estado": "proximo",
+   "fases": [
+    {
+     "clave": "fp1",
+     "nombre": "Práctica 1",
+     "session_key": 11421,
+     "inicio_utc": "2026-11-27T13:30:00Z",
+     "fin_utc": "2026-11-27T14:30:00Z",
+     "fecha_local": "Viernes 27 de noviembre",
+     "hora_local": "4:30 PM",
+     "estado": "proximo"
+    },
+    {
+     "clave": "fp2",
+     "nombre": "Práctica 2",
+     "session_key": 11422,
+     "inicio_utc": "2026-11-27T17:00:00Z",
+     "fin_utc": "2026-11-27T18:00:00Z",
+     "fecha_local": "Viernes 27 de noviembre",
+     "hora_local": "8:00 PM",
+     "estado": "proximo"
+    },
+    {
+     "clave": "fp3",
+     "nombre": "Práctica 3",
+     "session_key": 11423,
+     "inicio_utc": "2026-11-28T14:30:00Z",
+     "fin_utc": "2026-11-28T15:30:00Z",
+     "fecha_local": "Sábado 28 de noviembre",
+     "hora_local": "5:30 PM",
+     "estado": "proximo"
+    },
+    {
+     "clave": "q",
+     "nombre": "Clasificación",
+     "session_key": 11424,
+     "inicio_utc": "2026-11-28T18:00:00Z",
+     "fin_utc": "2026-11-28T19:00:00Z",
+     "fecha_local": "Sábado 28 de noviembre",
+     "hora_local": "9:00 PM",
+     "estado": "proximo"
+    },
+    {
+     "clave": "r",
+     "nombre": "Carrera",
+     "session_key": 11428,
+     "inicio_utc": "2026-11-29T16:00:00Z",
+     "fin_utc": "2026-11-29T18:00:00Z",
+     "fecha_local": "Domingo 29 de noviembre",
+     "hora_local": "7:00 PM",
+     "estado": "proximo"
+    }
+   ],
+   "meeting_key": 1301,
+   "tema": "qatar",
+   "pais": "Qatar",
+   "qualy_texto": "Sábado 28 de noviembre de 2026, 9:00 PM (hora local, UTC+3)",
+   "carrera_texto": "Domingo 29 de noviembre de 2026, 7:00 PM (hora local, UTC+3)",
+   "pasos": {},
+   "docs": {}
+  },
+  {
+   "slug": "abudhabi2026",
+   "nombre": "Gran Premio de Abu Dhabi",
+   "circuito": "Circuito de Yas Marina",
+   "ciudad": "Abu Dhabi, Emiratos Árabes Unidos",
+   "fecha_texto": "Domingo 6 de diciembre de 2026",
+   "estado": "proximo",
+   "fases": [
+    {
+     "clave": "fp1",
+     "nombre": "Práctica 1",
+     "session_key": 11429,
+     "inicio_utc": "2026-12-04T09:30:00Z",
+     "fin_utc": "2026-12-04T10:30:00Z",
+     "fecha_local": "Viernes 4 de diciembre",
+     "hora_local": "1:30 PM",
+     "estado": "proximo"
+    },
+    {
+     "clave": "fp2",
+     "nombre": "Práctica 2",
+     "session_key": 11430,
+     "inicio_utc": "2026-12-04T13:00:00Z",
+     "fin_utc": "2026-12-04T14:00:00Z",
+     "fecha_local": "Viernes 4 de diciembre",
+     "hora_local": "5:00 PM",
+     "estado": "proximo"
+    },
+    {
+     "clave": "fp3",
+     "nombre": "Práctica 3",
+     "session_key": 11431,
+     "inicio_utc": "2026-12-05T10:30:00Z",
+     "fin_utc": "2026-12-05T11:30:00Z",
+     "fecha_local": "Sábado 5 de diciembre",
+     "hora_local": "2:30 PM",
+     "estado": "proximo"
+    },
+    {
+     "clave": "q",
+     "nombre": "Clasificación",
+     "session_key": 11432,
+     "inicio_utc": "2026-12-05T14:00:00Z",
+     "fin_utc": "2026-12-05T15:00:00Z",
+     "fecha_local": "Sábado 5 de diciembre",
+     "hora_local": "6:00 PM",
+     "estado": "proximo"
+    },
+    {
+     "clave": "r",
+     "nombre": "Carrera",
+     "session_key": 11436,
+     "inicio_utc": "2026-12-06T13:00:00Z",
+     "fin_utc": "2026-12-06T15:00:00Z",
+     "fecha_local": "Domingo 6 de diciembre",
+     "hora_local": "5:00 PM",
+     "estado": "proximo"
+    }
+   ],
+   "meeting_key": 1302,
+   "tema": "abudhabi",
+   "pais": "United Arab Emirates",
+   "qualy_texto": "Sábado 5 de diciembre de 2026, 6:00 PM (hora local, UTC+4)",
+   "carrera_texto": "Domingo 6 de diciembre de 2026, 5:00 PM (hora local, UTC+4)",
+   "pasos": {},
+   "docs": {}
+  }
+ ]
+}

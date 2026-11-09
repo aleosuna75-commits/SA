@@ -1,3 +1,5 @@
 cache/
 *.log
 *.pkl
+# datasets por GP de gp_pipeline.py (se regeneran)
+dataset_qualy_[a-eg-z]*.csv

@@ -81,8 +81,10 @@ def carreras_jolpica():
                     "code": x["Driver"].get("code"), "team": Q.EQUIPO_CANON.get(x["Constructor"]["name"], x["Constructor"]["name"]),
                     "pos": int(x["position"]), "grid": int(x["grid"]), "status": x["status"],
                     "points": float(x["points"]), "laps": int(x["laps"]),
+                    "dt": r["date"] + "T" + (r.get("time") or "23:59:59Z"),
                 })
-    df = pd.DataFrame(filas).drop_duplicates(["season", "round", "code"])
+    # F1_CORTE (modo retro de gp_pipeline.py): sólo carreras que empezaron antes del corte
+    df = Q.jolpica_antes_del_corte(pd.DataFrame(filas)).drop_duplicates(["season", "round", "code"])
     n = df.groupby(["season", "round"]).code.transform("count")
     df["grid"] = np.where(df.grid == 0, n, df.grid)       # salida desde pit lane -> fondo
     df["terminado"] = df.status.str.contains(r"Finished|Lap", regex=True)
@@ -682,7 +684,8 @@ def main(meeting=OBJETIVO_MEETING, penalizaciones=None, qualy_archivo=None, parr
     else:
         data.to_csv(salida_dir / "dataset_carrera.csv", index=False)
     obj = data[data.meeting_key == meeting].copy().reset_index(drop=True)
-    historia = data[(data.meeting_key != meeting) & data.race_pos.notna()]
+    # sólo GPs anteriores al objetivo (al reproducir un GP pasado no se entrena con carreras posteriores)
+    historia = data[(data.meeting_key != meeting) & data.race_pos.notna() & (data.date < obj.date.min())]
     print(f"Filas: {len(historia)} | GPs: {historia.meeting_key.nunique()} | ({time.time() - t0:.0f} s)")
     print("Parrilla objetivo:", dict(zip(obj.name_acronym, obj.grid.astype(int))))
 

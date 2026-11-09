@@ -1,0 +1,39 @@
+{
+  "nombre": "Genérico",
+  "logo": ["POLE", "F1"],
+  "colores": {
+    "noche": "#0a0a0b", "hondo": "#070708", "noche-2": "#0f0f11", "carbon": "#151517", "carbon-2": "#1e1e21",
+    "hueso": "#eeeeec", "hueso-2": "#d0d0cc", "ceniza": "#a2a29c", "humo": "#6c6c68",
+    "cempa": "#e8402a", "cempa-2": "#f26a52", "cempa-osc": "#8d2416", "vela": "#ffd27a", "azul": "#8fb3d9",
+    "rosa": "#ef5a7e", "jade": "#74d6a8", "tinta": "#170504", "frio": "#3a4a5e"
+  },
+  "fuentes": {
+    "url": "https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Instrument+Sans:wght@400;500;600&family=Barlow+Condensed:wght@400;500;600;700&display=swap",
+    "display": "\"Instrument Serif\",\"Times New Roman\",serif",
+    "body": "\"Instrument Sans\",\"Avenir Next\",\"Segoe UI\",system-ui,sans-serif",
+    "dato": "\"Barlow Condensed\",\"Arial Narrow\",\"Roboto Condensed\",system-ui,sans-serif",
+    "t_peso": 400, "t_esp": ".04em", "t_em": "italic"
+  },
+  "lienzo": {"modo": "estelas", "colores": ["#ffffff", "#ffd27a"], "estelas": true},
+  "imagenes": {
+    "heroe": {"src": "img/generico/alpine-vegas.jpg", "alt": "Un monoplaza de Fórmula 1 a toda velocidad, con el fondo barrido", "pos": "50% 50%", "espejo": false},
+    "menu": {"src": "img/generico/salida-2015.jpg"},
+    "interludio": {"src": "img/generico/salida-2015.jpg"},
+    "casas": [
+      {"src": "img/generico/ferrari-mexico.jpg", "alt": "Un Ferrari rojo pasa junto a la pianola", "pie": "Ferrari en pista · 2016"},
+      {"src": "img/generico/red-bull-mexico.jpg", "alt": "Un Red Bull en la recta", "pie": "Red Bull en pista · 2017"},
+      {"src": "img/generico/salida-2015.jpg", "alt": "La primera curva después de una salida", "pie": "La salida · 2015"}
+    ],
+    "vivo": {"src": "img/generico/salida-2015.jpg"},
+    "carrera": {"src": "img/generico/ferrari-mexico.jpg"},
+    "cambios": {"src": "img/generico/red-bull-mexico.jpg", "alt": "Un Red Bull en la recta", "pie": "Lo que cambió tras la última práctica."},
+    "ofrenda": {"src": "img/generico/salida-2015.jpg"}
+  },
+  "textos": {},
+  "creditos": [
+    "Ferrari (2016) y Red Bull (2017): Gobierno CDMX · CC0, dominio público · <a href=\"https://commons.wikimedia.org/wiki/File:Formula_1_2016_-i---i-_(30063717774).jpg\" target=\"_blank\" rel=\"noopener\">1</a>, <a href=\"https://commons.wikimedia.org/wiki/File:F1_2017_-i---i-_(26299298269).jpg\" target=\"_blank\" rel=\"noopener\">2</a>",
+    "La salida (2015): Berik · <a href=\"https://creativecommons.org/licenses/by-sa/2.0/\" target=\"_blank\" rel=\"noopener\">CC BY-SA 2.0</a> · <a href=\"https://commons.wikimedia.org/wiki/File:2015_Abu_Dhabi_Grand_Prix_-_Race_start_(22882439484).jpg\" target=\"_blank\" rel=\"noopener\">archivo</a>",
+    "Monoplaza a toda velocidad: Departamento de Seguridad Nacional de EE. UU. (DHS) · dominio público (obra del gobierno de EE. UU.) · <a href=\"https://commons.wikimedia.org/wiki/File:Las_Vegas_Grand_Prix_(54942281143).jpg\" target=\"_blank\" rel=\"noopener\">archivo</a>",
+    "Fotos recortadas, reducidas y con ajuste de color. Las versiones derivadas de obras CC BY-SA se comparten bajo la misma licencia."
+  ]
+}

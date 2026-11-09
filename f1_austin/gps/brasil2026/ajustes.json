@@ -1,0 +1,12 @@
+{
+ "sustituciones": {},
+ "penalizaciones": {},
+ "parrilla": {},
+ "notas": [],
+ "fuentes": [
+  "Parrilla: OpenF1 starting_grid (session_key 11408) = parrilla de Jolpica de la carrera (22/22 iguales); se usa tal cual (consultado 9/11/2026 ~01:45 UTC).",
+  "Diferencias qualy -> parrilla: RUS P2 -> 7 (5 lugares por 6.º motor de combustión; confirmado por los comisarios: https://www.planetf1.com/news/fia-george-russell-brazilian-grand-prix-2026-penalty , 6/11/2026); LEC P4 -> 14, LIN P14 -> 18, HAM P11 -> 20, VER P16 -> 21 (motivos no verificados en prensa en esta corrida; la parrilla oficial ya los incluye).",
+  "Pilotos: Rafael Câmara (CAM, #51) corre con Haas; OpenF1 lo lista en FP1, FP2, FP3, Q y carrera, así que no hace falta sustitución. FP1 con 6 novatos (HER, BEG, BRO, MIN, FOR, SLA): titulares desde la FP2/FP3/Q (regla del modelo).",
+  "Carrera con lluvia: intermedios al inicio (≈ v1-16) y al final (≈ v62-71) según OpenF1 stints; el simulador asume seco."
+ ]
+}

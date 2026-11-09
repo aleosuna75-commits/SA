@@ -1,0 +1,18 @@
+[2026-11-09T01:47:56Z] brasil2026: fp3 (retro)
+  [  584 s] modelo_qualy_austin.py 1299 ... -> fp3.log (rc=0)
+{
+ "slug": "brasil2026",
+ "paso": "fp3",
+ "ok": true,
+ "segundos": 585,
+ "archivos_cambiados": [
+  "gps/brasil2026/gp.json"
+ ],
+ "docs": [
+  {
+   "coleccion": "gp",
+   "doc_id": "brasil2026",
+   "archivo": "gps/brasil2026/gp.json"
+  }
+ ]
+}

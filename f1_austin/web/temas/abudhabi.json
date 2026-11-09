@@ -1,0 +1,61 @@
+{
+  "nombre": "Atardecer en Yas Marina",
+  "logo": ["POLE", "AD"],
+  "colores": {
+    "noche": "#0a0710", "hondo": "#07050c", "noche-2": "#100b18", "carbon": "#161020", "carbon-2": "#20172c",
+    "hueso": "#f6ede6", "hueso-2": "#e0d0c6", "ceniza": "#b6a3a8", "humo": "#7d6a74",
+    "cempa": "#ff7a4d", "cempa-2": "#ff9c6e", "cempa-osc": "#a3401f", "vela": "#ffc98a", "azul": "#7fa6ff",
+    "rosa": "#ff5c7a", "jade": "#6fd6b3", "tinta": "#170905", "frio": "#4b2f7a"
+  },
+  "fuentes": {
+    "url": "https://fonts.googleapis.com/css2?family=El+Messiri:wght@400;500;600;700&family=Figtree:wght@300;400;500;600&family=Rajdhani:wght@400;500;600;700&display=swap",
+    "display": "\"El Messiri\",\"Georgia\",\"Times New Roman\",serif",
+    "body": "\"Figtree\",\"Avenir Next\",\"Segoe UI\",system-ui,sans-serif",
+    "dato": "\"Rajdhani\",\"Arial Narrow\",\"Roboto Condensed\",system-ui,sans-serif",
+    "t_peso": 400, "t_esp": ".06em", "t_em": "normal"
+  },
+  "lienzo": {"modo": "atardecer", "colores": ["#ff7a4d", "#ffc98a", "#ff5c7a", "#b48cff"], "estelas": true},
+  "imagenes": {
+    "heroe": {"src": "img/abudhabi/ocaso-yas.jpg", "alt": "Atardecer naranja y violeta detrás de los reflectores del Circuito de Yas Marina", "pos": "50% 62%", "espejo": false},
+    "menu": {"src": "img/abudhabi/recta-atardecer.jpg"},
+    "interludio": {"src": "img/abudhabi/fuegos-2015.jpg"},
+    "casas": [
+      {"src": "img/abudhabi/lotus-noche-2012.jpg", "alt": "El Lotus de Kimi Räikkönen de noche en Yas Marina", "pie": "Lotus de Räikkönen, ganador en 2012 · Yas Marina"},
+      {"src": "img/abudhabi/williams-2015.jpg", "alt": "Un Williams pasa frente a los comisarios en Yas Marina", "pie": "Williams en Yas Marina · 2015"},
+      {"src": "img/abudhabi/salida-2015.jpg", "alt": "La primera curva tras la salida del Gran Premio de Abu Dabi 2015", "pie": "La salida del GP de Abu Dabi 2015"}
+    ],
+    "vivo": {"src": "img/abudhabi/pitlane-noche.jpg"},
+    "carrera": {"src": "img/abudhabi/salida-2015.jpg"},
+    "cambios": {"src": "img/abudhabi/vuelo-etihad.jpg", "alt": "Un avión y aviones acrobáticos con estelas de humo sobre Yas Island al atardecer", "pie": "Vuelo de exhibición sobre Yas Island."},
+    "ofrenda": {"src": "img/abudhabi/recta-atardecer.jpg"}
+  },
+  "textos": {
+    "menu_inicio": "Del sol a los reflectores",
+    "heroe_ceja": "Circuito de Yas Marina · del atardecer a la noche",
+    "heroe_titular": "El último<br>sol de<br>la temporada",
+    "heroe_edicion": "Pronóstico de qualy y carrera · Edición Yas Marina.",
+    "parrilla_titulo": "La parrilla<br><em>del atardecer</em>",
+    "interludio_ceja": "Yas Island · Abu Dabi",
+    "interludio_titulo": "El sol<br><em>se despide.</em>",
+    "interludio_txt": "La qualy arranca con luz de día y termina bajo los reflectores: la pista se enfría vuelta a vuelta y los tiempos bajan al final.",
+    "casas_apodos": {"*": "Los retadores"},
+    "burbuja_titulo": "Entre luz<br><em>y sombra</em>",
+    "ofrenda_ceja": "Historia de Yas Marina",
+    "ofrenda_titulo": "Las poles<br><em>de Yas Marina</em>",
+    "estrategia_lugar": "en Yas Marina",
+    "riesgos": [
+      ["Pista que se enfría", "La carrera empieza al atardecer y termina de noche: el asfalto pierde temperatura y cambia el desgaste entre tandas."],
+      ["Safety car", "Desde el cambio de trazado de 2021 hay más rebases, pero un auto detenido en la zona del hotel trae auto de seguridad."],
+      ["Última carrera", "Es el cierre del año: con puestos del campeonato en juego, los equipos se arriesgan más con la estrategia."]
+    ]
+  },
+  "creditos": [
+    "Atardecer en Yas Marina y la recta al anochecer: Cesar I. Martins · <a href=\"https://creativecommons.org/licenses/by/2.0/\" target=\"_blank\" rel=\"noopener\">CC BY 2.0</a> · <a href=\"https://commons.wikimedia.org/wiki/File:Sunset_at_Yas_Marina_circuit_-_Abu_Dhabi_2014.jpg\" target=\"_blank\" rel=\"noopener\">1</a>, <a href=\"https://commons.wikimedia.org/wiki/File:Por_do_sol_no_circuito_Yas_Marina_-_Sunset_at_Yas_Marina_circuit_-_Abu_Dhabi_(17173577080).jpg\" target=\"_blank\" rel=\"noopener\">2</a>",
+    "Lotus de Räikkönen (2012): Play Among Friends Paf · <a href=\"https://creativecommons.org/licenses/by/2.0/\" target=\"_blank\" rel=\"noopener\">CC BY 2.0</a> · <a href=\"https://commons.wikimedia.org/wiki/File:2012_Abu_Dhabi_GP_Winner.jpg\" target=\"_blank\" rel=\"noopener\">archivo</a>",
+    "Williams y la salida de 2015: Berik · <a href=\"https://creativecommons.org/licenses/by-sa/2.0/\" target=\"_blank\" rel=\"noopener\">CC BY-SA 2.0</a> · <a href=\"https://commons.wikimedia.org/wiki/File:Bottas_Abu_Dhabi_2015.jpg\" target=\"_blank\" rel=\"noopener\">1</a>, <a href=\"https://commons.wikimedia.org/wiki/File:2015_Abu_Dhabi_Grand_Prix_-_Race_start_(22882439484).jpg\" target=\"_blank\" rel=\"noopener\">2</a>",
+    "Fuegos artificiales (2015): Willo2173 · <a href=\"https://creativecommons.org/licenses/by/2.0/\" target=\"_blank\" rel=\"noopener\">CC BY 2.0</a> · <a href=\"https://commons.wikimedia.org/wiki/File:Firework_Abu_Dhabi_Grand_Prix_2015.jpg\" target=\"_blank\" rel=\"noopener\">archivo</a>",
+    "Pit lane de noche: Nepenthes · <a href=\"https://creativecommons.org/licenses/by-sa/2.5/\" target=\"_blank\" rel=\"noopener\">CC BY-SA 2.5</a> · <a href=\"https://commons.wikimedia.org/wiki/File:Yas_Marina_Circuit_005.JPG\" target=\"_blank\" rel=\"noopener\">archivo</a>",
+    "Vuelo sobre Yas Island: Delta.jpg · <a href=\"https://creativecommons.org/licenses/by-sa/4.0/\" target=\"_blank\" rel=\"noopener\">CC BY-SA 4.0</a> · <a href=\"https://commons.wikimedia.org/wiki/File:Etihad_Airways_Flyover_-_Yas_Island,_Abu_Dhabi_Grand_Prix.jpg\" target=\"_blank\" rel=\"noopener\">archivo</a>",
+    "Fotos recortadas, reducidas y con ajuste de color. Las versiones derivadas de obras CC BY-SA se comparten bajo la misma licencia."
+  ]
+}

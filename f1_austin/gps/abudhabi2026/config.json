@@ -1,0 +1,75 @@
+{
+ "meeting_key": 1302,
+ "year": 2026,
+ "slug": "abudhabi2026",
+ "slug_modelo": "abudhabi",
+ "nombre": "Gran Premio de Abu Dhabi",
+ "nombre_en": "Abu Dhabi Grand Prix",
+ "circuito": "Circuito de Yas Marina",
+ "circuito_corto": "Yas Marina",
+ "ciudad": "Abu Dhabi, Emiratos Árabes Unidos",
+ "pais": "United Arab Emirates",
+ "circuit_key": 70,
+ "circuito_jolpica": "yas_marina",
+ "gmt_offset": "04:00:00",
+ "utc_texto": "UTC+4",
+ "fecha_texto": "Sábado 5 de diciembre de 2026",
+ "hora_texto": "6:00 PM (hora local, UTC+4)",
+ "fecha_texto_carrera": "Domingo 6 de diciembre de 2026",
+ "hora_texto_carrera": "5:00 PM (hora local, UTC+4)",
+ "tema": "abudhabi",
+ "sprint": false,
+ "sesiones": [
+  {
+   "clave": "fp1",
+   "nombre": "Práctica 1",
+   "nombre_en": "Practice 1",
+   "session_key": 11429,
+   "inicio_utc": "2026-12-04T09:30:00Z",
+   "fin_utc": "2026-12-04T10:30:00Z",
+   "fecha_local": "Viernes 4 de diciembre",
+   "hora_local": "1:30 PM"
+  },
+  {
+   "clave": "fp2",
+   "nombre": "Práctica 2",
+   "nombre_en": "Practice 2",
+   "session_key": 11430,
+   "inicio_utc": "2026-12-04T13:00:00Z",
+   "fin_utc": "2026-12-04T14:00:00Z",
+   "fecha_local": "Viernes 4 de diciembre",
+   "hora_local": "5:00 PM"
+  },
+  {
+   "clave": "fp3",
+   "nombre": "Práctica 3",
+   "nombre_en": "Practice 3",
+   "session_key": 11431,
+   "inicio_utc": "2026-12-05T10:30:00Z",
+   "fin_utc": "2026-12-05T11:30:00Z",
+   "fecha_local": "Sábado 5 de diciembre",
+   "hora_local": "2:30 PM"
+  },
+  {
+   "clave": "q",
+   "nombre": "Clasificación",
+   "nombre_en": "Qualifying",
+   "session_key": 11432,
+   "inicio_utc": "2026-12-05T14:00:00Z",
+   "fin_utc": "2026-12-05T15:00:00Z",
+   "fecha_local": "Sábado 5 de diciembre",
+   "hora_local": "6:00 PM"
+  },
+  {
+   "clave": "r",
+   "nombre": "Carrera",
+   "nombre_en": "Race",
+   "session_key": 11436,
+   "inicio_utc": "2026-12-06T13:00:00Z",
+   "fin_utc": "2026-12-06T15:00:00Z",
+   "fecha_local": "Domingo 6 de diciembre",
+   "hora_local": "5:00 PM"
+  }
+ ],
+ "generado": "2026-11-09T01:47:19Z"
+}

@@ -1,0 +1,5 @@
+# gp_pipeline.py: intermedios grandes (se regeneran)
+*/trabajo_carrera/dataset_carrera.csv
+*/dataset_qualy_*.csv
+*/fp3_live/
+ultimo_auto.json
