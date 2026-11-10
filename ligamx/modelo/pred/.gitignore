@@ -1,0 +1,2 @@
+# El registro de accesos a la PRUEBA es bitacora de auditoria: se versiona aunque la raiz ignore *.log
+!ACCESOS_PRUEBA.log

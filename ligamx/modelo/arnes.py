@@ -453,11 +453,13 @@ def evaluar(modelo: Modelo, periodo: str = "desarrollo", granularidad: str = "bl
     res = metricas.resumen(pred, con_ee=True)
     res.update({"n_cortes": len(grupos), "n_sin_pronostico": int(len(obj) - len(pred)),
                 "seg_ajustar": round(t_aj, 2), "seg_predecir": round(t_pr, 2)})
-    if guardar:
+    if guardar and len(pred) == 0:
+        print(f"  [{nombre}] sin pronósticos en {periodo}: no se guarda archivo", flush=True)
+    elif guardar:
         dir_pred.mkdir(parents=True, exist_ok=True)
         destino = ruta_pred(nombre, periodo, granularidad, parcial, dir_pred)
         pred.to_parquet(destino, index=False)
-        if guardar_matrices and len(pred) and any(m is not None for m in mats):
+        if guardar_matrices and any(m is not None for m in mats):
             dc = Path(dir_cache or DIR_CACHE)
             dc.mkdir(parents=True, exist_ok=True)
             con = [j for j, m in enumerate(mats) if m is not None]
@@ -468,7 +470,7 @@ def evaluar(modelo: Modelo, periodo: str = "desarrollo", granularidad: str = "bl
                   res, ruta=ruta_registro, periodo=periodo, granularidad=granularidad, parcial=parcial,
                   torneos=list(torneos) if torneos is not None else None,
                   desde=str(desde) if desde is not None else None, hasta=str(hasta) if hasta is not None else None)
-    if verbose:
+    if verbose and len(pred):
         print(f"  [{nombre}] {periodo}/{granularidad}: n={res['n']}  log-loss={res['logloss']:.4f}  "
               f"RPS={res['rps']:.4f}  Brier={res['brier']:.4f}  logv marcador={res['logv_marcador']:.4f}  "
               f"acierto={res['acierto']:.3f}  ({t_aj:.1f} s ajustar, {t_pr:.1f} s predecir)", flush=True)
