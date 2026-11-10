@@ -306,8 +306,10 @@ class Contexto:
             gan = None
             if gl != gv:
                 gan = L if gl > gv else Vv
-            elif pd.notna(ult["gl_et"]) and pd.notna(ult["gv_et"]) and ult["gl_et"] != ult["gv_et"]:
-                gan = L if ult["gl_et"] > ult["gv_et"] else Vv
+            elif (pd.notna(ult["gl_et"]) and pd.notna(ult["gv_et"])
+                  and (ult["gl_et"] - ult["gl"]) != (ult["gv_et"] - ult["gv"])):
+                # gl_et/gv_et son el marcador acumulado a 120' de la vuelta: cuentan sólo los goles del tiempo extra
+                gan = L if (ult["gl_et"] - ult["gl"]) > (ult["gv_et"] - ult["gv"]) else Vv
             elif pd.notna(ult["pen_l"]) and pd.notna(ult["pen_v"]) and ult["pen_l"] != ult["pen_v"]:
                 gan = L if ult["pen_l"] > ult["pen_v"] else Vv
             elif (tor, fase, a, b) in GANADOR_MANUAL:

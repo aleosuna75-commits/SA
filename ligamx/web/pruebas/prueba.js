@@ -100,11 +100,12 @@ async function correr(navegador, nombre, opciones) {
 
   // video de portada
   const video = await page.evaluate(async () => {
-    const v = document.getElementById('video-portada'); if (!v) return null;
+    const v = document.getElementById('video-portada');
+    if (!v) { const im = document.querySelector('#portada .fondo img'); return im ? { foto: true, readyState: im.complete && im.naturalWidth > 0 ? 4 : 0 } : null; }
     for (let i = 0; i < 40 && v.readyState < 2; i++) await new Promise(r => setTimeout(r, 250));
     return { readyState: v.readyState, pausado: v.paused, muted: v.muted, error: v.error ? v.error.code : null };
   });
-  revisa(video && video.readyState >= 2, 'video de portada con readyState >= 2', JSON.stringify(video));
+  revisa(video && video.readyState >= 2, 'fondo de portada (video o foto) cargado', JSON.stringify(video));
   await cap('1-portada');
 
   // estructura
@@ -217,7 +218,7 @@ async function correr(navegador, nombre, opciones) {
   const pr = await ctxR.newPage();
   await pr.goto(URL_DOC, { waitUntil: 'load' });
   await pr.waitForTimeout(700);
-  const red = await pr.evaluate(() => { const v = document.getElementById('video-portada'); return { pausado: v.paused, autoplay: v.hasAttribute('autoplay'), animadas: document.querySelectorAll('.entra').length, poster: !!v.getAttribute('poster') }; });
+  const red = await pr.evaluate(() => { const v = document.getElementById('video-portada') || { paused: true, hasAttribute: () => false, getAttribute: () => 'foto' }; return { pausado: v.paused, autoplay: v.hasAttribute('autoplay'), animadas: document.querySelectorAll('.entra').length, poster: !!v.getAttribute('poster') }; });
   revisa(red.pausado && !red.autoplay && red.animadas === 0 && red.poster, 'movimiento reducido: video en pausa con póster y sin animaciones', JSON.stringify(red));
   await ctxR.close();
 }

@@ -30,6 +30,7 @@ ESCENAS = {
     "menu": "img/ambiente/cancha-noche.jpg",
     "proximos": "img/ambiente/reflectores-noche.jpg",
     "combinada": "img/ambiente/balon-pasto.jpg",
+    "liguilla": "img/ambiente/reflectores-noche.jpg",
     "camino": "video/angel-festejo.mp4",
     "tabla": "img/ambiente/aficion-banderas.jpg",
     "ultima": "img/ambiente/red-porteria.jpg",
@@ -173,7 +174,33 @@ def recortar_medios(medios, datos):
         if slug not in slugs:
             avisos.append(f"{p['local']} vs {p['visitante']}: la sede «{slug}» no tiene fotos en medios.json.")
 
-    recorte = {"escenas": escenas, "estadios": estadios, "escudos": escudos,
+    # Portada: el favorito al título levantando el trofeo (la ocasión más reciente con foto libre); si no hay
+    # foto libre de ese equipo, su estadio. Cambia sola cuando cambia el favorito.
+    portada = escenas["portada"]
+    leyenda = None
+    camp = [c for c in datos["proyeccion"]["campeon"] if c.get("prob")]
+    fav = camp[0]["equipo"] if camp else None
+    tit = ((datos["proyeccion"].get("titulos") or {}).get(fav) or {}).get("ultimo") if fav else None
+    foto = (medios.get("campeon") or {}).get(fav) if fav else None
+    if foto and (AQUI / foto["archivo"]).exists():
+        portada = dict(_medio(foto), tipo="foto")
+        detalle = ", ".join(x for x in (foto.get("torneo"), foto.get("lugar")) if x)
+        leyenda = (f"{fav} levanta el trofeo" if foto.get("tipo") == "trofeo" else f"{fav} festeja el título") + (f" · {detalle}" if detalle else "")
+        usados.append(foto["archivo"])
+        creditos.append({"grupo": "Campeones", "titulo": leyenda, "archivo": foto["archivo"], "credito": foto.get("credito"),
+                         "licencia": foto.get("licencia"), "licencia_url": foto.get("licencia_url"),
+                         "url_pagina": foto.get("url_pagina"), "cambios": foto.get("cambios")})
+    elif fav:
+        casa = next((e for e in estadios if fav in (e.get("equipos") or []) and e["fotos"]), None)
+        if casa:
+            portada = dict(casa["fotos"][0], tipo="foto")
+            avisos.append(f"sin foto libre de {fav} con el trofeo: la portada usa su estadio ({casa['nombre']}).")
+        if tit:
+            leyenda = f"Último título de {fav}: {tit['torneo']}" + (f", {tit['estadio']}" if tit.get("estadio") else "")
+    if leyenda and tit and foto and foto.get("torneo") and foto["torneo"] != tit["torneo"]:
+        leyenda += f" (su último título fue el {tit['torneo']})"
+    escenas["portada"] = portada
+    recorte = {"portada": {"equipo": fav, "leyenda": leyenda}, "escenas": escenas, "estadios": estadios, "escudos": escudos,
                "nota_legal": medios.get("nota_legal"), "creditos": creditos}
     return recorte, usados, avisos
 
@@ -188,12 +215,17 @@ def construir(datos, medios, plantilla):
     validar(datos)
     recorte, usados, avisos = recortar_medios(medios, datos)
     portada = recorte["escenas"]["portada"]
-    if portada.get("tipo") != "video":
-        avisos.append("la escena de portada no es un video: se mostrará sólo la imagen.")
+    a = lambda x: html.escape(str(x or ""), quote=True)
+    if portada.get("tipo") == "video":
+        fondo = (f'<video id="video-portada" muted playsinline loop autoplay preload="metadata" poster="{a(portada.get("poster"))}" '
+                 f'width="1280" height="720" aria-hidden="true" tabindex="-1" disablepictureinpicture>'
+                 f'<source src="{a(portada["archivo"])}" type="video/mp4"></video>')
+    else:
+        fondo = (f'<img src="{a(portada["archivo"])}" alt="{a(portada.get("alt"))}" width="{a(portada.get("ancho") or 1600)}" '
+                 f'height="{a(portada.get("alto") or 1000)}" style="object-position:{a(portada.get("pos") or "50% 40%")}" decoding="async" fetchpriority="high">')
+    fondo += f'<figcaption class="credito">{html.escape(portada.get("credito") or "")}</figcaption>'
     reemplazos = {
-        "{{PORTADA_VIDEO}}": html.escape(portada["archivo"] if portada.get("tipo") == "video" else "", quote=True),
-        "{{PORTADA_POSTER}}": html.escape(portada.get("poster") or portada["archivo"], quote=True),
-        "{{PORTADA_CREDITO}}": html.escape(portada.get("credito") or ""),
+        "{{PORTADA_FONDO}}": fondo,
         "{{DATOS}}": _json_incrustado(datos),
         "{{MEDIOS}}": _json_incrustado(recorte),
     }

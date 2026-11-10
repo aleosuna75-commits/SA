@@ -288,6 +288,82 @@ def _ultimos(df_t: pd.DataFrame, corte, jornadas: dict[int, str], oficiales: dic
     return out
 
 
+def cuadro_proyectado(pron, sim: dict, liguilla_series: list[dict], clasificados: list[str] | None) -> dict:
+    """
+    Cuadro de liguilla "como va quedando": siembra (la real si la fase regular terminó; si no, los 8 con más
+    probabilidad de clasificar ordenados por su lugar esperado), y en cada ronda el favorito de cada serie con
+    su probabilidad EXACTA de avanzar (dos partidos con las lambdas de liguilla; empate global = mejor sembrado;
+    final con tiempos extra y penales). Las series reales usan lo ya jugado. Con resiembra en semifinales.
+    El camino es el de los favoritos: es la ruta más probable serie por serie, no una predicción segura.
+    """
+    eq = list(pron.equipos); ix = {e: i for i, e in enumerate(eq)}
+    pe = {d["equipo"]: d for d in sim["por_equipo"]}
+    if clasificados:
+        siembra, origen = list(clasificados), "tabla final"
+    else:
+        top = sorted(pe.values(), key=lambda d: -d["p_clasifica"])[:8]
+        siembra = [d["equipo"] for d in sorted(top, key=lambda d: (d["pos_esperada"], -d["puntos_esperados"]))]
+        origen = "lugar esperado"
+    pos = {e: i + 1 for i, e in enumerate(siembra)}
+    m = pron.malla(1, fase="liguilla")
+    LL, LV, rho = np.asarray(m["lam_l"])[0], np.asarray(m["lam_v"])[0], float(m.get("rho", 0.0))
+    reales = {}
+    for r in liguilla_series or []:
+        reales[(r["fase"], frozenset((r["mejor"], r["peor"])))] = r
+
+    def serie(a: str, b: str, fase: str) -> dict:
+        mejor, peor = (a, b) if pos[a] < pos[b] else (b, a)
+        real = reales.get((fase, frozenset((mejor, peor))))
+        if real:
+            pm, glob = real["p_avanza_mejor"], [p for p in real["piernas"] if p.get("jugado")]
+            out = {"real": True, "decidida": real.get("decidida", False), "ganador_real": real.get("ganador"),
+                   "piernas_jugadas": [{"local": p["local"], "visitante": p["visitante"], "gl": p["gl"], "gv": p["gv"]} for p in glob]}
+        else:
+            i, j = ix[mejor], ix[peor]
+            M1 = arnes.matriz_marcadores(LL[j, i], LV[j, i], rho)      # ida en casa del peor sembrado
+            M2 = arnes.matriz_marcadores(LL[i, j], LV[i, j], rho)      # vuelta en casa del mejor
+            extra = (LL[i, j] * simulador.FRACCION_EXTRA, LV[i, j] * simulador.FRACCION_EXTRA) if fase == "final" else None
+            pm = simulador.prob_serie(M1, M2, False, True, "final" if fase == "final" else "posicion", extra)["p_mejor"]
+            out = {"real": False, "decidida": False, "ganador_real": None, "piernas_jugadas": []}
+        fav = out["ganador_real"] or (mejor if pm >= 0.5 else peor)
+        out.update({"fase": fase, "mejor": mejor, "peor": peor, "siembra_mejor": pos[mejor], "siembra_peor": pos[peor],
+                    "p_avanza_mejor": float(pm), "p_avanza_peor": float(1 - pm), "favorito": fav,
+                    "p_favorito": float(pm if fav == mejor else 1 - pm)})
+        return out
+
+    cuartos = [serie(siembra[a - 1], siembra[b - 1], "cuartos") for a, b in ((1, 8), (2, 7), (3, 6), (4, 5))]
+    vivos = sorted((c["favorito"] for c in cuartos), key=lambda e: pos[e])
+    semis = [serie(vivos[0], vivos[3], "semifinal"), serie(vivos[1], vivos[2], "semifinal")]
+    final = serie(semis[0]["favorito"], semis[1]["favorito"], "final")
+    return {"origen_siembra": origen, "siembra": siembra, "cuartos": cuartos, "semifinal": semis, "final": final,
+            "campeon_ruta": final["favorito"],
+            "equipos": {e: {k: pe[e][k] for k in ("p_clasifica", "p_semifinal", "p_final", "p_campeon")} for e in siembra},
+            "nota": "Ruta de los favoritos serie por serie. Cada porcentaje es la probabilidad de avanzar en ESA serie; "
+                    "la probabilidad de campeón de cada equipo (simulación completa) toma en cuenta todos los caminos."}
+
+
+# ESPN pone mal la sede de alguna vuelta de final (ver modelo/variables.py)
+CORRIGE_SEDE_FINAL = {"Clausura 2017": "Estadio Akron"}
+
+
+def titulos(ctx: Contexto, df: pd.DataFrame) -> dict:
+    """Por equipo: títulos de liga desde 2001 y el último (torneo, fecha, estadio de la vuelta y global)."""
+    se = ctx.series()
+    fin = se[(se["fase"] == "final") & se["ganador"].notna()].sort_values("fecha")
+    out = {}
+    for _, f in fin.iterrows():
+        e = f["ganador"]
+        vuelta = df[(df["torneo"] == f["torneo"]) & (df["fase"] == "final")].sort_values("fecha_utc").tail(1)
+        estadio = str(vuelta["estadio"].iloc[0]) if len(vuelta) and pd.notna(vuelta["estadio"].iloc[0]) else None
+        estadio = CORRIGE_SEDE_FINAL.get(f["torneo"], estadio)
+        d = out.setdefault(e, {"n": 0})
+        d["n"] += 1
+        d["ultimo"] = {"torneo": f["torneo"], "fecha": str(pd.Timestamp(f["fecha"]).tz_convert("America/Mexico_City").date()),
+                       "estadio": estadio, "global": f["global"],
+                       "rival": f["b"] if f["a"] == e else f["a"]}
+    return out
+
+
 def _avisos(meta_modelo: dict, des: dict, reglas: dict, sim: dict, pendientes: list[dict], cal: dict | None) -> list[str]:
     """Límites honestos: lo que el sistema NO modela o no sabe."""
     a = [f"Modelo «{meta_modelo.get('nombre')}»: {x}" for x in (meta_modelo.get("avisos") or [])]
@@ -432,6 +508,16 @@ def construir(corte=None, n_sim: int = simulador.N_SIM, sellar: bool | None = No
                             "empate_global_cuartos_semis": lig.get("empate_global_cuartos_semis"),
                             "final_empate": lig.get("final_empate"), "cierra_en_casa": lig.get("cierra_en_casa"),
                             "fechas": lig.get("fechas")}}
+    try:
+        proyeccion["titulos"] = titulos(ctx, df)
+    except Exception as e:
+        print(f"aviso: titulos falló: {e}", file=sys.stderr)
+        proyeccion["titulos"] = {}
+    try:
+        liguilla["cuadro_proyectado"] = cuadro_proyectado(pron, sim, sim["series_reales"], clasificados)
+    except Exception as e:                                       # no tumba la exportación
+        print(f"aviso: cuadro_proyectado falló: {e}", file=sys.stderr)
+        liguilla["cuadro_proyectado"] = None
 
     # ---- fuerzas, estadios, dominios ----
     fz = pron.fuerzas()

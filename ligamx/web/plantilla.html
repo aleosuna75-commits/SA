@@ -83,6 +83,7 @@ h5{font:700 var(--t-1)/1.25 var(--f-texto);text-transform:uppercase;letter-spaci
 
 /* ---------- portada ---------- */
 .portada{position:relative;isolation:isolate;min-height:100vh;min-height:100svh;display:flex;align-items:flex-end;padding:calc(84px + env(safe-area-inset-top, 0px)) 0 54px}
+.trofeo-leyenda{margin:6px 0 14px;font:600 .8rem/1.4 var(--f-texto);letter-spacing:.06em;text-transform:uppercase;color:var(--oro)}
 .portada .fondo::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,var(--velo-1) 0%,var(--velo-0) 30%,var(--velo-2) 62%,var(--noche) 100%)}
 .sello{font:600 var(--t-1)/1.3 var(--f-texto);text-transform:uppercase;letter-spacing:.16em;color:var(--cal-2)}
 .sello b{color:var(--oro)}
@@ -304,6 +305,25 @@ td.v{background:linear-gradient(90deg,var(--oro-tenue) calc(var(--v,0)*100%),var
 .mitad>*{min-width:0}
 tbody th{background:var(--noche-3);color:var(--oro);padding-top:11px}
 .grupo>h4{color:var(--oro-2)}
+/* liguilla al momento */
+.llaves{display:grid;gap:var(--e-5);grid-template-columns:minmax(0,1fr)}
+@media (min-width:900px){.llaves{grid-template-columns:repeat(3,minmax(0,1fr));align-items:center}}
+.ronda{display:grid;gap:var(--e-3);min-width:0}
+.ronda>h3{font:800 var(--t-4)/1 var(--f-cartel);text-transform:uppercase;letter-spacing:.06em;color:var(--oro)}
+.ronda>h3 small{display:block;margin-top:4px;font:500 var(--t-0)/1.3 var(--f-texto);letter-spacing:.04em;text-transform:none;color:var(--gris)}
+.llave{border:1px solid var(--linea);border-radius:var(--radio);background:var(--noche-2);padding:var(--e-3);display:grid;gap:8px}
+.llave--real{border-color:var(--oro-brillo)}
+.llave__eq{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:10px;align-items:center;font-weight:600;font-size:var(--t-2);line-height:1.15}
+.llave__eq .sem{font:800 var(--t-1)/1 var(--f-texto);color:var(--gris);font-variant-numeric:tabular-nums;min-width:1.6em}
+.llave__eq b{font:800 1.25rem/1 var(--f-cartel);font-variant-numeric:tabular-nums;color:var(--cal-2)}
+.llave__eq.fav b{color:var(--oro-2)}
+.llave__eq.fav .eqn span{color:var(--cal)}
+.llave__eq:not(.fav) .eqn span{color:var(--gris)}
+.llave__eq .eqn{--d:26px;min-width:0}
+.llave small{color:var(--gris);font-size:var(--t-0)}
+.trofeo-ruta{display:grid;justify-items:center;gap:8px;text-align:center;padding:var(--e-5) var(--e-4);border:1px solid var(--oro-brillo);border-radius:var(--radio);background:linear-gradient(180deg,var(--oro-tenue),var(--velo-0))}
+.trofeo-ruta .eqn{--d:64px;flex-direction:column;font:800 var(--t-5)/1 var(--f-cartel);text-transform:uppercase}
+.trofeo-ruta p{color:var(--cal-2);font-size:var(--t-2);max-width:40ch}
 /* cruces */
 .cruce{display:grid;gap:6px;padding:10px 0;border-bottom:1px dashed var(--linea)}
 .cruce:last-child{border-bottom:0}
@@ -444,6 +464,7 @@ tbody th{background:var(--noche-3);color:var(--oro);padding-top:11px}
     <ul>
       <li><button type="button" data-ir="proximos">Partidos</button></li>
       <li><button type="button" data-ir="combinada">Combinada</button></li>
+      <li><button type="button" data-ir="liguilla">Liguilla</button></li>
       <li><button type="button" data-ir="camino">Camino al título</button></li>
       <li><button type="button" data-ir="tabla">Tabla</button></li>
       <li><button type="button" data-ir="ultima">Última jornada</button></li>
@@ -461,25 +482,21 @@ tbody th{background:var(--noche-3);color:var(--oro);padding-top:11px}
     <li style="--i:0"><button type="button" data-ir="portada"><i>00</i>Inicio</button></li>
     <li style="--i:1"><button type="button" data-ir="proximos"><i>01</i>Próximos partidos</button></li>
     <li style="--i:2"><button type="button" data-ir="combinada"><i>02</i>Combinada de la jornada</button></li>
-    <li style="--i:3"><button type="button" data-ir="camino"><i>03</i>Camino al título</button></li>
-    <li style="--i:4"><button type="button" data-ir="tabla"><i>04</i>Tabla general</button></li>
-    <li style="--i:5"><button type="button" data-ir="ultima"><i>05</i>Última jornada</button></li>
-    <li style="--i:6"><button type="button" data-ir="estadios"><i>06</i>Estadios</button></li>
-    <li style="--i:7"><button type="button" data-ir="dominios"><i>07</i>Dominios</button></li>
-    <li style="--i:8"><button type="button" data-ir="modelo"><i>08</i>El modelo</button></li>
-    <li style="--i:9"><button type="button" data-ir="creditos"><i>09</i>Créditos</button></li>
+    <li style="--i:3"><button type="button" data-ir="liguilla"><i>03</i>Liguilla al momento</button></li>
+    <li style="--i:4"><button type="button" data-ir="camino"><i>04</i>Camino al título</button></li>
+    <li style="--i:5"><button type="button" data-ir="tabla"><i>05</i>Tabla general</button></li>
+    <li style="--i:6"><button type="button" data-ir="ultima"><i>06</i>Última jornada</button></li>
+    <li style="--i:7"><button type="button" data-ir="estadios"><i>07</i>Estadios</button></li>
+    <li style="--i:8"><button type="button" data-ir="dominios"><i>08</i>Dominios</button></li>
+    <li style="--i:9"><button type="button" data-ir="modelo"><i>09</i>El modelo</button></li>
+    <li style="--i:10"><button type="button" data-ir="creditos"><i>10</i>Créditos</button></li>
   </ol>
   <span class="credito" id="menu-credito"></span>
 </div>
 
 <main id="contenido">
 <section class="portada" id="portada" aria-labelledby="t-portada">
-  <figure class="fondo">
-    <video id="video-portada" muted playsinline loop autoplay preload="metadata" poster="{{PORTADA_POSTER}}" width="1280" height="720" aria-hidden="true" tabindex="-1" disablepictureinpicture>
-      <source src="{{PORTADA_VIDEO}}" type="video/mp4">
-    </video>
-    <figcaption class="credito">{{PORTADA_CREDITO}}</figcaption>
-  </figure>
+  <figure class="fondo">{{PORTADA_FONDO}}</figure>
   <div class="interior">
     <p class="sello" id="p-sello">Liga MX · Pronósticos</p>
     <h1 id="t-portada" tabindex="-1">Cerebro <span>Liga MX</span></h1>
@@ -503,9 +520,16 @@ tbody th{background:var(--noche-3);color:var(--oro);padding-top:11px}
   <div class="interior cuerpo" id="b-combinada"></div>
 </section>
 
+<section class="banda" id="liguilla" aria-labelledby="t-liguilla">
+  <div class="cab"><figure class="fondo" data-escena="liguilla"></figure>
+    <div class="interior"><p class="rotulo">03 · Liguilla</p><h2 id="t-liguilla" tabindex="-1">Liguilla al momento</h2>
+    <p class="bajada" id="liguilla-bajada">Cómo va quedando el cuadro y quién avanzaría en cada serie.</p></div></div>
+  <div class="interior cuerpo" id="b-llaves"></div>
+</section>
+
 <section class="banda" id="camino" aria-labelledby="t-camino">
   <div class="cab"><figure class="fondo" data-escena="camino"></figure>
-    <div class="interior"><p class="rotulo">03 · Liguilla</p><h2 id="t-camino" tabindex="-1">Camino al título</h2>
+    <div class="interior"><p class="rotulo">04 · Campeón</p><h2 id="t-camino" tabindex="-1">Camino al título</h2>
     <p class="bajada" id="camino-bajada">Lo que resta del torneo, jugado miles de veces en la computadora.</p></div></div>
   <div class="interior cuerpo">
     <div id="b-cuadro"></div>
@@ -519,35 +543,35 @@ tbody th{background:var(--noche-3);color:var(--oro);padding-top:11px}
 
 <section class="banda" id="tabla" aria-labelledby="t-tabla">
   <div class="cab"><figure class="fondo" data-escena="tabla"></figure>
-    <div class="interior"><p class="rotulo">04 · Clasificación</p><h2 id="t-tabla" tabindex="-1">Tabla general</h2>
+    <div class="interior"><p class="rotulo">05 · Clasificación</p><h2 id="t-tabla" tabindex="-1">Tabla general</h2>
     <p class="bajada">Cómo va hoy y cómo se espera que termine la fase regular.</p></div></div>
   <div class="interior cuerpo"><div id="b-tabla"></div><div id="b-final"></div></div>
 </section>
 
 <section class="banda" id="ultima" aria-labelledby="t-ultima">
   <div class="cab"><figure class="fondo" data-escena="ultima"></figure>
-    <div class="interior"><p class="rotulo">05 · Rendición de cuentas</p><h2 id="t-ultima" tabindex="-1">Última jornada</h2>
+    <div class="interior"><p class="rotulo">06 · Rendición de cuentas</p><h2 id="t-ultima" tabindex="-1">Última jornada</h2>
     <p class="bajada">Lo que pasó contra lo que el modelo había dicho antes de cada partido.</p></div></div>
   <div class="interior cuerpo"><div id="b-ultima"></div><div id="b-desempeno"></div></div>
 </section>
 
 <section class="banda" id="estadios" aria-labelledby="t-estadios">
   <div class="cab"><figure class="fondo" data-escena="estadios"></figure>
-    <div class="interior"><p class="rotulo">06 · Las canchas</p><h2 id="t-estadios" tabindex="-1">Estadios</h2>
+    <div class="interior"><p class="rotulo">07 · Las canchas</p><h2 id="t-estadios" tabindex="-1">Estadios</h2>
     <p class="bajada">Las casas de la Liga MX, de la más alta a la que está al nivel del mar, y cuánto pesan.</p></div></div>
   <div class="interior cuerpo"><div id="b-estadios"></div><div id="b-localia"></div></div>
 </section>
 
 <section class="banda" id="dominios" aria-labelledby="t-dominios">
   <div class="cab"><figure class="fondo" data-escena="dominios"></figure>
-    <div class="interior"><p class="rotulo">07 · Historia en liguilla</p><h2 id="t-dominios" tabindex="-1">Dominios</h2>
+    <div class="interior"><p class="rotulo">08 · Historia en liguilla</p><h2 id="t-dominios" tabindex="-1">Dominios</h2>
     <p class="bajada">Las parejas que más veces se han cruzado en liguilla desde 2001 y quién se ha llevado las series.</p></div></div>
   <div class="interior cuerpo" id="b-dominios"></div>
 </section>
 
 <section class="banda" id="modelo" aria-labelledby="t-modelo">
   <div class="cab"><figure class="fondo" data-escena="modelo"></figure>
-    <div class="interior"><p class="rotulo">08 · Cómo se calcula</p><h2 id="t-modelo" tabindex="-1">El modelo</h2>
+    <div class="interior"><p class="rotulo">09 · Cómo se calcula</p><h2 id="t-modelo" tabindex="-1">El modelo</h2>
     <p class="bajada">Qué hace, qué tan bien lo ha hecho y, sin maquillaje, lo que no sabe.</p></div></div>
   <div class="interior cuerpo">
     <div id="b-como"></div>
@@ -560,7 +584,7 @@ tbody th{background:var(--noche-3);color:var(--oro);padding-top:11px}
 
 <section class="banda" id="creditos" aria-labelledby="t-creditos">
   <div class="cab"><figure class="fondo" data-escena="creditos"></figure>
-    <div class="interior"><p class="rotulo">09 · Fotos y videos</p><h2 id="t-creditos" tabindex="-1">Créditos</h2>
+    <div class="interior"><p class="rotulo">10 · Fotos y videos</p><h2 id="t-creditos" tabindex="-1">Créditos</h2>
     <p class="bajada">Todas las fotos y videos son de sus autores, usados bajo las licencias que se indican.</p></div></div>
   <div class="interior cuerpo" id="b-creditos"></div>
 </section>
@@ -838,6 +862,8 @@ function portada() {
   var c = D.proyeccion.campeon.filter(function (x) { return ok(x.prob); }).slice(0, 4), f = c[0];
   if (!f) return '<p class="titular">Pronósticos de cada partido, la liguilla y el campeón.</p>';
   var h = '<p class="titular"><b>' + E(f.equipo) + '</b> es el favorito al título: <b class="tab">' + pct(f.prob) + '</b></p>';
+  var pt = M.portada || {};
+  if (pt.leyenda) h += '<p class="trofeo-leyenda">' + E(pt.leyenda) + '</p>';
   h += '<ol class="favoritos" aria-label="Los cuatro con más probabilidad de ser campeón">' + c.map(function (x) {
     return '<li>' + esc(x.equipo, 38) + '<span class="fav__n">' + E(x.equipo) + '</span><span class="fav__p">' + pct(x.prob) + '</span></li>';
   }).join('') + '</ol>';
@@ -1090,6 +1116,37 @@ function cruces() {
   }
   return h;
 }
+/* ---------- liguilla al momento ---------- */
+function llaves() {
+  var L = D.liguilla, c = L.cuadro_proyectado;
+  if (!c || !c.cuartos) return '<p class="nota">El cuadro de la liguilla aparecerá aquí en cuanto haya datos.</p>';
+  var bj = id('liguilla-bajada');
+  if (bj) bj.textContent = L.en_curso ? 'La liguilla ya se juega: lo jugado es real y lo que falta es pronóstico.'
+    : (c.origen_siembra === 'tabla final' ? 'Ya están los ocho clasificados. Así quedaría el cuadro si cada serie la gana su favorito.'
+      : 'Todavía falta fase regular. Si la tabla termina como se espera, así quedaría el cuadro, serie por serie.');
+  var eqs = c.equipos || {};
+  function lado(s, e, sem) {
+    var fav = s.favorito === e, p = e === s.mejor ? s.p_avanza_mejor : s.p_avanza_peor;
+    return '<div class="llave__eq' + (fav ? ' fav' : '') + '"><span class="sem">' + sem + '.º</span>' + eqn(e, 26) + '<b>' + (s.decidida ? (s.ganador_real === e ? 'Avanzó' : '') : pct(p, 0)) + '</b></div>';
+  }
+  function llave(s) {
+    var leg = (s.piernas_jugadas || []).map(function (g) { return E(g.local) + ' ' + g.gl + '-' + g.gv + ' ' + E(g.visitante); }).join(' · ');
+    return '<div class="llave' + (s.real ? ' llave--real' : '') + '">' + lado(s, s.mejor, s.siembra_mejor) + lado(s, s.peor, s.siembra_peor) +
+      '<small>' + (leg ? 'Jugado: ' + leg + '. ' : '') + (s.decidida ? 'Serie terminada.' : (s.real ? 'Probabilidad de avanzar con lo ya jugado.' : 'Probabilidad de avanzar en esta serie.')) + '</small></div>';
+  }
+  function ronda(t, sub, ss) { return '<div class="ronda"><h3>' + t + '<small>' + sub + '</small></h3>' + ss.map(llave).join('') + '</div>'; }
+  var fe = (L.formato || {}).fechas || {};
+  var h = '<div class="llaves">' +
+    ronda('Cuartos', rangoFechas((fe.cuartos_ida || []).concat(fe.cuartos_vuelta || [])) || '1.º contra 8.º, 2.º contra 7.º…', c.cuartos) +
+    ronda('Semifinales', (rangoFechas((fe.semis_ida || []).concat(fe.semis_vuelta || [])) || '') + ' · se vuelve a sembrar', c.semifinal) +
+    '<div class="ronda"><h3>Final<small>' + (rangoFechas((fe.final_ida || []).concat(fe.final_vuelta || [])) || 'ida y vuelta') + ' · tiempos extra y penales si hay empate</small></h3>' + llave(c.final) +
+    '<div class="trofeo-ruta">' + eqn(c.campeon_ruta, 64) + '<p>Campeón si gana cada favorito. Su probabilidad real de ser campeón es ' +
+      '<b>' + pct((eqs[c.campeon_ruta] || {}).p_campeon) + '</b>, porque tiene que ganar tres series seguidas.</p></div></div>' +
+    '</div>';
+  h += '<p class="nota">' + E(c.nota || '') + (c.origen_siembra === 'lugar esperado' ? ' La siembra sale del lugar esperado de cada equipo en la tabla final; cambia con cada partido de aquí a la Jornada 17.' : '') + '</p>';
+  return h;
+}
+
 function formato() {
   var f = D.liguilla.formato || {}, fe = f.fechas || {};
   var filas = [['Cuartos de final', 'cuartos_ida', 'cuartos_vuelta'], ['Semifinales', 'semis_ida', 'semis_vuelta'], ['Final', 'final_ida', 'final_vuelta'], ['Final, fechas alternas', 'final_ida_opcion2', 'final_vuelta_opcion2']].map(function (r, i) {
@@ -1371,6 +1428,7 @@ seguro('portada', 'b-portada', portada);
 seguro('próximo partido', 'b-sigue', sigue);
 seguro('próximos partidos', 'b-partidos', partidos);
 seguro('combinada de la jornada', 'b-combinada', combinadaJornada);
+seguro('liguilla al momento', 'b-llaves', llaves);
 seguro('cuadro de la liguilla', 'b-cuadro', cuadro);
 seguro('quién será campeón', 'b-campeon', campeon);
 seguro('hasta dónde llega cada uno', 'b-embudo', embudo);
