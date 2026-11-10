@@ -2067,5 +2067,64 @@
    "url": "https://commons.wikimedia.org/wiki/File:Soccer_at_night_(Unsplash).jpg",
    "cambios": "redimensionada"
   }
- ]
+ ],
+ "campeon": {
+  "Toluca": {
+   "slug": "tol",
+   "archivo": "img/campeon/tol.jpg",
+   "tipo": "festejo",
+   "torneo": "Clausura 2025",
+   "fecha": "2025-05-25",
+   "lugar": "Estadio Nemesio Díez, Toluca",
+   "es_la_mas_reciente": false,
+   "alt": "Confeti y fuegos artificiales sobre el Estadio Nemesio Díez durante la premiación del Toluca, campeón del Clausura 2025 tras vencer 2-0 al América",
+   "pos": "50% 60%",
+   "autor": "Morogris",
+   "licencia": "CC BY-SA 4.0",
+   "licencia_url": "https://creativecommons.org/licenses/by-sa/4.0/",
+   "credito": "Foto: Morogris / Wikimedia Commons / CC BY-SA 4.0",
+   "cambios": "Recortada a 3:2, redimensionada a 1500 px de ancho y recomprimida (JPEG progresivo, sin metadatos).",
+   "url_pagina": "https://commons.wikimedia.org/wiki/File:Estadio_Nemesio_Diez_-_Clausura_2025_final_(7).jpg",
+   "ancho": 1500,
+   "alto": 1000,
+   "kb": 345,
+   "nota": "Festejo/premiación en la cancha (confeti y fuegos artificiales); el trofeo no se distingue. El título más reciente del Toluca es el Apertura 2025 (14-dic-2025, ante Tigres); no hay foto libre de esa final en Commons."
+  },
+  "Pumas": {
+   "slug": "pum",
+   "archivo": "img/campeon/pum.jpg",
+   "tipo": "festejo",
+   "torneo": "Clausura 2011",
+   "fecha": "2011-05-22",
+   "lugar": "Ángel de la Independencia, Ciudad de México",
+   "es_la_mas_reciente": true,
+   "alt": "Aficionados de Pumas celebran con el puño en alto frente al Ángel de la Independencia el título del Clausura 2011",
+   "pos": "50% 45%",
+   "autor": "Eneas De Troya",
+   "licencia": "CC BY 2.0",
+   "licencia_url": "https://creativecommons.org/licenses/by/2.0/",
+   "credito": "Foto: Eneas De Troya / Wikimedia Commons / CC BY 2.0",
+   "cambios": "Redimensionada a 1600 px de ancho y recomprimida (JPEG progresivo, sin metadatos).",
+   "url_pagina": "https://commons.wikimedia.org/wiki/File:Pumas,_Campe%C3%B3n_(5748985021).jpg",
+   "ancho": 1600,
+   "alto": 1062,
+   "kb": 186,
+   "nota": "Festejo de la afición en el Ángel, no en el estadio; sin trofeo. Clausura 2011 es el título de liga más reciente de Pumas."
+  }
+ },
+ "campeon_sin_foto": {
+  "América": "Revisé en Commons (HTML) la categoría del club y subcategorías (partidos, aficionados, estadio) y búsquedas de texto/MediaSearch de \"campeón\", \"final\", \"festejo\", \"trofeo\" con el torneo: Apertura 2024 (BBVA), Clausura 2024 y Apertura 2023 (Estadio Azteca), festejos en el Ángel y Category:Club América / Matches / Supporters / Estadio Azteca. No hay fotos libres de ninguna final ni festejo de campeonato.",
+  "Cruz Azul": "Revisé en Commons (HTML) la categoría del club y subcategorías (partidos, aficionados, estadio) y búsquedas de texto/MediaSearch de \"campeón\", \"final\", \"festejo\", \"trofeo\" con el torneo: Clausura 2026 (vuelta 24-may-2026 en el Olímpico Universitario ante Pumas) y Guard1anes/Clausura 2021; Category:Cruz Azul celebrations sólo tiene fotos de los años 60-70 (Segunda División). Sin foto libre.",
+  "Chivas": "Revisé en Commons (HTML) la categoría del club y subcategorías (partidos, aficionados, estadio) y búsquedas de texto/MediaSearch de \"campeón\", \"final\", \"festejo\", \"trofeo\" con el torneo: Clausura 2017 y Category:CD Guadalajara (sólo un \"Campeonato 1956-57\" y fotos de Chivas Femenil). Sin foto libre del varonil campeón reciente.",
+  "Pachuca": "Revisé en Commons (HTML) la categoría del club y subcategorías (partidos, aficionados, estadio) y búsquedas de texto/MediaSearch de \"campeón\", \"final\", \"festejo\", \"trofeo\" con el torneo: Apertura 2022 y Category:CF Pachuca / Estadio Hidalgo / Supporters (Pachuca_Festejo.jpg es de una clasificación de 2014, 258 px). Sin foto libre.",
+  "Monterrey": "Revisé en Commons (HTML) la categoría del club y subcategorías (partidos, aficionados, estadio) y búsquedas de texto/MediaSearch de \"campeón\", \"final\", \"festejo\", \"trofeo\" con el torneo: Apertura 2019 y Category:CF Monterrey / Matches / Estadio BBVA (sólo la final Apertura 2017 que perdió). Sin foto libre.",
+  "Atlas": "Revisé en Commons (HTML) la categoría del club y subcategorías (partidos, aficionados, estadio) y búsquedas de texto/MediaSearch de \"campeón\", \"final\", \"festejo\", \"trofeo\" con el torneo: Apertura 2021 y Clausura 2022, Glorieta Minerva, Category:Club Atlas / Estadio Jalisco. Sin foto libre.",
+  "Tijuana": "Revisé en Commons (HTML) la categoría del club y subcategorías (partidos, aficionados, estadio) y búsquedas de texto/MediaSearch de \"campeón\", \"final\", \"festejo\", \"trofeo\" con el torneo: Apertura 2012 y Category:Club Tijuana. Sin foto libre.",
+  "Santos": "Revisé en Commons (HTML) la categoría del club y subcategorías (partidos, aficionados, estadio) y búsquedas de texto/MediaSearch de \"campeón\", \"final\", \"festejo\", \"trofeo\" con el torneo: Clausura 2018 y Category:Club Santos Laguna / Estadio Corona. Sin foto libre.",
+  "León": "Revisé en Commons (HTML) la categoría del club y subcategorías (partidos, aficionados, estadio) y búsquedas de texto/MediaSearch de \"campeón\", \"final\", \"festejo\", \"trofeo\" con el torneo: Guardianes 2020 y Category:Club León. Sin foto libre.",
+  "Querétaro": "Nunca ha sido campeón de liga de Primera División; no aplica foto de campeonato.",
+  "Tigres": "Revisé en Commons (HTML) la categoría del club y subcategorías (partidos, aficionados, estadio) y búsquedas de texto/MediaSearch de \"campeón\", \"final\", \"festejo\", \"trofeo\" con el torneo: Clausura 2023 y Category:Tigres UANL / Matches / Estadio Universitario (sólo ida de la final Apertura 2017, sin festejo). Sin foto libre.",
+  "Necaxa": "No revisado a fondo por tiempo (último título: Invierno 1998); las búsquedas generales de \"campeón Liga MX\" en Commons no dieron nada.",
+  "Puebla": "No revisado a fondo por tiempo (último título: 1989-90); las búsquedas generales de \"campeón Liga MX\" en Commons no dieron nada."
+ }
 }
