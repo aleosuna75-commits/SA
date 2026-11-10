@@ -25,19 +25,25 @@
 - [x] 2. Cimientos de modelado: `modelo/arnes.py`, `base.py`, `metricas.py`, `datos.py`, `ARNES.md`;
   `modelo/variables.py`, `VARIABLES.md` (309 variables sin fuga, 20 pruebas en verde).
   Líneas base en desarrollo: frecuencias 1.0702, poisson_simple 1.0309, mercado (cierre, Shin) 1.0028.
-- [~] 3 y 5. Workflow `03_campeon_y_produccion.js` (lanzado 09:25 UTC, args `{saltar: []}`), dos cadenas:
-  - candidatos → selección. Señales de hecho: `modelo/informes/candidatos.md` (con sección "Estado"),
-    `modelo/RESULTADOS.md` + `campeon.json` + `pronostico.py`.
-  - mercados → simulador. Señales: `produccion/MERCADOS.md`, `produccion/SIMULADOR.md` + `salidas/actual.json` +
-    `salidas/CONTRATO.md`.
-  - Si se corta: relanzar con `args: {saltar: [...]}` (`candidatos`, `seleccion`, `mercados`, `simulador`).
-- [ ] 3b. Auditoría adversarial de fugas y réplica independiente (prompt en `notas/workflows/02_modelos.js`,
-  función `pAuditoria`) → `modelo/AUDITORIA.md`.
-- [ ] 6. Página (plantilla + constructor) leyendo `salidas/actual.json` según `salidas/CONTRATO.md` y
-  `web/medios.json`; referencia de estilo y de robustez: `f1_austin/web/plantilla.html` (probar en Chromium y WebKit;
-  dentro de iframe no tocar `location.hash`).
-- [ ] 7. Publicación (Artifact nuevo + sitio estático) y commit
-- [ ] 8. Automatización (`pipeline.py auto`, `mejora.py` campeón/retador, tareas programadas, runbook)
+- [x] 3. Competencia de modelos y selección: `modelo/informes/candidatos.md` (6 candidatos, 51 variantes),
+  `modelo/RESULTADOS.md` (prueba pre-registrada, abierta una vez), `campeon.json` (**ajuste**: Dixon-Coles corregido
+  con tiros, viaje y rotación), `registro.json` (retadores: ensamble, dc, dc2, elo, tiros), `pronostico.py`.
+  Resultado franco: en la prueba (480 partidos) todos los modelos quedan dentro del ruido (1.022 a 1.028) y el
+  mercado de cierre (1.003) les gana por ~0.02; el original limpio 1.0325 y subestima goles.
+- [x] 5. Producción: `produccion/mercados.py` (56 mercados por mitades), `combinada.py` (4 picks, conjunta exacta
+  calibrada), `contexto.py`, `simulador.py` (desempates oficiales, liguilla, campeón), `sellos.py`, `exportar.py`
+  → `salidas/actual.json` (contrato en `salidas/CONTRATO.md`). Comando único: `python3 -m produccion.exportar`.
+  Campeón al 10-nov: América 28%, Chivas 22%, Cruz Azul 21%, Toluca 20%.
+- [~] 6 y 3b. Workflow `04_pagina_y_auditoria.js` (lanzado 10:20 UTC, args `{saltar: []}`):
+  - página → `web/plantilla.html`, `web/construir.py`, `web/index.html`, `web/archivos_publicados.json`,
+    `web/LEEME.md`, `web/pruebas/`. Si se corta: revisar qué hay y relanzar (o terminar) con el mismo encargo.
+  - auditoría → `modelo/AUDITORIA.md`. Si se corta: relanzar con `saltar: ["pagina"]` si la página ya está.
+- [ ] 7. Publicación: Artifact NUEVO (título "Cerebro Liga MX", icono "soccer"), `file_path` = `web/index.html`,
+  `files` = lo listado en `web/archivos_publicados.json`; y sitio estático con `construir.py --documento`.
+- [ ] 8. Automatización: `pipeline.py auto` (actualizar ESPN → `variables.actualizar` → `produccion.exportar` →
+  `web/construir.py` → republicar Artifact → commit), `mejora.py` (campeón/retador con la regla de `registro.json`),
+  actualidad (lesionados) antes de cada jornada, tareas programadas por partido (14-nov, J17 20-22 nov, cuartos
+  25-29 nov, semis 2-6 dic, final 10/13 dic) y runbook. Al terminar, desactivar la tarea de continuidad.
 
 ## Cómo retomar una fase cortada
 - Los guiones de los workflows están copiados en `notas/workflows/` (los originales viven fuera del repo y se
@@ -63,3 +69,5 @@
 - 2026-11-10 04:55 UTC · Segundo corte por límite (regresó 08:50). Quedaron hechos: medios completos, arnés,
   variables. Cada ventana de 5 h da para ~1.6-2 M de tokens de agentes: lanzar como mucho 2 cadenas a la vez.
 - 2026-11-10 09:25 UTC · Lanzado `03_campeon_y_produccion.js` (candidatos → selección; mercados → simulador).
+- 2026-11-10 10:15 UTC · Terminó `03_campeon_y_produccion.js` completo (4 agentes, 1.15 M de tokens).
+- 2026-11-10 10:20 UTC · Lanzado `04_pagina_y_auditoria.js`.
