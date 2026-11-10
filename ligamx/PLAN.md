@@ -6,6 +6,10 @@ página con fotos de estadios, escudos y algún video; meter toda la estadístic
 entre equipos como América–Cruz Azul en finales, racha actual, lesionados, expulsados, peso de cada estadio) y
 **encontrar el mejor modelo**.
 
+**Precisión del usuario (10-nov, segundo mensaje):** no hay que construir sobre lo que existe: **encontrar lo mejor**;
+y debe quedar **automatizado y mejorar sobre sí mismo partido a partido y jornada a jornada** (como el de F1:
+tareas programadas + ciclo campeón/retador con regla anti-ruido).
+
 ## Punto de partida
 - En la raíz del repo hay una versión previa (agosto 2026): `cerebro_ligamx_2026.py` (Dixon-Coles validado con
   `golden/`), `generar.py`, `proyeccion.py`, `config/jornadas.json`, `docs/` (sitio simple GPV) y `ARQUITECTURA.md`.
@@ -16,7 +20,8 @@ entre equipos como América–Cruz Azul en finales, racha actual, lesionados, ex
   posesión, minuto de goles, alineaciones, momios). Esto abre mercados que antes no se podían modelar.
 
 ## Fases
-1. **Datos y reconocimiento** (workflow `ligamx-datos-y-reconocimiento`): `datos/` (ESPN + verificación),
+1. **Datos y reconocimiento** (workflows `ligamx-datos-espn`, `ligamx-reglas-y-actualidad`, `ligamx-medios`, en
+   paralelo porque cada workflow sólo corre 2 agentes a la vez en esta máquina de 4 CPU): `datos/` (ESPN + verificación),
    `config/torneo.json` (reglas de liguilla), `config/actualidad.json` (lesionados, suspendidos, DT),
    `web/medios.json` + `web/img` + `web/video` (estadios, ambiente, escudos), `notas/mapa_repo_previo.md`.
 2. **Cimientos de modelado**: arnés de validación walk-forward sin fugas + variables "a la fecha"
@@ -32,6 +37,11 @@ entre equipos como América–Cruz Azul en finales, racha actual, lesionados, ex
 6. **Página**: una sola página cinematográfica (como la de F1), móvil primero, menú de 3 barras, fotos, escudos,
    videos; Artifact + sitio estático.
 7. **Revisión final** (Chromium y WebKit), publicación, commit.
+8. **Automatización y mejora continua**: `pipeline.py auto` (actualiza datos de ESPN → recalibra → sella el
+   pronóstico antes de cada partido → califica el anterior → vuelve a simular liguilla y campeón → reconstruye la
+   página) + `mejora.py` (campeón/retador: tras cada jornada re-evalúa a los retadores en walk-forward y sólo adopta
+   uno si mejora más que el ruido) + tareas programadas alrededor de cada partido pendiente y de cada fase de
+   liguilla, con runbook en `ESTADO.md`.
 
 ## Reglas (heredadas y nuevas)
 - Sin fugas: todo se calibra sólo con partidos anteriores a la fecha del pronóstico.
