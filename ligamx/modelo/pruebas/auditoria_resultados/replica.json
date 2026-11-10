@@ -1,0 +1,821 @@
+{
+ "integridad": {
+  "desarrollo/ajuste": {
+   "n": 2981,
+   "ids_fuera_del_periodo": 0,
+   "evaluables_sin_pronostico": 0,
+   "duplicados": 0,
+   "resultado_distinto_al_csv": 0,
+   "max_abs_suma_menos_1": 4.440892098500626e-16,
+   "prob_fuera_de_0_1": 0,
+   "corte_no_anterior_al_inicio": 0,
+   "corte_distinto_al_recalculado": 0
+  },
+  "desarrollo/dc": {
+   "n": 2981,
+   "ids_fuera_del_periodo": 0,
+   "evaluables_sin_pronostico": 0,
+   "duplicados": 0,
+   "resultado_distinto_al_csv": 0,
+   "max_abs_suma_menos_1": 4.440892098500626e-16,
+   "prob_fuera_de_0_1": 0,
+   "corte_no_anterior_al_inicio": 0,
+   "corte_distinto_al_recalculado": 0
+  },
+  "desarrollo/poisson_simple": {
+   "n": 2981,
+   "ids_fuera_del_periodo": 0,
+   "evaluables_sin_pronostico": 0,
+   "duplicados": 0,
+   "resultado_distinto_al_csv": 0,
+   "max_abs_suma_menos_1": 4.440892098500626e-16,
+   "prob_fuera_de_0_1": 0,
+   "corte_no_anterior_al_inicio": 0,
+   "corte_distinto_al_recalculado": 0
+  },
+  "desarrollo/mercado_cierre_shin": {
+   "n": 1671,
+   "ids_fuera_del_periodo": 0,
+   "evaluables_sin_pronostico": 1310,
+   "duplicados": 0,
+   "resultado_distinto_al_csv": 0,
+   "max_abs_suma_menos_1": 2.220446049250313e-16,
+   "prob_fuera_de_0_1": 0,
+   "corte_no_anterior_al_inicio": 0,
+   "corte_distinto_al_recalculado": 0
+  },
+  "desarrollo/ensamble": {
+   "n": 2981,
+   "ids_fuera_del_periodo": 0,
+   "evaluables_sin_pronostico": 0,
+   "duplicados": 0,
+   "resultado_distinto_al_csv": 0,
+   "max_abs_suma_menos_1": 4.440892098500626e-16,
+   "prob_fuera_de_0_1": 0,
+   "corte_no_anterior_al_inicio": 0,
+   "corte_distinto_al_recalculado": 0
+  },
+  "desarrollo/elo": {
+   "n": 2981,
+   "ids_fuera_del_periodo": 0,
+   "evaluables_sin_pronostico": 0,
+   "duplicados": 0,
+   "resultado_distinto_al_csv": 0,
+   "max_abs_suma_menos_1": 4.440892098500626e-16,
+   "prob_fuera_de_0_1": 0,
+   "corte_no_anterior_al_inicio": 0,
+   "corte_distinto_al_recalculado": 0
+  },
+  "desarrollo/dc2": {
+   "n": 2981,
+   "ids_fuera_del_periodo": 0,
+   "evaluables_sin_pronostico": 0,
+   "duplicados": 0,
+   "resultado_distinto_al_csv": 0,
+   "max_abs_suma_menos_1": 4.440892098500626e-16,
+   "prob_fuera_de_0_1": 0,
+   "corte_no_anterior_al_inicio": 0,
+   "corte_distinto_al_recalculado": 0
+  },
+  "desarrollo/tiros": {
+   "n": 2981,
+   "ids_fuera_del_periodo": 0,
+   "evaluables_sin_pronostico": 0,
+   "duplicados": 0,
+   "resultado_distinto_al_csv": 0,
+   "max_abs_suma_menos_1": 4.440892098500626e-16,
+   "prob_fuera_de_0_1": 0,
+   "corte_no_anterior_al_inicio": 0,
+   "corte_distinto_al_recalculado": 0
+  },
+  "desarrollo/frecuencias": {
+   "n": 2981,
+   "ids_fuera_del_periodo": 0,
+   "evaluables_sin_pronostico": 0,
+   "duplicados": 0,
+   "resultado_distinto_al_csv": 0,
+   "max_abs_suma_menos_1": 4.440892098500626e-16,
+   "prob_fuera_de_0_1": 0,
+   "corte_no_anterior_al_inicio": 0,
+   "corte_distinto_al_recalculado": 0
+  },
+  "prueba/ajuste": {
+   "n": 480,
+   "ids_fuera_del_periodo": 0,
+   "evaluables_sin_pronostico": 0,
+   "duplicados": 0,
+   "resultado_distinto_al_csv": 0,
+   "max_abs_suma_menos_1": 4.440892098500626e-16,
+   "prob_fuera_de_0_1": 0,
+   "corte_no_anterior_al_inicio": 0,
+   "corte_distinto_al_recalculado": 0
+  },
+  "prueba/dc": {
+   "n": 480,
+   "ids_fuera_del_periodo": 0,
+   "evaluables_sin_pronostico": 0,
+   "duplicados": 0,
+   "resultado_distinto_al_csv": 0,
+   "max_abs_suma_menos_1": 4.440892098500626e-16,
+   "prob_fuera_de_0_1": 0,
+   "corte_no_anterior_al_inicio": 0,
+   "corte_distinto_al_recalculado": 0
+  },
+  "prueba/poisson_simple": {
+   "n": 480,
+   "ids_fuera_del_periodo": 0,
+   "evaluables_sin_pronostico": 0,
+   "duplicados": 0,
+   "resultado_distinto_al_csv": 0,
+   "max_abs_suma_menos_1": 4.440892098500626e-16,
+   "prob_fuera_de_0_1": 0,
+   "corte_no_anterior_al_inicio": 0,
+   "corte_distinto_al_recalculado": 0
+  },
+  "prueba/mercado_cierre_shin": {
+   "n": 476,
+   "ids_fuera_del_periodo": 0,
+   "evaluables_sin_pronostico": 4,
+   "duplicados": 0,
+   "resultado_distinto_al_csv": 0,
+   "max_abs_suma_menos_1": 2.220446049250313e-16,
+   "prob_fuera_de_0_1": 0,
+   "corte_no_anterior_al_inicio": 0,
+   "corte_distinto_al_recalculado": 0
+  },
+  "prueba/ensamble": {
+   "n": 480,
+   "ids_fuera_del_periodo": 0,
+   "evaluables_sin_pronostico": 0,
+   "duplicados": 0,
+   "resultado_distinto_al_csv": 0,
+   "max_abs_suma_menos_1": 4.440892098500626e-16,
+   "prob_fuera_de_0_1": 0,
+   "corte_no_anterior_al_inicio": 0,
+   "corte_distinto_al_recalculado": 0
+  },
+  "prueba/elo": {
+   "n": 480,
+   "ids_fuera_del_periodo": 0,
+   "evaluables_sin_pronostico": 0,
+   "duplicados": 0,
+   "resultado_distinto_al_csv": 0,
+   "max_abs_suma_menos_1": 4.440892098500626e-16,
+   "prob_fuera_de_0_1": 0,
+   "corte_no_anterior_al_inicio": 0,
+   "corte_distinto_al_recalculado": 0
+  },
+  "prueba/dc2": {
+   "n": 480,
+   "ids_fuera_del_periodo": 0,
+   "evaluables_sin_pronostico": 0,
+   "duplicados": 0,
+   "resultado_distinto_al_csv": 0,
+   "max_abs_suma_menos_1": 3.3306690738754696e-16,
+   "prob_fuera_de_0_1": 0,
+   "corte_no_anterior_al_inicio": 0,
+   "corte_distinto_al_recalculado": 0
+  },
+  "prueba/tiros": {
+   "n": 480,
+   "ids_fuera_del_periodo": 0,
+   "evaluables_sin_pronostico": 0,
+   "duplicados": 0,
+   "resultado_distinto_al_csv": 0,
+   "max_abs_suma_menos_1": 4.440892098500626e-16,
+   "prob_fuera_de_0_1": 0,
+   "corte_no_anterior_al_inicio": 0,
+   "corte_distinto_al_recalculado": 0
+  },
+  "prueba/cerebro_original_limpio": {
+   "n": 480,
+   "ids_fuera_del_periodo": 0,
+   "evaluables_sin_pronostico": 0,
+   "duplicados": 0,
+   "resultado_distinto_al_csv": 0,
+   "max_abs_suma_menos_1": 4.440892098500626e-16,
+   "prob_fuera_de_0_1": 0,
+   "corte_no_anterior_al_inicio": 0,
+   "corte_distinto_al_recalculado": 0
+  },
+  "prueba/frecuencias": {
+   "n": 480,
+   "ids_fuera_del_periodo": 0,
+   "evaluables_sin_pronostico": 0,
+   "duplicados": 0,
+   "resultado_distinto_al_csv": 0,
+   "max_abs_suma_menos_1": 2.220446049250313e-16,
+   "prob_fuera_de_0_1": 0,
+   "corte_no_anterior_al_inicio": 0,
+   "corte_distinto_al_recalculado": 0
+  }
+ },
+ "metricas": {
+  "desarrollo/ajuste": {
+   "n": 2981,
+   "logloss": 1.0225193242351143,
+   "ee": 0.007108486815851171,
+   "rps": 0.20931436351320645,
+   "brier": 0.6133951856905446,
+   "reportado": 1.0225,
+   "coincide_a_4_decimales": true
+  },
+  "desarrollo/dc": {
+   "n": 2981,
+   "logloss": 1.0297302773086716,
+   "ee": 0.006569309719171174,
+   "rps": 0.21166102102484788,
+   "brier": 0.6182694426461256,
+   "reportado": 1.0297,
+   "coincide_a_4_decimales": true
+  },
+  "desarrollo/poisson_simple": {
+   "n": 2981,
+   "logloss": 1.0309389844479886,
+   "ee": 0.0069827501566493335,
+   "rps": 0.21193481747922682,
+   "brier": 0.618874713902356,
+   "reportado": 1.0309,
+   "coincide_a_4_decimales": true
+  },
+  "desarrollo/mercado_cierre_shin": {
+   "n": 1671,
+   "logloss": 1.0028158811072498,
+   "ee": 0.009492578891322921,
+   "rps": 0.20408799528783514,
+   "brier": 0.5994726596097377,
+   "reportado": 1.0028,
+   "coincide_a_4_decimales": true
+  },
+  "desarrollo/ensamble": {
+   "n": 2981,
+   "logloss": 1.0253943219248711,
+   "ee": 0.006606433253855979,
+   "rps": 0.210151754675464,
+   "brier": 0.6152256408504951,
+   "reportado": 1.0254,
+   "coincide_a_4_decimales": true
+  },
+  "desarrollo/elo": {
+   "n": 2981,
+   "logloss": 1.031595787621921,
+   "ee": 0.0062222083743120596,
+   "rps": 0.21202934068315887,
+   "brier": 0.6194250401772217,
+   "reportado": 1.0316,
+   "coincide_a_4_decimales": true
+  },
+  "desarrollo/dc2": {
+   "n": 2981,
+   "logloss": 1.0290945328041696,
+   "ee": 0.0065362660110899135,
+   "rps": 0.21141394084107437,
+   "brier": 0.6179269006718874,
+   "reportado": null,
+   "coincide_a_4_decimales": null
+  },
+  "desarrollo/tiros": {
+   "n": 2981,
+   "logloss": 1.031906217416549,
+   "ee": 0.005731995898390887,
+   "rps": 0.2123089156483149,
+   "brier": 0.6196565283903287,
+   "reportado": null,
+   "coincide_a_4_decimales": null
+  },
+  "desarrollo/frecuencias": {
+   "n": 2981,
+   "logloss": 1.0701691896583196,
+   "ee": 0.004133976664173775,
+   "rps": 0.22521474132874408,
+   "brier": 0.6467151150647156,
+   "reportado": null,
+   "coincide_a_4_decimales": null
+  },
+  "prueba/ajuste": {
+   "n": 480,
+   "logloss": 1.0271908619443633,
+   "ee": 0.021466418281157418,
+   "rps": 0.21263535413156706,
+   "brier": 0.615588979891697,
+   "reportado": 1.0272,
+   "coincide_a_4_decimales": true
+  },
+  "prueba/dc": {
+   "n": 480,
+   "logloss": 1.0264104206502227,
+   "ee": 0.018339501585593266,
+   "rps": 0.2129094413870898,
+   "brier": 0.6149297159965628,
+   "reportado": 1.0264,
+   "coincide_a_4_decimales": true
+  },
+  "prueba/poisson_simple": {
+   "n": 480,
+   "logloss": 1.0276105465050809,
+   "ee": 0.019391581506524758,
+   "rps": 0.21322972096781287,
+   "brier": 0.6159323717413243,
+   "reportado": 1.0276,
+   "coincide_a_4_decimales": true
+  },
+  "prueba/mercado_cierre_shin": {
+   "n": 476,
+   "logloss": 1.0029984121218445,
+   "ee": 0.01937972130412028,
+   "rps": 0.2055471840335708,
+   "brier": 0.5994463275885139,
+   "reportado": 1.003,
+   "coincide_a_4_decimales": true
+  },
+  "prueba/ensamble": {
+   "n": 480,
+   "logloss": 1.0225365486925326,
+   "ee": 0.02022782810291053,
+   "rps": 0.21151988748595998,
+   "brier": 0.6125441488989818,
+   "reportado": 1.0225,
+   "coincide_a_4_decimales": true
+  },
+  "prueba/elo": {
+   "n": 480,
+   "logloss": 1.0221219629114755,
+   "ee": 0.019288180803673706,
+   "rps": 0.21159014618264538,
+   "brier": 0.6121747457274331,
+   "reportado": 1.0221,
+   "coincide_a_4_decimales": true
+  },
+  "prueba/dc2": {
+   "n": 480,
+   "logloss": 1.024450122303116,
+   "ee": 0.018006053004824926,
+   "rps": 0.21219213018635688,
+   "brier": 0.6137511987734051,
+   "reportado": null,
+   "coincide_a_4_decimales": null
+  },
+  "prueba/tiros": {
+   "n": 480,
+   "logloss": 1.0265993695791267,
+   "ee": 0.01649460732830175,
+   "rps": 0.21298225743706514,
+   "brier": 0.6152244596421226,
+   "reportado": null,
+   "coincide_a_4_decimales": null
+  },
+  "prueba/cerebro_original_limpio": {
+   "n": 480,
+   "logloss": 1.0325449760397194,
+   "ee": 0.01676788777675948,
+   "rps": 0.21303944979794384,
+   "brier": 0.6182172478472163,
+   "reportado": 1.0325,
+   "coincide_a_4_decimales": true
+  },
+  "prueba/frecuencias": {
+   "n": 480,
+   "logloss": 1.0742109205315507,
+   "ee": 0.009753584577239188,
+   "rps": 0.22922469693631592,
+   "brier": 0.6495761296890473,
+   "reportado": null,
+   "coincide_a_4_decimales": null
+  }
+ },
+ "pareadas": [
+  {
+   "periodo": "desarrollo",
+   "a": "ajuste",
+   "b": "mercado_cierre_shin",
+   "n": 1671,
+   "n_a": 2981,
+   "n_b": 1671,
+   "dif": 0.009495500322780123,
+   "dif_reportada": 0.0095,
+   "ee_bloque": 0.004295225162946253,
+   "ee_reportado": 0.0043,
+   "ic95": [
+    0.0010882182282207543,
+    0.017786787826335314
+   ],
+   "ee_partido": 0.004099748041898485,
+   "ee_semana": 0.004165106009947142,
+   "ee_mes": 0.003912899369652136,
+   "ee_analitico_bloque": 0.004311906302540805,
+   "d_rps": 0.002883015512581393,
+   "d_brier": 0.00629367124735153
+  },
+  {
+   "periodo": "desarrollo",
+   "a": "ajuste",
+   "b": "dc",
+   "n": 2981,
+   "n_a": 2981,
+   "n_b": 2981,
+   "dif": -0.007210953073557292,
+   "dif_reportada": -0.0072,
+   "ee_bloque": 0.0013464136934563861,
+   "ee_reportado": 0.0013,
+   "ic95": [
+    -0.00980331658071964,
+    -0.00451240170291667
+   ],
+   "ee_partido": 0.0013807911492445504,
+   "ee_semana": 0.0013083496993160615,
+   "ee_mes": 0.0013227723907443501,
+   "ee_analitico_bloque": 0.0013529772377681203,
+   "d_rps": -0.0023466575116414326,
+   "d_brier": -0.004874256955580935
+  },
+  {
+   "periodo": "desarrollo",
+   "a": "ajuste",
+   "b": "ensamble",
+   "n": 2981,
+   "n_a": 2981,
+   "n_b": 2981,
+   "dif": -0.0028749976897570074,
+   "dif_reportada": -0.0029,
+   "ee_bloque": 0.0010300829533524856,
+   "ee_reportado": 0.001,
+   "ic95": [
+    -0.004862726981535316,
+    -0.0008194879167034648
+   ],
+   "ee_partido": 0.001024188308665907,
+   "ee_semana": 0.0010120070730505089,
+   "ee_mes": 0.001000435903388882,
+   "ee_analitico_bloque": 0.0010188428301536113,
+   "d_rps": -0.0008373911622575509,
+   "d_brier": -0.001830455159950443
+  },
+  {
+   "periodo": "desarrollo",
+   "a": "poisson_simple",
+   "b": "mercado_cierre_shin",
+   "n": 1671,
+   "n_a": 2981,
+   "n_b": 1671,
+   "dif": 0.01852619259241086,
+   "dif_reportada": 0.0185,
+   "ee_bloque": 0.004584689667424117,
+   "ee_reportado": 0.0046,
+   "ic95": [
+    0.00954348706287434,
+    0.027514996035452533
+   ],
+   "ee_partido": 0.004476803699080455,
+   "ee_semana": 0.004455621522112035,
+   "ee_mes": 0.00415811008960866,
+   "ee_analitico_bloque": 0.004588125602484002,
+   "d_rps": 0.00577996304174144,
+   "d_brier": 0.012203614031029156
+  },
+  {
+   "periodo": "prueba",
+   "a": "ajuste",
+   "b": "mercado_cierre_shin",
+   "n": 476,
+   "n_a": 480,
+   "n_b": 476,
+   "dif": 0.023744710966875842,
+   "dif_reportada": 0.0237,
+   "ee_bloque": 0.008184719180563653,
+   "ee_reportado": 0.008,
+   "ic95": [
+    0.0075378983598928416,
+    0.039744481002563975
+   ],
+   "ee_partido": 0.00803958837379664,
+   "ee_semana": 0.008166553445249178,
+   "ee_mes": 0.00827103833500245,
+   "ee_analitico_bloque": 0.008121602178988427,
+   "d_rps": 0.007339400389749349,
+   "d_brier": 0.015763658641231727
+  },
+  {
+   "periodo": "prueba",
+   "a": "ajuste",
+   "b": "dc",
+   "n": 480,
+   "n_a": 480,
+   "n_b": 480,
+   "dif": 0.0007804412941406324,
+   "dif_reportada": 0.0008,
+   "ee_bloque": 0.004468228357433072,
+   "ee_reportado": 0.0045,
+   "ic95": [
+    -0.007991641394858206,
+    0.009787373957925808
+   ],
+   "ee_partido": 0.004840560623564298,
+   "ee_semana": 0.0042609405570320546,
+   "ee_mes": 0.0047767513161852725,
+   "ee_analitico_bloque": 0.004512485838443343,
+   "d_rps": -0.00027408725552277184,
+   "d_brier": 0.0006592638951342151
+  },
+  {
+   "periodo": "prueba",
+   "a": "ensamble",
+   "b": "ajuste",
+   "n": 480,
+   "n_a": 480,
+   "n_b": 480,
+   "dif": -0.004654313251830449,
+   "dif_reportada": -0.0047,
+   "ee_bloque": 0.002720381122382385,
+   "ee_reportado": 0.0028,
+   "ic95": [
+    -0.010058189619930734,
+    0.000617443668130232
+   ],
+   "ee_partido": 0.0029941360346508773,
+   "ee_semana": 0.0025440506062568272,
+   "ee_mes": 0.003217762155080213,
+   "ee_analitico_bloque": 0.002726502163848036,
+   "d_rps": -0.0011154666456070677,
+   "d_brier": -0.0030448309927152265
+  },
+  {
+   "periodo": "prueba",
+   "a": "elo",
+   "b": "mercado_cierre_shin",
+   "n": 476,
+   "n_a": 480,
+   "n_b": 476,
+   "dif": 0.018548634138025256,
+   "dif_reportada": 0.0185,
+   "ee_bloque": 0.007493786810962023,
+   "ee_reportado": 0.0075,
+   "ic95": [
+    0.003865938496229866,
+    0.03356541653064104
+   ],
+   "ee_partido": 0.008221677783054021,
+   "ee_semana": 0.007175897001004961,
+   "ee_mes": 0.007254089451259132,
+   "ee_analitico_bloque": 0.007513184448185288,
+   "d_rps": 0.00632441365813769,
+   "d_brier": 0.012325918595673505
+  },
+  {
+   "periodo": "prueba",
+   "a": "ajuste",
+   "b": "poisson_simple",
+   "n": 480,
+   "n_a": 480,
+   "n_b": 480,
+   "dif": -0.00041968456071755645,
+   "dif_reportada": -0.0004,
+   "ee_bloque": 0.004134171718306615,
+   "ee_reportado": 0.0042,
+   "ic95": [
+    -0.00844981468826579,
+    0.007824709235242231
+   ],
+   "ee_partido": 0.004473838130178438,
+   "ee_semana": 0.003970794333830111,
+   "ee_mes": 0.00431033478660344,
+   "ee_analitico_bloque": 0.004175307277739451,
+   "d_rps": -0.0005943668362458188,
+   "d_brier": -0.0003433918496272545
+  }
+ ],
+ "mercado": {
+  "desarrollo": {
+   "evaluables": 2981,
+   "con_momios": 1677,
+   "marcados_en_vivo": 6,
+   "ids_en_vivo": [
+    692368,
+    692377,
+    692383,
+    692385,
+    692388,
+    692386
+   ],
+   "usados": 1671,
+   "mismos_partidos_que_el_archivo": true,
+   "max_dif_prob_shin_propio_vs_archivo": 2.220446049250313e-16,
+   "logloss_shin_propio": 1.0028158811072498,
+   "rps": 0.20408799528783514,
+   "brier": 0.5994726596097377,
+   "logloss_si_no_se_filtrara_en_vivo": 0.9998330866888316,
+   "margen_medio": 0.062078064335892025,
+   "proveedores": {
+    "Bet365": 1301,
+    "ESPN BET": 343,
+    "Caesars Sportsbook (NJ)": 25,
+    "DraftKings (old)": 1,
+    "Caesars Sportsbook (Colorado)": 1
+   }
+  },
+  "prueba": {
+   "evaluables": 480,
+   "con_momios": 476,
+   "marcados_en_vivo": 0,
+   "ids_en_vivo": [],
+   "usados": 476,
+   "mismos_partidos_que_el_archivo": true,
+   "max_dif_prob_shin_propio_vs_archivo": 2.220446049250313e-16,
+   "logloss_shin_propio": 1.0029984121218445,
+   "rps": 0.2055471840335708,
+   "brier": 0.5994463275885139,
+   "logloss_si_no_se_filtrara_en_vivo": 1.0029984121218445,
+   "margen_medio": 0.060444990525945104,
+   "proveedores": {
+    "DraftKings": 313,
+    "ESPN BET": 163
+   }
+  }
+ },
+ "por_torneo": [
+  {
+   "periodo": "desarrollo",
+   "torneo": "Apertura 2016",
+   "n": 167,
+   "ajuste_menos_dc": -0.00332297163860725
+  },
+  {
+   "periodo": "desarrollo",
+   "torneo": "Clausura 2017",
+   "n": 167,
+   "ajuste_menos_dc": 0.0008174176813284373
+  },
+  {
+   "periodo": "desarrollo",
+   "torneo": "Apertura 2017",
+   "n": 167,
+   "ajuste_menos_dc": -0.004406697861615532
+  },
+  {
+   "periodo": "desarrollo",
+   "torneo": "Clausura 2018",
+   "n": 167,
+   "ajuste_menos_dc": -0.0030836512531805063
+  },
+  {
+   "periodo": "desarrollo",
+   "torneo": "Apertura 2018",
+   "n": 167,
+   "ajuste_menos_dc": -0.001852132577841228
+  },
+  {
+   "periodo": "desarrollo",
+   "torneo": "Clausura 2019",
+   "n": 167,
+   "ajuste_menos_dc": -0.010661156867533546
+  },
+  {
+   "periodo": "desarrollo",
+   "torneo": "Apertura 2019",
+   "n": 185,
+   "ajuste_menos_dc": 0.00037868691415512864
+  },
+  {
+   "periodo": "desarrollo",
+   "torneo": "Clausura 2020",
+   "n": 90,
+   "ajuste_menos_dc": -0.007572520317762004
+  },
+  {
+   "periodo": "desarrollo",
+   "torneo": "Apertura 2020",
+   "n": 171,
+   "ajuste_menos_dc": -0.00337617113230268
+  },
+  {
+   "periodo": "desarrollo",
+   "torneo": "Clausura 2021",
+   "n": 170,
+   "ajuste_menos_dc": -0.000552699361183294
+  },
+  {
+   "periodo": "desarrollo",
+   "torneo": "Apertura 2021",
+   "n": 171,
+   "ajuste_menos_dc": -0.005107531700418404
+  },
+  {
+   "periodo": "desarrollo",
+   "torneo": "Clausura 2022",
+   "n": 170,
+   "ajuste_menos_dc": -0.011628125240831753
+  },
+  {
+   "periodo": "desarrollo",
+   "torneo": "Apertura 2022",
+   "n": 171,
+   "ajuste_menos_dc": -0.014493100500548766
+  },
+  {
+   "periodo": "desarrollo",
+   "torneo": "Clausura 2023",
+   "n": 171,
+   "ajuste_menos_dc": -0.012919532401180036
+  },
+  {
+   "periodo": "desarrollo",
+   "torneo": "Apertura 2023",
+   "n": 170,
+   "ajuste_menos_dc": -0.005885280023318395
+  },
+  {
+   "periodo": "desarrollo",
+   "torneo": "Clausura 2024",
+   "n": 170,
+   "ajuste_menos_dc": -0.01769411990793694
+  },
+  {
+   "periodo": "desarrollo",
+   "torneo": "Apertura 2024",
+   "n": 170,
+   "ajuste_menos_dc": -0.016203877057238237
+  },
+  {
+   "periodo": "desarrollo",
+   "torneo": "Clausura 2025",
+   "n": 170,
+   "ajuste_menos_dc": -0.012665738420017203
+  },
+  {
+   "periodo": "prueba",
+   "torneo": "Apertura 2025",
+   "n": 170,
+   "ajuste_menos_dc": -0.009653820255354495
+  },
+  {
+   "periodo": "prueba",
+   "torneo": "Clausura 2026",
+   "n": 167,
+   "ajuste_menos_dc": 0.006114393129225592
+  },
+  {
+   "periodo": "prueba",
+   "torneo": "Apertura 2026",
+   "n": 143,
+   "ajuste_menos_dc": 0.006955647636483179
+  }
+ ],
+ "ajuste_menos_dc_todo": {
+  "n": 3461,
+  "dif": -0.006102640650415135,
+  "ee": 0.00134290773731398,
+  "reportado": [
+   -0.0061,
+   0.0013
+  ]
+ },
+ "regla_prueba": [
+  {
+   "candidato": "ensamble",
+   "dif_vs_ajuste": -0.004654313251830449,
+   "ee": 0.002720381122382385,
+   "z": -1.7109048484185976
+  },
+  {
+   "candidato": "elo",
+   "dif_vs_ajuste": -0.005068899032887827,
+   "ee": 0.005519922031578319,
+   "z": -0.9182917809146064
+  },
+  {
+   "candidato": "dc2",
+   "dif_vs_ajuste": -0.0027407396412473593,
+   "ee": 0.0047979731228391985,
+   "z": -0.5712286357339008
+  },
+  {
+   "candidato": "dc",
+   "dif_vs_ajuste": -0.0007804412941406324,
+   "ee": 0.004468228357433072,
+   "z": -0.17466459449019384
+  },
+  {
+   "candidato": "tiros",
+   "dif_vs_ajuste": -0.0005914923652365696,
+   "ee": 0.005951299054797248,
+   "z": -0.09938878214492969
+  }
+ ],
+ "apertura_vs_cierre_prueba": {
+  "n": 313,
+  "logloss_apertura": 1.0517094145855057,
+  "logloss_cierre": 1.0263841510735658,
+  "movimiento_abs_max_mediana": 0.038421632517129045,
+  "movimiento_abs_max_p90": 0.0919901923466401,
+  "partidos_con_movimiento_mayor_a_0.10": 24,
+  "de_esos_hacia_el_resultado_real": 16,
+  "ganancia_logloss_del_cierre_en_esos": 0.009708577096075501,
+  "ganancia_logloss_del_cierre_en_el_resto": 0.015616686415864414,
+  "proveedores": {
+   "DraftKings": 313
+  }
+ },
+ "torneos_desarrollo_ganados_por_ajuste": [
+  16,
+  18
+ ]
+}

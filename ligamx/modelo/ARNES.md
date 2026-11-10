@@ -127,7 +127,7 @@ futuro, Mf = arnes.pronosticar(base.PoissonSimple())             # los partidos 
 
 Tiempos medidos en esta máquina (un proceso): el arnés solo cuesta 2 s por recorrido (510 cortes); `PoissonSimple`
 completo **7.5 s** por bloque y 12.7 s por día (Newton con hessiana analítica, 4 iteraciones por corte arrancando
-del ajuste anterior); `Mercado` 2 s; `CerebroOriginal` <<SEG_ORIGINAL>> (gradiente numérico, sin arranque en caliente).
+del ajuste anterior); `Mercado` 2 s; `CerebroOriginal` 3,778 s en DESARROLLO (63 minutos; gradiente numérico, sin arranque en caliente).
 Conviene exportar `OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1` para no ocupar los 4 núcleos.
 
 ## 4. Utilidades de la matriz de marcadores (`arnes`)
@@ -180,7 +180,18 @@ Nombre del archivo: `<nombre>.parquet` (desarrollo, por bloque); sufijos `__dia`
 lo impredecible de los resultados), pero lo que importa es la diferencia pareada, cuyo error depende de cuánto se
 parezcan los dos modelos:
 
-<<TABLA_RUIDO>>
+| Par (a − b) | Periodo | n | Diferencia de log-loss | ee pareado (bloques) | Desviación por partido `s` = ee·√n |
+|---|---|---|---|---|---|
+| `ajuste` − `ensamble` | DESARROLLO | 2,981 | −0.0029 | 0.0010 | 0.05 |
+| `ajuste` − `dc` | DESARROLLO | 2,981 | −0.0072 | 0.0013 | 0.07 |
+| `ajuste` − `mercado_cierre_shin` | DESARROLLO | 1,671 | +0.0095 | 0.0043 | 0.18 |
+| `poisson_simple` − `mercado_cierre_shin` | DESARROLLO | 1,671 | +0.0185 | 0.0046 | 0.19 |
+| `ensamble` − `ajuste` | PRUEBA | 480 | −0.0047 | 0.0027 | 0.06 |
+| `ajuste` − `dc` | PRUEBA | 480 | +0.0008 | 0.0045 | 0.10 |
+| `ajuste` − `mercado_cierre_shin` | PRUEBA | 476 | +0.0237 | 0.0080 | 0.17 |
+
+(Tabla llenada en la auditoría del 2026-11-10 con `pruebas/auditoria_replica.py`, que recalcula estos errores con un
+bootstrap propio; por partido, por semana, por mes y con la fórmula analítica de conglomerados dan lo mismo ± 0.0005.)
 
 Lectura: (a) en la PRUEBA (≈ 480 partidos) una diferencia de log-loss contra el mercado menor que ≈ 0.017 (2 ee) no se
 distinguirá del azar; la que hoy separa a `poisson_simple` del mercado (0.0185) apenas llegaría a 2 ee. (b) Para
@@ -347,4 +358,15 @@ Marcador exacto contra `mercado_cierre_marcador` (logv −2.8460): `poisson_simp
 
 ## 12. Pendientes y dudas
 
-<<PENDIENTES>>
+(Sección llenada en la auditoría del 2026-11-10; el detalle está en `AUDITORIA.md`.)
+
+- `cerebro_original_limpio` terminó su corrida de DESARROLLO después de cerrar esta fase: log-loss 1.0370 (n = 2,981),
+  peor que `poisson_simple` (1.0309) y que `dc` (1.0297).
+- El arnés entrega en `hist` los partidos que EMPEZARON antes del corte. Tres partidos nocturnos (1 de DESARROLLO, 2 de
+  la PRUEBA) empiezan antes de la medianoche y terminan después: están en el historial de un corte de día que cae a
+  media segunda parte. No cambia nada (ningún partido empieza a menos de 9.5 horas de su corte), pero un pronóstico
+  "de las 00:00" hay que entenderlo como "de la mañana del día del partido".
+- El arnés no puede impedir que una familia elija sus variables o hiperparámetros mirando todo DESARROLLO: eso pasó
+  con `ajuste` (ver `AUDITORIA.md` §4). La única defensa es la PRUEBA y, ya usada, los pronósticos sellados.
+- Los momios de cierre vienen de una sola fuente (ESPN). El filtro de momios en vivo no marca ningún partido de la
+  PRUEBA; una captura temprana con momios verosímiles no se detectaría.

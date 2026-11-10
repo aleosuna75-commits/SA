@@ -467,7 +467,8 @@ def construir(corte=None, n_sim: int = simulador.N_SIM, sellar: bool | None = No
         "dominios": ctx.dominios_liguilla(),
         "desempeno": desempeno,
         "calibracion_series": cal,
-        "avisos": _avisos(meta_modelo, des, reglas, sim, pendientes, cal),
+        # primero los avisos de datos del propio Pronosticador (p. ej. caché de variables desactualizada)
+        "avisos": [f"DATOS: {x}" for x in getattr(pron, "avisos", [])] + _avisos(meta_modelo, des, reglas, sim, pendientes, cal),
     }
     doc["meta"]["segundos"] = round(time.time() - t0, 1)
     return redondear(doc)

@@ -283,3 +283,49 @@ def test_tabla_pronosticos(pro, df):
     assert {"lam_l", "lam_v", "p_l", "p_e", "p_v", "marcador", "p_marcador"} <= set(t.columns)
     np.testing.assert_allclose(t[["p_l", "p_e", "p_v"]].sum(axis=1), 1.0, atol=1e-9)
     assert t["marcador"].str.fullmatch(r"\d+-\d+").all()
+
+
+# --------------------------------------------------------------------------------------------------
+# Caché de variables desactualizada (añadido en la auditoría del 2026-11-10)
+# --------------------------------------------------------------------------------------------------
+def test_cache_de_variables_al_dia_no_avisa(pro):
+    assert pro.avisos == []
+
+
+def test_avisa_si_a_la_cache_de_variables_le_faltan_partidos(df, tmp_path, monkeypatch):
+    """Una caché a la que le faltan partidos anteriores al corte de coeficientes debe avisar, no callar."""
+    from modelo import variables as V
+    vieja = V.cargar("bloque")
+    vieja = vieja[vieja["fecha_utc"] < "2026-03-01"]
+    ruta = tmp_path / "variables_bloque.parquet"
+    vieja.to_parquet(ruta, index=False)
+    monkeypatch.setitem(C.RUTA_VARIABLES, "bloque", ruta)
+    C._tablas_variables.clear()
+    try:
+        with pytest.warns(RuntimeWarning, match="faltan"):
+            p = P.Pronosticador(corte="2026-11-10", df=df)
+        assert len(p.avisos) == 1 and "variables.actualizar" in p.avisos[0]
+        # un modelo que no usa la caché (dc) no tiene por qué avisar
+        import warnings
+        with warnings.catch_warnings():
+            warnings.simplefilter("error")
+            assert P.Pronosticador(corte="2026-11-10", modelo="dc", df=df).avisos == []
+    finally:
+        C._tablas_variables.clear()
+
+
+def test_estado_cache_detecta_un_partido_modificado(tmp_path, monkeypatch):
+    """variables.estado_cache compara firmas sin reconstruir: una firma distinta = caché desactualizada."""
+    import shutil
+    from modelo import variables as V
+    assert V.estado_cache("bloque")["al_dia"]
+    for r in V._rutas("bloque"):
+        shutil.copy(r, tmp_path / r.name)
+    monkeypatch.setattr(V, "DIR_CACHE", tmp_path)
+    fir = pd.read_parquet(V._rutas("bloque")[1])
+    k = fir.index[(fir["estado"] == "jugado") & (fir["t"] > pd.Timestamp("2026-02-01", tz="UTC").timestamp())][0]
+    fir.loc[k, "firma"] = "0"
+    fir.to_parquet(V._rutas("bloque")[1], index=False)
+    est = V.estado_cache("bloque")
+    assert not est["al_dia"] and est["cambiados"] == 1 and est["primer_cambio_utc"].startswith("2026-02")
+    assert V.estado_cache("bloque", hasta="2026-01-01")["al_dia"]          # lo anterior al cambio sigue sirviendo

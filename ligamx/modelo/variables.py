@@ -1736,6 +1736,53 @@ def actualizar(corte: str = "partido", forzar: bool = False, verboso: bool = Fal
     return df
 
 
+def estado_cache(corte: str = "partido", hasta=None) -> dict:
+    """
+    Diagnóstico de la caché SIN reconstruirla ni escribir nada (añadido en la auditoría): compara las
+    firmas guardadas con los CSV actuales, igual que `actualizar`, y dice si la caché sirve tal cual.
+
+    hasta: instante UTC; sólo cuentan los partidos que empiezan antes (p. ej. el corte con que un modelo
+        ajusta sus coeficientes: lo posterior no le afecta). None = todos.
+    Devuelve {"existe", "al_dia", "global_distinta", "cambiados" (partidos nuevos, modificados o
+    borrados antes de `hasta`), "primer_cambio_utc", "generado_utc", "mensaje"}. Si hay un cambio, TODAS
+    las filas desde ese instante pueden estar viejas (cada fila depende de su pasado).
+    """
+    r_tab, r_fir, r_meta = _rutas(corte)
+    out = {"corte": corte, "existe": r_tab.exists() and r_fir.exists() and r_meta.exists(), "al_dia": False,
+           "global_distinta": False, "cambiados": 0, "primer_cambio_utc": None, "generado_utc": None, "mensaje": ""}
+    if not out["existe"]:
+        out["mensaje"] = f"no existe la caché de variables '{corte}' ({r_tab.name}): ejecute variables.actualizar('{corte}')"
+        return out
+    partidos, tarjetas, alineaciones, sedes = leer_partidos(), leer_tarjetas(), leer_alineaciones(), leer_sedes()
+    try:
+        meta = json.loads(r_meta.read_text(encoding="utf-8"))
+    except Exception:
+        meta = {}
+    out["generado_utc"] = meta.get("generado_utc")
+    out["global_distinta"] = meta.get("firma_global") != _firma_global(corte, sedes)
+    tab = _preparar(partidos, None, corte)
+    nuevas = _firmas(tab, tarjetas, alineaciones)
+    viejas = pd.read_parquet(r_fir)
+    v_firma = dict(zip(viejas["id"], viejas["firma"]))
+    v_t = dict(zip(viejas["id"], viejas["t"]))
+    n_t = dict(zip(tab["id"], tab["_t"]))
+    cambios = [min(n_t[i], v_t.get(i, n_t[i])) for i, f in nuevas.items() if v_firma.get(i) != f]
+    cambios += [v_t[i] for i in v_firma if i not in n_t]
+    if hasta is not None:
+        tope = _a_epoca(hasta)
+        cambios = [t for t in cambios if t < tope]
+    out["cambiados"] = len(cambios)
+    if cambios:
+        out["primer_cambio_utc"] = pd.Timestamp(int(min(cambios)), unit="s", tz="UTC").strftime("%Y-%m-%dT%H:%MZ")
+    out["al_dia"] = not cambios and not out["global_distinta"]
+    if not out["al_dia"]:
+        motivo = ("cambió la configuración global (versión, sedes o formato del torneo)" if out["global_distinta"] else
+                  f"{len(cambios)} partidos nuevos o modificados desde {out['primer_cambio_utc']}")
+        out["mensaje"] = (f"la caché de variables '{corte}' (generada {out['generado_utc']}) está desactualizada: {motivo}; "
+                          f"ejecute variables.actualizar('{corte}') antes de pronosticar")
+    return out
+
+
 def ids_sin_sede(partidos: pd.DataFrame | None = None, sedes: pd.DataFrame | None = None) -> pd.DataFrame:
     """Estadios de ESPN (desde 2010) que no están en estadios_sedes.csv: hay que agregarlos a mano."""
     p = leer_partidos() if partidos is None else partidos

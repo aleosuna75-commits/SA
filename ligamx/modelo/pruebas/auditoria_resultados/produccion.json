@@ -1,0 +1,519 @@
+{
+ "validar_del_proyecto": [],
+ "peso_kb": 222.0,
+ "meta": {
+  "corte_utc": "2026-11-10T10:41:48.611214+00:00",
+  "torneo": "Apertura 2026",
+  "modelo": "ajuste"
+ },
+ "a_sumas": {
+  "pendientes": 10,
+  "max_abs_1x2_menos_1": 0.00010000000000021103,
+  "max_abs_matriz_menos_1": 0.000500000000000056,
+  "pares_complementarios_malos": [],
+  "prob_fuera_de_0_1": [],
+  "nulos_en_campos_numericos": [],
+  "nan_o_inf": [],
+  "n_nulos_en_campos_numericos": 0,
+  "n_nan_o_inf": 0,
+  "n_prob_fuera_de_0_1": 0
+ },
+ "b_a_mano": [
+  {
+   "partido": "Querétaro vs Monterrey",
+   "lam_l": 1.1757,
+   "lam_v": 1.6404,
+   "rho": -0.0574,
+   "a_mano": {
+    "p_local": 0.267,
+    "p_empate": 0.2576,
+    "p_visitante": 0.4754,
+    "O25": 0.5344,
+    "AA_SI": 0.564
+   },
+   "exportado": {
+    "p_local": 0.267,
+    "p_empate": 0.2576,
+    "p_visitante": 0.4754,
+    "O25": 0.5344,
+    "AA_SI": 0.5639
+   },
+   "max_dif": 5.765668142976299e-05,
+   "max_dif_matriz": 4.607238520467488e-05,
+   "marcador_a_mano": [
+    1,
+    1,
+    0.122
+   ],
+   "marcador_exportado": {
+    "gl": 1,
+    "gv": 1,
+    "prob": 0.122
+   }
+  },
+  {
+   "partido": "Puebla vs Atlético San Luis",
+   "lam_l": 1.359,
+   "lam_v": 1.4543,
+   "rho": -0.0574,
+   "a_mano": {
+    "p_local": 0.3457,
+    "p_empate": 0.2654,
+    "p_visitante": 0.3889,
+    "O25": 0.5337,
+    "AA_SI": 0.5763
+   },
+   "exportado": {
+    "p_local": 0.3457,
+    "p_empate": 0.2654,
+    "p_visitante": 0.3889,
+    "O25": 0.5337,
+    "AA_SI": 0.5763
+   },
+   "max_dif": 4.576074150386411e-05,
+   "max_dif_matriz": 4.87158679041309e-05,
+   "marcador_a_mano": [
+    1,
+    1,
+    0.1254
+   ],
+   "marcador_exportado": {
+    "gl": 1,
+    "gv": 1,
+    "prob": 0.1254
+   }
+  },
+  {
+   "partido": "Tijuana vs Atlante",
+   "lam_l": 2.0657,
+   "lam_v": 0.9866,
+   "rho": -0.0574,
+   "a_mano": {
+    "p_local": 0.6171,
+    "p_empate": 0.2163,
+    "p_visitante": 0.1666,
+    "O25": 0.5884,
+    "AA_SI": 0.5532
+   },
+   "exportado": {
+    "p_local": 0.6171,
+    "p_empate": 0.2163,
+    "p_visitante": 0.1666,
+    "O25": 0.5884,
+    "AA_SI": 0.5532
+   },
+   "max_dif": 4.340287877735438e-05,
+   "max_dif_matriz": 4.805235739367697e-05,
+   "marcador_a_mano": [
+    1,
+    1,
+    0.1018
+   ],
+   "marcador_exportado": {
+    "gl": 1,
+    "gv": 1,
+    "prob": 0.1018
+   }
+  }
+ ],
+ "c_combinadas": [
+  {
+   "partido": "Querétaro vs Monterrey",
+   "variante": "segura",
+   "picks_exportado_simulado": [
+    [
+     "V_ANOTA",
+     0.8061,
+     0.8059
+    ],
+    [
+     "G2T_SI",
+     0.7835,
+     0.7833
+    ],
+    [
+     "O15",
+     0.7783,
+     0.7781
+    ],
+    [
+     "12",
+     0.7424,
+     0.7426
+    ]
+   ],
+   "prob_conjunta_exportada": 0.4817,
+   "simulada": 0.48141,
+   "ee_mc": 0.00035,
+   "dif": -0.0002850000000000352,
+   "coincide": true,
+   "producto_ingenuo": 0.3649
+  },
+  {
+   "partido": "Puebla vs Atlético San Luis",
+   "variante": "equilibrada",
+   "picks_exportado_simulado": [
+    [
+     "D_X2",
+     0.7151,
+     0.7153
+    ],
+    [
+     "U15_1T",
+     0.6338,
+     0.634
+    ],
+    [
+     "L_U15",
+     0.6061,
+     0.6066
+    ],
+    [
+     "U25",
+     0.4663,
+     0.4666
+    ]
+   ],
+   "prob_conjunta_exportada": 0.3066,
+   "simulada": 0.30684,
+   "ee_mc": 0.00033,
+   "dif": 0.00024450000000003635,
+   "coincide": true,
+   "producto_ingenuo": 0.1281
+  },
+  {
+   "partido": "Tijuana vs Atlante",
+   "variante": "atrevida",
+   "picks_exportado_simulado": [
+    [
+     "U15_1T",
+     0.5949,
+     0.5951
+    ],
+    [
+     "D_X2",
+     0.5363,
+     0.5368
+    ],
+    [
+     "U25",
+     0.4116,
+     0.4121
+    ],
+    [
+     "L_U15",
+     0.3885,
+     0.3886
+    ]
+   ],
+   "prob_conjunta_exportada": 0.2176,
+   "simulada": 0.21764,
+   "ee_mc": 0.00029,
+   "dif": 4.350000000000187e-05,
+   "coincide": true,
+   "producto_ingenuo": 0.051
+  }
+ ],
+ "c_proporcion_1t": [
+  0.45617977528089887,
+  0.451426209177346
+ ],
+ "c_combinada_jornada": {
+  "etiqueta": "Jornada 17",
+  "n_partidos": 9,
+  "candidatos": "<list 9>",
+  "banda": "<list 2>",
+  "sin_pick": "<list 0>",
+  "equilibrada": "<dict 4>",
+  "segura": {
+   "prob_conjunta": 0.499,
+   "producto_de_picks": 0.4991,
+   "partidos_distintos": true
+  },
+  "atrevida": {
+   "prob_conjunta": 0.2105,
+   "producto_de_picks": 0.2105,
+   "partidos_distintos": true
+  }
+ },
+ "d_tabla": {
+  "equipos": 18,
+  "celdas_distintas_vs_tabla_csv": 0,
+  "celdas_distintas_vs_recuento_propio": 0,
+  "coincide_espn_en_el_csv": 18
+ },
+ "e_proyeccion": {
+  "suma_campeon": 1.0,
+  "suma_final": 1.9999,
+  "suma_semifinal": 4.0002,
+  "suma_clasifica": 7.9999,
+  "monotonia_violada": 0,
+  "max_abs_fila_posicion_menos_1": 0.00019999999999997797,
+  "max_abs_columna_posicion_menos_1": 0.00019999999999997797,
+  "max_abs_p_clasifica_menos_suma_top8": 0.00010000000000021103,
+  "campeon_tabla_final_vs_lista": 0.0,
+  "cruces_suma_por_llave": {
+   "1-8": 0.6264,
+   "2-7": 0.6266,
+   "3-6": 0.6306,
+   "4-5": 0.9029
+  },
+  "n_sim": 20000,
+  "n_muestras": 2000
+ },
+ "f_desempates": {
+  "criterios_config": [
+   "puntos",
+   "diferencia_de_goles",
+   "goles_a_favor",
+   "goles_de_visitante_con_el_mismo_numero_de_visitas",
+   "menos_puntos_fair_play",
+   "tabla_de_cociente",
+   "sorteo"
+  ],
+  "orden_de_criterios_respetado": {
+   "puntos": true,
+   "diferencia_de_goles": true,
+   "goles_a_favor": true,
+   "goles_de_visitante": true,
+   "menos_puntos_fair_play": true,
+   "tabla_de_cociente": true,
+   "sorteo": true
+  },
+  "orden_config_esperado": true,
+  "cuartos_global_empatado_avanza_mejor": 1.0,
+  "semifinal_2a2_con_gol_de_visita_del_mejor_avanza_mejor": 1.0,
+  "cuartos_2a2_con_mas_goles_de_visita_del_peor_avanza_mejor": 1.0,
+  "final_empatada_sin_goles_en_extra_es_moneda": 0.5,
+  "final_empatada_con_extra_formula": [
+   0.5347411926711291,
+   0.5347411926711291
+  ],
+  "reglas_config": {
+   "cruces_cuartos": [
+    [
+     1,
+     8
+    ],
+    [
+     2,
+     7
+    ],
+    [
+     3,
+     6
+    ],
+    [
+     4,
+     5
+    ]
+   ],
+   "gol_visitante": false,
+   "resiembra_semifinal": true,
+   "empate_global_cuartos_semis": "avanza el mejor ubicado en la tabla general; sin tiempos extra ni penales",
+   "final_empate": "dos tiempos extra de 15 minutos y, si sigue el empate, penales; la tabla no desempata"
+  },
+  "constantes_codigo": {
+   "FRACCION_EXTRA": 0.3333333333333333,
+   "P_PENALES": 0.5,
+   "VISITAS_CUENTAN": 8,
+   "TORNEO_COCIENTE": "Apertura 2024",
+   "clasifican": 8
+  }
+ },
+ "g_simulador": {
+  "n": 60000,
+  "max_abs_dif_propio_vs_proyecto": 0.001716666666666672,
+  "max_z": 1.2226425464012118,
+  "suma_propio": 1.0,
+  "max_abs_dif_puntual_vs_exportado": 0.009116666666666662,
+  "tabla": [
+   {
+    "index": "América",
+    "propio": 0.291,
+    "proyecto_puntual": 0.2905,
+    "exportado_con_incertidumbre": 0.2814
+   },
+   {
+    "index": "Chivas",
+    "propio": 0.2228,
+    "proyecto_puntual": 0.2245,
+    "exportado_con_incertidumbre": 0.2226
+   },
+   {
+    "index": "Cruz Azul",
+    "propio": 0.2166,
+    "proyecto_puntual": 0.2153,
+    "exportado_con_incertidumbre": 0.2109
+   },
+   {
+    "index": "Toluca",
+    "propio": 0.1976,
+    "proyecto_puntual": 0.1975,
+    "exportado_con_incertidumbre": 0.1999
+   },
+   {
+    "index": "Pachuca",
+    "propio": 0.023,
+    "proyecto_puntual": 0.024,
+    "exportado_con_incertidumbre": 0.0266
+   },
+   {
+    "index": "Monterrey",
+    "propio": 0.023,
+    "proyecto_puntual": 0.0233,
+    "exportado_con_incertidumbre": 0.0261
+   },
+   {
+    "index": "Atlas",
+    "propio": 0.0096,
+    "proyecto_puntual": 0.0092,
+    "exportado_con_incertidumbre": 0.0116
+   },
+   {
+    "index": "Tijuana",
+    "propio": 0.006,
+    "proyecto_puntual": 0.0058,
+    "exportado_con_incertidumbre": 0.0061
+   },
+   {
+    "index": "Santos",
+    "propio": 0.0042,
+    "proyecto_puntual": 0.004,
+    "exportado_con_incertidumbre": 0.006
+   },
+   {
+    "index": "León",
+    "propio": 0.003,
+    "proyecto_puntual": 0.0028,
+    "exportado_con_incertidumbre": 0.0044
+   },
+   {
+    "index": "Pumas",
+    "propio": 0.0026,
+    "proyecto_puntual": 0.0025,
+    "exportado_con_incertidumbre": 0.0035
+   }
+  ]
+ },
+ "h_robustez": {
+  "equipo_sin_historial": [
+   {
+    "lam_l": 1.3221821417392934,
+    "lam_v": 1.6697215226758326,
+    "finito": true
+   },
+   {
+    "lam_l": 2.342259591434267,
+    "lam_v": 0.9985236811635249,
+    "finito": true
+   }
+  ],
+  "equipo_sin_estadisticas_recientes": {
+   "equipo": "Necaxa",
+   "partido": "Querétaro vs Necaxa",
+   "todas_finitas": true,
+   "lam_con_datos": [
+    1.472908258460425,
+    1.2284044638107234
+   ],
+   "lam_sin_datos": [
+    1.4032822462437329,
+    1.220719501708538
+   ],
+   "avisos": [
+    "la caché de variables 'bloque' (generada 2026-11-10T04:49:41Z) está desactualizada: 9 partidos nuevos o modificados desde 2026-03-04T01:00Z; ejecute variables.actualizar('bloque') antes de pronosticar"
+   ]
+  },
+  "cache_desactualizada": {
+   "filas_faltantes": 252,
+   "avisa": true,
+   "avisos": [
+    "a la caché de variables 'bloque' le faltan 99 partidos jugados antes del corte de coeficientes (2026-07-13): los coeficientes de la corrección se ajustaron con datos incompletos; ejecute variables.actualizar('bloque') y vuelva a crear el Pronosticador"
+   ],
+   "max_dif_lambda": 0.019398253359509177,
+   "atributo_avisos": [
+    "a la caché de variables 'bloque' le faltan 99 partidos jugados antes del corte de coeficientes (2026-07-13): los coeficientes de la corrección se ajustaron con datos incompletos; ejecute variables.actualizar('bloque') y vuelva a crear el Pronosticador"
+   ]
+  },
+  "cache_con_firmas_viejas": {
+   "avisa": true,
+   "avisos": [
+    "la caché de variables 'bloque' (generada 2026-11-10T04:49:41Z) está desactualizada: 1 partidos nuevos o modificados desde 2026-02-01T01:00Z; ejecute variables.actualizar('bloque') antes de pronosticar"
+   ],
+   "atributo_avisos": 1
+  },
+  "cache_al_dia_no_avisa": true,
+  "cache_ausente": "falla con FileNotFoundError: [Errno 2] No such file or directory: '/tmp/tmp64tr9d_q/no_existe.parquet'"
+ },
+ "i_campeon_por_modelo": {
+  "n_sim": 20000,
+  "max_rango": 0.11605000000000001,
+  "tabla": [
+   {
+    "equipo": "América",
+    "ajuste": 0.2814,
+    "ensamble": 0.272,
+    "dc": 0.2748,
+    "elo": 0.2447,
+    "rango": 0.0367
+   },
+   {
+    "equipo": "Chivas",
+    "ajuste": 0.2226,
+    "ensamble": 0.1994,
+    "dc": 0.1805,
+    "elo": 0.1605,
+    "rango": 0.0621
+   },
+   {
+    "equipo": "Cruz Azul",
+    "ajuste": 0.2109,
+    "ensamble": 0.2572,
+    "dc": 0.2363,
+    "elo": 0.327,
+    "rango": 0.1161
+   },
+   {
+    "equipo": "Toluca",
+    "ajuste": 0.2,
+    "ensamble": 0.1955,
+    "dc": 0.216,
+    "elo": 0.1984,
+    "rango": 0.0206
+   },
+   {
+    "equipo": "Pachuca",
+    "ajuste": 0.0266,
+    "ensamble": 0.0223,
+    "dc": 0.0245,
+    "elo": 0.0178,
+    "rango": 0.0088
+   },
+   {
+    "equipo": "Monterrey",
+    "ajuste": 0.0262,
+    "ensamble": 0.018,
+    "dc": 0.0196,
+    "elo": 0.0096,
+    "rango": 0.0165
+   },
+   {
+    "equipo": "Atlas",
+    "ajuste": 0.0116,
+    "ensamble": 0.012,
+    "dc": 0.0136,
+    "elo": 0.0136,
+    "rango": 0.002
+   },
+   {
+    "equipo": "Tijuana",
+    "ajuste": 0.0061,
+    "ensamble": 0.01,
+    "dc": 0.0131,
+    "elo": 0.013,
+    "rango": 0.007
+   }
+  ]
+ }
+}

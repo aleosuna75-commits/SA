@@ -29,6 +29,7 @@ from __future__ import annotations
 import contextlib
 import json
 import math
+import warnings
 
 import numpy as np
 import pandas as pd
@@ -241,10 +242,40 @@ class Pronosticador:
                 self.modelo.ajustar(h0, c0)
                 self._hist_coef, self.corte_coeficientes = h0, c0
         self.modelo.ajustar(self._hist, self.corte)
+        self.avisos: list[str] = self._revisar_cache_variables()
         self._aux_cache = None
         self._malla_cache = None
         self._lap = None
         self.incertidumbre = "propia" if self._dc_propio() is not None else "prestada de dc"
+
+    def _revisar_cache_variables(self) -> list[str]:
+        """
+        Los coeficientes de un `Ajuste` salen de la caché de variables (modelo/cache/variables_*.parquet).
+        Si a la caché le faltan partidos anteriores al corte de coeficientes, o esos partidos cambiaron en
+        los CSV después de generarla, el modelo se ajustaría en silencio con datos incompletos (un dato
+        ausente cuenta como "promedio"). Aquí se comprueba con las firmas de la caché, sin reconstruirla:
+        si no está al día se emite un RuntimeWarning y el texto queda en `self.avisos` (la exportación lo
+        copia a los avisos de la página). Añadido en la auditoría del 2026-11-10.
+        """
+        modelos = [self.modelo] + list(getattr(self.modelo, "modelos", []))
+        avisos = []
+        h = self._hist_coef
+        ids = h.loc[(h["fecha_utc"] >= pd.Timestamp(V.DESDE, tz="UTC")).to_numpy(), "id"].to_numpy()
+        for tabla in sorted({m.tabla for m in modelos if isinstance(m, C.Ajuste)}):
+            faltan = int((~np.isin(ids, C.tabla_variables(tabla).index.to_numpy())).sum())
+            mensaje = None
+            if faltan:                                      # 1) filas ausentes (vale para cualquier archivo de variables)
+                mensaje = (f"a la caché de variables '{tabla}' le faltan {faltan} partidos jugados antes del corte de "
+                           f"coeficientes ({self.corte_coeficientes:%Y-%m-%d}): los coeficientes de la corrección se "
+                           f"ajustaron con datos incompletos; ejecute variables.actualizar('{tabla}') y vuelva a crear el Pronosticador")
+            elif C.RUTA_VARIABLES[tabla] == V._rutas(tabla)[0]:    # 2) filas presentes pero calculadas con datos viejos
+                est = V.estado_cache(tabla, hasta=self.corte_coeficientes)
+                if not est["al_dia"]:
+                    mensaje = est["mensaje"]
+            if mensaje:
+                avisos.append(mensaje)
+                warnings.warn(mensaje, RuntimeWarning, stacklevel=3)
+        return avisos
 
     # ------------------------------------------------------------------------------------------
     # Datos de entrada

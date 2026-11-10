@@ -1,0 +1,210 @@
+{
+ "H1": [
+  "Apertura 2016",
+  "Clausura 2021",
+  10
+ ],
+ "H2": [
+  "Apertura 2021",
+  "Clausura 2025",
+  8
+ ],
+ "regla_A_q<0.10_en_H1": [],
+ "regla_B_top6_en_H1": [
+  "sede_viaje_km_v",
+  "once_previa_rot5_v",
+  "forma10_cond_dg_l",
+  "once_previa_cambios_v",
+  "formaexp_cond_dg_l",
+  "sede_compartida"
+ ],
+ "top12_H1": [
+  {
+   "variable": "sede_viaje_km_v",
+   "z": 3.0997,
+   "p_rv": 0.0018,
+   "q_bh": 0.1684
+  },
+  {
+   "variable": "once_previa_rot5_v",
+   "z": 3.0981,
+   "p_rv": 0.0018,
+   "q_bh": 0.1684
+  },
+  {
+   "variable": "forma10_cond_dg_l",
+   "z": 2.5347,
+   "p_rv": 0.0111,
+   "q_bh": 0.5755
+  },
+  {
+   "variable": "once_previa_cambios_v",
+   "z": 2.4377,
+   "p_rv": 0.0142,
+   "q_bh": 0.5755
+  },
+  {
+   "variable": "formaexp_cond_dg_l",
+   "z": 2.3482,
+   "p_rv": 0.0187,
+   "q_bh": 0.6363
+  },
+  {
+   "variable": "sede_compartida",
+   "z": 2.2116,
+   "p_rv": 0.0243,
+   "q_bh": 0.6363
+  },
+  {
+   "variable": "juego10_corners_c_l",
+   "z": -2.1793,
+   "p_rv": 0.029,
+   "q_bh": 0.6363
+  },
+  {
+   "variable": "forma10_cond_gc_l",
+   "z": -2.1633,
+   "p_rv": 0.0304,
+   "q_bh": 0.6363
+  },
+  {
+   "variable": "juego10_tiros_c_l",
+   "z": -2.1594,
+   "p_rv": 0.0307,
+   "q_bh": 0.6363
+  },
+  {
+   "variable": "forma10_ppp_v",
+   "z": 2.1175,
+   "p_rv": 0.0339,
+   "q_bh": 0.6363
+  },
+  {
+   "variable": "jornada_est",
+   "z": -2.1144,
+   "p_rv": 0.0343,
+   "q_bh": 0.6363
+  },
+  {
+   "variable": "sede_habitual_l",
+   "z": -1.9449,
+   "p_rv": 0.0361,
+   "q_bh": 0.6363
+  }
+ ],
+ "z_de_las_seis": {
+  "sede_viaje_km_v": {
+   "H1": 3.1,
+   "H2": 2.41,
+   "todo": 3.9,
+   "q_H1": 0.168,
+   "q_todo": 0.021
+  },
+  "once_previa_cambios_v": {
+   "H1": 2.44,
+   "H2": 2.68,
+   "todo": 3.51,
+   "q_H1": 0.576,
+   "q_todo": 0.03
+  },
+  "juego10_tiros_f_l": {
+   "H1": 1.53,
+   "H2": 3.44,
+   "todo": 3.41,
+   "q_H1": 0.702,
+   "q_todo": 0.03
+  },
+  "juego10_tiros_c_l": {
+   "H1": -2.16,
+   "H2": -3.14,
+   "todo": -3.79,
+   "q_H1": 0.636,
+   "q_todo": 0.021
+  },
+  "juego10_tiros_f_v": {
+   "H1": -0.28,
+   "H2": -3.37,
+   "todo": -2.48,
+   "q_H1": 0.953,
+   "q_todo": 0.207
+  },
+  "juego10_tiros_c_v": {
+   "H1": 0.98,
+   "H2": 3.89,
+   "todo": 3.45,
+   "q_H1": 0.807,
+   "q_todo": 0.03
+  }
+ },
+ "sobreviven_en_todo_desarrollo": [
+  "sede_viaje_km_v",
+  "juego10_tiros_f_l",
+  "juego10_tiros_c_l",
+  "juego10_tiros_c_v",
+  "juego10_corners_c_l",
+  "juego10_corners_c_v",
+  "juego5_tiros_c_v",
+  "once_previa_cambios_v"
+ ],
+ "n_variables_disponibles_probadas": 285,
+ "ajuste_real_menos_dc_en_H2": {
+  "dif": -0.01207194575007733,
+  "ee": 0.0022031686910524814,
+  "z": -5.479356074323301,
+  "n": 1363
+ },
+ "ajuste_real_menos_dc_en_H1": {
+  "dif": -0.0031160624566865807,
+  "ee": 0.0015912269861858498,
+  "z": -1.9582765273204306,
+  "n": 1618
+ },
+ "honesta": {
+  "A": {
+   "variables": [],
+   "nota": "ninguna variable pasa la regla en H1: sin corrección (igual a dc)"
+  },
+  "B": {
+   "variables": [
+    "sede_viaje_km_v",
+    "once_previa_rot5_v",
+    "forma10_cond_dg_l",
+    "once_previa_cambios_v",
+    "formaexp_cond_dg_l",
+    "sede_compartida"
+   ],
+   "logloss_H2": 1.0249696017395344,
+   "logloss_dc_H2": 1.0281197385245908,
+   "logloss_ajuste_real_H2": 1.0160477927745135,
+   "menos_dc": {
+    "dif": -0.0031501367850562457,
+    "ee": 0.0012779208426388232,
+    "z": -2.4650484442772047,
+    "n": 1363
+   },
+   "menos_ajuste_real": {
+    "dif": 0.008921808965021085,
+    "ee": 0.0020255178761913865,
+    "z": 4.404705122522495
+   },
+   "coeficientes_ultimo_reajuste": {
+    "corte": "2025-01-10",
+    "n": 4481,
+    "b0_l": 0.004992782255422329,
+    "b0_v": 0.010488566182741615,
+    "l__sede_viaje_km_v": 0.034006095353748676,
+    "l__once_previa_rot5_v": -0.01391010922891522,
+    "l__forma10_cond_dg_l": 0.019607363528042078,
+    "l__once_previa_cambios_v": 0.021045137441919035,
+    "l__formaexp_cond_dg_l": 0.0025993070146855405,
+    "l__sede_compartida": -0.0035108750638357736,
+    "v__sede_viaje_km_v": -0.025880277856483933,
+    "v__once_previa_rot5_v": -0.033264817836378205,
+    "v__forma10_cond_dg_l": -0.004097658616764946,
+    "v__once_previa_cambios_v": -0.00621987684945933,
+    "v__formaexp_cond_dg_l": -0.009115208380563723,
+    "v__sede_compartida": 0.011464821714470339
+   }
+  }
+ }
+}

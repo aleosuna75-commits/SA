@@ -358,7 +358,9 @@ python3 -m modelo.pronostico              # imprime los pendientes y la tabla de
   pasado (5 casos), que el futuro no cambia el pronóstico, hessiana en el óptimo, ancho de la incertidumbre, cruces
   hipotéticos de liguilla y retadores por nombre o por instancia.
 - Antes de pronosticar hay que actualizar datos y caché de variables (`espn_descarga.py actualizar` y
-  `variables.actualizar("bloque")`): los coeficientes de la corrección leen esa caché.
+  `variables.actualizar("bloque")`): los coeficientes de la corrección leen esa caché. Desde la auditoría del 2026-11-10
+  el `Pronosticador` lo comprueba al crearse: si la caché no está al día emite un `RuntimeWarning` y deja el texto en
+  `avisos` (3 pruebas más: 25 en total). Ver `AUDITORIA.md`.
 
 ## 9. Pronóstico de los 10 partidos pendientes del Apertura 2026
 
