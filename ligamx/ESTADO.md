@@ -84,7 +84,7 @@
 - Hacer commit y push al cerrar cada fase (el contenedor es efímero).
 
 ## Tareas programadas
-- "Cerebro Liga MX diario": todos los días a la 01:20 (Ciudad de México), en esta sesión. Sigue el runbook de arriba.
+- "Cerebro Liga MX diario" (`trig_0195ELWvAUmne2MKmr1ih8zi`): todos los días a la 01:20 (Ciudad de México), en esta sesión. Sigue el runbook de arriba.
 - "Continuar Cerebro Liga MX" (`trig_011daxVc81g1dWPVNtuVKMCi`, cada hora): **desactivada** el 10-nov-2026 al
   quedar publicada la página y montada la automatización.
 
