@@ -1,0 +1,101 @@
+{
+ "corrida_utc": "2026-11-10T10:54:07Z",
+ "pasos": {
+  "datos": {
+   "ok": true,
+   "codigo": 0,
+   "nuevos_jugados": 0,
+   "reprogramados": 0,
+   "nuevos_en_calendario": 0,
+   "momios_actualizados": 0,
+   "tabla_coincide_con_espn": true,
+   "segundos": 7.9
+  },
+  "variables": {
+   "ok": true,
+   "segundos": 4.2
+  },
+  "mejora": {
+   "ok": true,
+   "omitido": "sin partidos nuevos",
+   "segundos": 0.0
+  },
+  "pronostico": {
+   "ok": true,
+   "salida": [
+    "/home/user/SA/ligamx/salidas/actual.json  209 KB  modelo=ensamble  pendientes=10  sellos nuevos=0  15.4 s",
+    "campeón: América 0.272, Cruz Azul 0.257, Chivas 0.199, Toluca 0.196, Pachuca 0.022"
+   ],
+   "segundos": 16.5
+  },
+  "pagina": {
+   "ok": true,
+   "salida": [
+    "listo en 0.02 s"
+   ],
+   "segundos": 0.1
+  }
+ },
+ "errores": [],
+ "nuevos_jugados": [],
+ "reprogramados": [],
+ "nuevos_en_calendario": [],
+ "proximo_partido": {
+  "id": "401876988",
+  "fecha_utc": "2026-11-14T23:00Z",
+  "fecha_local": "2026-11-14",
+  "hora_local": "17:00",
+  "fase": "regular",
+  "pierna": "",
+  "estado": "programado",
+  "local": "Querétaro",
+  "visitante": "Monterrey",
+  "estadio": "Estadio Corregidora",
+  "ciudad": "Santiago de Querétaro",
+  "momios": {
+   "ml_l": 3.4,
+   "ml_e": 3.6,
+   "ml_v": 1.952,
+   "total_linea": 2.5,
+   "over": 1.541,
+   "under": 2.25,
+   "proveedor": "DraftKings"
+  }
+ },
+ "modelo": "ensamble",
+ "corte_local": "2026-11-10 04:54",
+ "campeon_top": [
+  [
+   "América",
+   0.272
+  ],
+  [
+   "Cruz Azul",
+   0.2572
+  ],
+  [
+   "Chivas",
+   0.1994
+  ],
+  [
+   "Toluca",
+   0.1955
+  ],
+  [
+   "Pachuca",
+   0.0223
+  ]
+ ],
+ "liguilla_en_curso": false,
+ "pendientes": 10,
+ "desempeno": {
+  "n_calificados": 0,
+  "acumulado": {
+   "n": 0
+  }
+ },
+ "huella": "54c290217694e0b1dbcdb3f3e244c1d8",
+ "publicar": false,
+ "huella_publicada": "54c290217694e0b1dbcdb3f3e244c1d8",
+ "segundos": 28.7
+}

@@ -87,10 +87,7 @@
     "rps": 0.2115,
     "brier": 0.6125,
     "logv_marcador": -2.9894,
-    "acierto": 0.5,
-    "marcadores_exactos": 54,
-    "pendiente_calibracion": 0.85,
-    "error_calibracion": 0.031
+    "acierto": 0.5
    }
   }
  },
@@ -150,10 +147,7 @@
      "rps": 0.2126,
      "brier": 0.6156,
      "logv_marcador": -3.0057,
-     "acierto": 0.49,
-     "marcadores_exactos": 58,
-     "pendiente_calibracion": 0.78,
-     "error_calibracion": 0.035
+     "acierto": 0.49
     }
    },
    "estado": "retador: fue el modelo de producción hasta 2026-11-10"
@@ -192,10 +186,7 @@
      "rps": 0.2116,
      "brier": 0.6122,
      "logv_marcador": -2.9884,
-     "acierto": 0.508,
-     "marcadores_exactos": 59,
-     "pendiente_calibracion": 0.91,
-     "error_calibracion": 0.025
+     "acierto": 0.508
     }
    },
    "retador_menos_campeon": {
@@ -281,10 +272,7 @@
      "rps": 0.2122,
      "brier": 0.6138,
      "logv_marcador": -3.005,
-     "acierto": 0.487,
-     "marcadores_exactos": 59,
-     "pendiente_calibracion": 0.91,
-     "error_calibracion": 0.019
+     "acierto": 0.487
     }
    },
    "retador_menos_campeon": {
@@ -370,10 +358,7 @@
      "rps": 0.2129,
      "brier": 0.6149,
      "logv_marcador": -3.0056,
-     "acierto": 0.481,
-     "marcadores_exactos": 59,
-     "pendiente_calibracion": 0.9,
-     "error_calibracion": 0.024
+     "acierto": 0.481
     }
    },
    "retador_menos_campeon": {
@@ -459,10 +444,7 @@
      "rps": 0.213,
      "brier": 0.6152,
      "logv_marcador": -3.0019,
-     "acierto": 0.483,
-     "marcadores_exactos": 60,
-     "pendiente_calibracion": 1.01,
-     "error_calibracion": 0.018
+     "acierto": 0.483
     }
    },
    "retador_menos_campeon": {
@@ -826,5 +808,81 @@
    "anterior": "ajuste",
    "nota": "La auditoría (modelo/AUDITORIA.md) midió que la ventaja de ajuste en desarrollo está inflada por sesgo de selección de variables (ganancia honesta esperable ~0.003, no 0.0072) y que la prueba no la confirmó. ensamble (promedio de ajuste y elo) es el único estable frente a dc en los dos periodos (-0.0043 en desarrollo, -0.0039 en prueba) y el mejor en marcador exacto en ambos. No es un ganador demostrado: todos los candidatos quedan dentro del ruido y ninguno le gana al mercado de cierre."
   }
- ]
+ ],
+ "ultimo_ciclo": {
+  "fecha": "2026-11-10",
+  "produccion": "ensamble",
+  "adoptado": null,
+  "tabla": [
+   {
+    "modelo": "ensamble",
+    "rol": "producción",
+    "n": 3461,
+    "logloss": 1.025,
+    "logv_marcador": -2.8835
+   },
+   {
+    "modelo": "ajuste",
+    "rol": "retador",
+    "n": 3461,
+    "logloss": 1.0232,
+    "logv_marcador": -2.8894,
+    "d_logloss_vs_produccion": -0.0018,
+    "ee": 0.0009,
+    "z": -1.93,
+    "d_ultimos_bloques": 0.0174,
+    "cumple_regla": false
+   },
+   {
+    "modelo": "elo",
+    "rol": "retador",
+    "n": 3461,
+    "logloss": 1.0303,
+    "logv_marcador": -2.8922,
+    "d_logloss_vs_produccion": 0.0053,
+    "ee": 0.001,
+    "z": 5.46,
+    "d_ultimos_bloques": -0.0111,
+    "cumple_regla": false
+   },
+   {
+    "modelo": "dc2",
+    "rol": "retador",
+    "n": 3461,
+    "logloss": 1.0285,
+    "logv_marcador": -2.8938,
+    "d_logloss_vs_produccion": 0.0035,
+    "ee": 0.0011,
+    "z": 3.28,
+    "d_ultimos_bloques": -0.0063,
+    "cumple_regla": false
+   },
+   {
+    "modelo": "dc",
+    "rol": "retador",
+    "n": 3461,
+    "logloss": 1.0293,
+    "logv_marcador": -2.8944,
+    "d_logloss_vs_produccion": 0.0043,
+    "ee": 0.0009,
+    "z": 4.62,
+    "d_ultimos_bloques": 0.0004,
+    "cumple_regla": false
+   },
+   {
+    "modelo": "tiros",
+    "rol": "retador",
+    "n": 3461,
+    "logloss": 1.0312,
+    "logv_marcador": -2.8929,
+    "d_logloss_vs_produccion": 0.0062,
+    "ee": 0.0013,
+    "z": 4.57,
+    "d_ultimos_bloques": -0.0063,
+    "cumple_regla": false
+   }
+  ],
+  "partidos_fuera_de_muestra": 3461,
+  "ultimo_bloque": "2026-11-06"
+ }
 }

@@ -84,3 +84,14 @@
 2026-11-10T10:41:56Z	accion=leer	quien=auditoria	modelo=ajuste	granularidad=dia	pid=6575	argv=/home/user/SA/ligamx/modelo/pruebas/auditoria_produccion.py
 2026-11-10T10:46:24Z	accion=lectura_pareadas	quien=mejora.adoptar	modelo=ensamble	pid=7812	argv=/home/user/SA/ligamx/modelo/mejora.py adoptar ensamble --evento decisión tras la auditoría independiente --motivo La auditoría (modelo/AUDITORIA.md) midió que la ventaja de ajuste en desarrollo está inflada por sesgo de selección de variables (ganancia honesta esperable ~0.003, no 0.0072) y que la prueba no la confirmó. ensamble (promedio de ajuste y elo) es el único estable frente a dc en los dos periodos (-0.0043 en desarrollo, -0.0039 en prueba) y el mejor en marcador exacto en ambos. No es un ganador demostrado: todos los candidatos quedan dentro del ruido y ninguno le gana al mercado de cierre.
 2026-11-10T10:46:52Z	accion=leer	quien=desconocido	modelo=ensamble	granularidad=dia	pid=7857	argv=/home/user/SA/ligamx/produccion/exportar.py
+2026-11-10T10:51:12Z	accion=evaluar	quien=mejora.ciclo	modelo=ensamble	periodo=prueba	granularidad=dia	partidos=480	parcial=False	pid=9018	argv=/home/user/SA/ligamx/modelo/mejora.py ciclo
+2026-11-10T10:51:22Z	accion=evaluar	quien=mejora.ciclo	modelo=ajuste	periodo=prueba	granularidad=dia	partidos=480	parcial=False	pid=9018	argv=/home/user/SA/ligamx/modelo/mejora.py ciclo
+2026-11-10T10:51:32Z	accion=evaluar	quien=mejora.ciclo	modelo=elo	periodo=prueba	granularidad=dia	partidos=480	parcial=False	pid=9018	argv=/home/user/SA/ligamx/modelo/mejora.py ciclo
+2026-11-10T10:51:33Z	accion=evaluar	quien=mejora.ciclo	modelo=dc2	periodo=prueba	granularidad=dia	partidos=480	parcial=False	pid=9018	argv=/home/user/SA/ligamx/modelo/mejora.py ciclo
+2026-11-10T10:51:35Z	accion=evaluar	quien=mejora.ciclo	modelo=dc	periodo=prueba	granularidad=dia	partidos=480	parcial=False	pid=9018	argv=/home/user/SA/ligamx/modelo/mejora.py ciclo
+2026-11-10T10:51:36Z	accion=evaluar	quien=mejora.ciclo	modelo=tiros	periodo=prueba	granularidad=dia	partidos=480	parcial=False	pid=9018	argv=/home/user/SA/ligamx/modelo/mejora.py ciclo
+2026-11-10T10:51:39Z	accion=lectura_pareadas	quien=mejora.adoptar	modelo=ensamble	pid=9018	argv=/home/user/SA/ligamx/modelo/mejora.py ciclo
+2026-11-10T10:52:38Z	accion=leer	quien=desconocido	modelo=ensamble	granularidad=dia	pid=9089	argv=/home/user/SA/ligamx/produccion/exportar.py
+2026-11-10T10:53:14Z	accion=leer	quien=desconocido	modelo=ensamble	granularidad=dia	pid=9144	argv=/home/user/SA/ligamx/produccion/exportar.py
+2026-11-10T10:54:00Z	accion=leer	quien=desconocido	modelo=ensamble	granularidad=dia	pid=9198	argv=/home/user/SA/ligamx/produccion/exportar.py
+2026-11-10T10:54:35Z	accion=leer	quien=desconocido	modelo=ensamble	granularidad=dia	pid=9252	argv=/home/user/SA/ligamx/produccion/exportar.py

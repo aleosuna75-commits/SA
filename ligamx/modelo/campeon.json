@@ -80,10 +80,7 @@
    "rps": 0.2115,
    "brier": 0.6125,
    "logv_marcador": -2.9894,
-   "acierto": 0.5,
-   "marcadores_exactos": 54,
-   "pendiente_calibracion": 0.85,
-   "error_calibracion": 0.031
+   "acierto": 0.5
   }
  },
  "pareadas_campeon_menos_referencia": {
@@ -208,5 +205,12 @@
  ],
  "incertidumbre_parametros": "Aproximación normal de Laplace: N(estimación, H^-1) con la hessiana de la verosimilitud de Poisson ponderada y penalizada del Dixon-Coles base y la de la regresión de corrección; rho fijo. Ver RESULTADOS.md §7.",
  "api": "modelo.pronostico.Pronosticador",
- "modelo_anterior": "ajuste"
+ "modelo_anterior": "ajuste",
+ "ultimo_ciclo": {
+  "fecha": "2026-11-10",
+  "produccion": "ensamble",
+  "adoptado": null,
+  "partidos_fuera_de_muestra": 3461,
+  "ultimo_bloque": "2026-11-06"
+ }
 }

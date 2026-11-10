@@ -1,8 +1,9 @@
 # Sitio estático de pronósticos F1 (se genera con f1_austin/publicar_sitio.py).
-# Netlify publica la carpeta sitio_f1 tal cual: no hay paso de build.
+# Netlify publica la carpeta sitio_f1; el único paso de build arma dentro la página de Liga MX (/ligamx/).
 [build]
   publish = "sitio_f1"
-  command = ""
+  # Cerebro Liga MX: se arma en cada despliegue dentro de sitio_f1/ligamx (no se versiona duplicado)
+  command = "python3 ligamx/web/construir.py --documento --salida sitio_f1/ligamx"
 
 [[headers]]
   for = "/*"

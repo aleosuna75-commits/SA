@@ -34,16 +34,45 @@
   calibrada), `contexto.py`, `simulador.py` (desempates oficiales, liguilla, campeón), `sellos.py`, `exportar.py`
   → `salidas/actual.json` (contrato en `salidas/CONTRATO.md`). Comando único: `python3 -m produccion.exportar`.
   Campeón al 10-nov: América 28%, Chivas 22%, Cruz Azul 21%, Toluca 20%.
-- [~] 6 y 3b. Workflow `04_pagina_y_auditoria.js` (lanzado 10:20 UTC, args `{saltar: []}`):
-  - página → `web/plantilla.html`, `web/construir.py`, `web/index.html`, `web/archivos_publicados.json`,
-    `web/LEEME.md`, `web/pruebas/`. Si se corta: revisar qué hay y relanzar (o terminar) con el mismo encargo.
-  - auditoría → `modelo/AUDITORIA.md`. Si se corta: relanzar con `saltar: ["pagina"]` si la página ya está.
-- [ ] 7. Publicación: Artifact NUEVO (título "Cerebro Liga MX", icono "soccer"), `file_path` = `web/index.html`,
-  `files` = lo listado en `web/archivos_publicados.json`; y sitio estático con `construir.py --documento`.
-- [ ] 8. Automatización: `pipeline.py auto` (actualizar ESPN → `variables.actualizar` → `produccion.exportar` →
-  `web/construir.py` → republicar Artifact → commit), `mejora.py` (campeón/retador con la regla de `registro.json`),
-  actualidad (lesionados) antes de cada jornada, tareas programadas por partido (14-nov, J17 20-22 nov, cuartos
-  25-29 nov, semis 2-6 dic, final 10/13 dic) y runbook. Al terminar, desactivar la tarea de continuidad.
+- [x] 6. Página: `web/plantilla.html` + `web/construir.py` → `web/index.html` (51 revisiones en Chromium y WebKit).
+- [x] 3b. Auditoría: `modelo/AUDITORIA.md` (sin fugas; réplica independiente coincide; la ventaja de `ajuste` estaba
+  inflada por selección). Decisión: el modelo de producción es **`ensamble`** (`python3 -m modelo.mejora estado`).
+- [x] 7. Publicada: **https://claude.ai/artifact/K3fNKhot24LUcwn6PfXGF6** (título "Cerebro Liga MX", icono soccer;
+  `file_path` = `/home/user/SA/ligamx/web/index.html`; los 69 archivos de `web/archivos_publicados.json` ya están
+  publicados y sólo se reenvían si cambian). Es privada: el usuario la comparte desde el menú Share.
+- [x] 8. Automatización: `pipeline.py auto` + `modelo/mejora.py ciclo` + tarea programada diaria (runbook abajo).
+
+## Pendientes de mejora (avanzar uno por corrida diaria si alcanza el presupuesto; marcar al cerrar)
+- [ ] Lesionados y técnicos (`config/actualidad.json`, formato en `produccion/MERCADOS.md` §7): antes de la Jornada
+  17 (20-22 nov) y de cada ronda de liguilla. Guion: parte "Actualidad" de `notas/workflows/01_reglas_actualidad.js`.
+- [ ] Mostrar en la página el rango de la probabilidad de campeón entre modelos (hoy Cruz Azul va de 21% a 33% según
+  el modelo; ver `modelo/pruebas/auditoria_resultados/campeon_por_modelo.json`): que `produccion/exportar.py` lo
+  calcule (`proyeccion.campeon_por_modelo`) y `web/plantilla.html` lo dibuje.
+- [ ] Repetir la validación de mercados y combinadas con el modelo de producción
+  (`python3 -m produccion.mercados validar ensamble`, `python3 -m produccion.combinada validar ensamble`) y corregir
+  el sesgo de "ambos anotan" (subestimado 3.4 puntos con poisson_simple).
+- [ ] Sesgo del simulador tras la ida (subestima ~10 puntos al que cierra en casa): reevaluar con la liguilla real.
+- [ ] Retador "con mercado" (mezclar el modelo con los momios disponibles al pronosticar) evaluado sólo con
+  pronósticos sellados.
+- [ ] Sitio estático (Netlify): `netlify.toml` ya construye `sitio_f1/ligamx/` en cada despliegue.
+- [ ] Revisar la página en el Artifact real desde un iPhone (el usuario) y atender lo que reporte.
+
+## Runbook de la tarea diaria ("Cerebro Liga MX diario", 01:20 hora de la Ciudad de México)
+1. `cd /home/user/SA/ligamx && python3 pipeline.py auto` (30 s a 2 min). Hace: datos de ESPN → variables → ciclo de
+   mejora si hubo partidos nuevos (reevalúa producción y retadores; adopta sólo por regla) → pronósticos sellados,
+   calificación de lo jugado, simulación de tabla/liguilla/campeón → página.
+   Si el paso `datos` falla por red, reintentar una vez 10 minutos después; si vuelve a fallar, anotarlo aquí.
+2. Leer `salidas/ultimo_auto.json`. Si `publicar` es true: republicar el Artifact con
+   `file_path=/home/user/SA/ligamx/web/index.html` (y `url=https://claude.ai/artifact/K3fNKhot24LUcwn6PfXGF6` si la
+   conversación ya no recuerda la publicación; `files` sólo si cambió `web/archivos_publicados.json`, con
+   `root=/home/user/SA/ligamx/web`) y después `python3 pipeline.py publicado`.
+3. `git add ligamx && git commit && git push` (rama `claude/new-session-i9lrt6`).
+4. Si faltan 3 días o menos para el siguiente partido y `config/actualidad.json` no existe o tiene más de 4 días:
+   actualizar lesionados (pendiente de arriba), volver a correr `python3 -m produccion.exportar` y
+   `python3 web/construir.py`, republicar.
+5. Avisar al usuario SÓLO si: cambió el modelo de producción, se definieron los cruces de la liguilla, terminó una
+   serie o hay campeón, o algo falló dos días seguidos. Si no, terminar el turno sin escribirle.
+6. Cuando haya campeón: resumen final del desempeño sellado y desactivar la tarea.
 
 ## Cómo retomar una fase cortada
 - Los guiones de los workflows están copiados en `notas/workflows/` (los originales viven fuera del repo y se
@@ -54,10 +83,10 @@
 - Esta máquina tiene 4 CPU: cada workflow corre 2 agentes a la vez; conviene lanzar 2–3 workflows en paralelo.
 - Hacer commit y push al cerrar cada fase (el contenedor es efímero).
 
-## Tarea programada de continuidad
-- "Continuar Cerebro Liga MX" (`trig_011daxVc81g1dWPVNtuVKMCi`, minuto 13 de cada hora): despierta esta sesión. Si todo avanza, no hace nada; si el trabajo quedó
-  detenido, lo retoma desde este archivo. **Desactivarla cuando el proyecto esté publicado y la automatización de
-  jornadas quede montada** (fase 8).
+## Tareas programadas
+- "Cerebro Liga MX diario": todos los días a la 01:20 (Ciudad de México), en esta sesión. Sigue el runbook de arriba.
+- "Continuar Cerebro Liga MX" (`trig_011daxVc81g1dWPVNtuVKMCi`, cada hora): **desactivada** el 10-nov-2026 al
+  quedar publicada la página y montada la automatización.
 
 ## Bitácora
 - 2026-11-10 02:50 UTC · Reconocimiento: ESPN da resultados y estadísticas por partido; 143/153 jugados.
@@ -71,3 +100,5 @@
 - 2026-11-10 09:25 UTC · Lanzado `03_campeon_y_produccion.js` (candidatos → selección; mercados → simulador).
 - 2026-11-10 10:15 UTC · Terminó `03_campeon_y_produccion.js` completo (4 agentes, 1.15 M de tokens).
 - 2026-11-10 10:20 UTC · Lanzado `04_pagina_y_auditoria.js`.
+- 2026-11-10 10:45 UTC · Página publicada (Artifact), auditoría hecha, producción = ensamble.
+- 2026-11-10 10:55 UTC · `pipeline.py auto` y `mejora ciclo` probados; tarea diaria programada.

@@ -2,7 +2,8 @@
 
 Uso:
     python3 -m modelo.mejora estado                      # campeón, retadores y sus métricas guardadas
-    python3 -m modelo.mejora adoptar ensamble --motivo "..."   # cambia el modelo de producción
+    python3 -m modelo.mejora ciclo                       # reevalúa a todos con lo jugado y aplica la regla
+    python3 -m modelo.mejora adoptar ensamble --motivo "..."   # cambia el modelo de producción a mano
 
 `adoptar` reescribe modelo/campeon.json (lo que lee modelo.pronostico.Pronosticador) y mueve al campeón
 anterior a la lista de retadores de modelo/registro.json, dejando constancia en el historial. Las métricas
@@ -120,6 +121,100 @@ def adoptar(nombre: str, motivo: str, evento: str = "adopción manual") -> dict:
     return nuevo
 
 
+def _modelo_dia(nombre: str):
+    """Finalista listo para el recorrido por día (las variables se leen con corte por partido)."""
+    m = candidatos.finalistas()[nombre]
+    for x in [m] + list(getattr(m, "modelos", [])):
+        if hasattr(x, "tabla"):
+            x.tabla = "partido"
+    return m
+
+
+def _conjunto(nombre: str) -> pd.DataFrame | None:
+    """Predicciones fuera de muestra de todo el periodo: desarrollo (por bloque) + prueba y torneo en curso (por día)."""
+    partes = [d for d in (_leer(nombre, "desarrollo"), _leer(nombre, "prueba")) if d is not None]
+    if not partes:
+        return None
+    d = pd.concat(partes, ignore_index=True).drop_duplicates("id", keep="last")
+    return d[d["p_l"].notna() & d["resultado"].notna()]
+
+
+def ciclo(reevaluar: bool = True, adoptar_si_gana: bool = True) -> dict:
+    """
+    Ciclo de mejora continua (se corre tras cada jornada o partido de liguilla):
+      1. vuelve a recorrer en walk-forward, por día, el tramo reciente (Apertura 2025 a hoy) con el modelo de
+         producción y con cada retador, de modo que entren los partidos recién jugados;
+      2. compara cada retador contra el de producción, pareado, sobre TODO el periodo fuera de muestra, y en
+         los últimos 8 bloques;
+      3. adopta al mejor retador sólo si cumple la regla de registro.json (más de 2 errores estándar mejor y
+         no peor en los últimos 8 bloques). Devuelve la tabla y lo decidido, y lo anota en registro.json.
+    """
+    reg = json.loads(RUTA_REGISTRO.read_text(encoding="utf-8"))
+    campeon = reg["campeon"]["nombre"]
+    nombres = [campeon] + [r["nombre"] for r in reg["retadores"]]
+    if reevaluar:
+        from modelo import variables
+        variables.actualizar("bloque"); variables.actualizar()
+        for n in nombres:
+            arnes.evaluar(_modelo_dia(n), "prueba", "dia", permitir_prueba=True, quien="mejora.ciclo",
+                          registrar_variante=False, verbose=False)
+    umbral, k = float(reg["regla_adopcion"]["umbral_ee"]), int(reg["regla_adopcion"]["bloques_recientes"])
+    base = _conjunto(campeon)
+    recientes = sorted(base["bloque"].unique())[-k:]
+    filas, candidatos_ok = [], []
+    for n in nombres:
+        d = _conjunto(n)
+        if d is None:
+            continue
+        m = metricas.resumen(d)
+        prueba = _leer(n, "prueba")
+        fila = {"modelo": n, "rol": "producción" if n == campeon else "retador", "n": m["n"],
+                "logloss": round(m["logloss"], 4), "logv_marcador": round(m["logv_marcador"], 4)}
+        if prueba is not None:
+            mp = metricas.resumen(prueba, con_ee=True)
+            for e in ([reg["campeon"]] if n == campeon else [r for r in reg["retadores"] if r["nombre"] == n]):
+                e.setdefault("metricas", {})["prueba_dia"] = {
+                    "n": mp["n"], "logloss": round(mp["logloss"], 4), "ee_logloss": round(mp["ee_logloss"], 4),
+                    "rps": round(mp["rps"], 4), "brier": round(mp["brier"], 4),
+                    "logv_marcador": round(mp["logv_marcador"], 4), "acierto": round(mp["acierto"], 3)}
+        if n != campeon:
+            j = d.merge(base, on="id", suffixes=("", "_c"))
+            ll_r = _ll(j)
+            ll_c = _ll(j[["p_l_c", "p_e_c", "p_v_c"]].rename(columns=lambda c: c[:-2]).assign(resultado=j["resultado"]))
+            r = metricas.diferencia_pareada(ll_r, ll_c, j["bloque"])
+            rec = j["bloque"].isin(recientes).to_numpy()
+            d_rec = float((ll_r[rec] - ll_c[rec]).mean()) if rec.any() else float("nan")
+            cumple = bool(r["z"] < -umbral and d_rec <= 0)
+            fila.update({"d_logloss_vs_produccion": round(r["dif"], 4), "ee": round(r["ee"], 4), "z": round(r["z"], 2),
+                         "d_ultimos_bloques": round(d_rec, 4), "cumple_regla": cumple})
+            if cumple:
+                candidatos_ok.append((r["dif"], n))
+        filas.append(fila)
+    hoy = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    decision = {"fecha": hoy, "produccion": campeon, "adoptado": None, "tabla": filas,
+                "partidos_fuera_de_muestra": int(len(base)), "ultimo_bloque": str(recientes[-1]) if recientes else None}
+    reg["ultimo_ciclo"] = decision
+    reg["actualizado"] = hoy
+    RUTA_REGISTRO.write_text(json.dumps(reg, ensure_ascii=False, indent=1), encoding="utf-8")
+    if candidatos_ok and adoptar_si_gana:
+        _, mejor = min(candidatos_ok)
+        f = next(x for x in filas if x["modelo"] == mejor)
+        adoptar(mejor, f"Ciclo de mejora continua: {mejor} mejora a {campeon} por {-f['d_logloss_vs_produccion']:.4f} de log-loss "
+                       f"(ee {f['ee']:.4f}, z {f['z']}) en {f['n']} partidos fuera de muestra y no empeora en los últimos {k} bloques.",
+                evento="adopción por regla")
+        decision["adoptado"] = mejor
+        reg = json.loads(RUTA_REGISTRO.read_text(encoding="utf-8")); reg["ultimo_ciclo"] = decision
+        RUTA_REGISTRO.write_text(json.dumps(reg, ensure_ascii=False, indent=1), encoding="utf-8")
+    # el campeón vigente lleva sus métricas al día en campeon.json
+    camp = json.loads(RUTA_CAMPEON.read_text(encoding="utf-8"))
+    reg = json.loads(RUTA_REGISTRO.read_text(encoding="utf-8"))
+    camp["metricas"] = reg["campeon"].get("metricas", camp.get("metricas"))
+    camp["pareadas_campeon_menos_referencia"] = pareadas(reg["campeon"]["nombre"])
+    camp["ultimo_ciclo"] = {k_: decision[k_] for k_ in ("fecha", "produccion", "adoptado", "partidos_fuera_de_muestra", "ultimo_bloque")}
+    RUTA_CAMPEON.write_text(json.dumps(camp, ensure_ascii=False, indent=1), encoding="utf-8")
+    return decision
+
+
 def estado() -> None:
     reg = json.loads(RUTA_REGISTRO.read_text(encoding="utf-8"))
     filas = [dict(rol="producción", **{"nombre": reg["campeon"]["nombre"]}, **_met(reg["campeon"]))]
@@ -139,11 +234,16 @@ def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     sub = ap.add_subparsers(dest="cmd", required=True)
     sub.add_parser("estado")
+    c = sub.add_parser("ciclo"); c.add_argument("--sin-reevaluar", action="store_true"); c.add_argument("--sin-adoptar", action="store_true")
     a = sub.add_parser("adoptar"); a.add_argument("nombre"); a.add_argument("--motivo", required=True)
     a.add_argument("--evento", default="adopción manual")
     args = ap.parse_args(argv)
     if args.cmd == "estado":
         estado()
+    elif args.cmd == "ciclo":
+        d = ciclo(reevaluar=not args.sin_reevaluar, adoptar_si_gana=not args.sin_adoptar)
+        print(pd.DataFrame(d["tabla"]).to_string(index=False))
+        print("adoptado:", d["adoptado"] or "ninguno (sigue " + d["produccion"] + ")")
     else:
         adoptar(args.nombre, args.motivo, args.evento)
     return 0
