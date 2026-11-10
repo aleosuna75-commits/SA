@@ -1,0 +1,4 @@
+# Caché cruda de ESPN: se regenera con datos/espn_descarga.py
+datos/cache/
+__pycache__/
+*.log
