@@ -42,7 +42,8 @@
   publicados y sólo se reenvían si cambian). Es privada: el usuario la comparte desde el menú Share.
 - [x] 8. Automatización: `pipeline.py auto` + `modelo/mejora.py ciclo` + tarea programada diaria (runbook abajo).
 
-## Pendientes de mejora (avanzar uno por corrida diaria si alcanza el presupuesto; marcar al cerrar)
+## Pendientes de mejora
+- [ ] Fotos de campeón (`web/medios_parts/campeon.json`, unido a `web/medios.json`): sólo hay festejos libres de Toluca (Cl. 2025) y Pumas (Cl. 2011). Si aparecen fotos libres de otros equipos con el trofeo, agregarlas; la portada las toma sola cuando ese equipo es el favorito. (avanzar uno por corrida diaria si alcanza el presupuesto; marcar al cerrar)
 - [ ] Lesionados y técnicos (`config/actualidad.json`, formato en `produccion/MERCADOS.md` §7): antes de la Jornada
   17 (20-22 nov) y de cada ronda de liguilla. Guion: parte "Actualidad" de `notas/workflows/01_reglas_actualidad.js`.
 - [ ] Mostrar en la página el rango de la probabilidad de campeón entre modelos (hoy Cruz Azul va de 21% a 33% según
