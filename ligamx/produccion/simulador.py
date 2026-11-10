@@ -305,8 +305,10 @@ def series_reales(df: pd.DataFrame, torneo: str, corte, equipos: list[str], pos:
                 s["ganador"] = s["a"] if ga > gb else s["b"]
             elif fase != "final":
                 s["ganador"] = s["a"]                     # global empatado: avanza el mejor sembrado
-            elif pd.notna(ult["gl_et"]) and pd.notna(ult["gv_et"]) and ult["gl_et"] != ult["gv_et"]:
-                s["ganador"] = ult["local"] if ult["gl_et"] > ult["gv_et"] else ult["visitante"]
+            elif (pd.notna(ult["gl_et"]) and pd.notna(ult["gv_et"])
+                  and (ult["gl_et"] - ult["gl"]) != (ult["gv_et"] - ult["gv"])):
+                # gl_et/gv_et = marcador acumulado a 120' de la vuelta: deciden sólo los goles del tiempo extra
+                s["ganador"] = ult["local"] if (ult["gl_et"] - ult["gl"]) > (ult["gv_et"] - ult["gv"]) else ult["visitante"]
             elif pd.notna(ult["pen_l"]) and pd.notna(ult["pen_v"]) and ult["pen_l"] != ult["pen_v"]:
                 s["ganador"] = ult["local"] if ult["pen_l"] > ult["pen_v"] else ult["visitante"]
         out[fase].append(s)

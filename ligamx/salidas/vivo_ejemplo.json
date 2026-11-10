@@ -1,0 +1,494 @@
+{
+ "version": 1,
+ "ejemplo": true,
+ "generado_utc": "2026-11-21T23:41:20Z",
+ "estado": "en_juego",
+ "partidos": [
+  {
+   "id": 401877050,
+   "fase": "regular",
+   "etiqueta": "Jornada 17",
+   "local": "Pachuca",
+   "visitante": "Toluca",
+   "estado": "en_juego",
+   "inicio_utc": "2026-11-21T22:50:00Z",
+   "periodo": 2,
+   "minuto": 57,
+   "anadido": null,
+   "reloj_utc": "2026-11-21T23:41:05Z",
+   "gl": 1,
+   "gv": 1,
+   "rojas_l": 0,
+   "rojas_v": 1,
+   "eventos": [
+    {
+     "min": 12,
+     "anadido": null,
+     "tipo": "gol",
+     "equipo": "Toluca",
+     "jugador": "Paulinho",
+     "marcador": "0-1"
+    },
+    {
+     "min": 38,
+     "anadido": null,
+     "tipo": "penal",
+     "equipo": "Pachuca",
+     "jugador": "Salomón Rondón",
+     "marcador": "1-1"
+    },
+    {
+     "min": 51,
+     "anadido": null,
+     "tipo": "roja",
+     "equipo": "Toluca",
+     "jugador": "Marcel Ruiz",
+     "marcador": "1-1"
+    }
+   ],
+   "previo": {
+    "p_local": 0.3912,
+    "p_empate": 0.2614,
+    "p_visitante": 0.3474,
+    "marcador": {
+     "gl": 1,
+     "gv": 1
+    },
+    "lam_l": 1.4831,
+    "lam_v": 1.3853
+   },
+   "vivo": {
+    "p_local": 0.4712,
+    "p_empate": 0.3391,
+    "p_visitante": 0.1897,
+    "goles_restantes_l": 0.71,
+    "goles_restantes_v": 0.33,
+    "marcador_final": {
+     "gl": 1,
+     "gv": 1,
+     "prob": 0.3391
+    }
+   },
+   "serie": null
+  },
+  {
+   "id": 401877051,
+   "fase": "regular",
+   "etiqueta": "Jornada 17",
+   "local": "Santos",
+   "visitante": "León",
+   "estado": "descanso",
+   "inicio_utc": "2026-11-21T23:00:00Z",
+   "periodo": 1,
+   "minuto": 45,
+   "anadido": null,
+   "reloj_utc": "2026-11-21T23:48:00Z",
+   "gl": 0,
+   "gv": 0,
+   "rojas_l": 0,
+   "rojas_v": 0,
+   "eventos": [],
+   "previo": {
+    "p_local": 0.4082,
+    "p_empate": 0.2643,
+    "p_visitante": 0.3275,
+    "marcador": {
+     "gl": 1,
+     "gv": 1
+    },
+    "lam_l": 1.4893,
+    "lam_v": 1.3112
+   },
+   "vivo": {
+    "p_local": 0.3105,
+    "p_empate": 0.4302,
+    "p_visitante": 0.2593,
+    "goles_restantes_l": 0.74,
+    "goles_restantes_v": 0.66,
+    "marcador_final": {
+     "gl": 0,
+     "gv": 0,
+     "prob": 0.2466
+    }
+   },
+   "serie": null
+  },
+  {
+   "id": 401877049,
+   "fase": "regular",
+   "etiqueta": "Jornada 17",
+   "local": "Pumas",
+   "visitante": "Monterrey",
+   "estado": "programado",
+   "inicio_utc": "2026-11-22T01:00:00Z",
+   "periodo": null,
+   "minuto": null,
+   "anadido": null,
+   "reloj_utc": null,
+   "gl": null,
+   "gv": null,
+   "rojas_l": 0,
+   "rojas_v": 0,
+   "eventos": [],
+   "previo": {
+    "p_local": 0.4171,
+    "p_empate": 0.2597,
+    "p_visitante": 0.3232,
+    "marcador": {
+     "gl": 1,
+     "gv": 1
+    },
+    "lam_l": 1.5437,
+    "lam_v": 1.3336
+   },
+   "vivo": null,
+   "serie": null
+  },
+  {
+   "id": 401877054,
+   "fase": "regular",
+   "etiqueta": "Jornada 17",
+   "local": "Puebla",
+   "visitante": "Atlético San Luis",
+   "estado": "final",
+   "inicio_utc": "2026-11-21T01:00:00Z",
+   "periodo": 2,
+   "minuto": 90,
+   "anadido": 5,
+   "reloj_utc": null,
+   "gl": 2,
+   "gv": 0,
+   "rojas_l": 0,
+   "rojas_v": 0,
+   "eventos": [
+    {
+     "min": 33,
+     "anadido": null,
+     "tipo": "gol",
+     "equipo": "Puebla",
+     "jugador": "Ricardo Marín",
+     "marcador": "1-0"
+    },
+    {
+     "min": 90,
+     "anadido": 2,
+     "tipo": "gol",
+     "equipo": "Puebla",
+     "jugador": "Emiliano Gómez",
+     "marcador": "2-0"
+    }
+   ],
+   "previo": {
+    "p_local": 0.3554,
+    "p_empate": 0.2706,
+    "p_visitante": 0.374,
+    "marcador": {
+     "gl": 1,
+     "gv": 1
+    },
+    "lam_l": 1.3341,
+    "lam_v": 1.3746
+   },
+   "vivo": null,
+   "serie": null
+  }
+ ],
+ "tabla": [
+  {
+   "pos": 1,
+   "equipo": "Cruz Azul",
+   "PJ": 16,
+   "PTS": 32,
+   "DG": 11,
+   "GF": 37,
+   "cambio": 0,
+   "en_juego": false
+  },
+  {
+   "pos": 2,
+   "equipo": "América",
+   "PJ": 16,
+   "PTS": 30,
+   "DG": 15,
+   "GF": 38,
+   "cambio": 0,
+   "en_juego": false
+  },
+  {
+   "pos": 3,
+   "equipo": "Chivas",
+   "PJ": 16,
+   "PTS": 30,
+   "DG": 11,
+   "GF": 26,
+   "cambio": 0,
+   "en_juego": false
+  },
+  {
+   "pos": 4,
+   "equipo": "Toluca",
+   "PJ": 16,
+   "PTS": 27,
+   "DG": 14,
+   "GF": 35,
+   "cambio": 0,
+   "en_juego": true
+  },
+  {
+   "pos": 5,
+   "equipo": "Atlas",
+   "PJ": 16,
+   "PTS": 27,
+   "DG": -3,
+   "GF": 27,
+   "cambio": 0,
+   "en_juego": false
+  },
+  {
+   "pos": 6,
+   "equipo": "Santos",
+   "PJ": 16,
+   "PTS": 25,
+   "DG": 3,
+   "GF": 23,
+   "cambio": 0,
+   "en_juego": true
+  },
+  {
+   "pos": 7,
+   "equipo": "León",
+   "PJ": 16,
+   "PTS": 23,
+   "DG": 2,
+   "GF": 23,
+   "cambio": 0,
+   "en_juego": true
+  },
+  {
+   "pos": 8,
+   "equipo": "Pachuca",
+   "PJ": 16,
+   "PTS": 22,
+   "DG": 9,
+   "GF": 29,
+   "cambio": 0,
+   "en_juego": true
+  },
+  {
+   "pos": 9,
+   "equipo": "Tijuana",
+   "PJ": 16,
+   "PTS": 22,
+   "DG": 3,
+   "GF": 25,
+   "cambio": 0,
+   "en_juego": false
+  },
+  {
+   "pos": 10,
+   "equipo": "Monterrey",
+   "PJ": 15,
+   "PTS": 21,
+   "DG": 1,
+   "GF": 26,
+   "cambio": 0,
+   "en_juego": false
+  },
+  {
+   "pos": 11,
+   "equipo": "Pumas",
+   "PJ": 16,
+   "PTS": 21,
+   "DG": -2,
+   "GF": 24,
+   "cambio": 0,
+   "en_juego": false
+  },
+  {
+   "pos": 12,
+   "equipo": "Querétaro",
+   "PJ": 15,
+   "PTS": 20,
+   "DG": -5,
+   "GF": 18,
+   "cambio": 0,
+   "en_juego": false
+  },
+  {
+   "pos": 13,
+   "equipo": "Puebla",
+   "PJ": 16,
+   "PTS": 19,
+   "DG": -4,
+   "GF": 19,
+   "cambio": 0,
+   "en_juego": false
+  },
+  {
+   "pos": 14,
+   "equipo": "Atlético San Luis",
+   "PJ": 16,
+   "PTS": 19,
+   "DG": -5,
+   "GF": 19,
+   "cambio": 0,
+   "en_juego": false
+  },
+  {
+   "pos": 15,
+   "equipo": "Tigres",
+   "PJ": 16,
+   "PTS": 15,
+   "DG": -8,
+   "GF": 17,
+   "cambio": 0,
+   "en_juego": false
+  },
+  {
+   "pos": 16,
+   "equipo": "Atlante",
+   "PJ": 16,
+   "PTS": 14,
+   "DG": -10,
+   "GF": 16,
+   "cambio": 0,
+   "en_juego": false
+  },
+  {
+   "pos": 17,
+   "equipo": "Necaxa",
+   "PJ": 16,
+   "PTS": 13,
+   "DG": -11,
+   "GF": 17,
+   "cambio": 0,
+   "en_juego": false
+  },
+  {
+   "pos": 18,
+   "equipo": "Juárez",
+   "PJ": 16,
+   "PTS": 11,
+   "DG": -21,
+   "GF": 13,
+   "cambio": 0,
+   "en_juego": false
+  }
+ ],
+ "tabla_nota": "Tabla al momento: cuenta los marcadores de los partidos en juego como si terminaran así.",
+ "proyeccion": {
+  "n_sim": 20000,
+  "clasifica": [
+   {
+    "equipo": "Pachuca",
+    "p": 0.4213,
+    "delta": 0.0612
+   },
+   {
+    "equipo": "Monterrey",
+    "p": 0.4098,
+    "delta": -0.015
+   },
+   {
+    "equipo": "Tijuana",
+    "p": 0.5649,
+    "delta": -0.0177
+   },
+   {
+    "equipo": "Santos",
+    "p": 0.8366,
+    "delta": 0.0104
+   },
+   {
+    "equipo": "León",
+    "p": 0.4668,
+    "delta": -0.0389
+   },
+   {
+    "equipo": "Pumas",
+    "p": 0.1201,
+    "delta": 0.0
+   },
+   {
+    "equipo": "Querétaro",
+    "p": 0.1805,
+    "delta": 0.0
+   }
+  ],
+  "campeon": [
+   {
+    "equipo": "América",
+    "p": 0.2725,
+    "delta": 0.0
+   },
+   {
+    "equipo": "Cruz Azul",
+    "p": 0.2581,
+    "delta": 0.0
+   },
+   {
+    "equipo": "Chivas",
+    "p": 0.1982,
+    "delta": 0.0
+   },
+   {
+    "equipo": "Toluca",
+    "p": 0.1956,
+    "delta": 0.0
+   },
+   {
+    "equipo": "Pachuca",
+    "p": 0.0221,
+    "delta": 0.0
+   },
+   {
+    "equipo": "Monterrey",
+    "p": 0.0178,
+    "delta": 0.0
+   },
+   {
+    "equipo": "Atlas",
+    "p": 0.0121,
+    "delta": 0.0
+   },
+   {
+    "equipo": "Tijuana",
+    "p": 0.01,
+    "delta": 0.0
+   },
+   {
+    "equipo": "Santos",
+    "p": 0.005,
+    "delta": 0.0
+   },
+   {
+    "equipo": "León",
+    "p": 0.0043,
+    "delta": 0.0
+   },
+   {
+    "equipo": "Pumas",
+    "p": 0.0029,
+    "delta": 0.0
+   },
+   {
+    "equipo": "Querétaro",
+    "p": 0.0014,
+    "delta": 0.0
+   }
+  ]
+ },
+ "series": [],
+ "ultimo_evento": {
+  "utc": "2026-11-21T23:35:10Z",
+  "tipo": "roja",
+  "partido_id": 401877050,
+  "texto": "Roja para Toluca (51'): Marcel Ruiz. Pachuca 1-1 Toluca"
+ },
+ "siguiente": {
+  "id": 401877049,
+  "inicio_utc": "2026-11-22T01:00:00Z",
+  "local": "Pumas",
+  "visitante": "Monterrey"
+ }
+}

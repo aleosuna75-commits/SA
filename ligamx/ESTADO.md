@@ -42,6 +42,24 @@
   publicados y sólo se reenvían si cambian). Es privada: el usuario la comparte desde el menú Share.
 - [x] 8. Automatización: `pipeline.py auto` + `modelo/mejora.py ciclo` + tarea programada diaria (runbook abajo).
 
+## En curso (10-nov-2026, 22:00 UTC): en vivo y rediseño
+Pedido del usuario: la versión visual que le encantó es la del commit `5306055`; volver a ponerla a punto, que la
+liguilla tenga **estructura de torneo** con **pronóstico de ida y vuelta por partido**, y que la actualización **se vea
+en vivo**. Workflow `notas/workflows/05_vivo_y_rediseno.js` (motor en vivo ∥ rediseño → crítica visual ∥ crítica
+funcional → corrección). Ya hecho a mano: `liguilla.torneo` en `produccion/exportar.py` (siembra, rondas, series con
+ida/vuelta) y `salidas/vivo_ejemplo.json` (contrato del documento en vivo).
+Al terminar el workflow falta (lo hace la sesión principal):
+1. Revisar capturas y pruebas; `python3 -m produccion.exportar`, `python3 web/construir.py`.
+2. Republicar el Artifact con `capabilities: {db: {rules: [{path: "vivo", read: "view", write: "owner"}]}, user: {}}`
+   y los archivos nuevos de `web/archivos_publicados.json`.
+3. Sembrar `vivo/actual` con `ArtifactData set` (file_path = copia estable de `salidas/vivo.json`), verificar con
+   `list` y con `as_level: "view"`; guardar la versión devuelta en `salidas/vivo_version.txt`.
+4. Operación en día de partido (añadir al runbook): la corrida diaria programa con `send_later` un despertar 10 min
+   antes de cada inicio; ahí se lanza `python3 vivo.py observar` en segundo plano y `python3 vivo.py esperar --desde N`
+   (Bash en segundo plano, máx. 2 h); en cada evento: copiar `salidas/vivo.json` a `salidas/vivo_relevo.json`,
+   `ArtifactData set vivo/actual` con `if_version`, guardar versión, volver a esperar; al final del día
+   `pipeline.py auto`, republicar y commit.
+
 ## Pendientes de mejora
 - [ ] Fotos de campeón (`web/medios_parts/campeon.json`, unido a `web/medios.json`): sólo hay festejos libres de Toluca (Cl. 2025) y Pumas (Cl. 2011). Si aparecen fotos libres de otros equipos con el trofeo, agregarlas; la portada las toma sola cuando ese equipo es el favorito. (avanzar uno por corrida diaria si alcanza el presupuesto; marcar al cerrar)
 - [ ] Lesionados y técnicos (`config/actualidad.json`, formato en `produccion/MERCADOS.md` §7): antes de la Jornada
