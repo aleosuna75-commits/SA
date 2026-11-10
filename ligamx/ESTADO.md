@@ -16,17 +16,24 @@
   de la sesión. Rama `claude/new-session-i9lrt6`.
 
 ## Fases (marcar al cerrar)
-- [ ] 1. Datos y reconocimiento — **en curso** (lanzados 2026-11-10 ~03:00 UTC)
-  - `01_datos_espn.js` → `datos/espn_descarga.py`, `datos/partidos.csv`, `goles.csv`, `tarjetas.csv`,
-    `alineaciones.csv`, `calendario_pendiente.json`, `tabla_apertura2026.csv`, `COBERTURA.md`,
-    `notas/mapa_repo_previo.md`. Listo cuando exista `COBERTURA.md` con la sección "Verificación independiente".
-  - `01_reglas_actualidad.js` → `config/torneo.json`, `config/actualidad.json`,
-    `notas/como_actualizar_actualidad.md`.
-  - `01_medios.js` → `web/medios.json`, `web/img/estadios`, `web/img/ambiente`, `web/img/escudos`, `web/video`.
-- [ ] 2. Cimientos de modelado (arnés walk-forward sin fugas + variables a la fecha) → `modelo/`
-- [ ] 3. Competencia de modelos + ensamble + revisión adversarial → `modelo/RESULTADOS.md`
+- [~] 1. Datos y reconocimiento
+  - [x] Base de ESPN: `datos/` (8,767 partidos 2001-2026, `COBERTURA.md`, `espn_descarga.py actualizar`). La
+    verificación independiente no llegó a correr: la cubre la auditoría de la fase 3.
+  - [x] Reglas: `config/torneo.json` (escrito a mano desde `notas/reglas_oficial.md`, fuente: reglamento 2026-27).
+  - [x] Escudos: `web/img/escudos/*.png` + `web/medios_parts/escudos.json`.
+  - [~] Estadios, videos y ambiente: workflow `02_medios_resto.js` (lanzado 04:20 UTC). Listo cuando existan
+    `web/medios_parts/estadios_1.json`, `estadios_3.json` y `videos.json`. Después, unir todo en `web/medios.json`.
+  - [ ] Actualidad (lesionados, suspendidos, DT): **pendiente**. Las suspensiones se deducen de `tarjetas.csv`
+    (lo hace `modelo/variables.py`); las lesiones requieren búsqueda web antes de cada jornada (guion en
+    `notas/workflows/01_reglas_actualidad.js`, parte "Actualidad").
+- [~] 2 y 3. Cimientos + competencia de modelos + selección + auditoría: workflow `02_modelos.js` (lanzado 04:10
+  UTC, args `{saltar: []}`). Etapas y su señal de "hecho" en disco: arnés (`modelo/ARNES.md`), variables
+  (`modelo/VARIABLES.md`), familias (`modelo/informes/poisson.md`, `ratings.md`, `variables.md`), selección
+  (`modelo/RESULTADOS.md`, `campeon.json`, `pronostico.py`), auditoría (`modelo/AUDITORIA.md`). Si se corta, relanzar
+  con `args: {saltar: [...]}` listando las etapas ya hechas (`arnes`, `variables`, `poisson`, `ratings`,
+  `variables_ml`, `seleccion`).
 - [ ] 4. Análisis especiales (liguilla, dominios, estadios, rachas, ausencias, córners/tarjetas)
-- [ ] 5. Producción: pronósticos, combinada de 4 picks, simulación de liguilla y campeón → `salidas/*.json`
+- [ ] 5. Producción: mercados, combinada de 4 picks, simulación de tabla → liguilla → campeón → `salidas/*.json`
 - [ ] 6. Página (plantilla + constructor), probada en Chromium y WebKit
 - [ ] 7. Publicación (Artifact + sitio estático) y commit
 - [ ] 8. Automatización (`pipeline.py auto`, `mejora.py`, tareas programadas, runbook)
@@ -48,3 +55,7 @@
 ## Bitácora
 - 2026-11-10 02:50 UTC · Reconocimiento: ESPN da resultados y estadísticas por partido; 143/153 jugados.
 - 2026-11-10 03:00 UTC · Fase 1 lanzada en tres workflows paralelos.
+- 2026-11-10 03:30 UTC · Se agotó el límite de uso a media fase 1 (regresó 03:50). Quedaron hechos: datos ESPN,
+  notas de reglas, mapa del código previo, fotos de 11 estadios. Lección: ~2.2 M de tokens de agentes agotan la
+  ventana; lanzar menos agentes a la vez y por prioridad.
+- 2026-11-10 04:20 UTC · Relanzado: modelos (`02_modelos.js`) y medios restantes (`02_medios_resto.js`).

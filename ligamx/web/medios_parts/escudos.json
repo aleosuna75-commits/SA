@@ -1,0 +1,204 @@
+{
+ "nota_legal": "Los escudos y nombres son marcas de sus respectivos clubes; se muestran en baja resolución sólo para identificar a los equipos. Sitio independiente, sin afiliación con la Liga MX ni con los clubes.",
+ "fuente": "ESPN (a.espncdn.com)",
+ "equipos": {
+  "América": {
+   "slug": "ame",
+   "abr": "AME",
+   "espn_id": 227,
+   "escudo": "img/escudos/ame.png",
+   "c1": "#0A2240",
+   "c2": "#FFD100",
+   "fg": "#FFD100",
+   "dominante": "#f0f000",
+   "kb": 30.0
+  },
+  "Atlante": {
+   "slug": "ate",
+   "abr": "ATE",
+   "espn_id": 226,
+   "escudo": "img/escudos/ate.png",
+   "c1": "#0033A0",
+   "c2": "#C8102E",
+   "fg": "#FFFFFF",
+   "dominante": "#480000",
+   "kb": 16.5
+  },
+  "Atlas": {
+   "slug": "ats",
+   "abr": "ATS",
+   "espn_id": 216,
+   "escudo": "img/escudos/ats.png",
+   "c1": "#A6192E",
+   "c2": "#111111",
+   "fg": "#FFFFFF",
+   "dominante": "#d80018",
+   "kb": 12.1
+  },
+  "Atlético San Luis": {
+   "slug": "asl",
+   "abr": "ASL",
+   "espn_id": 15720,
+   "escudo": "img/escudos/asl.png",
+   "c1": "#C8102E",
+   "c2": "#0A2240",
+   "fg": "#FFFFFF",
+   "dominante": "#9090a8",
+   "kb": 32.0
+  },
+  "Cruz Azul": {
+   "slug": "caz",
+   "abr": "CAZ",
+   "espn_id": 218,
+   "escudo": "img/escudos/caz.png",
+   "c1": "#003DA5",
+   "c2": "#FFFFFF",
+   "fg": "#FFFFFF",
+   "dominante": "#001860",
+   "kb": 23.7
+  },
+  "Juárez": {
+   "slug": "jua",
+   "abr": "JUA",
+   "espn_id": 17851,
+   "escudo": "img/escudos/jua.png",
+   "c1": "#16693B",
+   "c2": "#111111",
+   "fg": "#FFFFFF",
+   "dominante": "#181818",
+   "kb": 29.5
+  },
+  "Chivas": {
+   "slug": "chi",
+   "abr": "CHI",
+   "espn_id": 219,
+   "escudo": "img/escudos/chi.png",
+   "c1": "#C8102E",
+   "c2": "#FFFFFF",
+   "fg": "#0A2240",
+   "dominante": "#486078",
+   "kb": 31.7
+  },
+  "León": {
+   "slug": "leo",
+   "abr": "LEO",
+   "espn_id": 228,
+   "escudo": "img/escudos/leo.png",
+   "c1": "#0F7A3D",
+   "c2": "#FFFFFF",
+   "fg": "#FFFFFF",
+   "dominante": "#187848",
+   "kb": 17.3
+  },
+  "Monterrey": {
+   "slug": "mty",
+   "abr": "MTY",
+   "espn_id": 220,
+   "escudo": "img/escudos/mty.png",
+   "c1": "#16284B",
+   "c2": "#FFFFFF",
+   "fg": "#16284B",
+   "dominante": "#001830",
+   "kb": 14.6
+  },
+  "Necaxa": {
+   "slug": "nec",
+   "abr": "NEC",
+   "espn_id": 229,
+   "escudo": "img/escudos/nec.png",
+   "c1": "#D3222A",
+   "c2": "#FFFFFF",
+   "fg": "#FFFFFF",
+   "dominante": "#d80018",
+   "kb": 17.4
+  },
+  "Pachuca": {
+   "slug": "pac",
+   "abr": "PAC",
+   "espn_id": 234,
+   "escudo": "img/escudos/pac.png",
+   "c1": "#0A4D8C",
+   "c2": "#FFFFFF",
+   "fg": "#0A4D8C",
+   "dominante": "#c0c0d8",
+   "kb": 23.3
+  },
+  "Puebla": {
+   "slug": "pue",
+   "abr": "PUE",
+   "espn_id": 231,
+   "escudo": "img/escudos/pue.png",
+   "c1": "#005EB8",
+   "c2": "#FFFFFF",
+   "fg": "#FFFFFF",
+   "dominante": "#607890",
+   "kb": 31.6
+  },
+  "Pumas": {
+   "slug": "pum",
+   "abr": "PUM",
+   "espn_id": 233,
+   "escudo": "img/escudos/pum.png",
+   "c1": "#14284B",
+   "c2": "#D4A017",
+   "fg": "#D4A017",
+   "dominante": "#181830",
+   "kb": 8.1
+  },
+  "Querétaro": {
+   "slug": "qro",
+   "abr": "QRO",
+   "espn_id": 222,
+   "escudo": "img/escudos/qro.png",
+   "c1": "#14284B",
+   "c2": "#111111",
+   "fg": "#FFFFFF",
+   "dominante": "#d8d8d8",
+   "kb": 17.5
+  },
+  "Santos": {
+   "slug": "san",
+   "abr": "SAN",
+   "espn_id": 225,
+   "escudo": "img/escudos/san.png",
+   "c1": "#0F7A3D",
+   "c2": "#FFFFFF",
+   "fg": "#FFFFFF",
+   "dominante": "#007830",
+   "kb": 21.5
+  },
+  "Tigres": {
+   "slug": "tig",
+   "abr": "TIG",
+   "espn_id": 232,
+   "escudo": "img/escudos/tig.png",
+   "c1": "#F4B223",
+   "c2": "#14284B",
+   "fg": "#14284B",
+   "dominante": "#d8a830",
+   "kb": 16.4
+  },
+  "Tijuana": {
+   "slug": "tij",
+   "abr": "XOL",
+   "espn_id": 10125,
+   "escudo": "img/escudos/tij.png",
+   "c1": "#B01E28",
+   "c2": "#111111",
+   "fg": "#FFFFFF",
+   "dominante": "#d81818",
+   "kb": 29.4
+  },
+  "Toluca": {
+   "slug": "tol",
+   "abr": "TOL",
+   "espn_id": 223,
+   "escudo": "img/escudos/tol.png",
+   "c1": "#C8102E",
+   "c2": "#FFFFFF",
+   "fg": "#C8102E",
+   "dominante": "#c00018",
+   "kb": 28.2
+  }
+ }
+}

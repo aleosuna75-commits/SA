@@ -1,0 +1,79 @@
+{
+  "torneo": "Apertura 2026",
+  "equipos": 18,
+  "jornadas": 17,
+  "puntos": {"victoria": 3, "empate": 1, "derrota": 0},
+  "clasifican_directo": 8,
+  "play_in": {"existe": false, "detalle": "El reglamento 2026-27 elimina el Play-In: la fase final son cuartos, semifinales y final (art. 22 y 26)."},
+  "desempate_tabla": [
+    "puntos",
+    "diferencia_de_goles",
+    "goles_a_favor",
+    "goles_de_visitante_con_el_mismo_numero_de_visitas",
+    "menos_puntos_fair_play",
+    "tabla_de_cociente",
+    "sorteo"
+  ],
+  "desempate_tabla_notas": [
+    "No existe el criterio de enfrentamiento directo en 2026-27.",
+    "Goles de visitante: si los clubes empatados tienen distinto número de partidos de visita, sólo cuentan hasta la última jornada en la que tenían el mismo número (art. 25, nota al pie).",
+    "Fair Play: primera amarilla 1 punto; segunda amarilla 3; roja directa 3; amarilla más roja directa 4. Gana quien tenga menos.",
+    "Cociente: puntos entre partidos de Apertura 2024 a la fecha (art. 34)."
+  ],
+  "ajustes_tabla": {
+    "regla_menores": "Menos 3 puntos al club que no sume 1,170 minutos de menores en la fase regular (art. 49).",
+    "minutos_por_cumplir_al_2026_11_10": {"Toluca": 41, "Puebla": 16, "Santos": 36, "Querétaro": 46, "León": 91, "Tigres": 102, "Monterrey": 108},
+    "nota": "A todos les alcanza con un partido (tope de 225 minutos por partido). Se vigila en la tabla oficial de menores de ligamx.net tras la Jornada 17."
+  },
+  "liguilla": {
+    "rondas": ["cuartos", "semifinal", "final"],
+    "ida_vuelta": true,
+    "cruces_cuartos": [[1, 8], [2, 7], [3, 6], [4, 5]],
+    "cierra_en_casa": "mejor posición en la tabla (práctica en 7 de 7 series del Clausura 2026; en la final es derecho del mejor sembrado)",
+    "empate_global_cuartos_semis": "avanza el mejor ubicado en la tabla general; sin tiempos extra ni penales",
+    "gol_visitante": false,
+    "resiembra_semifinal": true,
+    "final_empate": "dos tiempos extra de 15 minutos y, si sigue el empate, penales; la tabla no desempata",
+    "tarjetas": "las amarillas se borran al empezar la liguilla; las suspensiones ya ganadas sí se cumplen; 5 amarillas = 1 partido",
+    "fechas": {
+      "cuartos_ida": ["2026-11-25", "2026-11-26"],
+      "cuartos_vuelta": ["2026-11-28", "2026-11-29"],
+      "semis_ida": ["2026-12-02", "2026-12-03"],
+      "semis_vuelta": ["2026-12-05", "2026-12-06"],
+      "final_ida": ["2026-12-10"],
+      "final_vuelta": ["2026-12-13"],
+      "final_ida_opcion2": ["2026-12-24"],
+      "final_vuelta_opcion2": ["2026-12-27"]
+    }
+  },
+  "pendientes_fase_regular": {
+    "jornada_17": ["2026-11-20", "2026-11-22"],
+    "reprogramado": {"partido": "Querétaro vs Monterrey (Jornada 7)", "fecha": "2026-11-14", "nota": "Cae en Fecha FIFA: se juega sin convocados a selecciones."}
+  },
+  "fecha_fifa_noviembre": ["2026-11-09", "2026-11-17"],
+  "copa_intercontinental_toluca": {
+    "partidos": ["2026-12-09", "2026-12-12", "2026-12-16"],
+    "sede": "Qatar",
+    "nota": "Si Toluca avanza, la final de liga se recorre al 24 y 27 de diciembre (la liga no ha precisado la condición exacta)."
+  },
+  "sedes_compartidas": {"Estadio Banorte": ["América", "Cruz Azul", "Atlante"]},
+  "reglas_nuevas": [
+    "Sin ascenso ni descenso desde 2026-27 (art. 35).",
+    "Máximo 7 no formados en México en cancha y 9 registrados (art. 47).",
+    "Cinco cambios en tres ventanas; uno más en los tiempos extra de la final (art. 50)."
+  ],
+  "fuentes": [
+    {"url": "https://fmf.mx/docs/reglamentos/507.pdf", "titulo": "Reglamento de Competencia de la Liga BBVA MX, temporada 2026-2027", "fecha": "2026-07-15", "sustenta": "clasificados, desempates, liguilla, final, menores, extranjeros"},
+    {"url": "https://fmf.mx/docs/reglamentos/509.pdf", "titulo": "Reglamento de Sanciones 2026-2027", "fecha": "2026-07-15", "sustenta": "tarjetas y suspensiones"},
+    {"url": "https://www.ligamx.net/cancha/detallenoticia/47591/calendario-oficial-del-torneo-apertura-2026", "titulo": "Calendario oficial del Torneo Apertura 2026", "fecha": "2026-06-09", "sustenta": "fechas de cuartos, semifinales y final; fecha FIFA"},
+    {"url": "https://www.foxsports.com.mx/2026/10/22/toluca-jugara-la-copa-intercontinental-en-qatar-fifa-confirma-la-sede-para-los-partidos/", "titulo": "FIFA revela dónde jugará Toluca la Copa Intercontinental 2026", "fecha": "2026-10-22", "sustenta": "fechas de la Intercontinental"}
+  ],
+  "dudas": [
+    "Fechas de la final: 10 y 13 de diciembre, o 24 y 27 si Toluca avanza en la Intercontinental; se resuelve tras las semifinales.",
+    "Día, hora y sede de cada partido de cuartos: se fijan el lunes 23 de noviembre.",
+    "Sede de Cruz Azul en liguilla: Banorte o Ciudad de los Deportes (en el Clausura 2026 jugó la ida de la final en Ciudad de los Deportes).",
+    "Momento exacto en que se aplicaría la resta de 3 puntos por menores.",
+    "La nota de ESPN sobre quién avanza en series empatadas puede ser errónea (dijo gol de visitante en Pumas-América del Clausura 2026): quién avanza se deduce de la regla."
+  ],
+  "detalle": "notas/reglas_oficial.md y notas/reglas_medios.md"
+}
