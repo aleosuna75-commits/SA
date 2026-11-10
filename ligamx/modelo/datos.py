@@ -8,6 +8,7 @@ Todo lo que define QUÉ sabe un modelo y CUÁNDO vive aquí:
                      México, bloque walk-forward, día, periodo y banderas de calidad.
   * jugados()     -> sólo los partidos con resultado (historial).
   * pendientes()  -> los programados que faltan por jugar.
+  * tabla()       -> goles, tarjetas o alineaciones, restringidas a los partidos de un historial.
   * asignar_bloques() -> corte de lunes/viernes 00:00 (hora de la Ciudad de México) de cada partido.
 
 Convenciones de tipos: numérico con faltantes = float64 con NaN (los vacíos del CSV NUNCA se vuelven
@@ -214,6 +215,31 @@ def torneos_de(periodo: str, df: pd.DataFrame | None = None) -> list[str]:
     """Torneos de un periodo, en orden cronológico."""
     df = cargar() if df is None else df
     return sorted(df.loc[df["periodo"] == periodo, "torneo"].unique(), key=clave_torneo)
+
+
+_TABLAS = {"goles": "goles.csv", "tarjetas": "tarjetas.csv", "alineaciones": "alineaciones.csv"}
+_cache_tablas: dict = {}
+
+
+def tabla(nombre: str, hist: pd.DataFrame | None = None) -> pd.DataFrame:
+    """
+    Tabla auxiliar ('goles', 'tarjetas' o 'alineaciones'; diccionario en datos/COBERTURA.md) restringida
+    a los partidos de `hist`. Dentro de `Modelo.ajustar` úsese SIEMPRE con el `hist` recibido: así
+    ningún gol, tarjeta o alineación posterior al corte puede colarse en una variable. Sin `hist`
+    devuelve la tabla completa (sólo para exploración, nunca dentro de un modelo).
+    """
+    if nombre not in _TABLAS:
+        raise ValueError(f"tabla debe ser una de {sorted(_TABLAS)}")
+    ruta = DIR_DATOS / _TABLAS[nombre]
+    llave = (nombre, ruta.stat().st_mtime_ns)
+    if llave not in _cache_tablas:
+        for k in [k for k in _cache_tablas if k[0] == nombre]:
+            del _cache_tablas[k]
+        _cache_tablas[llave] = pd.read_csv(ruta, encoding="utf-8", low_memory=False)
+    t = _cache_tablas[llave]
+    if hist is None:
+        return t.copy()
+    return t[t["partido_id"].isin(hist["id"].to_numpy())].reset_index(drop=True)
 
 
 def columna_corte(granularidad: str) -> str:

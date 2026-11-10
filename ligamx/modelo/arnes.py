@@ -21,6 +21,7 @@ import fcntl
 import importlib
 import json
 import os
+import pickle
 import re
 import sys
 import time
@@ -31,6 +32,12 @@ import pandas as pd
 from scipy.special import gammaln
 
 from . import datos, metricas
+
+try:                                              # los .parquet de pred/ necesitan pyarrow
+    import pyarrow  # noqa: F401
+except ImportError as e:                          # pragma: no cover
+    raise ImportError("El arnés guarda las predicciones en parquet: instale pyarrow "
+                      "(python3 -m pip install --user pyarrow)") from e
 
 DIR_MODELO = Path(__file__).resolve().parent
 DIR_PRED = DIR_MODELO / "pred"
@@ -69,7 +76,10 @@ class Modelo:
           {"M": matriz 11x11}          M[x, y] = P(local x, visita y), suma 1 (lam_l/lam_v opcionales); o
           {"p1x2": [pl, pe, pv]}       sólo 1X2 (no entra en las métricas de marcador); o
           None                         sin pronóstico para ese partido (se omite la fila).
-        Claves extra que empiecen con "x_" y sean escalares se guardan como columnas.
+        Si vienen M o las lambdas, el 1X2 sale SIEMPRE de la matriz (un "p1x2" adicional se ignora): así
+        el resultado, el marcador y los totales de un modelo son coherentes entre sí. Para dar matriz a
+        un 1X2 que se calculó aparte, use ajustar_M_a_1x2.
+        Claves extra que empiecen con "x_" y sean numéricas se guardan como columnas.
     """
     nombre: str = "sin_nombre"
     familia: str = "sin_familia"
@@ -206,7 +216,8 @@ def _normalizar(pr) -> tuple[np.ndarray, np.ndarray | None, float, float, dict] 
         return None
     if not isinstance(pr, dict):
         raise TypeError("predecir debe devolver un dict por partido (o None)")
-    extras = {k: float(v) for k, v in pr.items() if k.startswith("x_") and np.isscalar(v)}
+    extras = {k: float(v) for k, v in pr.items()
+              if k.startswith("x_") and isinstance(v, (int, float, np.integer, np.floating))}
     M = None
     if pr.get("M") is not None:
         M = np.array(pr["M"], dtype=float)
@@ -282,7 +293,9 @@ def ruta_pred(nombre: str, periodo: str = "desarrollo", granularidad: str = "blo
 
 def leer_pred(nombre: str, periodo: str = "desarrollo", granularidad: str = "bloque",
               parcial: bool = False, dir_pred: str | Path | None = None) -> pd.DataFrame:
-    """Lee las predicciones guardadas de un modelo."""
+    """Lee las predicciones guardadas de un modelo (leer las de PRUEBA también queda en el registro de accesos)."""
+    if periodo == "prueba":
+        _acceso_prueba(dir_pred, "leer", nombre, granularidad=granularidad)
     return pd.read_parquet(ruta_pred(nombre, periodo, granularidad, parcial, dir_pred))
 
 
@@ -372,11 +385,36 @@ def cortes(periodo: str = "desarrollo", granularidad: str = "bloque", df: pd.Dat
     return obj
 
 
+def _candado(hist: pd.DataFrame, corte: pd.Timestamp, bloque: pd.DataFrame) -> None:
+    """
+    Candado contra fugas, en tiempo de ejecución: el historial sólo trae partidos jugados con fecha_utc
+    anterior al corte, y ningún partido a pronosticar es anterior al corte ni está en el historial.
+    """
+    if len(hist) and not (hist["fecha_utc"].iloc[-1] < corte and hist["fecha_utc"].max() < corte):
+        raise AssertionError(f"fuga: el historial contiene partidos del {hist['fecha_utc'].max()} (corte {corte})")
+    if len(hist) and not (hist["estado"] == "jugado").all():
+        raise AssertionError("fuga: el historial contiene partidos no jugados")
+    if not (bloque["fecha_utc"] >= corte).all():
+        raise AssertionError(f"fuga: hay partidos a pronosticar anteriores al corte {corte}")
+    if len(hist) and np.isin(bloque["id"].to_numpy(), hist["id"].to_numpy()).any():
+        raise AssertionError("fuga: un partido a pronosticar está en el historial")
+
+
+def _acceso_prueba(dir_pred, accion: str, nombre: str, quien: str | None = None, **datos_extra) -> None:
+    """Deja constancia en pred/ACCESOS_PRUEBA.log de quién miró la PRUEBA, cuándo y con qué modelo."""
+    quien = quien or os.environ.get("AGENTE") or os.environ.get("USER") or "desconocido"
+    extra = "".join(f"\t{k}={v}" for k, v in datos_extra.items())
+    _anexar(Path(dir_pred or DIR_PRED) / NOMBRE_LOG_PRUEBA,
+            f"{_ahora()}\taccion={accion}\tquien={quien}\tmodelo={nombre}{extra}\tpid={os.getpid()}"
+            f"\targv={' '.join(sys.argv)}")
+
+
 def evaluar(modelo: Modelo, periodo: str = "desarrollo", granularidad: str = "bloque", *,
             permitir_prueba: bool = False, torneos: list[str] | None = None, desde=None, hasta=None,
             guardar: bool = True, guardar_matrices: bool = True, registrar_variante: bool = True,
             dir_pred: str | Path | None = None, dir_cache: str | Path | None = None,
             ruta_registro: str | Path | None = None, quien: str | None = None,
+            reanudar: bool = False, cada: int = 20,
             df: pd.DataFrame | None = None, verbose: bool = True) -> pd.DataFrame:
     """
     Recorre el periodo en orden cronológico: para cada corte ajusta el modelo con los partidos jugados
@@ -386,6 +424,11 @@ def evaluar(modelo: Modelo, periodo: str = "desarrollo", granularidad: str = "bl
                    permitir_prueba=True y deja constancia en pred/ACCESOS_PRUEBA.log.
     granularidad   'bloque' (cortes lunes y viernes 00:00 CDMX) o 'dia' (corte al inicio de cada día).
     torneos, desde, hasta   subconjunto para iterar rápido (el archivo se guarda con sufijo __parcial).
+    reanudar, cada          para modelos lentos: guarda un punto de control en cache/ cada `cada` cortes y,
+                   si la corrida se interrumpe, la siguiente llamada idéntica retoma donde se quedó. Supone
+                   que el resultado de `ajustar` no depende de las llamadas anteriores (el estado guardado
+                   sólo sirve para arrancar más rápido); el punto de control se invalida si cambian el
+                   nombre, los hiperparámetros, los partidos a evaluar o los datos.
     Devuelve (y guarda en modelo/pred/) una fila por partido: id, fecha_utc, torneo, fase, pierna, local,
     visitante, bloque, dia, corte, p_l, p_e, p_v, lam_l, lam_v, p_over15, p_over25, p_over35, p_ambos,
     marcador_probable, p_marcador_probable, gl, gv, resultado, logp_marcador. Las matrices 11x11 quedan
@@ -405,22 +448,36 @@ def evaluar(modelo: Modelo, periodo: str = "desarrollo", granularidad: str = "bl
             raise PermissionError(
                 "La PRUEBA (Apertura 2025 en adelante) sólo la mira el agente de selección, una vez y con "
                 "candidatos declarados de antemano. Si es el caso, llame con permitir_prueba=True.")
-        quien = quien or os.environ.get("AGENTE") or os.environ.get("USER") or "desconocido"
-        _anexar(dir_pred / NOMBRE_LOG_PRUEBA,
-                f"{_ahora()}\tquien={quien}\tmodelo={nombre}\tperiodo={periodo}\tgranularidad={granularidad}"
-                f"\tpartidos={len(obj)}\tparcial={parcial}\tpid={os.getpid()}\targv={' '.join(sys.argv)}")
+        _acceso_prueba(dir_pred, "evaluar", nombre, quien, periodo=periodo, granularidad=granularidad,
+                       partidos=len(obj), parcial=parcial)
 
     f_ns = jug["fecha_utc"].to_numpy(dtype="datetime64[ns]").astype("int64")
     filas, mats = [], []
     t_aj = t_pr = 0.0
     t0 = time.time()
     grupos = list(obj.groupby("corte", sort=True))
+
+    # --- punto de control para modelos lentos: se retoma donde se quedó una corrida interrumpida ---
+    control = Path(dir_cache or DIR_CACHE) / f"reanudar_{ruta_pred(nombre, periodo, granularidad, parcial).stem}.pkl"
+    firma = json.dumps({"nombre": nombre, "hiper": getattr(modelo, "hiperparametros", {}), "periodo": periodo,
+                        "granularidad": granularidad, "ids": obj["id"].tolist(),
+                        "datos": int(jug["gl"].sum() * 1000 + jug["gv"].sum())}, default=_json, sort_keys=True)
+    hechos = 0
+    if reanudar and control.is_file():
+        with open(control, "rb") as fh:
+            guardado = pickle.load(fh)
+        if guardado.get("firma") == firma:
+            filas, mats, hechos = guardado["filas"], guardado["mats"], guardado["hechos"]
+            t_aj, t_pr = guardado["t_aj"], guardado["t_pr"]
+            if verbose:
+                print(f"  [{nombre}] se retoma en el corte {hechos + 1}/{len(grupos)}", flush=True)
+
     for i, (corte, g) in enumerate(grupos, start=1):
+        if i <= hechos:
+            continue
         k = int(np.searchsorted(f_ns, corte.value, side="left"))        # partidos con fecha_utc < corte
         hist = jug.iloc[:k]
-        # --- candado contra fugas: nada del historial es posterior al corte ni pertenece al bloque ---
-        assert k == 0 or hist["fecha_utc"].iloc[-1] < corte, "fuga: el historial llega al corte"
-        assert g.index.min() >= k and (g["fecha_utc"] >= corte).all(), "fuga: partido del bloque en el historial"
+        _candado(hist, corte, g)
         t = time.time()
         modelo.ajustar(hist, corte)
         t_aj += time.time() - t
@@ -433,6 +490,14 @@ def evaluar(modelo: Modelo, periodo: str = "desarrollo", granularidad: str = "bl
         mats += mb
         if verbose and (i % 100 == 0 or i == len(grupos)):
             print(f"  [{nombre}] corte {i}/{len(grupos)}  {corte:%Y-%m-%d}  {time.time() - t0:6.1f} s", flush=True)
+        if reanudar and (i % max(int(cada), 1) == 0) and i < len(grupos):
+            control.parent.mkdir(parents=True, exist_ok=True)
+            temporal = control.with_name(f".{control.name}.{os.getpid()}.tmp")
+            with open(temporal, "wb") as fh:
+                pickle.dump({"firma": firma, "filas": filas, "mats": mats, "hechos": i, "t_aj": t_aj, "t_pr": t_pr}, fh)
+            os.replace(temporal, control)
+    if reanudar and control.is_file():
+        control.unlink()                                                 # corrida completa: ya no hace falta
 
     pred = pd.DataFrame(filas)
     if len(pred):
@@ -458,7 +523,9 @@ def evaluar(modelo: Modelo, periodo: str = "desarrollo", granularidad: str = "bl
     elif guardar:
         dir_pred.mkdir(parents=True, exist_ok=True)
         destino = ruta_pred(nombre, periodo, granularidad, parcial, dir_pred)
-        pred.to_parquet(destino, index=False)
+        temporal = destino.with_name(f".{destino.name}.{os.getpid()}.tmp")
+        pred.to_parquet(temporal, index=False)          # escritura atómica: otro agente nunca lee un archivo a medias
+        os.replace(temporal, destino)
         if guardar_matrices and any(m is not None for m in mats):
             dc = Path(dir_cache or DIR_CACHE)
             dc.mkdir(parents=True, exist_ok=True)
@@ -494,7 +561,7 @@ def pronosticar(modelo: Modelo, partidos: pd.DataFrame | None = None, granularid
     for corte, g in partidos.groupby(col, sort=True):
         k = int(np.searchsorted(f_ns, corte.value, side="left"))
         hist = jug.iloc[:k]
-        assert k == 0 or hist["fecha_utc"].iloc[-1] < corte, "fuga: el historial llega al corte"
+        _candado(hist, corte, g)
         modelo.ajustar(hist, corte)
         previos = g[datos.COLS_PREPARTIDO].reset_index(drop=True)
         fb, mb = _filas(previos, modelo.predecir(previos), corte)
@@ -580,6 +647,21 @@ def resumen(periodo: str = "desarrollo", granularidad: str = "bloque", dir_pred:
     return t.sort_values("logloss").reset_index(drop=True) if len(t) else t
 
 
+def desglose(nombre: str, por: str = "torneo", periodo: str = "desarrollo", granularidad: str = "bloque",
+             dir_pred: str | Path | None = None) -> pd.DataFrame:
+    """
+    Métricas de un modelo guardado partidas por `por`: 'torneo', 'fase', 'anio' o cualquier columna de la
+    tabla de predicciones. Sirve para ver si una mejora es pareja o viene de un solo tramo.
+    """
+    m = metricas.metricas_por_partido(leer_pred(nombre, periodo, granularidad, dir_pred=dir_pred))
+    if por == "anio":
+        m["anio"] = m["fecha_utc"].dt.tz_convert(datos.ZONA).dt.year
+    t = m.groupby(por, sort=False).agg(n=("ll", "size"), logloss=("ll", "mean"), rps=("rps", "mean"),
+                                       brier=("brier", "mean"), logv_marcador=("logp_marcador", "mean"),
+                                       acierto=("acierto", "mean")).reset_index()
+    return t
+
+
 def calibracion(nombre: str, periodo: str = "desarrollo", granularidad: str = "bloque",
                 por_clase: bool = False, dir_pred: str | Path | None = None) -> pd.DataFrame:
     """Tabla de calibración por deciles de un modelo guardado."""
@@ -621,6 +703,7 @@ def main(argv: list[str] | None = None) -> int:
     e.add_argument("--permitir-prueba", action="store_true", help="sólo el agente de selección")
     e.add_argument("--quien", default=None, help="quién pide la PRUEBA (queda en ACCESOS_PRUEBA.log)")
     e.add_argument("--no-guardar", action="store_true")
+    e.add_argument("--reanudar", action="store_true", help="retoma una corrida interrumpida (modelos lentos)")
 
     c = sub.add_parser("comparar", help="tabla pareada contra una referencia")
     c.add_argument("nombres", nargs="+")
@@ -635,6 +718,11 @@ def main(argv: list[str] | None = None) -> int:
     k.add_argument("--por-clase", action="store_true")
     comunes(k)
 
+    g = sub.add_parser("desglose", help="métricas de un modelo por torneo, fase o año")
+    g.add_argument("nombre")
+    g.add_argument("--por", default="torneo")
+    comunes(g)
+
     sub.add_parser("registro", help="cuántas variantes se han probado, por familia")
 
     a = ap.parse_args(argv)
@@ -642,13 +730,15 @@ def main(argv: list[str] | None = None) -> int:
         modelo = instanciar(a.modelo, json.loads(a.kw))
         evaluar(modelo, a.periodo, a.granularidad, permitir_prueba=a.permitir_prueba,
                 torneos=[t.strip() for t in a.torneos.split(",")] if a.torneos else None,
-                desde=a.desde, hasta=a.hasta, guardar=not a.no_guardar, quien=a.quien)
+                desde=a.desde, hasta=a.hasta, guardar=not a.no_guardar, quien=a.quien, reanudar=a.reanudar)
     elif a.orden == "comparar":
         _imprimir(comparar(a.nombres, a.referencia, a.periodo, a.granularidad))
     elif a.orden == "resumen":
         _imprimir(resumen(a.periodo, a.granularidad))
     elif a.orden == "calibracion":
         _imprimir(calibracion(a.nombre, a.periodo, a.granularidad, a.por_clase))
+    elif a.orden == "desglose":
+        _imprimir(desglose(a.nombre, a.por, a.periodo, a.granularidad))
     elif a.orden == "registro":
         t = leer_registro()
         if len(t):

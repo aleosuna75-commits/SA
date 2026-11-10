@@ -10,8 +10,8 @@ Líneas base de Cerebro Liga MX. Todas implementan arnes.Modelo.
   CerebroOriginalExacto  el motor previo tal cual (priors, credibilidad y capas a mano). Sólo es
                          legítimo desde el 14-ago-2026, cuando el código quedó congelado.
   Mercado                probabilidades implícitas de los momios (cierre o apertura) sin margen, por
-                         normalización proporcional o por el método de Shin. Es REFERENCIA: no sirve
-                         para simular rondas futuras.
+                         normalización proporcional, por el método de Shin o por el de potencia. Es
+                         REFERENCIA: no sirve para simular rondas futuras.
 
 Evaluar todas en DESARROLLO (desde ligamx/):  python3 -m modelo.base
 """
@@ -351,20 +351,40 @@ def prob_shin(momios, iteraciones: int = 60) -> tuple[np.ndarray, np.ndarray]:
     return P / P.sum(axis=1, keepdims=True), z
 
 
+def prob_potencia(momios, iteraciones: int = 60) -> tuple[np.ndarray, np.ndarray]:
+    """
+    Probabilidades implícitas por el método de potencia: p_i = pi_i^k con pi_i = 1/momio_i y k >= 1 tal
+    que sum p_i = 1 (bisección vectorizada). Quita todavía más margen a los momios altos que Shin.
+    Devuelve (P (n, 3), k (n,)).
+    """
+    pi = 1.0 / np.asarray(momios, float).reshape(-1, 3)
+    lo, hi = np.ones(len(pi)), np.full(len(pi), 3.0)
+    for _ in range(iteraciones):                        # sum pi_i^k decrece con k (pi_i < 1)
+        mid = 0.5 * (lo + hi)
+        mayor = (pi ** mid[:, None]).sum(axis=1) > 1.0
+        lo, hi = np.where(mayor, mid, lo), np.where(mayor, hi, mid)
+    k = 0.5 * (lo + hi)
+    P = pi ** k[:, None]
+    return P / P.sum(axis=1, keepdims=True), k
+
+
+_METODOS_MERCADO = {"proporcional": "prop", "shin": "shin", "potencia": "pot"}
+
+
 class Mercado(Modelo):
     """
     Referencia de mercado: 1X2 implícito en los momios, sin margen. tipo = 'cierre' (ml_l, ml_e, ml_v)
-    o 'apertura' (ml_*_abre); metodo = 'shin' o 'proporcional'. Sólo pronostica donde hay momios
-    completos (y no marcados como capturados en vivo); no produce matriz de marcadores.
+    o 'apertura' (ml_*_abre); metodo = 'proporcional', 'shin' o 'potencia'. Sólo pronostica donde hay
+    momios completos (y no marcados como capturados en vivo); no produce matriz de marcadores.
     """
     familia = "referencia_mercado"
 
     def __init__(self, tipo: str = "cierre", metodo: str = "shin", nombre: str | None = None):
-        if tipo not in ("cierre", "apertura") or metodo not in ("shin", "proporcional"):
-            raise ValueError("tipo: 'cierre' o 'apertura'; metodo: 'shin' o 'proporcional'")
+        if tipo not in ("cierre", "apertura") or metodo not in _METODOS_MERCADO:
+            raise ValueError("tipo: 'cierre' o 'apertura'; metodo: 'proporcional', 'shin' o 'potencia'")
         self.tipo, self.metodo = tipo, metodo
         self.cols = ["ml_l", "ml_e", "ml_v"] if tipo == "cierre" else ["ml_l_abre", "ml_e_abre", "ml_v_abre"]
-        self.nombre = nombre or f"mercado_{'cierre' if tipo == 'cierre' else 'abre'}_{'shin' if metodo == 'shin' else 'prop'}"
+        self.nombre = nombre or f"mercado_{'cierre' if tipo == 'cierre' else 'abre'}_{_METODOS_MERCADO[metodo]}"
         self.hiperparametros = {"tipo": tipo, "metodo": metodo}
 
     def ajustar(self, hist, corte):
@@ -375,9 +395,87 @@ class Mercado(Modelo):
         ok = np.isfinite(mom).all(axis=1) & (mom > 1.0).all(axis=1)
         out: list = [None] * len(partidos)
         if ok.any():
-            P = prob_shin(mom[ok])[0] if self.metodo == "shin" else prob_proporcional(mom[ok])
+            P = {"shin": lambda m: prob_shin(m)[0], "potencia": lambda m: prob_potencia(m)[0],
+                 "proporcional": prob_proporcional}[self.metodo](mom[ok])
             for i, p in zip(np.flatnonzero(ok), P):
                 out[i] = {"p1x2": p}
+        return out
+
+
+LINEAS_OU = (1.5, 2.5, 3.5, 4.5)                        # líneas de goles sin devolución (medio gol)
+
+
+def marcador_de_mercado(p1x2, linea=None, p_over=None, iteraciones: int = 60) -> tuple[np.ndarray, ...]:
+    """
+    Parámetros (lam_l, lam_v, rho) de la matriz Dixon-Coles que reproduce lo que cotiza el mercado:
+    P(gana local) y P(gana visita) del 1X2 y, donde hay línea de goles, P(total > línea). Son tres
+    ecuaciones con tres incógnitas, resueltas por Newton amortiguado y vectorizado (jacobiano numérico).
+    Sin línea de goles utilizable se fija rho = 0 y se resuelven sólo las dos del 1X2.
+    rho se limita a [-0.3, 0.3]: si el mercado pide más, queda un residuo. Devuelve
+    (lam_l, lam_v, rho, residuo), donde residuo es el máximo error absoluto de las ecuaciones.
+    """
+    p = np.asarray(p1x2, float).reshape(-1, 3)
+    n = len(p)
+    linea = np.full(n, np.nan) if linea is None else np.asarray(linea, float).ravel()
+    p_over = np.full(n, np.nan) if p_over is None else np.asarray(p_over, float).ravel()
+    con_ou = np.isin(linea, LINEAS_OU) & np.isfinite(p_over) & (p_over > 0.01) & (p_over < 0.99)
+    mas = (arnes._TOTAL[None, :, :] > np.where(con_ou, linea, 2.5)[:, None, None])
+
+    def F(th):
+        M = arnes.matrices_marcadores(np.exp(th[:, 0]), np.exp(th[:, 1]), th[:, 2])
+        q = arnes.p1x2(M)
+        tercero = np.where(con_ou, (M * mas).sum(axis=(1, 2)) - np.where(con_ou, p_over, 0.0), th[:, 2])
+        return np.column_stack([q[:, 0] - p[:, 0], q[:, 2] - p[:, 2], tercero])
+
+    th = np.column_stack([np.full(n, math.log(1.45)), np.full(n, math.log(1.15)), np.zeros(n)])
+    h = 1e-5
+    for _ in range(iteraciones):
+        f0 = F(th)
+        J = np.empty((n, 3, 3))
+        for j in range(3):
+            d = th.copy()
+            d[:, j] += h
+            J[:, :, j] = (F(d) - f0) / h
+        paso = np.linalg.solve(J + 1e-9 * np.eye(3)[None], -f0[:, :, None])[:, :, 0]
+        paso[:, :2] = np.clip(paso[:, :2], -0.5, 0.5)
+        paso[:, 2] = np.clip(paso[:, 2], -0.1, 0.1)
+        th = th + paso
+        th[:, :2] = np.clip(th[:, :2], math.log(0.05), math.log(6.0))
+        th[:, 2] = np.clip(th[:, 2], -0.3, 0.3)
+        if np.abs(paso).max() < 1e-10:
+            break
+    return np.exp(th[:, 0]), np.exp(th[:, 1]), th[:, 2], np.abs(F(th)).max(axis=1)
+
+
+class MercadoMarcador(Modelo):
+    """
+    Referencia de mercado para el MARCADOR: la matriz Dixon-Coles implícita en los momios de cierre
+    (1X2 sin margen por Shin + línea de goles sin margen por normalización proporcional; ver
+    marcador_de_mercado). Su 1X2 se reescala al del mercado, así que coincide con mercado_cierre_shin.
+    Sólo donde hay momios 1X2; sin línea de goles utilizable usa rho = 0. Es REFERENCIA, como Mercado.
+    """
+    familia = "referencia_mercado"
+
+    def __init__(self, nombre: str | None = None):
+        self.nombre = nombre or "mercado_cierre_marcador"
+        self.hiperparametros = {"tipo": "cierre", "metodo_1x2": "shin", "metodo_goles": "proporcional",
+                                "matriz": "Dixon-Coles con lam_l, lam_v y rho implícitos"}
+
+    def ajustar(self, hist, corte):
+        pass
+
+    def predecir(self, partidos):
+        mom = partidos[["ml_l", "ml_e", "ml_v"]].to_numpy(float)
+        ok = np.isfinite(mom).all(axis=1) & (mom > 1.0).all(axis=1)
+        out: list = [None] * len(partidos)
+        if ok.any():
+            P = prob_shin(mom[ok])[0]
+            ou = partidos[["over", "under"]].to_numpy(float)[ok]
+            p_over = (1.0 / ou[:, 0]) / (1.0 / ou[:, 0] + 1.0 / ou[:, 1])
+            ll, lv, rho, res = marcador_de_mercado(P, partidos["total_linea"].to_numpy(float)[ok], p_over)
+            for i, p, a, b, r, e in zip(np.flatnonzero(ok), P, ll, lv, rho, res):
+                M = arnes.ajustar_M_a_1x2(arnes.matriz_marcadores(a, b, r), p)
+                out[i] = {"M": M, "lam_l": a, "lam_v": b, "x_rho": r, "x_residuo": e}
         return out
 
 
@@ -387,8 +485,8 @@ class Mercado(Modelo):
 def lineas_base(con_original: bool = True) -> list[Modelo]:
     """Las líneas base que se evalúan en DESARROLLO (el Cerebro original tarda decenas de minutos)."""
     m: list[Modelo] = [Frecuencias(), PoissonSimple(),
-                       Mercado("cierre", "proporcional"), Mercado("cierre", "shin"),
-                       Mercado("apertura", "proporcional"), Mercado("apertura", "shin")]
+                       Mercado("cierre", "proporcional"), Mercado("cierre", "shin"), Mercado("cierre", "potencia"),
+                       Mercado("apertura", "proporcional"), Mercado("apertura", "shin"), MercadoMarcador()]
     if con_original:
         m.append(CerebroOriginal())
     return m

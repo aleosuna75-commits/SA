@@ -1,0 +1,319 @@
+{
+  "estadios": [
+    {
+      "slug": "caliente",
+      "nombre": "Estadio Caliente",
+      "nombre_historico": "Estadio Caliente",
+      "apodo": "La Perrera; también El Mictlán",
+      "ciudad": "Tijuana",
+      "estado": "Baja California",
+      "altitud_m": 65,
+      "capacidad": 31333,
+      "superficie": "sintetico",
+      "lat": 32.50618,
+      "lon": -116.99312,
+      "inaugurado": 2007,
+      "techo": "parcial: solo la tribuna principal tiene techo",
+      "equipos": [
+        "Tijuana"
+      ],
+      "equipos_slug": [
+        "tij"
+      ],
+      "dato": "Es el único estadio de la Liga MX con pasto sintético. Abrió en 2007 con 13,333 lugares y ha crecido por etapas; la meta anunciada es llegar a 33,333.",
+      "fuente_datos": "Liga MX, ficha oficial del club (ligamx.net/cancha/club/5/tijuana, consultada 2026-11-10): aforo 31,333 y coordenadas. Wikipedia ES/EN «Estadio Caliente»: inauguración (11-nov-2007), apodos, aforo inicial de 13,333 y meta de 33,333; ES lo da como el único estadio de Primera División con pasto sintético; como aforo actual ES da 27,333-28,333 y EN 27,333 (docs/estadios.js: 27,333), por debajo de la cifra de la Liga MX. TV Azteca (16-jul-2026) lo describe como uno de los inmuebles más particulares de la liga «por su cancha de pasto sintético». Altitud: modelos de elevación SRTM 30 m (opentopodata.org) y Copernicus (open-meteo.com), ±10 m: 62-67 m (docs/estadios.js: 65). Techo: observado en las fotos de 2014 y 2020; el estadio sigue en ampliación y puede haber cambiado.",
+      "fotos": [
+        {
+          "archivo": "img/estadios/caliente-1.jpg",
+          "alt": "Interior del Estadio Caliente durante un partido al atardecer: butacas rojas con la palabra «XOLOS», cancha sintética y un cielo de nubes dramáticas.",
+          "pos": "30% 50%",
+          "autor": "Chiko elektriko",
+          "licencia": "CC BY-SA 4.0",
+          "url_pagina": "https://commons.wikimedia.org/wiki/File:Estadio_Caliente_2020.jpg",
+          "url_original": "https://upload.wikimedia.org/wikipedia/commons/4/42/Estadio_Caliente_2020.jpg",
+          "ancho": 1600,
+          "alto": 1057,
+          "kb": 346,
+          "titulo": "File:Estadio Caliente 2020.jpg",
+          "licencia_url": "https://creativecommons.org/licenses/by-sa/4.0/deed.es",
+          "credito": "Chiko elektriko / Wikimedia Commons / CC BY-SA 4.0",
+          "cambios": "recortada (se quitó el 14 % inferior) y redimensionada",
+          "original_ancho": 3937,
+          "original_alto": 3024,
+          "fecha_foto": "2020-02-21"
+        },
+        {
+          "archivo": "img/estadios/caliente-2.jpg",
+          "alt": "Estadio Caliente de noche y sin público: la tribuna principal techada e iluminada, butacas rojas con la palabra «Caliente» y el equipo entrenando en la cancha.",
+          "pos": "40% 45%",
+          "autor": "Lrios82",
+          "licencia": "CC BY-SA 4.0",
+          "url_pagina": "https://commons.wikimedia.org/wiki/File:Xolos_estadio_caliente.jpg",
+          "url_original": "https://upload.wikimedia.org/wikipedia/commons/7/7f/Xolos_estadio_caliente.jpg",
+          "ancho": 1600,
+          "alto": 896,
+          "kb": 343,
+          "titulo": "File:Xolos estadio caliente.jpg",
+          "licencia_url": "https://creativecommons.org/licenses/by-sa/4.0/deed.es",
+          "credito": "Lrios82 / Wikimedia Commons / CC BY-SA 4.0",
+          "cambios": "recortada (se quitó el 2 % superior y el 14 % inferior) y redimensionada; perfil de color Adobe RGB convertido a sRGB",
+          "original_ancho": 3000,
+          "original_alto": 2000,
+          "fecha_foto": "2014-09-17"
+        }
+      ]
+    },
+    {
+      "slug": "victoria",
+      "nombre": "Estadio Victoria",
+      "nombre_historico": "Estadio Victoria",
+      "apodo": "",
+      "ciudad": "Aguascalientes",
+      "estado": "Aguascalientes",
+      "altitud_m": 1885,
+      "capacidad": 23851,
+      "superficie": "natural",
+      "lat": 21.8808,
+      "lon": -102.27534,
+      "inaugurado": 2003,
+      "techo": "parcial: velaria blanca sobre casi todo el graderío, una cabecera sin techo",
+      "equipos": [
+        "Necaxa"
+      ],
+      "equipos_slug": [
+        "nec"
+      ],
+      "dato": "Lleva el nombre de una cerveza: Grupo Modelo adquirió por 25 años el derecho a bautizarlo. Abrió en 2003, cuando el Necaxa dejó la Ciudad de México y el Estadio Azteca para mudarse a Aguascalientes.",
+      "fuente_datos": "Liga MX, ficha oficial del club (ligamx.net/cancha/club/29/necaxa, consultada 2026-11-10): aforo 23,851 y coordenadas. Wikipedia ES «Estadio Victoria (Aguascalientes)» y EN «Estadio Victoria»: origen del nombre (concesión de 25 años a Grupo Modelo), mudanza del Necaxa en 2003, pasto natural; la ficha de EN da el mismo aforo y ES 25,500. Inauguración: 26-jul-2003 según ES y la ficha de EN (el texto de EN dice 29-jul-2003; el año coincide). Altitud: modelos de elevación SRTM 30 m (opentopodata.org) y Copernicus (open-meteo.com), ±10 m: 1,882-1,885 m (docs/estadios.js: 1,885). Techo: observado en las fotos de 2012 y 2013. Apodo: no hallé uno documentado.",
+      "fotos": [
+        {
+          "archivo": "img/estadios/victoria-1.jpg",
+          "alt": "Interior del Estadio Victoria vacío y de día: butacas rojas y blancas, palcos y la cubierta de velaria blanca rematada con astas de bandera.",
+          "pos": "45% 50%",
+          "autor": "AntoFran",
+          "licencia": "CC BY-SA 3.0",
+          "url_pagina": "https://commons.wikimedia.org/wiki/File:Estadio_Victoria_(Aguascalientes).jpg",
+          "url_original": "https://upload.wikimedia.org/wikipedia/commons/d/de/Estadio_Victoria_%28Aguascalientes%29.jpg",
+          "ancho": 1600,
+          "alto": 864,
+          "kb": 213,
+          "titulo": "File:Estadio Victoria (Aguascalientes).jpg",
+          "licencia_url": "https://creativecommons.org/licenses/by-sa/3.0/deed.es",
+          "credito": "AntoFran / Wikimedia Commons / CC BY-SA 3.0",
+          "cambios": "recortada (se quitó el 28 % inferior) y redimensionada",
+          "original_ancho": 3264,
+          "original_alto": 2448,
+          "fecha_foto": "2012-02-29"
+        },
+        {
+          "archivo": "img/estadios/victoria-2.jpg",
+          "alt": "El Estadio Victoria visto a lo lejos entre árboles, con su cubierta blanca y sus mástiles, y la sierra del Cerro del Muerto al fondo.",
+          "pos": "50% 60%",
+          "autor": "Luis Alvaz",
+          "licencia": "CC BY-SA 4.0",
+          "url_pagina": "https://commons.wikimedia.org/wiki/File:Vista_del_Estadio_Victoria_con_el_Cerro_del_Muerto_de_fondo,_Aguascalientes.jpg",
+          "url_original": "https://upload.wikimedia.org/wikipedia/commons/e/e7/Vista_del_Estadio_Victoria_con_el_Cerro_del_Muerto_de_fondo%2C_Aguascalientes.jpg",
+          "ancho": 1600,
+          "alto": 888,
+          "kb": 215,
+          "titulo": "File:Vista del Estadio Victoria con el Cerro del Muerto de fondo, Aguascalientes.jpg",
+          "licencia_url": "https://creativecommons.org/licenses/by-sa/4.0/deed.es",
+          "credito": "Luis Alvaz / Wikimedia Commons / CC BY-SA 4.0",
+          "cambios": "recortada (se quitó el 6 % superior y el 20 % inferior) y redimensionada",
+          "original_ancho": 4000,
+          "original_alto": 3000,
+          "fecha_foto": "2013-11-14"
+        }
+      ]
+    },
+    {
+      "slug": "leon",
+      "nombre": "Estadio León",
+      "nombre_historico": "Estadio León; la ficha de la Liga MX lo registra como «Estadio Nou Camp»",
+      "apodo": "Nou Camp",
+      "ciudad": "León",
+      "estado": "Guanajuato",
+      "altitud_m": 1800,
+      "capacidad": 29000,
+      "superficie": "natural",
+      "lat": 21.11555,
+      "lon": -101.6577,
+      "inaugurado": 1967,
+      "techo": "parcial: techo sobre las dos tribunas laterales, cabeceras descubiertas",
+      "equipos": [
+        "León"
+      ],
+      "equipos_slug": [
+        "leo"
+      ],
+      "dato": "Sede de los Mundiales de 1970 y 1986 y del futbol olímpico de 1968. Aquí Alemania Federal le remontó un 0-2 a Inglaterra y ganó 3-2 en tiempo extra en los cuartos de final de México 70.",
+      "fuente_datos": "Liga MX, ficha oficial del club (ligamx.net/cancha/club/9/leon, consultada 2026-11-10): nombre «Estadio Nou Camp», aforo 29,000 y coordenadas. Wikipedia ES/EN «Estadio León»: «coloquialmente conocido como Nou Camp», sede olímpica y mundialista, ficha del Alemania Federal 3-2 Inglaterra (14-jun-1970), césped; ambas dan 31,297 de aforo (también docs/estadios.js). Inauguración en 1967: 1-mar según las fichas de ES y EN, 1-feb según el texto de ES (el año coincide). Altitud: modelos de elevación SRTM 30 m (opentopodata.org) y Copernicus (open-meteo.com), ±10 m: 1,800-1,805 m (docs/estadios.js: 1,802). Techo: observado en la foto de 2013.",
+      "fotos": [
+        {
+          "archivo": "img/estadios/leon-1.jpg",
+          "alt": "Interior del Estadio León al atardecer visto desde detrás de una portería: gradas verdes con el escudo y la palabra «León» en amarillo y blanco.",
+          "pos": "52% 45%",
+          "autor": "Anthnkn",
+          "licencia": "CC BY-SA 3.0",
+          "url_pagina": "https://commons.wikimedia.org/wiki/File:Estadio_Le%C3%B3n_(Nou_Camp),_Le%C3%B3n,_Guanajuato,_M%C3%A9xico_-Imagen_Actual-_2013-12-10_14-09.jpg",
+          "url_original": "https://upload.wikimedia.org/wikipedia/commons/7/7d/Estadio_Le%C3%B3n_%28Nou_Camp%29%2C_Le%C3%B3n%2C_Guanajuato%2C_M%C3%A9xico_-Imagen_Actual-_2013-12-10_14-09.jpg",
+          "ancho": 1600,
+          "alto": 936,
+          "kb": 223,
+          "titulo": "File:Estadio León (Nou Camp), León, Guanajuato, México -Imagen Actual- 2013-12-10 14-09.jpg",
+          "licencia_url": "https://creativecommons.org/licenses/by-sa/3.0/deed.es",
+          "credito": "Anthnkn / Wikimedia Commons / CC BY-SA 3.0",
+          "cambios": "recortada (se quitó el 2 % superior y el 20 % inferior) y redimensionada",
+          "original_ancho": 3264,
+          "original_alto": 2448,
+          "fecha_foto": "2013-12-10"
+        },
+        {
+          "archivo": "img/estadios/leon-2.jpg",
+          "alt": "Fachada del Estadio León con su letrero y el escudo del club, bajo un cielo de nubes al atardecer y junto a un edificio blanco.",
+          "pos": "40% 70%",
+          "autor": "PabloBWV",
+          "licencia": "CC BY-SA 4.0",
+          "url_pagina": "https://commons.wikimedia.org/wiki/File:Estadio_Le%C3%B3n..jpg",
+          "url_original": "https://upload.wikimedia.org/wikipedia/commons/8/8f/Estadio_Le%C3%B3n..jpg",
+          "ancho": 1600,
+          "alto": 930,
+          "kb": 222,
+          "titulo": "File:Estadio León..jpg",
+          "licencia_url": "https://creativecommons.org/licenses/by-sa/4.0/deed.es",
+          "credito": "PabloBWV / Wikimedia Commons / CC BY-SA 4.0",
+          "cambios": "recortada (se quitó el 4 % superior y el 18.5 % inferior) y redimensionada",
+          "original_ancho": 4160,
+          "original_alto": 3120,
+          "fecha_foto": "2017-05-06"
+        }
+      ]
+    },
+    {
+      "slug": "lastras",
+      "nombre": "Estadio Libertad Financiera",
+      "nombre_historico": "Estadio Alfonso Lastras Ramírez (1999-2026)",
+      "apodo": "El Coloso de Valle Dorado",
+      "ciudad": "San Luis Potosí",
+      "estado": "San Luis Potosí",
+      "altitud_m": 1860,
+      "capacidad": 28429,
+      "superficie": "natural",
+      "lat": 22.13871,
+      "lon": -100.95086,
+      "inaugurado": 1999,
+      "techo": "ninguno",
+      "equipos": [
+        "Atlético San Luis"
+      ],
+      "equipos_slug": [
+        "asl"
+      ],
+      "dato": "Su nombre histórico honra a Alfonso Lastras Ramírez, rector de la UASLP de 1986 a 1995 y cofundador de los Cachorros del Atlético Potosino. Desde enero de 2026 se llama Libertad Financiera por patrocinio.",
+      "fuente_datos": "Liga MX, ficha oficial del club (ligamx.net/cancha/club/11220/atletico-de-san-luis, consultada 2026-11-10): nombre «Estadio Libertad Financiera» y aforo 28,429; la ficha no trae coordenadas, así que lat/lon son las de Wikipedia ES. Wikipedia ES «Estadio Alfonso Lastras» y EN «Estadio Libertad Financiera»: origen del nombre, apodo, pasto natural; EN da el mismo aforo y ES 25,000-27,000 (docs/estadios.js: 25,709). Cambio de nombre: Excélsior (14-ene-2026), que además le da un aforo aproximado de 25 mil, por debajo de la cifra de la Liga MX. Inauguración dudosa: ES dice mayo de 1999 (18 o 25 según el apartado) y que el primer partido importante fue en 2002; EN dice obra iniciada en 1999 y apertura en 2002. Altitud: modelos de elevación SRTM 30 m (opentopodata.org) y Copernicus (open-meteo.com), ±10 m: 1,855-1,863 m (docs/estadios.js: 1,860). Techo: en las fotos de 2009 y 2013 no se ve ninguna grada techada.",
+      "fotos": [
+        {
+          "archivo": "img/estadios/lastras-1.jpg",
+          "alt": "Interior del Estadio Alfonso Lastras (hoy Libertad Financiera) de día y desde la cancha: gradas azules, doradas y rojas bajo cuatro torres de luz.",
+          "pos": "48% 60%",
+          "autor": "Alihf Esparza (Flickr: alhihfz)",
+          "licencia": "CC BY 2.0",
+          "url_pagina": "https://commons.wikimedia.org/wiki/File:Estadio_Alfonso_Lastras.jpg",
+          "url_original": "https://upload.wikimedia.org/wikipedia/commons/4/42/Estadio_Alfonso_Lastras.jpg",
+          "ancho": 1600,
+          "alto": 684,
+          "kb": 206,
+          "titulo": "File:Estadio Alfonso Lastras.jpg",
+          "licencia_url": "https://creativecommons.org/licenses/by/2.0/deed.es",
+          "credito": "Alihf Esparza / Flickr vía Wikimedia Commons / CC BY 2.0",
+          "cambios": "recortada (se quitó el 24 % inferior) y redimensionada",
+          "original_ancho": 3584,
+          "original_alto": 2016,
+          "fecha_foto": "2009-10-11"
+        },
+        {
+          "archivo": "img/estadios/lastras-2.jpg",
+          "alt": "Estadio Alfonso Lastras (hoy Libertad Financiera) de noche y a nivel de cancha: gradas azules y doradas casi vacías detrás de una portería.",
+          "pos": "45% 55%",
+          "autor": "Padaguan",
+          "licencia": "CC BY-SA 3.0",
+          "url_pagina": "https://commons.wikimedia.org/wiki/File:Estadio_Alfonso_Lastras.jpeg",
+          "url_original": "https://upload.wikimedia.org/wikipedia/commons/a/aa/Estadio_Alfonso_Lastras.jpeg",
+          "ancho": 1600,
+          "alto": 811,
+          "kb": 242,
+          "titulo": "File:Estadio Alfonso Lastras.jpeg",
+          "licencia_url": "https://creativecommons.org/licenses/by-sa/3.0/deed.es",
+          "credito": "Padaguan / Wikimedia Commons / CC BY-SA 3.0",
+          "cambios": "recorte apaisado de una foto vertical (franja del 12 % al 50 % de la altura) y redimensionada",
+          "original_ancho": 2448,
+          "original_alto": 3264,
+          "fecha_foto": "2013-01-05"
+        }
+      ]
+    },
+    {
+      "slug": "benitojuarez",
+      "nombre": "Estadio Olímpico Benito Juárez",
+      "nombre_historico": "Estadio Olímpico Benito Juárez",
+      "apodo": "",
+      "ciudad": "Ciudad Juárez",
+      "estado": "Chihuahua",
+      "altitud_m": 1125,
+      "capacidad": 19703,
+      "superficie": "natural",
+      "lat": 31.75299,
+      "lon": -106.46781,
+      "inaugurado": 1981,
+      "techo": "parcial: solo la tribuna principal tiene techo",
+      "equipos": [
+        "Juárez"
+      ],
+      "equipos_slug": [
+        "jua"
+      ],
+      "dato": "Se estrenó el 12 de mayo de 1981 con un México 0-0 Atlético de Madrid. Pertenece a la UACJ, conserva su pista de atletismo y, con 19,703 lugares, es el estadio más chico de la Liga MX.",
+      "fuente_datos": "Liga MX, ficha oficial del club (ligamx.net/cancha/club/11790/fc-juarez, consultada 2026-11-10): aforo 19,703 y coordenadas. Wikipedia ES/EN «Estadio Olímpico Benito Juárez»: mismo aforo (EN anota que la UACJ lista 22,800), primer partido el 12-may-1981 (la obra se entregó el 2-oct-1980), propiedad de la UACJ, pista olímpica, menor aforo de la Liga MX, césped. Altitud: modelos de elevación SRTM 30 m (opentopodata.org) y Copernicus (open-meteo.com), ±10 m: 1,122-1,129 m (docs/estadios.js: 1,125). Techo: observado en la panorámica de 2008. Apodo: no hallé uno documentado. Fotos: en Commons solo existe una imagen libre del estadio, una panorámica de 2008 (época de los Indios de Ciudad Juárez) armada con cuatro tomas; las dos fotos son recortes sin costuras de esa misma panorámica.",
+      "fotos": [
+        {
+          "archivo": "img/estadios/benitojuarez-1.jpg",
+          "alt": "Tribuna descubierta del Estadio Olímpico Benito Juárez llena de aficionados de rojo en 2008, con anuncios en lo alto y la pista de atletismo a la izquierda.",
+          "pos": "45% 55%",
+          "autor": "Payucon",
+          "licencia": "CC BY-SA 4.0",
+          "url_pagina": "https://commons.wikimedia.org/wiki/File:Panoramicaestadiobenitojuarez.jpg",
+          "url_original": "https://upload.wikimedia.org/wikipedia/commons/7/71/Panoramicaestadiobenitojuarez.jpg",
+          "ancho": 1582,
+          "alto": 587,
+          "kb": 214,
+          "titulo": "File:Panoramicaestadiobenitojuarez.jpg",
+          "licencia_url": "https://creativecommons.org/licenses/by-sa/4.0/deed.es",
+          "credito": "Payucon / Wikimedia Commons / CC BY-SA 4.0",
+          "cambios": "recorte del tramo derecho (41 % del ancho) de una panorámica, tomado de la rendición oficial de 3840 px; sin reescalar",
+          "original_ancho": 4949,
+          "original_alto": 756,
+          "fecha_foto": "2008-10-06"
+        },
+        {
+          "archivo": "img/estadios/benitojuarez-2.jpg",
+          "alt": "Cancha y pista de atletismo del Estadio Olímpico Benito Juárez durante un partido en 2008, con una sierra desértica al fondo.",
+          "pos": "30% 45%",
+          "autor": "Payucon",
+          "licencia": "CC BY-SA 4.0",
+          "url_pagina": "https://commons.wikimedia.org/wiki/File:Panoramicaestadiobenitojuarez.jpg",
+          "url_original": "https://upload.wikimedia.org/wikipedia/commons/7/71/Panoramicaestadiobenitojuarez.jpg",
+          "ancho": 940,
+          "alto": 561,
+          "kb": 97,
+          "titulo": "File:Panoramicaestadiobenitojuarez.jpg",
+          "licencia_url": "https://creativecommons.org/licenses/by-sa/4.0/deed.es",
+          "credito": "Payucon / Wikimedia Commons / CC BY-SA 4.0",
+          "cambios": "recorte del tramo central (24 % del ancho) de la misma panorámica, tomado de la rendición oficial de 3840 px; sin reescalar (940 px de ancho)",
+          "original_ancho": 4949,
+          "original_alto": 756,
+          "fecha_foto": "2008-10-06"
+        }
+      ]
+    }
+  ]
+}

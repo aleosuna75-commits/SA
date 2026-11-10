@@ -62,9 +62,12 @@ def brier_1x2(P, y) -> np.ndarray:
 
 
 def acierto_1x2(P, y) -> np.ndarray:
-    """1 si el resultado más probable ocurrió (empates de probabilidad: local, luego empate)."""
+    """
+    1 si el resultado más probable ocurrió. Probabilidades iguales (a 10 decimales) se resuelven a favor
+    del local y luego del empate, para que el ruido de redondeo no cambie el pick.
+    """
     P, y = _validar(P, y)
-    return (np.argmax(P, axis=1) == y).astype(float)
+    return (np.argmax(np.round(P, 10), axis=1) == y).astype(float)
 
 
 def logv_marcador(M, gl, gv) -> np.ndarray:
