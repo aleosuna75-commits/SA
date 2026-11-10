@@ -196,7 +196,7 @@ granularidad, si fue parcial y las métricas (n, log-loss y su error estándar, 
 Quien califique una variante por otra vía debe llamar `arnes.registrar(nombre, familia, hiperparametros, metricas)`.
 `python3 -m modelo.arnes registro` da el conteo por familia y `arnes.leer_registro()` la tabla completa. Elegir la
 mejor de N variantes mirando el mismo periodo sesga a favor de la elegida: al reportar un ganador hay que decir N.
-Al cierre de esta fase el registro tiene <<N_REGISTRO>>.
+Al cierre de esta fase el registro tiene 10 corridas de líneas base y referencias (`frecuencias` y `poisson_simple` por bloque y por día, y seis del mercado, dos de ellas de momios de apertura sin partidos en desarrollo); `cerebro_original_limpio` se anota al terminar su corrida. A esa cuenta la fase de candidatos sumó 51 variantes (dc 12, dc2 7, elo 14, tiros 3, ajuste 9, ensamble 6; ver `informes/candidatos.md`): 61 líneas al 10-nov-2026.
 
 ## 8. Candados contra fugas
 
@@ -246,15 +246,50 @@ es previa al partido, pero ESPN lo publica con el partido: úsese con esa reserv
 
 ### 9.1 Tabla de líneas base en DESARROLLO (corte por bloque)
 
-<<TABLA_BASE>>
+| Modelo | n | Log-loss | ee | RPS | Brier | logv marcador | Acierto | Pendiente calib. | Log-loss en los 1,671 con momios |
+|---|---|---|---|---|---|---|---|---|---|
+| `mercado_cierre_pot` | 1,671 | 1.0025 | 0.0095 | 0.2040 | 0.5993 | — | 0.508 | 1.11 | 1.0025 |
+| `mercado_cierre_shin` | 1,671 | 1.0028 | 0.0093 | 0.2041 | 0.5995 | — | 0.508 | 1.13 | 1.0028 |
+| `mercado_cierre_marcador` | 1,671 | 1.0028 | 0.0093 | 0.2041 | 0.5995 | -2.8460 | 0.508 | 1.13 | 1.0028 |
+| `mercado_cierre_prop` | 1,671 | 1.0039 | 0.0089 | 0.2044 | 0.6001 | — | 0.508 | 1.19 | 1.0039 |
+| `poisson_simple` | 2,981 | 1.0309 | 0.0071 | 0.2119 | 0.6189 | -2.8793 | 0.481 | 0.99 | 1.0213 |
+| `frecuencias` | 2,981 | 1.0702 | 0.0043 | 0.2252 | 0.6467 | -2.9242 | 0.450 | 0.99 | 1.0671 |
+
+`ee` = error estándar del log-loss por bootstrap de bloques. Los modelos del mercado sólo cubren los partidos con
+momios, que son más recientes y algo más predecibles: para comparar hay que usar la última columna o la tabla pareada.
+`cerebro_original_limpio` no está en la tabla: su corrida (lenta: 400 de 510 cortes en 2,990 s) no había terminado al cerrar esta fase; al
+terminar, `python3 -m modelo.arnes resumen` y `comparar` la incluyen sin más. Los candidatos C1 a C6 están en
+`informes/candidatos.md`.
 
 ### 9.2 Comparación pareada contra el mercado (cierre, Shin) en los partidos con momios
 
-<<TABLA_PAREADA>>
+Diferencia = modelo − `mercado_cierre_shin` (log-loss del mercado 1.0028, acierto 0.508), n = 1,671.
+
+| Modelo | Log-loss | d_ll | ee | IC 95% | z | d_RPS (ee) | d_Brier (ee) | Acierto |
+|---|---|---|---|---|---|---|---|---|
+| `frecuencias` | 1.0671 | +0.0643 | 0.0074 | [+0.0502, +0.0791] | +8.7 | +0.0211 (0.0025) | +0.0451 (0.0052) | 0.456 |
+| `poisson_simple` | 1.0213 | +0.0185 | 0.0046 | [+0.0087, +0.0276] | +4.0 | +0.0058 (0.0015) | +0.0122 (0.0032) | 0.496 |
+| `mercado_cierre_prop` | 1.0039 | +0.0011 | 0.0004 | [+0.0003, +0.0019] | +2.5 | +0.0003 (0.0001) | +0.0007 (0.0003) | 0.508 |
+| `mercado_cierre_pot` | 1.0025 | -0.0003 | 0.0002 | [-0.0007, +0.0001] | -1.6 | -0.0001 (0.0001) | -0.0002 (0.0001) | 0.508 |
+
+Marcador exacto contra `mercado_cierre_marcador` (logv −2.8460): `poisson_simple` −0.0374 (ee 0.0061) y `frecuencias`
+−0.0908 (ee 0.0100). En los 2,981 partidos, `frecuencias` − `poisson_simple` = +0.0392 de log-loss (ee 0.0053, z = +7.4).
 
 ### 9.3 Lectura
 
-<<LECTURA>>
+- **La escala del problema.** Del azar (1.0986) a no saber nada de los equipos (`frecuencias`, 1.0702) hay 0.028; de
+  ahí a un modelo de fuerzas (`poisson_simple`, 1.0309) hay 0.039; y de ahí al mercado de cierre, 0.0185 (ee 0.0046)
+  en los partidos con momios. Toda la mejora posible de un modelo propio vive en esa última franja.
+- **El mercado es la vara, no un rival.** Le gana a `poisson_simple` por 4 errores estándar en 1X2 y por 0.037 en el
+  marcador exacto, pero usa información posterior al corte y no existe para rondas futuras.
+- **`poisson_simple` está bien calibrado** (pendiente 0.99) y pronostica bien el total de goles (1.49 + 1.14 contra
+  1.51 + 1.15 observados), pero da pocos empates (25.0% contra 26.8% observado) por suponer goles independientes.
+- **El orden de magnitud de una mejora real.** Entre modelos de fuerzas parecidos el ee pareado es de 0.001 a 0.002, y
+  cambiar vida media, encogimiento o pasar a Elo mueve el log-loss menos que eso. La única mejora clara de la fase de
+  candidatos fue corregir las lambdas con tiros, viaje y rotación (`ajuste`: 1.0225, −0.0084 frente a
+  `poisson_simple` con ee 0.0014; +0.0095 frente al mercado con ee 0.0043). Detalle en `informes/candidatos.md`.
+- **Cómo quitar el margen.** Shin y potencia son indistinguibles (0.0003, ee 0.0002) y ambos mejoran a la
+  normalización proporcional (0.0011, ee 0.0004). La referencia es `mercado_cierre_shin`.
 
 ## 10. Hallazgos sobre los momios
 

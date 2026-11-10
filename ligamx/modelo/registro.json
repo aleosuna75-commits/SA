@@ -1,0 +1,868 @@
+{
+ "actualizado": "2026-11-10",
+ "protocolo": {
+  "metrica": "log-loss 1X2 a 90 minutos",
+  "walk_forward": "por bloques (cortes lunes y viernes 00:00 CDMX)",
+  "periodo": "Apertura 2016 en adelante (DESARROLLO + PRUEBA + lo que se vaya jugando)",
+  "error_estandar": "bootstrap de bloques, 2,000 réplicas, semilla 20261110 (metricas.diferencia_pareada)",
+  "nota": "las cifras 'conjunto' y 'ultimos_8_bloques' de este archivo unen DESARROLLO por bloque con PRUEBA por día (lo evaluado el 2026-11-10)"
+ },
+ "regla_adopcion": {
+  "texto": "Tras cada jornada se reevalúan campeón y retadores en walk-forward. Un retador sólo se adopta si mejora al campeón por más de 2 errores estándar pareados sobre todo el periodo Y no empeora (diferencia <= 0) en los últimos 8 bloques.",
+  "umbral_ee": 2.0,
+  "bloques_recientes": 8,
+  "metrica": "logloss_1x2"
+ },
+ "campeon": {
+  "nombre": "ajuste",
+  "desde": "2026-11-10",
+  "clase": "modelo.familias.candidatos:Ajuste",
+  "hiperparametros": {
+   "base": "dc",
+   "base_hiper": {
+    "vida_media": 365.0,
+    "ridge": 4.0,
+    "ridge_local": null,
+    "fase": false,
+    "ridge_fase": null,
+    "peso_liguilla": 1.0,
+    "olvido_torneo": 1.0,
+    "w_goles": 1.0,
+    "ventana_dias": 3650.0,
+    "rho": "perfilada"
+   },
+   "ridge": 1000.0,
+   "grupos": [
+    "viaje",
+    "rotacion",
+    "tiros"
+   ],
+   "columnas": [
+    "sede_viaje_km_v",
+    "once_previa_cambios_v",
+    "juego10_tiros_f_l",
+    "juego10_tiros_c_l",
+    "juego10_tiros_f_v",
+    "juego10_tiros_c_v"
+   ],
+   "inicio": "2011-07-01",
+   "tabla": "bloque"
+  },
+  "metricas": {
+   "desarrollo_bloque": {
+    "n": 2981,
+    "logloss": 1.0225,
+    "ee_logloss": 0.0071,
+    "rps": 0.2093,
+    "brier": 0.6134,
+    "logv_marcador": -2.8707,
+    "acierto": 0.488,
+    "marcadores_exactos": 387,
+    "pendiente_calibracion": 1.01,
+    "error_calibracion": 0.011
+   },
+   "prueba_dia": {
+    "n": 480,
+    "logloss": 1.0272,
+    "ee_logloss": 0.0212,
+    "rps": 0.2126,
+    "brier": 0.6156,
+    "logv_marcador": -3.0057,
+    "acierto": 0.49,
+    "marcadores_exactos": 58,
+    "pendiente_calibracion": 0.78,
+    "error_calibracion": 0.035
+   }
+  }
+ },
+ "retadores": [
+  {
+   "nombre": "ensamble",
+   "clase": "modelo.familias.candidatos:Ensamble",
+   "estado": "retador (primero): mejor que el campeón en la PRUEBA sin llegar a 2 ee; mejor marcador exacto",
+   "hiperparametros": {
+    "modo": "lambdas",
+    "modelos": [
+     "ajuste",
+     "elo"
+    ],
+    "hiper": {
+     "ajuste": {
+      "base": "dc",
+      "base_hiper": {
+       "vida_media": 365.0,
+       "ridge": 4.0,
+       "ridge_local": null,
+       "fase": false,
+       "ridge_fase": null,
+       "peso_liguilla": 1.0,
+       "olvido_torneo": 1.0,
+       "w_goles": 1.0,
+       "ventana_dias": 3650.0,
+       "rho": "perfilada"
+      },
+      "ridge": 1000.0,
+      "grupos": [
+       "viaje",
+       "rotacion",
+       "tiros"
+      ],
+      "columnas": [
+       "sede_viaje_km_v",
+       "once_previa_cambios_v",
+       "juego10_tiros_f_l",
+       "juego10_tiros_c_l",
+       "juego10_tiros_f_v",
+       "juego10_tiros_c_v"
+      ],
+      "inicio": "2011-07-01",
+      "tabla": "bloque"
+     },
+     "elo": {
+      "k": 8.0,
+      "regresion": 0.15,
+      "margen": true,
+      "ventaja_inicial": 60.0,
+      "k_ventaja": 1.0,
+      "castigo_nuevo": 50.0,
+      "ventana_dias": 3650.0,
+      "quemado": 6
+     }
+    }
+   },
+   "metricas": {
+    "desarrollo_bloque": {
+     "n": 2981,
+     "logloss": 1.0254,
+     "ee_logloss": 0.0067,
+     "rps": 0.2102,
+     "brier": 0.6152,
+     "logv_marcador": -2.8665,
+     "acierto": 0.48,
+     "marcadores_exactos": 387,
+     "pendiente_calibracion": 1.08,
+     "error_calibracion": 0.017
+    },
+    "prueba_dia": {
+     "n": 480,
+     "logloss": 1.0225,
+     "ee_logloss": 0.02,
+     "rps": 0.2115,
+     "brier": 0.6125,
+     "logv_marcador": -2.9894,
+     "acierto": 0.5,
+     "marcadores_exactos": 54,
+     "pendiente_calibracion": 0.85,
+     "error_calibracion": 0.031
+    }
+   },
+   "retador_menos_campeon": {
+    "desarrollo": {
+     "n": 2981,
+     "d_logloss": 0.0029,
+     "ee": 0.001,
+     "ic95": [
+      0.0009,
+      0.0049
+     ],
+     "z": 2.9,
+     "d_logv_marcador": 0.0042,
+     "ee_logv_marcador": 0.0021
+    },
+    "prueba": {
+     "n": 480,
+     "d_logloss": -0.0047,
+     "ee": 0.0028,
+     "ic95": [
+      -0.0101,
+      0.0006
+     ],
+     "z": -1.7,
+     "d_logv_marcador": 0.0163,
+     "ee_logv_marcador": 0.0051
+    },
+    "conjunto": {
+     "n": 3461,
+     "d_logloss": 0.0018,
+     "ee": 0.0009,
+     "ic95": [
+      -0.0002,
+      0.0036
+     ],
+     "z": 1.9
+    },
+    "ultimos_8_bloques": {
+     "n": 64,
+     "bloques": [
+      "2026-09-25",
+      "2026-11-06"
+     ],
+     "d_logloss": -0.0174,
+     "ee": 0.0081
+    }
+   },
+   "adoptable_hoy": false
+  },
+  {
+   "nombre": "elo",
+   "clase": "modelo.familias.candidatos:Elo",
+   "estado": "retador: el de menor log-loss en la PRUEBA; en DESARROLLO pierde con el campeón por 4.5 ee",
+   "hiperparametros": {
+    "k": 8.0,
+    "regresion": 0.15,
+    "margen": true,
+    "ventaja_inicial": 60.0,
+    "k_ventaja": 1.0,
+    "castigo_nuevo": 50.0,
+    "ventana_dias": 3650.0,
+    "quemado": 6
+   },
+   "metricas": {
+    "desarrollo_bloque": {
+     "n": 2981,
+     "logloss": 1.0316,
+     "ee_logloss": 0.0063,
+     "rps": 0.212,
+     "brier": 0.6194,
+     "logv_marcador": -2.8766,
+     "acierto": 0.481,
+     "marcadores_exactos": 391,
+     "pendiente_calibracion": 1.11,
+     "error_calibracion": 0.011
+    },
+    "prueba_dia": {
+     "n": 480,
+     "logloss": 1.0221,
+     "ee_logloss": 0.0191,
+     "rps": 0.2116,
+     "brier": 0.6122,
+     "logv_marcador": -2.9884,
+     "acierto": 0.508,
+     "marcadores_exactos": 59,
+     "pendiente_calibracion": 0.91,
+     "error_calibracion": 0.025
+    }
+   },
+   "retador_menos_campeon": {
+    "desarrollo": {
+     "n": 2981,
+     "d_logloss": 0.0091,
+     "ee": 0.002,
+     "ic95": [
+      0.0051,
+      0.0131
+     ],
+     "z": 4.5,
+     "d_logv_marcador": -0.0059,
+     "ee_logv_marcador": 0.0043
+    },
+    "prueba": {
+     "n": 480,
+     "d_logloss": -0.0051,
+     "ee": 0.0056,
+     "ic95": [
+      -0.0158,
+      0.0056
+     ],
+     "z": -0.9,
+     "d_logv_marcador": 0.0172,
+     "ee_logv_marcador": 0.0104
+    },
+    "conjunto": {
+     "n": 3461,
+     "d_logloss": 0.0071,
+     "ee": 0.0019,
+     "ic95": [
+      0.0031,
+      0.0107
+     ],
+     "z": 3.7
+    },
+    "ultimos_8_bloques": {
+     "n": 64,
+     "bloques": [
+      "2026-09-25",
+      "2026-11-06"
+     ],
+     "d_logloss": -0.0285,
+     "ee": 0.0164
+    }
+   },
+   "adoptable_hoy": false
+  },
+  {
+   "nombre": "dc2",
+   "clase": "modelo.familias.candidatos:DixonColes",
+   "estado": "retador: equivale a dc en DESARROLLO",
+   "hiperparametros": {
+    "vida_media": 365.0,
+    "ridge": 4.0,
+    "ridge_local": 30.0,
+    "fase": false,
+    "ridge_fase": null,
+    "peso_liguilla": 1.0,
+    "olvido_torneo": 1.0,
+    "w_goles": 1.0,
+    "ventana_dias": 3650.0,
+    "rho": "perfilada"
+   },
+   "metricas": {
+    "desarrollo_bloque": {
+     "n": 2981,
+     "logloss": 1.0291,
+     "ee_logloss": 0.0066,
+     "rps": 0.2114,
+     "brier": 0.6179,
+     "logv_marcador": -2.8759,
+     "acierto": 0.486,
+     "marcadores_exactos": 384,
+     "pendiente_calibracion": 1.06,
+     "error_calibracion": 0.012
+    },
+    "prueba_dia": {
+     "n": 480,
+     "logloss": 1.0245,
+     "ee_logloss": 0.0178,
+     "rps": 0.2122,
+     "brier": 0.6138,
+     "logv_marcador": -3.005,
+     "acierto": 0.487,
+     "marcadores_exactos": 59,
+     "pendiente_calibracion": 0.91,
+     "error_calibracion": 0.019
+    }
+   },
+   "retador_menos_campeon": {
+    "desarrollo": {
+     "n": 2981,
+     "d_logloss": 0.0066,
+     "ee": 0.0014,
+     "ic95": [
+      0.0038,
+      0.0094
+     ],
+     "z": 4.6,
+     "d_logv_marcador": -0.0052,
+     "ee_logv_marcador": 0.0019
+    },
+    "prueba": {
+     "n": 480,
+     "d_logloss": -0.0027,
+     "ee": 0.0048,
+     "ic95": [
+      -0.0124,
+      0.0064
+     ],
+     "z": -0.6,
+     "d_logv_marcador": 0.0007,
+     "ee_logv_marcador": 0.0061
+    },
+    "conjunto": {
+     "n": 3461,
+     "d_logloss": 0.0053,
+     "ee": 0.0014,
+     "ic95": [
+      0.0025,
+      0.0079
+     ],
+     "z": 3.8
+    },
+    "ultimos_8_bloques": {
+     "n": 64,
+     "bloques": [
+      "2026-09-25",
+      "2026-11-06"
+     ],
+     "d_logloss": -0.0237,
+     "ee": 0.0156
+    }
+   },
+   "adoptable_hoy": false
+  },
+  {
+   "nombre": "dc",
+   "clase": "modelo.familias.candidatos:DixonColes",
+   "estado": "retador y respaldo: no necesita la tabla de variables",
+   "hiperparametros": {
+    "vida_media": 365.0,
+    "ridge": 4.0,
+    "ridge_local": null,
+    "fase": false,
+    "ridge_fase": null,
+    "peso_liguilla": 1.0,
+    "olvido_torneo": 1.0,
+    "w_goles": 1.0,
+    "ventana_dias": 3650.0,
+    "rho": "perfilada"
+   },
+   "metricas": {
+    "desarrollo_bloque": {
+     "n": 2981,
+     "logloss": 1.0297,
+     "ee_logloss": 0.0066,
+     "rps": 0.2117,
+     "brier": 0.6183,
+     "logv_marcador": -2.8765,
+     "acierto": 0.479,
+     "marcadores_exactos": 377,
+     "pendiente_calibracion": 1.06,
+     "error_calibracion": 0.014
+    },
+    "prueba_dia": {
+     "n": 480,
+     "logloss": 1.0264,
+     "ee_logloss": 0.0181,
+     "rps": 0.2129,
+     "brier": 0.6149,
+     "logv_marcador": -3.0056,
+     "acierto": 0.481,
+     "marcadores_exactos": 59,
+     "pendiente_calibracion": 0.9,
+     "error_calibracion": 0.024
+    }
+   },
+   "retador_menos_campeon": {
+    "desarrollo": {
+     "n": 2981,
+     "d_logloss": 0.0072,
+     "ee": 0.0013,
+     "ic95": [
+      0.0047,
+      0.0098
+     ],
+     "z": 5.4,
+     "d_logv_marcador": -0.0058,
+     "ee_logv_marcador": 0.0018
+    },
+    "prueba": {
+     "n": 480,
+     "d_logloss": -0.0008,
+     "ee": 0.0045,
+     "ic95": [
+      -0.0099,
+      0.0079
+     ],
+     "z": -0.2,
+     "d_logv_marcador": 0.0001,
+     "ee_logv_marcador": 0.0058
+    },
+    "conjunto": {
+     "n": 3461,
+     "d_logloss": 0.0061,
+     "ee": 0.0013,
+     "ic95": [
+      0.0034,
+      0.0086
+     ],
+     "z": 4.7
+    },
+    "ultimos_8_bloques": {
+     "n": 64,
+     "bloques": [
+      "2026-09-25",
+      "2026-11-06"
+     ],
+     "d_logloss": -0.017,
+     "ee": 0.0123
+    }
+   },
+   "adoptable_hoy": false
+  },
+  {
+   "nombre": "tiros",
+   "clase": "modelo.familias.candidatos:DixonColes",
+   "estado": "descartado en DESARROLLO (peor que dc); se conserva sólo como referencia",
+   "hiperparametros": {
+    "vida_media": 365.0,
+    "ridge": 4.0,
+    "ridge_local": null,
+    "fase": false,
+    "ridge_fase": null,
+    "peso_liguilla": 1.0,
+    "olvido_torneo": 1.0,
+    "w_goles": 0.7,
+    "ventana_dias": 3650.0,
+    "rho": "perfilada"
+   },
+   "metricas": {
+    "desarrollo_bloque": {
+     "n": 2981,
+     "logloss": 1.0319,
+     "ee_logloss": 0.0058,
+     "rps": 0.2123,
+     "brier": 0.6197,
+     "logv_marcador": -2.8753,
+     "acierto": 0.48,
+     "marcadores_exactos": 376,
+     "pendiente_calibracion": 1.19,
+     "error_calibracion": 0.017
+    },
+    "prueba_dia": {
+     "n": 480,
+     "logloss": 1.0266,
+     "ee_logloss": 0.0163,
+     "rps": 0.213,
+     "brier": 0.6152,
+     "logv_marcador": -3.0019,
+     "acierto": 0.483,
+     "marcadores_exactos": 60,
+     "pendiente_calibracion": 1.01,
+     "error_calibracion": 0.018
+    }
+   },
+   "retador_menos_campeon": {
+    "desarrollo": {
+     "n": 2981,
+     "d_logloss": 0.0094,
+     "ee": 0.0018,
+     "ic95": [
+      0.0057,
+      0.013
+     ],
+     "z": 5.1,
+     "d_logv_marcador": -0.0046,
+     "ee_logv_marcador": 0.0025
+    },
+    "prueba": {
+     "n": 480,
+     "d_logloss": -0.0006,
+     "ee": 0.006,
+     "ic95": [
+      -0.0125,
+      0.0109
+     ],
+     "z": -0.1,
+     "d_logv_marcador": 0.0037,
+     "ee_logv_marcador": 0.0073
+    },
+    "conjunto": {
+     "n": 3461,
+     "d_logloss": 0.008,
+     "ee": 0.0018,
+     "ic95": [
+      0.0042,
+      0.0114
+     ],
+     "z": 4.4
+    },
+    "ultimos_8_bloques": {
+     "n": 64,
+     "bloques": [
+      "2026-09-25",
+      "2026-11-06"
+     ],
+     "d_logloss": -0.0237,
+     "ee": 0.0155
+    }
+   },
+   "adoptable_hoy": false
+  }
+ ],
+ "referencias": {
+  "poisson_simple": {
+   "metricas": {
+    "desarrollo_bloque": {
+     "n": 2981,
+     "logloss": 1.0309,
+     "ee_logloss": 0.0071,
+     "rps": 0.2119,
+     "brier": 0.6189,
+     "logv_marcador": -2.8793,
+     "acierto": 0.481,
+     "marcadores_exactos": 383,
+     "pendiente_calibracion": 0.99,
+     "error_calibracion": 0.013
+    },
+    "prueba_dia": {
+     "n": 480,
+     "logloss": 1.0276,
+     "ee_logloss": 0.0191,
+     "rps": 0.2132,
+     "brier": 0.6159,
+     "logv_marcador": -3.0085,
+     "acierto": 0.487,
+     "marcadores_exactos": 52,
+     "pendiente_calibracion": 0.86,
+     "error_calibracion": 0.023
+    }
+   },
+   "campeon_menos_referencia": {
+    "desarrollo": {
+     "n": 2981,
+     "d_logloss": -0.0084,
+     "ee": 0.0014,
+     "ic95": [
+      -0.0113,
+      -0.0057
+     ],
+     "z": -5.9,
+     "d_logv_marcador": 0.0086,
+     "ee_logv_marcador": 0.0021
+    },
+    "prueba": {
+     "n": 480,
+     "d_logloss": -0.0004,
+     "ee": 0.0042,
+     "ic95": [
+      -0.0085,
+      0.0079
+     ],
+     "z": -0.1,
+     "d_logv_marcador": 0.0028,
+     "ee_logv_marcador": 0.0062
+    }
+   }
+  },
+  "cerebro_original_limpio": {
+   "metricas": {
+    "desarrollo_bloque": null,
+    "prueba_dia": {
+     "n": 480,
+     "logloss": 1.0325,
+     "ee_logloss": 0.0167,
+     "rps": 0.213,
+     "brier": 0.6182,
+     "logv_marcador": -3.1233,
+     "acierto": 0.5,
+     "marcadores_exactos": 48,
+     "pendiente_calibracion": 0.93,
+     "error_calibracion": 0.033
+    }
+   },
+   "campeon_menos_referencia": {
+    "desarrollo": null,
+    "prueba": {
+     "n": 480,
+     "d_logloss": -0.0054,
+     "ee": 0.0084,
+     "ic95": [
+      -0.0211,
+      0.0119
+     ],
+     "z": -0.6,
+     "d_logv_marcador": 0.1177,
+     "ee_logv_marcador": 0.0209
+    }
+   }
+  },
+  "cerebro_original_exacto": {
+   "metricas": {
+    "desarrollo_bloque": null,
+    "prueba_dia": {
+     "n": 116,
+     "logloss": 1.0996,
+     "ee_logloss": 0.0349,
+     "rps": 0.2276,
+     "brier": 0.6618,
+     "logv_marcador": -3.2497,
+     "acierto": 0.422,
+     "marcadores_exactos": 14,
+     "pendiente_calibracion": 0.49,
+     "error_calibracion": 0.054
+    }
+   },
+   "campeon_menos_referencia": {
+    "desarrollo": null,
+    "prueba": {
+     "n": 116,
+     "d_logloss": 0.0075,
+     "ee": 0.0172,
+     "ic95": [
+      -0.0254,
+      0.0428
+     ],
+     "z": 0.4,
+     "d_logv_marcador": 0.1396,
+     "ee_logv_marcador": 0.0373
+    }
+   },
+   "nota": "sólo desde el 14-ago-2026 (116 partidos): antes sus priors y capas ven el futuro"
+  },
+  "frecuencias": {
+   "metricas": {
+    "desarrollo_bloque": {
+     "n": 2981,
+     "logloss": 1.0702,
+     "ee_logloss": 0.0043,
+     "rps": 0.2252,
+     "brier": 0.6467,
+     "logv_marcador": -2.9242,
+     "acierto": 0.45,
+     "marcadores_exactos": 387,
+     "pendiente_calibracion": 0.99,
+     "error_calibracion": 0.014
+    },
+    "prueba_dia": {
+     "n": 480,
+     "logloss": 1.0742,
+     "ee_logloss": 0.01,
+     "rps": 0.2292,
+     "brier": 0.6496,
+     "logv_marcador": -3.0535,
+     "acierto": 0.442,
+     "marcadores_exactos": 59,
+     "pendiente_calibracion": 0.92,
+     "error_calibracion": 0.036
+    }
+   },
+   "campeon_menos_referencia": {
+    "desarrollo": null,
+    "prueba": null
+   }
+  },
+  "mercado_cierre_shin": {
+   "metricas": {
+    "desarrollo_bloque": {
+     "n": 1671,
+     "logloss": 1.0028,
+     "ee_logloss": 0.0093,
+     "rps": 0.2041,
+     "brier": 0.5995,
+     "logv_marcador": null,
+     "acierto": 0.508,
+     "marcadores_exactos": null,
+     "pendiente_calibracion": 1.13,
+     "error_calibracion": 0.021
+    },
+    "prueba_dia": {
+     "n": 476,
+     "logloss": 1.003,
+     "ee_logloss": 0.0191,
+     "rps": 0.2055,
+     "brier": 0.5994,
+     "logv_marcador": null,
+     "acierto": 0.506,
+     "marcadores_exactos": null,
+     "pendiente_calibracion": 0.95,
+     "error_calibracion": 0.017
+    }
+   },
+   "campeon_menos_referencia": {
+    "desarrollo": {
+     "n": 1671,
+     "d_logloss": 0.0095,
+     "ee": 0.0043,
+     "ic95": [
+      0.0005,
+      0.0177
+     ],
+     "z": 2.2,
+     "d_logv_marcador": null,
+     "ee_logv_marcador": null
+    },
+    "prueba": {
+     "n": 476,
+     "d_logloss": 0.0237,
+     "ee": 0.008,
+     "ic95": [
+      0.0084,
+      0.0393
+     ],
+     "z": 3.0,
+     "d_logv_marcador": null,
+     "ee_logv_marcador": null
+    }
+   }
+  },
+  "mercado_abre_shin": {
+   "metricas": {
+    "desarrollo_bloque": null,
+    "prueba_dia": {
+     "n": 313,
+     "logloss": 1.0517,
+     "ee_logloss": 0.023,
+     "rps": 0.2212,
+     "brier": 0.633,
+     "logv_marcador": null,
+     "acierto": 0.466,
+     "marcadores_exactos": null,
+     "pendiente_calibracion": 0.72,
+     "error_calibracion": 0.045
+    }
+   },
+   "campeon_menos_referencia": {
+    "desarrollo": null,
+    "prueba": {
+     "n": 313,
+     "d_logloss": 0.0125,
+     "ee": 0.0086,
+     "ic95": [
+      -0.0043,
+      0.0291
+     ],
+     "z": 1.5,
+     "d_logv_marcador": null,
+     "ee_logv_marcador": null
+    }
+   },
+   "nota": "ESPN sólo trae momios de apertura desde diciembre de 2025 (313 partidos de la PRUEBA)"
+  },
+  "mercado_cierre_marcador": {
+   "metricas": {
+    "desarrollo_bloque": {
+     "n": 1671,
+     "logloss": 1.0028,
+     "ee_logloss": 0.0093,
+     "rps": 0.2041,
+     "brier": 0.5995,
+     "logv_marcador": -2.846,
+     "acierto": 0.508,
+     "marcadores_exactos": 235,
+     "pendiente_calibracion": 1.13,
+     "error_calibracion": 0.022
+    },
+    "prueba_dia": {
+     "n": 476,
+     "logloss": 1.003,
+     "ee_logloss": 0.0191,
+     "rps": 0.2055,
+     "brier": 0.5994,
+     "logv_marcador": -2.9655,
+     "acierto": 0.506,
+     "marcadores_exactos": 60,
+     "pendiente_calibracion": 0.95,
+     "error_calibracion": 0.017
+    }
+   },
+   "campeon_menos_referencia": {
+    "desarrollo": {
+     "n": 1671,
+     "d_logloss": 0.0095,
+     "ee": 0.0043,
+     "ic95": [
+      0.0005,
+      0.0177
+     ],
+     "z": 2.2,
+     "d_logv_marcador": -0.0274,
+     "ee_logv_marcador": 0.0054
+    },
+    "prueba": {
+     "n": 476,
+     "d_logloss": 0.0237,
+     "ee": 0.008,
+     "ic95": [
+      0.0084,
+      0.0393
+     ],
+     "z": 3.0,
+     "d_logv_marcador": -0.0457,
+     "ee_logv_marcador": 0.0098
+    }
+   }
+  }
+ },
+ "variantes_probadas": {
+  "candidatos_en_desarrollo": 51,
+  "detalle": "dc 12, dc2 7, elo 14, tiros 3, ajuste 9, ensamble 6 (registro_variantes.jsonl)",
+  "prueba": "6 candidatos pre-registrados, una sola pasada (granularidad día)"
+ },
+ "historial": [
+  {
+   "fecha": "2026-11-10",
+   "evento": "selección inicial",
+   "campeon": "ajuste",
+   "nota": "regla pre-registrada; ningún candidato superó a ajuste por más de 2 ee en la PRUEBA"
+  }
+ ]
+}

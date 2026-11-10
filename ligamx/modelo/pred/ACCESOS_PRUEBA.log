@@ -1,1 +1,78 @@
 2026-11-10T04:21:23Z	accion=incidente	quien=agente_arnes	modelo=ninguno	nota=Antes de existir el arnes, en el control de calidad de los momios sobre partidos.csv, se imprimio el log-loss del MERCADO (normalizacion proporcional, momios crudos) por torneo y por casa, incluidos Apertura 2025 (0.953), Clausura 2026 (1.004) y Apertura 2026 (1.060), y unas 20 filas de partidos de PRUEBA con momios y marcador. No se evaluo ningun modelo ni se uso para decidir nada; las lineas base y sus hiperparametros estaban fijados de antemano. Desde entonces todo se limito a DESARROLLO.	pid=5921	argv=-
+2026-11-10T09:46:41Z	accion=evaluar	quien=agente_seleccion	modelo=dc	periodo=prueba	granularidad=dia	partidos=480	parcial=False	pid=1732	argv=/tmp/claude-0/-home-user-SA/2bd39326-8617-5400-b04f-4c3059628357/scratchpad/prueba_run.py rapidos
+2026-11-10T09:46:42Z	accion=evaluar	quien=agente_seleccion	modelo=dc2	periodo=prueba	granularidad=dia	partidos=480	parcial=False	pid=1732	argv=/tmp/claude-0/-home-user-SA/2bd39326-8617-5400-b04f-4c3059628357/scratchpad/prueba_run.py rapidos
+2026-11-10T09:46:44Z	accion=evaluar	quien=agente_seleccion	modelo=elo	periodo=prueba	granularidad=dia	partidos=480	parcial=False	pid=1732	argv=/tmp/claude-0/-home-user-SA/2bd39326-8617-5400-b04f-4c3059628357/scratchpad/prueba_run.py rapidos
+2026-11-10T09:46:45Z	accion=evaluar	quien=agente_seleccion	modelo=tiros	periodo=prueba	granularidad=dia	partidos=480	parcial=False	pid=1732	argv=/tmp/claude-0/-home-user-SA/2bd39326-8617-5400-b04f-4c3059628357/scratchpad/prueba_run.py rapidos
+2026-11-10T09:46:47Z	accion=evaluar	quien=agente_seleccion	modelo=ajuste	periodo=prueba	granularidad=dia	partidos=480	parcial=False	pid=1732	argv=/tmp/claude-0/-home-user-SA/2bd39326-8617-5400-b04f-4c3059628357/scratchpad/prueba_run.py rapidos
+2026-11-10T09:46:56Z	accion=evaluar	quien=agente_seleccion	modelo=ensamble	periodo=prueba	granularidad=dia	partidos=480	parcial=False	pid=1732	argv=/tmp/claude-0/-home-user-SA/2bd39326-8617-5400-b04f-4c3059628357/scratchpad/prueba_run.py rapidos
+2026-11-10T09:47:06Z	accion=evaluar	quien=agente_seleccion	modelo=poisson_simple	periodo=prueba	granularidad=dia	partidos=480	parcial=False	pid=1732	argv=/tmp/claude-0/-home-user-SA/2bd39326-8617-5400-b04f-4c3059628357/scratchpad/prueba_run.py rapidos
+2026-11-10T09:47:08Z	accion=evaluar	quien=agente_seleccion	modelo=frecuencias	periodo=prueba	granularidad=dia	partidos=480	parcial=False	pid=1732	argv=/tmp/claude-0/-home-user-SA/2bd39326-8617-5400-b04f-4c3059628357/scratchpad/prueba_run.py rapidos
+2026-11-10T09:47:09Z	accion=evaluar	quien=agente_seleccion	modelo=mercado_cierre_shin	periodo=prueba	granularidad=dia	partidos=480	parcial=False	pid=1732	argv=/tmp/claude-0/-home-user-SA/2bd39326-8617-5400-b04f-4c3059628357/scratchpad/prueba_run.py rapidos
+2026-11-10T09:47:10Z	accion=evaluar	quien=agente_seleccion	modelo=mercado_abre_shin	periodo=prueba	granularidad=dia	partidos=480	parcial=False	pid=1732	argv=/tmp/claude-0/-home-user-SA/2bd39326-8617-5400-b04f-4c3059628357/scratchpad/prueba_run.py rapidos
+2026-11-10T09:47:10Z	accion=evaluar	quien=agente_seleccion	modelo=mercado_cierre_marcador	periodo=prueba	granularidad=dia	partidos=480	parcial=False	pid=1732	argv=/tmp/claude-0/-home-user-SA/2bd39326-8617-5400-b04f-4c3059628357/scratchpad/prueba_run.py rapidos
+2026-11-10T09:47:13Z	accion=evaluar	quien=agente_seleccion	modelo=cerebro_original_exacto	periodo=prueba	granularidad=dia	partidos=116	parcial=True	pid=1767	argv=/tmp/claude-0/-home-user-SA/2bd39326-8617-5400-b04f-4c3059628357/scratchpad/prueba_run.py exacto
+2026-11-10T09:48:26Z	accion=evaluar	quien=agente_seleccion	modelo=cerebro_original_limpio	periodo=prueba	granularidad=dia	partidos=480	parcial=False	pid=1808	argv=/tmp/claude-0/-home-user-SA/2bd39326-8617-5400-b04f-4c3059628357/scratchpad/prueba_run.py limpio
+2026-11-10T09:49:05Z	accion=leer	quien=agente_seleccion	modelo=ajuste	granularidad=dia	pid=1833	argv=-
+2026-11-10T09:49:05Z	accion=leer	quien=agente_seleccion	modelo=ensamble	granularidad=dia	pid=1833	argv=-
+2026-11-10T09:49:05Z	accion=leer	quien=agente_seleccion	modelo=dc2	granularidad=dia	pid=1833	argv=-
+2026-11-10T09:49:05Z	accion=leer	quien=agente_seleccion	modelo=dc	granularidad=dia	pid=1833	argv=-
+2026-11-10T09:49:05Z	accion=leer	quien=agente_seleccion	modelo=elo	granularidad=dia	pid=1833	argv=-
+2026-11-10T09:49:05Z	accion=leer	quien=agente_seleccion	modelo=tiros	granularidad=dia	pid=1833	argv=-
+2026-11-10T09:49:05Z	accion=leer	quien=agente_seleccion	modelo=poisson_simple	granularidad=dia	pid=1833	argv=-
+2026-11-10T09:49:05Z	accion=leer	quien=agente_seleccion	modelo=poisson_simple	granularidad=dia	pid=1833	argv=-
+2026-11-10T09:49:05Z	accion=leer	quien=agente_seleccion	modelo=ajuste	granularidad=dia	pid=1833	argv=-
+2026-11-10T09:49:05Z	accion=leer	quien=agente_seleccion	modelo=ensamble	granularidad=dia	pid=1833	argv=-
+2026-11-10T09:49:05Z	accion=leer	quien=agente_seleccion	modelo=dc2	granularidad=dia	pid=1833	argv=-
+2026-11-10T09:49:05Z	accion=leer	quien=agente_seleccion	modelo=dc	granularidad=dia	pid=1833	argv=-
+2026-11-10T09:49:05Z	accion=leer	quien=agente_seleccion	modelo=elo	granularidad=dia	pid=1833	argv=-
+2026-11-10T09:49:05Z	accion=leer	quien=agente_seleccion	modelo=tiros	granularidad=dia	pid=1833	argv=-
+2026-11-10T09:49:05Z	accion=leer	quien=agente_seleccion	modelo=dc	granularidad=dia	pid=1833	argv=-
+2026-11-10T09:49:05Z	accion=leer	quien=agente_seleccion	modelo=ajuste	granularidad=dia	pid=1833	argv=-
+2026-11-10T09:49:05Z	accion=leer	quien=agente_seleccion	modelo=ensamble	granularidad=dia	pid=1833	argv=-
+2026-11-10T09:49:05Z	accion=leer	quien=agente_seleccion	modelo=dc2	granularidad=dia	pid=1833	argv=-
+2026-11-10T09:49:05Z	accion=leer	quien=agente_seleccion	modelo=elo	granularidad=dia	pid=1833	argv=-
+2026-11-10T09:49:05Z	accion=leer	quien=agente_seleccion	modelo=tiros	granularidad=dia	pid=1833	argv=-
+2026-11-10T09:49:05Z	accion=leer	quien=agente_seleccion	modelo=poisson_simple	granularidad=dia	pid=1833	argv=-
+2026-11-10T09:49:42Z	accion=leer	quien=agente_seleccion	modelo=ajuste	granularidad=dia	pid=1862	argv=-
+2026-11-10T09:49:42Z	accion=leer	quien=agente_seleccion	modelo=dc	granularidad=dia	pid=1862	argv=-
+2026-11-10T10:00:48Z	accion=leer	quien=agente_seleccion	modelo=ajuste	granularidad=dia	pid=2303	argv=/tmp/claude-0/-home-user-SA/2bd39326-8617-5400-b04f-4c3059628357/scratchpad/analisis.py
+2026-11-10T10:00:48Z	accion=leer	quien=agente_seleccion	modelo=ensamble	granularidad=dia	pid=2303	argv=/tmp/claude-0/-home-user-SA/2bd39326-8617-5400-b04f-4c3059628357/scratchpad/analisis.py
+2026-11-10T10:00:48Z	accion=leer	quien=agente_seleccion	modelo=dc2	granularidad=dia	pid=2303	argv=/tmp/claude-0/-home-user-SA/2bd39326-8617-5400-b04f-4c3059628357/scratchpad/analisis.py
+2026-11-10T10:00:48Z	accion=leer	quien=agente_seleccion	modelo=dc	granularidad=dia	pid=2303	argv=/tmp/claude-0/-home-user-SA/2bd39326-8617-5400-b04f-4c3059628357/scratchpad/analisis.py
+2026-11-10T10:00:48Z	accion=leer	quien=agente_seleccion	modelo=elo	granularidad=dia	pid=2303	argv=/tmp/claude-0/-home-user-SA/2bd39326-8617-5400-b04f-4c3059628357/scratchpad/analisis.py
+2026-11-10T10:00:48Z	accion=leer	quien=agente_seleccion	modelo=tiros	granularidad=dia	pid=2303	argv=/tmp/claude-0/-home-user-SA/2bd39326-8617-5400-b04f-4c3059628357/scratchpad/analisis.py
+2026-11-10T10:00:48Z	accion=leer	quien=agente_seleccion	modelo=poisson_simple	granularidad=dia	pid=2303	argv=/tmp/claude-0/-home-user-SA/2bd39326-8617-5400-b04f-4c3059628357/scratchpad/analisis.py
+2026-11-10T10:00:48Z	accion=leer	quien=agente_seleccion	modelo=cerebro_original_limpio	granularidad=dia	pid=2303	argv=/tmp/claude-0/-home-user-SA/2bd39326-8617-5400-b04f-4c3059628357/scratchpad/analisis.py
+2026-11-10T10:00:48Z	accion=leer	quien=agente_seleccion	modelo=frecuencias	granularidad=dia	pid=2303	argv=/tmp/claude-0/-home-user-SA/2bd39326-8617-5400-b04f-4c3059628357/scratchpad/analisis.py
+2026-11-10T10:00:48Z	accion=leer	quien=agente_seleccion	modelo=mercado_cierre_shin	granularidad=dia	pid=2303	argv=/tmp/claude-0/-home-user-SA/2bd39326-8617-5400-b04f-4c3059628357/scratchpad/analisis.py
+2026-11-10T10:00:48Z	accion=leer	quien=agente_seleccion	modelo=mercado_abre_shin	granularidad=dia	pid=2303	argv=/tmp/claude-0/-home-user-SA/2bd39326-8617-5400-b04f-4c3059628357/scratchpad/analisis.py
+2026-11-10T10:00:48Z	accion=leer	quien=agente_seleccion	modelo=mercado_cierre_marcador	granularidad=dia	pid=2303	argv=/tmp/claude-0/-home-user-SA/2bd39326-8617-5400-b04f-4c3059628357/scratchpad/analisis.py
+2026-11-10T10:00:48Z	accion=leer	quien=agente_seleccion	modelo=cerebro_original_exacto	granularidad=dia	pid=2303	argv=/tmp/claude-0/-home-user-SA/2bd39326-8617-5400-b04f-4c3059628357/scratchpad/analisis.py
+2026-11-10T10:00:51Z	accion=leer	quien=agente_seleccion	modelo=ajuste	granularidad=dia	pid=2303	argv=/tmp/claude-0/-home-user-SA/2bd39326-8617-5400-b04f-4c3059628357/scratchpad/analisis.py
+2026-11-10T10:00:51Z	accion=leer	quien=agente_seleccion	modelo=dc	granularidad=dia	pid=2303	argv=/tmp/claude-0/-home-user-SA/2bd39326-8617-5400-b04f-4c3059628357/scratchpad/analisis.py
+2026-11-10T10:00:51Z	accion=leer	quien=agente_seleccion	modelo=ensamble	granularidad=dia	pid=2303	argv=/tmp/claude-0/-home-user-SA/2bd39326-8617-5400-b04f-4c3059628357/scratchpad/analisis.py
+2026-11-10T10:00:51Z	accion=leer	quien=agente_seleccion	modelo=elo	granularidad=dia	pid=2303	argv=/tmp/claude-0/-home-user-SA/2bd39326-8617-5400-b04f-4c3059628357/scratchpad/analisis.py
+2026-11-10T10:00:51Z	accion=leer	quien=agente_seleccion	modelo=poisson_simple	granularidad=dia	pid=2303	argv=/tmp/claude-0/-home-user-SA/2bd39326-8617-5400-b04f-4c3059628357/scratchpad/analisis.py
+2026-11-10T10:00:51Z	accion=leer	quien=agente_seleccion	modelo=cerebro_original_limpio	granularidad=dia	pid=2303	argv=/tmp/claude-0/-home-user-SA/2bd39326-8617-5400-b04f-4c3059628357/scratchpad/analisis.py
+2026-11-10T10:00:51Z	accion=leer	quien=agente_seleccion	modelo=mercado_cierre_shin	granularidad=dia	pid=2303	argv=/tmp/claude-0/-home-user-SA/2bd39326-8617-5400-b04f-4c3059628357/scratchpad/analisis.py
+2026-11-10T10:00:51Z	accion=leer	quien=agente_seleccion	modelo=ajuste	granularidad=dia	pid=2303	argv=/tmp/claude-0/-home-user-SA/2bd39326-8617-5400-b04f-4c3059628357/scratchpad/analisis.py
+2026-11-10T10:00:51Z	accion=leer	quien=agente_seleccion	modelo=dc	granularidad=dia	pid=2303	argv=/tmp/claude-0/-home-user-SA/2bd39326-8617-5400-b04f-4c3059628357/scratchpad/analisis.py
+2026-11-10T10:00:51Z	accion=leer	quien=agente_seleccion	modelo=ensamble	granularidad=dia	pid=2303	argv=/tmp/claude-0/-home-user-SA/2bd39326-8617-5400-b04f-4c3059628357/scratchpad/analisis.py
+2026-11-10T10:00:51Z	accion=leer	quien=agente_seleccion	modelo=elo	granularidad=dia	pid=2303	argv=/tmp/claude-0/-home-user-SA/2bd39326-8617-5400-b04f-4c3059628357/scratchpad/analisis.py
+2026-11-10T10:00:51Z	accion=leer	quien=agente_seleccion	modelo=poisson_simple	granularidad=dia	pid=2303	argv=/tmp/claude-0/-home-user-SA/2bd39326-8617-5400-b04f-4c3059628357/scratchpad/analisis.py
+2026-11-10T10:00:51Z	accion=leer	quien=agente_seleccion	modelo=cerebro_original_limpio	granularidad=dia	pid=2303	argv=/tmp/claude-0/-home-user-SA/2bd39326-8617-5400-b04f-4c3059628357/scratchpad/analisis.py
+2026-11-10T10:00:51Z	accion=leer	quien=agente_seleccion	modelo=mercado_cierre_shin	granularidad=dia	pid=2303	argv=/tmp/claude-0/-home-user-SA/2bd39326-8617-5400-b04f-4c3059628357/scratchpad/analisis.py
+2026-11-10T10:00:51Z	accion=leer	quien=agente_seleccion	modelo=ajuste	granularidad=dia	pid=2303	argv=/tmp/claude-0/-home-user-SA/2bd39326-8617-5400-b04f-4c3059628357/scratchpad/analisis.py
+2026-11-10T10:00:51Z	accion=leer	quien=agente_seleccion	modelo=mercado_cierre_shin	granularidad=dia	pid=2303	argv=/tmp/claude-0/-home-user-SA/2bd39326-8617-5400-b04f-4c3059628357/scratchpad/analisis.py
+2026-11-10T10:02:29Z	accion=leer	quien=agente_seleccion	modelo=ajuste	granularidad=dia	pid=2389	argv=/tmp/claude-0/-home-user-SA/2bd39326-8617-5400-b04f-4c3059628357/scratchpad/json_out.py
+2026-11-10T10:02:30Z	accion=leer	quien=agente_seleccion	modelo=ensamble	granularidad=dia	pid=2389	argv=/tmp/claude-0/-home-user-SA/2bd39326-8617-5400-b04f-4c3059628357/scratchpad/json_out.py
+2026-11-10T10:02:30Z	accion=leer	quien=agente_seleccion	modelo=elo	granularidad=dia	pid=2389	argv=/tmp/claude-0/-home-user-SA/2bd39326-8617-5400-b04f-4c3059628357/scratchpad/json_out.py
+2026-11-10T10:02:30Z	accion=leer	quien=agente_seleccion	modelo=dc2	granularidad=dia	pid=2389	argv=/tmp/claude-0/-home-user-SA/2bd39326-8617-5400-b04f-4c3059628357/scratchpad/json_out.py
+2026-11-10T10:02:30Z	accion=leer	quien=agente_seleccion	modelo=dc	granularidad=dia	pid=2389	argv=/tmp/claude-0/-home-user-SA/2bd39326-8617-5400-b04f-4c3059628357/scratchpad/json_out.py
+2026-11-10T10:02:30Z	accion=leer	quien=agente_seleccion	modelo=tiros	granularidad=dia	pid=2389	argv=/tmp/claude-0/-home-user-SA/2bd39326-8617-5400-b04f-4c3059628357/scratchpad/json_out.py
+2026-11-10T10:03:06Z	accion=leer	quien=desconocido	modelo=ajuste	granularidad=dia	pid=2420	argv=/root/.local/lib/python3.13/site-packages/pytest/__main__.py produccion/pruebas/test_simulador.py -q --durations=3
+2026-11-10T10:03:11Z	accion=leer	quien=desconocido	modelo=ajuste	granularidad=dia	pid=2420	argv=/root/.local/lib/python3.13/site-packages/pytest/__main__.py produccion/pruebas/test_simulador.py -q --durations=3
+2026-11-10T10:03:17Z	accion=leer	quien=desconocido	modelo=ajuste	granularidad=dia	pid=2420	argv=/root/.local/lib/python3.13/site-packages/pytest/__main__.py produccion/pruebas/test_simulador.py -q --durations=3
+2026-11-10T10:08:14Z	accion=leer	quien=desconocido	modelo=ajuste	granularidad=dia	pid=2822	argv=/home/user/SA/ligamx/produccion/exportar.py
+2026-11-10T10:09:03Z	accion=leer	quien=desconocido	modelo=ajuste	granularidad=dia	pid=2885	argv=/home/user/SA/ligamx/produccion/exportar.py
+2026-11-10T10:12:26Z	accion=leer	quien=desconocido	modelo=ajuste	granularidad=dia	pid=3031	argv=/home/user/SA/ligamx/produccion/exportar.py

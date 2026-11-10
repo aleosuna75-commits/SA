@@ -1,0 +1,14 @@
+{
+ "generado_utc": "2026-11-10T10:12:22.746041+00:00",
+ "n_sellos": 22,
+ "n_partidos_sellados": 10,
+ "n_calificados": 0,
+ "primer_sello_utc": "2026-11-10T09:57:18.747707+00:00",
+ "acumulado": {
+  "n": 0
+ },
+ "por_modelo": {},
+ "por_torneo": {},
+ "nota": "Sólo cuentan pronósticos sellados antes del inicio de cada partido; con pocos partidos el error estándar es grande y ninguna cifra es concluyente.",
+ "partidos": []
+}
