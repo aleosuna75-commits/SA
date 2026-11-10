@@ -1,0 +1,338 @@
+{
+  "estadios": [
+    {
+      "slug": "akron",
+      "nombre": "Estadio Akron",
+      "nombre_historico": "Estadio Omnilife (2010-2016) y Estadio Chivas (2016-2017); «Estadio Guadalajara» durante el Mundial 2026",
+      "apodo": "",
+      "ciudad": "Zapopan",
+      "estado": "Jalisco",
+      "altitud_m": 1670,
+      "capacidad": 46232,
+      "superficie": "hibrido",
+      "lat": 20.68178,
+      "lon": -103.46265,
+      "inaugurado": 2010,
+      "techo": "parcial: cubierta anular sobre todas las gradas, cancha a cielo abierto",
+      "equipos": [
+        "Chivas"
+      ],
+      "equipos_slug": [
+        "chi"
+      ],
+      "dato": "Está diseñado como un volcán con una nube encima: talud de pasto y cubierta blanca. Abrió con pasto sintético (2010-2012) y hoy su cancha es híbrida.",
+      "fuente_datos": "Liga MX, ficha oficial del club (ligamx.net/cancha/club/7/guadalajara, consultada 2026-11-10): aforo 46,232 y coordenadas. Wikipedia EN/ES «Estadio Akron»: inauguración (30-jul-2010), nombres anteriores, diseño volcán-nube y paso de sintético a natural en 2012. Claro Sports (19-may-2025): cancha híbrida para el Mundial. altitud: modelo de elevación SRTM 30 m (opentopodata.org) y Copernicus (open-meteo.com) en el terreno junto al estadio, ±10 m (Wikipedia EN: 1,670 m).",
+      "fotos": [
+        {
+          "archivo": "img/estadios/akron-1.jpg",
+          "alt": "Interior del Estadio Akron visto desde la cabecera sur: butacas rojas, cancha y la cubierta blanca en anillo abierta al cielo.",
+          "pos": "45% 55%",
+          "autor": "Alejan98",
+          "licencia": "CC0 1.0",
+          "url_pagina": "https://commons.wikimedia.org/wiki/File:Estadio_Akron_02-07-2022_cabecera_sur_lado_derecho.jpg",
+          "url_original": "https://upload.wikimedia.org/wikipedia/commons/1/1a/Estadio_Akron_02-07-2022_cabecera_sur_lado_derecho.jpg",
+          "ancho": 1520,
+          "alto": 937,
+          "kb": 336,
+          "titulo": "File:Estadio Akron 02-07-2022 cabecera sur lado derecho.jpg",
+          "licencia_url": "https://creativecommons.org/publicdomain/zero/1.0/deed.es",
+          "credito": "Alejan98 / Wikimedia Commons / CC0 1.0",
+          "cambios": "redimensionada",
+          "original_ancho": 2984,
+          "original_alto": 1840,
+          "fecha_foto": "2022-07-02"
+        },
+        {
+          "archivo": "img/estadios/akron-2.jpg",
+          "alt": "Exterior del Estadio Akron: el talud de pasto y la cubierta blanca en forma de platillo, con aficionados caminando hacia el acceso.",
+          "pos": "50% 48%",
+          "autor": "Erik Cleves Kristensen",
+          "licencia": "CC BY 4.0",
+          "url_pagina": "https://commons.wikimedia.org/wiki/File:Estadio_Akron,_Guadalajara_(55329822641).jpg",
+          "url_original": "https://upload.wikimedia.org/wikipedia/commons/c/cd/Estadio_Akron%2C_Guadalajara_%2855329822641%29.jpg",
+          "ancho": 1600,
+          "alto": 930,
+          "kb": 290,
+          "titulo": "File:Estadio Akron, Guadalajara (55329822641).jpg",
+          "licencia_url": "https://creativecommons.org/licenses/by/4.0/deed.es",
+          "credito": "Erik Cleves Kristensen / Flickr vía Wikimedia Commons / CC BY 4.0",
+          "cambios": "redimensionada; perfil de color Display P3 convertido a sRGB",
+          "original_ancho": 3794,
+          "original_alto": 2206,
+          "fecha_foto": "2026-06-12"
+        }
+      ]
+    },
+    {
+      "slug": "jalisco",
+      "nombre": "Estadio Jalisco",
+      "nombre_historico": "Estadio Jalisco",
+      "apodo": "",
+      "ciudad": "Guadalajara",
+      "estado": "Jalisco",
+      "altitud_m": 1530,
+      "capacidad": 55020,
+      "superficie": "natural",
+      "lat": 20.70482,
+      "lon": -103.32803,
+      "inaugurado": 1960,
+      "techo": "parcial: anillo perimetral que cubre la tribuna alta; cancha a cielo abierto",
+      "equipos": [
+        "Atlas"
+      ],
+      "equipos_slug": [
+        "ats"
+      ],
+      "dato": "Sede de los Mundiales de 1970 y 1986: el Brasil de Pelé jugó aquí cinco de sus seis partidos de México 70, hasta la semifinal.",
+      "fuente_datos": "Liga MX, ficha oficial del club (ligamx.net/cancha/club/10445/atlas, consultada 2026-11-10): aforo 55,020 y coordenadas. Wikipedia ES «Estadio Jalisco»: inauguración (31-ene-1960), mismo aforo, techo extendido a todas las tribunas en 1970 y partidos de Brasil en el Mundial 70. Superficie: Wikipedia la da como césped y Récord (11-feb-2026) reporta que no se instaló un sistema nuevo de cancha. altitud: modelo de elevación SRTM 30 m (opentopodata.org) y Copernicus (open-meteo.com) en el terreno junto al estadio, ±10 m (docs/estadios.js: 1,527 m).",
+      "fotos": [
+        {
+          "archivo": "img/estadios/jalisco-1.jpg",
+          "alt": "Interior del Estadio Jalisco al atardecer, con público en las gradas, luminarias encendidas y el anillo del techo recortando el cielo.",
+          "pos": "52% 65%",
+          "autor": "Alejan98",
+          "licencia": "CC0 1.0",
+          "url_pagina": "https://commons.wikimedia.org/wiki/File:Estadio_Jalisco_06022022_medio_tiempo.jpg",
+          "url_original": "https://upload.wikimedia.org/wikipedia/commons/6/62/Estadio_Jalisco_06022022_medio_tiempo.jpg",
+          "ancho": 1600,
+          "alto": 1200,
+          "kb": 345,
+          "titulo": "File:Estadio Jalisco 06022022 medio tiempo.jpg",
+          "licencia_url": "https://creativecommons.org/publicdomain/zero/1.0/deed.es",
+          "credito": "Alejan98 / Wikimedia Commons / CC0 1.0",
+          "cambios": "redimensionada",
+          "original_ancho": 3264,
+          "original_alto": 2448,
+          "fecha_foto": "2022-02-06"
+        },
+        {
+          "archivo": "img/estadios/jalisco-2.jpg",
+          "alt": "Interior del Estadio Jalisco de día, casi vacío: gradas rojas, cancha a media sombra y cielo azul sobre el anillo del techo.",
+          "pos": "48% 62%",
+          "autor": "Alejan98",
+          "licencia": "CC0 1.0",
+          "url_pagina": "https://commons.wikimedia.org/wiki/File:Estadio_Jalisco_06022022.jpg",
+          "url_original": "https://upload.wikimedia.org/wikipedia/commons/8/82/Estadio_Jalisco_06022022.jpg",
+          "ancho": 1600,
+          "alto": 1200,
+          "kb": 331,
+          "titulo": "File:Estadio Jalisco 06022022.jpg",
+          "licencia_url": "https://creativecommons.org/publicdomain/zero/1.0/deed.es",
+          "credito": "Alejan98 / Wikimedia Commons / CC0 1.0",
+          "cambios": "redimensionada",
+          "original_ancho": 3264,
+          "original_alto": 2448,
+          "fecha_foto": "2022-02-06"
+        }
+      ]
+    },
+    {
+      "slug": "bbva",
+      "nombre": "Estadio BBVA",
+      "nombre_historico": "Estadio BBVA Bancomer (2015-2019); «Estadio Monterrey» durante el Mundial 2026",
+      "apodo": "El Gigante de Acero",
+      "ciudad": "Guadalupe",
+      "estado": "Nuevo León",
+      "altitud_m": 495,
+      "capacidad": 53529,
+      "superficie": "hibrido",
+      "lat": 25.66926,
+      "lon": -100.24448,
+      "inaugurado": 2015,
+      "techo": "parcial: cubierta sobre todas las gradas, cancha a cielo abierto",
+      "equipos": [
+        "Monterrey"
+      ],
+      "equipos_slug": [
+        "mty"
+      ],
+      "dato": "Su lado sur es más bajo que el norte (32 m contra 46 m) y deja ver el Cerro de la Silla desde la grada.",
+      "fuente_datos": "Liga MX, ficha oficial del club (ligamx.net/cancha/club/14/monterrey, consultada 2026-11-10): aforo 53,529 y coordenadas. Wikipedia EN «Estadio BBVA»: mismo aforo, inauguración (2-ago-2015), nombre anterior, alturas norte/sur, vista al Cerro de la Silla y césped GrassMaster. Publimetro (5-jun-2025): cancha híbrida nueva para el Mundial. altitud: modelo de elevación SRTM 30 m (opentopodata.org) y Copernicus (open-meteo.com) en el terreno junto al estadio, ±10 m (Wikipedia EN dice 530 m, sin fuente).",
+      "fotos": [
+        {
+          "archivo": "img/estadios/bbva-1.jpg",
+          "alt": "Interior del Estadio BBVA vacío, visto desde una cabecera: butacas azules, cancha y la estructura metálica del techo.",
+          "pos": "50% 55%",
+          "autor": "Presidencia de la República Mexicana",
+          "licencia": "CC BY 2.0",
+          "url_pagina": "https://commons.wikimedia.org/wiki/File:Estadio_BBVA_Bancomer_Inauguration.jpg",
+          "url_original": "https://upload.wikimedia.org/wikipedia/commons/6/68/Estadio_BBVA_Bancomer_Inauguration.jpg",
+          "ancho": 1600,
+          "alto": 988,
+          "kb": 337,
+          "titulo": "File:Estadio BBVA Bancomer Inauguration.jpg",
+          "licencia_url": "https://creativecommons.org/licenses/by/2.0/deed.es",
+          "credito": "Presidencia de la República Mexicana / Flickr vía Wikimedia Commons / CC BY 2.0",
+          "cambios": "redimensionada",
+          "original_ancho": 6479,
+          "original_alto": 4001,
+          "fecha_foto": "2015-08-01"
+        },
+        {
+          "archivo": "img/estadios/bbva-2.jpg",
+          "alt": "Vista aérea del Estadio BBVA al pie del Cerro de la Silla, con la ciudad extendida alrededor.",
+          "pos": "38% 60%",
+          "autor": "Arne Müseler / arne-mueseler.com",
+          "licencia": "CC BY-SA 3.0 DE",
+          "url_pagina": "https://commons.wikimedia.org/wiki/File:Mexico_Guadalupe_Monterrey_Estadio_BBVA_Bancomer_fifa_world_cup_2026_4.JPG",
+          "url_original": "https://upload.wikimedia.org/wikipedia/commons/a/ab/Mexico_Guadalupe_Monterrey_Estadio_BBVA_Bancomer_fifa_world_cup_2026_4.JPG",
+          "ancho": 1600,
+          "alto": 900,
+          "kb": 300,
+          "titulo": "File:Mexico Guadalupe Monterrey Estadio BBVA Bancomer fifa world cup 2026 4.JPG",
+          "licencia_url": "https://creativecommons.org/licenses/by-sa/3.0/de/deed.de",
+          "credito": "Foto: Arne Müseler / arne-mueseler.com / CC-BY-SA-3.0",
+          "cambios": "redimensionada",
+          "original_ancho": 4000,
+          "original_alto": 2250,
+          "fecha_foto": "2026-01-28"
+        },
+        {
+          "archivo": "img/estadios/bbva-3.jpg",
+          "alt": "Vista aérea cercana del Estadio BBVA: la envolvente de aluminio con el letrero del estadio y, al fondo, la ciudad y sus cerros.",
+          "pos": "58% 60%",
+          "autor": "Arne Müseler / arne-mueseler.com",
+          "licencia": "CC BY-SA 3.0 DE",
+          "url_pagina": "https://commons.wikimedia.org/wiki/File:Mexico_Guadalupe_Monterrey_Estadio_BBVA_Bancomer_fifa_world_cup_2026_1.JPG",
+          "url_original": "https://upload.wikimedia.org/wikipedia/commons/0/0e/Mexico_Guadalupe_Monterrey_Estadio_BBVA_Bancomer_fifa_world_cup_2026_1.JPG",
+          "ancho": 1600,
+          "alto": 900,
+          "kb": 339,
+          "titulo": "File:Mexico Guadalupe Monterrey Estadio BBVA Bancomer fifa world cup 2026 1.JPG",
+          "licencia_url": "https://creativecommons.org/licenses/by-sa/3.0/de/deed.de",
+          "credito": "Foto: Arne Müseler / arne-mueseler.com / CC-BY-SA-3.0",
+          "cambios": "redimensionada",
+          "original_ancho": 4000,
+          "original_alto": 2250,
+          "fecha_foto": "2026-01-28"
+        }
+      ]
+    },
+    {
+      "slug": "volcan",
+      "nombre": "Estadio Universitario",
+      "nombre_historico": "Estadio Universitario",
+      "apodo": "El Volcán",
+      "ciudad": "San Nicolás de los Garza",
+      "estado": "Nuevo León",
+      "altitud_m": 520,
+      "capacidad": 41886,
+      "superficie": "natural",
+      "lat": 25.72252,
+      "lon": -100.312,
+      "inaugurado": 1967,
+      "techo": "ninguno",
+      "equipos": [
+        "Tigres"
+      ],
+      "equipos_slug": [
+        "tig"
+      ],
+      "dato": "Lo estrenó el rival: el partido inaugural, el 30 de mayo de 1967, fue un Monterrey 1-1 Atlético de Madrid.",
+      "fuente_datos": "Liga MX, ficha oficial del club (ligamx.net/cancha/club/16/tigres, consultada 2026-11-10): aforo 41,886 y coordenadas. Wikipedia ES/EN «Estadio Universitario (UANL)»: apodo, inauguración y partido inaugural, mismo aforo en EN (ES dice 42,500). Superficie: Wikipedia la da como césped; no hallé reporte de sistema híbrido. altitud: modelo de elevación SRTM 30 m (opentopodata.org) y Copernicus (open-meteo.com) en el terreno junto al estadio, ±10 m (docs/estadios.js: 515 m).",
+      "fotos": [
+        {
+          "archivo": "img/estadios/volcan-1.jpg",
+          "alt": "Interior del Estadio Universitario durante un partido, con un atardecer naranja y la silueta de la sierra detrás de la tribuna.",
+          "pos": "55% 45%",
+          "autor": "Jdanielrmz11",
+          "licencia": "CC BY-SA 4.0",
+          "url_pagina": "https://commons.wikimedia.org/wiki/File:Colorido_cielo_sobre_estadio_Universitario.jpg",
+          "url_original": "https://upload.wikimedia.org/wikipedia/commons/4/47/Colorido_cielo_sobre_estadio_Universitario.jpg",
+          "ancho": 1520,
+          "alto": 1140,
+          "kb": 348,
+          "titulo": "File:Colorido cielo sobre estadio Universitario.jpg",
+          "licencia_url": "https://creativecommons.org/licenses/by-sa/4.0/deed.es",
+          "credito": "Jdanielrmz11 / Wikimedia Commons / CC BY-SA 4.0",
+          "cambios": "redimensionada",
+          "original_ancho": 4608,
+          "original_alto": 3456,
+          "fecha_foto": "2020-02-03"
+        },
+        {
+          "archivo": "img/estadios/volcan-2.jpg",
+          "alt": "Vista aérea del Estadio Universitario: tazón sin techo con gradas amarillas y azules, rodeado por la ciudad.",
+          "pos": "50% 52%",
+          "autor": "Arne Müseler / arne-mueseler.com",
+          "licencia": "CC BY-SA 3.0 DE",
+          "url_pagina": "https://commons.wikimedia.org/wiki/File:Mexico_monterrey_San_Nicol%C3%A1s_de_los_Garza_Estadio_Universitario_1.JPG",
+          "url_original": "https://upload.wikimedia.org/wikipedia/commons/4/41/Mexico_monterrey_San_Nicol%C3%A1s_de_los_Garza_Estadio_Universitario_1.JPG",
+          "ancho": 1360,
+          "alto": 765,
+          "kb": 341,
+          "titulo": "File:Mexico monterrey San Nicolás de los Garza Estadio Universitario 1.JPG",
+          "licencia_url": "https://creativecommons.org/licenses/by-sa/3.0/de/deed.de",
+          "credito": "Foto: Arne Müseler / arne-mueseler.com / CC-BY-SA-3.0",
+          "cambios": "redimensionada",
+          "original_ancho": 4000,
+          "original_alto": 2250,
+          "fecha_foto": "2026-01-28"
+        }
+      ]
+    },
+    {
+      "slug": "corona",
+      "nombre": "Estadio TSM Corona",
+      "nombre_historico": "Estadio Corona (nombre de uso común desde su apertura en 2009; el Estadio Corona original, de 1970, cerró ese año)",
+      "apodo": "El Templo del Desierto",
+      "ciudad": "Torreón",
+      "estado": "Coahuila",
+      "altitud_m": 1120,
+      "capacidad": 29101,
+      "superficie": "natural",
+      "lat": 25.62877,
+      "lon": -103.37992,
+      "inaugurado": 2009,
+      "techo": "parcial: solo la tribuna principal (poniente)",
+      "equipos": [
+        "Santos"
+      ],
+      "equipos_slug": [
+        "san"
+      ],
+      "dato": "Se inauguró el 11 de noviembre de 2009 con un Santos Laguna 2-1 Santos de Brasil; Pelé dio la patada inaugural.",
+      "fuente_datos": "Liga MX, ficha oficial del club (ligamx.net/cancha/club/14102/santos-laguna, consultada 2026-11-10): nombre «TSM Corona», aforo 29,101 y coordenadas. Wikipedia ES «Estadio Corona (TSM)» y EN «Estadio Corona»: inauguración, partido inaugural, apodo y mismo aforo en EN (ES dice 30,000). Superficie: Wikipedia la da como césped y Fox Sports (13-ago-2025) describe que el césped se retiró por placas y se volvió a colocar, sin mencionar sistema híbrido. Techo: observado en las fotos. altitud: modelo de elevación SRTM 30 m (opentopodata.org) y Copernicus (open-meteo.com) en el terreno junto al estadio, ±10 m.",
+      "fotos": [
+        {
+          "archivo": "img/estadios/corona-1.jpg",
+          "alt": "Estadio Corona lleno durante un partido al atardecer, con la tribuna principal techada al fondo y aficionados en primer plano.",
+          "pos": "50% 45%",
+          "autor": "MiguelCMuela",
+          "licencia": "CC BY-SA 4.0",
+          "url_pagina": "https://commons.wikimedia.org/wiki/File:Estadio_Corona_TSM_Pano.jpg",
+          "url_original": "https://upload.wikimedia.org/wikipedia/commons/5/55/Estadio_Corona_TSM_Pano.jpg",
+          "ancho": 1600,
+          "alto": 900,
+          "kb": 231,
+          "titulo": "File:Estadio Corona TSM Pano.jpg",
+          "licencia_url": "https://creativecommons.org/licenses/by-sa/4.0/deed.es",
+          "credito": "MiguelCMuela / Wikimedia Commons / CC BY-SA 4.0",
+          "cambios": "recorte central 16:9 de una panorámica 2.5:1 y redimensionada",
+          "original_ancho": 6064,
+          "original_alto": 2418,
+          "fecha_foto": "2015-05-09"
+        },
+        {
+          "archivo": "img/estadios/corona-2.jpg",
+          "alt": "Interior del Estadio Corona vacío visto desde la tribuna alta: butacas verdes, cancha y, al fondo, la llanura y las sierras de La Laguna.",
+          "pos": "45% 55%",
+          "autor": "MiguelCMuela",
+          "licencia": "CC BY-SA 4.0",
+          "url_pagina": "https://commons.wikimedia.org/wiki/File:Estadio_Corona_TSM.jpg",
+          "url_original": "https://upload.wikimedia.org/wikipedia/commons/4/49/Estadio_Corona_TSM.jpg",
+          "ancho": 1520,
+          "alto": 1140,
+          "kb": 350,
+          "titulo": "File:Estadio Corona TSM.jpg",
+          "licencia_url": "https://creativecommons.org/licenses/by-sa/4.0/deed.es",
+          "credito": "MiguelCMuela / Wikimedia Commons / CC BY-SA 4.0",
+          "cambios": "redimensionada",
+          "original_ancho": 3264,
+          "original_alto": 2448,
+          "fecha_foto": "2015-12-16"
+        }
+      ]
+    }
+  ]
+}
