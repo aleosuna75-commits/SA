@@ -1,4 +1,8 @@
 # Caché cruda de ESPN: se regenera con datos/espn_descarga.py
 datos/cache/
+# Cachés y predicciones del modelado: se regeneran con el arnés
+modelo/cache/
+modelo/pred/*.parquet
 __pycache__/
+.pytest_cache/
 *.log

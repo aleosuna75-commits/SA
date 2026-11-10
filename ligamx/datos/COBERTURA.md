@@ -5,7 +5,7 @@ Generado automáticamente por `espn_descarga.py` el 2026-11-09 (no editar a mano
 - Fuente: API pública de ESPN, liga `mex.1` (scoreboard por año + summary por partido).
 - Partidos en `partidos.csv`: **8767** (8684 jugados) de 2001-07-21 a 2026-11-22; 51 torneos.
 - ESPN no tiene eventos de Liga MX anteriores al Invierno 2001 (probado 1996-2000: vacío).
-- Partidos jugados con algún bloque de detalle (stats, eventos o alineaciones): 8269 (95%).
+- Partidos jugados con algún bloque de detalle (stats, eventos o alineaciones): 8668 (100%).
 
 ## 1. Cobertura por torneo
 
@@ -13,37 +13,37 @@ Porcentajes sobre partidos **jugados**. `stats` = boxscore real; `eventos` = gol
 
 | Torneo | Partidos | Jugados | Regular | Liguilla | stats | eventos | tarjetas | alin. | momios | HT | posesión | asist. | árbitro |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| Apertura 2001 | 185 | 185 | 171 | 14 | 0% | 91% | 0% | 0% | 0% | 91% | 0% | 0% | 0% |
-| Clausura 2002 | 190 | 189 | 171 | 18 | 0% | 90% | 0% | 0% | 0% | 90% | 0% | 0% | 0% |
-| Apertura 2002 | 204 | 204 | 190 | 14 | 0% | 95% | 0% | 0% | 0% | 95% | 0% | 7% | 0% |
-| Clausura 2003 | 206 | 206 | 190 | 16 | 0% | 90% | 0% | 0% | 0% | 90% | 0% | 7% | 0% |
-| Apertura 2003 | 208 | 208 | 190 | 18 | 0% | 92% | 0% | 0% | 0% | 92% | 0% | 9% | 0% |
-| Clausura 2004 | 207 | 206 | 190 | 16 | 0% | 91% | 0% | 0% | 0% | 91% | 0% | 8% | 0% |
-| Apertura 2004 | 167 | 167 | 153 | 14 | 0% | 96% | 0% | 0% | 0% | 96% | 0% | 7% | 0% |
-| Clausura 2005 | 169 | 167 | 153 | 14 | 0% | 96% | 0% | 0% | 0% | 96% | 0% | 10% | 0% |
-| Apertura 2005 | 167 | 167 | 153 | 14 | 0% | 92% | 0% | 0% | 0% | 92% | 0% | 12% | 0% |
-| Clausura 2006 | 169 | 167 | 153 | 14 | 0% | 90% | 0% | 0% | 0% | 90% | 0% | 7% | 0% |
-| Apertura 2006 | 171 | 171 | 153 | 18 | 0% | 92% | 0% | 0% | 0% | 92% | 0% | 11% | 0% |
-| Clausura 2007 | 171 | 170 | 153 | 17 | 0% | 91% | 0% | 0% | 0% | 91% | 0% | 4% | 0% |
-| Apertura 2007 | 173 | 171 | 153 | 18 | 0% | 93% | 0% | 0% | 0% | 93% | 0% | 12% | 0% |
-| Clausura 2008 | 171 | 171 | 153 | 18 | 0% | 92% | 0% | 0% | 0% | 92% | 0% | 0% | 0% |
-| Apertura 2008 | 167 | 167 | 153 | 14 | 0% | 91% | 0% | 0% | 0% | 91% | 0% | 0% | 0% |
-| Clausura 2009 | 167 | 167 | 153 | 14 | 0% | 90% | 0% | 0% | 0% | 90% | 0% | 0% | 0% |
-| Apertura 2009 | 167 | 167 | 153 | 14 | 0% | 95% | 0% | 0% | 0% | 95% | 0% | 0% | 0% |
-| Clausura 2010 | 167 | 167 | 153 | 14 | 0% | 93% | 0% | 0% | 0% | 93% | 0% | 0% | 0% |
-| Apertura 2010 | 167 | 167 | 153 | 14 | 0% | 92% | 0% | 0% | 0% | 92% | 0% | 0% | 0% |
-| Clausura 2011 | 167 | 167 | 153 | 14 | 0% | 90% | 0% | 0% | 0% | 90% | 0% | 0% | 0% |
-| Apertura 2011 | 167 | 167 | 153 | 14 | 0% | 93% | 0% | 0% | 0% | 93% | 0% | 0% | 0% |
-| Clausura 2012 | 167 | 167 | 153 | 14 | 0% | 90% | 0% | 0% | 0% | 90% | 0% | 0% | 0% |
-| Apertura 2012 | 167 | 167 | 153 | 14 | 0% | 90% | 0% | 0% | 0% | 90% | 0% | 0% | 0% |
-| Clausura 2013 | 167 | 167 | 153 | 14 | 0% | 95% | 0% | 0% | 0% | 95% | 0% | 0% | 0% |
-| Apertura 2013 | 167 | 167 | 153 | 14 | 0% | 92% | 0% | 0% | 0% | 92% | 0% | 1% | 0% |
-| Clausura 2014 | 167 | 167 | 153 | 14 | 0% | 90% | 0% | 0% | 0% | 90% | 0% | 0% | 0% |
-| Apertura 2014 | 167 | 167 | 153 | 14 | 0% | 86% | 0% | 0% | 0% | 86% | 0% | 1% | 0% |
-| Clausura 2015 | 167 | 167 | 153 | 14 | 0% | 93% | 0% | 0% | 0% | 93% | 0% | 0% | 0% |
-| Apertura 2015 | 167 | 167 | 153 | 14 | 0% | 95% | 0% | 0% | 0% | 95% | 0% | 4% | 0% |
+| Apertura 2001 | 185 | 185 | 171 | 14 | 0% | 98% | 0% | 0% | 0% | 98% | 0% | 0% | 0% |
+| Clausura 2002 | 190 | 189 | 171 | 18 | 0% | 97% | 0% | 3% | 0% | 97% | 0% | 0% | 0% |
+| Apertura 2002 | 204 | 204 | 190 | 14 | 0% | 100% | 0% | 48% | 0% | 100% | 0% | 7% | 19% |
+| Clausura 2003 | 206 | 206 | 190 | 16 | 0% | 99% | 0% | 47% | 0% | 99% | 0% | 7% | 16% |
+| Apertura 2003 | 208 | 208 | 190 | 18 | 100% | 99% | 7% | 43% | 0% | 99% | 0% | 9% | 14% |
+| Clausura 2004 | 207 | 206 | 190 | 16 | 100% | 99% | 8% | 39% | 0% | 99% | 0% | 8% | 10% |
+| Apertura 2004 | 167 | 167 | 153 | 14 | 99% | 99% | 5% | 40% | 0% | 99% | 0% | 7% | 9% |
+| Clausura 2005 | 169 | 167 | 153 | 14 | 99% | 100% | 6% | 57% | 0% | 100% | 0% | 10% | 13% |
+| Apertura 2005 | 167 | 167 | 153 | 14 | 100% | 100% | 12% | 99% | 0% | 100% | 0% | 12% | 14% |
+| Clausura 2006 | 169 | 167 | 153 | 14 | 99% | 99% | 10% | 100% | 0% | 99% | 0% | 7% | 7% |
+| Apertura 2006 | 171 | 171 | 153 | 18 | 100% | 100% | 8% | 100% | 0% | 100% | 0% | 11% | 51% |
+| Clausura 2007 | 171 | 170 | 153 | 17 | 0% | 100% | 0% | 100% | 0% | 100% | 0% | 4% | 51% |
+| Apertura 2007 | 173 | 171 | 153 | 18 | 0% | 100% | 0% | 100% | 0% | 100% | 0% | 12% | 45% |
+| Clausura 2008 | 171 | 171 | 153 | 18 | 81% | 100% | 7% | 44% | 0% | 100% | 0% | 0% | 100% |
+| Apertura 2008 | 167 | 167 | 153 | 14 | 100% | 100% | 8% | 43% | 0% | 100% | 0% | 0% | 90% |
+| Clausura 2009 | 167 | 167 | 153 | 14 | 100% | 100% | 13% | 17% | 0% | 100% | 0% | 0% | 100% |
+| Apertura 2009 | 167 | 167 | 153 | 14 | 99% | 100% | 7% | 15% | 0% | 100% | 0% | 0% | 100% |
+| Clausura 2010 | 167 | 167 | 153 | 14 | 100% | 100% | 8% | 13% | 0% | 100% | 0% | 0% | 99% |
+| Apertura 2010 | 167 | 167 | 153 | 14 | 100% | 100% | 10% | 14% | 0% | 100% | 0% | 0% | 100% |
+| Clausura 2011 | 167 | 167 | 153 | 14 | 99% | 100% | 11% | 22% | 0% | 100% | 0% | 0% | 100% |
+| Apertura 2011 | 167 | 167 | 153 | 14 | 100% | 100% | 8% | 22% | 0% | 100% | 0% | 0% | 100% |
+| Clausura 2012 | 167 | 167 | 153 | 14 | 100% | 100% | 9% | 37% | 0% | 100% | 0% | 0% | 100% |
+| Apertura 2012 | 167 | 167 | 153 | 14 | 98% | 98% | 93% | 99% | 0% | 100% | 98% | 0% | 0% |
+| Clausura 2013 | 167 | 167 | 153 | 14 | 100% | 100% | 90% | 100% | 0% | 100% | 100% | 0% | 0% |
+| Apertura 2013 | 167 | 167 | 153 | 14 | 100% | 100% | 95% | 100% | 0% | 100% | 100% | 1% | 7% |
+| Clausura 2014 | 167 | 167 | 153 | 14 | 100% | 100% | 96% | 100% | 0% | 100% | 100% | 0% | 0% |
+| Apertura 2014 | 167 | 167 | 153 | 14 | 100% | 100% | 96% | 100% | 0% | 100% | 100% | 1% | 0% |
+| Clausura 2015 | 167 | 167 | 153 | 14 | 100% | 100% | 98% | 100% | 0% | 100% | 100% | 0% | 0% |
+| Apertura 2015 | 167 | 167 | 153 | 14 | 99% | 100% | 97% | 100% | 0% | 100% | 99% | 4% | 0% |
 | Clausura 2016 | 167 | 167 | 153 | 14 | 100% | 100% | 98% | 100% | 0% | 100% | 100% | 100% | 0% |
-| Apertura 2016 | 167 | 167 | 153 | 14 | 9% | 95% | 9% | 10% | 0% | 95% | 9% | 100% | 1% |
+| Apertura 2016 | 167 | 167 | 153 | 14 | 99% | 100% | 98% | 99% | 0% | 100% | 99% | 100% | 1% |
 | Clausura 2017 | 168 | 167 | 153 | 14 | 100% | 100% | 99% | 98% | 0% | 100% | 100% | 99% | 0% |
 | Apertura 2017 | 167 | 167 | 153 | 14 | 100% | 100% | 98% | 99% | 0% | 100% | 100% | 99% | 0% |
 | Clausura 2018 | 167 | 167 | 153 | 14 | 92% | 100% | 90% | 100% | 0% | 100% | 92% | 99% | 75% |
@@ -73,17 +73,17 @@ Regla: primer torneo a partir del cual TODOS los torneos siguientes (con partido
 |---|---|---|---|
 | Estadísticas (tiros, córners, faltas, tarjetas...) | Clausura 2025 | Clausura 2020 | 647 de 650 (100%) |
 | Posesión | Clausura 2025 | Clausura 2020 | 646 de 650 (99%) |
-| Goles con minuto | Clausura 2017 | Apertura 2001 | 3295 de 3296 (100%) |
-| Marcador de medio tiempo | Clausura 2017 | Apertura 2001 | 3296 de 3296 (100%) |
+| Goles con minuto | Apertura 2001 | Apertura 2001 | 8659 de 8684 (100%) |
+| Marcador de medio tiempo | Apertura 2001 | Apertura 2001 | 8664 de 8684 (100%) |
 | Tarjetas con minuto | Clausura 2025 | Clausura 2020 | 642 de 650 (99%) |
-| Alineaciones (11 titulares) | Clausura 2017 | Clausura 2017 | 3281 de 3296 (100%) |
+| Alineaciones (11 titulares) | Apertura 2012 | Apertura 2012 | 4780 de 4799 (100%) |
 | Momios 1X2 | Clausura 2025 | Clausura 2021 | 646 de 650 (99%) |
 | Asistencia | nunca | nunca |  |
 | Árbitro | nunca | nunca |  |
 
 ## 3. Notas de calidad de los datos
 
-- **Marcador de 90 minutos**: `gl`/`gv` nunca incluyen tiempos extra. Hay 11 partidos con tiempos extra (`gl_et`/`gv_et`) y 20 con tanda de penales (`pen_l`/`pen_v`). El campo `score` de ESPN SÍ incluye los goles del tiempo extra; aquí se separan con el marcador por periodos y los goles con minuto.
+- **Marcador de 90 minutos**: `gl`/`gv` nunca incluyen tiempos extra. Hay 15 partidos con tiempos extra (`gl_et`/`gv_et`) y 20 con tanda de penales (`pen_l`/`pen_v`). El campo `score` de ESPN SÍ incluye los goles del tiempo extra; aquí se separan con el marcador por periodos y los goles con minuto.
 - **Jugadas duplicadas**: ESPN ingirió dos veces algunos partidos (sobre todo 2016-2018): los goles y tarjetas salen repetidos con un minuto de diferencia. Se depuran (se conserva la versión reprocesada) y sólo se marca `tiene_eventos`=1 si los goles suman el marcador.
 - **Estadísticas en ceros**: en partidos viejos ESPN manda 0 en lo que no midió. Se dejan VACÍAS (no cero) cuando el boxscore no tiene tiros y faltas; la posesión sólo cuando ambos lados suman 100.
 - **Estadios**: ESPN usa el nombre actual del inmueble (p. ej. el Azteca aparece como Estadio Banorte en todos los años); `estadio_id` es estable.
@@ -93,6 +93,7 @@ Regla: primer torneo a partir del cual TODOS los torneos siguientes (con partido
 - **Resultados de escritorio / abandonados**: 2021-02-20 Atlas 3-0 América (id 590969: abandonado según ESPN; resultado oficial 3-0 distinto de los goles en cancha 0-2 (resultado de escritorio)); 2022-03-05 Querétaro 0-1 Atlas (id 623106: partido suspendido al 62' por violencia en la tribuna con 0-1; ESPN conserva el marcador de cancha y historico_ligamx.csv trae 0-3 (resultado de escritorio)). `gl`/`gv` llevan lo que publica ESPN (en el abandonado de 2021, el resultado oficial de escritorio; en el suspendido de 2022, el de cancha); los goles de cancha están en goles.csv. Conviene excluir estos partidos al ajustar modelos de goles.
 - **Fases corregidas** (19 partidos en Apertura 2002, Apertura 2003, Apertura 2009, Clausura 2014): ESPN etiquetó mal la fase (liguilla completa como 'reclassification', final como semifinal o cuartos como fase regular); se dedujo por la estructura de las series. El valor original queda en `fase_espn`.
 - **Registros fantasma** (3): eventos que ESPN dejó como 'programado' con fecha pasada y sin resultado; quedan como `pospuesto` con nota: 40393 (2002-02-03 Querétaro-Morelia), 194736 (2006-01-30 Morelia-Atlas), 490116 (2016-07-17 Tigres-Chivas).
+- **Medio tiempo**: en 10 partidos el conteo de goles del primer tiempo difiere del marcador por periodos de ESPN; se usa el de los goles con minuto y se anota en `nota`.
 
 ## 4. Diccionario de columnas
 
