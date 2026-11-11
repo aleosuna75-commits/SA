@@ -152,3 +152,4 @@ prueba real: Querétaro–Monterrey, sábado 14-nov 17:00 de México (despertare
 - 2026-11-11 04:50 UTC · Simulaciones a 1,000,000 (50,000 muestras) en el pronóstico y 100,000 en vivo. Resultado:
   América 26.6%, Cruz Azul 26.3%, Toluca 20.0%, Chivas 19.3% (coherente con la corrida de 20,000: diferencias de menos
   de 1.7 errores estándar). `pipeline.py auto` tarda 68 s. Pruebas: 82 de producción, 230 + 230 de página. V6 publicada.
+- 2026-11-11 07:30 UTC · Corrida diaria: sin partidos nuevos; momios actualizados; V7 publicada, `vivo/actual` en versión 4. Sin partidos en 48 h (despertares del 14-nov ya programados). No se avanzó un pendiente de mejora: la ventana de límite de hoy ya se usó en el rediseño.
