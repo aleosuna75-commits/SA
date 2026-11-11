@@ -68,8 +68,10 @@ Falta (en orden):
 1. [ ] Workflow `notas/workflows/06_correcciones.js`: corrección visual (los 16 defectos de
    `notas/critica_visual_v4.md`; prioridad: portada que quepa en la primera pantalla del iPhone, mini-cuadro del
    torneo en celular, cuadro entre 1160 y 1400 px) ∥ crítica funcional (página en vivo + `vivo.py` + `en_juego.py`)
-   → corrección funcional y verificación final. Si se cortó: relanzar con `resumeFromRunId` (el id está en la
-   bitácora) o sólo las etapas que falten.
+   → corrección funcional y verificación final. Lanzado el 11-nov 03:25 UTC: tarea `wzhgapr03`, corrida
+   `wf_0172a560-1c9`. Si se cortó: `Workflow({scriptPath: "/home/user/SA/ligamx/notas/workflows/06_correcciones.js",
+   resumeFromRunId: "wf_0172a560-1c9"})` (los agentes terminados salen de caché; cada agente revisa `git status`
+   y continúa lo que haya quedado a medias). Capturas finales en el scratchpad de la sesión, carpeta `final/`.
 2. [ ] Revisar capturas finales (WebKit iPhone y escritorio), `python3 -m pytest modelo/pruebas produccion/pruebas -q`,
    `node web/pruebas/prueba.js chromium` y `webkit`.
 3. [ ] `python3 pipeline.py auto`, republicar (con `url` y capabilities), `python3 pipeline.py publicado`, volver a
