@@ -542,7 +542,8 @@ def test_series_de_liguilla_al_momento(par):
     p = doc["partidos"][0]
     assert p["fase"] == "cuartos" and p["etiqueta"] == "Cuartos de final, vuelta"
     assert p["serie"] == {"llave": "C1", "mejor": "Cruz Azul", "peor": "Tijuana", "global_mejor": 1, "global_peor": 1,
-                          "p_avanza_mejor": s["p_avanza_mejor"], "p_avanza_peor": s["p_avanza_peor"]}
+                          "p_avanza_mejor": s["p_avanza_mejor"], "p_avanza_peor": s["p_avanza_peor"],
+                          "fase": "cuartos", "decidida": False, "ganador": None}
     # el mismo estado en una final vale menos: hay tiempos extra y penales
     sf = motor("final").documento([_cruda(9002, "Cruz Azul", "Tijuana", "en_juego", 70, 1, 0)], ahora)["series"][0]
     assert sf["p_avanza_mejor"] < s["p_avanza_mejor"]
@@ -800,6 +801,147 @@ def test_observar_de_corrido(df, par, tmp_path):
     assert vivo.observar(None, m2, tmp_path / "v2.json", tmp_path / "e2.jsonl", tmp_path / "c2.lock", dormir=g2.dormir, reloj=g2.reloj) == 0
     assert vivo.leer_eventos(tmp_path / "e2.jsonl") == []
     assert json.loads((tmp_path / "v2.json").read_text(encoding="utf-8"))["estado"] == "sin_partidos"
+
+
+class GuionHostil(Guion):
+    """Como Guion, pero un paso puede ser "vacio" (ESPN responde `events: []`) o "ilegible" (evento sin equipos)."""
+
+    def pedir(self, url):
+        self.pedidos += 1
+        r = self.pasos[min(self.i, len(self.pasos) - 1)][1]
+        if isinstance(r, Exception):
+            raise r
+        if not url.endswith("20261107") or r == "vacio":
+            return {"events": []}
+        if r == "ilegible":
+            return {"events": [{"id": str(ID_PUMAS_AMERICA), "date": "2026-11-08T03:10Z", "competitions": [{}]}]}
+        return {"events": [r]}
+
+
+def _motor_pumas_america(df, par, g):
+    corte = pd.Timestamp("2026-11-08T03:00:00Z")
+    return vivo.Motor(n_sim=400, n_muestras=40, pron=Pronosticador(corte=corte, partidos=df), df=df, corte=corte.to_pydatetime(),
+                      sellos={}, parametros=par, pedir=g.pedir)
+
+
+def test_observar_no_cree_una_respuesta_vacia_a_medio_partido(df, par, tmp_path):
+    """H01: una respuesta vacía o ilegible de ESPN a medio partido no es «hoy no hay partidos»: ni se escribe ni se termina."""
+    ev = evento("20261107", ID_PUMAS_AMERICA)
+    pasos = [("2026-11-08T03:00:00Z", rebobinar(ev, estado="pre")),
+             ("2026-11-08T03:13:30Z", rebobinar(ev, 3)),                        # 0-1
+             ("2026-11-08T03:14:00Z", "vacio"),
+             ("2026-11-08T03:14:30Z", "ilegible"),
+             ("2026-11-08T03:40:00Z", rebobinar(ev, 30)),                       # 1-1
+             ("2026-11-08T05:10:00Z", ev), ("2026-11-08T05:16:00Z", ev), ("2026-11-08T05:21:00Z", ev)]
+    g = GuionHostil(pasos)
+    salida, ruta, candado = tmp_path / "vivo.json", tmp_path / "eventos.jsonl", tmp_path / "observar.lock"
+    escritos, original = [], vivo.escribir_json
+
+    def espia(doc, r):
+        escritos.append((doc["estado"], len(doc["partidos"])))
+        return original(doc, r)
+
+    vivo.escribir_json = espia
+    try:
+        cod = vivo.observar(None, _motor_pumas_america(df, par, g), salida, ruta, candado, dormir=g.dormir, reloj=g.reloj, max_ciclos=40)
+    finally:
+        vivo.escribir_json = original
+    assert cod == 0 and g.i == len(pasos) - 1                      # siguió hasta 10 minutos después del final
+    assert all(n == 1 and e != "sin_partidos" for e, n in escritos) and len(escritos) == len(pasos) - 2
+    assert [e["tipo"] for e in vivo.leer_eventos(ruta)] == ["inicio", "gol", "gol", "gol", "gol", "final"]
+    assert json.loads(salida.read_text(encoding="utf-8"))["estado"] == "terminado_hoy"
+    # si ESPN de verdad retira un partido que no había empezado, se le cree tras CONFIRMAR_MENOS consultas seguidas
+    g2 = GuionHostil([("2026-11-08T02:00:00Z", rebobinar(ev, estado="pre"))] + [("2026-11-08T02:01:00Z", "vacio")] * 12)
+    cod = vivo.observar(None, _motor_pumas_america(df, par, g2), tmp_path / "v2.json", tmp_path / "e2.jsonl", tmp_path / "c2.lock",
+                        dormir=g2.dormir, reloj=g2.reloj, max_ciclos=40)
+    assert cod == 0 and g2.i == vivo.CONFIRMAR_MENOS + 1           # 1 buena + 5 rechazadas + la que se acepta + la que confirma
+    assert json.loads((tmp_path / "v2.json").read_text(encoding="utf-8"))["estado"] == "sin_partidos"
+
+
+def test_observar_relanzado_avisa_aunque_alguien_haya_pisado_el_documento(df, par, tmp_path):
+    """H13: si entre la muerte de `observar` y su relanzamiento corrió `una-vez`, el primer ciclo saca un «refresco»."""
+    ev = evento("20261107", ID_PUMAS_AMERICA)
+    g = GuionHostil([("2026-11-08T03:00:00Z", rebobinar(ev, estado="pre")), ("2026-11-08T03:13:30Z", rebobinar(ev, 3)),
+                     ("2026-11-08T03:40:00Z", rebobinar(ev, 30))])
+    salida, ruta, candado = tmp_path / "vivo.json", tmp_path / "eventos.jsonl", tmp_path / "observar.lock"
+    motor = _motor_pumas_america(df, par, g)
+    assert vivo.observar(None, motor, salida, ruta, candado, dormir=g.dormir, reloj=g.reloj, max_ciclos=2) == 0
+    assert [e["tipo"] for e in vivo.leer_eventos(ruta)] == ["inicio", "gol"]
+    g.i = 2                                                        # el observador murió; el partido siguió hasta el 30' (1-1)
+    vivo.una_vez(motor, ahora=g.reloj(), salida=salida, bitacora=vivo.Bitacora(ruta))     # `una-vez` ya dejó el 1-1 en vivo.json
+    assert json.loads(salida.read_text(encoding="utf-8"))["partidos"][0]["gl"] == 1
+    assert vivo.observar(None, motor, salida, ruta, candado, dormir=g.dormir, reloj=g.reloj, max_ciclos=1) == 0
+    evs = vivo.leer_eventos(ruta)
+    assert [e["tipo"] for e in evs] == ["inicio", "gol", "refresco"] and "Pumas 1-1 América" in evs[-1]["texto"]
+    doc = json.loads(salida.read_text(encoding="utf-8"))
+    # con algo en juego el documento caduca: MIN_REFRESCO + MIN_VENCE minutos después de generado
+    assert vivo.de_iso(doc["vence_utc"]) - vivo.de_iso(doc["generado_utc"]) == dt.timedelta(minutes=vivo.MIN_REFRESCO + vivo.MIN_VENCE)
+
+
+def test_esperar_agrupa_lo_que_no_urge_y_detecta_al_observador_colgado(tmp_path):
+    """H03 y H12: un descanso espera un poco por si llega otro evento; un gol no; y un latido viejo es código 5."""
+    import time as _t
+    ruta, candado = tmp_path / "eventos.jsonl", tmp_path / "observar.lock"
+    bit = vivo.Bitacora(ruta)
+    ahora = dt.datetime(2026, 11, 22, 1, 0, tzinfo=UTC)
+    f = vivo._candado(candado)
+    try:
+        vivo._latido(f, {"pid": 1, "latido": _t.time()})
+        bit.anotar([{"tipo": "descanso", "partido_id": 1, "texto": "Descanso: A 0-0 B"}], ahora)
+        out, t0 = io.StringIO(), _t.monotonic()
+        assert vivo.esperar(0, 5, ruta, candado, pausa=0.05, salida=out, agrupar=0.4) == 0 and _t.monotonic() - t0 >= 0.4
+        assert json.loads(out.getvalue())["tipos"] == ["descanso"]
+        bit.anotar([{"tipo": "gol", "partido_id": 2, "texto": "Gol de C"}], ahora)
+        out, t0 = io.StringIO(), _t.monotonic()
+        assert vivo.esperar(0, 5, ruta, candado, pausa=0.05, salida=out, agrupar=30) == 0 and _t.monotonic() - t0 < 2
+        d = json.loads(out.getvalue())
+        assert (d["n"], d["pendientes"], d["ultimo_n"], d["tipos"]) == (1, 1, 2, ["descanso", "gol"])
+        # sin eventos nuevos, candado tomado y latido viejo: colgado
+        vivo._latido(f, {"pid": 4321, "latido": _t.time() - 1000})
+        out = io.StringIO()
+        assert vivo.esperar(2, 5, ruta, candado, pausa=0.05, salida=out) == 5
+        d = json.loads(out.getvalue())
+        assert d["colgado"] is True and d["pid"] == 4321 and d["segundos_sin_latido"] >= 1000
+        vivo._latido(f, {"pid": 4321, "latido": _t.time()})                           # con latido reciente sólo se agota
+        assert vivo.esperar(2, 0.2, ruta, candado, pausa=0.05, salida=io.StringIO()) == 4
+    finally:
+        f.close()
+
+
+def test_tiempo_extra_sin_jugada_tanda_y_reloj_atrasado(par):
+    """H09 y H20: el gol del tiempo extra sin jugada publicada no cuenta a 90'; la tanda decide; «45'+3'» en el 2T es el 46'."""
+    def motor(fase):
+        actual = {"meta": {"torneo": TORNEO}, "tabla": [], "pendientes": [],
+                  "proyeccion": {"n_sim": 20000, "regular_completa": True, "tabla_final": [], "campeon": [{"equipo": "Cruz Azul", "prob": 0.3}]},
+                  "liguilla": {"torneo": {"rondas": [{"fase": fase, "series": [_serie(fase)]}]}}}
+        sello = {9002: {"id": 9002, "sellado_utc": "2026-11-28T07:20:00+00:00", "fecha_utc": "2026-11-29T01:00:00+00:00", "fase": fase,
+                        "pierna": 2, "lam_l": 2.0, "lam_v": 0.9, "rho": 0.0, "p_l": 0.64, "p_e": 0.2, "p_v": 0.16,
+                        "marcador": {"gl": 2, "gv": 0, "prob": 0.1}}}
+        return vivo.Motor(actual=actual, sellos=sello, parametros=par, proyectar=False)
+
+    ahora = dt.datetime(2026, 11, 29, 3, 0, tzinfo=UTC)
+    m = motor("final")                                             # ida 1-0 Tijuana; vuelta 1-0 Cruz Azul a los 90': global 1-1
+    m.documento([_cruda(9002, "Cruz Azul", "Tijuana", "en_juego", 90, 1, 0)], ahora)
+    c = _cruda(9002, "Cruz Azul", "Tijuana", "en_juego", 100, 1, 0, periodo=3)
+    c["gl"] = 2                                                    # ESPN ya movió el marcador a 2-0 y todavía no publica la jugada
+    doc = m.documento([c], ahora)
+    p, s = doc["partidos"][0], doc["series"][0]
+    assert (p["gl"], p["gv"]) == (2, 0) and p["vivo"]["p_local"] == 1.0 and p["vivo"]["marcador_final"]["gl"] == 1   # a 90' fue 1-0
+    assert (p["gl90"], p["gv90"]) == (1, 0)
+    assert 0.5 < s["p_avanza_mejor"] < 1.0 and s["decidida"] is False            # va ganando el tiempo extra, pero no está decidido
+    # final tras penales y ESPN todavía sin `winner`: la tanda (3-4) dice quién ganó
+    c = _cruda(9002, "Cruz Azul", "Tijuana", "final", 120, 1, 0, periodo=5)
+    c.update(tanda_l=3, tanda_v=4)
+    s = motor("final").documento([c], ahora)["series"][0]
+    assert (s["decidida"], s["ganador"], s["p_avanza_mejor"]) == (True, "Tijuana", 0.0)
+    # segundo tiempo con el reloj atrasado del primero
+    c = _cruda(9002, "Cruz Azul", "Tijuana", "en_juego", 45, 1, 1, periodo=2)
+    c["anadido"] = 3
+    doc = motor("cuartos").documento([c], ahora)
+    p = doc["partidos"][0]
+    assert (p["periodo"], p["minuto"], p["anadido"]) == (2, 46, None) and p["vivo"]["goles_restantes_l"] > 0.8
+    assert doc["vence_utc"] == vivo.iso(ahora + dt.timedelta(minutes=vivo.MIN_REFRESCO + vivo.MIN_VENCE))
+    assert motor("cuartos").documento([], ahora)["vence_utc"] is None
 
 
 def test_guion_de_partido_es_coherente(df):

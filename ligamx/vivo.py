@@ -65,7 +65,13 @@ SEG_ACTIVO = 20                  # cada cuánto se consulta con partido en juego
 SEG_REPOSO = 120
 MIN_ANTES = 15
 MIN_TRAS_FINAL = 10              # `observar` termina cuando todos llevan 10 minutos finalizados
-MIN_REFRESCO = 15                # evento «refresco» si hay partido en juego y nada que avisar
+MIN_REFRESCO = 25                # evento «refresco» (latido) si hay partido en juego y nada que avisar en ese rato
+MIN_VENCE = 12                   # margen sobre el refresco: pasado `vence_utc` la página deja de decir «en vivo»
+CONFIRMAR_MENOS = 6              # consultas seguidas para creerle a ESPN que un partido de hoy ya no está en la lista
+CONFIRMAR_MENOS_ACTIVO = 45      # lo mismo si el que falta estaba en juego (unos 15 minutos)
+SEG_LATIDO_VIEJO = 420           # `esperar`: con el candado tomado y el latido más viejo que esto, `observar` está colgado
+SEG_AGRUPAR = 40                 # `esperar`: un evento que no es gol ni roja espera esto por si llega otro (un solo aviso)
+TIPOS_URGENTES = ("gol", "gol_anulado", "roja")
 RUIDO_DELTA = 0.01               # por debajo de esto un cambio de la proyección puede ser ruido de simulación
 ESTADOS_ACTIVOS = ("en_juego", "descanso")
 NOMBRE_FASE = {"cuartos": "Cuartos de final", "semifinal": "Semifinal", "final": "Final", "repechaje": "Repechaje"}
@@ -451,6 +457,8 @@ class Motor:
         self.pron_fijo, self.df_fijo, self.corte = pron, df, corte
         self.actual_fijo, self.sellos_fijos, self.par = actual, sellos, parametros
         self.pedir = pedir
+        # sólo el motor de producción (todo por omisión) reajusta los parámetros en juego, y sólo desde `una_vez`
+        self.reajustar = pron is None and df is None and actual is None and sellos is None and parametros is None and pedir is None
         self._base: dict | None = None
         self._ctx: tuple | None = None
         self.memoria: dict[int, dict] = {}                       # por partido: cuándo se vio el descanso, el final...
@@ -459,7 +467,7 @@ class Motor:
     def parametros(self):
         if self.par is None:
             from produccion import en_juego as EJ
-            self.par = EJ.leer_parametros()
+            self.par = EJ.leer_parametros(actualizar=False) or EJ.leer_parametros()   # el reajuste es cosa de `pipeline.py auto`
             if self.par is None:
                 raise RuntimeError("no hay parámetros del modelo en juego (python3 -m produccion.en_juego ajustar)")
         return self.par
@@ -616,6 +624,9 @@ class Motor:
         else:
             estado = "terminado_hoy"
         doc = {"version": VERSION, "generado_utc": iso(ahora), "dia": str(hoy), "estado": estado, "partidos": partidos}
+        # con algo en juego el motor vuelve a escribir, como muy tarde, en MIN_REFRESCO minutos: pasado `vence_utc` la
+        # página deja de presentarlo como «en vivo» (se cortó el flujo). Sin nada en juego no caduca.
+        doc["vence_utc"] = iso(ahora + dt.timedelta(minutes=MIN_REFRESCO + MIN_VENCE)) if activos else None
         if prueba:
             doc["prueba"] = True
         # tabla, proyección y series: cada bloque aislado (si uno falla, el documento sale con lo previo y un aviso)
@@ -647,7 +658,8 @@ class Motor:
             s = por_llave.get(p["id"])
             p["serie"] = None if s is None else {
                 "llave": s["llave"], "mejor": s["mejor"]["equipo"], "peor": s["peor"]["equipo"], "global_mejor": s["global_mejor"],
-                "global_peor": s["global_peor"], "p_avanza_mejor": s["p_avanza_mejor"], "p_avanza_peor": s["p_avanza_peor"]}
+                "global_peor": s["global_peor"], "p_avanza_mejor": s["p_avanza_mejor"], "p_avanza_peor": s["p_avanza_peor"],
+                "fase": s["fase"], "decidida": s["decidida"], "ganador": s["ganador"]}
             p.pop("_cruda", None)
         doc["ultimo_evento"] = ultimo_evento
         doc["siguiente"] = self._siguiente(ctx, partidos, t_juego)
@@ -681,6 +693,8 @@ class Motor:
             periodo = max(periodo, 1)
             if minuto is None:
                 minuto = {1: 1, 2: 46, 3: 91, 4: 106}.get(periodo, 120)
+            elif periodo == 2 and minuto <= 45:                    # ya es el segundo tiempo y el reloj sigue en «45'+3'»
+                minuto, anadido = 46, None
             seg = c.get("segundos")
             dentro = (seg % 60.0) if (seg and seg > 0) else 30.0  # segundos ya corridos del minuto que marca el reloj
             reloj = iso(ahora - dt.timedelta(seconds=dentro))
@@ -710,10 +724,17 @@ class Motor:
             eventos, rl, rv = [], 0, 0
         # marcador a 90 minutos (el que cuenta para el pronóstico y la tabla): ESPN suma los goles del tiempo extra
         if gl is not None and periodo and periodo >= 3:
-            extra = [(a, b)[k] - g90[k] for k in (0, 1)] if (a, b) == (gl, gv) else [0, 0]
+            if (a, b) == (gl, gv):                                 # todas las jugadas publicadas: mandan sus minutos
+                extra = [(a, b)[k] - g90[k] for k in (0, 1)]
+            elif mem.get("g90"):                                   # ESPN movió el marcador sin publicar la jugada: es del tiempo extra
+                extra = [max(0, gl - mem["g90"][0]), max(0, gv - mem["g90"][1])]
+            else:
+                extra = [0, 0]
             gl90, gv90 = gl - extra[0], gv - extra[1]
         else:
             gl90, gv90, extra = gl, gv, [0, 0]
+            if gl is not None and estado in ESTADOS_ACTIVOS:
+                mem["g90"] = (gl, gv)                              # mientras no haya tiempo extra, éste es el marcador a 90 minutos
         previo = info.get("previo")
         if previo is None and self.proyectar and estado in ("en_juego", "descanso", "final"):
             try:                                                   # sin sello: el pronóstico del modelo congelado
@@ -757,12 +778,14 @@ class Motor:
              "vivo": vivo, "serie": None}
         if previo is not None and previo.get("origen") != "sello":
             p["previo"]["origen"] = previo.get("origen")
+        if gl is not None and (periodo or 0) >= 3:                 # con tiempo extra: el marcador a 90' (el del pronóstico)
+            p["gl90"], p["gv90"] = gl90, gv90
         if c.get("tanda_l") is not None and c.get("tanda_v") is not None and (periodo or 0) >= 5:
             p["penales"] = {"l": c["tanda_l"], "v": c["tanda_v"]}
         # lo que necesitan la tabla, la simulación y las series (no sale en el documento)
         p["_cruda"] = {"gl90": gl90, "gv90": gv90, "extra": extra, "rest": rest, "previo": previo, "pierna": pierna,
                        "fair": [sum(fair[0].values()), sum(fair[1].values())], "gana": c.get("gana"),
-                       "segundos": c.get("segundos"), "rojas": (rl, rv)}
+                       "segundos": c.get("segundos"), "rojas": (rl, rv), "tanda": (c.get("tanda_l"), c.get("tanda_v"))}
         return p
 
     def _tabla(self, ctx: dict, partidos: list[dict], tocados: list[dict], ahora: dt.datetime) -> tuple[list[dict], str]:
@@ -963,6 +986,10 @@ class Motor:
                     ganador = mejor                                # global empatado: avanza el mejor sembrado
                 elif c.get("gana"):
                     ganador = fin_hoy["local"] if c["gana"] == "local" else fin_hoy["visitante"]
+                elif gm != gp and sum(c.get("extra") or [0, 0]) > 0:
+                    ganador = mejor if gm > gp else peor           # lo decidió un gol del tiempo extra (el global ya lo incluye)
+                elif None not in (c.get("tanda") or (None, None)) and c["tanda"][0] != c["tanda"][1]:
+                    ganador = fin_hoy["local"] if c["tanda"][0] > c["tanda"][1] else fin_hoy["visitante"]
                 else:
                     decidida = False                               # ESPN aún no dice quién ganó el tiempo extra o los penales
                 if ganador is not None:
@@ -1219,6 +1246,12 @@ def una_vez(motor: Motor | None = None, ahora: dt.datetime | None = None, salida
     doc = motor.documento(crudas, ahora, ultimo_evento=ult, avisos=avisos)
     if salida is not None:
         escribir_json(doc, salida)
+    if motor.reajustar and doc["estado"] not in ESTADOS_ACTIVOS:   # nunca a medio partido: `observar` no reajusta
+        try:
+            from produccion import en_juego as EJ
+            EJ.leer_parametros()                                   # reajusta sólo si cambiaron los datos (firma por contenido)
+        except Exception as e:
+            log(f"aviso: no se revisaron los parámetros en juego: {type(e).__name__}: {e}")
     return doc
 
 
@@ -1226,12 +1259,15 @@ def _candado(ruta: Path = RUTA_CANDADO):
     """Candado exclusivo de `observar` (None si ya hay otro corriendo). Se suelta al cerrar el archivo o morir el proceso."""
     ruta.parent.mkdir(parents=True, exist_ok=True)
     f = open(ruta, "a+", encoding="utf-8")
-    try:
-        fcntl.flock(f, fcntl.LOCK_EX | fcntl.LOCK_NB)
-    except OSError:
-        f.close()
-        return None
-    return f
+    for intento in range(4):                                       # `esperar` y `estado` lo prueban un instante con LOCK_SH
+        try:
+            fcntl.flock(f, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            return f
+        except OSError:
+            if intento < 3:
+                time.sleep(0.15)
+    f.close()
+    return None
 
 
 def observador_activo(ruta: Path = RUTA_CANDADO) -> bool:
@@ -1283,7 +1319,9 @@ def observar(hasta: dt.datetime | None = None, motor: Motor | None = None, salid
         if viejo and not viejo.get("prueba") and viejo.get("dia") == str(dia0):
             previos = {p["id"]: p for p in viejo.get("partidos") or []}
         t_final: dict[int, dt.datetime] = {}
-        fallos, ciclos, primero = 0, 0, not previos
+        # `primero`: al arrancar (o relanzar a medio partido) siempre sale un «refresco» si hay algo en juego y nada
+        # que avisar, para que la sesión copie el estado aunque alguien haya pisado vivo.json mientras tanto
+        fallos, ciclos, primero, menos, vacios = 0, 0, True, 0, 0
         log(f"observar: día {dia0}, eventos desde el número {bit.n + 1}" + (f", hasta {iso(hasta)}" if hasta else ""))
         while True:
             ahora = reloj()
@@ -1296,6 +1334,18 @@ def observar(hasta: dt.datetime | None = None, motor: Motor | None = None, salid
             espera = SEG_REPOSO
             try:
                 crudas, avisos = leer_hoy(ahora, motor.pedir)
+                # una respuesta con menos partidos que la anterior (lista vacía, evento ilegible) es casi siempre un
+                # tropiezo de ESPN: no se escribe ni se da por cierta hasta que se repite varias consultas seguidas
+                faltan = [a for i, a in previos.items() if i not in {c["id"] for c in crudas}]
+                if faltan:
+                    menos += 1
+                    tope = CONFIRMAR_MENOS_ACTIVO if any(a.get("estado") in ESTADOS_ACTIVOS for a in faltan) else CONFIRMAR_MENOS
+                    if menos < tope:
+                        raise ErrorRed(f"ESPN devolvió {len(crudas)} partidos de hoy y antes había {len(previos)} "
+                                       f"(falta {', '.join(str(a.get('local')) + '-' + str(a.get('visitante')) for a in faltan)}; "
+                                       f"consulta {menos} de {tope} antes de creerlo)")
+                    log(f"observar: ESPN ya no lista {len(faltan)} partido(s) de hoy tras {menos} consultas; se acepta")
+                menos = 0
                 doc = motor.documento(crudas, ahora, ultimo_evento=bit.ultimo_del_dia(dia0), avisos=avisos)
                 evs = detectar_eventos(previos, doc["partidos"])
                 activos = [p for p in doc["partidos"] if p["estado"] in ESTADOS_ACTIVOS]
@@ -1321,10 +1371,15 @@ def observar(hasta: dt.datetime | None = None, motor: Motor | None = None, salid
                     else:
                         t_final.pop(p["id"], None)
                 _latido(candado, {"pid": os.getpid(), "inicio_utc": iso(inicio), "ultimo_ciclo_utc": iso(ahora),
-                                  "estado": doc["estado"], "partidos": len(doc["partidos"]), "ultimo_evento_n": bit.n})
+                                  "latido": time.time(), "estado": doc["estado"], "partidos": len(doc["partidos"]),
+                                  "ultimo_evento_n": bit.n})
                 if not doc["partidos"]:
-                    log("observar: hoy no hay partidos; termina")
-                    return 0
+                    vacios += 1
+                    if vacios >= 2:                                # dos consultas seguidas sin partidos: se le cree
+                        log("observar: hoy no hay partidos; termina")
+                        return 0
+                    raise ErrorRed("ESPN dice que hoy no hay partidos; se confirma en la siguiente consulta")
+                vacios = 0
                 if all(p["id"] in t_final and (ahora - t_final[p["id"]]) >= dt.timedelta(minutes=MIN_TRAS_FINAL)
                        for p in doc["partidos"]):
                     log("observar: todos los partidos de hoy llevan 10 minutos finalizados; termina")
@@ -1342,6 +1397,9 @@ def observar(hasta: dt.datetime | None = None, motor: Motor | None = None, salid
                 espera = min(SEG_REPOSO, SEG_ACTIVO * fallos)
                 log(f"observar: error {type(e).__name__}: {e}; reintento en {espera} s")
                 traceback.print_exc()
+            if fallos:                                             # el latido dice que el proceso sigue vivo aunque ESPN falle
+                _latido(candado, {"pid": os.getpid(), "inicio_utc": iso(inicio), "ultimo_ciclo_utc": None, "latido": time.time(),
+                                  "fallos": fallos, "ultimo_evento_n": bit.n})
             ciclos += 1
             if max_ciclos is not None and ciclos >= max_ciclos:
                 return 0
@@ -1355,32 +1413,62 @@ def observar(hasta: dt.datetime | None = None, motor: Motor | None = None, salid
             candado.close()
 
 
+def _latido_viejo(ruta_candado: Path, limite: float = SEG_LATIDO_VIEJO) -> dict | None:
+    """Latido de `observar` si tiene más de `limite` segundos (proceso colgado); None si es reciente o no se puede saber."""
+    try:
+        d = json.loads(Path(ruta_candado).read_text(encoding="utf-8") or "null")
+        t = float(d["latido"])
+    except (OSError, ValueError, TypeError, KeyError):
+        return None
+    return d if time.time() - t > limite else None
+
+
 def esperar(desde: int, max_seg: float = 6600.0, ruta_eventos: Path = RUTA_EVENTOS, ruta_candado: Path = RUTA_CANDADO,
-            pausa: float = 2.0, salida=None) -> int:
+            pausa: float = 2.0, salida=None, agrupar: float = SEG_AGRUPAR, limite_latido: float = SEG_LATIDO_VIEJO) -> int:
     """
     Sale con 0 imprimiendo en UNA línea el primer evento con número > `desde` (más `pendientes`: cuántos
-    eventos más hay después de ése, y `ultimo_n`); con 3 si `observar` ya no corre y no hay más eventos;
-    con 4 si se agotó `max_seg`.
+    eventos más hay después de ése, `ultimo_n` y `tipos`); con 3 si `observar` ya no corre y no hay más
+    eventos; con 4 si se agotó `max_seg`; con 5 si `observar` tiene el candado pero su latido es viejo
+    (colgado: hay que matarlo y relanzarlo). Un gol, un gol anulado o una roja salen de inmediato; con
+    cualquier otro evento espera `agrupar` segundos por si llega otro (así dos descansos o dos finales
+    casi simultáneos son un solo aviso).
     """
     salida = salida or sys.stdout
     t0 = time.monotonic()
+    t_primero = None
 
     def nuevos():
         return [e for e in leer_eventos(ruta_eventos) if e["n"] > desde]
 
+    def entregar(evs):
+        print(json.dumps({**evs[0], "pendientes": len(evs) - 1, "ultimo_n": evs[-1]["n"], "tipos": [e.get("tipo") for e in evs]},
+                         ensure_ascii=False, separators=(",", ":")), file=salida, flush=True)
+        return 0
+
     while True:
         evs = nuevos()
-        if not evs and not observador_activo(ruta_candado):
+        activo = observador_activo(ruta_candado)
+        if not evs and not activo:
             evs = nuevos()                                        # pudo anotar justo antes de terminar
             if not evs:
                 ult = max((e["n"] for e in leer_eventos(ruta_eventos)), default=0)
                 print(json.dumps({"terminado": True, "desde": desde, "ultimo_n": ult}, ensure_ascii=False), file=salida, flush=True)
                 return 3
         if evs:
-            print(json.dumps({**evs[0], "pendientes": len(evs) - 1, "ultimo_n": evs[-1]["n"]}, ensure_ascii=False,
-                             separators=(",", ":")), file=salida, flush=True)
-            return 0
+            t_primero = t_primero if t_primero is not None else time.monotonic()
+            if (not activo or any(e.get("tipo") in TIPOS_URGENTES for e in evs)
+                    or time.monotonic() - t_primero >= agrupar):
+                return entregar(evs)
+        elif activo:
+            viejo = _latido_viejo(ruta_candado, limite_latido)
+            if viejo is not None:
+                print(json.dumps({"colgado": True, "desde": desde, "pid": viejo.get("pid"),
+                                  "segundos_sin_latido": round(time.time() - float(viejo["latido"]))}, ensure_ascii=False),
+                      file=salida, flush=True)
+                return 5
         if time.monotonic() - t0 >= max_seg:
+            if evs:
+                return entregar(evs)
             print(json.dumps({"agotado": True, "desde": desde, "segundos": round(time.monotonic() - t0)}, ensure_ascii=False),
                   file=salida, flush=True)
             return 4
@@ -1564,9 +1652,12 @@ def estado() -> dict:
         pass
     evs = leer_eventos()
     doc = leer_json(RUTA_VIVO) or {}
-    return {"observar_activo": observador_activo(), "latido": latido, "eventos": len(evs),
+    activo = observador_activo()
+    return {"observar_activo": activo, "observar_colgado": bool(activo and _latido_viejo(RUTA_CANDADO)), "latido": latido,
+            "eventos": len(evs),
             "ultimo_n": max((e["n"] for e in evs), default=0), "ultimo_evento": evs[-1] if evs else None,
-            "vivo": {"generado_utc": doc.get("generado_utc"), "estado": doc.get("estado"), "partidos": len(doc.get("partidos") or [])}}
+            "vivo": {"generado_utc": doc.get("generado_utc"), "vence_utc": doc.get("vence_utc"), "estado": doc.get("estado"),
+                     "partidos": len(doc.get("partidos") or [])}}
 
 
 def _resumen(doc: dict, peso: int | None = None) -> dict:
@@ -1591,6 +1682,7 @@ def main(argv=None) -> int:
     s = sub.add_parser("esperar", help="espera al siguiente evento")
     s.add_argument("--desde", type=int, required=True)
     s.add_argument("--max-seg", type=float, default=6600.0)
+    s.add_argument("--agrupar", type=float, default=SEG_AGRUPAR, help="segundos que espera un evento que no es gol ni roja por si llega otro")
     s.add_argument("--eventos", default=str(RUTA_EVENTOS), help="archivo de eventos (el de una repetición: <salida>_eventos.jsonl)")
     s.add_argument("--candado", default=str(RUTA_CANDADO), help="candado del proceso que los anota (repetición: <salida>.lock)")
     s = sub.add_parser("repetir", help="reproduce un partido ya jugado")
@@ -1624,7 +1716,7 @@ def main(argv=None) -> int:
             ap.error("--hasta debe ser AAAA-MM-DDTHH:MM")
         return observar(hasta, Motor(n_sim=a.n_sim, proyectar=not a.sin_proyeccion))
     if a.cmd == "esperar":
-        return esperar(a.desde, a.max_seg, Path(a.eventos), Path(a.candado))
+        return esperar(a.desde, a.max_seg, Path(a.eventos), Path(a.candado), agrupar=a.agrupar)
     if a.cmd == "repetir":
         r = repetir(a.id, a.velocidad, Path(a.salida), n_sim=a.n_sim, proyectar=not a.sin_proyeccion)
         r["ultimo"] = _resumen(r["ultimo"])

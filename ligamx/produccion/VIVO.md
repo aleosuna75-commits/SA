@@ -2,7 +2,7 @@
 
 Qué hay: `vivo.py` (consulta ESPN, arma el documento en vivo y avisa de cada evento), `produccion/en_juego.py`
 (modelo en juego), el parámetro `en_juego` de `produccion/simulador.py`, el campo `vivo` de `salidas/actual.json`
-y las pruebas `produccion/pruebas/test_vivo.py` (22, sin red). Contrato del documento: `salidas/CONTRATO.md`
+y las pruebas `produccion/pruebas/test_vivo.py` (26, sin red). Contrato del documento: `salidas/CONTRATO.md`
 («Documento en vivo»); ejemplo: `salidas/vivo_ejemplo.json`.
 
 ## 1. Cómo funciona
@@ -141,18 +141,28 @@ simula esos partidos como marcador actual + Poisson(lo que falta). Detalles que 
 | comando | qué hace |
 |---|---|
 | `python3 vivo.py una-vez` | una consulta; escribe `salidas/vivo.json` e imprime un resumen. Código 1 si ESPN no responde (no pisa el archivo) |
-| `python3 vivo.py observar [--hasta AAAA-MM-DDTHH:MM]` | bucle: cada 20 s con partido en juego o a menos de 15 min de uno; cada 120 s si no. Anota los eventos. Termina solo 10 minutos después del último final, si hoy no hay partidos, al cambiar el día (04:00) o al llegar `--hasta` (hora de México; con `Z`, UTC). Código 2 si ya hay otro corriendo |
-| `python3 vivo.py esperar --desde N [--max-seg 6600]` | imprime en UNA línea el primer evento con número > N (más `pendientes` y `ultimo_n`) y sale con 0; 3 si `observar` ya no corre y no hay más; 4 si se agotó el tiempo |
+| `python3 vivo.py observar [--hasta AAAA-MM-DDTHH:MM]` | bucle: cada 20 s con partido en juego o a menos de 15 min de uno; cada 120 s si no. Anota los eventos. Termina solo 10 minutos después del último final, si hoy no hay partidos (confirmado en dos consultas seguidas), al cambiar el día (04:00) o al llegar `--hasta` (hora de México; con `Z`, UTC). Código 2 si ya hay otro corriendo |
+| `python3 vivo.py esperar --desde N [--max-seg 6600] [--agrupar 40]` | imprime en UNA línea el primer evento con número > N (más `pendientes`, `ultimo_n` y `tipos`) y sale con 0. Un gol, un gol anulado o una roja salen de inmediato; cualquier otro evento espera `--agrupar` segundos por si llega otro (un solo aviso). 3 si `observar` ya no corre y no hay más; 4 si se agotó el tiempo; **5 si `observar` tiene el candado pero lleva más de 7 minutos sin latido (colgado)** |
 | `python3 vivo.py repetir <id> [--velocidad 60] [--salida salidas/vivo_prueba.json]` | reproduce un partido ya jugado (goles y rojas de los CSV) con el contexto de ese día; documentos con `"prueba": true` |
 | `python3 vivo.py plan [--horas 48]` · `python3 pipeline.py vivo-plan` | próximos inicios en UTC y hora de México |
-| `python3 vivo.py estado` | ¿corre `observar`?, último latido, último evento (`ultimo_n`) |
+| `python3 vivo.py estado` | ¿corre `observar`? (`observar_activo`), ¿está colgado? (`observar_colgado`), último latido, último evento (`ultimo_n`) y `vivo.vence_utc` |
 | `python3 -m produccion.en_juego ajustar` / `validar` / `curva` | parámetros, validación y curva del modelo en juego |
 
 Eventos (`tipo`): `inicio`, `gol`, `gol_anulado` (el marcador bajó o se corrigió), `roja`, `descanso`,
-`segundo_tiempo`, `tiempos_extra`, `penales`, `final`, `pospuesto` y `refresco` (cada 15 minutos si hay partido
-en juego y nada que avisar). Si ESPN no responde un rato, al volver salen de golpe y en orden todos los que se
-perdieron. Un partido que ya iba empezado cuando arrancó `observar` no «anuncia» lo que pasó antes: sale un
+`segundo_tiempo`, `tiempos_extra`, `penales`, `final`, `pospuesto` y `refresco` (el latido: sale si hay partido
+en juego y en 25 minutos no hubo nada que avisar, y siempre en el primer ciclo de un `observar` que arranca o se
+relanza con algo en juego). Si ESPN no responde un rato, al volver salen de golpe y en orden todos los que se
+perdieron. Un partido que ya iba empezado cuando arrancó `observar` no «anuncia» lo que pasó antes: sale el
 `refresco` con el estado.
+
+**Caducidad.** Cada documento con algo en juego lleva `vence_utc` = `generado_utc` + 37 minutos (25 del
+refresco + 12 de margen). Si el flujo se corta (sesión sin límite de uso, observador muerto, escritura
+rechazada), la página deja de decir «en vivo» sola al pasar esa hora: retira la franja, detiene el reloj y pone
+«Sin actualizar desde las HH:MM». No hace falta que nadie la «apague».
+
+**Respuestas raras de ESPN.** Si una consulta trae menos partidos de hoy que la anterior (lista vacía, evento
+ilegible), `observar` no la cree ni escribe nada: reintenta, y sólo la acepta si se repite 6 consultas seguidas
+(45 si el partido que falta estaba en juego). «Hoy no hay partidos» necesita dos consultas seguidas.
 
 `pipeline.py auto` corre `vivo.py una-vez` después de los pronósticos y **antes** de construir la página (para
 que ésta lleve el estado del día en `actual.json` → `vivo`); si ESPN no responde queda un aviso en
@@ -160,46 +170,101 @@ que ésta lleve el estado del día en `actual.json` → `vivo`); si ESPN no resp
 
 ## 6. Procedimiento de un día de partido
 
-Todo desde `/home/user/SA/ligamx`.
+Todo desde `/home/user/SA/ligamx`. Es el ÚNICO procedimiento (si otro archivo dice otra cosa, vale éste). Está
+hecho para gastar lo menos posible: la sesión sólo despierta cuando cambia algo que la página debe mostrar, y
+cada despertar es UNA llamada (`ArtifactData set`), sin leer el documento ni comentar nada.
 
-1. **Antes** (la tarea diaria de la 01:20 ya lo deja hecho): `python3 pipeline.py auto` sella los pronósticos y
-   deja `actual.json` y `vivo.json` al día. `python3 pipeline.py vivo-plan --horas 48` dice a qué hora empieza
-   cada partido y desde cuándo conviene observar (`observar_desde_utc`, 15 minutos antes).
-2. **Unos 20 minutos antes del primer partido**, lanzar el observador desligado de la terminal:
+**Cuánto cuesta.** Un partido son 4 avisos fijos (inicio, descanso, segundo tiempo, final) + ~3 goles + ~0.3
+rojas + 1 o 2 refrescos: de 8 a 10 despertares por partido aislado, menos si hay partidos simultáneos (comparten
+refrescos y se agrupan los avisos que no urgen). Una jornada de 9 partidos son unos 70-80 despertares repartidos
+en tres o cuatro días.
 
-       setsid nohup python3 vivo.py observar > salidas/vivo_observar.log 2>&1 &
-       python3 vivo.py estado          # observar_activo: true; anotar ultimo_n
+### 6.1 Antes (lo deja hecho la tarea diaria)
 
-   y copiar una primera vez `salidas/vivo.json` a la base del Artifact (colección `vivo`, documento `actual`;
-   con ArtifactData: acción `set` y `file_path=salidas/vivo.json`) para que la página muestre «previo».
-3. **Bucle de la sesión** (N = `ultimo_n` del paso 2):
+`python3 pipeline.py auto` sella los pronósticos y deja `actual.json` y `vivo.json` al día.
+`python3 pipeline.py vivo-plan --horas 48` dice a qué hora empieza cada partido (`observar_desde_utc`, 15
+minutos antes). Con eso la tarea diaria programa, con `send_later`, por cada **bloque** de partidos (los que
+empiezan con menos de 2 h 30 de diferencia entre sí):
 
-       python3 vivo.py esperar --desde N     # en segundo plano; despierta sola (hasta 110 minutos)
+- un despertar «armar» 20 minutos antes del primer inicio del bloque;
+- un despertar «vigilar» 60 minutos después de cada inicio (por si la sesión o el contenedor murieron);
+- un despertar «cierre» 2 h 30 después del último inicio del bloque.
 
-   - código **0**: pasó algo. Copiar `salidas/vivo.json` a `vivo/actual` (el archivo ya trae TODO lo ocurrido,
-     no hace falta atender los `pendientes` uno por uno), tomar N = `ultimo_n` de la línea impresa y volver a esperar.
-   - código **4**: no pasó nada en 110 minutos; volver a esperar con el mismo N.
-   - código **3**: `observar` ya no corre. `python3 vivo.py estado`: si `vivo.estado` es `terminado_hoy` (o
-     `sin_partidos`) ir al paso 4; si no (lo mató el entorno o se cayó), relanzarlo como en el paso 2 —retoma
-     desde el `vivo.json` que dejó, sin repetir ni perder avisos— y seguir esperando con el mismo N.
-4. **Cierre**: `python3 pipeline.py auto` (baja los resultados, califica los sellos, rehace tabla, liguilla y
-   campeón, y vuelve a correr `una-vez`); copiar el `vivo.json` final a `vivo/actual`; si
-   `salidas/ultimo_auto.json` dice `publicar: true`, republicar la página y `python3 pipeline.py publicado`;
-   commit y push.
+### 6.2 «Armar» (20 minutos antes del primer partido)
+
+    python3 vivo.py estado                      # si observar_activo es true y no está colgado, no relanzar
+    setsid nohup python3 vivo.py observar >> salidas/vivo_observar.log 2>&1 &
+    python3 vivo.py estado                      # observar_activo: true; anotar ultimo_n
+
+Escribir una primera vez el documento (ver 6.4) para que la página muestre «previo», y entrar al bucle.
+
+### 6.3 Bucle de la sesión (N = `ultimo_n`)
+
+    python3 vivo.py esperar --desde N           # Bash en segundo plano; despierta sola (hasta 110 minutos)
+
+| sale con | qué pasó | qué hacer |
+|---|---|---|
+| **0** | hay eventos (la línea trae `ultimo_n`, `pendientes` y `tipos`) | escribir el documento (6.4), N = `ultimo_n`, volver a esperar. El archivo ya trae TODO lo ocurrido: no se atienden los `pendientes` uno por uno |
+| **4** | nada en 110 minutos | volver a esperar con el mismo N |
+| **3** | `observar` ya no corre | `python3 vivo.py estado`: si `vivo.estado` es `terminado_hoy` o `sin_partidos`, ir al cierre (6.5). Si no (lo mató el entorno), relanzarlo como en 6.2 y seguir esperando con el mismo N: al arrancar saca un `refresco` con el estado, así que la página se pone al día aunque se haya perdido algo |
+| **5** | `observar` está colgado (la línea trae `pid`) | `kill <pid>` (si sigue vivo, `kill -9`), relanzar como en 6.2 y seguir esperando con el mismo N |
+
+### 6.4 Escribir el documento en la base del Artifact
+
+Una sola llamada, sin copiar ni leer nada antes (`salidas/vivo.json` se escribe de forma atómica: nunca se lee a medias):
+
+    ArtifactData  action=set  url=<la del Artifact>  collection=vivo  doc_id=actual
+                  file_path=/home/user/SA/ligamx/salidas/vivo.json  if_version=<V>
+
+- `<V>` es la `version` que devolvió la escritura anterior (está en el resultado de esa llamada; la primera del
+  día sale de `salidas/vivo_version.txt`). La herramienta la exige para un documento que ya existe.
+- **Si la rechaza** (la versión no coincide: otra sesión escribió, o el número guardado es viejo), el resultado
+  dice cuál es la versión actual: repetir la MISMA llamada una vez con ese número. No hace falta leer el
+  documento: este proceso es el único que escribe en `vivo/actual`.
+- Al terminar el día (6.5), guardar la última versión en `salidas/vivo_version.txt`. Si ese archivo se pierde o
+  queda viejo sólo cuesta un reintento.
+- Si la escritura falla dos veces seguidas, no insistir en bucle: seguir esperando; el siguiente evento lo
+  vuelve a intentar y, mientras tanto, la página se marca sola como «sin actualizar» al pasar `vence_utc`.
+
+### 6.5 «Vigilar» y «cierre»
+
+- **Vigilar** (despertar programado): `python3 vivo.py estado`. Si `observar_activo` es false y hay partidos
+  por jugar o en juego, o `observar_colgado` es true → matar/relanzar (6.2). Si no hay un `esperar` corriendo
+  en esta sesión, escribir el documento (6.4) y volver al bucle (6.3) con N = `ultimo_n`. Si todo está bien,
+  no hacer nada más.
+- **Cierre**: si `vivo.estado` no es `terminado_hoy`, tratarlo como «vigilar» y reprogramar el cierre 30
+  minutos después. Si ya terminó: `python3 pipeline.py auto` (baja los resultados, califica los sellos, rehace
+  tabla, liguilla y campeón, y vuelve a correr `una-vez`); escribir PRIMERO `vivo/actual` con el `vivo.json`
+  final (6.4) y guardar la versión; DESPUÉS, si `salidas/ultimo_auto.json` dice `publicar: true`, republicar
+  la página (con `url` y las capabilities de `web/capacidades.json`) y `python3 pipeline.py publicado`;
+  commit y push.
 
 En liguilla, además: `pipeline.py auto` debe haber corrido DESPUÉS de la ida (lo hace la tarea diaria) para que
-`liguilla.torneo` traiga la serie real con la ida ya jugada; el P(avanza) al momento parte de ahí.
+`liguilla.torneo` traiga la serie real con la ida ya jugada; el P(avanza) al momento parte de ahí. Si no corrió,
+el documento trata la ida como no jugada (global 0-0) sin avisar: comprobarlo en «armar» el día de la vuelta
+(`python3 pipeline.py auto` tarda menos de un minuto).
 
-**Probar sin partido real**: `python3 vivo.py repetir 401876913 --velocidad 60` (América 2-2 Toluca del
-31-oct-2026: dos goles por lado, dos rojas y un penal al 90'+2'; dura 2 minutos) y en otra terminal
+### 6.6 Probar sin partido real
+
+`python3 vivo.py repetir 401876913 --velocidad 60` (América 2-2 Toluca del 31-oct-2026: dos goles por lado, dos
+rojas y un penal al 90'+2'; dura 2 minutos) y en otra terminal
 `python3 vivo.py esperar --desde 0 --eventos salidas/vivo_prueba_eventos.jsonl --candado salidas/vivo_prueba.lock`.
-Si se copia `salidas/vivo_prueba.json` a `vivo/actual` para ver la página moverse, al terminar hay que volver a
-poner el real (`python3 vivo.py una-vez` y copiar `salidas/vivo.json`).
+Los documentos de `repetir` llevan `"prueba": true` y la página los rotula «Prueba». Para ver la página moverse
+se puede escribir `salidas/vivo_prueba.json` en `vivo/actual`, pero **nunca con un partido real en juego o por
+empezar en las siguientes 3 horas**, y al terminar hay que volver a poner el real (`python3 vivo.py una-vez` y
+escribir `salidas/vivo.json`): la página no acepta un documento con `generado_utc` anterior al que ya muestra,
+así que el real, que es más nuevo, lo reemplaza.
 
-**Si algo falla**: ESPN sin respuesta → `observar` reintenta solo (20, 40… hasta 120 s) y lo dice en
-`salidas/vivo_observar.log`; candado tomado (código 2) → ya hay un observador (`vivo.py estado`); documento sin
-`vivo` en un partido en juego → falta el pronóstico previo (ver `avisos`); proyección sin cambios con `nota` →
-falló la simulación (el resto del documento es válido).
+### 6.7 Si algo falla
+
+- ESPN sin respuesta → `observar` reintenta solo (20, 40… hasta 120 s) y lo dice en `salidas/vivo_observar.log`;
+  una respuesta vacía o incompleta a medio partido no se cree (ver «Respuestas raras de ESPN»).
+- Candado tomado (código 2) → ya hay un observador (`vivo.py estado`).
+- Documento sin `vivo` en un partido en juego → falta el pronóstico previo (ver `avisos`).
+- Proyección sin cambios con `nota` → falló la simulación (el resto del documento es válido).
+- La sesión se quedó sin límite de uso o el contenedor se recicló → nada escribe; la página se marca «sin
+  actualizar» al pasar `vence_utc` y el siguiente despertar programado («vigilar» o «cierre») retoma en 6.5.
+  El contenedor nuevo no tiene `vivo_eventos.jsonl` (no va al repositorio): N vuelve a empezar en 0.
 
 ## 7. Límites honestos
 
@@ -213,4 +278,14 @@ falló la simulación (el resto del documento es válido).
   el manejo de los estados en vivo de ESPN está probado con partidos reales rebobinados; el primer partido
   real (Querétaro-Monterrey, 14-nov) es la prueba de fuego, sobre todo de cómo marca ESPN el descanso.
 - La tabla al momento suma las tarjetas de hoy al Fair Play de forma aproximada (amarilla 1, cualquier roja 3).
-- En tiempos extra y penales el modelo es deliberadamente simple (reparto lineal y 50/50).
+- En tiempos extra y penales el modelo es deliberadamente simple (reparto lineal y 50/50). El motor no avisa
+  del descanso ni de la reanudación del tiempo extra (el reloj de la página se queda en «105+'» hasta el
+  siguiente documento) y, si ESPN mueve el marcador antes de publicar la jugada, ese gol se cuenta como del
+  tiempo extra sólo si `observar` vio el partido antes de que acabaran los 90 minutos.
+- Expulsiones: el ajuste sólo mira quién tiene más jugadores, no cuántos más: dos expulsados pesan lo mismo que
+  uno, y 1-1 en rojas es «sin efecto» (hay muy pocos partidos con dos de diferencia para estimarlo aparte).
+- Una pausa a media parte (lluvia, falla de luz) sale como evento `descanso` y la página dice «Descanso»; un
+  partido abandonado sale como `final` con el marcador del momento (igual que en `datos/`), hasta que la liga
+  decida otra cosa.
+- El aviso que ve la gente es el último evento del ciclo: tras un hueco de consultas puede ser «Arranca el
+  segundo tiempo» y no el gol que cayó antes (el marcador y la lista de goles sí están completos).

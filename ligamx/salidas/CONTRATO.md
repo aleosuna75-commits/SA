@@ -1212,7 +1212,8 @@ atómica, menos de 40 KB (un día de 4 partidos pesa unos 6 KB). Ejemplo con la 
 | campo | significado |
 |---|---|
 | `version` | 1 |
-| `generado_utc` | cuándo se armó (reloj real) |
+| `generado_utc` | cuándo se armó (reloj real). La página nunca reemplaza un documento por otro con `generado_utc` anterior |
+| `vence_utc` | hasta cuándo vale como «en vivo»: `generado_utc` + 37 minutos si hay algo en juego o en descanso (el motor escribe al menos cada 25 minutos); `null` si no hay nada en juego. Pasada esa hora la página deja de decir «en vivo» (se cortó el flujo). Un documento sin el campo caduca a los 40 minutos |
 | `dia` | fecha de México del día de partido (cambia a las 04:00, no a medianoche) |
 | `estado` | `sin_partidos` · `previo` (hay partidos hoy y ninguno en juego: falta alguno por empezar) · `en_juego` · `descanso` (los que se juegan están todos en pausa) · `terminado_hoy` |
 | `partidos` | los de HOY, por hora de inicio (abajo) |
@@ -1222,7 +1223,7 @@ atómica, menos de 40 KB (un día de 4 partidos pesa unos 6 KB). Ejemplo con la 
 | `ultimo_evento` | `{utc, tipo, partido_id, texto, n}` del último evento notificable del día, o `null` |
 | `siguiente` | `{id, inicio_utc, local, visitante}` del próximo partido que no ha empezado (de hoy si queda alguno) |
 | `avisos` | (opcional) textos: algo no se pudo calcular o ESPN no respondió para un día |
-| `prueba` | (opcional) `true` en los documentos de `vivo.py repetir`; la página debe decirlo |
+| `prueba` | (opcional) `true` en los documentos de `vivo.py repetir`; la página lo rotula «Prueba» (franja, sección, tarjeta y conexión) |
 
 Cada elemento de `partidos`:
 
@@ -1236,7 +1237,8 @@ Cada elemento de `partidos`:
 | `eventos` | goles y expulsiones en orden: `min`, `anadido`, `tipo` (`gol`, `penal`, `autogol`, `roja`), `equipo` (en un autogol, el equipo al que le cuenta), `jugador`, `marcador` (parcial tras la jugada, "local-visitante") |
 | `previo` | pronóstico SELLADO antes del partido: `p_local`, `p_empate`, `p_visitante`, `marcador` (`gl`, `gv`), `lam_l`, `lam_v`. Si no hay sello trae además `origen` (de dónde salió) |
 | `vivo` | sólo en juego o en descanso: `p_local`, `p_empate`, `p_visitante` del resultado FINAL a 90 minutos, `goles_restantes_l`, `goles_restantes_v` (goles que se espera que falten) y `marcador_final` (`gl`, `gv`, `prob`: el marcador final más probable). `null` antes de empezar y al terminar |
-| `serie` | `null` o `{llave, mejor, peor, global_mejor, global_peor, p_avanza_mejor, p_avanza_peor}` |
+| `serie` | `null` o `{llave, mejor, peor, global_mejor, global_peor, p_avanza_mejor, p_avanza_peor, fase, decidida, ganador}` |
+| `gl90`, `gv90` | (opcional, sólo con `periodo` ≥ 3) marcador a los 90 minutos: es el que califica el pronóstico; `gl`/`gv` ya incluyen el tiempo extra |
 | `penales` | (opcional) `{l, v}` si hubo tanda |
 
 Cada elemento de `series` (SERIE compacta): `llave`, `fase`, `mejor` y `peor` (`{equipo, siembra}`), `piernas`
@@ -1258,5 +1260,5 @@ penales a 50/50), `delta_avanza_mejor` (frente a `actual.json`), `favorito`, `p_
 | `vivo_ejemplo.json` | ejemplo con la forma completa del documento en vivo (`"ejemplo": true`) |
 | `vivo_eventos.jsonl` | un renglón por evento notificable de `vivo.py observar`: `n` (consecutivo), `utc`, `tipo` (`inicio`, `gol`, `gol_anulado`, `roja`, `descanso`, `segundo_tiempo`, `tiempos_extra`, `penales`, `final`, `pospuesto`, `refresco`), `partido_id`, `texto`, `marcador`, `minuto`. Sólo se agrega |
 | `vivo_prueba.json`, `vivo_prueba_eventos.jsonl` | lo mismo para `vivo.py repetir` (no van al repositorio) |
-| `en_juego_parametros.json` | parámetros del modelo en juego: curva de goles por casilla (`w`), `efectos` (multiplicadores) y de dónde salieron; se reajusta sola cuando cambian los datos |
+| `en_juego_parametros.json` | parámetros del modelo en juego: curva de goles por casilla (`w`), `efectos` (multiplicadores) y de dónde salieron; la reajusta `vivo.py una-vez` (el de `pipeline.py auto`) cuando cambia el contenido de los datos y no hay nada en juego; `observar` nunca la toca |
 | `en_juego_validacion.json` | validación sin fuga del modelo en juego (`python3 -m produccion.en_juego validar`) |

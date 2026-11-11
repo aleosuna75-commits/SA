@@ -31,6 +31,7 @@ medio de esa casilla (en_curso=True).
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import math
 import sys
@@ -583,9 +584,9 @@ def firma_datos() -> str:
     partes = []
     for r in (datos.DIR_DATOS / "goles.csv", datos.DIR_DATOS / "tarjetas.csv", datos.RUTA_PARTIDOS,
               arnes.ruta_pred(MODELO_LAMBDAS)):
-        try:
-            st = Path(r).stat()
-            partes.append(f"{Path(r).name}:{st.st_size}:{st.st_mtime_ns}")
+        try:                                                       # por contenido, no por fecha: un clon nuevo no fuerza un reajuste
+            b = Path(r).read_bytes()
+            partes.append(f"{Path(r).name}:{len(b)}:{hashlib.sha1(b).hexdigest()[:16]}")
         except OSError:
             partes.append(f"{Path(r).name}:no")
     return "|".join(partes)

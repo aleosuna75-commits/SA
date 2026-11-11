@@ -49,9 +49,11 @@ ESCENAS = {
 #   pos_ancho encuadre en horizontal (escritorio): la foto cubre toda la portada
 #   lado      en pantallas anchas, de qué lado va el texto para no tapar el estadio ("izq" o "der")
 #   zoom      en pantallas anchas, acercamiento inicial (1.04 si no se indica); el punto fijo es pos_ancho
+#   dx_ancho  (opcional) en pantallas anchas, corre la foto de lado (% de su ancho; negativo = a la izquierda) cuando
+#             el estadio está al centro y el texto no cabría a su lado; el borde que queda libre se funde con el fondo
 #   tono      "noche" (ya es oscura), "ocaso" o "dia" (se oscurece y se enfría para que no queme el cielo)
 PORTADAS = {
-    "banorte": {"foto": "img/estadios/banorte-3.jpg", "pos": "9% 50%", "pos_ancho": "100% 100%", "zoom": 1.26, "lado": "der", "tono": "noche"},
+    "banorte": {"foto": "img/estadios/banorte-3.jpg", "pos": "9% 50%", "pos_ancho": "100% 100%", "zoom": 1.05, "dx_ancho": "-27%", "lado": "der", "tono": "noche"},
     "bbva": {"foto": "img/estadios/bbva-2.jpg", "pos": "60% 50%", "pos_ancho": "50% 40%", "lado": "izq", "tono": "ocaso"},
     "volcan": {"foto": "img/estadios/volcan-1.jpg", "pos": "50% 30%", "pos_ancho": "50% 35%", "lado": "izq", "tono": "ocaso"},
     "cu": {"foto": "img/estadios/cu-3.jpg", "pos": "55% 60%", "pos_ancho": "50% 62%", "lado": "izq", "tono": "ocaso"},
@@ -243,7 +245,8 @@ def recortar_medios(medios, datos, forzar_portada=None):
         raise ErrorDatos("No hay foto para la portada: revisa PORTADAS y medios.json.")
     portada = dict(_medio(foto), tipo="foto", pos=ajuste.get("pos") or foto.get("pos") or "50% 50%",
                    pos_ancho=ajuste.get("pos_ancho") or foto.get("pos") or "50% 50%",
-                   lado=ajuste.get("lado") or "izq", tono=ajuste.get("tono") or "dia", zoom=ajuste.get("zoom") or 1.04, pie=pie)
+                   lado=ajuste.get("lado") or "izq", tono=ajuste.get("tono") or "dia", zoom=ajuste.get("zoom") or 1.04,
+                   dx_ancho=ajuste.get("dx_ancho") or "", pie=pie)
     if foto["archivo"] not in usados:
         usados.append(foto["archivo"])
     escenas["portada"] = portada
@@ -268,9 +271,10 @@ def construir(datos, medios, plantilla, forzar_portada=None):
     credito = portada.get("credito") or ""
     if credito and not re.match(r"(?i)foto", credito):
         credito = "Foto: " + credito
+    dx = portada.get("dx_ancho") if re.fullmatch(r"-?\d+(\.\d+)?%", str(portada.get("dx_ancho") or "")) else ""
     fondo = (f'<img class="kb" src="{a(portada["archivo"])}" alt="{a(portada.get("alt"))}" width="{a(portada.get("ancho") or 1600)}" '
-             f'height="{a(portada.get("alto") or 900)}" style="--pos:{a(portada["pos"])};--pos-ancho:{a(portada["pos_ancho"])};--zoom:{float(portada["zoom"]):.2f}" '
-             f'decoding="async" fetchpriority="high">')
+             f'height="{a(portada.get("alto") or 900)}" style="--pos:{a(portada["pos"])};--pos-ancho:{a(portada["pos_ancho"])};--zoom:{float(portada["zoom"]):.2f}'
+             + (f';--dx-ancho:{dx}" data-dx ' if dx else '" ') + 'decoding="async" fetchpriority="high">')
     reemplazos = {
         "{{PORTADA_FONDO}}": fondo,
         "{{PORTADA_TONO}}": a(portada["tono"]),
