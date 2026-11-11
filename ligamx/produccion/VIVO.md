@@ -129,11 +129,13 @@ simula esos partidos como marcador actual + Poisson(lo que falta). Detalles que 
   pasado en la cancha. Esto vale porque el modelo de producción usa `rho ≠ 0` (un sorteo uniforme por partido);
   con un modelo de `rho = 0` las corridas dejan de estar sincronizadas y el `delta` trae más ruido.
 - vivo.py publica `p = último pronóstico previo (actual.json) + (simulación con en_juego − simulación base)`,
-  las dos con 6,000 simulaciones, 600 muestras de parámetros y la misma semilla. Sin nada en juego `p` es
+  las dos con 100,000 simulaciones, 10,000 muestras de parámetros y la misma semilla (el pronóstico previo usa
+  1,000,000; al momento se usan menos porque se recalcula en cada consulta: con 1,000,000 cada gol llegaría ~40 s tarde). Sin nada en juego `p` es
   exactamente el de `actual.json` y `delta` = 0.
-- Ruido: un `delta` de campeón de menos de ~1 punto en un equipo que no juega puede ser ruido (`proyeccion.ruido`).
+- Ruido: un `delta` de menos de ~0.3 puntos en un equipo que no juega puede ser ruido (`proyeccion.ruido` = 0.003;
+  medido el 11-nov-2026 entre 6 semillas: desviación del cambio 0.0012 con 100,000 simulaciones, 0.004 con 6,000).
 - Costo: armar la base (pronosticador + simulación) tarda ~10 s la primera vez del día y se guarda en
-  `modelo/cache/vivo_base.pkl`; cada ciclo posterior tarda ~0.3 s.
+  `modelo/cache/vivo_base.pkl` (~15 s con 100,000); cada ciclo posterior tarda ~4 s.
 - Un partido que ya acabó pero todavía no está en `partidos.csv` entra con `lam_rest = 0` (marcador fijo).
 
 ## 5. Comandos

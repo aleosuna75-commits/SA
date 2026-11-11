@@ -61,8 +61,10 @@ cálculo exacto), global empatado (pasa el mejor sembrado), cuadro completo con 
 
 ## 3. Incertidumbre y error de Monte Carlo
 
-20,000 torneos repartidos en 2,000 muestras de parámetros (`malla(n)`, k >= 1; 10 torneos por muestra).
-Tarda 4.2 s con el campeón (rho distinto de 0) y 0.4 s con el provisional. El error de Monte Carlo
+**1,000,000 de torneos repartidos en 50,000 muestras de parámetros** (`malla(n)`, k >= 1; 20 torneos por muestra),
+desde el 11-nov-2026 por pedido del usuario (antes 20,000 en 2,000 muestras). Tarda ~50 s y usa ~4.4 GB de memoria
+(medido). Subir sólo los torneos no basta: con 2,000 muestras el error de P(campeón) de América baja de 0.0036 a
+0.0020 (manda la incertidumbre de parámetros); con 50,000 muestras baja a 0.0006. El error de Monte Carlo
 (`ee_*`) se calcula entre muestras, así que incluye el ruido de haber sorteado parámetros; se comprobó
 contra la dispersión entre 8 semillas (0.0024 observado vs 0.0037 informado para P(campeón) de América).
 Con `n_muestras=0` se usa sólo la estimación puntual.

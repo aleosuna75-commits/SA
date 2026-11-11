@@ -909,7 +909,7 @@ tr.enjuego td.eqc .pulso{margin-left:8px;vertical-align:middle}
 <section class="banda" id="camino" aria-labelledby="t-camino">
   <div class="cab"><figure class="fondo" data-escena="camino"></figure>
     <div class="interior"><p class="rotulo">04 · Campeón</p><h2 id="t-camino" tabindex="-1">Camino al título</h2>
-    <p class="bajada" id="camino-bajada">Lo que resta del torneo, jugado miles de veces en la computadora.</p></div></div>
+    <p class="bajada" id="camino-bajada">Lo que resta del torneo, jugado un millón de veces en la computadora.</p></div></div>
   <div class="interior cuerpo">
     <div id="b-campeon"></div>
     <div class="medio" aria-hidden="true"></div>
@@ -2014,7 +2014,7 @@ function como() {
     '<li><span><b>La fuerza de cada equipo.</b> Con ' + (ok(D.meta.partidos_en_la_historia) ? miles(D.meta.partidos_en_la_historia) + ' partidos' : 'los partidos') + ' de historia se estima cuánto anota y cuánto recibe cada equipo, y cuánto ayuda jugar en casa (un modelo Dixon-Coles, «dc»).</span></li>' +
     '<li><span><b>El ajuste' + (m.nombre ? ' («' + E(m.nombre) + '»)' : '') + '.</b> ' + desc + '</span></li>' +
     '<li><span><b>Goles y marcadores.</b> De ahí salen los goles esperados de cada equipo y la probabilidad de cada marcador. Con eso se arma el 1X2, los mercados y las combinadas.</span></li>' +
-    '<li><span><b>El torneo, miles de veces.</b> Lo que falta se juega ' + (ok(P.n_sim) ? miles(P.n_sim) + ' veces' : 'miles de veces') + ' en la computadora' + (ok(P.n_muestras) ? ', con ' + miles(P.n_muestras) + ' versiones de la fuerza de los equipos (porque no se conoce con exactitud)' : '') + ', y se cuenta cuántas veces queda campeón cada quien.</span></li></ol></div>' +
+    '<li><span><b>El torneo, ' + (ok(P.n_sim) && P.n_sim >= 1e6 ? (P.n_sim === 1e6 ? 'un millón de veces' : 'millones de veces') : 'miles de veces') + '.</b> Lo que falta se juega ' + (ok(P.n_sim) ? miles(P.n_sim) + ' veces' : 'miles de veces') + ' en la computadora' + (ok(P.n_muestras) ? ', con ' + miles(P.n_muestras) + ' versiones de la fuerza de los equipos (porque no se conoce con exactitud)' : '') + ', y se cuenta cuántas veces queda campeón cada quien.</span></li></ol></div>' +
     '<div class="bloque a">' + (s && (s.regla || s.motivo) ? '<details><summary><span>Cómo se eligió<small>La regla se fijó antes de ver los resultados' + (s.fecha_seleccion ? ' · ' + fechaCorta(s.fecha_seleccion, true) : '') + '</small></span></summary><div class="det">' +
       (s.regla ? '<div class="sub"><h5>La regla</h5><p class="nota">' + E(s.regla) + '</p></div>' : '') + (s.motivo ? '<div class="sub"><h5>Por qué ganó</h5><p class="nota">' + E(s.motivo) + '</p></div>' : '') +
       (m.incertidumbre_parametros ? '<div class="sub"><h5>Incertidumbre de los parámetros</h5><p class="nota">' + E(m.incertidumbre_parametros) + '</p></div>' : '') + '</div></details>' : '') +

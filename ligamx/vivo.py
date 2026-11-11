@@ -59,8 +59,9 @@ UTC = dt.timezone.utc
 VERSION = 1
 PESO_MAXIMO = 40 * 1024
 CORTE_DIA_H = 4                  # el «día de partido» acaba a las 04:00 de México (un partido nocturno no cambia de día)
-N_SIM = 6000                     # simulaciones de la proyección al momento
-N_MUESTRAS = 600                 # muestras de parámetros entre las que se reparten
+N_SIM = 100_000                  # simulaciones de la proyección al momento (se recalcula en cada consulta: ~4 s; con
+                                 # 1,000,000, como el pronóstico previo, cada gol llegaría ~40 s tarde)
+N_MUESTRAS = 10_000              # muestras de parámetros entre las que se reparten
 SEG_ACTIVO = 20                  # cada cuánto se consulta con partido en juego o a menos de 15 min de uno
 SEG_REPOSO = 120
 MIN_ANTES = 15
@@ -72,7 +73,8 @@ CONFIRMAR_MENOS_ACTIVO = 45      # lo mismo si el que falta estaba en juego (uno
 SEG_LATIDO_VIEJO = 420           # `esperar`: con el candado tomado y el latido más viejo que esto, `observar` está colgado
 SEG_AGRUPAR = 40                 # `esperar`: un evento que no es gol ni roja espera esto por si llega otro (un solo aviso)
 TIPOS_URGENTES = ("gol", "gol_anulado", "roja")
-RUIDO_DELTA = 0.01               # por debajo de esto un cambio de la proyección puede ser ruido de simulación
+RUIDO_DELTA = 0.003              # por debajo de esto un cambio de la proyección puede ser ruido de simulación
+                                 # (medido el 11-nov-2026: desviación del cambio entre semillas 0.0012 con 100,000; era 0.004 con 6,000)
 ESTADOS_ACTIVOS = ("en_juego", "descanso")
 NOMBRE_FASE = {"cuartos": "Cuartos de final", "semifinal": "Semifinal", "final": "Final", "repechaje": "Repechaje"}
 TIPOS_GOL = ("gol", "penal", "autogol")

@@ -1,5 +1,5 @@
 {
- "corrida_utc": "2026-11-11T04:02:23Z",
+ "corrida_utc": "2026-11-11T04:43:53Z",
  "pasos": {
   "datos": {
    "ok": true,
@@ -9,11 +9,11 @@
    "nuevos_en_calendario": 0,
    "momios_actualizados": 0,
    "tabla_coincide_con_espn": true,
-   "segundos": 5.7
+   "segundos": 5.6
   },
   "variables": {
    "ok": true,
-   "segundos": 3.5
+   "segundos": 3.7
   },
   "mejora": {
    "ok": true,
@@ -23,10 +23,10 @@
   "pronostico": {
    "ok": true,
    "salida": [
-    "/home/user/SA/ligamx/salidas/actual.json  232 KB  modelo=ensamble  pendientes=10  sellos nuevos=0  12.8 s",
-    "campeón: América 0.272, Cruz Azul 0.258, Chivas 0.198, Toluca 0.196, Pachuca 0.022"
+    "/home/user/SA/ligamx/salidas/actual.json  232 KB  modelo=ensamble  pendientes=10  sellos nuevos=0  56.5 s",
+    "campeón: América 0.266, Cruz Azul 0.263, Toluca 0.200, Chivas 0.193, Pachuca 0.022"
    ],
-   "segundos": 13.8
+   "segundos": 57.5
   },
   "vivo": {
    "ok": true,
@@ -39,14 +39,14 @@
     "visitante": "Monterrey"
    },
    "incrustado": true,
-   "segundos": 1.7
+   "segundos": 1.2
   },
   "pagina": {
    "ok": true,
    "salida": [
-    "listo en 0.01 s"
+    "listo en 0.02 s"
    ],
-   "segundos": 0.0
+   "segundos": 0.1
   }
  },
  "errores": [],
@@ -87,27 +87,27 @@
   "incrustado": true
  },
  "modelo": "ensamble",
- "corte_local": "2026-11-10 22:02",
+ "corte_local": "2026-11-10 22:44",
  "campeon_top": [
   [
    "América",
-   0.2723
+   0.2662
   ],
   [
    "Cruz Azul",
-   0.2582
-  ],
-  [
-   "Chivas",
-   0.1982
+   0.2626
   ],
   [
    "Toluca",
-   0.1956
+   0.1998
+  ],
+  [
+   "Chivas",
+   0.193
   ],
   [
    "Pachuca",
-   0.0222
+   0.0221
   ]
  ],
  "liguilla_en_curso": false,
@@ -118,9 +118,9 @@
    "n": 0
   }
  },
- "huella": "3fa0c7b2fcb9b21797d33634b2eb2bfe",
+ "huella": "2d9fe6a124a578432f699201c4cdc28d",
  "publicar": false,
- "huella_publicada": "3fa0c7b2fcb9b21797d33634b2eb2bfe",
- "segundos": 24.8,
- "publicado_utc": "2026-11-11T04:12:44Z"
+ "huella_publicada": "2d9fe6a124a578432f699201c4cdc28d",
+ "segundos": 68.1,
+ "publicado_utc": "2026-11-11T04:45:19Z"
 }

@@ -107,3 +107,5 @@
 2026-11-10T23:07:50Z	accion=leer	quien=desconocido	modelo=ensamble	granularidad=dia	pid=15371	argv=/home/user/SA/ligamx/produccion/exportar.py --corte 2026-05-23T12:00 --sin-sello --salida /tmp/claude-0/-home-user-SA/2bd39326-8617-5400-b04f-4c3059628357/scratchpad/critica/retro/20260523T1200.json
 2026-11-11T02:56:38Z	accion=leer	quien=desconocido	modelo=ensamble	granularidad=dia	pid=280	argv=/home/user/SA/ligamx/produccion/exportar.py
 2026-11-11T04:02:46Z	accion=leer	quien=desconocido	modelo=ensamble	granularidad=dia	pid=15422	argv=/home/user/SA/ligamx/produccion/exportar.py
+2026-11-11T04:35:46Z	accion=leer	quien=desconocido	modelo=ensamble	granularidad=dia	pid=455	argv=/home/user/SA/ligamx/produccion/exportar.py
+2026-11-11T04:44:59Z	accion=leer	quien=desconocido	modelo=ensamble	granularidad=dia	pid=2562	argv=/home/user/SA/ligamx/produccion/exportar.py

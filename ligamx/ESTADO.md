@@ -52,12 +52,16 @@ Nada pendiente (11-nov-2026, 04:15 UTC). Lo último cerrado: rediseño a punto (
 primera pantalla del iPhone, mini-cuadro del torneo con ida y vuelta, cuadro por ancho, trofeo y confeti), liguilla con
 estructura de torneo y pronóstico de ida y vuelta por partido (`liguilla.torneo`), y capa EN VIVO (motor `vivo.py` +
 `produccion/en_juego.py`, documento `vivo/actual` en la base del Artifact, página con franja, tarjeta, «Al momento» y
-avance de series). Publicado como V5 de https://claude.ai/artifact/K3fNKhot24LUcwn6PfXGF6 con
+avance de series). Publicado en https://claude.ai/artifact/K3fNKhot24LUcwn6PfXGF6 (V5; V6 con el millón de simulaciones) con
 `capabilities` = `web/capacidades.json` (**al republicar pasar SIEMPRE `url` y esas capabilities**; sin `url` se crea
 un duplicado, como pasó con https://claude.ai/artifact/9Pa1hLxwQxgokdJJUowHqF, que no se usa y sólo se borra si el
 usuario lo pide). Workflows: `notas/workflows/05_vivo_y_rediseno.js` y `06_correcciones.js`; críticas en
 `notas/critica_visual_v4.md` y en el diario de la corrida `wf_0172a560-1c9`.
 Pruebas al cierre: 157 de pytest, 230 revisiones de página en Chromium y 230 en WebKit.
+**Simulaciones (pedido del usuario, 11-nov):** el pronóstico usa **1,000,000 de torneos** en 50,000 muestras de
+parámetros (`produccion/simulador.py`: `N_SIM`, `N_MUESTRAS`; ~55 s y ~4.4 GB; error de P(campeón) ±0.06 puntos, antes
+±0.36). La proyección en vivo usa 100,000 en 10,000 muestras (`vivo.py`; ~7 s por actualización; con 1,000,000 cada gol
+llegaría ~40 s tarde). Publicado como V6; `vivo/actual` en versión 3.
 **Sin probar todavía:** un partido real en juego y la página real recibiendo la base (sólo con base simulada). Primera
 prueba real: Querétaro–Monterrey, sábado 14-nov 17:00 de México (despertares ya programados, ver «Tareas programadas»).
 
@@ -145,3 +149,6 @@ prueba real: Querétaro–Monterrey, sábado 14-nov 17:00 de México (despertare
   agentes); al volver el límite se publicó una intermedia (V4) y se corrió el 06 (corrección visual de 17 defectos ∥
   crítica funcional con 23 hallazgos → cierre: 13 altos/medios atendidos). Base del Artifact: `vivo/actual` en
   versión 2. El usuario pidió dejar siempre programada la continuación cuando se acaben los límites.
+- 2026-11-11 04:50 UTC · Simulaciones a 1,000,000 (50,000 muestras) en el pronóstico y 100,000 en vivo. Resultado:
+  América 26.6%, Cruz Azul 26.3%, Toluca 20.0%, Chivas 19.3% (coherente con la corrida de 20,000: diferencias de menos
+  de 1.7 errores estándar). `pipeline.py auto` tarda 68 s. Pruebas: 82 de producción, 230 + 230 de página. V6 publicada.

@@ -700,7 +700,8 @@ resultado. Cuando existe: `origen` (`"sello"` o `"modelo/pred (walk-forward, no 
 
 ## proyeccion
 
-Resultado de la simulación (20,000 torneos repartidos en 2,000 muestras de los parámetros; `semilla` fija).
+Resultado de la simulación (1,000,000 de torneos repartidos en 50,000 muestras de los parámetros; `semilla` fija;
+los ejemplos de abajo son de cuando eran 20,000).
 `partidos_pendientes_regular` y `regular_completa` dicen en qué punto está el torneo.
 
 - `tabla_final` (18 filas, ordenadas por lugar esperado): `pos_actual`, `pts_actual`, `pj_actual`,

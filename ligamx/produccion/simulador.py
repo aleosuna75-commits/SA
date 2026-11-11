@@ -15,7 +15,7 @@ Consume sólo el contrato del `Pronosticador` (`equipos`, `partidos(df)`, `malla
   * partidos EN JUEGO (`simular(..., en_juego=...)`): se simulan como marcador actual + Poisson(goles
     que faltan) en vez de desde cero (ver produccion/en_juego.py y produccion/VIVO.md).
 
-Uso:  python3 -m produccion.simulador [--corte AAAA-MM-DDTHH:MM] [--n-sim 20000] [--calibrar]
+Uso:  python3 -m produccion.simulador [--corte AAAA-MM-DDTHH:MM] [--n-sim 1000000] [--calibrar]
 """
 from __future__ import annotations
 
@@ -36,8 +36,9 @@ RAIZ = datos.RAIZ
 RUTA_REGLAS = RAIZ / "config" / "torneo.json"
 DIR_SALIDAS = RAIZ / "salidas"
 MAXG = arnes.MAX_GOLES                       # 10: tope de goles por equipo y partido
-N_SIM = 20000
-N_MUESTRAS = 2000                            # muestras de parámetros entre las que se reparten las simulaciones
+N_SIM = 1_000_000                           # torneos simulados (pedido del usuario, 11-nov-2026; ~50 s y ~4.4 GB)
+N_MUESTRAS = 50_000                          # muestras de parámetros entre las que se reparten (20 torneos por muestra): con
+                                             # sólo 2,000 el error casi no baja al subir n_sim (manda la incertidumbre de parámetros)
 SEMILLA = 20261110
 FASES_LIGUILLA = ("cuartos", "semifinal", "final")
 TORNEO_COCIENTE = "Apertura 2024"            # art. 34: puntos entre partidos desde este torneo
