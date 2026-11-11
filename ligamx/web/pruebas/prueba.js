@@ -6,10 +6,17 @@
      PLAYWRIGHT_BROWSERS_PATH=<carpeta con webkit> node web/pruebas/prueba.js webkit [--capturas]
 
    Reconstruye la página (construir.py --documento --salida web/), la abre con file:// desde web/ en
-   iPhone 13 y en escritorio 1440x900 y revisa: sin errores de consola, sin desplazamiento horizontal,
-   una tarjeta por partido pendiente, pestañas de combinada, menú, imágenes, textos sin "undefined",
-   "NaN" ni "null", video de portada, movimiento reducido y una variante con liguilla en curso y datos
-   opcionales en null. Con --capturas guarda PNG en web/pruebas/capturas/. Sale con código 1 si algo falla. */
+   iPhone 13 y en escritorio 1440x900 y revisa:
+   - archivo: fragmento válido, tokens de color, sin scripts externos, capacidad "db" declarada y usada;
+   - portada: foto del favorito con movimiento lento, trofeo con su escudo, confeti, nada encimado;
+   - cuadro de la liguilla: 4 + 2 + 1 series, ida y vuelta con marcador en cada una, el cuadro se desplaza
+     de lado pero el cuerpo no, botones de ronda, detalle de la serie;
+   - menú coherente con las secciones, pestañas, imágenes, textos sin "undefined"/"NaN"/"null";
+   - en vivo con un window.claude simulado (db.doc("vivo/actual").onSnapshot): franja, minuto que avanza,
+     gol nuevo con aviso, tabla al momento, documentos corruptos, límite de 10 s y página sin base de datos;
+   - variantes: liguilla en curso (una ida jugada, una serie terminada), sin liguilla.torneo, datos
+     opcionales en null, «vivo» incrustado, movimiento reducido.
+   Con --capturas guarda PNG en web/pruebas/capturas/. Sale con código 1 si algo falla. */
 'use strict';
 const path = require('path');
 const fs = require('fs');
@@ -22,7 +29,9 @@ const motor = (process.argv[2] || 'chromium').toLowerCase();
 const CAPTURAS = process.argv.includes('--capturas');
 const DIR_CAP = path.join(__dirname, 'capturas');
 const URL_DOC = 'file://' + path.join(WEB, 'documento.html');
-const VARIANTE = path.join(WEB, '_variante_prueba.html');
+const EJEMPLO = JSON.parse(fs.readFileSync(path.join(WEB, '..', 'salidas', 'vivo_ejemplo.json'), 'utf8'));
+const AHORA_EJEMPLO = '2026-11-21T23:41:30Z'; /* 10 s después de «generado_utc» del ejemplo */
+const temporales = [];
 const fallas = [];
 let revisados = 0;
 
@@ -31,24 +40,35 @@ function revisa(cond, nombre, detalle) {
   if (!cond) { fallas.push(nombre + (detalle ? ' → ' + detalle : '')); console.log('  FALLA  ' + nombre + (detalle ? ' → ' + detalle : '')); }
   else console.log('  ok     ' + nombre);
 }
+const copia = x => JSON.parse(JSON.stringify(x));
 
-/* documento con la liguilla en curso (ejemplo del CONTRATO) y varios opcionales en null */
-function escribirVariante() {
+/* escribe una copia de documento.html con los datos incrustados cambiados por fn(d) */
+function variante(nombre, fn) {
   const doc = fs.readFileSync(path.join(WEB, 'documento.html'), 'utf8');
   const re = /(<script type="application\/json" id="datos">)([\s\S]*?)(<\/script>)/;
   const d = JSON.parse(re.exec(doc)[2]);
-  d.liguilla.en_curso = true;
-  d.liguilla.clasificados = ['Cruz Azul', 'América', 'Chivas', 'Santos', 'Toluca', 'Atlas', 'Pachuca', 'Tijuana'];
-  d.liguilla.series = [{
-    fase: 'cuartos', mejor: 'Cruz Azul', peor: 'Pachuca', siembra_mejor: 1, siembra_peor: 8,
-    piernas: [
-      { pierna: 1, id: 990000000, fecha_utc: '2026-11-26T01:00:00+00:00', local: 'Pachuca', visitante: 'Cruz Azul', jugado: true, gl: 1, gv: 0 },
-      { pierna: 2, id: 990000001, fecha_utc: '2026-11-29T01:00:00+00:00', local: 'Cruz Azul', visitante: 'Pachuca', jugado: false, lam_l: 1.7583, lam_v: 1.1389,
-        p_local: 0.5188, p_empate: 0.235, p_visitante: 0.2462, marcadores: [{ gl: 1, gv: 1, prob: 0.1105 }, { gl: 2, gv: 1, prob: 0.0971 }] }],
-    decidida: false, ganador: null, p_avanza_mejor: 0.5188, p_avanza_peor: 0.4812, p_global_mejor: 0.2862, p_global_empate: 0.2326, p_global_peor: 0.4812,
-    globales: [{ mejor: 1, peor: 2, prob: 0.1105 }, { mejor: 2, peor: 2, prob: 0.0971 }], regla_empate: 'avanza el mejor sembrado', p_avanza_mejor_sim: 0.5139, n_sim_cruce: 20000
-  }, { fase: 'semifinal', mejor: 'América', peor: 'Toluca', siembra_mejor: 2, siembra_peor: 5, piernas: [], decidida: true, ganador: 'América', p_avanza_mejor: null, p_avanza_peor: null, globales: null, regla_empate: null }];
-  /* datos raros: opcionales en null, ficha sin detalle, equipo sin escudo, sede sin fotos */
+  fn(d);
+  const ruta = path.join(WEB, '_variante_' + nombre + '.html');
+  fs.writeFileSync(ruta, doc.replace(re, (_, a, __, c) => a + JSON.stringify(d).replace(/<\//g, '<\\/') + c));
+  temporales.push(ruta);
+  return 'file://' + ruta;
+}
+
+/* liguilla en curso (una ida jugada, una serie terminada, una definida) y varios opcionales en null */
+function conLiguillaEnCurso(d) {
+  const t = d.liguilla.torneo, cu = t.rondas[0].series;
+  d.liguilla.en_curso = true; t.estado = 'en_curso';
+  const c1 = cu[0]; c1.real = true; c1.alternativas = [];
+  Object.assign(c1.piernas[0], { id: 990000000, fecha_utc: '2026-11-26T03:00:00+00:00', fecha_local: '2026-11-25', hora_local: '21:00', jugado: true, gl: 1, gv: 0 });
+  ['lam_l', 'lam_v', 'p_local', 'p_empate', 'p_visitante', 'marcador', 'marcadores'].forEach(k => delete c1.piernas[0][k]);
+  Object.assign(c1.piernas[1], { id: 990000001, fecha_utc: '2026-11-29T01:00:00+00:00', fecha_local: '2026-11-28', hora_local: '19:00' });
+  const c2 = cu[1]; c2.real = true; c2.decidida = true; c2.ganador = c2.mejor.equipo; c2.favorito = c2.ganador; c2.p_avanza_mejor = 1; c2.p_avanza_peor = 0; c2.alternativas = [];
+  c2.piernas.forEach((l, i) => { Object.assign(l, { id: 990000010 + i, fecha_local: i ? '2026-11-29' : '2026-11-26', hora_local: '19:00', jugado: true, gl: i ? 2 : 0, gv: i ? 1 : 0 }); ['lam_l', 'lam_v', 'p_local', 'p_empate', 'p_visitante', 'marcador', 'marcadores'].forEach(k => delete l[k]); });
+  c2.global = { probable: null, top: [], p_gana_mejor: null, p_empate: null, p_gana_peor: null };
+  cu[2].real = true; cu[2].alternativas = null;
+  const c4 = cu[3]; c4.global = null; c4.alternativas = null; c4.piernas[1].estadio = null; c4.piernas[0].marcador = null; c4.piernas[0].marcadores = null; c4.regla_empate = null;
+  t.rondas[1].series[1].viene_de = null; t.rondas[1].fechas = null; t.nota = null;
+  /* datos raros en el resto de la página: opcionales en null, ficha sin detalle, equipo sin escudo, sede sin fotos */
   const p0 = d.pendientes[0];
   p0.momios = null; p0.combinadas = null; p0.contexto = null; p0.explica = null; p0.mercados = null; p0.top5 = null; p0.lam_l = null;
   const p1 = d.pendientes[1];
@@ -57,11 +77,23 @@ function escribirVariante() {
   const p2 = d.pendientes[2];
   ['lam_l', 'lam_v', 'rho', 'top5', 'matriz', 'mercados', 'combinadas', 'explica', 'contexto', 'momios'].forEach(k => delete p2[k]); p2.detalle = false;
   d.combinada_jornada = null; d.calibracion_series = null; d.ultimos_resultados[0].pronostico = null;
-  d.meta.modelo.contra_referencias = null; d.meta.modelo.seleccion = null;
+  d.meta.modelo.contra_referencias = null; d.meta.modelo.seleccion = null; d.proyeccion.titulos = null;
   d.desempeno.acumulado = { n: 12, aciertos_1x2: 6, acierto_1x2: 0.5, marcadores_exactos: 2, marcador_exacto: 0.1667, logloss: 1.02, ee_logloss: 0.05, brier: 0.6, rps: 0.2,
     prob_media_del_pick: 0.47, logloss_referencia_tercios: 1.0986, combinadas: { segura: { n: 12, completas: 5, frecuencia: 0.4167, prob_anunciada: 0.45, picks_acertados_media: 3.1 } } };
   d.dominios = d.dominios.filter(x => !(x.a === 'América' && x.b === 'Cruz Azul'));
-  fs.writeFileSync(VARIANTE, doc.replace(re, (_, a, __, c) => a + JSON.stringify(d).replace(/<\//g, '<\\/') + c));
+}
+
+/* window.claude simulado: use("db") entrega una base cuyo doc().onSnapshot manda PRIMERO el documento dado
+   y luego lo que la prueba le pase con window.__vivo(doc, deCache) */
+function guionClaude(modo, doc) {
+  return `(function () {
+    var DOC = ${JSON.stringify(doc || null)}, sus = null;
+    function foto(d, cache) { return { id: 'actual', exists: d != null, data: function () { return d == null ? undefined : d; }, metadata: { fromCache: !!cache, hasPendingWrites: false } }; }
+    window.__subs = 0; window.__usos = 0;
+    window.__vivo = function (d, cache) { if (sus) sus(foto(d, cache)); };
+    var db = { doc: function (ruta) { window.__ruta = ruta; return { onSnapshot: function (sig, err) { window.__subs++; sus = sig; setTimeout(function () { sig(foto(DOC, false)); }, 150); return function () { sus = null; }; } }; } };
+    window.claude = { use: function (n) { window.__usos++; return new Promise(function (r) { ${modo === 'mudo' ? '' : `setTimeout(function () { r(${modo === 'nulo' ? 'null' : "n === 'db' ? db : null"}); }, 40);`} }); } };
+  })();`;
 }
 
 async function textoVisible(page) {
@@ -77,46 +109,147 @@ function palabrasMalas(txt) {
   const m = txt.match(/.{0,40}(undefined|\bNaN\b|\bnull\b|\[object Object\]).{0,40}/);
   return m ? m[0].replace(/\s+/g, ' ') : null;
 }
+/* desbordes: ni el documento ni ningún elemento visible fuera de un contenedor con desplazamiento propio */
+function desbordes(page) {
+  return page.evaluate(() => {
+    const ancho = window.innerWidth, malos = [];
+    document.querySelectorAll('body *').forEach(e => {
+      const r = e.getBoundingClientRect(); if (!r.width || !r.height) return;
+      if (r.right > ancho + 1.5 || r.left < -1.5) {
+        let p = e.parentElement, dentro = false;
+        while (p && p !== document.body) { const o = getComputedStyle(p); if (/(auto|scroll|hidden|clip)/.test(o.overflowX)) { dentro = true; break; } p = p.parentElement; }
+        if (!dentro) malos.push(e.tagName + '.' + String(e.className).slice(0, 40));
+      }
+    });
+    return { sw: document.documentElement.scrollWidth, ancho, malos: malos.slice(0, 6) };
+  });
+}
+function abrir(ctx, errores) {
+  return ctx.newPage().then(page => {
+    page.on('console', m => { if (m.type() === 'error') errores.push(m.text() + ' @ ' + (m.location().url || '')); });
+    page.on('pageerror', e => errores.push('pageerror: ' + e.message));
+    return page;
+  });
+}
 
 async function correr(navegador, nombre, opciones) {
   console.log('\n== ' + motor + ' · ' + nombre + ' ==');
+  const movil = nombre === 'iphone';
   const ctx = await navegador.newContext(Object.assign({ ignoreHTTPSErrors: true, locale: 'es-MX' }, opciones));
-  const page = await ctx.newPage();
   const errores = [];
-  page.on('console', m => { if (m.type() === 'error') errores.push(m.text() + ' @ ' + (m.location().url || '')); });
-  page.on('pageerror', e => errores.push('pageerror: ' + e.message));
+  const page = await abrir(ctx, errores);
   let fuentes = true;
   page.on('requestfailed', r => { if (/fonts\.(googleapis|gstatic)\.com/.test(r.url())) fuentes = false; });
   await page.goto(URL_DOC, { waitUntil: 'load' });
-  await page.waitForTimeout(600);
-  const cap = async (archivo, op) => { if (CAPTURAS) { fs.mkdirSync(DIR_CAP, { recursive: true }); await page.screenshot(Object.assign({ path: path.join(DIR_CAP, motor + '-' + nombre + '-' + archivo + '.png') }, op || {})); } };
-  const capEl = async (archivo, sel, altoMax) => {
+  await page.waitForTimeout(700);
+  const capDe = pg => async (archivo, op) => { if (CAPTURAS) { fs.mkdirSync(DIR_CAP, { recursive: true }); await pg.screenshot(Object.assign({ path: path.join(DIR_CAP, motor + '-' + nombre + '-' + archivo + '.png') }, op || {})); } };
+  const capElDe = pg => async (archivo, sel, altoMax) => {
     if (!CAPTURAS) return;
-    const el = page.locator(sel).first(); await el.scrollIntoViewIfNeeded(); await page.waitForTimeout(700);
+    const el = pg.locator(sel).first(); await el.scrollIntoViewIfNeeded(); await pg.waitForTimeout(700);
     const b = await el.boundingBox(); if (!b) return;
-    const y = await page.evaluate(() => window.pageYOffset);
-    await cap(archivo, { fullPage: true, clip: { x: 0, y: Math.max(0, b.y + y - 8), width: page.viewportSize().width, height: Math.min(altoMax || 1500, b.height + 16) } });
+    const y = await pg.evaluate(() => window.pageYOffset);
+    await capDe(pg)(archivo, { fullPage: true, clip: { x: 0, y: Math.max(0, b.y + y - 8), width: pg.viewportSize().width, height: Math.min(altoMax || 1500, b.height + 16) } });
   };
+  const cap = capDe(page), capEl = capElDe(page);
 
-  // video de portada
-  const video = await page.evaluate(async () => {
-    const v = document.getElementById('video-portada');
-    if (!v) { const im = document.querySelector('#portada .fondo img'); return im ? { foto: true, readyState: im.complete && im.naturalWidth > 0 ? 4 : 0 } : null; }
-    for (let i = 0; i < 40 && v.readyState < 2; i++) await new Promise(r => setTimeout(r, 250));
-    return { readyState: v.readyState, pausado: v.paused, muted: v.muted, error: v.error ? v.error.code : null };
+  /* ---------- portada ---------- */
+  const por = await page.evaluate(async () => {
+    const d = JSON.parse(document.getElementById('datos').textContent), m = JSON.parse(document.getElementById('medios').textContent);
+    const im = document.querySelector('#portada .fondo img');
+    for (let i = 0; i < 40 && !(im.complete && im.naturalWidth > 0); i++) await new Promise(r => setTimeout(r, 250));
+    const cv = document.getElementById('confeti'), px = cv.getContext('2d').getImageData(0, 0, cv.width, cv.height).data;
+    let pintados = 0; for (let i = 3; i < px.length; i += 4) if (px[i] > 20) pintados++;
+    const caja = s => { const e = document.querySelector(s); if (!e) return null; const r = e.getBoundingClientRect(); return { x: r.left, y: r.top, r: r.right, b: r.bottom }; };
+    const piezas = ['#p-sello', '#t-portada', '#portada .titular', '#portada .palmares', '#portada .favoritos', '#p-pie', '#portada .foto-de'].map(s => [s, caja(s)]).filter(x => x[1]);
+    const encima = [];
+    for (let i = 0; i < piezas.length; i++) for (let j = i + 1; j < piezas.length; j++) { const a = piezas[i][1], b = piezas[j][1]; if (a.x < b.r - 1 && b.x < a.r - 1 && a.y < b.b - 1 && b.y < a.b - 1) encima.push(piezas[i][0] + ' / ' + piezas[j][0]); }
+    const em = caja('#portada .emblema'), tit = caja('#portada .titular'), barra = caja('#barra');
+    if (em && tit && em.x < tit.r - 1 && tit.x < em.r - 1 && em.y < tit.b - 1 && tit.y < em.b - 1) encima.push('emblema / titular');
+    if (em && barra && em.y < barra.b - 4) encima.push('emblema / barra');
+    const fav = d.proyeccion.campeon[0].equipo, tit0 = ((d.proyeccion.titulos || {})[fav] || {}).ultimo;
+    return { cargada: im.complete && im.naturalWidth > 0, src: im.getAttribute('src'), kb: im.classList.contains('kb'), anim: im.getAnimations ? im.getAnimations().length : -1,
+      fav, titular: (document.querySelector('#portada .titular') || {}).textContent || '', equipoPortada: m.portada.equipo, escudo: !!document.querySelector('#emblema-esc img, #emblema-esc .esc'),
+      trofeo: !!document.querySelector('#portada .emblema svg use') && !!document.getElementById('s-trofeo'), favoritos: document.querySelectorAll('#portada .favoritos li').length,
+      palmares: (document.querySelector('#portada .palmares') || {}).textContent || '', debePalmares: !!(tit0 && tit0.torneo), torneoTitulo: tit0 ? tit0.torneo : '',
+      credito: (document.querySelector('#portada .foto-de') || {}).textContent || '', confeti: pintados, encima, tono: document.getElementById('portada').getAttribute('data-tono'),
+      reloj: !!document.querySelector('#reloj b') || !!document.querySelector('#reloj .nota') };
   });
-  revisa(video && video.readyState >= 2, 'fondo de portada (video o foto) cargado', JSON.stringify(video));
+  revisa(por.cargada && /^img\/(estadios|campeon)\//.test(por.src), 'portada: foto del favorito cargada (' + por.src + ')', JSON.stringify(por.src));
+  revisa(por.kb && por.anim > 0, 'portada: la foto se mueve lento (Ken Burns)', 'animaciones: ' + por.anim);
+  revisa(por.titular.includes(por.fav) && por.equipoPortada === por.fav && por.favoritos === 4, 'portada: titular, favorito (' + por.fav + ') y sus 4 probabilidades', JSON.stringify([por.titular, por.equipoPortada, por.favoritos]));
+  revisa(por.escudo && por.trofeo, 'portada: trofeo dibujado con el escudo del favorito');
+  revisa(por.confeti > 40, 'portada: confeti pintado en el lienzo', String(por.confeti));
+  revisa(!por.debePalmares || por.palmares.includes(por.torneoTitulo), 'portada: leyenda con su último título (' + por.torneoTitulo + ')', por.palmares);
+  revisa(/Foto/.test(por.credito) && por.credito.length > 12, 'portada: crédito de la foto visible', por.credito);
+  revisa(por.encima.length === 0, 'portada: nada encimado', por.encima.join(' | '));
+  revisa(por.reloj, 'portada: cuenta regresiva del próximo partido');
   await cap('1-portada');
 
-  // estructura
+  /* ---------- estructura ---------- */
   const n = await page.evaluate(() => ({ tarjetas: document.querySelectorAll('.partido').length, pendientes: JSON.parse(document.getElementById('datos').textContent).pendientes.length,
-    respaldos: document.querySelectorAll('.respaldo').length, estadios: document.querySelectorAll('.estadio').length, h1: document.querySelectorAll('h1').length }));
+    respaldos: document.querySelectorAll('.respaldo').length, estadios: document.querySelectorAll('.estadio').length, h1: document.querySelectorAll('h1').length,
+    conexion: Array.from(document.querySelectorAll('.js-conexion')).map(e => e.textContent), franja: !document.getElementById('franja').hidden, vivo: !document.getElementById('vivo').hidden }));
   revisa(n.tarjetas === n.pendientes && n.tarjetas > 0, 'una tarjeta por partido pendiente', n.tarjetas + ' de ' + n.pendientes);
   revisa(n.respaldos === 0, 'ningún bloque en modo respaldo', String(n.respaldos));
   revisa(n.estadios === 16, 'galería con los 16 estadios', String(n.estadios));
   revisa(n.h1 === 1, 'un solo h1');
+  revisa(!n.franja && !n.vivo && n.conexion.some(t => /^Sin conexión en vivo: datos de las \d\d:\d\d/.test(t)), 'sin window.claude: la página funciona y lo dice', JSON.stringify(n.conexion));
 
-  // pestañas de la combinada del primer partido
+  /* ---------- cuadro de la liguilla ---------- */
+  const cu = await page.evaluate(() => {
+    const t = JSON.parse(document.getElementById('datos').textContent).liguilla.torneo;
+    const por = f => Array.from(document.querySelectorAll('.ronda[data-fase="' + f + '"] .llave'));
+    const todas = Array.from(document.querySelectorAll('#cuadro .llave'));
+    const sin = todas.filter(l => { const ps = l.querySelectorAll('.pierna'); return ps.length !== 2 || Array.from(ps).some(p => !p.querySelector('.tablero') || !p.querySelector('.x12') || !/Ida|Vuelta/.test(p.textContent)) || !l.querySelector('.llave__global .tablero') || !l.querySelector('.avanza') || l.querySelectorAll('.llave__eq .esc').length !== 2; }).map(l => l.getAttribute('data-llave'));
+    const c = document.getElementById('cuadro'), cs = getComputedStyle(c), nodo = document.querySelector('.nodo[data-pos="a"]');
+    const sedes = todas.every(l => Array.from(l.querySelectorAll('.pierna__n span')).every(s => /Estadio/.test(s.textContent)));
+    return { cuartos: por('cuartos').length, semis: por('semifinal').length, final: por('final').length, sin, sedes, estado: t.estado,
+      texto: document.querySelector('.cuadro-estado').textContent, campeon: (document.querySelector('.campeon-ruta b') || {}).textContent, campeonDato: t.campeon_ruta,
+      trofeo: !!document.querySelector('.campeon-ruta svg use'), display: cs.display, sw: c.scrollWidth, cw: c.clientWidth,
+      linea: nodo ? getComputedStyle(nodo, '::after').borderTopWidth : '', vieneDe: (document.querySelector('.llave[data-llave="S1"] .llave__id') || {}).textContent || '',
+      dentro: todas.every(l => { const r = l.getBoundingClientRect(); return r.left >= -1 && r.right <= window.innerWidth + 1; }) };
+  });
+  revisa(cu.cuartos === 4 && cu.semis === 2 && cu.final === 1, 'cuadro: 4 series de cuartos, 2 semifinales y la final', JSON.stringify([cu.cuartos, cu.semis, cu.final]));
+  revisa(cu.sin.length === 0, 'cuadro: cada serie trae ida y vuelta con marcador en tablero, 1X2 chico, barra de avance y global', cu.sin.join(','));
+  revisa(cu.sedes, 'cuadro: cada partido dice su sede');
+  revisa(cu.campeon === cu.campeonDato && cu.trofeo, 'cuadro: termina en el campeón con su trofeo', cu.campeon + ' / ' + cu.campeonDato);
+  revisa(cu.estado !== 'proyectado' || /si la tabla termina como se espera/i.test(cu.texto), 'cuadro: dice que es proyectado («si la tabla termina como se espera»)', cu.texto.slice(0, 80));
+  revisa(parseFloat(cu.linea) >= 1.5 && /C\d y C\d/.test(cu.vieneDe), 'cuadro: líneas de unión y de qué llaves sale cada semifinal', cu.linea + ' · ' + cu.vieneDe);
+  if (movil) {
+    revisa(cu.sw > cu.cw + 100, 'cuadro (celular): vive en su contenedor con desplazamiento horizontal', cu.sw + ' > ' + cu.cw);
+    await page.locator('#cuadro').scrollIntoViewIfNeeded();
+    const ind = await page.evaluate(() => { const d = document.querySelector('.desliza'), b = document.querySelectorAll('.rondas-nav button'); return { desliza: !!d && d.getBoundingClientRect().width > 0, botones: b.length, actual: (document.querySelector('.rondas-nav [aria-current="true"]') || {}).textContent || '', snap: getComputedStyle(document.getElementById('cuadro')).scrollSnapType }; });
+    revisa(ind.desliza && ind.botones === 3 && /Cuartos/.test(ind.actual) && /x/.test(ind.snap), 'cuadro (celular): indicador de deslizar, botones de ronda y scroll-snap', JSON.stringify(ind));
+    await page.click('.rondas-nav button[data-ronda="2"]');
+    await page.waitForTimeout(1500);
+    const tr = await page.evaluate(() => { const c = document.getElementById('cuadro'), f = document.querySelector('.llave[data-llave="F"]').getBoundingClientRect(); return { sl: c.scrollLeft, doc: document.documentElement.scrollWidth, ancho: window.innerWidth, x: window.pageXOffset, actual: document.querySelector('.rondas-nav [aria-current="true"]').textContent, finalVisible: f.left >= 0 && f.right <= window.innerWidth + 1 && f.top >= 0 && f.top < window.innerHeight }; });
+    revisa(tr.sl > 100 && tr.doc <= tr.ancho + 1 && tr.x === 0, 'cuadro (celular): el cuadro se desplaza de lado y el cuerpo de la página no', JSON.stringify(tr));
+    revisa(/Final/.test(tr.actual) && tr.finalVisible, 'cuadro (celular): el botón «Final» lleva a la final y queda marcado', JSON.stringify(tr));
+    await cap('3-cuadro-final');
+    await page.evaluate(() => { document.getElementById('cuadro').scrollLeft = 0; });
+    await page.waitForTimeout(300);
+  } else {
+    revisa(cu.display === 'grid' && cu.dentro && cu.sw <= cu.cw + 1, 'cuadro (escritorio): horizontal completo, las 7 series a la vista', JSON.stringify([cu.display, cu.dentro, cu.sw, cu.cw]));
+    const geo = await page.evaluate(() => { const r = k => document.querySelector('.llave[data-llave="' + k + '"]').getBoundingClientRect(); const f = r('F'), s1 = r('S1'), s2 = r('S2'), c = document.querySelector('.campeon-ruta').getBoundingClientRect(), rot = Array.from(document.querySelectorAll('.cuadro__rot')).map(e => e.getBoundingClientRect());
+      return { centro: Math.abs((f.left + f.right) / 2 - window.innerWidth / 2), orden: s1.right < f.left && f.right < s2.left, campeonArriba: c.bottom <= f.top + 1, libre: rot.every(q => q.right < c.left || q.left > c.right || q.bottom < c.top) }; });
+    revisa(geo.centro < 12 && geo.orden && geo.campeonArriba && geo.libre, 'cuadro (escritorio): la final al centro, las semifinales a los lados y el campeón encima', JSON.stringify(geo));
+  }
+  await capEl('3-cuadro', '#b-llaves', movil ? 1700 : 1000);
+
+  /* detalle de la serie */
+  const det0 = await page.evaluate(() => { const d = document.getElementById('serie-det'); return d ? { titulo: d.querySelector('h3').textContent, legs: d.querySelectorAll('.leg').length, top: Array.from(d.querySelectorAll('.leg')).map(l => l.querySelectorAll('.top5 li').length), x12: d.querySelectorAll('.leg .x12').length, chips: d.querySelectorAll('.serie-sel button').length, alt: d.querySelectorAll('.lista li').length, sel: (document.querySelector('.llave--sel') || { getAttribute: () => null }).getAttribute('data-llave') } : null; });
+  revisa(det0 && det0.legs === 2 && det0.top.every(x => x === 5) && det0.x12 === 2 && det0.chips === 7 && det0.alt >= 1 && det0.sel === 'C1', 'detalle de la serie: ida y vuelta con los 5 marcadores más probables y los cruces alternativos', JSON.stringify(det0));
+  await page.click('.llave[data-llave="S1"] .llave__id b');
+  await page.waitForTimeout(1300);
+  const det1 = await page.evaluate(() => { const d = document.getElementById('serie-det'), r = d.getBoundingClientRect(); return { titulo: d.querySelector('h3').textContent, sel: document.querySelector('.llave--sel').getAttribute('data-llave'), viene: (d.querySelector('.viene') || {}).textContent || '', top: Math.round(r.top), alto: window.innerHeight, hash: location.hash }; });
+  revisa(det1.sel === 'S1' && det1.titulo !== det0.titulo && /resiembra/.test(det1.viene) && det1.top >= 0 && det1.top < det1.alto * 0.6 && det1.hash === '', 'tocar una serie del cuadro abre su detalle (dice de qué llaves viene y que hay resiembra)', JSON.stringify(det1));
+  await page.click('.serie-sel button[data-serie="F"]');
+  await page.waitForTimeout(300);
+  const det2 = await page.evaluate(() => ({ titulo: document.querySelector('#serie-det h3').textContent, pres: document.querySelector('.serie-sel [aria-pressed="true"]').textContent, foco: document.activeElement && document.activeElement.getAttribute('data-serie') }));
+  revisa(det2.pres === 'F' && det2.titulo !== det1.titulo && det2.foco === 'F', 'los botones del detalle cambian de serie sin perder el foco', JSON.stringify(det2));
+  await capEl('3b-detalle', '#serie-det', 2800);
+
+  /* ---------- pestañas de la combinada del primer partido ---------- */
   const pest = await page.evaluate(() => {
     const tabs = Array.from(document.querySelectorAll('.partido [role="tab"]')).slice(0, 3);
     const panel = t => document.getElementById(t.getAttribute('aria-controls'));
@@ -131,7 +264,16 @@ async function correr(navegador, nombre, opciones) {
   });
   revisa(pest.n === 3 && pest.vuelve && pest.vistos.every(v => v.sel === 'true' && !v.oculto && v.otroOculto && v.distinto), 'cada pestaña de la combinada cambia el contenido', JSON.stringify(pest));
 
-  // menú de tres barras: abre, Escape lo cierra, elegir sección lo cierra y desplaza
+  /* ---------- menú de tres barras ---------- */
+  const men = await page.evaluate(() => {
+    const items = Array.from(document.querySelectorAll('#menu li')).filter(li => !li.hidden).map(li => { const b = li.querySelector('[data-ir]'); return { ir: b.getAttribute('data-ir'), num: (b.querySelector('i') || {}).textContent || '' }; });
+    const secciones = Array.from(document.querySelectorAll('main > section[id]')).filter(s => !s.hidden).map(s => s.id);
+    const rotulos = {}; document.querySelectorAll('main > section[id] .rotulo').forEach(r => { const m = /^(\d\d)/.exec(r.textContent.trim()); if (m) rotulos[r.closest('section').id] = m[1]; });
+    return { items, secciones, rotulos, barra: Array.from(document.querySelectorAll('.barra__nav li')).filter(li => !li.hidden).map(li => li.querySelector('[data-ir]').getAttribute('data-ir')) };
+  });
+  revisa(men.items.every(i => men.secciones.includes(i.ir)) && men.secciones.every(s => men.items.some(i => i.ir === s)), 'el menú lista exactamente las secciones que existen', JSON.stringify([men.items.map(i => i.ir), men.secciones]));
+  revisa(men.items.every((i, k) => i.num === ('0' + k).slice(-2)) && men.items.every(i => !men.rotulos[i.ir] || men.rotulos[i.ir] === i.num) && men.barra.every(b => men.secciones.includes(b)), 'numeración del menú igual a la de las secciones', JSON.stringify([men.items.map(i => i.num), men.rotulos]));
+  await page.evaluate(() => window.scrollTo(0, 0));
   await page.click('#hamb');
   const abierto = await page.evaluate(() => ({ visible: !document.getElementById('menu').hidden, aria: document.getElementById('hamb').getAttribute('aria-expanded'), foco: document.activeElement && document.activeElement.closest('#menu') !== null }));
   revisa(abierto.visible && abierto.aria === 'true' && abierto.foco, 'el menú abre y toma el foco', JSON.stringify(abierto));
@@ -142,11 +284,11 @@ async function correr(navegador, nombre, opciones) {
   revisa(await page.evaluate(() => document.getElementById('menu').hidden), 'el botón cierra el menú');
   await page.click('#hamb');
   await page.click('#menu [data-ir="estadios"]');
-  await page.waitForTimeout(1600);
+  await page.waitForTimeout(1800);
   const tras = await page.evaluate(() => ({ cerrado: document.getElementById('menu').hidden, top: Math.round(document.getElementById('estadios').getBoundingClientRect().top), hash: location.hash }));
   revisa(tras.cerrado && Math.abs(tras.top) < 120 && tras.hash === '', 'elegir sección cierra el menú y desplaza sin tocar location.hash', JSON.stringify(tras));
 
-  // recorre la página para disparar la carga diferida y revisa imágenes
+  /* ---------- imágenes (recorre la página para disparar la carga diferida) ---------- */
   await page.evaluate(async () => {
     const paso = window.innerHeight * 0.9;
     for (let y = 0; y < document.documentElement.scrollHeight; y += paso) { window.scrollTo(0, y); await new Promise(r => setTimeout(r, 60)); }
@@ -157,86 +299,251 @@ async function correr(navegador, nombre, opciones) {
   const imgs = await page.evaluate(() => { const t = Array.from(document.images); return { total: t.length, rotas: t.filter(i => !(i.complete && i.naturalWidth > 0)).map(i => i.getAttribute('src')), sinAlt: t.filter(i => !i.hasAttribute('alt')).length }; });
   revisa(imgs.total > 60 && imgs.rotas.length === 0, 'ninguna imagen rota (' + imgs.total + ')', imgs.rotas.slice(0, 5).join(', '));
   revisa(imgs.sinAlt === 0, 'todas las imágenes tienen atributo alt');
-
-  // galería: cambiar de foto
   const gal = await page.evaluate(() => { const b = document.querySelectorAll('.estadio [data-foto]')[1]; const im = b.closest('figure').querySelector('img'); const a = im.getAttribute('src'); b.click(); return { cambia: im.getAttribute('src') !== a, pres: b.getAttribute('aria-pressed') }; });
   revisa(gal.cambia && gal.pres === 'true', 'la galería de estadios cambia de foto');
 
-  // capturas de secciones
+  /* capturas de secciones */
   await page.evaluate(() => { const d = document.querySelector('.partido details'); if (d) d.open = true; });
-  await capEl('3-partido', '.partido', 2600);
-  await capEl('3b-porque', '.partido details', 2400);
-  await capEl('4-camino', '#b-campeon', 1300);
-  await capEl('4b-cruces', '#b-cruces', 1500);
-  await capEl('5-tabla', '#b-tabla', 1300);
-  await capEl('6-estadios', '#b-estadios', 1500);
-  await capEl('7-modelo', '#b-fuerzas', 1400);
-  await capEl('8-cab', '#camino .cab', 700);
+  await capEl('4-partido', '.partido', 2600);
+  await capEl('5-camino', '#b-campeon', 1300);
+  await capEl('5b-cruces', '#b-cruces', 1500);
+  await capEl('6-tabla', '#b-tabla', 1300);
+  await capEl('7-estadios', '#b-estadios', 1500);
+  await capEl('8-modelo', '#b-fuerzas', 1400);
 
-  // desbordes: ni el documento ni ningún elemento visible se sale del ancho
-  const desb = await page.evaluate(() => {
-    const ancho = window.innerWidth, malos = [];
-    document.querySelectorAll('body *').forEach(e => {
-      const r = e.getBoundingClientRect(); if (!r.width || !r.height) return;
-      if (r.right > ancho + 1.5 || r.left < -1.5) {
-        let p = e.parentElement, dentro = false;
-        while (p && p !== document.body) { const o = getComputedStyle(p); if (/(auto|scroll|hidden|clip)/.test(o.overflowX)) { dentro = true; break; } p = p.parentElement; }
-        if (!dentro) malos.push(e.tagName + '.' + String(e.className).slice(0, 40));
-      }
-    });
-    return { sw: document.documentElement.scrollWidth, ancho, malos: malos.slice(0, 6) };
-  });
-  revisa(desb.sw <= desb.ancho + 1, 'sin desplazamiento horizontal', desb.sw + ' > ' + desb.ancho);
+  const desb = await desbordes(page);
+  revisa(desb.sw <= desb.ancho + 1, 'sin desplazamiento horizontal del cuerpo', desb.sw + ' > ' + desb.ancho);
   revisa(desb.malos.length === 0, 'ningún elemento se sale de la pantalla', desb.malos.join(' | '));
-
   const mala = palabrasMalas(await textoVisible(page));
   revisa(!mala, 'sin "undefined", "NaN" ni "null" en el texto', mala || '');
   revisa(errores.length === 0, 'sin errores de consola ni pageerror', errores.slice(0, 4).join(' || '));
   if (!fuentes) console.log('  nota   las fuentes de Google no cargaron en esta máquina: se probó con la pila de respaldo');
   else console.log('  nota   fuente de titulares cargada: ' + await page.evaluate(() => document.fonts.check('900 40px "Big Shoulders Display"')));
+  await page.close();
 
-  // variante: liguilla en curso y opcionales en null
+  /* ---------- EN VIVO con la base simulada ---------- */
   const errV = [];
-  const pv = await ctx.newPage();
-  pv.on('console', m => { if (m.type() === 'error') errV.push(m.text()); });
-  pv.on('pageerror', e => errV.push('pageerror: ' + e.message));
-  await pv.goto('file://' + VARIANTE, { waitUntil: 'load' });
-  await pv.waitForTimeout(400);
-  const v = await pv.evaluate(() => ({ series: document.querySelectorAll('.serie').length, tarjetas: document.querySelectorAll('.partido').length, respaldos: document.querySelectorAll('.respaldo').length,
-    cuadroVisible: !document.getElementById('b-cuadro').hidden, sw: document.documentElement.scrollWidth, ancho: window.innerWidth, grupos: Array.from(document.querySelectorAll('#b-partidos .grupo > h3')).map(h => h.textContent) }));
-  revisa(v.series === 2 && v.cuadroVisible, 'variante: el cuadro real de la liguilla aparece', JSON.stringify(v));
-  revisa(v.tarjetas === 10 && v.respaldos === 0 && errV.length === 0, 'variante: datos en null no rompen nada', JSON.stringify(v) + ' ' + errV.slice(0, 3).join(' || '));
+  const pv = await abrir(ctx, errV);
+  await pv.clock.install({ time: new Date(AHORA_EJEMPLO) });
+  await pv.addInitScript(guionClaude('db', EJEMPLO));
+  await pv.goto(URL_DOC, { waitUntil: 'load' });
+  await pv.waitForTimeout(900);
+  await pv.evaluate(() => { window.__marca = 1; });
+  const idJ = EJEMPLO.partidos[0].id, idF = EJEMPLO.partidos.filter(p => p.estado === 'final')[0].id;
+  const estado = () => pv.evaluate(([idJ, idF]) => {
+    const fr = document.getElementById('franja'), q = (s, r) => (r || document).querySelector(s), t = e => e ? e.textContent : '';
+    const b = q('.fr[data-ir="p-' + idJ + '"]'), tar = q('#p-' + idJ + ' [data-pvivo]'), fin = q('#p-' + idF + ' [data-pvivo]');
+    return { franja: !fr.hidden, top: Math.round(fr.getBoundingClientRect().top), barra: Math.round(document.getElementById('barra').getBoundingClientRect().bottom), botones: fr.querySelectorAll('.fr').length, pulso: !!q('.franja .pulso'),
+      minuto: t(q('.fr__min', b)), marcador: b ? Array.from(b.querySelectorAll('.tablero b')).map(x => x.textContent).join('-') : '', escudos: b ? b.querySelectorAll('.esc').length : 0,
+      conexion: Array.from(document.querySelectorAll('.js-conexion')).map(e => e.textContent), modo: (q('.js-conexion') || { getAttribute: () => '' }).getAttribute('data-modo'),
+      subs: window.__subs, usos: window.__usos, ruta: window.__ruta, marca: window.__marca,
+      seccion: !document.getElementById('vivo').hidden, marcs: document.querySelectorAll('.marc').length, filas: document.querySelectorAll('#b-vivo-tabla tbody tr').length, enJuego: document.querySelectorAll('#b-vivo-tabla tr.enjuego').length,
+      flechas: document.querySelectorAll('#b-vivo-tabla .mov').length, deltas: document.querySelectorAll('#b-vivo-proy .dl').length, listas: document.querySelectorAll('#b-vivo-proy .barras').length,
+      navVivo: Array.from(document.querySelectorAll('.js-nav-vivo')).every(e => !e.hidden),
+      tarjeta: !!tar && !tar.hidden, eventos: tar ? tar.querySelectorAll('.ev').length : 0, jugadores: tar ? t(q('.eventos', tar)) : '', barras: tar ? tar.querySelectorAll('.x12').length : 0, previo: tar ? /antes del partido/i.test(tar.textContent) : false, minTarjeta: tar ? t(q('.pvivo__min', tar)) : '',
+      final: !!fin && !fin.hidden && /Resultado (acertado|fallado)/.test(fin.textContent) && !!fin.querySelector('.tablero--real'), cambia: document.querySelectorAll('.tablero b.cambia').length,
+      aviso: document.getElementById('aviso').hidden ? '' : document.getElementById('aviso').textContent, voz: document.getElementById('aviso-voz').textContent, respaldos: document.querySelectorAll('.respaldo').length };
+  }, [idJ, idF]);
+  let e1 = await estado();
+  revisa(e1.franja && e1.botones === 2 && e1.pulso && e1.escudos === 2 && e1.marcador === '1-1' && e1.top >= e1.barra - 2 && e1.top < e1.barra + 6, 'en vivo: franja bajo la barra con escudos, marcador en tablero y punto que late', JSON.stringify(e1));
+  revisa(e1.subs === 1 && e1.ruta === 'vivo/actual' && e1.usos === 1, 'en vivo: una sola suscripción a db.doc("vivo/actual")', JSON.stringify([e1.subs, e1.ruta, e1.usos]));
+  revisa(e1.minuto === "57'" && e1.minTarjeta === "57'", 'en vivo: el minuto sale del documento', e1.minuto + ' / ' + e1.minTarjeta);
+  revisa(e1.conexion.some(t => /^En vivo · actualizado (ahora mismo|hace \d+ s)/.test(t)) && e1.modo === 'vivo', 'en vivo: indicador de conexión («En vivo · actualizado hace…»)', JSON.stringify(e1.conexion));
+  revisa(e1.tarjeta && e1.eventos === 3 && /Paulinho/.test(e1.jugadores) && /Marcel Ruiz/.test(e1.jugadores) && e1.barras === 2 && e1.previo, 'en vivo: la tarjeta trae marcador, eventos con jugador y la probabilidad al momento contra el pronóstico previo', JSON.stringify([e1.tarjeta, e1.eventos, e1.barras, e1.previo]));
+  revisa(e1.final, 'en vivo: al terminar, resultado final y si el pronóstico acertó');
+  revisa(e1.seccion && e1.marcs === EJEMPLO.partidos.length && e1.filas === EJEMPLO.tabla.length && e1.enJuego === EJEMPLO.tabla.filter(r => r.en_juego).length && e1.flechas === e1.filas && e1.listas === 2 && e1.deltas >= 8 && e1.navVivo, 'en vivo: tabla al momento (flechas, equipos en juego) y probabilidades con su cambio', JSON.stringify([e1.seccion, e1.marcs, e1.filas, e1.enJuego, e1.flechas, e1.listas, e1.deltas, e1.navVivo]));
+  await capDe(pv)('9-vivo-franja');
+  await capElDe(pv)('9b-vivo-seccion', '#vivo', 3400);
+  await capElDe(pv)('9c-vivo-tarjeta', '#p-' + idJ, 1300);
+  await pv.evaluate(() => window.scrollTo(0, 0));
+
+  await pv.clock.fastForward(120000);
+  await pv.waitForTimeout(150);
+  let e2 = await estado();
+  revisa(e2.minuto === "59'" && e2.minTarjeta === "59'", 'en vivo: el minuto avanza solo en la página (57\' → 59\')', e2.minuto + ' / ' + e2.minTarjeta);
+  revisa(e2.conexion.some(t => /hace 2 min/.test(t)), 'en vivo: la antigüedad de los datos se actualiza', JSON.stringify(e2.conexion));
+
+  await pv.click('.fr[data-ir="p-' + idJ + '"]');
+  await pv.waitForTimeout(1600);
+  const ida = await pv.evaluate(id => { const r = document.getElementById('p-' + id).getBoundingClientRect(), f = document.getElementById('franja').getBoundingClientRect(); return { top: Math.round(r.top), bajoFranja: r.top >= f.bottom - 2, alto: window.innerHeight }; }, idJ);
+  revisa(ida.top < ida.alto * 0.5 && ida.bajoFranja, 'en vivo: tocar la franja lleva a la tarjeta del partido', JSON.stringify(ida));
+
+  /* llega un gol */
+  const gol = copia(EJEMPLO);
+  gol.generado_utc = '2026-11-21T23:44:10Z';
+  Object.assign(gol.partidos[0], { gl: 2, minuto: 60, reloj_utc: '2026-11-21T23:44:05Z' });
+  gol.partidos[0].eventos.push({ min: 60, anadido: null, tipo: 'gol', equipo: 'Pachuca', jugador: 'Oussama Idrissi', marcador: '2-1' });
+  gol.partidos[0].vivo = { p_local: 0.8312, p_empate: 0.1321, p_visitante: 0.0367, goles_restantes_l: 0.66, goles_restantes_v: 0.3, marcador_final: { gl: 2, gv: 1, prob: 0.3712 } };
+  gol.tabla.forEach(r => { if (r.equipo === 'Pachuca') { r.PTS = 24; r.cambio = 2; } });
+  gol.ultimo_evento = { utc: '2026-11-21T23:44:08Z', tipo: 'gol', partido_id: idJ, texto: "Gol de Pachuca (60'): Oussama Idrissi. Pachuca 2-1 Toluca" };
+  await pv.evaluate(d => window.__vivo(d, false), gol);
+  await pv.waitForTimeout(250);
+  let e3 = await estado();
+  revisa(e3.marcador === '2-1' && e3.eventos === 4 && /Idrissi/.test(e3.jugadores), 'en vivo: con el gol cambia el marcador y se suma el evento', e3.marcador + ' · ' + e3.eventos);
+  revisa(/Gol de Pachuca/.test(e3.aviso) && e3.voz === e3.aviso, 'en vivo: aviso breve del evento nuevo (visible y en aria-live)', JSON.stringify([e3.aviso, e3.voz]));
+  revisa(e3.cambia >= 2, 'en vivo: el marcador que cambió se anima', String(e3.cambia));
+  revisa(e3.subs === 1 && e3.marca === 1, 'en vivo: sigue la misma suscripción y la página no se recargó', JSON.stringify([e3.subs, e3.marca]));
+  await capDe(pv)('9d-vivo-gol');
+
+  /* liguilla en vivo: el cuadro muestra el global y la probabilidad de avanzar al momento */
+  const lig = copia(gol);
+  lig.generado_utc = '2026-11-21T23:45:00Z';
+  lig.series = [{ llave: 'C1', fase: 'cuartos', mejor: { equipo: 'Cruz Azul', siembra: 1 }, peor: { equipo: 'Tijuana', siembra: 8 }, global_mejor: 1, global_peor: 0, p_avanza_mejor: 0.8731, p_avanza_peor: 0.1269, decidida: false, ganador: null, al_momento: true },
+    { llave: 'C2', fase: 'cuartos', mejor: { equipo: 'América', siembra: 2 }, peor: { equipo: 'León', siembra: 7 }, global_mejor: 0, global_peor: 0, p_avanza_mejor: 0.84, p_avanza_peor: 0.16, al_momento: false }];
+  lig.partidos[0].serie = { llave: 'C1', mejor: 'Cruz Azul', peor: 'Tijuana', global_mejor: 1, global_peor: 0, p_avanza_mejor: 0.8731, p_avanza_peor: 0.1269 };
+  await pv.evaluate(d => window.__vivo(d, false), lig);
+  await pv.waitForTimeout(200);
+  const lv = await pv.evaluate(() => { const e = document.querySelector('[data-vivo-serie="C1"]'), o = document.querySelector('[data-vivo-serie="C2"]'); return { visible: !e.hidden, texto: e.textContent, tablero: Array.from(e.querySelectorAll('.tablero b')).map(b => b.textContent).join('-'), otra: o.hidden }; });
+  revisa(lv.visible && /Al momento/.test(lv.texto) && lv.tablero === '1-0' && /87%/.test(lv.texto) && lv.otra, 'en vivo: el cuadro muestra el global y la probabilidad de avanzar al momento', JSON.stringify(lv));
+  await capElDe(pv)('9e-vivo-cuadro', '.llave[data-llave="C1"]', 600);
+
+  /* documentos corruptos o incompletos: nada se rompe */
+  const raros = [{}, { partidos: null, tabla: null, proyeccion: null }, { version: 1, estado: 'en_juego', generado_utc: 'ayer', partidos: [null, 7, { id: 1, local: null }], tabla: [null, 'x'], series: 'x', ultimo_evento: 5 },
+    { generado_utc: '2026-11-21T23:46:00Z', estado: null, partidos: [{ id: 5, local: 'Pachuca', visitante: 'Toluca', estado: 'en_juego', minuto: null, periodo: null, reloj_utc: null, gl: null, gv: null, rojas_l: null, eventos: [null, {}, { min: null, tipo: 'cosa' }], previo: null, vivo: {}, serie: {} },
+      { id: idJ, local: 'Pachuca', visitante: 'Toluca', estado: 'descanso', gl: 2, gv: 1, eventos: null, previo: { p_local: null }, vivo: { p_local: 0.8, p_empate: null }, serie: { llave: 'C9', mejor: null } },
+      { id: idF, local: 'Puebla', visitante: 'Atlético San Luis', estado: 'final', gl: 2, gv: 0, previo: null, vivo: null }],
+      tabla: [{ equipo: 'Pachuca', pos: null, PTS: null, cambio: null }, { equipo: 'Equipo Nuevo', pos: 2, cambio: -3, en_juego: true }], proyeccion: { clasifica: [null, { equipo: 'Pachuca', p: null }, { equipo: 'León', p: 0.4, delta: null }], campeon: null }, series: [null, { llave: 'C1' }, { llave: 'S1', mejor: { equipo: 'Cruz Azul' }, peor: null, global: { mejor: 1, peor: null } }], ultimo_evento: { utc: null, texto: null }, siguiente: null },
+    null, [1, 2], 'texto'];
+  for (const r of raros) { await pv.evaluate(d => window.__vivo(d, false), r); await pv.waitForTimeout(120); }
+  await pv.clock.fastForward(3000);
+  const tr = await estado();
+  const malaR = palabrasMalas(await textoVisible(pv));
+  revisa(errV.length === 0 && tr.respaldos === 0 && !malaR, 'en vivo: documentos corruptos ({}, null, campos raros) no rompen nada ni dejan errores', errV.slice(0, 3).join(' || ') + ' ' + tr.respaldos + ' ' + (malaR || ''));
+  revisa(!tr.franja && !tr.seccion && tr.conexion.some(t => /sin partidos en juego/.test(t)), 'en vivo: sin documento válido se retira la franja y lo dice', JSON.stringify([tr.franja, tr.seccion, tr.conexion]));
+  /* día sin partidos, tal como lo escribe el motor: tabla y proyección, pero nada «al momento» */
+  await pv.evaluate(d => window.__vivo(d, false), { version: 1, generado_utc: '2026-11-21T23:47:00Z', dia: '2026-11-21', estado: 'sin_partidos', partidos: [], tabla: EJEMPLO.tabla, tabla_nota: 'Tabla general: hoy no hay partidos.', proyeccion: EJEMPLO.proyeccion, series: [], ultimo_evento: null, siguiente: EJEMPLO.siguiente });
+  await pv.waitForTimeout(150);
+  const sinp = await estado();
+  revisa(!sinp.franja && !sinp.seccion && !sinp.navVivo && sinp.conexion.some(t => /^Conexión en vivo lista · sin partidos en juego/.test(t)), 'en vivo: en un día sin partidos no aparece nada «al momento»', JSON.stringify([sinp.franja, sinp.seccion, sinp.navVivo, sinp.conexion]));
+  await pv.evaluate(d => window.__vivo(d, false), lig);
+  await pv.waitForTimeout(200);
+  const vuelve = await estado();
+  revisa(vuelve.franja && vuelve.marcador === '2-1' && vuelve.subs === 1, 'en vivo: al volver un documento válido todo se repone');
+  const desbV = await desbordes(pv);
+  revisa(desbV.sw <= desbV.ancho + 1 && desbV.malos.length === 0, 'en vivo: sin desplazamiento horizontal ni elementos fuera', desbV.sw + ' ' + desbV.malos.join(' | '));
+  await pv.close();
+
+  /* copia guardada (fromCache) y luego la definitiva; base que nunca contesta; base nula */
+  const errC = [];
+  const pc = await abrir(ctx, errC);
+  await pc.clock.install({ time: new Date(AHORA_EJEMPLO) });
+  await pc.addInitScript(guionClaude('mudo'));
+  await pc.goto(URL_DOC, { waitUntil: 'load' });
+  await pc.waitForTimeout(500);
+  const c0 = await pc.evaluate(() => document.querySelector('.js-conexion').textContent);
+  await pc.clock.fastForward(11000);
+  await pc.waitForTimeout(100);
+  const c1 = await pc.evaluate(() => ({ t: document.querySelector('.js-conexion').textContent, tarjetas: document.querySelectorAll('.partido').length }));
+  revisa(/^Conectando en vivo/.test(c0) && /^Sin conexión en vivo por ahora: datos de las \d\d:\d\d/.test(c1.t) && c1.tarjetas > 0 && errC.length === 0, 'en vivo: «conectando» tiene límite de 10 s y la página sigue completa', JSON.stringify([c0, c1]) + errC.join('|'));
+  await pc.close();
+  const pn = await abrir(ctx, errC);
+  await pn.addInitScript(guionClaude('nulo'));
+  await pn.goto(URL_DOC, { waitUntil: 'load' });
+  await pn.waitForTimeout(600);
+  const cn = await pn.evaluate(() => ({ t: document.querySelector('.js-conexion').textContent, franja: !document.getElementById('franja').hidden }));
+  revisa(/^Sin conexión en vivo: datos de las/.test(cn.t) && !cn.franja && errC.length === 0, 'en vivo: si use("db") da null la página funciona igual y lo dice', JSON.stringify(cn));
+  await pn.close();
+
+  /* «vivo» incrustado (sin base): se usa si es reciente, con el minuto detenido, y se ignora si es viejo */
+  const urlVivo = variante('vivo', d => { d.vivo = copia(EJEMPLO); });
+  const pi = await abrir(ctx, errC);
+  await pi.clock.install({ time: new Date(AHORA_EJEMPLO) });
+  await pi.goto(urlVivo, { waitUntil: 'load' });
+  await pi.waitForTimeout(600);
+  await pi.clock.fastForward(180000);
+  await pi.waitForTimeout(100);
+  const inc = await pi.evaluate(() => ({ franja: !document.getElementById('franja').hidden, min: (document.querySelector('.fr__min') || {}).textContent, t: document.querySelector('.js-conexion').textContent, ejemplo: /ejemplo/i.test(document.getElementById('vivo').textContent) }));
+  revisa(inc.franja && inc.min === "57'" && /^Sin conexión en vivo: datos de las 17:41/.test(inc.t) && inc.ejemplo, 'vivo incrustado sin base: se muestra, dice de qué hora es y no avanza el reloj', JSON.stringify(inc));
+  await pi.close();
+  const ctxN = await navegador.newContext(Object.assign({ ignoreHTTPSErrors: true, locale: 'es-MX' }, opciones)); /* reloj real: el ejemplo es de otro día */
+  const pj = await abrir(ctxN, errC);
+  await pj.goto(urlVivo, { waitUntil: 'load' });
+  await pj.waitForTimeout(500);
+  const viejo = await pj.evaluate(() => ({ franja: !document.getElementById('franja').hidden, seccion: !document.getElementById('vivo').hidden }));
+  revisa(!viejo.franja && !viejo.seccion && errC.length === 0, 'vivo incrustado de otro día: no se presenta como «al momento»', JSON.stringify(viejo) + errC.join('|'));
+  await ctxN.close();
+
+  /* ---------- variante: liguilla en curso y opcionales en null ---------- */
+  const errL = [];
+  const pl = await abrir(ctx, errL);
+  await pl.goto(variante('liguilla', conLiguillaEnCurso), { waitUntil: 'load' });
+  await pl.waitForTimeout(500);
+  const v = await pl.evaluate(() => {
+    const q = s => document.querySelector(s), c1 = q('.llave[data-llave="C1"]'), c2 = q('.llave[data-llave="C2"]'), c3 = q('.llave[data-llave="C3"]'), s1 = q('.llave[data-llave="S1"]');
+    const piernas = Array.from(c1.querySelectorAll('.pierna'));
+    return { llaves: document.querySelectorAll('#cuadro .llave').length, tarjetas: document.querySelectorAll('.partido').length, respaldos: document.querySelectorAll('.respaldo').length,
+      idaReal: !!piernas[0].querySelector('.tablero--real') && /Resultado/.test(piernas[0].textContent) && Array.from(piernas[0].querySelectorAll('.tablero b')).map(b => b.textContent).join('-') === '1-0',
+      vueltaPron: !piernas[1].querySelector('.tablero--real') && !!piernas[1].querySelector('.x12') && /28 nov/.test(piernas[1].textContent),
+      chips: [c1, c2, c3, s1].map(l => (l.querySelector('.llave__id .chip') || {}).textContent), globalIda: /Global hoy/.test(c1.textContent) && /Cierre probable/.test(c1.textContent), leyenda: !!q('.leyenda-m'),
+      avanza: /Avanza/.test(c2.textContent) && !!c2.querySelector('.llave__eq.fuera') && /Global final/.test(c2.textContent), estado: q('.cuadro-estado').textContent,
+      sel: (q('.llave--sel') || { getAttribute: () => '' }).getAttribute('data-llave'), legReal: document.querySelectorAll('#serie-det .leg--real').length, legs: document.querySelectorAll('#serie-det .leg').length,
+      sw: document.documentElement.scrollWidth, ancho: window.innerWidth, grupos: Array.from(document.querySelectorAll('#b-partidos .grupo > h3')).map(h => h.textContent) };
+  });
+  revisa(v.llaves === 7 && v.idaReal && v.vueltaPron && v.globalIda && v.leyenda, 'liguilla en curso: la ida jugada sale como resultado real resaltado y la vuelta como pronóstico con su fecha', JSON.stringify(v));
+  revisa(v.chips[0] === 'En curso' && v.chips[1] === 'Terminada' && v.chips[2] === 'Definida' && v.chips[3] === 'Proyectada' && v.avanza && /en curso/i.test(v.estado), 'liguilla en curso: estados por serie (en curso, terminada con quien avanza, definida, proyectada)', JSON.stringify(v.chips));
+  revisa(v.sel === 'C1' && v.legs === 2 && v.legReal === 1, 'liguilla en curso: el detalle abre en la serie que sigue viva', JSON.stringify([v.sel, v.legs, v.legReal]));
+  revisa(v.tarjetas === 10 && v.respaldos === 0 && errL.length === 0, 'variante: datos en null no rompen nada', JSON.stringify([v.tarjetas, v.respaldos]) + ' ' + errL.slice(0, 3).join(' || '));
   revisa(v.grupos.includes('Cuartos de final, ida'), 'variante: los partidos de liguilla forman su grupo', v.grupos.join(', '));
-  revisa(v.sw <= v.ancho + 1, 'variante: sin desplazamiento horizontal');
-  const malaV = palabrasMalas(await textoVisible(pv));
-  revisa(!malaV, 'variante: sin "undefined", "NaN" ni "null"', malaV || '');
-  if (CAPTURAS) { const el = pv.locator('#b-cuadro'); await el.scrollIntoViewIfNeeded(); await pv.waitForTimeout(500); await el.screenshot({ path: path.join(DIR_CAP, motor + '-' + nombre + '-9-liguilla.png') }); }
+  for (const k of ['C2', 'C4', 'S2', 'F']) { await pl.evaluate(k => document.querySelector('.serie-sel [data-serie="' + k + '"]').click(), k); await pl.waitForTimeout(60); }
+  const desbL = await desbordes(pl);
+  revisa(desbL.sw <= desbL.ancho + 1 && desbL.malos.length === 0, 'variante: sin desplazamiento horizontal', desbL.sw + ' ' + desbL.malos.join(' | '));
+  const malaV = palabrasMalas(await textoVisible(pl));
+  revisa(!malaV && errL.length === 0 && await pl.evaluate(() => document.querySelectorAll('.respaldo').length) === 0, 'variante: sin "undefined", "NaN" ni "null" (también al recorrer el detalle de cada serie)', (malaV || '') + errL.slice(0, 2).join('|'));
+  await pl.evaluate(() => document.querySelector('.serie-sel [data-serie="C1"]').click());
+  await capElDe(pl)('10-liguilla-en-curso', '#b-llaves', movil ? 1500 : 1000);
+  await capElDe(pl)('10b-detalle-en-curso', '#serie-det', 1500);
+  await pl.close();
+
+  /* sin liguilla.torneo: aviso en lugar del cuadro */
+  const ps = await abrir(ctx, errL);
+  await ps.goto(variante('sintorneo', d => { d.liguilla.torneo = null; d.liguilla.cuadro_proyectado = null; }), { waitUntil: 'load' });
+  await ps.waitForTimeout(400);
+  const st = await ps.evaluate(() => ({ vacio: !!document.querySelector('#b-llaves .vacio'), respaldos: document.querySelectorAll('.respaldo').length, tarjetas: document.querySelectorAll('.partido').length }));
+  revisa(st.vacio && st.respaldos === 0 && st.tarjetas > 0 && errL.length === 0, 'sin liguilla.torneo: estado vacío en lugar del cuadro, sin errores', JSON.stringify(st) + errL.slice(0, 2).join('|'));
+  await ps.close();
   await ctx.close();
 
-  // movimiento reducido: sin autoplay ni animaciones
+  /* ---------- movimiento reducido ---------- */
   const ctxR = await navegador.newContext(Object.assign({ ignoreHTTPSErrors: true }, opciones, { reducedMotion: 'reduce' }));
   const pr = await ctxR.newPage();
+  await pr.addInitScript(() => { window.__raf = 0; const o = window.requestAnimationFrame; window.requestAnimationFrame = function (f) { window.__raf++; return o.call(window, f); }; });
   await pr.goto(URL_DOC, { waitUntil: 'load' });
-  await pr.waitForTimeout(700);
-  const red = await pr.evaluate(() => { const v = document.getElementById('video-portada') || { paused: true, hasAttribute: () => false, getAttribute: () => 'foto' }; return { pausado: v.paused, autoplay: v.hasAttribute('autoplay'), animadas: document.querySelectorAll('.entra').length, poster: !!v.getAttribute('poster') }; });
-  revisa(red.pausado && !red.autoplay && red.animadas === 0 && red.poster, 'movimiento reducido: video en pausa con póster y sin animaciones', JSON.stringify(red));
+  await pr.waitForTimeout(900);
+  const red = await pr.evaluate(() => { const im = document.querySelector('#portada .fondo img'), cv = document.getElementById('confeti'), px = cv.getContext('2d').getImageData(0, 0, cv.width, cv.height).data; let n = 0; for (let i = 3; i < px.length; i += 4) if (px[i] > 20) n++;
+    return { anim: im.getAnimations ? im.getAnimations().length : 0, raf: window.__raf, confeti: n, animadas: document.querySelectorAll('.entra').length, videos: Array.from(document.querySelectorAll('video')).filter(v => !v.paused).length }; });
+  revisa(red.anim === 0 && red.raf === 0 && red.confeti > 40 && red.animadas === 0 && red.videos === 0, 'movimiento reducido: foto quieta, confeti fijo, sin animaciones ni video', JSON.stringify(red));
   await ctxR.close();
 }
 
 (async () => {
+  /* --vivo (opción de prueba) incrusta el documento en vivo sólo en documento.html; después se construye la página normal */
+  const indice = path.join(WEB, 'index.html'), huella = f => fs.existsSync(f) ? fs.statSync(f).mtimeMs : 0;
+  const antesIndice = huella(indice);
+  execFileSync('python3', [path.join(WEB, 'construir.py'), '--vivo', path.join(WEB, '..', 'salidas', 'vivo_ejemplo.json')], { stdio: 'pipe' });
+  const conVivo = fs.readFileSync(path.join(WEB, 'documento.html'), 'utf8'), intacto = huella(indice) === antesIndice;
   execFileSync('python3', [path.join(WEB, 'construir.py'), '--documento', '--salida', WEB], { stdio: 'inherit' });
-  const frag = fs.readFileSync(path.join(WEB, 'index.html'), 'utf8');
+  const frag = fs.readFileSync(indice, 'utf8');
   const antes = frag.split('<script type="application/json"')[0];
+  const guion = frag.split('</script>').slice(-2)[0];
   console.log('== archivo ==');
   revisa(!/<!doctype|<html[\s>]|<head[\s>]|<body[\s>]/i.test(antes), 'index.html es un fragmento (sin doctype, html, head ni body)');
   revisa(/^<title>Cerebro Liga MX<\/title>\s*<meta name="claude:viewport-fit-sides" content="cover">/.test(frag), 'empieza con <title> y la meta de la plataforma');
-  revisa(!/<script[^>]+src=|<iframe|location\.hash|pushState|\balert\(|\bconfirm\(|\bprompt\(|localStorage/.test(antes + frag.split('</script>').pop()), 'sin scripts externos, iframes, hash, alert ni localStorage');
+  revisa(!/<script[^>]+src=|<iframe|location\.hash|pushState|\balert\(|\bconfirm\(|\bprompt\(|localStorage|location\.reload/.test(antes + guion), 'sin scripts externos, iframes, hash, alert, localStorage ni recargas');
+  revisa(!/<link[^>]+href="(?!https:\/\/fonts\.googleapis\.com\/)/.test(antes) && !/(src|poster)="https?:/.test(antes), 'hojas de estilo sólo de Google Fonts; imágenes y videos sólo propios');
   const css = /<style>([\s\S]*?)<\/style>/.exec(frag)[1], raiz = /:root\{[\s\S]*?\n\}/.exec(css)[0];
   const literales = css.replace(raiz, '').match(/#[0-9a-fA-F]{3,8}\b|rgba?\(|hsla?\(/g);
   revisa(!literales, 'ningún color literal fuera de los tokens de :root', (literales || []).slice(0, 5).join(' '));
+  revisa(/color-scheme:dark/.test(raiz) && /body\{[^}]*background:var\(--noche\)/.test(css) && /max\(16px, env\(safe-area-inset-left/.test(raiz) && /max\(16px, env\(safe-area-inset-right/.test(raiz), 'un solo tema oscuro, fondo explícito y canal lateral con env(safe-area-inset-*)');
+  revisa(/\.use\('db'\)/.test(guion) && /\.doc\('vivo\/actual'\)/.test(guion) && (guion.match(/onSnapshot\(/g) || []).length === 1 && !/window\.claude\.(db|room|artifact)/.test(guion), 'usa la capacidad con claude.use("db") y una sola llamada a onSnapshot');
+  const caps = JSON.parse(fs.readFileSync(path.join(WEB, 'capacidades.json'), 'utf8'));
+  revisa(caps.db && Array.isArray(caps.db.rules), 'capacidades.json declara la capacidad "db"', JSON.stringify(caps));
+  const datosDe = h => JSON.parse(/<script type="application\/json" id="datos">([\s\S]*?)<\/script>/.exec(h)[1]);
+  const vivoPrueba = datosDe(conVivo).vivo, vivoNormal = datosDe(frag).vivo, vivoActual = JSON.parse(fs.readFileSync(path.join(WEB, '..', 'salidas', 'actual.json'), 'utf8')).vivo;
+  revisa(vivoPrueba && vivoPrueba.ejemplo === true && intacto, 'construir.py --vivo incrusta ese documento en documento.html y no toca index.html');
+  revisa(JSON.stringify(vivoNormal) === JSON.stringify(vivoActual) && !(vivoNormal && vivoNormal.ejemplo), 'sin la opción, index.html incrusta actual.json → vivo sólo si existe (' + (vivoActual ? 'hoy existe: ' + vivoActual.estado : 'hoy no existe') + ')');
   const usados = JSON.parse(fs.readFileSync(path.join(WEB, 'archivos_publicados.json'), 'utf8'));
-  revisa(usados.length > 0 && usados.every(r => fs.existsSync(path.join(WEB, r))), 'archivos_publicados.json: los ' + usados.length + ' archivos existen');
-  escribirVariante();
+  const enPagina = Array.from(new Set((frag.match(/(?:img|video)\/[\w./-]+\.(?:jpg|jpeg|png|webp|svg|mp4)/g) || [])));
+  revisa(usados.length > 0 && usados.every(r => fs.existsSync(path.join(WEB, r))) && enPagina.every(r => usados.includes(r)), 'archivos_publicados.json: los ' + usados.length + ' archivos existen y cubren todo lo que la página usa', enPagina.filter(r => !usados.includes(r)).slice(0, 4).join(', '));
 
   const proxy = process.env.HTTPS_PROXY || process.env.https_proxy;
   const navegador = await pw[motor].launch(proxy ? { proxy: { server: proxy } } : {});
@@ -245,8 +552,8 @@ async function correr(navegador, nombre, opciones) {
     await correr(navegador, 'escritorio', { viewport: { width: 1440, height: 900 } });
   } finally {
     await navegador.close();
-    try { fs.unlinkSync(VARIANTE); } catch (e) { /* ya no estaba */ }
+    temporales.forEach(f => { try { fs.unlinkSync(f); } catch (e) { /* ya no estaba */ } });
   }
   console.log('\n' + (fallas.length ? 'FALLARON ' + fallas.length + ' de ' + revisados + ':\n - ' + fallas.join('\n - ') : 'TODO BIEN: ' + revisados + ' revisiones en ' + motor));
   process.exit(fallas.length ? 1 : 0);
-})().catch(e => { console.error(e); try { fs.unlinkSync(VARIANTE); } catch (x) { /* nada */ } process.exit(1); });
+})().catch(e => { console.error(e); temporales.forEach(f => { try { fs.unlinkSync(f); } catch (x) { /* nada */ } }); process.exit(1); });

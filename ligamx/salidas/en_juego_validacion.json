@@ -1,0 +1,1373 @@
+{
+ "generado_utc": "2026-11-10T22:04:55Z",
+ "modelo_lambdas": "ensamble",
+ "partidos": 2981,
+ "torneos": 18,
+ "rho_alterno": -0.05,
+ "ventana_torneos": 8,
+ "umbral_z": 2.0,
+ "efectos_por_torneo": [
+  {
+   "torneo": "Apertura 2016",
+   "goles_previos": 0.0,
+   "aplicados": [],
+   "efectos": {
+    "base": 1.0,
+    "pierde": 1.0,
+    "gana_1": 1.0,
+    "gana_2": 1.0,
+    "con_menos": 1.0,
+    "con_mas": 1.0
+   }
+  },
+  {
+   "torneo": "Clausura 2017",
+   "goles_previos": 464.0,
+   "aplicados": [
+    "pierde",
+    "con_mas"
+   ],
+   "efectos": {
+    "base": 1.0,
+    "pierde": 1.2001,
+    "gana_1": 1.0,
+    "gana_2": 1.0,
+    "con_menos": 1.0,
+    "con_mas": 2.0418
+   }
+  },
+  {
+   "torneo": "Apertura 2017",
+   "goles_previos": 875.0,
+   "aplicados": [
+    "base",
+    "pierde",
+    "con_menos",
+    "con_mas"
+   ],
+   "efectos": {
+    "base": 0.8942,
+    "pierde": 1.2826,
+    "gana_1": 1.0,
+    "gana_2": 1.0,
+    "con_menos": 0.5961,
+    "con_mas": 1.9301
+   }
+  },
+  {
+   "torneo": "Clausura 2018",
+   "goles_previos": 1295.0,
+   "aplicados": [
+    "base",
+    "pierde",
+    "con_menos",
+    "con_mas"
+   ],
+   "efectos": {
+    "base": 0.9025,
+    "pierde": 1.2233,
+    "gana_1": 1.0,
+    "gana_2": 1.0,
+    "con_menos": 0.5166,
+    "con_mas": 1.7343
+   }
+  },
+  {
+   "torneo": "Apertura 2018",
+   "goles_previos": 1729.0,
+   "aplicados": [
+    "base",
+    "pierde",
+    "con_menos",
+    "con_mas"
+   ],
+   "efectos": {
+    "base": 0.9202,
+    "pierde": 1.1747,
+    "gana_1": 1.0,
+    "gana_2": 1.0,
+    "con_menos": 0.6245,
+    "con_mas": 1.5363
+   }
+  },
+  {
+   "torneo": "Clausura 2019",
+   "goles_previos": 2175.0,
+   "aplicados": [
+    "base",
+    "pierde",
+    "con_menos",
+    "con_mas"
+   ],
+   "efectos": {
+    "base": 0.9346,
+    "pierde": 1.1628,
+    "gana_1": 1.0,
+    "gana_2": 1.0,
+    "con_menos": 0.6021,
+    "con_mas": 1.4879
+   }
+  },
+  {
+   "torneo": "Apertura 2019",
+   "goles_previos": 2624.0,
+   "aplicados": [
+    "pierde",
+    "gana_1",
+    "con_menos",
+    "con_mas"
+   ],
+   "efectos": {
+    "base": 1.0,
+    "pierde": 1.077,
+    "gana_1": 0.8723,
+    "gana_2": 1.0,
+    "con_menos": 0.5616,
+    "con_mas": 1.5275
+   }
+  },
+  {
+   "torneo": "Clausura 2020",
+   "goles_previos": 3168.0,
+   "aplicados": [
+    "pierde",
+    "con_menos",
+    "con_mas"
+   ],
+   "efectos": {
+    "base": 1.0,
+    "pierde": 1.0916,
+    "gana_1": 1.0,
+    "gana_2": 1.0,
+    "con_menos": 0.5583,
+    "con_mas": 1.5315
+   }
+  },
+  {
+   "torneo": "Apertura 2020",
+   "goles_previos": 3428.0,
+   "aplicados": [
+    "pierde",
+    "gana_1",
+    "con_menos",
+    "con_mas"
+   ],
+   "efectos": {
+    "base": 1.0,
+    "pierde": 1.0952,
+    "gana_1": 0.902,
+    "gana_2": 1.0,
+    "con_menos": 0.5515,
+    "con_mas": 1.6022
+   }
+  },
+  {
+   "torneo": "Clausura 2021",
+   "goles_previos": 3859.0,
+   "aplicados": [
+    "pierde",
+    "gana_1",
+    "con_menos",
+    "con_mas"
+   ],
+   "efectos": {
+    "base": 1.0,
+    "pierde": 1.0921,
+    "gana_1": 0.8817,
+    "gana_2": 1.0,
+    "con_menos": 0.545,
+    "con_mas": 1.5621
+   }
+  },
+  {
+   "torneo": "Apertura 2021",
+   "goles_previos": 4266.0,
+   "aplicados": [
+    "pierde",
+    "gana_1",
+    "con_menos",
+    "con_mas"
+   ],
+   "efectos": {
+    "base": 1.0,
+    "pierde": 1.0844,
+    "gana_1": 0.8808,
+    "gana_2": 1.0,
+    "con_menos": 0.5613,
+    "con_mas": 1.556
+   }
+  },
+  {
+   "torneo": "Clausura 2022",
+   "goles_previos": 4641.0,
+   "aplicados": [
+    "base",
+    "pierde",
+    "gana_1",
+    "con_menos",
+    "con_mas"
+   ],
+   "efectos": {
+    "base": 0.956,
+    "pierde": 1.127,
+    "gana_1": 0.9158,
+    "gana_2": 1.0,
+    "con_menos": 0.5628,
+    "con_mas": 1.5552
+   }
+  },
+  {
+   "torneo": "Apertura 2022",
+   "goles_previos": 5082.0,
+   "aplicados": [
+    "pierde",
+    "gana_1",
+    "con_menos",
+    "con_mas"
+   ],
+   "efectos": {
+    "base": 1.0,
+    "pierde": 1.0806,
+    "gana_1": 0.8857,
+    "gana_2": 1.0,
+    "con_menos": 0.5505,
+    "con_mas": 1.4955
+   }
+  },
+  {
+   "torneo": "Clausura 2023",
+   "goles_previos": 5563.0,
+   "aplicados": [
+    "pierde",
+    "gana_1",
+    "con_menos",
+    "con_mas"
+   ],
+   "efectos": {
+    "base": 1.0,
+    "pierde": 1.0975,
+    "gana_1": 0.8945,
+    "gana_2": 1.0,
+    "con_menos": 0.5563,
+    "con_mas": 1.504
+   }
+  },
+  {
+   "torneo": "Apertura 2023",
+   "goles_previos": 6041.0,
+   "aplicados": [
+    "pierde",
+    "gana_1",
+    "con_menos",
+    "con_mas"
+   ],
+   "efectos": {
+    "base": 1.0,
+    "pierde": 1.1027,
+    "gana_1": 0.9098,
+    "gana_2": 1.0,
+    "con_menos": 0.5429,
+    "con_mas": 1.4828
+   }
+  },
+  {
+   "torneo": "Clausura 2024",
+   "goles_previos": 6522.0,
+   "aplicados": [
+    "pierde",
+    "gana_1",
+    "con_menos",
+    "con_mas"
+   ],
+   "efectos": {
+    "base": 1.0,
+    "pierde": 1.1014,
+    "gana_1": 0.912,
+    "gana_2": 1.0,
+    "con_menos": 0.5335,
+    "con_mas": 1.4962
+   }
+  },
+  {
+   "torneo": "Apertura 2024",
+   "goles_previos": 7008.0,
+   "aplicados": [
+    "pierde",
+    "gana_1",
+    "con_menos",
+    "con_mas"
+   ],
+   "efectos": {
+    "base": 1.0,
+    "pierde": 1.1156,
+    "gana_1": 0.9151,
+    "gana_2": 1.0,
+    "con_menos": 0.5212,
+    "con_mas": 1.5346
+   }
+  },
+  {
+   "torneo": "Clausura 2025",
+   "goles_previos": 7464.0,
+   "aplicados": [
+    "base",
+    "pierde",
+    "con_menos",
+    "con_mas"
+   ],
+   "efectos": {
+    "base": 0.9587,
+    "pierde": 1.1582,
+    "gana_1": 1.0,
+    "gana_2": 1.0,
+    "con_menos": 0.5147,
+    "con_mas": 1.5391
+   }
+  }
+ ],
+ "por_minuto": {
+  "15": {
+   "n": 2981,
+   "fraccion_restante_media": 0.8775,
+   "logloss": {
+    "modelo": {
+     "media": 0.9822,
+     "ee": 0.0082,
+     "ic_inf": 0.966,
+     "ic_sup": 0.9984,
+     "n": 2981,
+     "n_bloques": 510
+    },
+    "curva": {
+     "media": 0.9851,
+     "ee": 0.0088,
+     "ic_inf": 0.9674,
+     "ic_sup": 1.0019,
+     "n": 2981,
+     "n_bloques": 510
+    },
+    "marcador": {
+     "media": 0.9849,
+     "ee": 0.0085,
+     "ic_inf": 0.9679,
+     "ic_sup": 1.0012,
+     "n": 2981,
+     "n_bloques": 510
+    },
+    "modelo_rho": {
+     "media": 0.9814,
+     "ee": 0.0082,
+     "ic_inf": 0.9651,
+     "ic_sup": 0.9975,
+     "n": 2981,
+     "n_bloques": 510
+    },
+    "previo": {
+     "media": 1.0254,
+     "ee": 0.0067,
+     "ic_inf": 1.0124,
+     "ic_sup": 1.0381,
+     "n": 2981,
+     "n_bloques": 510
+    },
+    "persistencia": {
+     "media": 1.0253,
+     "ee": 0.0067,
+     "ic_inf": 1.0117,
+     "ic_sup": 1.0388,
+     "n": 2981,
+     "n_bloques": 510
+    }
+   },
+   "brier": {
+    "modelo": 0.5859,
+    "curva": 0.5878,
+    "marcador": 0.5876,
+    "modelo_rho": 0.5855,
+    "previo": 0.6152,
+    "persistencia": 0.6145
+   },
+   "acierto": {
+    "modelo": 0.5133,
+    "curva": 0.5089,
+    "marcador": 0.5092,
+    "modelo_rho": 0.5146,
+    "previo": 0.4797,
+    "persistencia": 0.4908,
+    "se_queda_como_va": 0.3875
+   },
+   "contra": {
+    "previo": {
+     "dif": -0.0432,
+     "ee": 0.0047,
+     "ic_inf": -0.0526,
+     "ic_sup": -0.0341,
+     "z": -9.1035,
+     "n": 2981,
+     "n_bloques": 510
+    },
+    "persistencia": {
+     "dif": -0.0431,
+     "ee": 0.0048,
+     "ic_inf": -0.0528,
+     "ic_sup": -0.0338,
+     "z": -9.0373,
+     "n": 2981,
+     "n_bloques": 510
+    },
+    "curva": {
+     "dif": -0.0028,
+     "ee": 0.0015,
+     "ic_inf": -0.0059,
+     "ic_sup": 0.0001,
+     "z": -1.862,
+     "n": 2981,
+     "n_bloques": 510
+    },
+    "marcador": {
+     "dif": -0.0026,
+     "ee": 0.0013,
+     "ic_inf": -0.0052,
+     "ic_sup": -0.0,
+     "z": -2.0065,
+     "n": 2981,
+     "n_bloques": 510
+    },
+    "modelo_rho": {
+     "dif": 0.0009,
+     "ee": 0.0005,
+     "ic_inf": -0.0,
+     "ic_sup": 0.0018,
+     "z": 1.874,
+     "n": 2981,
+     "n_bloques": 510
+    }
+   },
+   "calibracion": [
+    {
+     "p_media": 0.1159,
+     "frec_obs": 0.0972,
+     "n": 895
+    },
+    {
+     "p_media": 0.1987,
+     "frec_obs": 0.1765,
+     "n": 895
+    },
+    {
+     "p_media": 0.2399,
+     "frec_obs": 0.238,
+     "n": 895
+    },
+    {
+     "p_media": 0.2648,
+     "frec_obs": 0.2841,
+     "n": 894
+    },
+    {
+     "p_media": 0.2822,
+     "frec_obs": 0.2864,
+     "n": 894
+    },
+    {
+     "p_media": 0.3003,
+     "frec_obs": 0.2964,
+     "n": 894
+    },
+    {
+     "p_media": 0.345,
+     "frec_obs": 0.3412,
+     "n": 894
+    },
+    {
+     "p_media": 0.4124,
+     "frec_obs": 0.4172,
+     "n": 894
+    },
+    {
+     "p_media": 0.5011,
+     "frec_obs": 0.5034,
+     "n": 894
+    },
+    {
+     "p_media": 0.6735,
+     "frec_obs": 0.6935,
+     "n": 894
+    }
+   ],
+   "error_calibracion": 0.0101,
+   "pendiente_calibracion": 1.063,
+   "goles_restantes": {
+    "esperados_modelo": 2.302,
+    "esperados_curva": 2.3381,
+    "observados": {
+     "media": 2.3381,
+     "ee": 0.0271,
+     "ic_inf": 2.286,
+     "ic_sup": 2.3909,
+     "n": 2981,
+     "n_bloques": 510
+    }
+   },
+   "con_expulsion": {
+    "n": 39,
+    "logloss_modelo": 0.88,
+    "logloss_marcador": 1.057,
+    "logloss_curva": 1.0599,
+    "modelo_menos_marcador": {
+     "dif": -0.177,
+     "ee": 0.0858,
+     "ic_inf": -0.3371,
+     "ic_sup": 0.0042,
+     "z": -2.0618,
+     "n": 39,
+     "n_bloques": 36
+    }
+   }
+  },
+  "30": {
+   "n": 2981,
+   "fraccion_restante_media": 0.7348,
+   "logloss": {
+    "modelo": {
+     "media": 0.9194,
+     "ee": 0.0094,
+     "ic_inf": 0.9009,
+     "ic_sup": 0.9388,
+     "n": 2981,
+     "n_bloques": 510
+    },
+    "curva": {
+     "media": 0.9224,
+     "ee": 0.0103,
+     "ic_inf": 0.9022,
+     "ic_sup": 0.9431,
+     "n": 2981,
+     "n_bloques": 510
+    },
+    "marcador": {
+     "media": 0.9228,
+     "ee": 0.0099,
+     "ic_inf": 0.9036,
+     "ic_sup": 0.9428,
+     "n": 2981,
+     "n_bloques": 510
+    },
+    "modelo_rho": {
+     "media": 0.9185,
+     "ee": 0.0095,
+     "ic_inf": 0.9,
+     "ic_sup": 0.9379,
+     "n": 2981,
+     "n_bloques": 510
+    },
+    "previo": {
+     "media": 1.0254,
+     "ee": 0.0067,
+     "ic_inf": 1.0124,
+     "ic_sup": 1.0381,
+     "n": 2981,
+     "n_bloques": 510
+    },
+    "persistencia": {
+     "media": 0.9654,
+     "ee": 0.0089,
+     "ic_inf": 0.9487,
+     "ic_sup": 0.9837,
+     "n": 2981,
+     "n_bloques": 510
+    }
+   },
+   "brier": {
+    "modelo": 0.5451,
+    "curva": 0.5463,
+    "marcador": 0.5463,
+    "modelo_rho": 0.5446,
+    "previo": 0.6152,
+    "persistencia": 0.5727
+   },
+   "acierto": {
+    "modelo": 0.5552,
+    "curva": 0.5525,
+    "marcador": 0.5525,
+    "modelo_rho": 0.5535,
+    "previo": 0.4797,
+    "persistencia": 0.528,
+    "se_queda_como_va": 0.4881
+   },
+   "contra": {
+    "previo": {
+     "dif": -0.106,
+     "ee": 0.0071,
+     "ic_inf": -0.1203,
+     "ic_sup": -0.0919,
+     "z": -15.0218,
+     "n": 2981,
+     "n_bloques": 510
+    },
+    "persistencia": {
+     "dif": -0.0461,
+     "ee": 0.005,
+     "ic_inf": -0.0564,
+     "ic_sup": -0.0363,
+     "z": -9.1714,
+     "n": 2981,
+     "n_bloques": 510
+    },
+    "curva": {
+     "dif": -0.0031,
+     "ee": 0.0022,
+     "ic_inf": -0.0073,
+     "ic_sup": 0.0012,
+     "z": -1.4112,
+     "n": 2981,
+     "n_bloques": 510
+    },
+    "marcador": {
+     "dif": -0.0035,
+     "ee": 0.0019,
+     "ic_inf": -0.0072,
+     "ic_sup": 0.0003,
+     "z": -1.8014,
+     "n": 2981,
+     "n_bloques": 510
+    },
+    "modelo_rho": {
+     "dif": 0.0009,
+     "ee": 0.0004,
+     "ic_inf": 0.0,
+     "ic_sup": 0.0017,
+     "z": 2.1622,
+     "n": 2981,
+     "n_bloques": 510
+    }
+   },
+   "calibracion": [
+    {
+     "p_media": 0.0649,
+     "frec_obs": 0.0525,
+     "n": 895
+    },
+    {
+     "p_media": 0.1568,
+     "frec_obs": 0.1207,
+     "n": 895
+    },
+    {
+     "p_media": 0.2143,
+     "frec_obs": 0.2235,
+     "n": 895
+    },
+    {
+     "p_media": 0.255,
+     "frec_obs": 0.2405,
+     "n": 894
+    },
+    {
+     "p_media": 0.2895,
+     "frec_obs": 0.2975,
+     "n": 894
+    },
+    {
+     "p_media": 0.3145,
+     "frec_obs": 0.3221,
+     "n": 894
+    },
+    {
+     "p_media": 0.3402,
+     "frec_obs": 0.3468,
+     "n": 894
+    },
+    {
+     "p_media": 0.4104,
+     "frec_obs": 0.4072,
+     "n": 894
+    },
+    {
+     "p_media": 0.5309,
+     "frec_obs": 0.5436,
+     "n": 894
+    },
+    {
+     "p_media": 0.7574,
+     "frec_obs": 0.7796,
+     "n": 894
+    }
+   ],
+   "error_calibracion": 0.0133,
+   "pendiente_calibracion": 1.086,
+   "goles_restantes": {
+    "esperados_modelo": 1.9445,
+    "esperados_curva": 1.9581,
+    "observados": {
+     "media": 1.9701,
+     "ee": 0.0242,
+     "ic_inf": 1.9243,
+     "ic_sup": 2.0176,
+     "n": 2981,
+     "n_bloques": 510
+    }
+   },
+   "con_expulsion": {
+    "n": 121,
+    "logloss_modelo": 0.8113,
+    "logloss_marcador": 0.906,
+    "logloss_curva": 0.9036,
+    "modelo_menos_marcador": {
+     "dif": -0.0947,
+     "ee": 0.0412,
+     "ic_inf": -0.1761,
+     "ic_sup": -0.0114,
+     "z": -2.297,
+     "n": 121,
+     "n_bloques": 104
+    }
+   }
+  },
+  "45": {
+   "n": 2981,
+   "fraccion_restante_media": 0.5511,
+   "logloss": {
+    "modelo": {
+     "media": 0.8229,
+     "ee": 0.0113,
+     "ic_inf": 0.8001,
+     "ic_sup": 0.8451,
+     "n": 2981,
+     "n_bloques": 510
+    },
+    "curva": {
+     "media": 0.8317,
+     "ee": 0.0123,
+     "ic_inf": 0.8073,
+     "ic_sup": 0.8559,
+     "n": 2981,
+     "n_bloques": 510
+    },
+    "marcador": {
+     "media": 0.8311,
+     "ee": 0.0119,
+     "ic_inf": 0.8077,
+     "ic_sup": 0.855,
+     "n": 2981,
+     "n_bloques": 510
+    },
+    "modelo_rho": {
+     "media": 0.8226,
+     "ee": 0.0114,
+     "ic_inf": 0.7995,
+     "ic_sup": 0.845,
+     "n": 2981,
+     "n_bloques": 510
+    },
+    "previo": {
+     "media": 1.0254,
+     "ee": 0.0067,
+     "ic_inf": 1.0124,
+     "ic_sup": 1.0381,
+     "n": 2981,
+     "n_bloques": 510
+    },
+    "persistencia": {
+     "media": 0.8799,
+     "ee": 0.0116,
+     "ic_inf": 0.8571,
+     "ic_sup": 0.9033,
+     "n": 2981,
+     "n_bloques": 510
+    }
+   },
+   "brier": {
+    "modelo": 0.4852,
+    "curva": 0.4904,
+    "marcador": 0.4899,
+    "modelo_rho": 0.4851,
+    "previo": 0.6152,
+    "persistencia": 0.5162
+   },
+   "acierto": {
+    "modelo": 0.6139,
+    "curva": 0.6085,
+    "marcador": 0.6062,
+    "modelo_rho": 0.6099,
+    "previo": 0.4797,
+    "persistencia": 0.5854,
+    "se_queda_como_va": 0.5854
+   },
+   "contra": {
+    "previo": {
+     "dif": -0.2025,
+     "ee": 0.0095,
+     "ic_inf": -0.2207,
+     "ic_sup": -0.1839,
+     "z": -21.3853,
+     "n": 2981,
+     "n_bloques": 510
+    },
+    "persistencia": {
+     "dif": -0.057,
+     "ee": 0.0053,
+     "ic_inf": -0.0677,
+     "ic_sup": -0.0468,
+     "z": -10.6568,
+     "n": 2981,
+     "n_bloques": 510
+    },
+    "curva": {
+     "dif": -0.0088,
+     "ee": 0.0026,
+     "ic_inf": -0.014,
+     "ic_sup": -0.0038,
+     "z": -3.3695,
+     "n": 2981,
+     "n_bloques": 510
+    },
+    "marcador": {
+     "dif": -0.0082,
+     "ee": 0.0024,
+     "ic_inf": -0.013,
+     "ic_sup": -0.0038,
+     "z": -3.449,
+     "n": 2981,
+     "n_bloques": 510
+    },
+    "modelo_rho": {
+     "dif": 0.0003,
+     "ee": 0.0003,
+     "ic_inf": -0.0004,
+     "ic_sup": 0.0009,
+     "z": 0.7782,
+     "n": 2981,
+     "n_bloques": 510
+    }
+   },
+   "calibracion": [
+    {
+     "p_media": 0.0267,
+     "frec_obs": 0.0212,
+     "n": 895
+    },
+    {
+     "p_media": 0.0904,
+     "frec_obs": 0.0726,
+     "n": 895
+    },
+    {
+     "p_media": 0.1629,
+     "frec_obs": 0.133,
+     "n": 895
+    },
+    {
+     "p_media": 0.2197,
+     "frec_obs": 0.2181,
+     "n": 894
+    },
+    {
+     "p_media": 0.2679,
+     "frec_obs": 0.2662,
+     "n": 894
+    },
+    {
+     "p_media": 0.3219,
+     "frec_obs": 0.3244,
+     "n": 894
+    },
+    {
+     "p_media": 0.3692,
+     "frec_obs": 0.3859,
+     "n": 894
+    },
+    {
+     "p_media": 0.4189,
+     "frec_obs": 0.4329,
+     "n": 894
+    },
+    {
+     "p_media": 0.6087,
+     "frec_obs": 0.6208,
+     "n": 894
+    },
+    {
+     "p_media": 0.8479,
+     "frec_obs": 0.8591,
+     "n": 894
+    }
+   ],
+   "error_calibracion": 0.0113,
+   "pendiente_calibracion": 1.077,
+   "goles_restantes": {
+    "esperados_modelo": 1.4715,
+    "esperados_curva": 1.4683,
+    "observados": {
+     "media": 1.4683,
+     "ee": 0.0218,
+     "ic_inf": 1.4273,
+     "ic_sup": 1.5086,
+     "n": 2981,
+     "n_bloques": 510
+    }
+   },
+   "con_expulsion": {
+    "n": 256,
+    "logloss_modelo": 0.7304,
+    "logloss_marcador": 0.831,
+    "logloss_curva": 0.8303,
+    "modelo_menos_marcador": {
+     "dif": -0.1006,
+     "ee": 0.0249,
+     "ic_inf": -0.1484,
+     "ic_sup": -0.0521,
+     "z": -4.0329,
+     "n": 256,
+     "n_bloques": 191
+    }
+   }
+  },
+  "60": {
+   "n": 2981,
+   "fraccion_restante_media": 0.3905,
+   "logloss": {
+    "modelo": {
+     "media": 0.7163,
+     "ee": 0.0129,
+     "ic_inf": 0.6917,
+     "ic_sup": 0.7414,
+     "n": 2981,
+     "n_bloques": 510
+    },
+    "curva": {
+     "media": 0.7233,
+     "ee": 0.0135,
+     "ic_inf": 0.6974,
+     "ic_sup": 0.7494,
+     "n": 2981,
+     "n_bloques": 510
+    },
+    "marcador": {
+     "media": 0.7235,
+     "ee": 0.0132,
+     "ic_inf": 0.6985,
+     "ic_sup": 0.7491,
+     "n": 2981,
+     "n_bloques": 510
+    },
+    "modelo_rho": {
+     "media": 0.7163,
+     "ee": 0.013,
+     "ic_inf": 0.6917,
+     "ic_sup": 0.7416,
+     "n": 2981,
+     "n_bloques": 510
+    },
+    "previo": {
+     "media": 1.0254,
+     "ee": 0.0067,
+     "ic_inf": 1.0124,
+     "ic_sup": 1.0381,
+     "n": 2981,
+     "n_bloques": 510
+    },
+    "persistencia": {
+     "media": 0.7752,
+     "ee": 0.0131,
+     "ic_inf": 0.7495,
+     "ic_sup": 0.8013,
+     "n": 2981,
+     "n_bloques": 510
+    }
+   },
+   "brier": {
+    "modelo": 0.4202,
+    "curva": 0.4243,
+    "marcador": 0.424,
+    "modelo_rho": 0.4203,
+    "previo": 0.6152,
+    "persistencia": 0.4485
+   },
+   "acierto": {
+    "modelo": 0.683,
+    "curva": 0.6793,
+    "marcador": 0.6783,
+    "modelo_rho": 0.6827,
+    "previo": 0.4797,
+    "persistencia": 0.6743,
+    "se_queda_como_va": 0.6743
+   },
+   "contra": {
+    "previo": {
+     "dif": -0.3091,
+     "ee": 0.0116,
+     "ic_inf": -0.3316,
+     "ic_sup": -0.286,
+     "z": -26.7108,
+     "n": 2981,
+     "n_bloques": 510
+    },
+    "persistencia": {
+     "dif": -0.0589,
+     "ee": 0.0047,
+     "ic_inf": -0.0683,
+     "ic_sup": -0.05,
+     "z": -12.4095,
+     "n": 2981,
+     "n_bloques": 510
+    },
+    "curva": {
+     "dif": -0.007,
+     "ee": 0.0024,
+     "ic_inf": -0.0117,
+     "ic_sup": -0.0024,
+     "z": -2.873,
+     "n": 2981,
+     "n_bloques": 510
+    },
+    "marcador": {
+     "dif": -0.0072,
+     "ee": 0.0023,
+     "ic_inf": -0.0117,
+     "ic_sup": -0.0028,
+     "z": -3.103,
+     "n": 2981,
+     "n_bloques": 510
+    },
+    "modelo_rho": {
+     "dif": 0.0,
+     "ee": 0.0002,
+     "ic_inf": -0.0004,
+     "ic_sup": 0.0005,
+     "z": 0.1068,
+     "n": 2981,
+     "n_bloques": 510
+    }
+   },
+   "calibracion": [
+    {
+     "p_media": 0.0083,
+     "frec_obs": 0.0067,
+     "n": 895
+    },
+    {
+     "p_media": 0.044,
+     "frec_obs": 0.038,
+     "n": 895
+    },
+    {
+     "p_media": 0.098,
+     "frec_obs": 0.0894,
+     "n": 895
+    },
+    {
+     "p_media": 0.1751,
+     "frec_obs": 0.1644,
+     "n": 894
+    },
+    {
+     "p_media": 0.2278,
+     "frec_obs": 0.2271,
+     "n": 894
+    },
+    {
+     "p_media": 0.2814,
+     "frec_obs": 0.283,
+     "n": 894
+    },
+    {
+     "p_media": 0.3913,
+     "frec_obs": 0.3982,
+     "n": 894
+    },
+    {
+     "p_media": 0.4866,
+     "frec_obs": 0.4955,
+     "n": 894
+    },
+    {
+     "p_media": 0.7067,
+     "frec_obs": 0.7148,
+     "n": 894
+    },
+    {
+     "p_media": 0.9151,
+     "frec_obs": 0.9172,
+     "n": 894
+    }
+   ],
+   "error_calibracion": 0.0055,
+   "pendiente_calibracion": 1.038,
+   "goles_restantes": {
+    "esperados_modelo": 1.0496,
+    "esperados_curva": 1.0404,
+    "observados": {
+     "media": 1.0453,
+     "ee": 0.0174,
+     "ic_inf": 1.0121,
+     "ic_sup": 1.0805,
+     "n": 2981,
+     "n_bloques": 510
+    }
+   },
+   "con_expulsion": {
+    "n": 357,
+    "logloss_modelo": 0.6397,
+    "logloss_marcador": 0.6983,
+    "logloss_curva": 0.6956,
+    "modelo_menos_marcador": {
+     "dif": -0.0586,
+     "ee": 0.018,
+     "ic_inf": -0.0942,
+     "ic_sup": -0.0228,
+     "z": -3.2535,
+     "n": 357,
+     "n_bloques": 242
+    }
+   }
+  },
+  "75": {
+   "n": 2981,
+   "fraccion_restante_media": 0.2321,
+   "logloss": {
+    "modelo": {
+     "media": 0.5647,
+     "ee": 0.014,
+     "ic_inf": 0.5381,
+     "ic_sup": 0.5933,
+     "n": 2981,
+     "n_bloques": 510
+    },
+    "curva": {
+     "media": 0.57,
+     "ee": 0.0145,
+     "ic_inf": 0.5425,
+     "ic_sup": 0.5988,
+     "n": 2981,
+     "n_bloques": 510
+    },
+    "marcador": {
+     "media": 0.5699,
+     "ee": 0.0142,
+     "ic_inf": 0.5427,
+     "ic_sup": 0.5984,
+     "n": 2981,
+     "n_bloques": 510
+    },
+    "modelo_rho": {
+     "media": 0.5646,
+     "ee": 0.0141,
+     "ic_inf": 0.5378,
+     "ic_sup": 0.5933,
+     "n": 2981,
+     "n_bloques": 510
+    },
+    "previo": {
+     "media": 1.0254,
+     "ee": 0.0067,
+     "ic_inf": 1.0124,
+     "ic_sup": 1.0381,
+     "n": 2981,
+     "n_bloques": 510
+    },
+    "persistencia": {
+     "media": 0.6114,
+     "ee": 0.0145,
+     "ic_inf": 0.5832,
+     "ic_sup": 0.6403,
+     "n": 2981,
+     "n_bloques": 510
+    }
+   },
+   "brier": {
+    "modelo": 0.3246,
+    "curva": 0.3267,
+    "marcador": 0.3267,
+    "modelo_rho": 0.3246,
+    "previo": 0.6152,
+    "persistencia": 0.3411
+   },
+   "acierto": {
+    "modelo": 0.7813,
+    "curva": 0.7813,
+    "marcador": 0.7813,
+    "modelo_rho": 0.7813,
+    "previo": 0.4797,
+    "persistencia": 0.7813,
+    "se_queda_como_va": 0.7813
+   },
+   "contra": {
+    "previo": {
+     "dif": -0.4607,
+     "ee": 0.013,
+     "ic_inf": -0.485,
+     "ic_sup": -0.4351,
+     "z": -35.538,
+     "n": 2981,
+     "n_bloques": 510
+    },
+    "persistencia": {
+     "dif": -0.0467,
+     "ee": 0.0045,
+     "ic_inf": -0.0557,
+     "ic_sup": -0.0381,
+     "z": -10.353,
+     "n": 2981,
+     "n_bloques": 510
+    },
+    "curva": {
+     "dif": -0.0053,
+     "ee": 0.0022,
+     "ic_inf": -0.0096,
+     "ic_sup": -0.0011,
+     "z": -2.4032,
+     "n": 2981,
+     "n_bloques": 510
+    },
+    "marcador": {
+     "dif": -0.0052,
+     "ee": 0.0021,
+     "ic_inf": -0.0094,
+     "ic_sup": -0.0011,
+     "z": -2.4944,
+     "n": 2981,
+     "n_bloques": 510
+    },
+    "modelo_rho": {
+     "dif": 0.0001,
+     "ee": 0.0001,
+     "ic_inf": -0.0002,
+     "ic_sup": 0.0003,
+     "z": 0.4163,
+     "n": 2981,
+     "n_bloques": 510
+    }
+   },
+   "calibracion": [
+    {
+     "p_media": 0.0012,
+     "frec_obs": 0.0022,
+     "n": 895
+    },
+    {
+     "p_media": 0.014,
+     "frec_obs": 0.019,
+     "n": 895
+    },
+    {
+     "p_media": 0.0353,
+     "frec_obs": 0.0324,
+     "n": 895
+    },
+    {
+     "p_media": 0.1094,
+     "frec_obs": 0.1018,
+     "n": 894
+    },
+    {
+     "p_media": 0.1679,
+     "frec_obs": 0.1689,
+     "n": 894
+    },
+    {
+     "p_media": 0.2109,
+     "frec_obs": 0.2204,
+     "n": 894
+    },
+    {
+     "p_media": 0.378,
+     "frec_obs": 0.3792,
+     "n": 894
+    },
+    {
+     "p_media": 0.6371,
+     "frec_obs": 0.6398,
+     "n": 894
+    },
+    {
+     "p_media": 0.8097,
+     "frec_obs": 0.8009,
+     "n": 894
+    },
+    {
+     "p_media": 0.9708,
+     "frec_obs": 0.9698,
+     "n": 894
+    }
+   ],
+   "error_calibracion": 0.0041,
+   "pendiente_calibracion": 0.996,
+   "goles_restantes": {
+    "esperados_modelo": 0.6281,
+    "esperados_curva": 0.6184,
+    "observados": {
+     "media": 0.6286,
+     "ee": 0.014,
+     "ic_inf": 0.6015,
+     "ic_sup": 0.6567,
+     "n": 2981,
+     "n_bloques": 510
+    }
+   },
+   "con_expulsion": {
+    "n": 488,
+    "logloss_modelo": 0.5185,
+    "logloss_marcador": 0.5491,
+    "logloss_curva": 0.5467,
+    "modelo_menos_marcador": {
+     "dif": -0.0305,
+     "ee": 0.0129,
+     "ic_inf": -0.0557,
+     "ic_sup": -0.0049,
+     "z": -2.3695,
+     "n": 488,
+     "n_bloques": 292
+    }
+   }
+  }
+ },
+ "todos_los_minutos": {
+  "previo": {
+   "dif": -0.2243,
+   "ee": 0.0073,
+   "ic_inf": -0.2383,
+   "ic_sup": -0.2094,
+   "z": -30.7096,
+   "n": 14905,
+   "n_bloques": 510
+  },
+  "persistencia": {
+   "dif": -0.0504,
+   "ee": 0.0037,
+   "ic_inf": -0.0578,
+   "ic_sup": -0.0431,
+   "z": -13.7602,
+   "n": 14905,
+   "n_bloques": 510
+  },
+  "curva": {
+   "dif": -0.0054,
+   "ee": 0.0017,
+   "ic_inf": -0.0087,
+   "ic_sup": -0.0022,
+   "z": -3.2428,
+   "n": 14905,
+   "n_bloques": 510
+  },
+  "marcador": {
+   "dif": -0.0053,
+   "ee": 0.0015,
+   "ic_inf": -0.0083,
+   "ic_sup": -0.0024,
+   "z": -3.4913,
+   "n": 14905,
+   "n_bloques": 510
+  },
+  "modelo_rho": {
+   "dif": 0.0004,
+   "ee": 0.0002,
+   "ic_inf": -0.0,
+   "ic_sup": 0.0009,
+   "z": 1.7739,
+   "n": 14905,
+   "n_bloques": 510
+  }
+ },
+ "segundos": 2.4
+}

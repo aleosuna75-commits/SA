@@ -4,6 +4,11 @@
     python3 web/construir.py                      # escribe web/index.html (fragmento) y web/archivos_publicados.json
     python3 web/construir.py --documento          # además un sitio estático completo en web/sitio/
     python3 web/construir.py --documento --salida DIR
+    python3 web/construir.py --vivo RUTA          # de prueba: incrusta ese documento en vivo (forma: salidas/vivo_ejemplo.json)
+    python3 web/construir.py --portada EQUIPO     # de prueba: fuerza el equipo de la portada (para revisar las 16)
+
+Las dos opciones de prueba NO tocan index.html ni archivos_publicados.json: sólo escriben el documento completo
+(web/documento.html, o el sitio de --salida), para que un ensayo nunca llegue a publicarse por descuido.
 
 Lee salidas/actual.json (contrato en salidas/CONTRATO.md) y web/medios.json, los incrusta en
 plantilla.html dentro de <script type="application/json"> y escribe el resultado. Las imágenes y los
@@ -26,7 +31,6 @@ PLANTILLA = AQUI / "plantilla.html"
 
 # Qué foto o video va de fondo en cada banda (deben existir en medios.json con "usar": true).
 ESCENAS = {
-    "portada": "video/bbva-aerea-foto.mp4",
     "menu": "img/ambiente/cancha-noche.jpg",
     "proximos": "img/ambiente/reflectores-noche.jpg",
     "combinada": "img/ambiente/balon-pasto.jpg",
@@ -39,6 +43,39 @@ ESCENAS = {
     "modelo": "img/ambiente/cancha-aerea.jpg",
     "creditos": "img/ambiente/celebracion-pirotecnia.jpg",
 }
+
+# Portada: la foto del estadio del favorito al título, elegida a mano (la mejor nocturna o aérea de cada casa).
+#   pos       encuadre en vertical (celular): la foto ocupa la parte alta de la portada
+#   pos_ancho encuadre en horizontal (escritorio): la foto cubre toda la portada
+#   lado      en pantallas anchas, de qué lado va el texto para no tapar el estadio ("izq" o "der")
+#   zoom      en pantallas anchas, acercamiento inicial (1.04 si no se indica); el punto fijo es pos_ancho
+#   tono      "noche" (ya es oscura), "ocaso" o "dia" (se oscurece y se enfría para que no queme el cielo)
+PORTADAS = {
+    "banorte": {"foto": "img/estadios/banorte-3.jpg", "pos": "9% 50%", "pos_ancho": "100% 100%", "zoom": 1.26, "lado": "der", "tono": "noche"},
+    "bbva": {"foto": "img/estadios/bbva-2.jpg", "pos": "60% 50%", "pos_ancho": "50% 40%", "lado": "izq", "tono": "ocaso"},
+    "volcan": {"foto": "img/estadios/volcan-1.jpg", "pos": "50% 30%", "pos_ancho": "50% 35%", "lado": "izq", "tono": "ocaso"},
+    "cu": {"foto": "img/estadios/cu-3.jpg", "pos": "55% 60%", "pos_ancho": "50% 62%", "lado": "izq", "tono": "ocaso"},
+    "corona": {"foto": "img/estadios/corona-1.jpg", "pos": "42% 50%", "pos_ancho": "50% 42%", "lado": "izq", "tono": "ocaso"},
+    "caliente": {"foto": "img/estadios/caliente-2.jpg", "pos": "38% 50%", "pos_ancho": "50% 30%", "lado": "izq", "tono": "noche"},
+    "nemesio": {"foto": "img/estadios/nemesio-1.jpg", "pos": "55% 50%", "pos_ancho": "50% 55%", "lado": "izq", "tono": "dia"},
+    "akron": {"foto": "img/estadios/akron-2.jpg", "pos": "50% 50%", "pos_ancho": "50% 45%", "lado": "izq", "tono": "dia"},
+    "hidalgo": {"foto": "img/estadios/hidalgo-3.jpg", "pos": "28% 40%", "pos_ancho": "50% 38%", "lado": "der", "tono": "noche"},
+    "cuauhtemoc": {"foto": "img/estadios/cuauhtemoc-2.jpg", "pos": "40% 60%", "pos_ancho": "50% 62%", "lado": "der", "tono": "dia"},
+    "corregidora": {"foto": "img/estadios/corregidora-2.jpg", "pos": "55% 50%", "pos_ancho": "50% 45%", "lado": "izq", "tono": "noche"},
+    "jalisco": {"foto": "img/estadios/jalisco-1.jpg", "pos": "45% 50%", "pos_ancho": "50% 55%", "lado": "izq", "tono": "dia"},
+    "victoria": {"foto": "img/estadios/victoria-1.jpg", "pos": "50% 50%", "pos_ancho": "50% 60%", "lado": "izq", "tono": "dia"},
+    "leon": {"foto": "img/estadios/leon-1.jpg", "pos": "40% 45%", "pos_ancho": "50% 40%", "lado": "izq", "tono": "ocaso"},
+    "lastras": {"foto": "img/estadios/lastras-2.jpg", "pos": "50% 50%", "pos_ancho": "50% 45%", "lado": "izq", "tono": "noche"},
+    "benitojuarez": {"foto": "img/estadios/benitojuarez-2.jpg", "pos": "40% 45%", "pos_ancho": "50% 40%", "lado": "izq", "tono": "ocaso"},
+}
+# Fotos de festejo de campeonato (medios.json → campeon): mismo ajuste, por equipo.
+PORTADAS_CAMPEON = {
+    "Toluca": {"pos": "62% 40%", "pos_ancho": "50% 45%", "lado": "izq", "tono": "noche"},
+    "Pumas": {"pos": "55% 30%", "pos_ancho": "50% 30%", "lado": "der", "tono": "dia"},
+}
+PORTADA_RESPALDO = "banorte"  # si no hay favorito o su estadio no tiene fotos
+# Capacidades del Artifact que la página usa (se declaran al publicar; ver LEEME.md).
+CAPACIDADES = {"db": {"rules": [{"path": "", "read": "view", "write": "admin"}]}}
 
 # Campos sin los que la página no tiene sentido (ruta con puntos; [] = lista no vacía en cada elemento).
 OBLIGATORIOS = [
@@ -106,7 +143,7 @@ def _medio(m):
     return {k: m[k] for k in CAMPOS_MEDIO if m.get(k) is not None}
 
 
-def recortar_medios(medios, datos):
+def recortar_medios(medios, datos, forzar_portada=None):
     """Deja de medios.json sólo lo que la página usa. Devuelve (recorte, rutas usadas, avisos)."""
     avisos = []
     usados = []
@@ -174,34 +211,44 @@ def recortar_medios(medios, datos):
         if slug not in slugs:
             avisos.append(f"{p['local']} vs {p['visitante']}: la sede «{slug}» no tiene fotos en medios.json.")
 
-    # Portada: el favorito al título levantando el trofeo (la ocasión más reciente con foto libre); si no hay
-    # foto libre de ese equipo, su estadio. Cambia sola cuando cambia el favorito.
-    portada = escenas["portada"]
-    leyenda = None
+    # Portada: cambia sola con el favorito al título (proyeccion.campeon[0]). Fondo = foto libre de su festejo de
+    # campeón si existe (medios.json → campeon); si no, la foto elegida a mano de su estadio (PORTADAS).
     camp = [c for c in datos["proyeccion"]["campeon"] if c.get("prob")]
-    fav = camp[0]["equipo"] if camp else None
-    tit = ((datos["proyeccion"].get("titulos") or {}).get(fav) or {}).get("ultimo") if fav else None
-    foto = (medios.get("campeon") or {}).get(fav) if fav else None
-    if foto and (AQUI / foto["archivo"]).exists():
-        portada = dict(_medio(foto), tipo="foto")
-        detalle = ", ".join(x for x in (foto.get("torneo"), foto.get("lugar")) if x)
-        leyenda = (f"{fav} levanta el trofeo" if foto.get("tipo") == "trofeo" else f"{fav} festeja el título") + (f" · {detalle}" if detalle else "")
-        usados.append(foto["archivo"])
-        creditos.append({"grupo": "Campeones", "titulo": leyenda, "archivo": foto["archivo"], "credito": foto.get("credito"),
-                         "licencia": foto.get("licencia"), "licencia_url": foto.get("licencia_url"),
-                         "url_pagina": foto.get("url_pagina"), "cambios": foto.get("cambios")})
-    elif fav:
-        casa = next((e for e in estadios if fav in (e.get("equipos") or []) and e["fotos"]), None)
+    fav = forzar_portada or (camp[0]["equipo"] if camp else None)
+    casa = next((e for e in medios.get("estadios", []) if fav in (e.get("equipos") or [])), None) if fav else None
+    festejo = (medios.get("campeon") or {}).get(fav) if fav else None
+    foto, ajuste, pie = None, {}, None
+    if festejo and (AQUI / festejo["archivo"]).is_file():
+        foto, ajuste = festejo, PORTADAS_CAMPEON.get(fav, {})
+        donde = ", ".join(x for x in (festejo.get("torneo"), festejo.get("lugar")) if x)
+        pie = ("El trofeo en manos de " if festejo.get("tipo") == "trofeo" else "Festejo del título de ") + fav + (f": {donde}" if donde else "")
+        creditos.append({"grupo": "Campeones", "titulo": pie, "archivo": festejo["archivo"], "credito": festejo.get("credito"),
+                         "licencia": festejo.get("licencia"), "licencia_url": festejo.get("licencia_url"),
+                         "url_pagina": festejo.get("url_pagina"), "cambios": festejo.get("cambios")})
+    else:
+        if not casa:
+            casa = next((e for e in medios.get("estadios", []) if e.get("slug") == PORTADA_RESPALDO), None)
+            if fav:
+                avisos.append(f"{fav} no tiene estadio en medios.json: la portada usa el {casa['nombre'] if casa else 'fondo liso'}.")
         if casa:
-            portada = dict(casa["fotos"][0], tipo="foto")
-            avisos.append(f"sin foto libre de {fav} con el trofeo: la portada usa su estadio ({casa['nombre']}).")
-        if tit:
-            leyenda = f"Último título de {fav}: {tit['torneo']}" + (f", {tit['estadio']}" if tit.get("estadio") else "")
-    if leyenda and tit and foto and foto.get("torneo") and foto["torneo"] != tit["torneo"]:
-        leyenda += f" (su último título fue el {tit['torneo']})"
+            ajuste = PORTADAS.get(casa["slug"], {})
+            foto = next((f for f in casa.get("fotos", []) if f["archivo"] == ajuste.get("foto")), None)
+            if not foto and casa.get("fotos"):
+                foto = casa["fotos"][0]
+                avisos.append(f"portada: PORTADAS no tiene foto válida para «{casa['slug']}»; se usa {foto['archivo']}.")
+            if foto:
+                de = [e for e in (casa.get("equipos") or [])]
+                pie = casa["nombre"] + (f", donde juega {fav}" if fav and fav in de else "")
+    if not foto:
+        raise ErrorDatos("No hay foto para la portada: revisa PORTADAS y medios.json.")
+    portada = dict(_medio(foto), tipo="foto", pos=ajuste.get("pos") or foto.get("pos") or "50% 50%",
+                   pos_ancho=ajuste.get("pos_ancho") or foto.get("pos") or "50% 50%",
+                   lado=ajuste.get("lado") or "izq", tono=ajuste.get("tono") or "dia", zoom=ajuste.get("zoom") or 1.04, pie=pie)
+    if foto["archivo"] not in usados:
+        usados.append(foto["archivo"])
     escenas["portada"] = portada
-    recorte = {"portada": {"equipo": fav, "leyenda": leyenda}, "escenas": escenas, "estadios": estadios, "escudos": escudos,
-               "nota_legal": medios.get("nota_legal"), "creditos": creditos}
+    recorte = {"portada": {"equipo": fav, "estadio": casa["nombre"] if casa else None}, "escenas": escenas, "estadios": estadios,
+               "escudos": escudos, "nota_legal": medios.get("nota_legal"), "creditos": creditos}
     return recorte, usados, avisos
 
 
@@ -210,22 +257,25 @@ def _json_incrustado(obj):
     return json.dumps(obj, ensure_ascii=False, separators=(",", ":")).replace("</", "<\\/")
 
 
-def construir(datos, medios, plantilla):
+def construir(datos, medios, plantilla, forzar_portada=None):
     """Devuelve (fragmento_html, rutas usadas, avisos)."""
     validar(datos)
-    recorte, usados, avisos = recortar_medios(medios, datos)
+    recorte, usados, avisos = recortar_medios(medios, datos, forzar_portada)
+    if not ((datos.get("liguilla") or {}).get("torneo") or {}).get("rondas"):
+        avisos.append("actual.json no trae liguilla.torneo: la sección «Liguilla» mostrará un aviso en lugar del cuadro.")
     portada = recorte["escenas"]["portada"]
     a = lambda x: html.escape(str(x or ""), quote=True)
-    if portada.get("tipo") == "video":
-        fondo = (f'<video id="video-portada" muted playsinline loop autoplay preload="metadata" poster="{a(portada.get("poster"))}" '
-                 f'width="1280" height="720" aria-hidden="true" tabindex="-1" disablepictureinpicture>'
-                 f'<source src="{a(portada["archivo"])}" type="video/mp4"></video>')
-    else:
-        fondo = (f'<img src="{a(portada["archivo"])}" alt="{a(portada.get("alt"))}" width="{a(portada.get("ancho") or 1600)}" '
-                 f'height="{a(portada.get("alto") or 1000)}" style="object-position:{a(portada.get("pos") or "50% 40%")}" decoding="async" fetchpriority="high">')
-    fondo += f'<figcaption class="credito">{html.escape(portada.get("credito") or "")}</figcaption>'
+    credito = portada.get("credito") or ""
+    if credito and not re.match(r"(?i)foto", credito):
+        credito = "Foto: " + credito
+    fondo = (f'<img class="kb" src="{a(portada["archivo"])}" alt="{a(portada.get("alt"))}" width="{a(portada.get("ancho") or 1600)}" '
+             f'height="{a(portada.get("alto") or 900)}" style="--pos:{a(portada["pos"])};--pos-ancho:{a(portada["pos_ancho"])};--zoom:{float(portada["zoom"]):.2f}" '
+             f'decoding="async" fetchpriority="high">')
     reemplazos = {
         "{{PORTADA_FONDO}}": fondo,
+        "{{PORTADA_TONO}}": a(portada["tono"]),
+        "{{PORTADA_LADO}}": a(portada["lado"]),
+        "{{PORTADA_CREDITO}}": html.escape(" · ".join(x for x in (portada.get("pie"), credito) if x)),
         "{{DATOS}}": _json_incrustado(datos),
         "{{MEDIOS}}": _json_incrustado(recorte),
     }
@@ -248,6 +298,8 @@ def como_documento(fragmento):
     return ("<!doctype html>\n<html lang=\"es-MX\">\n<head>\n<meta charset=\"utf-8\">\n"
             "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1, viewport-fit=cover\">\n"
             "<meta name=\"theme-color\" content=\"#06120e\">\n"
+            "<style>:root{padding:env(safe-area-inset-top,0px) 0 env(safe-area-inset-bottom,0px)}body{margin:0}"
+            "img{max-width:100%}[hidden]{display:none!important}</style>\n"
             + cabeza + "\n</head>\n<body>" + cuerpo + "</body>\n</html>\n")
 
 
@@ -259,6 +311,11 @@ def main(argv=None):
     ap.add_argument("--salida", type=Path, default=None,
                     help="directorio del sitio estático (por omisión web/sitio/). Si es la propia carpeta web/, "
                          "sólo escribe documento.html junto a img/ y video/, sin copiar nada")
+    ap.add_argument("--vivo", type=Path, default=None,
+                    help="incrusta este documento en vivo (misma forma que salidas/vivo_ejemplo.json) como datos.vivo; "
+                         "sin la opción se incrusta actual.json → vivo si existe")
+    ap.add_argument("--portada", default=None, metavar="EQUIPO",
+                    help="sólo para revisar: fuerza el equipo de la portada en lugar del favorito al título")
     args = ap.parse_args(argv)
     t0 = time.time()
     try:
@@ -270,7 +327,16 @@ def main(argv=None):
             medios = json.loads(MEDIOS.read_text(encoding="utf-8"))
         except json.JSONDecodeError as e:
             raise ErrorDatos(f"JSON inválido: {e}")
-        fragmento, usados, avisos = construir(datos, medios, PLANTILLA.read_text(encoding="utf-8"))
+        if args.vivo is not None:
+            if not args.vivo.exists():
+                raise ErrorDatos(f"No existe {args.vivo}.")
+            try:
+                datos["vivo"] = json.loads(args.vivo.read_text(encoding="utf-8"))
+            except json.JSONDecodeError as e:
+                raise ErrorDatos(f"JSON inválido en {args.vivo}: {e}")
+        if args.portada and args.portada not in medios.get("escudos", {}):
+            raise ErrorDatos(f"--portada: «{args.portada}» no es un equipo de medios.json.")
+        fragmento, usados, avisos = construir(datos, medios, PLANTILLA.read_text(encoding="utf-8"), args.portada)
         faltan = [r for r in usados if not (AQUI / r).is_file()]
         if faltan:
             raise ErrorDatos("La página usa archivos que no existen en web/:\n  - " + "\n  - ".join(faltan))
@@ -283,12 +349,21 @@ def main(argv=None):
         tmp.write_text(texto, encoding="utf-8")
         tmp.replace(ruta)  # nunca queda un archivo a medias
 
-    escribir(AQUI / "index.html", fragmento)
     publicados = sorted(set(usados))
-    escribir(AQUI / "archivos_publicados.json", json.dumps(publicados, ensure_ascii=False, indent=1) + "\n")
-    peso = sum((AQUI / r).stat().st_size for r in publicados)
-    print(f"index.html: {len(fragmento.encode('utf-8')) / 1024:.0f} KB · {len(publicados)} archivos de medios "
-          f"({peso / 1e6:.1f} MB) en archivos_publicados.json · corte {datos['meta']['corte_local']}")
+    de_prueba = args.vivo is not None or bool(args.portada)
+    if de_prueba:
+        args.documento = True
+        if args.salida is None:
+            args.salida = AQUI
+        print("opción de prueba (--vivo o --portada): no se toca index.html; sólo se escribe el documento")
+    else:
+        escribir(AQUI / "index.html", fragmento)
+        escribir(AQUI / "archivos_publicados.json", json.dumps(publicados, ensure_ascii=False, indent=1) + "\n")
+        escribir(AQUI / "capacidades.json", json.dumps(CAPACIDADES, ensure_ascii=False, indent=1) + "\n")
+        peso = sum((AQUI / r).stat().st_size for r in publicados)
+        print(f"index.html: {len(fragmento.encode('utf-8')) / 1024:.0f} KB · {len(publicados)} archivos de medios "
+              f"({peso / 1e6:.1f} MB) en archivos_publicados.json · corte {datos['meta']['corte_local']}"
+              + (" · con «vivo» incrustado" if datos.get("vivo") else ""))
 
     if args.documento:
         destino = (args.salida or (AQUI / "sitio")).resolve()

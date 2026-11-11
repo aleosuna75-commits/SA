@@ -1,0 +1,11 @@
+{
+ "db": {
+  "rules": [
+   {
+    "path": "",
+    "read": "view",
+    "write": "admin"
+   }
+  ]
+ }
+}

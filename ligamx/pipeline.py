@@ -4,6 +4,7 @@
     python3 pipeline.py auto --forzar-mejora
     python3 pipeline.py publicado       # anotar que la página ya se republicó (tras `auto` con publicar = true)
     python3 pipeline.py estado          # qué hay pendiente y cuándo
+    python3 pipeline.py vivo-plan [--horas 48]   # próximos inicios (UTC y hora de México) para montar `vivo.py observar`
 
 Pasos de `auto` (cada uno aislado: si uno falla se anota y los demás siguen cuando tiene sentido):
   1. datos       datos/espn_descarga.py actualizar  (resultados nuevos, reprogramaciones, momios)
@@ -12,7 +13,9 @@ Pasos de `auto` (cada uno aislado: si uno falla se anota y los demás siguen cua
                  retadores con lo recién jugado y adopta a uno sólo si cumple la regla (registro.json)
   4. pronóstico  produccion.exportar: recalibra, sella los pronósticos de lo que viene, califica lo ya jugado,
                  vuelve a simular tabla, liguilla y campeón  → salidas/actual.json
-  5. página      web/construir.py → web/index.html y web/archivos_publicados.json
+  5. vivo        vivo.py una-vez: estado del día según ESPN → salidas/vivo.json, incrustado en actual.json
+                 (campo "vivo"). Si ESPN no responde se anota como aviso: NO cuenta como error de la corrida
+  6. página      web/construir.py → web/index.html y web/archivos_publicados.json
 Escribe salidas/ultimo_auto.json con lo que pasó y con `publicar` = true si la página cambió (quien corre la
 tarea programada republica el Artifact y hace commit y push).
 """
@@ -46,6 +49,26 @@ def _json_final(texto: str) -> dict:
     """El JSON que imprime espn_descarga.py actualizar (puede traer avisos antes)."""
     i = texto.find("{")
     return json.JSONDecoder().raw_decode(texto[i:])[0] if i >= 0 else {}
+
+
+def paso_vivo() -> dict:
+    """
+    `vivo.py una-vez` (estado del día según ESPN → salidas/vivo.json) y el campo "vivo" de actual.json al día.
+    Nunca lanza: el motor en vivo es auxiliar, así que si ESPN no responde (o algo falla) queda un aviso y
+    la corrida sigue; en ese caso se conserva el vivo.json anterior (exportar lo descarta si pasa de 36 h).
+    """
+    try:
+        import vivo as V
+        doc = V.una_vez(V.Motor())
+        out = {"estado": doc["estado"], "partidos": len(doc["partidos"]), "siguiente": doc.get("siguiente")}
+    except Exception as e:
+        out = {"aviso": f"vivo una-vez no se pudo correr: {type(e).__name__}: {e}"}
+    try:
+        from produccion import exportar
+        out["incrustado"] = bool(exportar.incrustar_vivo())
+    except Exception as e:
+        out["aviso_incrustar"] = f"{type(e).__name__}: {e}"
+    return out
 
 
 def auto(forzar_mejora: bool = False) -> dict:
@@ -100,6 +123,10 @@ def auto(forzar_mejora: bool = False) -> dict:
             raise RuntimeError(out[-400:])
         return {"salida": out.strip().splitlines()[-2:]}
 
+    def vivo():
+        rep["vivo"] = paso_vivo()
+        return rep["vivo"]
+
     def pagina():
         cod, out = _correr([sys.executable, "web/construir.py"])
         if cod != 0:
@@ -111,7 +138,10 @@ def auto(forzar_mejora: bool = False) -> dict:
     if ok_datos:
         paso("mejora", mejora)
     if paso("pronostico", pronostico):
+        paso("vivo", vivo)                  # antes de la página, para que ésta lleve incrustado el estado del día
         paso("pagina", pagina)
+    else:
+        paso("vivo", vivo)
 
     try:
         a = json.loads((SALIDAS / "actual.json").read_text(encoding="utf-8"))
@@ -157,7 +187,12 @@ def main(argv=None) -> int:
     sub = ap.add_subparsers(dest="cmd", required=True)
     a = sub.add_parser("auto"); a.add_argument("--forzar-mejora", action="store_true")
     sub.add_parser("estado"); sub.add_parser("publicado")
+    v = sub.add_parser("vivo-plan"); v.add_argument("--horas", type=float, default=48.0)
     args = ap.parse_args(argv)
+    if args.cmd == "vivo-plan":
+        import vivo as V
+        print(json.dumps(V.plan(args.horas), ensure_ascii=False, indent=1))
+        return 0
     rep = auto(args.forzar_mejora) if args.cmd == "auto" else publicado() if args.cmd == "publicado" else estado()
     print(json.dumps({k: v for k, v in rep.items() if k not in ("mejora",)}, ensure_ascii=False, indent=1))
     return 1 if rep.get("errores") else 0

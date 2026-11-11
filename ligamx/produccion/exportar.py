@@ -9,6 +9,9 @@ Pasos: ajusta el Pronosticador (el campeón si existe modelo/campeon.json; si no
 sella los pronósticos de los partidos que no han empezado (sólo sin --corte), califica los sellos de
 lo ya jugado, arma mercados y combinadas, corre el simulador y escribe el JSON (descrito campo por
 campo en salidas/CONTRATO.md). Probabilidades con 4 decimales; el archivo debe pesar menos de 600 KB.
+
+El campo "vivo" lleva incrustado el último documento en vivo (salidas/vivo.json, que escribe vivo.py) si
+existe y tiene menos de 36 horas; `incrustar_vivo()` actualiza sólo ese campo sin rehacer lo demás.
 """
 from __future__ import annotations
 
@@ -34,6 +37,8 @@ DIR_SALIDAS = datos.RAIZ / "salidas"
 RUTA_ACTUAL = DIR_SALIDAS / "actual.json"
 DIR_HISTORIAL = DIR_SALIDAS / "historial"
 RUTA_CALIBRACION = DIR_SALIDAS / "calibracion_series.json"
+RUTA_VIVO = DIR_SALIDAS / "vivo.json"
+HORAS_VIVO = 36                                # un documento en vivo más viejo que esto ya no se incrusta
 PESO_MAXIMO = 600 * 1024
 VERSION_CONTRATO = "1.0"
 DIAS = ["lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"]
@@ -516,6 +521,38 @@ def _avisos(meta_modelo: dict, des: dict, reglas: dict, sim: dict, pendientes: l
     return a
 
 
+def leer_vivo(ruta: str | Path | None = None, ahora: pd.Timestamp | None = None) -> dict | None:
+    """
+    Último documento en vivo (salidas/vivo.json, lo escribe vivo.py; contrato en salidas/CONTRATO.md) si
+    existe, se puede leer, no es de prueba y su `generado_utc` tiene menos de HORAS_VIVO horas; si no, None.
+    """
+    try:
+        d = json.loads(Path(ruta or RUTA_VIVO).read_text(encoding="utf-8"))
+        t = pd.Timestamp(d["generado_utc"])
+        t = t.tz_localize("UTC") if t.tzinfo is None else t.tz_convert("UTC")
+    except Exception:
+        return None
+    ahora = pd.Timestamp.now(tz="UTC") if ahora is None else ahora
+    if not isinstance(d, dict) or d.get("prueba") or d.get("ejemplo") or not (pd.Timedelta(0) <= ahora - t < pd.Timedelta(hours=HORAS_VIVO)):
+        return None
+    return d
+
+
+def incrustar_vivo(ruta_actual: str | Path | None = None, ruta_vivo: str | Path | None = None) -> bool:
+    """
+    Pone en el campo "vivo" de salidas/actual.json el documento en vivo vigente (o null) sin rehacer nada
+    más; escritura atómica y sin copia al historial. Devuelve True si el archivo cambió.
+    """
+    ruta = Path(ruta_actual or RUTA_ACTUAL)
+    doc = json.loads(ruta.read_text(encoding="utf-8"))
+    nuevo = leer_vivo(ruta_vivo)
+    if doc.get("vivo", None) == nuevo and "vivo" in doc:
+        return False
+    doc["vivo"] = nuevo
+    escribir(doc, ruta, historial=False)
+    return True
+
+
 # ==================================================================================================
 # Documento completo
 # ==================================================================================================
@@ -667,6 +704,8 @@ def construir(corte=None, n_sim: int = simulador.N_SIM, sellar: bool | None = No
         "calibracion_series": cal,
         # primero los avisos de datos del propio Pronosticador (p. ej. caché de variables desactualizada)
         "avisos": [f"DATOS: {x}" for x in getattr(pron, "avisos", [])] + _avisos(meta_modelo, des, reglas, sim, pendientes, cal),
+        # último documento en vivo (vivo.py); en una corrida retrospectiva no aplica
+        "vivo": None if retro else leer_vivo(),
     }
     doc["meta"]["segundos"] = round(time.time() - t0, 1)
     return redondear(doc)

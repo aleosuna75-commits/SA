@@ -11,7 +11,9 @@ Consume sólo el contrato del `Pronosticador` (`equipos`, `partidos(df)`, `malla
   * la incertidumbre de los parámetros se propaga repartiendo las simulaciones entre las muestras
     k >= 1 de `malla(n)`; el error de Monte Carlo se calcula entre muestras (conglomerados);
   * `prob_serie` da la probabilidad EXACTA de una serie (sin simular) y `calibrar_series` la contrasta
-    con las liguillas de DESARROLLO.
+    con las liguillas de DESARROLLO;
+  * partidos EN JUEGO (`simular(..., en_juego=...)`): se simulan como marcador actual + Poisson(goles
+    que faltan) en vez de desde cero (ver produccion/en_juego.py y produccion/VIVO.md).
 
 Uso:  python3 -m produccion.simulador [--corte AAAA-MM-DDTHH:MM] [--n-sim 20000] [--calibrar]
 """
@@ -86,6 +88,62 @@ def marcadores(rng: np.random.Generator, lam_l, lam_v, rho: float = 0.0):
         c = np.cumsum(arnes.matrices_marcadores(a[s], b[s], rho).reshape(-1, (MAXG + 1) ** 2), axis=1)
         j[s] = np.minimum((c < u[s, None]).sum(axis=1), (MAXG + 1) ** 2 - 1)
     return (j // (MAXG + 1)).reshape(forma), (j % (MAXG + 1)).reshape(forma)
+
+
+def matrices_en_juego(gl: int, gv: int, lam_rest_l, lam_rest_v, rho: float = 0.0) -> np.ndarray:
+    """
+    Matrices (n, 11, 11) del marcador FINAL de un partido en juego: marcador actual (gl, gv) más los
+    goles que faltan (Poisson con la corrección de Dixon-Coles de `arnes.matrices_marcadores` sobre lo
+    que falta). Lo que pasaría de 10 goles se acumula en la orilla. Es la versión por lotes de
+    `en_juego.matriz_final`.
+    """
+    R = arnes.matrices_marcadores(np.maximum(np.atleast_1d(np.asarray(lam_rest_l, float)), 1e-9),
+                                  np.maximum(np.atleast_1d(np.asarray(lam_rest_v, float)), 1e-9), rho)
+    m = MAXG + 1
+    gl, gv = int(min(gl, MAXG)), int(min(gv, MAXG))
+    F = np.zeros_like(R)
+    F[:, gl:, gv:] = R[:, :m - gl, :m - gv]
+    if gl:
+        F[:, MAXG, gv:] += R[:, m - gl:, :m - gv].sum(axis=1)
+    if gv:
+        F[:, gl:, MAXG] += R[:, :m - gl, m - gv:].sum(axis=2)
+    if gl and gv:
+        F[:, MAXG, MAXG] += R[:, m - gl:, m - gv:].sum(axis=(1, 2))
+    return F / F.sum(axis=(1, 2), keepdims=True)
+
+
+def acoplar_en_juego(rng: np.random.Generator, gl0, gv0, lam_l, lam_v, rho: float, v: dict):
+    """
+    Marcadores finales de un partido EN JUEGO, acoplados a los que dio el sorteo normal (gl0, gv0).
+
+    P = distribución previa de cada simulación (lambdas completas `lam_l`, `lam_v` y `rho`); Q = marcador
+    actual v["gl"]-v["gv"] más los goles que faltan. Si `v` trae las lambdas previas del partido
+    ("lam_l", "lam_v") lo que falta se escala por simulación (lam de la simulación x lam_rest / lam
+    previa: la incertidumbre de los parámetros sigue viva y al minuto 0 Q = P); si no, se usan
+    lam_rest_l y lam_rest_v tal cual. Acoplamiento máximo: el sorteo normal se conserva con probabilidad
+    min(1, Q/P) y, si no, se sortea del sobrante (Q - P)+. La distribución que sale es exactamente Q
+    (nunca menos goles que el marcador actual) y coincide con el sorteo normal lo más posible, así que
+    la diferencia entre simular con y sin `en_juego` es sólo lo que ha pasado en la cancha.
+    """
+    gl0, gv0 = np.asarray(gl0, dtype=np.int64), np.asarray(gv0, dtype=np.int64)
+    n, m = len(gl0), MAXG + 1
+    lam_l = np.broadcast_to(np.asarray(lam_l, float), (n,))
+    lam_v = np.broadcast_to(np.asarray(lam_v, float), (n,))
+    rl, rv = max(float(v.get("lam_rest_l") or 0.0), 0.0), max(float(v.get("lam_rest_v") or 0.0), 0.0)
+    pl, pv = float(v.get("lam_l") or 0.0), float(v.get("lam_v") or 0.0)
+    rest_l = lam_l * (rl / pl) if pl > 0 else np.full(n, rl)
+    rest_v = lam_v * (rv / pv) if pv > 0 else np.full(n, rv)
+    Q = matrices_en_juego(v["gl"], v["gv"], rest_l, rest_v, rho).reshape(n, -1)
+    P = arnes.matrices_marcadores(lam_l, lam_v, rho).reshape(n, -1)
+    i0 = gl0 * m + gv0
+    filas = np.arange(n)
+    conserva = rng.random(n) * P[filas, i0] <= Q[filas, i0] * (1.0 + 1e-9)
+    sobra = np.maximum(Q - P, 0.0)
+    tot = sobra.sum(axis=1)
+    c = np.cumsum(sobra, axis=1)
+    j = np.minimum((c < (rng.random(n) * tot)[:, None]).sum(axis=1), m * m - 1)
+    idx = np.where(conserva | (tot <= 1e-12), i0, j)
+    return idx // m, idx % m
 
 
 def ordenar(pts, dg, gf, gvis, fair, coc, azar) -> np.ndarray:
@@ -315,13 +373,21 @@ def series_reales(df: pd.DataFrame, torneo: str, corte, equipos: list[str], pos:
     return out
 
 
-def _jugar_serie(rng, mejor, peor, k, LL, LV, rho, fase: str, reales: dict):
+def _jugar_serie(rng, mejor, peor, k, LL, LV, rho, fase: str, reales: dict, rng_vivo=None):
     """
     Simula una serie por simulación (vectores de índices `mejor`, `peor` y de muestra de parámetros
     `k`). Ida en casa del peor sembrado y vuelta en casa del mejor, salvo que una serie real diga otra
-    cosa; lo ya jugado se respeta. Devuelve un vector booleano: avanza el mejor sembrado.
+    cosa; lo ya jugado se respeta. Una pierna real con `vivo` (partido en juego: gl, gv, lam_rest_l,
+    lam_rest_v y, en la vuelta de la final, `extra` con lo mismo para el tiempo extra) se simula como
+    marcador actual + Poisson(resto) con `rng_vivo` (flujo aparte para no desplazar los demás sorteos;
+    ver `acoplar_en_juego`).
+    Devuelve un vector booleano: avanza el mejor sembrado.
     """
     n = len(mejor)
+    rng_vivo = rng if rng_vivo is None else rng_vivo
+    vivos: list[list] = [[], []]                             # por pierna: (simulaciones de esa serie, estado en juego)
+    ext_l, ext_v = np.full(n, -1), np.full(n, -1)            # tiempo extra en juego (final)
+    ext_rl, ext_rv = np.zeros(n), np.zeros(n)
     loc = [peor.copy(), mejor.copy()]
     vis = [mejor.copy(), peor.copy()]
     fijo_l = [np.full(n, -1), np.full(n, -1)]
@@ -342,6 +408,14 @@ def _jugar_serie(rng, mejor, peor, k, LL, LV, rho, fase: str, reales: dict):
                 fijo_l[j][m], fijo_v[j][m] = min(p["gl"], MAXG), min(p["gv"], MAXG)
             else:
                 mult_l[j][m], mult_v[j][m] = p["mult_l"], p["mult_v"]
+                v = p.get("vivo")
+                if v is not None:
+                    vivos[j].append((m, v))
+                    x = v.get("extra")
+                    if j == 1 and x is not None:
+                        ext_l[m], ext_v[m] = int(x["gl"]), int(x["gv"])
+                        ext_rl[m] = max(float(x.get("lam_rest_l") or 0.0), 0.0)
+                        ext_rv[m] = max(float(x.get("lam_rest_v") or 0.0), 0.0)
         if s["ganador"] is not None:
             forzado[m] = s["ganador"]
     goles_m, goles_p = np.zeros(n, dtype=np.int64), np.zeros(n, dtype=np.int64)
@@ -352,6 +426,9 @@ def _jugar_serie(rng, mejor, peor, k, LL, LV, rho, fase: str, reales: dict):
         gl, gv = marcadores(rng, ll, lv, rho)
         gl = np.where(fijo_l[j] >= 0, fijo_l[j], gl)
         gv = np.where(fijo_v[j] >= 0, fijo_v[j], gv)
+        for m, v in vivos[j]:                                # pierna en juego: marcador actual + lo que falta
+            gl, gv = gl.copy(), gv.copy()
+            gl[m], gv[m] = acoplar_en_juego(rng_vivo, gl[m], gv[m], ll[m], lv[m], rho, v)
         es_m = loc[j] == mejor
         goles_m += np.where(es_m, gl, gv)
         goles_p += np.where(es_m, gv, gl)
@@ -360,6 +437,10 @@ def _jugar_serie(rng, mejor, peor, k, LL, LV, rho, fase: str, reales: dict):
         gana = goles_m >= goles_p
     else:
         el, ev = marcadores(rng, lam2[0] * FRACCION_EXTRA, lam2[1] * FRACCION_EXTRA, 0.0)
+        en_extra = ext_l >= 0
+        if en_extra.any():                                   # tiempo extra en juego
+            el = np.where(en_extra, ext_l + rng_vivo.poisson(ext_rl), el)
+            ev = np.where(en_extra, ext_v + rng_vivo.poisson(ext_rv), ev)
         es_m = loc[1] == mejor
         em, ep = np.where(es_m, el, ev), np.where(es_m, ev, el)
         moneda = rng.random(n) < P_PENALES
@@ -396,7 +477,7 @@ def _pares(mejor, peor, gana, n_eq: int, eq: list[str], n_sim: int, minimo: floa
 
 def simular(pron=None, corte=None, df: pd.DataFrame | None = None, n_sim: int = N_SIM,
             n_muestras: int = N_MUESTRAS, semilla: int = SEMILLA, reglas: dict | None = None,
-            torneo: str | None = None) -> dict:
+            torneo: str | None = None, en_juego: dict | None = None) -> dict:
     """
     Simula lo que falta del torneo y devuelve un dict serializable a JSON:
       meta, tabla_actual, por_equipo (puntos esperados, distribución del lugar final, P(clasificar),
@@ -406,6 +487,17 @@ def simular(pron=None, corte=None, df: pd.DataFrame | None = None, n_sim: int = 
     Las `n_sim` simulaciones se reparten entre `n_muestras` muestras de parámetros (k >= 1 de la malla);
     con n_muestras = 0 se usa sólo la estimación puntual (k = 0).
     `pron` cumple el contrato del Pronosticador; si es None se usa `obtener_pronosticador(corte)`.
+
+    `en_juego` = {id_partido: {"gl", "gv", "lam_rest_l", "lam_rest_v"}} marca partidos pendientes que ya
+    empezaron (o que ya acabaron y todavía no están en partidos.csv: lam_rest = 0): se simulan como
+    marcador actual + Poisson(goles que faltan) en vez de desde cero, así que ninguna simulación baja
+    del marcador actual. Con las lambdas previas del partido ("lam_l", "lam_v", opcionales) lo que falta
+    se escala en cada simulación con su muestra de parámetros. En liguilla la pierna puede traer además
+    "extra" (tiempo extra en juego de la final: gl, gv, lam_rest_l, lam_rest_v, penales) y "avanza"
+    (equipo que ya ganó la serie). Los sorteos de estos partidos salen de un generador aparte y
+    acoplados al sorteo normal (`acoplar_en_juego`): con la misma semilla, todo lo demás se sortea igual
+    que sin `en_juego` (si el modelo usa rho != 0), y la diferencia entre las dos corridas mide sólo el
+    efecto de lo que está pasando en la cancha. Los ids aplicados quedan en meta["en_juego"].
     """
     t0 = time.time()
     df = datos.cargar() if df is None else df
@@ -437,6 +529,9 @@ def simular(pron=None, corte=None, df: pd.DataFrame | None = None, n_sim: int = 
     LLl, LVl = np.asarray(ml["lam_l"], float), np.asarray(ml["lam_v"], float)
     kidx = np.repeat(np.zeros(K, dtype=int) if puntual else np.arange(1, K + 1), por_k)
     rng = np.random.default_rng(semilla)
+    vivo = {int(i): dict(v) for i, v in (en_juego or {}).items()}
+    rng_vivo = np.random.default_rng([abs(int(semilla)), 7919])      # flujo aparte para los partidos en juego
+    vivo_aplicados: list[int] = []
     filas = np.arange(N)
 
     # ---------------- fase regular ----------------
@@ -455,6 +550,11 @@ def simular(pron=None, corte=None, df: pd.DataFrame | None = None, n_sim: int = 
         lam_l = LLr[kidx[:, None], il[None, :], iv[None, :]] * aj_l[None, :]
         lam_v = LVr[kidx[:, None], il[None, :], iv[None, :]] * aj_v[None, :]
         gl, gv = marcadores(rng, lam_l, lam_v, rho_r)
+        for j, pid in enumerate(pend["id"].to_numpy()):          # partidos en juego: marcador actual + lo que falta
+            v = vivo.get(int(pid))
+            if v is not None:
+                gl[:, j], gv[:, j] = acoplar_en_juego(rng_vivo, gl[:, j], gv[:, j], lam_l[:, j], lam_v[:, j], rho_r, v)
+                vivo_aplicados.append(int(pid))
         pl = 3 * (gl > gv) + (gl == gv)
         pv = 3 * (gv > gl) + (gl == gv)
         for j in range(n_p):
@@ -484,6 +584,12 @@ def simular(pron=None, corte=None, df: pd.DataFrame | None = None, n_sim: int = 
             for p in s["piernas"].values():
                 if not p["jugado"]:
                     por_id[p["id"]] = p
+                    if p["id"] in vivo:                          # pierna en juego (o recién terminada)
+                        p["vivo"] = vivo[p["id"]]
+                        vivo_aplicados.append(int(p["id"]))
+                        gan = p["vivo"].get("avanza")
+                        if gan in eq and eq.index(gan) in (s["a"], s["b"]):
+                            s["ganador"] = eq.index(gan)
     if por_id:
         filas_df = df[df["id"].isin(list(por_id))]
         for d in pron.partidos(filas_df):
@@ -499,7 +605,7 @@ def simular(pron=None, corte=None, df: pd.DataFrame | None = None, n_sim: int = 
     cruces_llave = []
     for (s1, s2) in cruces:
         m_, p_ = sem[:, s1 - 1], sem[:, s2 - 1]
-        g_ = _jugar_serie(rng, m_, p_, kidx, LLl, LVl, rho_l, "cuartos", reales)
+        g_ = _jugar_serie(rng, m_, p_, kidx, LLl, LVl, rho_l, "cuartos", reales, rng_vivo)
         gan_q.append(np.where(g_, m_, p_))
         cruces_llave.append((f"{s1}-{s2}", m_, p_, g_))
     Wq = np.stack(gan_q, axis=1)                             # (N, 4) equipos que pasan a semifinales
@@ -509,13 +615,13 @@ def simular(pron=None, corte=None, df: pd.DataFrame | None = None, n_sim: int = 
     gan_s = []
     for a_, b_ in ((0, 3), (1, 2)):
         m_, p_ = eq_de_sem[filas, sq[:, a_]], eq_de_sem[filas, sq[:, b_]]
-        g_ = _jugar_serie(rng, m_, p_, kidx, LLl, LVl, rho_l, "semifinal", reales)
+        g_ = _jugar_serie(rng, m_, p_, kidx, LLl, LVl, rho_l, "semifinal", reales, rng_vivo)
         gan_s.append(np.where(g_, m_, p_))
         semis.append((m_, p_, g_))
     Ws = np.stack(gan_s, axis=1)
     sf = np.sort(semilla_de[filas[:, None], Ws], axis=1)
     fm, fp = eq_de_sem[filas, sf[:, 0]], eq_de_sem[filas, sf[:, 1]]
-    gfin = _jugar_serie(rng, fm, fp, kidx, LLl, LVl, rho_l, "final", reales)
+    gfin = _jugar_serie(rng, fm, fp, kidx, LLl, LVl, rho_l, "final", reales, rng_vivo)
     campeon = np.where(gfin, fm, fp)
 
     # ---------------- resúmenes ----------------
@@ -591,7 +697,7 @@ def simular(pron=None, corte=None, df: pd.DataFrame | None = None, n_sim: int = 
         "meta": {"torneo": torneo, "corte_utc": corte.isoformat(), "n_sim": int(N), "n_muestras": 0 if puntual else int(K),
                  "sim_por_muestra": int(N) if puntual else int(por_k), "semilla": int(semilla), "modelo": getattr(pron, "nombre", type(pron).__name__),
                  "partidos_pendientes_regular": int(n_p), "regular_completa": bool(regular_completa),
-                 "clasifican": n_clas, "segundos": round(time.time() - t0, 2)},
+                 "clasifican": n_clas, "en_juego": sorted(set(vivo_aplicados)), "segundos": round(time.time() - t0, 2)},
         "equipos": eq,
         "tabla_actual": json.loads(tab.to_json(orient="records", force_ascii=False)),
         "por_equipo": por_equipo,
@@ -631,7 +737,14 @@ def detalle_serie(s: dict, eq: list[str], pos: dict[str, int], LL0: np.ndarray, 
         else:
             ll = p.get("lam_l", LL0[p["local"], p["visitante"]] * p.get("mult_l", 1.0))
             lv = p.get("lam_v", LV0[p["local"], p["visitante"]] * p.get("mult_v", 1.0))
-            Ms[num] = arnes.matriz_marcadores(ll, lv, p.get("rho", rho))
+            v = p.get("vivo")
+            if v is not None:                                # en juego: matriz condicional al marcador y al minuto
+                from . import en_juego as EJ
+                Ms[num] = EJ.matriz_final(v["gl"], v["gv"], v.get("lam_rest_l") or 0.0, v.get("lam_rest_v") or 0.0)
+                d.update({"en_juego": True, "gl_vivo": int(v["gl"]), "gv_vivo": int(v["gv"]),
+                          "lam_rest_l": float(v.get("lam_rest_l") or 0.0), "lam_rest_v": float(v.get("lam_rest_v") or 0.0)})
+            else:
+                Ms[num] = arnes.matriz_marcadores(ll, lv, p.get("rho", rho))
             pr = arnes.p1x2(Ms[num])
             pr = np.asarray(pr, float).ravel()
             d.update({"lam_l": float(ll), "lam_v": float(lv), "p_local": float(pr[0]), "p_empate": float(pr[1]),
@@ -645,6 +758,14 @@ def detalle_serie(s: dict, eq: list[str], pos: dict[str, int], LL0: np.ndarray, 
         extra = (ll2 * FRACCION_EXTRA, lv2 * FRACCION_EXTRA)
     r = prob_serie(Ms[1], Ms[2], piernas[1]["local"] == a, p2["local"] == a,
                    "final" if fase == "final" else "posicion", extra)
+    x = (p2.get("vivo") or {}).get("extra")
+    if fase == "final" and x is not None:                    # tiempo extra en juego: el global a 90' quedó empatado
+        from . import en_juego as EJ
+        p_loc = EJ.prob_tiempos_extra(x["gl"], x["gv"], x.get("lam_rest_l") or 0.0, x.get("lam_rest_v") or 0.0,
+                                      bool(x.get("penales")))
+        e_mejor = p_loc if p2["local"] == a else 1.0 - p_loc
+        r["p_mejor"] = float(r["p_global_mejor"] + r["p_global_empate"] * e_mejor)
+        r["p_peor"] = float(1.0 - r["p_mejor"])
     if s.get("ganador") is not None:
         r["p_mejor"], r["p_peor"] = (1.0, 0.0) if s["ganador"] == a else (0.0, 1.0)
     G = r["G"]

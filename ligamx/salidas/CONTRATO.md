@@ -20,7 +20,8 @@ con zona; `fecha_local`/`hora_local` en hora de la Ciudad de México. Resultado 
 empate, `"V"` visitante. Marcadores a 90 minutos. Peso al 2026-11-10 04:12: 222 KB (tope 600 KB).
 
 Campos de primer nivel: `meta`, `tabla`, `pendientes`, `combinada_jornada`, `ultimos_resultados`,
-`proyeccion`, `liguilla`, `fuerzas`, `estadios`, `dominios`, `desempeno`, `calibracion_series`, `avisos`.
+`proyeccion`, `liguilla`, `fuerzas`, `estadios`, `dominios`, `desempeno`, `calibracion_series`, `avisos`,
+`vivo` (último documento en vivo incrustado; su contrato está al final: «Documento en vivo»).
 
 ## meta
 
@@ -1031,6 +1032,23 @@ Hoy:
 }
 ```
 
+### liguilla.torneo (la liguilla con estructura de torneo)
+
+`estado` (`proyectado` antes de que acabe la fase regular, `definido` con los ocho clasificados,
+`en_curso`, `terminado`), `origen_siembra`, `siembra` (8 filas: `pos`, `equipo`, `p_clasifica`,
+`p_semifinal`, `p_final`, `p_campeon`), `rondas` (cuartos, semifinal, final: `fase`, `nombre`, `fechas`
+de ida y vuelta y `series`), `campeon_ruta`, `campeon_decidido`, `p_campeon_ruta` y `nota`. Cada SERIE:
+
+| campo | significado |
+|---|---|
+| `llave` | `C1`..`C4`, `S1`, `S2`, `F` |
+| `fase`, `real`, `viene_de` | `real` = el cruce ya está en el calendario; `viene_de` = llaves de las que salen sus equipos (resiembra) |
+| `mejor`, `peor` | `{equipo, siembra}` |
+| `piernas` | ida y vuelta: `pierna`, `nombre`, `id`, `fecha_utc`, `fecha_local`, `hora_local`, `local`, `visitante`, `estadio` (`slug`, `nombre`), `jugado`, `gl`, `gv`; sin jugar: `lam_l`, `lam_v`, `p_local`, `p_empate`, `p_visitante`, `marcador` y `marcadores` (5) |
+| `global` | `probable` (`mejor`, `peor`, `prob`), `top` (5), `p_gana_mejor`, `p_empate`, `p_gana_peor` |
+| `p_avanza_mejor`, `p_avanza_peor`, `favorito`, `p_favorito` | probabilidad exacta de avanzar en ESA serie |
+| `decidida`, `ganador`, `regla_empate`, `alternativas` | `alternativas`: otros cruces posibles de esa llave (`mejor`, `peor`, `prob`, `p_avanza_mejor`) |
+
 ## fuerzas (18 filas, de mayor a menor `rating`)
 
 Son las columnas que entrega `Pronosticador.fuerzas()`. Con el modelo campeón, todo en GOLES frente a
@@ -1177,6 +1195,57 @@ Lista de textos con los límites honestos del sistema (lo que no se modela). La 
 ]
 ```
 
+## vivo (último documento en vivo, incrustado)
+
+Copia de `salidas/vivo.json` en el momento de exportar (o de `exportar.incrustar_vivo()`, que es lo que hace
+`pipeline.py auto` justo después de correr `vivo.py una-vez`). Es `null` si el archivo no existe, no se puede
+leer, es una repetición de prueba o su `generado_utc` tiene más de 36 horas, y siempre `null` en una corrida
+retrospectiva. Sirve como estado inicial de la página: en cuanto llega el documento de la base de datos del
+Artifact (`vivo/actual`, por `onSnapshot`) manda el que tenga el `generado_utc` más reciente.
+
+## Documento en vivo (`salidas/vivo.json` · base de datos del Artifact, ruta `vivo/actual`)
+
+Lo escribe `vivo.py` (`una-vez`, `observar` o `repetir`; ver `produccion/VIVO.md`). JSON compacto, escritura
+atómica, menos de 40 KB (un día de 4 partidos pesa unos 6 KB). Ejemplo con la forma completa:
+`salidas/vivo_ejemplo.json`. JavaScript no calcula nada: todas las probabilidades vienen de aquí.
+
+| campo | significado |
+|---|---|
+| `version` | 1 |
+| `generado_utc` | cuándo se armó (reloj real) |
+| `dia` | fecha de México del día de partido (cambia a las 04:00, no a medianoche) |
+| `estado` | `sin_partidos` · `previo` (hay partidos hoy y ninguno en juego: falta alguno por empezar) · `en_juego` · `descanso` (los que se juegan están todos en pausa) · `terminado_hoy` |
+| `partidos` | los de HOY, por hora de inicio (abajo) |
+| `tabla`, `tabla_nota` | tabla general AL MOMENTO (18 filas): `pos`, `equipo`, `PJ`, `PTS`, `DG`, `GF`, `cambio` (lugares ganados, positivo, o perdidos frente a la tabla sin los partidos en juego) y `en_juego`. Los marcadores en juego cuentan como finales; desempates oficiales del simulador (las tarjetas de hoy suman al Fair Play de forma aproximada: amarilla 1, roja 3). En liguilla es la tabla final de la fase regular |
+| `proyeccion` | `n_sim`, `clasifica` y `campeon`: listas `{equipo, p, delta}` ordenadas por `p`. `delta` = cambio frente al último pronóstico previo (el de `actual.json`). `clasifica` sólo trae a los equipos sin decidir (vacía en liguilla). `ruido` (0.01): un `delta` menor puede ser ruido de simulación. `partidos_considerados`: ids cuyos marcadores del momento entraron en la simulación. `nota` si no se pudo recalcular |
+| `series` | liguilla: una entrada por serie REAL de `liguilla.torneo` (abajo); `[]` en fase regular |
+| `ultimo_evento` | `{utc, tipo, partido_id, texto, n}` del último evento notificable del día, o `null` |
+| `siguiente` | `{id, inicio_utc, local, visitante}` del próximo partido que no ha empezado (de hoy si queda alguno) |
+| `avisos` | (opcional) textos: algo no se pudo calcular o ESPN no respondió para un día |
+| `prueba` | (opcional) `true` en los documentos de `vivo.py repetir`; la página debe decirlo |
+
+Cada elemento de `partidos`:
+
+| campo | significado |
+|---|---|
+| `id`, `fase`, `etiqueta`, `local`, `visitante`, `inicio_utc` | como en `pendientes` (`fase`: `regular`, `cuartos`, `semifinal`, `final`) |
+| `estado` | `programado` · `en_juego` · `descanso` · `final` · `pospuesto` |
+| `periodo`, `minuto`, `anadido` | `periodo` 1 o 2 (3 y 4 tiempos extra, 5 penales); `minuto` del reloj de ESPN (se está jugando ese minuto); `anadido` en tiempo agregado (`45'+2'` = minuto 45, añadido 2). En el descanso: periodo 1, minuto 45. Al final: minuto 90 y el agregado que hubo. `null` si no ha empezado |
+| `reloj_utc` | instante en que empezó el minuto `minuto` (para que la página avance el reloj sola: minuto actual = `minuto` + minutos enteros desde `reloj_utc`, sin pasar de 45 / 90 mientras no llegue otro documento); en el descanso, cuándo se vio empezar; `null` si no se juega |
+| `gl`, `gv`, `rojas_l`, `rojas_v` | marcador y expulsiones al momento (`gl`/`gv` `null` si no ha empezado). En tiempos extra el marcador incluye sus goles |
+| `eventos` | goles y expulsiones en orden: `min`, `anadido`, `tipo` (`gol`, `penal`, `autogol`, `roja`), `equipo` (en un autogol, el equipo al que le cuenta), `jugador`, `marcador` (parcial tras la jugada, "local-visitante") |
+| `previo` | pronóstico SELLADO antes del partido: `p_local`, `p_empate`, `p_visitante`, `marcador` (`gl`, `gv`), `lam_l`, `lam_v`. Si no hay sello trae además `origen` (de dónde salió) |
+| `vivo` | sólo en juego o en descanso: `p_local`, `p_empate`, `p_visitante` del resultado FINAL a 90 minutos, `goles_restantes_l`, `goles_restantes_v` (goles que se espera que falten) y `marcador_final` (`gl`, `gv`, `prob`: el marcador final más probable). `null` antes de empezar y al terminar |
+| `serie` | `null` o `{llave, mejor, peor, global_mejor, global_peor, p_avanza_mejor, p_avanza_peor}` |
+| `penales` | (opcional) `{l, v}` si hubo tanda |
+
+Cada elemento de `series` (SERIE compacta): `llave`, `fase`, `mejor` y `peor` (`{equipo, siembra}`), `piernas`
+(`pierna`, `id`, `local`, `visitante`, `estado` [`programado`, `en_juego`, `descanso`, `final`], `gl`, `gv`),
+`global_mejor`, `global_peor` (goles de las piernas jugadas o en juego), `p_avanza_mejor`, `p_avanza_peor`
+(cálculo exacto con lo ya jugado, el marcador y el minuto de la pierna en juego; final: tiempos extra y
+penales a 50/50), `delta_avanza_mejor` (frente a `actual.json`), `favorito`, `p_favorito`, `decidida`,
+`ganador` y `al_momento` (`false` = ninguna pierna de la serie se juega hoy: son los números de `actual.json`).
+
 ## Otros archivos de `salidas/`
 
 | archivo | contenido |
@@ -1185,3 +1254,9 @@ Lista de textos con los límites honestos del sistema (lo que no se modela). La 
 | `desempeno.json` | lo de `desempeno` con todos los partidos calificados y el detalle de cada pick |
 | `calibracion_series.json` | salida completa de la calibración histórica de series |
 | `historial/actual_<corte>.json` | copia de cada corrida |
+| `vivo.json` | último documento en vivo (contrato arriba); lo escribe `vivo.py` |
+| `vivo_ejemplo.json` | ejemplo con la forma completa del documento en vivo (`"ejemplo": true`) |
+| `vivo_eventos.jsonl` | un renglón por evento notificable de `vivo.py observar`: `n` (consecutivo), `utc`, `tipo` (`inicio`, `gol`, `gol_anulado`, `roja`, `descanso`, `segundo_tiempo`, `tiempos_extra`, `penales`, `final`, `pospuesto`, `refresco`), `partido_id`, `texto`, `marcador`, `minuto`. Sólo se agrega |
+| `vivo_prueba.json`, `vivo_prueba_eventos.jsonl` | lo mismo para `vivo.py repetir` (no van al repositorio) |
+| `en_juego_parametros.json` | parámetros del modelo en juego: curva de goles por casilla (`w`), `efectos` (multiplicadores) y de dónde salieron; se reajusta sola cuando cambian los datos |
+| `en_juego_validacion.json` | validación sin fuga del modelo en juego (`python3 -m produccion.en_juego validar`) |

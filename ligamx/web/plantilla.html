@@ -10,12 +10,14 @@
   --cancha:#00573f; --cancha-2:#0b7354;
   --oro:#c9a961; --oro-2:#ecd9a6; --oro-tenue:rgba(201,169,97,.2); --oro-brillo:rgba(201,169,97,.45);
   --cal:#f4f1e8; --cal-2:#d6d8cf; --gris:#a3b8ad; --gris-2:#7d9388;
-  --linea:rgba(244,241,232,.15); --linea-2:rgba(244,241,232,.34);
+  --linea:rgba(244,241,232,.15); --linea-2:rgba(244,241,232,.34); --linea-cal:rgba(244,241,232,.62);
   --local:#63d69a; --empate:#c5cec8; --visita:#7db8ff;
   --gana:#63d69a; --iguala:#c5cec8; --pierde:#f2978a;
   --pastilla:#ebe8de; --tinta:#06120e;
   --velo-0:rgba(6,18,14,0); --velo-1:rgba(6,18,14,.4); --velo-2:rgba(6,18,14,.74); --velo-3:rgba(6,18,14,.95);
   --sombra:rgba(0,0,0,.5); --franja:rgba(6,18,14,.13); --led:rgba(236,217,166,.09);
+  --rojo:#ff5b4f; --rojo-2:#ffb9b1; --rojo-tenue:rgba(255,91,79,.14); --rojo-brillo:rgba(255,91,79,.55);
+  --tinte-0:rgba(255,255,255,1); --tinte-ocaso:rgba(150,170,196,1); --tinte-dia:rgba(86,112,138,1);
   --f-cartel:"Big Shoulders Display","Big Shoulders","Oswald","Roboto Condensed","Arial Narrow","Helvetica Neue",Impact,sans-serif;
   --f-texto:"Archivo","Helvetica Neue",Helvetica,Arial,system-ui,sans-serif;
   --t-0:.72rem; --t-1:.82rem; --t-2:.94rem; --t-3:1.0625rem; --t-4:1.32rem; --t-5:1.75rem;
@@ -26,13 +28,14 @@
 }
 *,*::before,*::after{box-sizing:border-box}
 body{margin:0;background:var(--noche);color:var(--cal);font:400 var(--t-3)/1.5 var(--f-texto);-webkit-text-size-adjust:100%}
-img,video{display:block;max-width:100%}
+img,video,canvas{display:block;max-width:100%}
+[hidden]{display:none!important}
 button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;cursor:pointer;-webkit-tap-highlight-color:transparent}
 h1,h2,h3,h4,h5,p,ol,ul,dl,dd,figure{margin:0;padding:0}
 ol,ul{list-style:none}
 a{color:var(--oro-2);text-underline-offset:3px}
 :focus-visible{outline:2px solid var(--oro-2);outline-offset:3px;border-radius:3px}
-h2:focus{outline:none}
+h2:focus,h3:focus{outline:none}
 .tab,table,.tablero{font-variant-numeric:tabular-nums lining-nums}
 .oculto{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
 main{overflow-x:hidden;overflow-x:clip}
@@ -81,23 +84,44 @@ h5{font:700 var(--t-1)/1.25 var(--f-texto);text-transform:uppercase;letter-spaci
 .credito{position:absolute;right:var(--canal-d);bottom:8px;z-index:2;max-width:min(78%,520px);font:500 var(--t-0)/1.3 var(--f-texto);color:var(--cal-2);background:var(--velo-2);padding:3px 7px;border-radius:3px;text-align:right}
 .credito a{color:inherit}
 
-/* ---------- portada ---------- */
-.portada{position:relative;isolation:isolate;min-height:100vh;min-height:100svh;display:flex;align-items:flex-end;padding:calc(84px + env(safe-area-inset-top, 0px)) 0 54px}
-.trofeo-leyenda{margin:6px 0 14px;font:600 .8rem/1.4 var(--f-texto);letter-spacing:.06em;text-transform:uppercase;color:var(--oro)}
-.portada .fondo::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,var(--velo-1) 0%,var(--velo-0) 30%,var(--velo-2) 62%,var(--noche) 100%)}
-.sello{font:600 var(--t-1)/1.3 var(--f-texto);text-transform:uppercase;letter-spacing:.16em;color:var(--cal-2)}
+/* ---------- portada: la casa del favorito, con trofeo y confeti ---------- */
+.portada{position:relative;isolation:isolate;overflow:hidden;--foto:clamp(300px,98vw,560px);padding:calc(var(--foto) - 118px) 0 var(--e-5)}
+.portada .fondo{bottom:auto;height:var(--foto);background:var(--noche)}
+.portada .fondo img{object-position:var(--pos,50% 50%);transform-origin:var(--pos,50% 50%);transform:scale(var(--z0,1.04));will-change:transform;--z0:1.04;--z1:1.16}
+.portada .fondo::before{content:"";position:absolute;inset:0;z-index:1;background:var(--tinte-0);mix-blend-mode:multiply}
+.portada[data-tono="ocaso"] .fondo::before{background:var(--tinte-ocaso)}
+.portada[data-tono="dia"] .fondo::before{background:var(--tinte-dia)}
+.portada[data-tono="dia"] .fondo img{filter:saturate(.8) contrast(1.08)}
+.portada .fondo::after{content:"";position:absolute;inset:0;z-index:2;background:linear-gradient(180deg,var(--velo-2) 0,var(--velo-0) 24%,var(--velo-0) 42%,var(--velo-2) 72%,var(--noche) 98%)}
+.confeti{position:absolute;left:0;top:0;width:100%;height:var(--foto);z-index:0;pointer-events:none}
+.portada__caja{position:relative;z-index:1;display:grid;grid-template-columns:minmax(0,1fr) auto;column-gap:var(--e-3);align-items:end}
+.portada__marca{min-width:0}
+.sello{display:grid;gap:3px;font:600 var(--t-1)/1.3 var(--f-texto);text-transform:uppercase;letter-spacing:.16em;color:var(--cal-2)}
 .sello b{color:var(--oro)}
+.sello span{font-size:var(--t-0);letter-spacing:.09em;white-space:nowrap}
+.sello,.titular{text-shadow:0 1px 10px var(--sombra)}
 h1{font:900 var(--t-7)/.8 var(--f-cartel);text-transform:uppercase;letter-spacing:.005em;margin:var(--e-3) 0 var(--e-4)}
 h1 span{display:block;color:var(--oro)}
+.emblema{position:relative;width:clamp(84px,27vw,150px);aspect-ratio:200/286;margin-bottom:var(--e-4);filter:drop-shadow(0 8px 22px var(--sombra))}
+.trofeo{display:block;width:100%;height:100%;color:var(--oro-2);overflow:visible}
+.emblema__esc{position:absolute;left:50%;top:32%;width:47%;aspect-ratio:1;transform:translate(-50%,-50%)}
+.emblema__esc .esc{width:100%;height:100%;font-size:1rem;box-shadow:0 0 0 2px var(--oro),0 6px 18px var(--sombra)}
+#b-portada,.portada__pie{grid-column:1/-1;min-width:0}
 .titular{font:700 clamp(1.5rem,5.6vw,2.5rem)/1.05 var(--f-cartel);text-transform:uppercase;letter-spacing:.03em;max-width:22ch}
 .titular b{color:var(--oro-2);font-weight:900}
-.favoritos{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1px;margin-top:var(--e-4);max-width:720px;border:1px solid var(--linea-2);border-top:0;background:var(--linea-2);position:relative}
-.favoritos li{display:grid;grid-template-columns:auto minmax(0,1fr);gap:1px 10px;align-items:center;padding:9px 12px;background:var(--velo-2);min-width:0}
+.palmares{display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 8px;margin-top:var(--e-3);padding-left:10px;border-left:2px solid var(--oro);font:500 var(--t-1)/1.4 var(--f-texto);color:var(--cal-2);max-width:60ch}
+.palmares span{font-weight:700;text-transform:uppercase;letter-spacing:.13em;font-size:var(--t-0);color:var(--oro)}
+.palmares b{color:var(--cal);font-weight:700}
+.palmares i{flex-basis:100%;font-style:normal}
+.favoritos{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1px;margin-top:var(--e-4);max-width:720px;border:1px solid var(--linea-2);background:var(--linea-2);position:relative}
+.favoritos li{display:grid;grid-template-columns:auto minmax(0,1fr);gap:1px 10px;align-items:center;padding:9px 12px;background:var(--noche-2);min-width:0}
 .favoritos .esc{grid-row:1/3}
 .favoritos .fav__n{font:600 var(--t-1)/1.15 var(--f-texto);color:var(--cal-2);min-width:0;overflow-wrap:break-word}
 .favoritos .fav__p{font:900 1.75rem/1 var(--f-cartel);font-variant-numeric:tabular-nums;color:var(--cal)}
+.favoritos li:first-child{background:linear-gradient(135deg,var(--oro-tenue),var(--velo-0) 70%),var(--noche-2)}
 .favoritos li:first-child .fav__p{color:var(--oro-2)}
-.fav-pie{margin-top:var(--e-2);font-size:var(--t-0);color:var(--cal-2);max-width:60ch}
+.portada__pie{display:grid;gap:4px;margin-top:var(--e-3);font-size:var(--t-0);line-height:1.4;color:var(--cal-2);max-width:72ch}
+.portada__pie .foto-de{color:var(--gris)}
 
 /* próximo partido */
 .sigue{background:var(--noche-2);border-top:1px solid var(--linea);border-bottom:1px solid var(--linea);padding:var(--e-5) 0}
@@ -172,6 +196,19 @@ h1 span{display:block;color:var(--oro)}
 .tablero b{min-width:.78em;padding:.04em .1em .08em;text-align:center;font:900 var(--t-marc)/.9 var(--f-cartel);color:var(--oro-2);background:radial-gradient(var(--led) 1px,var(--velo-0) 1.3px) 0 0/4px 4px,var(--noche-3);border-radius:4px;text-shadow:0 0 16px var(--oro-brillo)}
 .tablero i{width:6px;height:6px;border-radius:50%;background:var(--oro);box-shadow:0 0 8px var(--oro-brillo)}
 .tablero--ch b{font-size:1.9rem}
+.tablero--mini{gap:3px;padding:3px;border-radius:6px;box-shadow:none}
+.tablero--mini b{font-size:1.4rem;min-width:.92em;border-radius:3px;text-shadow:0 0 10px var(--oro-brillo)}
+.tablero--mini i{width:4px;height:4px}
+.tablero--real b{color:var(--cal);background:var(--noche-4);text-shadow:none}
+.tablero--real i{background:var(--cal);box-shadow:none}
+.tablero--vivo{border-color:var(--rojo-brillo)}
+.tablero--vivo i{background:var(--rojo);box-shadow:0 0 8px var(--rojo-brillo)}
+.chip{display:inline-flex;align-items:center;gap:6px;padding:3px 8px;border:1px solid var(--linea-2);border-radius:999px;font:700 .66rem/1.2 var(--f-texto);font-style:normal;text-transform:uppercase;letter-spacing:.1em;color:var(--cal-2);white-space:nowrap}
+.chip--oro{border-color:var(--oro);color:var(--oro-2)}
+.chip--real{background:var(--cal);border-color:var(--cal);color:var(--tinta)}
+.chip--vivo{background:var(--rojo);border-color:var(--rojo);color:var(--tinta)}
+.pulso{flex:none;display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--rojo)}
+.chip--vivo .pulso{background:var(--tinta)}
 .duelo__p{font:600 var(--t-1)/1 var(--f-texto);color:var(--cal-2);font-variant-numeric:tabular-nums}
 /* barra 1X2: franja de pasto segmentada con rayas de podadora */
 .x12{display:flex;gap:2px;height:30px;background:var(--cal);border:2px solid var(--cal);border-radius:3px;overflow:hidden;transform-origin:left}
@@ -305,25 +342,172 @@ td.v{background:linear-gradient(90deg,var(--oro-tenue) calc(var(--v,0)*100%),var
 .mitad>*{min-width:0}
 tbody th{background:var(--noche-3);color:var(--oro);padding-top:11px}
 .grupo>h4{color:var(--oro-2)}
-/* liguilla al momento */
-.llaves{display:grid;gap:var(--e-5);grid-template-columns:minmax(0,1fr)}
-@media (min-width:900px){.llaves{grid-template-columns:repeat(3,minmax(0,1fr));align-items:center}}
-.ronda{display:grid;gap:var(--e-3);min-width:0}
-.ronda>h3{font:800 var(--t-4)/1 var(--f-cartel);text-transform:uppercase;letter-spacing:.06em;color:var(--oro)}
-.ronda>h3 small{display:block;margin-top:4px;font:500 var(--t-0)/1.3 var(--f-texto);letter-spacing:.04em;text-transform:none;color:var(--gris)}
-.llave{border:1px solid var(--linea);border-radius:var(--radio);background:var(--noche-2);padding:var(--e-3);display:grid;gap:8px}
-.llave--real{border-color:var(--oro-brillo)}
-.llave__eq{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:10px;align-items:center;font-weight:600;font-size:var(--t-2);line-height:1.15}
-.llave__eq .sem{font:800 var(--t-1)/1 var(--f-texto);color:var(--gris);font-variant-numeric:tabular-nums;min-width:1.6em}
-.llave__eq b{font:800 1.25rem/1 var(--f-cartel);font-variant-numeric:tabular-nums;color:var(--cal-2)}
-.llave__eq.fav b{color:var(--oro-2)}
-.llave__eq.fav .eqn span{color:var(--cal)}
-.llave__eq:not(.fav) .eqn span{color:var(--gris)}
-.llave__eq .eqn{--d:26px;min-width:0}
-.llave small{color:var(--gris);font-size:var(--t-0)}
-.trofeo-ruta{display:grid;justify-items:center;gap:8px;text-align:center;padding:var(--e-5) var(--e-4);border:1px solid var(--oro-brillo);border-radius:var(--radio);background:linear-gradient(180deg,var(--oro-tenue),var(--velo-0))}
-.trofeo-ruta .eqn{--d:64px;flex-direction:column;font:800 var(--t-5)/1 var(--f-cartel);text-transform:uppercase}
-.trofeo-ruta p{color:var(--cal-2);font-size:var(--t-2);max-width:40ch}
+/* ---------- liguilla: cuadro de eliminatoria con líneas de cal ---------- */
+.cuadro-marco{display:grid;gap:var(--e-4);min-width:0;--u:26px;--cal-l:2px solid var(--linea-cal)}
+.cuadro-cab{display:grid;gap:var(--e-3)}
+.cuadro-estado{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px}
+.cuadro-estado p{flex:1 1 30ch;color:var(--cal-2);font-size:var(--t-2);max-width:66ch}
+.leyenda-m{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:var(--t-0);color:var(--gris)}
+.leyenda-m span{display:inline-flex;align-items:center;gap:6px}
+.leyenda-m i{width:14px;height:14px;border-radius:3px;background:var(--noche-3);border:1px solid var(--oro)}
+.leyenda-m i.r{background:var(--noche-4);border-color:var(--cal)}
+.rondas-nav{display:flex;align-items:stretch;gap:6px}
+.rondas-nav button{flex:1 1 0;min-width:0;min-height:48px;padding:6px 6px;border:1px solid var(--linea-2);border-radius:8px;background:var(--noche-2);font:800 1rem/1 var(--f-cartel);text-transform:uppercase;letter-spacing:.06em;color:var(--cal-2)}
+.rondas-nav button small{display:block;margin-top:4px;font:500 var(--t-0)/1 var(--f-texto);letter-spacing:.01em;text-transform:none;color:var(--gris)}
+.rondas-nav button[aria-current="true"]{background:var(--oro);border-color:var(--oro);color:var(--tinta)}
+.rondas-nav button[aria-current="true"] small{color:var(--tinta)}
+.desliza{display:flex;align-items:center;justify-content:flex-end;gap:10px;font:700 var(--t-0)/1.2 var(--f-texto);text-transform:uppercase;letter-spacing:.14em;color:var(--oro)}
+.desliza i{position:relative;flex:none;width:30px;height:2px;background:var(--oro)}
+.desliza i::after{content:"";position:absolute;right:0;top:-4px;width:8px;height:8px;border-top:2px solid var(--oro);border-right:2px solid var(--oro);transform:rotate(45deg)}
+.cuadro-caja{position:relative;min-width:0}
+.cuadro{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;scroll-padding-left:var(--canal-i);padding:4px var(--canal-d) 14px var(--canal-i);-webkit-overflow-scrolling:touch;overscroll-behavior-x:contain;scrollbar-width:thin;scrollbar-color:var(--linea-2) var(--velo-0)}
+.cuadro:focus-visible{outline-offset:-2px}
+.cuadro__rot{display:none}
+.ronda{flex:0 0 min(86vw,352px);display:flex;flex-direction:column;min-width:0;padding-right:var(--u);scroll-snap-align:start}
+.ronda:last-of-type{padding-right:0;scroll-snap-align:end}
+.ronda__cab{display:flex;align-items:baseline;gap:10px;height:34px;font:800 var(--t-4)/1 var(--f-cartel);text-transform:uppercase;letter-spacing:.06em;color:var(--oro);white-space:nowrap}
+.ronda__cab small{font:500 var(--t-0)/1 var(--f-texto);letter-spacing:.02em;text-transform:none;color:var(--gris)}
+.ronda__nodos{flex:1;display:grid;grid-auto-rows:1fr}
+.nodo{position:relative;display:flex;align-items:center;min-width:0;padding:7px 0}
+.ronda[data-fase="cuartos"] .nodo{align-items:stretch}
+.llave{align-content:start}
+.nodo::before,.nodo::after{content:"";position:absolute;pointer-events:none}
+.nodo[data-pos="a"]::after,.nodo[data-pos="c"]::after,.nodo[data-pos="s1"]::after{left:100%;top:50%;width:calc(var(--u) / 2 + 1px);height:50%;border-top:var(--cal-l);border-right:var(--cal-l);border-top-right-radius:12px}
+.nodo[data-pos="b"]::after,.nodo[data-pos="d"]::after,.nodo[data-pos="s2"]::after{left:100%;bottom:50%;width:calc(var(--u) / 2 + 1px);height:50%;border-bottom:var(--cal-l);border-right:var(--cal-l);border-bottom-right-radius:12px}
+.nodo[data-pos="s1"]::before,.nodo[data-pos="s2"]::before,.nodo[data-pos="f"]::before{right:100%;top:50%;width:calc(var(--u) / 2);margin-top:-1px;border-top:var(--cal-l)}
+.llave{position:relative;width:100%;display:grid;gap:7px;padding:6px 10px 10px;background:var(--noche-2);border:1px solid var(--linea);border-radius:var(--radio);cursor:pointer;transition:border-color .2s,box-shadow .2s}
+.llave>*{min-width:0}
+.llave:hover{border-color:var(--linea-2)}
+.llave--real{background:var(--noche-3);border-color:var(--linea-2)}
+.llave--sel,.llave--sel:hover{border-color:var(--oro);box-shadow:0 0 0 1px var(--oro),0 10px 28px var(--sombra)}
+.llave__id{display:flex;align-items:center;gap:8px;font:600 var(--t-0)/1.2 var(--f-texto);color:var(--gris)}
+.llave__id b{font:900 1.1rem/1 var(--f-cartel);letter-spacing:.06em;color:var(--oro)}
+.llave__id span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.llave__id span:not(.chip){flex:0 1 auto;min-width:0}
+.llave__id .chip{flex:none;overflow:visible}
+.llave__id .llave__ver,.llave__id .chip{margin-left:auto}
+.llave__id .chip+.llave__ver{margin-left:0}
+.llave__eqs{display:grid;gap:2px}
+.llave__eq{display:grid;grid-template-columns:1.2em auto minmax(0,1fr) auto;gap:8px;align-items:center;min-height:28px;--d:24px}
+.llave__eq .sem{font:800 var(--t-0)/1 var(--f-texto);color:var(--gris);text-align:center;font-variant-numeric:tabular-nums}
+.llave__eq .n{font:600 var(--t-2)/1.1 var(--f-texto);color:var(--cal-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.llave__eq>b{font:900 1.3rem/1 var(--f-cartel);font-variant-numeric:tabular-nums;color:var(--cal-2)}
+.llave__eq.fav .n{color:var(--cal)}
+.llave__eq.fav>b{color:var(--oro-2)}
+.llave__eq.fuera{opacity:.5}
+.avanza{display:flex;gap:2px;height:6px;border-radius:3px;overflow:hidden;transform-origin:left}
+.avanza i{min-width:3px;background:var(--cal-2)}
+.avanza i.f{background:linear-gradient(90deg,var(--oro),var(--oro-2))}
+.avanza--g{height:22px}
+.avanza--g i{display:grid;place-items:center;min-width:2.8em;font:800 var(--t-0)/1 var(--f-texto);font-style:normal;font-variant-numeric:tabular-nums;color:var(--tinta)}
+.piernas{display:grid;gap:7px;padding-top:8px;border-top:1px dashed var(--linea)}
+.pierna{display:grid;grid-template-columns:auto minmax(0,1fr);gap:3px 10px;align-items:center}
+.pierna__n{grid-column:1/-1;display:flex;align-items:baseline;gap:8px;min-width:0;font:500 var(--t-0)/1.2 var(--f-texto);color:var(--gris)}
+.pierna__n b{flex:none;font-weight:700;text-transform:uppercase;letter-spacing:.13em;font-size:.66rem;color:var(--oro)}
+.pierna__n span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pm{display:inline-flex;align-items:center;gap:6px;--d:22px}
+.pierna__x{display:grid;gap:3px;min-width:0}
+.pierna__x small{display:flex;justify-content:space-between;font:600 .66rem/1 var(--f-texto);color:var(--gris);font-variant-numeric:tabular-nums}
+.pierna__x .chip{justify-self:start}
+.llave__global{display:flex;align-items:center;gap:4px 8px;padding-top:8px;border-top:1px dashed var(--linea);font:700 .66rem/1.2 var(--f-texto);text-transform:uppercase;letter-spacing:.12em;color:var(--oro)}
+.llave__global em{font:600 var(--t-0)/1 var(--f-texto);font-style:normal;letter-spacing:0;text-transform:none;color:var(--gris);font-variant-numeric:tabular-nums}
+.llave__global .pm{margin-left:auto}
+.llave__vivo{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;padding:6px 8px;border:1px solid var(--rojo-brillo);border-radius:6px;background:var(--rojo-tenue);font:600 var(--t-0)/1.2 var(--f-texto);color:var(--cal-2)}
+.llave__vivo .pm{margin-left:auto}
+.llave__ver{flex:none;margin-left:auto;display:inline-flex;align-items:center;gap:6px;min-height:28px;font:700 .66rem/1 var(--f-texto);text-transform:uppercase;letter-spacing:.14em;color:var(--oro-2)}
+.llave__ver::after{content:"";width:6px;height:6px;border-top:2px solid currentColor;border-right:2px solid currentColor;transform:rotate(45deg)}
+.final-eje{position:relative;width:100%}
+.campeon-ruta{position:absolute;left:0;right:0;bottom:calc(100% + 22px);display:grid;justify-items:center;gap:3px;text-align:center}
+.campeon-ruta::after{content:"";position:absolute;left:50%;top:100%;height:22px;margin-left:-1px;border-left:var(--cal-l)}
+.campeon-ruta .emblema{width:74px;margin:0}
+.campeon-ruta b{font:900 var(--t-5)/1 var(--f-cartel);text-transform:uppercase;letter-spacing:.03em}
+.campeon-ruta span{font:700 .66rem/1.2 var(--f-texto);text-transform:uppercase;letter-spacing:.14em;color:var(--oro)}
+.campeon-ruta small{font-size:var(--t-0);line-height:1.3;color:var(--cal-2);max-width:26ch;padding-bottom:4px}
+/* detalle de la serie elegida */
+.serie-det{display:grid;gap:var(--e-5);padding:var(--e-4);scroll-margin-top:84px}
+.serie-det>*{min-width:0}
+.serie-sel{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;scrollbar-width:none}
+.serie-sel button{flex:none;min-width:46px;min-height:40px;padding:0 12px;border:1px solid var(--linea-2);border-radius:999px;font:800 1rem/1 var(--f-cartel);letter-spacing:.06em;color:var(--cal-2)}
+.serie-sel button[aria-pressed="true"]{background:var(--oro);border-color:var(--oro);color:var(--tinta)}
+.serie-det__t{display:grid;gap:6px}
+.serie-det__t p{color:var(--cal-2);font-size:var(--t-2);max-width:66ch}
+.serie-duelo{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);gap:10px;align-items:start;text-align:center}
+.serie-duelo .vs{align-self:center;display:grid;justify-items:center;gap:5px}
+.legs{display:grid;gap:var(--e-4)}
+.leg{display:grid;gap:var(--e-3);align-content:start;padding:var(--e-4);border:1px solid var(--linea);border-radius:8px;background:var(--noche);min-width:0}
+.leg>*{min-width:0}
+.leg--real{border-color:var(--linea-2);background:var(--noche-3)}
+.leg__cab{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 10px}
+.leg__cab h4{color:var(--oro-2)}
+.leg__cab span{font-size:var(--t-1);color:var(--cal-2)}
+.leg__cab .chip{margin-left:auto;align-self:center}
+.leg .duelo{margin-top:0}
+.leg .eq__n{font-size:1.1rem}
+.viene{padding-left:12px;border-left:2px solid var(--linea-2);font-size:var(--t-1);color:var(--cal-2);max-width:66ch}
+
+/* ---------- en vivo ---------- */
+.franja{position:fixed;left:0;right:0;top:calc(60px + env(safe-area-inset-top, 0px));z-index:45;background:var(--velo-3);border-top:1px solid var(--linea);border-bottom:1px solid var(--linea-2);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
+.franja__in{display:flex;align-items:center;gap:10px;width:100%;max-width:var(--ancho);margin:0 auto;min-height:46px;padding:0 var(--canal-d) 0 var(--canal-i)}
+.franja__rot{flex:none;display:flex;align-items:center;gap:7px;font:800 1rem/1 var(--f-cartel);letter-spacing:.1em;text-transform:uppercase;color:var(--rojo-2)}
+.franja__lista{flex:1;min-width:0;display:flex;gap:8px;overflow-x:auto;padding:6px 0;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+.franja__lista::-webkit-scrollbar,.serie-sel::-webkit-scrollbar{display:none}
+.fr{flex:none;display:flex;align-items:center;gap:6px;min-height:34px;padding:2px 10px 2px 4px;border:1px solid var(--linea-2);border-radius:999px;background:var(--noche-2);--d:24px}
+.fr__min{min-width:2.3em;text-align:right;font:800 .95rem/1 var(--f-cartel);letter-spacing:.04em;font-variant-numeric:tabular-nums;color:var(--rojo-2)}
+.fr--desc .fr__min{color:var(--cal-2)}
+.con-franja .barra{background:var(--velo-3)}
+.con-franja .partido,.con-franja .serie-det,.con-franja .marc{scroll-margin-top:128px}
+.con-franja .banda,.con-franja .portada{scroll-margin-top:46px}
+.aviso{position:fixed;left:50%;top:calc(118px + env(safe-area-inset-top, 0px));z-index:46;transform:translateX(-50%);width:max-content;max-width:min(92vw,560px);padding:9px 16px;border:1px solid var(--oro);border-radius:999px;background:var(--noche-3);box-shadow:0 10px 30px var(--sombra);font:600 var(--t-1)/1.3 var(--f-texto);color:var(--cal);text-align:center}
+.conexion{display:inline-flex;align-items:center;gap:8px;font:600 var(--t-0)/1.3 var(--f-texto);letter-spacing:.03em;color:var(--gris)}
+.conexion::before{content:"";flex:none;width:8px;height:8px;border-radius:50%;background:var(--gris-2)}
+.conexion[data-modo="vivo"]{color:var(--cal-2)}
+.conexion[data-modo="vivo"]::before{background:var(--gana)}
+.conexion[data-modo="conectando"]::before{background:var(--oro)}
+.conexion:empty{display:none}
+.banda--vivo{padding:var(--e-6) 0 var(--e-7);background:linear-gradient(180deg,var(--rojo-tenue),var(--velo-0) 220px),var(--noche-2);border-bottom:1px solid var(--linea);scroll-margin-top:60px}
+.vivo-cab{display:grid;gap:8px}
+.vivo-cab .rotulo{color:var(--rojo-2);margin-bottom:0}
+.vivo-cab .rotulo::before{width:8px;height:8px;border:0;border-radius:50%;background:var(--rojo)}
+.marcs{display:grid;gap:var(--e-3)}
+.marc{display:grid;gap:10px;align-content:start;padding:12px;border:1px solid var(--linea);border-radius:var(--radio);background:var(--noche);min-width:0;scroll-margin-top:84px}
+.marc--vivo{border-color:var(--rojo-brillo)}
+.marc__cab{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;font-size:var(--t-0);color:var(--gris)}
+.marc__cab .min{margin-left:auto;font:800 1.15rem/1 var(--f-cartel);letter-spacing:.04em;color:var(--cal-2);font-variant-numeric:tabular-nums}
+.marc--vivo .marc__cab .min{color:var(--rojo-2)}
+.marc__eq{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:10px;align-items:center;--d:28px;font:600 var(--t-2)/1.15 var(--f-texto)}
+.marc__eq>b{font:900 1.7rem/1 var(--f-cartel);font-variant-numeric:tabular-nums}
+.marc__eq .roja{margin-left:6px}
+.marc__ev{font-size:var(--t-0);color:var(--cal-2);line-height:1.45}
+.pvivo{display:grid;gap:var(--e-4);padding:var(--e-4);border:1px solid var(--rojo-brillo);border-radius:8px;background:linear-gradient(180deg,var(--rojo-tenue),var(--velo-0) 60%),var(--noche)}
+.pvivo>*{min-width:0}
+.pvivo--final{border-color:var(--linea-2);background:var(--noche)}
+.pvivo__cab{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px}
+.pvivo__min{font:900 1.6rem/1 var(--f-cartel);letter-spacing:.03em;color:var(--rojo-2);font-variant-numeric:tabular-nums}
+.pvivo--final .pvivo__min{color:var(--cal-2)}
+.pvivo__cab .mini{margin-left:auto}
+.pvivo__marc{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);gap:10px;align-items:center;text-align:center}
+.pvivo__marc .eq{gap:5px}
+.roja{display:inline-block;width:9px;height:13px;border-radius:2px;background:var(--rojo);vertical-align:-1px}
+.eventos{border-top:1px solid var(--linea)}
+.ev{display:grid;grid-template-columns:minmax(0,1fr) 3.6em minmax(0,1fr);gap:8px;align-items:center;padding:7px 0;border-bottom:1px solid var(--linea);font-size:var(--t-1);line-height:1.25}
+.ev__min{text-align:center;font:800 1.05rem/1 var(--f-cartel);color:var(--oro-2);font-variant-numeric:tabular-nums}
+.ev__l{text-align:right}
+.ev b{font-weight:600}
+.ev small{display:block;color:var(--gris);font-size:var(--t-0)}
+.ico{display:inline-block;width:11px;height:11px;margin:0 5px;border-radius:50%;background:var(--cal);box-shadow:inset 0 0 0 2px var(--noche-2),inset 0 0 0 5px var(--cal);vertical-align:-1px}
+.compara{display:grid;gap:12px}
+.compara__f{display:grid;gap:6px}
+.compara__f>span{font:700 var(--t-0)/1.2 var(--f-texto);text-transform:uppercase;letter-spacing:.12em;color:var(--oro)}
+.compara__f.antes>span{color:var(--gris)}
+.compara__f small{display:flex;justify-content:space-between;gap:8px;font-size:var(--t-0);color:var(--gris);font-variant-numeric:tabular-nums}
+.ley .dl{display:block;font:700 var(--t-0)/1.1 var(--f-texto);font-variant-numeric:tabular-nums;color:var(--gris)}
+.dl.mas{color:var(--gana)} .dl.menos{color:var(--pierde)}
+.mov{display:inline-block;min-width:2.4em;font:800 var(--t-0)/1 var(--f-texto);font-variant-numeric:tabular-nums;color:var(--gris-2);text-align:left}
+.mov.sube{color:var(--gana)} .mov.baja{color:var(--pierde)}
+tr.enjuego td{background:var(--rojo-tenue)}
+tr.enjuego td.eqc .pulso{margin-left:8px;vertical-align:middle}
+.barras .val .dl{display:block;margin-top:2px;font:700 .66rem/1.1 var(--f-texto);font-variant-numeric:tabular-nums;color:var(--gris)}
+.barras .val .dl.mas{color:var(--gana)} .barras .val .dl.menos{color:var(--pierde)}
 /* cruces */
 .cruce{display:grid;gap:6px;padding:10px 0;border-bottom:1px dashed var(--linea)}
 .cruce:last-child{border-bottom:0}
@@ -341,9 +525,6 @@ tbody th{background:var(--noche-3);color:var(--oro);padding-top:11px}
 .reglas div{padding-left:12px;border-left:2px solid var(--linea-2)}
 .reglas dt{font:700 var(--t-0)/1.2 var(--f-texto);text-transform:uppercase;letter-spacing:.1em;color:var(--oro)}
 .reglas dd{font-size:var(--t-2);color:var(--cal-2);margin-top:3px}
-.serie{padding:var(--e-4);display:grid;gap:var(--e-3)}
-.serie__g{display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap;font:800 1.2rem/1 var(--f-cartel);text-transform:uppercase}
-.pierna{padding:10px;border:1px solid var(--linea);border-radius:6px;display:grid;gap:8px;font-size:var(--t-1)}
 /* resultados */
 .res{padding:var(--e-4);display:grid;gap:var(--e-3)}
 .res__m{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);gap:8px;align-items:center;font-weight:600;font-size:var(--t-2);line-height:1.15}
@@ -410,6 +591,13 @@ tbody th{background:var(--noche-3);color:var(--oro);padding-top:11px}
   .favoritos{grid-template-columns:repeat(4,minmax(0,1fr))}
   .favoritos li{display:flex;flex-direction:column;align-items:flex-start;gap:8px;padding:14px}
   .favoritos .fav__p{font-size:2.3rem}
+  .sello{display:block}
+  .sello span{font-size:inherit;letter-spacing:inherit}
+  .sello b::after{content:" · ";color:var(--cal-2)}
+  .marcs{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .ronda{flex-basis:min(46vw,372px)}
+  .legs{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .serie-det{padding:var(--e-5)}
   .sigue__caja{grid-template-columns:minmax(0,1fr) auto auto;gap:var(--e-5)}
   .rej{grid-template-columns:repeat(2,minmax(0,1fr))}
   .dos{grid-template-columns:repeat(2,minmax(0,1fr))}
@@ -421,6 +609,19 @@ tbody th{background:var(--noche-3);color:var(--oro);padding-top:11px}
   .tira{grid-template-columns:repeat(18,8px)}
   .eq__n{font-size:1.7rem}
   .creds{grid-template-columns:repeat(2,minmax(0,1fr));column-gap:var(--e-5)}
+}
+@media (min-width:900px){
+  .portada{--foto:100%;display:flex;align-items:flex-end;min-height:min(100vh,960px);min-height:min(100svh,960px);padding:calc(104px + env(safe-area-inset-top, 0px)) 0 var(--e-7)}
+  .portada .fondo{height:100%}
+  .portada .fondo img{object-position:var(--pos-ancho,50% 50%);transform-origin:var(--pos-ancho,50% 50%);--z0:var(--zoom,1.04);--z1:calc(var(--zoom,1.04) * 1.08)}
+  h1{font-size:clamp(4rem,11.2vw,10rem)}
+  .portada .fondo::after{background:linear-gradient(180deg,var(--velo-2) 0,var(--velo-0) 18%,var(--velo-0) 44%,var(--velo-2) 80%,var(--noche) 100%),linear-gradient(90deg,var(--velo-2) 0,var(--velo-1) 38%,var(--velo-0) 66%)}
+  .portada[data-lado="der"] .fondo::after{background:linear-gradient(180deg,var(--velo-2) 0,var(--velo-0) 18%,var(--velo-0) 44%,var(--velo-2) 80%,var(--noche) 100%),linear-gradient(270deg,var(--velo-2) 0,var(--velo-1) 38%,var(--velo-0) 66%)}
+  .confeti{height:100%}
+  .portada__caja{width:fit-content;max-width:100%}
+  .portada[data-lado="der"] .portada__caja{margin-left:auto}
+  .emblema{width:clamp(150px,15vw,210px)}
+  .marcs{grid-template-columns:repeat(3,minmax(0,1fr))}
 }
 @media (min-width:980px){
   :root{--t-3:1.09rem}
@@ -437,15 +638,45 @@ tbody th{background:var(--noche-3);color:var(--oro);padding-top:11px}
 @media (min-width:1160px){
   .barra__nav{display:block}
   .hamb{margin-left:var(--e-3)}
+  /* cuadro en espejo: cuartos a los lados, la final al centro */
+  .cuadro-marco{--u:30px}
+  .rondas-nav,.desliza{display:none}
+  .cuadro{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));grid-template-rows:auto 1fr 1fr;column-gap:var(--u);overflow:visible;width:100%;max-width:1440px;margin:0 auto;padding:var(--e-7) var(--canal-d) 0 var(--canal-i)}
+  .ronda,.ronda__nodos{display:contents}
+  .ronda__cab{display:none}
+  .cuadro__rot{display:block;grid-row:1;align-self:end;padding-bottom:6px;font:800 var(--t-4)/1 var(--f-cartel);text-transform:uppercase;letter-spacing:.06em;color:var(--oro)}
+  .cuadro__rot small{display:block;margin-top:4px;font:500 var(--t-0)/1 var(--f-texto);letter-spacing:.02em;text-transform:none;color:var(--gris)}
+  .cuadro__rot.d{text-align:right}
+  .nodo[data-pos="a"]{grid-area:2/1} .nodo[data-pos="b"]{grid-area:3/1}
+  .nodo[data-pos="s1"]{grid-area:2/2/4/3} .nodo[data-pos="f"]{grid-area:2/3/4/4} .nodo[data-pos="s2"]{grid-area:2/4/4/5}
+  .nodo[data-pos="c"]{grid-area:2/5} .nodo[data-pos="d"]{grid-area:3/5}
+  .nodo[data-pos="c"]::after{left:auto;right:100%;border-right:0;border-left:var(--cal-l);border-top-right-radius:0;border-top-left-radius:12px}
+  .nodo[data-pos="d"]::after{left:auto;right:100%;border-right:0;border-left:var(--cal-l);border-bottom-right-radius:0;border-bottom-left-radius:12px}
+  .nodo[data-pos="s1"]::after{width:var(--u);height:0;margin-top:-1px;border-right:0;border-radius:0}
+  .nodo[data-pos="s2"]::after{left:auto;right:100%;bottom:auto;top:50%;width:var(--u);height:0;margin-top:-1px;border:0;border-top:var(--cal-l);border-radius:0}
+  .nodo[data-pos="s2"]::before{right:auto;left:100%}
+  .nodo[data-pos="f"]::before{display:none}
+  .llave__eq .n{font-size:var(--t-1)}
+  .llave__ver{font-size:0;letter-spacing:0;gap:0;min-width:24px;justify-content:flex-end}
 }
 /* ---------- movimiento (siempre parte de un estado visible) ---------- */
 @keyframes sube{from{opacity:.35;transform:translateY(18px)}to{opacity:1;transform:none}}
 @keyframes crece{from{transform:scaleX(.02)}to{transform:none}}
 @keyframes menu-entra{from{opacity:0;transform:translateY(-10px)}to{opacity:1;transform:none}}
 @keyframes paralaje{from{transform:translateY(-5%) scale(1.12)}to{transform:translateY(5%) scale(1.12)}}
+@keyframes kenburns{from{transform:scale(var(--z0,1.04))}to{transform:scale(var(--z1,1.16))}}
+@keyframes late{0%{box-shadow:0 0 0 0 var(--rojo-brillo)}70%,100%{box-shadow:0 0 0 7px var(--velo-0)}}
+@keyframes gol{0%{transform:scale(1.4);color:var(--tinta);background-color:var(--oro-2)}55%{transform:scale(1);color:var(--tinta);background-color:var(--oro-2)}100%{transform:none}}
+@keyframes aviso-entra{from{opacity:0;transform:translate(-50%,-8px)}to{opacity:1;transform:translate(-50%,0)}}
+@keyframes empuja{from{transform:translateX(0)}to{transform:translateX(7px)}}
 @media (prefers-reduced-motion:no-preference){
   .entra{animation:sube .7s cubic-bezier(.2,.7,.2,1) both}
-  .entra .pista i,.entra .x12,.entra .partida{animation:crece .9s cubic-bezier(.2,.7,.2,1) .1s both}
+  .kb{animation:kenburns 36s ease-in-out infinite alternate}
+  .pulso{animation:late 1.6s ease-out infinite}
+  .tablero b.cambia{animation:gol 1.4s cubic-bezier(.2,.7,.2,1)}
+  .aviso{animation:aviso-entra .35s cubic-bezier(.2,.7,.2,1) both}
+  .desliza i{animation:empuja .9s ease-in-out infinite alternate}
+  .entra .pista i,.entra .x12,.entra .partida,.entra .avanza{animation:crece .9s cubic-bezier(.2,.7,.2,1) .1s both}
   .menu:not([hidden]) li{animation:menu-entra .4s both;animation-delay:calc(var(--i,0)*28ms)}
   @supports (animation-timeline:view()){
     @media (min-width:980px){
@@ -462,6 +693,7 @@ tbody th{background:var(--noche-3);color:var(--oro);padding-top:11px}
   <button type="button" class="marca" data-ir="portada" aria-label="Cerebro Liga MX, ir al inicio">Cerebro <b>Liga MX</b></button>
   <nav class="barra__nav" aria-label="Secciones">
     <ul>
+      <li class="js-nav-vivo" hidden><button type="button" data-ir="vivo">Al momento</button></li>
       <li><button type="button" data-ir="proximos">Partidos</button></li>
       <li><button type="button" data-ir="combinada">Combinada</button></li>
       <li><button type="button" data-ir="liguilla">Liguilla</button></li>
@@ -476,13 +708,39 @@ tbody th{background:var(--noche-3);color:var(--oro);padding-top:11px}
   <button type="button" class="hamb" id="hamb" aria-expanded="false" aria-controls="menu" aria-label="Abrir menú"><span></span><span></span><span></span></button>
 </header>
 
+<div class="franja" id="franja" role="region" aria-label="Partidos en vivo" hidden>
+  <div class="franja__in">
+    <span class="franja__rot"><i class="pulso" aria-hidden="true"></i>En vivo</span>
+    <div class="franja__lista" id="franja-lista"></div>
+  </div>
+</div>
+<p class="aviso" id="aviso" aria-hidden="true" hidden></p>
+<p class="oculto" id="aviso-voz" role="status" aria-live="polite"></p>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false"><defs>
+  <symbol id="s-trofeo" viewBox="0 0 200 286">
+    <g fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M31 50C2 50 0 104 50 124M169 50c29 0 31 54-19 74"/>
+      <path d="M30 32c0 70 28 118 54 136h32c26-18 54-66 54-136" fill="currentColor" fill-opacity=".13"/>
+      <ellipse cx="100" cy="32" rx="70" ry="9" fill="currentColor" fill-opacity=".2"/>
+      <path d="M88 168v8c0 14 6 18 6 30h12c0-12 6-16 6-30v-8"/>
+      <path d="M84 184h32"/>
+      <path d="M72 206h56l9 20H63z" fill="currentColor" fill-opacity=".13"/>
+      <path d="M52 226h96v36H52z" fill="currentColor" fill-opacity=".2"/>
+      <path d="M40 262h120v14H40z"/>
+      <path d="M72 244h56" stroke-width="2"/>
+    </g>
+    <g fill="currentColor"><path d="M20 2l2.6 6.4L29 11l-6.4 2.6L20 20l-2.6-6.4L11 11l6.4-2.6z"/><path d="M186 132l2 5 5 2-5 2-2 5-2-5-5-2 5-2z"/></g>
+  </symbol>
+</defs></svg>
+
 <div class="menu" id="menu" role="dialog" aria-modal="true" aria-label="Menú de secciones" hidden>
   <figure class="fondo" data-escena="menu" data-sin-credito></figure>
   <ol>
     <li style="--i:0"><button type="button" data-ir="portada"><i>00</i>Inicio</button></li>
+    <li style="--i:0" class="js-nav-vivo" hidden><button type="button" data-ir="vivo"><i><span class="pulso" aria-hidden="true"></span></i>Al momento</button></li>
     <li style="--i:1"><button type="button" data-ir="proximos"><i>01</i>Próximos partidos</button></li>
     <li style="--i:2"><button type="button" data-ir="combinada"><i>02</i>Combinada de la jornada</button></li>
-    <li style="--i:3"><button type="button" data-ir="liguilla"><i>03</i>Liguilla al momento</button></li>
+    <li style="--i:3"><button type="button" data-ir="liguilla"><i>03</i>Liguilla</button></li>
     <li style="--i:4"><button type="button" data-ir="camino"><i>04</i>Camino al título</button></li>
     <li style="--i:5"><button type="button" data-ir="tabla"><i>05</i>Tabla general</button></li>
     <li style="--i:6"><button type="button" data-ir="ultima"><i>06</i>Última jornada</button></li>
@@ -495,16 +753,29 @@ tbody th{background:var(--noche-3);color:var(--oro);padding-top:11px}
 </div>
 
 <main id="contenido">
-<section class="portada" id="portada" aria-labelledby="t-portada">
+<section class="portada" id="portada" aria-labelledby="t-portada" data-tono="{{PORTADA_TONO}}" data-lado="{{PORTADA_LADO}}">
   <figure class="fondo">{{PORTADA_FONDO}}</figure>
-  <div class="interior">
-    <p class="sello" id="p-sello">Liga MX · Pronósticos</p>
-    <h1 id="t-portada" tabindex="-1">Cerebro <span>Liga MX</span></h1>
+  <canvas class="confeti" id="confeti" aria-hidden="true"></canvas>
+  <div class="interior"><div class="portada__caja">
+    <div class="portada__marca">
+      <p class="sello" id="p-sello"><b>Liga MX</b><span>Pronósticos</span></p>
+      <h1 id="t-portada" tabindex="-1">Cerebro <span>Liga MX</span></h1>
+    </div>
+    <div class="emblema" aria-hidden="true"><svg class="trofeo" viewBox="0 0 200 286"><use href="#s-trofeo"></use></svg><span class="emblema__esc" id="emblema-esc"></span></div>
     <div id="b-portada"><p class="titular">Marcador, resultado y combinada de cada partido. Y quién será campeón.</p></div>
-  </div>
+    <div class="portada__pie"><p id="p-pie"></p><p class="foto-de">{{PORTADA_CREDITO}}</p></div>
+  </div></div>
 </section>
 
 <section class="sigue" aria-label="Próximo partido"><div class="interior" id="b-sigue"></div></section>
+
+<section class="banda--vivo" id="vivo" aria-labelledby="t-vivo" hidden>
+  <div class="interior cuerpo">
+    <div class="vivo-cab"><p class="rotulo">En vivo</p><h2 id="t-vivo" tabindex="-1">Al momento</h2><p class="conexion js-conexion"></p></div>
+    <div id="b-vivo-partidos"></div>
+    <div class="mitad"><div id="b-vivo-tabla"></div><div id="b-vivo-proy"></div></div>
+  </div>
+</section>
 
 <section class="banda" id="proximos" aria-labelledby="t-proximos">
   <div class="cab"><figure class="fondo" data-escena="proximos"></figure>
@@ -522,9 +793,9 @@ tbody th{background:var(--noche-3);color:var(--oro);padding-top:11px}
 
 <section class="banda" id="liguilla" aria-labelledby="t-liguilla">
   <div class="cab"><figure class="fondo" data-escena="liguilla"></figure>
-    <div class="interior"><p class="rotulo">03 · Liguilla</p><h2 id="t-liguilla" tabindex="-1">Liguilla al momento</h2>
-    <p class="bajada" id="liguilla-bajada">Cómo va quedando el cuadro y quién avanzaría en cada serie.</p></div></div>
-  <div class="interior cuerpo" id="b-llaves"></div>
+    <div class="interior"><p class="rotulo">03 · Fase final</p><h2 id="t-liguilla" tabindex="-1">Liguilla</h2>
+    <p class="bajada" id="liguilla-bajada">El cuadro completo: cuartos, semifinales y final, con el pronóstico de la ida y la vuelta de cada serie.</p></div></div>
+  <div class="cuerpo"><div id="b-llaves"></div><div class="interior cuerpo"><div id="b-serie"></div><div id="b-formato"></div></div></div>
 </section>
 
 <section class="banda" id="camino" aria-labelledby="t-camino">
@@ -532,12 +803,10 @@ tbody th{background:var(--noche-3);color:var(--oro);padding-top:11px}
     <div class="interior"><p class="rotulo">04 · Campeón</p><h2 id="t-camino" tabindex="-1">Camino al título</h2>
     <p class="bajada" id="camino-bajada">Lo que resta del torneo, jugado miles de veces en la computadora.</p></div></div>
   <div class="interior cuerpo">
-    <div id="b-cuadro"></div>
     <div id="b-campeon"></div>
     <div class="medio" aria-hidden="true"></div>
     <div id="b-embudo"></div>
     <div id="b-cruces"></div>
-    <div id="b-formato"></div>
   </div>
 </section>
 
@@ -630,6 +899,9 @@ var MES3 = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct'
 var DIAS = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
 var ENT = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
 function ok(x) { return typeof x === 'number' && isFinite(x); }
+function arr(x) { return Array.isArray(x) ? x : []; }
+function obj(x) { return x && typeof x === 'object' && !Array.isArray(x) ? x : null; }
+function txt(x) { return typeof x === 'string' || typeof x === 'number' ? String(x) : ''; }
 function E(s) { return s == null ? '' : String(s).replace(/[&<>"']/g, function (c) { return ENT[c]; }); }
 function pct(x, d) {
   if (!ok(x)) return '—';
@@ -653,12 +925,24 @@ function fecha(iso) { /* 'AAAA-MM-DD' → 'sábado 14 de noviembre' */
   return DIAS[new Date(Date.UTC(p.a, p.m - 1, p.d)).getUTCDay()] + ' ' + p.d + ' de ' + MESES[p.m - 1];
 }
 function fechaCorta(iso, conAnio) { var p = partes(iso); return p ? p.d + ' ' + MES3[p.m - 1] + (conAnio ? ' ' + p.a : '') : ''; }
-function rangoFechas(lista) { /* ['2026-11-25','2026-11-26'] → '25 y 26 nov' */
-  var ps = (lista || []).map(partes).filter(Boolean); if (!ps.length) return '';
+function rangoFechas(lista, sep) { /* ['2026-11-25','2026-11-26'] → '25 y 26 nov' */
+  var ps = arr(lista).map(partes).filter(Boolean); if (!ps.length) return '';
+  sep = sep || ' y ';
   if (ps.length === 1) return ps[0].d + ' ' + MES3[ps[0].m - 1];
   var mismo = ps.every(function (p) { return p.m === ps[0].m; });
-  return mismo ? ps.map(function (p) { return p.d; }).join(' y ') + ' ' + MES3[ps[0].m - 1]
-    : ps.map(function (p) { return p.d + ' ' + MES3[p.m - 1]; }).join(' y ');
+  return mismo ? ps.map(function (p) { return p.d; }).join(sep) + ' ' + MES3[ps[0].m - 1]
+    : ps.map(function (p) { return p.d + ' ' + MES3[p.m - 1]; }).join(sep);
+}
+function ventana(lista) { /* fechas de una ronda → '25 al 29 nov' */
+  var ps = arr(lista).filter(function (x) { return partes(x); }).slice().sort(); if (!ps.length) return '';
+  if (ps.length <= 2) return rangoFechas(ps);
+  var a = partes(ps[0]), b = partes(ps[ps.length - 1]);
+  return a.d + (a.m === b.m ? '' : ' ' + MES3[a.m - 1]) + ' al ' + b.d + ' ' + MES3[b.m - 1];
+}
+function horaMX(iso) { /* instante UTC → 'HH:MM' del centro de México (UTC−6 todo el año) */
+  var t = Date.parse(iso || ''); if (!ok(t)) return '';
+  var d = new Date(t - 6 * 3600000);
+  return ('0' + d.getUTCHours()).slice(-2) + ':' + ('0' + d.getUTCMinutes()).slice(-2);
 }
 function corte(txt) { /* '2026-11-10 04:12' → '10 de noviembre de 2026, 04:12 h' */
   var p = partes(txt); if (!p) return E(txt);
@@ -693,9 +977,10 @@ function ley(p) {
   function c(k, col, v, n) { return '<div style="--c:var(--' + col + ')"' + (g === k ? ' class="gan"' : '') + '><b>' + pct(v) + '</b><span>' + E(n) + '</span></div>'; }
   return '<div class="ley">' + c('L', 'local', p.p_local, p.local) + c('E', 'empate', p.p_empate, 'Empate') + c('V', 'visita', p.p_visitante, p.visitante) + '</div>';
 }
-function tablero(gl, gv, chico) {
-  return '<span class="tablero' + (chico ? ' tablero--ch' : '') + '"><b>' + E(gl) + '</b><i></i><b>' + E(gv) + '</b></span>';
+function tablero(gl, gv, tam, extra) { /* tam: true = chico, 'mini' = el de las llaves; extra: clases y atributos */
+  return '<span class="tablero' + (tam === 'mini' ? ' tablero--mini' : tam ? ' tablero--ch' : '') + (extra ? ' ' + extra : '') + '"><b>' + E(gl) + '</b><i></i><b>' + E(gv) + '</b></span>';
 }
+function trofeo() { return '<svg class="trofeo" viewBox="0 0 200 286" aria-hidden="true" focusable="false"><use href="#s-trofeo"></use></svg>'; }
 function iv(v, lo, hi, min, max, cero) { /* punto con intervalo sobre un eje [min, max] */
   function x(t) { return Math.max(0, Math.min(100, (t - min) / (max - min) * 100)); }
   var h = '<span class="iv" aria-hidden="true">';
@@ -760,7 +1045,7 @@ function ir(destino) {
   var el = id(destino); if (!el) return;
   ponerMenu(false, true);
   el.scrollIntoView({ behavior: REDUCE ? 'auto' : 'smooth', block: 'start' });
-  var h = $('h1[tabindex],h2[tabindex]', el);
+  var h = $('h1[tabindex],h2[tabindex],h3[tabindex]', el);
   if (h) { try { h.focus({ preventScroll: true }); } catch (e) { /* sin foco no pasa nada */ } }
 }
 function navegacion() {
@@ -770,6 +1055,12 @@ function navegacion() {
     var t = e.target && e.target.closest ? e.target : null; if (!t) return;
     var b = t.closest('[data-ir]');
     if (b) { ir(b.getAttribute('data-ir')); return; }
+    var sr = t.closest('[data-serie]');
+    if (sr) { elegirSerie(sr.getAttribute('data-serie'), !sr.hasAttribute('data-aqui')); return; }
+    var rn = t.closest('[data-ronda]');
+    if (rn) { irRonda(+rn.getAttribute('data-ronda')); return; }
+    var ll = t.closest('.llave');
+    if (ll) { elegirSerie(ll.getAttribute('data-llave'), true); return; }
     var tab = t.closest('[role="tab"]');
     if (tab) { elegirPestana(tab); return; }
     var f = t.closest('[data-foto]');
@@ -825,19 +1116,12 @@ function fondos() {
   var mc = id('menu-credito'); if (mc && M.escenas && M.escenas.menu) mc.textContent = credTxt(M.escenas.menu);
 }
 function videos() {
-  var vp = id('video-portada');
   function toca(v) { v.muted = true; var p = v.play(); if (p && p.catch) p.catch(function () { /* autoplay bloqueado: queda el póster */ }); }
-  if (REDUCE) { /* sin movimiento: sólo el póster */
-    if (vp) { vp.removeAttribute('autoplay'); vp.pause(); try { vp.load(); } catch (e) { /* nada */ } }
-    return;
-  }
-  if (vp) toca(vp);
-  if (!('IntersectionObserver' in window)) return;
+  if (REDUCE || !('IntersectionObserver' in window)) return; /* sin movimiento: sólo el póster */
   var io = new IntersectionObserver(function (es) {
     es.forEach(function (x) { if (x.isIntersecting) toca(x.target); else x.target.pause(); });
   }, { threshold: 0.15 });
   $$('video[data-auto]').forEach(function (v) { io.observe(v); });
-  if (vp) io.observe(vp);
 }
 function entradas() {
   if (REDUCE || !('IntersectionObserver' in window)) return;
@@ -857,37 +1141,105 @@ function cambiarFoto(b) { /* galería de estadios: cambia la foto, su alt y su c
 
 /* ---------- 0. portada y próximo partido ---------- */
 function portada() {
-  var m = D.meta, s = id('p-sello');
-  if (s) s.innerHTML = '<b>' + E(m.torneo) + '</b> · Actualizado ' + fechaCorta(m.corte_local, true) + ((/(\d{2}:\d{2})/.exec(m.corte_local || '') || [])[1] ? ', ' + /(\d{2}:\d{2})/.exec(m.corte_local)[1] + ' h' : '');
+  var m = D.meta, s = id('p-sello'), hh = (/(\d{2}:\d{2})/.exec(m.corte_local || '') || [])[1];
+  if (s) s.innerHTML = '<b>' + E(m.torneo) + '</b><span>Actualizado ' + fechaCorta(m.corte_local) + (hh ? ', ' + hh + ' h' : '') + '</span>';
   var c = D.proyeccion.campeon.filter(function (x) { return ok(x.prob); }).slice(0, 4), f = c[0];
+  var ep = (M.portada || {}).equipo || (f && f.equipo), em = id('emblema-esc');
+  if (em) em.innerHTML = ep ? esc(ep, 96) : '';
+  var pie = id('p-pie');
+  if (pie) pie.textContent = 'Probabilidad de ser campeón' + (ok(D.proyeccion.n_sim) ? ' en ' + miles(D.proyeccion.n_sim) + ' torneos simulados' : '') + '.' +
+    (m.modelo && m.modelo.provisional ? ' Modelo provisional.' : '') + (m.retrospectivo ? ' Corrida retrospectiva.' : '');
   if (!f) return '<p class="titular">Pronósticos de cada partido, la liguilla y el campeón.</p>';
   var h = '<p class="titular"><b>' + E(f.equipo) + '</b> es el favorito al título: <b class="tab">' + pct(f.prob) + '</b></p>';
-  var pt = M.portada || {};
-  if (pt.leyenda) h += '<p class="trofeo-leyenda">' + E(pt.leyenda) + '</p>';
+  var u = obj((obj((D.proyeccion.titulos || {})[f.equipo]) || {}).ultimo);
+  if (u && u.torneo) {
+    var gm = /^(.+?) (\d+)-(\d+) (.+)$/.exec(txt(u.global)), fin = '';
+    if (gm && u.rival && (gm[1] === f.equipo || gm[4] === f.equipo)) fin = 'Final ante ' + u.rival + ', ' + (gm[1] === f.equipo ? gm[2] + '-' + gm[3] : gm[3] + '-' + gm[2]) + ' en el global';
+    else if (u.global) fin = 'Final: ' + u.global;
+    h += '<p class="palmares"><span>Su último título</span><b>' + E(u.torneo) + '</b><i>' + E([fin, txt(u.estadio)].filter(Boolean).join(' · ')) + '</i></p>';
+  }
   h += '<ol class="favoritos" aria-label="Los cuatro con más probabilidad de ser campeón">' + c.map(function (x) {
     return '<li>' + esc(x.equipo, 38) + '<span class="fav__n">' + E(x.equipo) + '</span><span class="fav__p">' + pct(x.prob) + '</span></li>';
   }).join('') + '</ol>';
-  h += '<p class="fav-pie">Probabilidad de ser campeón' + (ok(D.proyeccion.n_sim) ? ' en ' + miles(D.proyeccion.n_sim) + ' torneos simulados' : '') + '.' +
-    (m.modelo && m.modelo.provisional ? ' Modelo provisional.' : '') + (m.retrospectivo ? ' Corrida retrospectiva.' : '') + '</p>';
   return h;
+}
+/* confeti en los colores del favorito: lienzo ligero, en pausa fuera de pantalla; una sola imagen fija con movimiento reducido */
+function confeti() {
+  var cv = id('confeti'), sec = id('portada'); if (!cv || !sec || !cv.getContext) return;
+  var ctx = cv.getContext('2d'); if (!ctx) return;
+  var e = M.escudos[(M.portada || {}).equipo] || {}, st = window.getComputedStyle(document.documentElement);
+  function luz(c) { var m = /^#([0-9a-f]{6})$/i.exec(c || ''); if (!m) return 0; var n = parseInt(m[1], 16); return (0.299 * (n >> 16) + 0.587 * (n >> 8 & 255) + 0.114 * (n & 255)) / 255; }
+  var club = [e.c1, e.c2, e.fg].filter(function (c, i, a) { return luz(c) > 0.16 && a.indexOf(c) === i; });
+  var oro = (st.getPropertyValue('--oro-2') || '').trim(), cal = (st.getPropertyValue('--cal') || '').trim();
+  var cols = club.concat(club, [oro, cal]).filter(Boolean); if (!cols.length) return;
+  var W = 0, H = 0, ps = [], vivo = false, visible = true, antes = 0, raf = 0;
+  function azar(a, b) { return a + Math.random() * (b - a); }
+  function nueva(arriba) { return { x: azar(0, W), y: arriba ? azar(-40, -8) : azar(0, H), w: azar(4, 8), h: azar(8, 15), vy: azar(16, 40), fase: azar(0, 6.28), vf: azar(0.6, 1.6), giro: azar(0, 6.28), vg: azar(-1.2, 1.2), vuelta: azar(0, 6.28), vv: azar(1.4, 3.4), c: cols[Math.floor(Math.random() * cols.length)], a: azar(0.55, 0.95) }; }
+  function medir() {
+    var r = cv.getBoundingClientRect(), dpr = Math.min(window.devicePixelRatio || 1, 2);
+    W = Math.max(1, Math.round(r.width)); H = Math.max(1, Math.round(r.height));
+    cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    var n = Math.round(Math.min(64, Math.max(22, W * H / 15000)));
+    while (ps.length < n) ps.push(nueva(false));
+    ps.length = n;
+  }
+  function pinta(dt) {
+    ctx.clearRect(0, 0, W, H);
+    for (var i = 0; i < ps.length; i++) {
+      var q = ps[i];
+      q.y += q.vy * dt; q.fase += q.vf * dt; q.giro += q.vg * dt; q.vuelta += q.vv * dt;
+      if (q.y > H + 20) ps[i] = q = nueva(true);
+      var k = q.y / H, f = k > 0.62 ? Math.max(0, 1 - (k - 0.62) / 0.34) : 1; /* se apaga antes de llegar al texto */
+      if (f <= 0) continue;
+      ctx.save();
+      ctx.globalAlpha = q.a * f;
+      ctx.translate(q.x + Math.sin(q.fase) * 14, q.y);
+      ctx.rotate(q.giro);
+      ctx.scale(1, Math.cos(q.vuelta));
+      ctx.fillStyle = q.c;
+      ctx.fillRect(-q.w / 2, -q.h / 2, q.w, q.h);
+      ctx.restore();
+    }
+  }
+  function cuadro(t) {
+    raf = 0; if (!vivo) return;
+    var dt = antes ? Math.min(0.05, (t - antes) / 1000) : 0; antes = t;
+    pinta(dt);
+    raf = window.requestAnimationFrame(cuadro);
+  }
+  function ajusta() {
+    var debe = visible && !document.hidden && !REDUCE;
+    if (debe && !vivo) { vivo = true; antes = 0; if (!raf) raf = window.requestAnimationFrame(cuadro); }
+    else if (!debe && vivo) { vivo = false; if (raf) { window.cancelAnimationFrame(raf); raf = 0; } }
+  }
+  medir(); pinta(0);
+  var tm = 0;
+  window.addEventListener('resize', function () { clearTimeout(tm); tm = setTimeout(function () { medir(); pinta(0); }, 180); });
+  if (REDUCE || !window.requestAnimationFrame) return;
+  document.addEventListener('visibilitychange', ajusta);
+  if ('IntersectionObserver' in window) new IntersectionObserver(function (es) { visible = es[es.length - 1].isIntersecting; ajusta(); }, { threshold: 0.02 }).observe(sec);
+  ajusta();
 }
 function sigue(el) {
   var ps = D.pendientes;
   if (!ps.length) return '<p class="nota">No hay partidos pendientes por ahora. La página se actualiza cuando se programe el siguiente.</p>';
   var ahora = Date.now();
-  var p = ps.filter(function (x) { return Date.parse(x.fecha_utc) > ahora; })[0] || ps[0];
+  var fut = ps.filter(function (x) { return Date.parse(x.fecha_utc) > ahora; }), p = fut[0] || ps[ps.length - 1], hayFuturo = fut.length > 1;
   var est = p.estadio || {};
-  el.innerHTML = '<div class="sigue__caja"><div><p class="rotulo">Próximo partido</p>' +
+  el.innerHTML = '<div class="sigue__caja"><div><p class="rotulo">' + (fut.length ? 'Próximo partido' : 'Último partido programado') + '</p>' +
     '<p class="sigue__duelo">' + eqn(p.local, 40) + '<small>VS</small>' + eqn(p.visitante, 40) + '</p>' +
     '<p class="sigue__cuando">' + may(fecha(p.fecha_local)) + ' · ' + E(p.hora_local) + ' h, centro de México' + (est.nombre ? ' · ' + E(est.nombre) : '') + '</p></div>' +
     '<div class="reloj" id="reloj" role="timer" aria-label="Tiempo que falta para el partido"></div>' +
-    '<button type="button" class="boton" data-ir="p-' + E(p.id) + '">Ver pronóstico</button></div>';
+    '<button type="button" class="boton" data-ir="p-' + E(p.id) + '">Ver pronóstico</button></div>' +
+    '<p class="conexion js-conexion" style="margin-top:var(--e-3)"></p>';
   var reloj = id('reloj'), t = Date.parse(p.fecha_utc), tm = null, celdas = null;
   function tic() {
     var s = Math.floor((t - Date.now()) / 1000);
     if (!ok(s) || s <= 0) {
-      reloj.innerHTML = '<p class="nota">Ya empezó o ya se jugó.<br>La página se actualiza al terminar.</p>';
-      if (tm) clearInterval(tm); return;
+      reloj.innerHTML = '<p class="nota">Ya empezó o ya se jugó.<br>El pronóstico queda sellado.</p>';
+      if (tm) clearInterval(tm);
+      if (hayFuturo) setTimeout(function () { seguro('próximo partido', 'b-sigue', sigue); }, 2000); /* pasa al siguiente */
+      return;
     }
     var v = [Math.floor(s / 86400), Math.floor(s % 86400 / 3600), Math.floor(s % 3600 / 60), s % 60];
     if (!celdas) {
@@ -1014,7 +1366,8 @@ function tarjeta(p, nSede) {
   var alt = ok(est.altitud_m) ? est.altitud_m : (em && em.altitud_m);
   var h = '<article class="partido a" id="p-' + E(p.id) + '" aria-labelledby="pt-' + E(p.id) + '"><figure class="partido__foto">' + (foto ? img(foto) + cred(foto) : '') +
     '<div class="placa"><div><p class="placa__n">' + E(est.nombre || 'Sede por confirmar') + '</p>' + (est.ciudad ? '<p class="placa__c">' + E(est.ciudad) + '</p>' : '') + '</div>' +
-    (ok(alt) ? '<div class="alt"><b>' + miles(alt) + ' m</b><span>altitud</span></div>' : '') + '</div></figure><div class="partido__cuerpo">';
+    (ok(alt) ? '<div class="alt"><b>' + miles(alt) + ' m</b><span>altitud</span></div>' : '') + '</div></figure><div class="partido__cuerpo">' +
+    '<div class="pvivo ancho" data-pvivo="' + E(p.id) + '" hidden></div>';
   function equipo(eq, x, rol) {
     return '<div class="eq">' + esc(eq, 58) + '<span class="eq__n">' + E(eq) + '</span><span class="eq__r">' + rol + (x && ok(x.posicion) ? ' · ' + x.posicion + '.º' + (ok(x.puntos) ? ', ' + x.puntos + ' pts' : '') : '') + '</span></div>';
   }
@@ -1073,7 +1426,7 @@ function combinadaJornada() {
     (cand ? '<div class="bloque a"><div class="bloque__cab"><h3>Los candidatos</h3><p>El mejor pronóstico de cada partido' + (ok(cj.n_partidos) ? ' (' + cj.n_partidos + ')' : '') + ', del más al menos probable. Los boletos toman los primeros de esta lista.</p></div><ul class="lista">' + cand + '</ul></div>' : '') + '</div>';
 }
 
-/* ---------- 3. camino al título ---------- */
+/* ---------- 4. camino al título ---------- */
 function campeon() {
   var cs = D.proyeccion.campeon, con = cs.filter(function (c) { return ok(c.prob) && c.prob > 0; }), sin = cs.filter(function (c) { return !(c.prob > 0); });
   var tope = con.reduce(function (m, c) { return Math.max(m, c.prob); }, 0) || 1;
@@ -1116,35 +1469,205 @@ function cruces() {
   }
   return h;
 }
-/* ---------- liguilla al momento ---------- */
-function llaves() {
-  var L = D.liguilla, c = L.cuadro_proyectado;
-  if (!c || !c.cuartos) return '<p class="nota">El cuadro de la liguilla aparecerá aquí en cuanto haya datos.</p>';
-  var bj = id('liguilla-bajada');
-  if (bj) bj.textContent = L.en_curso ? 'La liguilla ya se juega: lo jugado es real y lo que falta es pronóstico.'
-    : (c.origen_siembra === 'tabla final' ? 'Ya están los ocho clasificados. Así quedaría el cuadro si cada serie la gana su favorito.'
-      : 'Todavía falta fase regular. Si la tabla termina como se espera, así quedaría el cuadro, serie por serie.');
-  var eqs = c.equipos || {};
-  function lado(s, e, sem) {
-    var fav = s.favorito === e, p = e === s.mejor ? s.p_avanza_mejor : s.p_avanza_peor;
-    return '<div class="llave__eq' + (fav ? ' fav' : '') + '"><span class="sem">' + sem + '.º</span>' + eqn(e, 26) + '<b>' + (s.decidida ? (s.ganador_real === e ? 'Avanzó' : '') : pct(p, 0)) + '</b></div>';
-  }
-  function llave(s) {
-    var leg = (s.piernas_jugadas || []).map(function (g) { return E(g.local) + ' ' + g.gl + '-' + g.gv + ' ' + E(g.visitante); }).join(' · ');
-    return '<div class="llave' + (s.real ? ' llave--real' : '') + '">' + lado(s, s.mejor, s.siembra_mejor) + lado(s, s.peor, s.siembra_peor) +
-      '<small>' + (leg ? 'Jugado: ' + leg + '. ' : '') + (s.decidida ? 'Serie terminada.' : (s.real ? 'Probabilidad de avanzar con lo ya jugado.' : 'Probabilidad de avanzar en esta serie.')) + '</small></div>';
-  }
-  function ronda(t, sub, ss) { return '<div class="ronda"><h3>' + t + '<small>' + sub + '</small></h3>' + ss.map(llave).join('') + '</div>'; }
-  var fe = (L.formato || {}).fechas || {};
-  var h = '<div class="llaves">' +
-    ronda('Cuartos', rangoFechas((fe.cuartos_ida || []).concat(fe.cuartos_vuelta || [])) || '1.º contra 8.º, 2.º contra 7.º…', c.cuartos) +
-    ronda('Semifinales', (rangoFechas((fe.semis_ida || []).concat(fe.semis_vuelta || [])) || '') + ' · se vuelve a sembrar', c.semifinal) +
-    '<div class="ronda"><h3>Final<small>' + (rangoFechas((fe.final_ida || []).concat(fe.final_vuelta || [])) || 'ida y vuelta') + ' · tiempos extra y penales si hay empate</small></h3>' + llave(c.final) +
-    '<div class="trofeo-ruta">' + eqn(c.campeon_ruta, 64) + '<p>Campeón si gana cada favorito. Su probabilidad real de ser campeón es ' +
-      '<b>' + pct((eqs[c.campeon_ruta] || {}).p_campeon) + '</b>, porque tiene que ganar tres series seguidas.</p></div></div>' +
-    '</div>';
-  h += '<p class="nota">' + E(c.nota || '') + (c.origen_siembra === 'lugar esperado' ? ' La siembra sale del lugar esperado de cada equipo en la tabla final; cambia con cada partido de aquí a la Jornada 17.' : '') + '</p>';
+/* ---------- liguilla: cuadro de eliminatoria (cuartos → semifinales → final → campeón) ---------- */
+var FASES = { cuartos: 'Cuartos de final', semifinal: 'Semifinales', final: 'Final' };
+var FASE1 = { cuartos: 'Cuartos de final', semifinal: 'Semifinal', final: 'Final' };
+var ESTADOS_T = {
+  proyectado: ['Cuadro proyectado', 'Todavía falta fase regular. Si la tabla termina como se espera, estos serían los cruces; se recalculan con cada partido.'],
+  definido: ['Cuadro definido', 'Ya están los ocho clasificados. Cada marcador es el pronóstico de ese partido.'],
+  en_curso: ['Liguilla en curso', 'Lo jugado es real; lo que falta es pronóstico.'],
+  terminado: ['Liguilla terminada', 'Así quedó el cuadro.']
+};
+var SERIES = {}, ORDEN = [], serieSel = null;
+function eqDe(x) { return typeof x === 'string' ? x : txt((obj(x) || {}).equipo); }
+function semDe(x) { var n = (obj(x) || {}).siembra; return ok(n) ? n : null; }
+function torneo() { var t = obj((D.liguilla || {}).torneo); return t && arr(t.rondas).length ? t : null; }
+function rondaDe(fase) { var t = torneo(); return (t ? arr(t.rondas).filter(function (r) { return obj(r) && r.fase === fase; })[0] : null) || {}; }
+function jugadas(s) { return arr(s.piernas).filter(function (l) { return obj(l) && l.jugado && ok(l.gl) && ok(l.gv); }); }
+function globalReal(s) { /* goles de cada uno en lo ya jugado de la serie (suma de resultados reales) */
+  var mj = eqDe(s.mejor), g = { m: 0, p: 0, n: 0 };
+  jugadas(s).forEach(function (l) { g.n++; if (l.local === mj) { g.m += l.gl; g.p += l.gv; } else { g.m += l.gv; g.p += l.gl; } });
+  return g;
+}
+function estadoSerie(s) {
+  if (s.decidida) return [' chip--real', 'Terminada'];
+  if (jugadas(s).length) return [' chip--real', 'En curso'];
+  return s.real ? [' chip--oro', 'Definida'] : ['', 'Proyectada'];
+}
+function cuandoPierna(l, r) { /* la fecha si ya existe; si no, la ventana de la ronda */
+  if (l.fecha_local) return fechaCorta(l.fecha_local) + (l.hora_local ? ', ' + l.hora_local + ' h' : '');
+  return rangoFechas((obj(r.fechas) || {})[l.pierna === 2 ? 'vuelta' : 'ida'], ' o ');
+}
+function marcPierna(l) { /* local a la izquierda: escudo, tablero, escudo */
+  var jug = !!l.jugado, m = obj(l.marcador) || {}, gl = jug ? l.gl : m.gl, gv = jug ? l.gv : m.gv;
+  if (!ok(gl) || !ok(gv)) return '<span class="pm">' + esc(l.local, 22, true) + '<span class="mini">vs</span>' + esc(l.visitante, 22, true) + '</span>';
+  return '<span class="pm" role="img" aria-label="' + (jug ? 'Resultado' : 'Pronóstico') + ': ' + E(l.local) + ' ' + gl + ', ' + E(l.visitante) + ' ' + gv + '">' +
+    esc(l.local, 22) + tablero(gl, gv, 'mini', jug ? 'tablero--real' : '') + esc(l.visitante, 22) + '</span>';
+}
+function ladoLlave(s, e, sem, p) {
+  var gano = s.decidida && s.ganador === e, fuera = s.decidida && s.ganador && s.ganador !== e, fav = s.decidida ? gano : s.favorito === e;
+  return '<div class="llave__eq' + (fav ? ' fav' : '') + (fuera ? ' fuera' : '') + '"><span class="sem">' + (sem == null ? '' : sem) + '</span>' + esc(e, 26) + '<span class="n">' + E(e) + '</span>' +
+    (s.decidida ? (gano ? '<span class="chip chip--oro">Avanza</span>' : '<span></span>') : '<b data-avz>' + pct(p, 0) + '</b>') + '</div>';
+}
+function barraAvanza(s, grande) {
+  var a = s.p_avanza_mejor, b = s.p_avanza_peor; if (!ok(a) || !ok(b) || s.decidida) return '';
+  var mj = eqDe(s.mejor), pr = eqDe(s.peor), fm = s.favorito !== pr;
+  function seg(v, f) { return '<i' + (f ? ' class="f"' : '') + ' style="flex:' + Math.max(v, 0.001).toFixed(3) + ' 1 0">' + (grande ? pct(v, 0) : '') + '</i>'; }
+  return '<div class="avanza' + (grande ? ' avanza--g' : '') + '" role="img" aria-label="Avanza ' + E(mj) + ' ' + pct(a, 0) + ', ' + E(pr) + ' ' + pct(b, 0) + '">' + seg(a, fm) + seg(b, !fm) + '</div>';
+}
+function parGlobal(s, a, b, real) { return '<span class="pm" role="img" aria-label="' + E(eqDe(s.mejor)) + ' ' + a + ', ' + E(eqDe(s.peor)) + ' ' + b + '">' + esc(eqDe(s.mejor), 20) + tablero(a, b, 'mini', real ? 'tablero--real' : '') + esc(eqDe(s.peor), 20) + '</span>'; }
+function globalLlave(s) {
+  var g = globalReal(s), pb = obj((obj(s.global) || {}).probable), h = '';
+  if (g.n) h += '<p class="llave__global"><span>' + (s.decidida ? 'Global final' : 'Global hoy') + '</span>' + parGlobal(s, g.m, g.p, true) + '</p>';
+  if (!s.decidida && pb && ok(pb.mejor) && ok(pb.peor)) h += '<p class="llave__global"><span>' + (g.n ? 'Cierre probable' : 'Global probable') + '</span>' + (ok(pb.prob) ? '<em>' + pct(pb.prob, 0) + '</em>' : '') + parGlobal(s, pb.mejor, pb.peor) + '</p>';
   return h;
+}
+function nodoLlave(s, pos, extra) {
+  var mj = eqDe(s.mejor), pr = eqDe(s.peor), est = estadoSerie(s), r = rondaDe(s.fase), de = arr(s.viene_de).map(txt).filter(Boolean);
+  var quien = s.fase === 'cuartos' ? (semDe(s.mejor) != null && semDe(s.peor) != null ? semDe(s.mejor) + '.º contra ' + semDe(s.peor) + '.º' : 'Cuartos')
+    : (!s.real && de.length === 2 ? 'De ' + de[0] + ' y ' + de[1] : FASE1[s.fase] || '');
+  var mixto = (torneo() || {}).estado !== 'proyectado' || s.real; /* la etiqueta por serie sólo cuando no todo el cuadro es proyectado */
+  var legs = arr(s.piernas).filter(obj).map(function (l) {
+    var meta = [txt((obj(l.estadio) || {}).nombre), cuandoPierna(l, r)].filter(Boolean).join(' · ');
+    return '<li class="pierna"><p class="pierna__n"><b>' + (l.pierna === 2 ? 'Vuelta' : 'Ida') + '</b><span>' + E(meta) + '</span></p>' + marcPierna(l) +
+      (l.jugado ? '<span class="pierna__x"><span class="chip chip--real">Resultado</span></span>'
+        : ok(l.p_local) && ok(l.p_empate) && ok(l.p_visitante) ? '<span class="pierna__x">' + x12(l.p_local, l.p_empate, l.p_visitante, true) + '<small aria-hidden="true"><span>' + pct(l.p_local, 0) + '</span><span>' + pct(l.p_empate, 0) + '</span><span>' + pct(l.p_visitante, 0) + '</span></small></span>' : '<span></span>') + '</li>';
+  }).join('');
+  var k = E(s.llave);
+  var art = '<article class="llave' + (s.real ? ' llave--real' : '') + '" data-llave="' + k + '" aria-label="' + E(FASE1[s.fase] || '') + ' ' + k + ': ' + E(mj) + ' contra ' + E(pr) + '">' +
+    '<p class="llave__id"><b>' + k + '</b><span>' + E(quien) + '</span>' + (mixto ? '<span class="chip' + est[0] + '">' + est[1] + '</span>' : '') +
+    '<button type="button" class="llave__ver" data-serie="' + k + '" aria-label="Ver el detalle de la serie ' + E(mj) + ' contra ' + E(pr) + '">Detalle</button></p>' +
+    '<div class="llave__eqs">' + ladoLlave(s, mj, semDe(s.mejor), s.p_avanza_mejor) + ladoLlave(s, pr, semDe(s.peor), s.p_avanza_peor) + '</div>' + barraAvanza(s) +
+    '<div class="llave__vivo" data-vivo-serie="' + k + '" hidden></div>' +
+    (legs ? '<ol class="piernas" aria-label="Pronóstico por partido">' + legs + '</ol>' : '') + globalLlave(s) + '</article>';
+  return '<div class="nodo" data-pos="' + pos + '">' + (extra ? '<div class="final-eje">' + extra + art + '</div>' : art) + '</div>';
+}
+function llaves() {
+  var t = torneo();
+  if (!t) return '<div class="interior">' + vacio('El cuadro todavía no está', 'En cuanto el modelo arme la liguilla, aquí aparecen cuartos, semifinales y final con el pronóstico de cada partido.') + '</div>';
+  var cu = arr(rondaDe('cuartos').series).filter(obj), se = arr(rondaDe('semifinal').series).filter(obj), fi = arr(rondaDe('final').series).filter(obj);
+  SERIES = {}; ORDEN = [];
+  cu.concat(se, fi).forEach(function (s) { if (s.llave && !SERIES[s.llave]) { SERIES[s.llave] = s; ORDEN.push(s.llave); } });
+  if (!ORDEN.length) return '<div class="interior">' + vacio('El cuadro todavía no está', 'Aún no hay series que mostrar.') + '</div>';
+  /* los cuartos se acomodan según de qué llaves sale cada semifinal (con la resiembra puede cambiar) */
+  var cabal = cu.length === 4 && se.length === 2 && fi.length === 1, ord = [];
+  if (cabal) {
+    if (arr(se[1].viene_de).indexOf(cu[0].llave) >= 0) se = [se[1], se[0]];
+    se.forEach(function (x) { arr(x.viene_de).forEach(function (k) { var c = cu.filter(function (q) { return q.llave === k; })[0]; if (c && ord.indexOf(c) < 0) ord.push(c); }); });
+    if (ord.length !== 4) ord = [cu[0], cu[3], cu[1], cu[2]];
+  } else ord = cu;
+  var e = ESTADOS_T[t.estado] || ESTADOS_T.proyectado, bj = id('liguilla-bajada');
+  if (bj) bj.textContent = t.estado === 'en_curso' ? 'La liguilla ya se juega. Aquí está el cuadro: lo jugado es real y lo que falta, pronóstico.'
+    : t.estado === 'terminado' ? 'La liguilla terminó. Así quedó el cuadro, serie por serie.'
+    : 'El cuadro completo: cuartos, semifinales y final, con el pronóstico de la ida y la vuelta de cada serie.';
+  function vent(r) { var f = obj(r.fechas) || {}; return ventana(arr(f.ida).concat(arr(f.vuelta))); }
+  var R = [['cuartos', 'Cuartos', ord, 'abcd'], ['semifinal', 'Semifinales', se, ['s1', 's2']], ['final', 'Final', fi, ['f']]].filter(function (x) { return x[2].length; });
+  var hayReal = cu.concat(se, fi).some(function (x) { return jugadas(x).length; });
+  var h = '<div class="cuadro-marco"><div class="interior cuadro-cab"><div class="cuadro-estado"><span class="chip chip--oro">' + e[0] + '</span><p>' + e[1] +
+    (t.estado !== 'terminado' ? ' Semifinales y final siguen la ruta de los favoritos; en semifinales hay resiembra.' : '') + '</p></div>' +
+    (hayReal ? '<p class="leyenda-m"><span><i class="r"></i>Resultado real</span><span><i></i>Pronóstico del modelo</span></p>' : '') +
+    '<div class="rondas-nav" role="group" aria-label="Ir a una ronda del cuadro">' + R.map(function (x, i) {
+      return '<button type="button" data-ronda="' + i + '"' + (i === 0 ? ' aria-current="true"' : '') + '>' + x[1] + '<small>' + E(vent(rondaDe(x[0]))) + '</small></button>';
+    }).join('') + '</div><p class="desliza" aria-hidden="true">Desliza el cuadro<i></i></p></div>';
+  h += '<div class="cuadro-caja"><div class="cuadro" id="cuadro" tabindex="0" role="group" aria-label="Cuadro de la liguilla: cuartos, semifinales y final">';
+  if (cabal) h += [['Cuartos', 'cuartos', 1, ''], ['Semifinal', 'semifinal', 2, ''], ['Semifinal', 'semifinal', 4, ' d'], ['Cuartos', 'cuartos', 5, ' d']].map(function (x) {
+    return '<p class="cuadro__rot' + x[3] + '" style="grid-column:' + x[2] + '" aria-hidden="true">' + x[0] + '<small>' + E(vent(rondaDe(x[1]))) + '</small></p>';
+  }).join('');
+  h += R.map(function (x) {
+    return '<div class="ronda" data-fase="' + x[0] + '"><h3 class="ronda__cab">' + E(FASES[x[0]]) + '<small>' + E(vent(rondaDe(x[0]))) + '</small></h3><div class="ronda__nodos">' +
+      x[2].map(function (sr, i) {
+        return parcial('serie ' + sr.llave, function () { return nodoLlave(sr, cabal ? x[3][i] : '', x[0] === 'final' ? campeonRuta(t) : ''); });
+      }).join('') + '</div></div>';
+  }).join('');
+  h += '</div></div>' + (t.nota ? '<div class="interior"><p class="nota">' + E(t.nota) + '</p></div>' : '') + '</div>';
+  return h;
+}
+function campeonRuta(t) {
+  var e = txt(t.campeon_ruta); if (!e) return '';
+  return '<div class="campeon-ruta"><div class="emblema" aria-hidden="true">' + trofeo() + '<span class="emblema__esc">' + esc(e, 40) + '</span></div>' +
+    '<span>' + (t.campeon_decidido ? 'Campeón' : 'Campeón por esta ruta') + '</span><b>' + E(e) + '</b>' +
+    (t.campeon_decidido || !ok(t.p_campeon_ruta) ? '' : '<small>Con todos los caminos posibles, su probabilidad de título es ' + pct(t.p_campeon_ruta) + '</small>') + '</div>';
+}
+function legDetalle(l, r) {
+  var jug = !!l.jugado, m = obj(l.marcador) || {}, gl = jug ? l.gl : m.gl, gv = jug ? l.gv : m.gv;
+  var meta = [txt((obj(l.estadio) || {}).nombre), cuandoPierna(l, r)].filter(Boolean).join(' · ');
+  function eq(e, rol) { return '<div class="eq">' + esc(e, 46) + '<span class="eq__n">' + E(e) + '</span><span class="eq__r">' + rol + '</span></div>'; }
+  var h = '<div class="leg' + (jug ? ' leg--real' : '') + '"><div class="leg__cab"><h4>' + (l.pierna === 2 ? 'Vuelta' : 'Ida') + '</h4><span>' + E(meta) + '</span><span class="chip' + (jug ? ' chip--real">Resultado' : '">Pronóstico') + '</span></div>' +
+    '<div class="duelo">' + eq(l.local, 'Local') + '<div class="duelo__c"><span class="mini">' + (jug ? 'Marcador<br>final' : 'Marcador<br>más probable') + '</span>' +
+    (ok(gl) && ok(gv) ? tablero(gl, gv, true, jug ? 'tablero--real' : '') : '<span class="mini">Por definir</span>') + (!jug && ok(m.prob) ? '<span class="duelo__p">' + pct(m.prob) + '</span>' : '') + '</div>' + eq(l.visitante, 'Visita') + '</div>';
+  if (jug) return h + '</div>';
+  if (ok(l.p_local) && ok(l.p_empate) && ok(l.p_visitante)) h += '<div class="sub"><h5>Quién gana este partido</h5>' + x12(l.p_local, l.p_empate, l.p_visitante) + ley(l) + '</div>';
+  var top = arr(l.marcadores).filter(obj).slice(0, 5).map(function (t) { return '<li><b>' + E(t.gl) + '-' + E(t.gv) + '</b>' + pct(t.prob) + '</li>'; }).join('');
+  if (top) h += '<div class="sub"><h5>Los 5 marcadores más probables</h5><ul class="top5">' + top + '</ul></div>';
+  if (ok(l.lam_l) && ok(l.lam_v)) h += '<div class="xg"><div><span>Goles esperados<br>de ' + E(abr(l.local)) + '</span><b>' + n2(l.lam_l) + '</b></div><div><span>Goles esperados<br>de ' + E(abr(l.visitante)) + '</span><b>' + n2(l.lam_v) + '</b></div></div>';
+  return h + '</div>';
+}
+function detalleSerie() {
+  var s = SERIES[serieSel]; if (!s) return '';
+  var r = rondaDe(s.fase), mj = eqDe(s.mejor), pr = eqDe(s.peor), est = estadoSerie(s), g = globalReal(s), G = obj(s.global) || {}, pb = obj(G.probable), de = arr(s.viene_de).map(txt).filter(Boolean);
+  var chips = ORDEN.map(function (k) {
+    return '<button type="button" data-serie="' + E(k) + '" data-aqui aria-pressed="' + (k === serieSel) + '" aria-label="Serie ' + E(k) + ': ' + E(eqDe(SERIES[k].mejor)) + ' contra ' + E(eqDe(SERIES[k].peor)) + '">' + E(k) + '</button>';
+  }).join('');
+  function eq(e, sem) { return '<div class="eq">' + esc(e, 58) + '<span class="eq__n">' + E(e) + '</span>' + (sem != null ? '<span class="eq__r">' + sem + '.º de la tabla</span>' : '') + '</div>'; }
+  var h = '<article class="serie-det corner" id="serie-det" aria-labelledby="serie-t"><div class="serie-sel" role="group" aria-label="Elegir otra serie">' + chips + '</div>' +
+    '<div class="serie-det__t"><p class="cuando"><b>' + E(FASE1[s.fase] || '') + '</b><span>Llave ' + E(s.llave) + '</span><span class="chip' + est[0] + '">' + est[1] + '</span></p>' +
+    '<h3 id="serie-t" tabindex="-1">' + E(mj) + ' contra ' + E(pr) + '</h3></div>';
+  h += '<div class="serie-duelo">' + eq(mj, semDe(s.mejor)) + '<div class="vs"><span class="mini">' + (g.n ? (s.decidida ? 'Global<br>final' : 'Global<br>hasta hoy') : 'Global<br>más probable') + '</span>' +
+    (g.n ? tablero(g.m, g.p, false, 'tablero--real') : pb && ok(pb.mejor) && ok(pb.peor) ? tablero(pb.mejor, pb.peor) : '<span class="mini">VS</span>') +
+    (!g.n && pb && ok(pb.prob) ? '<span class="duelo__p">' + pct(pb.prob) + '</span>' : '') + '</div>' + eq(pr, semDe(s.peor)) + '</div>';
+  if (s.decidida) h += '<p class="pick"><span>Serie terminada</span><b>Avanzó ' + E(s.ganador || '') + '</b></p>';
+  else if (ok(s.p_avanza_mejor) && ok(s.p_avanza_peor)) h += '<div class="sub"><h5>Quién avanza</h5>' + barraAvanza(s, true) +
+    '<div class="cruce__eq"><span class="eqn">' + E(mj) + '</span><span class="eqn">' + E(pr) + '</span></div>' +
+    (s.regla_empate ? '<p class="nota">Si el global queda empatado: ' + E(s.regla_empate) + '.</p>' : '') + '</div>';
+  if (!s.real && de.length === 2) h += '<p class="viene">' + (s.fase === 'final'
+    ? 'Es la final que resulta si avanzan los favoritos de las semifinales ' + E(de[0]) + ' y ' + E(de[1]) + '.'
+    : 'Es el cruce que resulta si avanzan los favoritos de las llaves ' + E(de[0]) + ' y ' + E(de[1]) + '. En semifinales hay resiembra: de los cuatro que sigan vivos, el mejor ubicado enfrenta al peor, así que el rival puede cambiar.') + '</p>';
+  var legs = arr(s.piernas).filter(obj).map(function (l) { return parcial('partido de ' + (l.pierna === 2 ? 'vuelta' : 'ida'), function () { return legDetalle(l, r); }); }).join('');
+  if (legs) h += '<div class="legs">' + legs + '</div>';
+  var top = arr(G.top).filter(obj).slice(0, 5).map(function (x) { return '<li><b>' + E(x.mejor) + '-' + E(x.peor) + '</b>' + pct(x.prob) + '</li>'; }).join('');
+  if (top && !s.decidida) h += '<div class="sub"><h5>' + (g.n ? 'Cómo puede terminar el global' : 'Los 5 marcadores globales más probables') + '</h5><p class="nota">Primero los goles de ' + E(mj) + '.</p><ul class="top5">' + top + '</ul>' +
+    (ok(G.p_gana_mejor) && ok(G.p_empate) && ok(G.p_gana_peor) ? '<ul class="chips"><li>Gana el global ' + E(mj) + ' <b>' + pct(G.p_gana_mejor, 0) + '</b></li><li>Global empatado <b>' + pct(G.p_empate, 0) + '</b></li><li>Gana el global ' + E(pr) + ' <b>' + pct(G.p_gana_peor, 0) + '</b></li></ul>' : '') + '</div>';
+  var alt = s.real ? [] : arr(s.alternativas).filter(obj);
+  if (alt.length) h += '<div class="sub"><h5>' + (s.fase === 'cuartos' ? 'Los cruces más probables de esta llave' : s.fase === 'final' ? 'Las finales más probables' : 'Las semifinales más probables') + '</h5>' +
+    '<p class="nota">El cuadro todavía puede cambiar. En cuántas simulaciones sale cada cruce y cuánto avanzaría el mejor ubicado.</p><ul class="lista">' + alt.slice(0, 4).map(function (o) {
+      return '<li><span class="eqn" style="--d:24px;flex-wrap:wrap">' + esc(o.mejor, 24) + esc(o.peor, 24) + '<span>' + E(o.mejor) + ' – ' + E(o.peor) + '</span></span><span>' + pct(o.prob) + (ok(o.p_avanza_mejor) ? '<br>' + E(abr(o.mejor)) + ' avanza ' + pct(o.p_avanza_mejor, 0) : '') + '</span></li>';
+    }).join('') + '</ul></div>';
+  return h + '</article>';
+}
+function elegirSerie(k, conScroll) {
+  if (!SERIES[k]) return;
+  var eraChip = document.activeElement && document.activeElement.hasAttribute && document.activeElement.hasAttribute('data-aqui');
+  serieSel = k;
+  $$('.llave').forEach(function (a) { a.classList.toggle('llave--sel', a.getAttribute('data-llave') === k); });
+  seguro('detalle de la serie', 'b-serie', detalleSerie);
+  seguro('serie al momento', null, vivoCuadro);
+  var d = id('serie-det'); if (!d) return;
+  if (conScroll) {
+    d.scrollIntoView({ behavior: REDUCE ? 'auto' : 'smooth', block: 'start' });
+    var t = id('serie-t'); if (t) { try { t.focus({ preventScroll: true }); } catch (e) { /* sin foco no pasa nada */ } }
+  } else if (eraChip) { var b = $('.serie-sel [aria-pressed="true"]', d); if (b) { try { b.focus({ preventScroll: true }); } catch (e2) { /* nada */ } } }
+}
+function irRonda(i) { /* desplaza el cuadro a esa ronda y, si su primera serie queda fuera de la pantalla, la trae a la vista */
+  var c = id('cuadro'), r = c ? $$('.ronda', c)[i] : null; if (!r) return;
+  var x = Math.max(0, c.scrollLeft + r.getBoundingClientRect().left - c.getBoundingClientRect().left - 16), suave = REDUCE ? 'auto' : 'smooth';
+  try { c.scrollTo({ left: x, behavior: suave }); } catch (e) { c.scrollLeft = x; }
+  var ll = $('.campeon-ruta', r) || $('.llave', r), b = ll ? ll.getBoundingClientRect() : null, alto = window.innerHeight || 0;
+  if (b && (b.top < 110 || b.top > alto * 0.5)) { try { window.scrollBy({ top: b.top - 124, behavior: suave }); } catch (e2) { /* se queda donde está */ } }
+}
+function cuadroListo() { /* botones de ronda al día con el desplazamiento, y serie elegida al abrir */
+  var c = id('cuadro'); if (!c) return;
+  var bs = $$('[data-ronda]'), rs = $$('.ronda', c), pend = false;
+  function marca() {
+    pend = false;
+    var x = c.getBoundingClientRect().left + 16, cual = 0, d = Infinity;
+    rs.forEach(function (r, i) { var q = Math.abs(r.getBoundingClientRect().left - x); if (q < d) { d = q; cual = i; } });
+    if (c.scrollLeft > 8 && c.scrollLeft + c.clientWidth >= c.scrollWidth - 4) cual = rs.length - 1;
+    bs.forEach(function (b, i) { if (i === cual) b.setAttribute('aria-current', 'true'); else b.removeAttribute('aria-current'); });
+  }
+  c.addEventListener('scroll', function () { if (!pend) { pend = true; setTimeout(marca, 60); } }, { passive: true });
+  marca();
+  var prim = ORDEN.filter(function (k) { return !SERIES[k].decidida; })[0] || ORDEN[ORDEN.length - 1];
+  elegirSerie(serieSel && SERIES[serieSel] ? serieSel : prim, false);
 }
 
 function formato() {
@@ -1163,45 +1686,6 @@ function formato() {
   return '<div class="mitad">' + (filas ? '<div class="bloque a"><div class="bloque__cab"><h3>Fechas de la liguilla</h3></div><ul class="fechas">' + filas + '</ul></div>' : '') +
     (reglas ? '<div class="bloque a"><div class="bloque__cab"><h3>Cómo se juega</h3></div><dl class="reglas">' + reglas + '</dl></div>' : '') + '</div>';
 }
-var FASES = { cuartos: 'Cuartos de final', semifinal: 'Semifinales', final: 'Final' };
-function serie(s) {
-  var gm = 0, gp = 0, jug = 0;
-  var piernas = (s.piernas || []).map(function (l) {
-    var f = fechaCorta(String(l.fecha_utc || '').slice(0, 10)), t = '<b>' + (l.pierna === 1 ? 'Ida' : l.pierna === 2 ? 'Vuelta' : 'Partido') + (f ? ' · ' + f : '') + '</b>';
-    if (l.jugado) {
-      jug++; if (l.local === s.mejor) { gm += l.gl; gp += l.gv; } else { gm += l.gv; gp += l.gl; }
-      return '<div class="pierna">' + t + '<span>' + E(l.local) + ' <b>' + E(l.gl) + '-' + E(l.gv) + '</b> ' + E(l.visitante) + '</span></div>';
-    }
-    var mar = (l.marcadores || []).slice(0, 3).map(function (m) { return m.gl + '-' + m.gv + ' (' + pct(m.prob) + ')'; }).join(', ');
-    return '<div class="pierna">' + t + '<span>' + E(l.local) + ' vs ' + E(l.visitante) + '</span>' + x12(l.p_local, l.p_empate, l.p_visitante, true) +
-      (ok(l.p_local) ? '<span class="nota">' + E(l.local) + ' ' + pct(l.p_local) + ' · empate ' + pct(l.p_empate) + ' · ' + E(l.visitante) + ' ' + pct(l.p_visitante) + '</span>' : '') +
-      (mar ? '<span class="nota">Marcadores más probables: ' + mar + '</span>' : '') + '</div>';
-  }).join('');
-  var gl = (s.globales || []).slice(0, 3).map(function (g) { return g.mejor + '-' + g.peor + ' (' + pct(g.prob) + ')'; }).join(', ');
-  return '<article class="serie corner a"><p class="mini">' + (FASES[s.fase] || E(may(s.fase))) + (ok(s.siembra_mejor) && ok(s.siembra_peor) ? ' · ' + s.siembra_mejor + '.º contra ' + s.siembra_peor + '.º' : '') + '</p>' +
-    '<div class="serie__g">' + eqn(s.mejor, 34) + (jug ? tablero(gm, gp, true) : '<small class="nota">VS</small>') + eqn(s.peor, 34) + '</div>' +
-    (jug ? '<p class="nota" style="text-align:center">Marcador global tras ' + jug + (jug === 1 ? ' partido' : ' partidos') + '</p>' : '') +
-    (s.decidida ? '<p class="pick"><span>Serie terminada</span><b>Avanzó ' + E(s.ganador || '') + '</b></p>'
-      : (ok(s.p_avanza_mejor) && ok(s.p_avanza_peor) ? '<div class="sub"><h5>Probabilidad de avanzar</h5>' + cruceBarra(s) + '</div>' : '')) +
-    piernas + (gl && !s.decidida ? '<p class="nota">Globales más probables (' + E(s.mejor) + ' primero): ' + gl + '.</p>' : '') +
-    (s.regla_empate && !s.decidida ? '<p class="nota">Si el global queda empatado: ' + E(s.regla_empate) + '.</p>' : '') + '</article>';
-}
-function cruceBarra(s) {
-  return '<div class="partida" role="img" aria-label="Avanza ' + E(s.mejor) + ' ' + pct(s.p_avanza_mejor) + ', ' + E(s.peor) + ' ' + pct(s.p_avanza_peor) + '"><i style="flex:' + Math.max(s.p_avanza_mejor, 0.001).toFixed(3) + ' 1 0">' + pct(s.p_avanza_mejor) + '</i><i style="flex:' + Math.max(s.p_avanza_peor, 0.001).toFixed(3) + ' 1 0">' + pct(s.p_avanza_peor) + '</i></div>' +
-    '<p class="nota">' + E(s.mejor) + ' (dorado) contra ' + E(s.peor) + '.</p>';
-}
-function cuadro(el) {
-  var L = D.liguilla, ss = L.series || [];
-  if (!L.en_curso || !ss.length) { el.hidden = true; return ''; }
-  el.hidden = false;
-  var b = id('camino-bajada'); if (b) b.textContent = 'La liguilla ya se juega: el cuadro real, serie por serie, y lo que falta simulado miles de veces.';
-  return '<div class="bloque"><div class="bloque__cab"><h3>La liguilla, serie por serie</h3><p>Marcador global, pronóstico de cada partido pendiente y probabilidad de avanzar.</p></div>' +
-    ['final', 'semifinal', 'cuartos'].map(function (f) {
-      var de = ss.filter(function (s) { return s.fase === f; });
-      return de.length ? '<div class="grupo"><h4>' + FASES[f] + '</h4><div class="rej">' + de.map(function (s) { return parcial('serie ' + s.mejor + ' - ' + s.peor, function () { return serie(s); }); }).join('') + '</div></div>' : '';
-    }).join('') + '</div>';
-}
-
 /* ---------- 4. tabla general ---------- */
 function c(v) { return ok(v) ? v : (v == null ? '—' : E(v)); }
 function forma(fs) {
@@ -1209,7 +1693,8 @@ function forma(fs) {
   return '<span class="forma" role="img" aria-label="Últimos ' + fs.length + ', del más reciente al más antiguo: ' + E(fs.join(', ')) + '">' + fs.map(function (r) { return '<i class="' + E(r) + '">' + E(r) + '</i>'; }).join('') + '</span>';
 }
 function tablaGeneral() {
-  return '<div class="bloque a"><div class="bloque__cab"><h3>Así va hoy</h3><p>La línea blanca marca el corte: los primeros 8 van a la liguilla. Forma: últimos 5, el más reciente a la izquierda.</p></div>' +
+  return '<div class="bloque a"><div class="bloque__cab"><h3>Así va hoy</h3><p>La línea blanca marca el corte: los primeros 8 van a la liguilla. Forma: últimos 5, el más reciente a la izquierda.</p>' +
+    '<p class="js-ir-vivo" hidden><button type="button" class="boton" data-ir="vivo"><i class="pulso" aria-hidden="true"></i>Hay partidos en juego: ver la tabla al momento</button></p></div>' +
     '<div class="caja-tabla" tabindex="0" role="region" aria-label="Tabla general"><table><thead><tr><th>#</th><th class="i">Equipo</th><th>PJ</th><th class="c-x">G</th><th class="c-x">E</th><th class="c-x">P</th><th class="c-x">GF</th><th class="c-x">GC</th><th>DG</th><th>Pts</th><th class="i">Forma</th></tr></thead><tbody>' +
     D.tabla.map(function (r) {
       return '<tr' + (r.pos === 8 ? ' class="corte"' : '') + '><td class="pos">' + c(r.pos) + '</td><td class="i eqc">' + eqn(r.equipo, 26) + '</td><td>' + c(r.PJ) + '</td><td class="c-x">' + c(r.G) + '</td><td class="c-x">' + c(r.E) + '</td><td class="c-x">' + c(r.P) +
@@ -1415,6 +1900,287 @@ function pie(el) {
   el.appendChild(p);
 }
 
+/* ---------- en vivo: documento «vivo/actual» de la base del Artifact (capacidad "db") ----------
+   La página no calcula nada: pinta el documento que escribe el motor (forma en salidas/vivo_ejemplo.json).
+   Sin base de datos (visitante sin sesión, vista previa) usa el «vivo» incrustado, si es reciente, y lo dice. */
+var V = null;                                  /* documento en vivo vigente, ya revisado, o null */
+var CX = { modo: 'sin', n: 0 };                /* conexión: sin | conectando | espera | vivo */
+var vistoEvento = null, marcadores = {}, tmAviso = 0;
+var EN_JUEGO = { en_juego: 1, descanso: 1 };
+function normVivo(d) { /* devuelve sólo lo que tiene la forma esperada; un documento raro queda en null sin romper nada */
+  d = obj(d); if (!d) return null;
+  var v = {
+    ejemplo: !!d.ejemplo, generado_utc: typeof d.generado_utc === 'string' ? d.generado_utc : '', estado: txt(d.estado),
+    partidos: arr(d.partidos).filter(function (p) { return obj(p) && p.id != null && typeof p.local === 'string' && typeof p.visitante === 'string'; }),
+    tabla: arr(d.tabla).filter(function (r) { return obj(r) && typeof r.equipo === 'string'; }), tabla_nota: txt(d.tabla_nota),
+    proyeccion: obj(d.proyeccion) || {}, series: arr(d.series).filter(function (x) { return obj(x) && x.llave; }),
+    ultimo_evento: obj(d.ultimo_evento), siguiente: obj(d.siguiente)
+  };
+  if (!v.partidos.length && !v.tabla.length && !v.series.length) return null;
+  var t = Date.parse(v.generado_utc), edad = ok(t) ? Date.now() - t : null;
+  v.edad0 = edad;
+  v.activo = v.partidos.length > 0;                 /* hay partidos de hoy (por jugar, en juego o terminados) */
+  v.hayJuego = v.partidos.some(function (p) { return EN_JUEGO[p.estado]; });
+  v.atrasado = v.hayJuego && (edad == null || edad > 3 * 3600000); /* «en juego» de hace horas: el motor dejó de escribir */
+  return v;
+}
+function edadVivo() { var t = V ? Date.parse(V.generado_utc) : NaN; return ok(t) ? Date.now() - t : null; }
+function aplicarVivo(doc, deLaBase) {
+  var nuevo = normVivo(doc);
+  if (nuevo && (nuevo.edad0 == null || Math.abs(nuevo.edad0) > 12 * 3600000)) nuevo = null; /* de otro día: ya no es «al momento» */
+  if (deLaBase && !nuevo && V && !V.deLaBase) { tic(); return; }                            /* la base no trae nada mejor que lo incrustado */
+  if (nuevo) nuevo.deLaBase = !!deLaBase;
+  V = nuevo;
+  pintarVivo();
+}
+function minutoVivo(p, corre) { /* el reloj avanza solo desde reloj_utc mientras hay conexión; nunca pasa del tope del periodo */
+  if (p.estado === 'descanso') return 'Descanso';
+  if (p.estado === 'final') return 'Final';
+  if (p.estado === 'pospuesto') return 'Pospuesto';
+  if (p.estado !== 'en_juego') { var h = horaMX(p.inicio_utc); return h ? h + ' h' : 'Por jugar'; }
+  if (!ok(p.minuto)) return 'En juego';
+  var t = Date.parse(p.reloj_utc || ''), d = corre && ok(t) ? Math.floor((Date.now() - t) / 60000) : 0;
+  if (!(d > 0)) d = 0;
+  var tope = { 1: 45, 2: 90, 3: 105, 4: 120 }[p.periodo] || null;
+  if (ok(p.anadido) && p.anadido > 0) return p.minuto + '+' + Math.min(p.anadido + d, 15) + "'";
+  var m = p.minuto + d;
+  return tope && m > tope ? tope + "+'" : m + "'";
+}
+function tableroVivo(p, tam) {
+  var jug = ok(p.gl) && ok(p.gv);
+  if (!jug) return '<span class="mini">vs</span>';
+  return tablero(p.gl, p.gv, tam, 'tablero--real' + (EN_JUEGO[p.estado] && !V.atrasado ? ' tablero--vivo' : '') + '" data-marc="' + E(p.id));
+}
+function chipVivo(p) {
+  if (p.estado === 'en_juego') return V.atrasado ? '<span class="chip">Sin actualizar</span>' : '<span class="chip chip--vivo"><i class="pulso" aria-hidden="true"></i>En vivo</span>';
+  if (p.estado === 'descanso') return '<span class="chip chip--oro">Descanso</span>';
+  if (p.estado === 'final') return '<span class="chip chip--real">Final</span>';
+  if (p.estado === 'pospuesto') return '<span class="chip">Pospuesto</span>';
+  return '<span class="chip">Por jugar</span>';
+}
+function rojas(n) { n = ok(n) && n > 0 ? Math.min(n, 4) : 0; var h = ''; for (var i = 0; i < n; i++) h += '<i class="roja" role="img" aria-label="expulsado"></i>'; return h; }
+var EVENTO = { gol: 'Gol', penal: 'Gol de penal', autogol: 'Autogol', roja: 'Expulsado' };
+function minEv(e) { return ok(e.min) ? e.min + (ok(e.anadido) && e.anadido > 0 ? '+' + e.anadido : '') + "'" : ''; }
+function destinoPartido(p) { return $('#p-' + String(p.id).replace(/[^\w-]/g, '')) ? 'p-' + String(p.id).replace(/[^\w-]/g, '') : 'vm-' + String(p.id).replace(/[^\w-]/g, ''); }
+function pickPrevio(p) { /* el pronóstico sellado: el de la tarjeta si existe; si no, el resultado con más probabilidad del previo */
+  var pend = D.pendientes.filter(function (x) { return String(x.id) === String(p.id); })[0], pv = obj(p.previo) || {};
+  if (pend && pend.pick && pend.pick.resultado) return { r: pend.pick.resultado, p: pend.pick.prob };
+  if (!ok(pv.p_local) || !ok(pv.p_empate) || !ok(pv.p_visitante)) return null;
+  var r = pv.p_local >= pv.p_empate && pv.p_local >= pv.p_visitante ? 'L' : pv.p_visitante >= pv.p_empate ? 'V' : 'E';
+  return { r: r, p: r === 'L' ? pv.p_local : r === 'V' ? pv.p_visitante : pv.p_empate };
+}
+function serieVivo(sv) { /* serie compacta del documento en vivo → nombres y global, venga como venga */
+  sv = obj(sv); if (!sv) return null;
+  var g = obj(sv.global) || {}, gm = ok(sv.global_mejor) ? sv.global_mejor : g.mejor, gp = ok(sv.global_peor) ? sv.global_peor : g.peor;
+  return { llave: txt(sv.llave), mejor: eqDe(sv.mejor), peor: eqDe(sv.peor), gm: ok(gm) ? gm : null, gp: ok(gp) ? gp : null, pm: ok(sv.p_avanza_mejor) ? sv.p_avanza_mejor : null, pp: ok(sv.p_avanza_peor) ? sv.p_avanza_peor : null,
+    hoy: sv.al_momento !== false, gano: sv.decidida ? txt(sv.ganador) : '' };
+}
+function lineaSerie(x) {
+  if (!x || !x.mejor || !x.peor) return '';
+  return (x.gm != null && x.gp != null ? '<span>Global al momento</span><span class="pm">' + esc(x.mejor, 20, true) + tablero(x.gm, x.gp, 'mini', 'tablero--real') + esc(x.peor, 20, true) + '</span>' : '') +
+    (x.gano ? '<span>Serie decidida: avanza <b>' + E(x.gano) + '</b></span>'
+      : x.pm != null && x.pp != null ? '<span>Avanza: ' + E(abr(x.mejor)) + ' <b>' + pct(x.pm, 0) + '</b> · ' + E(abr(x.peor)) + ' <b>' + pct(x.pp, 0) + '</b></span>' : '');
+}
+function bloqueVivo(p) { /* el bloque de la tarjeta del partido */
+  var pv = obj(p.previo) || {}, vv = obj(p.vivo), fin = p.estado === 'final';
+  function lado(e, n) { return '<div class="eq">' + esc(e, 44) + '<span class="eq__n">' + E(e) + ' ' + rojas(n) + '</span></div>'; }
+  var h = '<div class="pvivo__cab">' + chipVivo(p) + (p.estado === 'en_juego' ? '<span class="pvivo__min" data-reloj="' + E(p.id) + '">' + E(minutoVivo(p, false)) + '</span>' : '') +
+    (V.ejemplo ? '<span class="chip">Ejemplo</span>' : '') + (fin ? '<span class="mini">Resultado final</span>' : '') + '</div>' +
+    '<div class="pvivo__marc">' + lado(p.local, p.rojas_l) + tableroVivo(p) + lado(p.visitante, p.rojas_v) + '</div>';
+  var evs = arr(p.eventos).filter(obj);
+  if (evs.length) h += '<ol class="eventos" aria-label="Goles y expulsiones">' + evs.map(function (e) {
+    var roja = e.tipo === 'roja', deLocal = e.equipo === p.local;
+    var cosa = '<b>' + E(e.jugador || EVENTO[e.tipo] || 'Jugada') + '</b><small>' + (roja ? '<i class="roja" aria-hidden="true"></i> ' : '') + E(EVENTO[e.tipo] || '') + (!roja && e.marcador ? ' · ' + E(e.marcador) : '') + '</small>';
+    return '<li class="ev"><span class="ev__l">' + (deLocal ? cosa : '') + '</span><span class="ev__min">' + E(minEv(e)) + '</span><span class="ev__v">' + (deLocal ? '' : cosa) + '</span></li>';
+  }).join('') + '</ol>';
+  else if (!fin && EN_JUEGO[p.estado]) h += '<p class="nota">Todavía sin goles ni expulsados.</p>';
+  if (!fin && vv && ok(vv.p_local) && ok(vv.p_empate) && ok(vv.p_visitante)) {
+    var hayPrevio = ok(pv.p_local) && ok(pv.p_empate) && ok(pv.p_visitante);
+    function col(c, v, antes, nom) {
+      var d = hayPrevio ? (v - antes) * 100 : null;
+      return '<div style="--c:var(--' + c + ')"><b>' + pct(v) + '</b><span>' + E(nom) + '</span>' + (d == null ? '' : '<span class="dl ' + (d > 0.05 ? 'mas' : d < -0.05 ? 'menos' : '') + '">' + (Math.abs(d) < 0.05 ? 'sin cambio' : sig(d, 1) + ' pts') + '</span>') + '</div>';
+    }
+    var mf = obj(vv.marcador_final);
+    h += '<div class="compara"><div class="compara__f"><span>Probabilidad al momento</span>' + x12(vv.p_local, vv.p_empate, vv.p_visitante) +
+      '<div class="ley">' + col('local', vv.p_local, pv.p_local, p.local) + col('empate', vv.p_empate, pv.p_empate, 'Empate') + col('visita', vv.p_visitante, pv.p_visitante, p.visitante) + '</div></div>' +
+      (hayPrevio ? '<div class="compara__f antes"><span>Pronóstico antes del partido</span>' + x12(pv.p_local, pv.p_empate, pv.p_visitante, true) +
+        '<small><span>' + pct(pv.p_local) + '</span><span>' + pct(pv.p_empate) + '</span><span>' + pct(pv.p_visitante) + '</span></small></div>' : '') + '</div>';
+    var ch = (mf && ok(mf.gl) && ok(mf.gv) ? '<li>Marcador final más probable <b>' + mf.gl + '-' + mf.gv + '</b>' + (ok(mf.prob) ? ' (' + pct(mf.prob, 0) + ')' : '') + '</li>' : '') +
+      (ok(vv.goles_restantes_l) && ok(vv.goles_restantes_v) ? '<li>Goles que se esperan de aquí al final: ' + E(abr(p.local)) + ' <b>' + n2(vv.goles_restantes_l) + '</b> · ' + E(abr(p.visitante)) + ' <b>' + n2(vv.goles_restantes_v) + '</b></li>' : '');
+    if (ch) h += '<ul class="chips">' + ch + '</ul>';
+  }
+  if (fin && ok(p.gl) && ok(p.gv)) {
+    var pk = pickPrevio(p), res = p.gl > p.gv ? 'L' : p.gl < p.gv ? 'V' : 'E', pm = obj(pv.marcador);
+    if (pk) h += '<p class="nota">El modelo decía: <b>' + (pk.r === 'E' ? 'empate' : 'gana ' + E(pk.r === 'L' ? p.local : p.visitante)) + '</b>' + (ok(pk.p) ? ' (' + pct(pk.p) + ')' : '') + (pm && ok(pm.gl) && ok(pm.gv) ? ', marcador ' + pm.gl + '-' + pm.gv : '') + '.</p>' +
+      '<div class="sellos"><span class="sello-r ' + (pk.r === res ? 'si">Resultado acertado' : 'no">Resultado fallado') + '</span>' + (pm && pm.gl === p.gl && pm.gv === p.gv ? '<span class="sello-r si">Marcador exacto</span>' : '') + '</div>';
+  }
+  var ls = lineaSerie(serieVivo(p.serie));
+  if (ls) h += '<div class="llave__vivo">' + ls + '</div>';
+  return h;
+}
+function vivoFranja() {
+  var fr = id('franja'), li = id('franja-lista'); if (!fr || !li) return;
+  var ps = V && !V.atrasado ? V.partidos.filter(function (p) { return EN_JUEGO[p.estado]; }) : [];
+  fr.hidden = !ps.length;
+  document.documentElement.classList.toggle('con-franja', !!ps.length);
+  li.innerHTML = ps.map(function (p) {
+    return '<button type="button" class="fr' + (p.estado === 'descanso' ? ' fr--desc' : '') + '" data-ir="' + destinoPartido(p) + '" aria-label="' + E(p.local) + ' ' + E(p.gl) + ', ' + E(p.visitante) + ' ' + E(p.gv) + '. Ver el partido">' +
+      esc(p.local, 24) + tableroVivo(p, 'mini') + esc(p.visitante, 24) + '<span class="fr__min" data-reloj="' + E(p.id) + '" data-corto>' + E(minutoVivo(p, false)) + '</span></button>';
+  }).join('');
+}
+function vivoTarjetas() {
+  var porId = {}; if (V) V.partidos.forEach(function (p) { porId[String(p.id)] = p; });
+  $$('[data-pvivo]').forEach(function (el) {
+    var p = porId[el.getAttribute('data-pvivo')], ver = !!p && (EN_JUEGO[p.estado] || p.estado === 'final' || p.estado === 'pospuesto');
+    el.hidden = !ver;
+    el.className = 'pvivo ancho' + (ver && !EN_JUEGO[p.estado] ? ' pvivo--final' : '');
+    el.innerHTML = ver ? parcial('partido en vivo', function () { return bloqueVivo(p); }) : '';
+  });
+}
+function vivoSeccion() {
+  var sec = id('vivo'); if (!sec) return;
+  var hay = !!V && V.activo, rot = $('.rotulo', sec);
+  sec.hidden = !hay;
+  if (rot) rot.textContent = hay && V.hayJuego && !V.atrasado ? 'En vivo' : 'Hoy';
+  $$('.js-nav-vivo').forEach(function (li) { li.hidden = !hay; });
+  $$('.js-ir-vivo').forEach(function (el) { el.hidden = !(hay && V.hayJuego); });
+  if (!hay) { ['b-vivo-partidos', 'b-vivo-tabla', 'b-vivo-proy'].forEach(function (k) { var e = id(k); if (e) e.innerHTML = ''; }); return; }
+  seguro('marcadores al momento', 'b-vivo-partidos', function () {
+    if (!V.partidos.length) return '';
+    var orden = { en_juego: 0, descanso: 0, programado: 1, final: 2, pospuesto: 3 };
+    var ps = V.partidos.slice().sort(function (a, b) { return (orden[a.estado] == null ? 4 : orden[a.estado]) - (orden[b.estado] == null ? 4 : orden[b.estado]) || String(a.inicio_utc || '').localeCompare(String(b.inicio_utc || '')); });
+    return '<div class="marcs">' + ps.map(function (p) {
+      return parcial(p.local + ' vs ' + p.visitante, function () {
+        var kid = String(p.id).replace(/[^\w-]/g, ''), vivo = EN_JUEGO[p.estado] && !V.atrasado, vv = obj(p.vivo), pv = obj(p.previo) || {}, jug = ok(p.gl) && ok(p.gv);
+        var evs = arr(p.eventos).filter(obj).map(function (e) { return minEv(e) + ' ' + (e.tipo === 'roja' ? 'expulsado ' : '') + txt(e.jugador || EVENTO[e.tipo]) + (e.tipo === 'penal' ? ' (penal)' : e.tipo === 'autogol' ? ' (autogol)' : '') + ' (' + abr(e.equipo) + ')'; }).join(' · ');
+        var pr = vivo && vv && ok(vv.p_local) ? [vv.p_local, vv.p_empate, vv.p_visitante, 'Al momento'] : p.estado !== 'final' && ok(pv.p_local) ? [pv.p_local, pv.p_empate, pv.p_visitante, 'Pronóstico'] : null;
+        function fila(e, g, r) { return '<div class="marc__eq">' + esc(e, 28) + '<span>' + E(e) + rojas(r) + '</span><b>' + (jug ? E(g) : '') + '</b></div>'; }
+        return '<article class="marc' + (vivo ? ' marc--vivo' : '') + '" id="vm-' + kid + '" aria-label="' + E(p.local) + ' contra ' + E(p.visitante) + '"><p class="marc__cab">' + chipVivo(p) + (p.etiqueta ? '<span>' + E(p.etiqueta) + '</span>' : '') +
+          (p.estado === 'en_juego' || p.estado === 'programado' ? '<span class="min" data-reloj="' + E(p.id) + '">' + E(minutoVivo(p, false)) + '</span>' : '') + '</p>' +
+          '<div data-marc-filas="' + E(p.id) + '">' + fila(p.local, p.gl, p.rojas_l) + fila(p.visitante, p.gv, p.rojas_v) + '</div>' +
+          (evs ? '<p class="marc__ev">' + E(evs) + '</p>' : '') +
+          (pr && ok(pr[1]) && ok(pr[2]) ? '<div class="pierna__x">' + x12(pr[0], pr[1], pr[2], true) + '<small><span>' + pr[3] + '</span><span>' + pct(pr[0], 0) + ' · ' + pct(pr[1], 0) + ' · ' + pct(pr[2], 0) + '</span></small></div>' : '') +
+          ($('#p-' + kid) ? '<button type="button" class="llave__ver" data-ir="p-' + kid + '">Ver el partido</button>' : '') + '</article>';
+      });
+    }).join('') + '</div>';
+  });
+  seguro('tabla al momento', 'b-vivo-tabla', function () {
+    if (!V.tabla.length) return '';
+    return '<div class="bloque"><div class="bloque__cab"><h3>Tabla al momento</h3><p>' + E(V.tabla_nota || 'Con los marcadores de este momento.') + ' La flecha dice cuántos lugares gana o pierde cada equipo.</p></div>' +
+      '<div class="caja-tabla" tabindex="0" role="region" aria-label="Tabla al momento"><table><thead><tr><th>#</th><th class="i"><span class="oculto">Cambio</span></th><th class="i">Equipo</th><th>PJ</th><th>DG</th><th class="c-x">GF</th><th>Pts</th></tr></thead><tbody>' +
+      V.tabla.map(function (r) {
+        var cm = ok(r.cambio) ? r.cambio : 0;
+        return '<tr class="' + (r.pos === 8 ? 'corte' : '') + (r.en_juego ? ' enjuego' : '') + '"><td class="pos">' + c(r.pos) + '</td><td class="i"><span class="mov' + (cm > 0 ? ' sube' : cm < 0 ? ' baja' : '') + '"' +
+          (cm ? ' role="img" aria-label="' + (cm > 0 ? 'sube ' : 'baja ') + Math.abs(cm) + (Math.abs(cm) === 1 ? ' lugar' : ' lugares') + '">' + (cm > 0 ? '▲' : '▼') + Math.abs(cm) : ' aria-hidden="true">–') + '</span></td>' +
+          '<td class="i eqc">' + eqn(r.equipo, 26) + (r.en_juego ? '<i class="pulso" role="img" aria-label="en juego"></i>' : '') + '</td><td>' + c(r.PJ) + '</td><td>' + (ok(r.DG) ? sig(r.DG, 0) : '—') + '</td><td class="c-x">' + c(r.GF) + '</td><td class="pts">' + c(r.PTS) + '</td></tr>';
+      }).join('') + '</tbody></table></div><p class="nota">La línea blanca es el corte de la liguilla. El punto rojo marca a los equipos que están jugando.</p></div>';
+  });
+  seguro('probabilidades al momento', 'b-vivo-proy', function () {
+    var P = V.proyeccion;
+    function lista(titulo, bajada, filas, tope) {
+      filas = arr(filas).filter(function (x) { return obj(x) && typeof x.equipo === 'string' && ok(x.p); }).sort(function (a, b) { return b.p - a.p; }).slice(0, tope);
+      if (!filas.length) return '';
+      var mx = filas[0].p || 1;
+      return '<div class="bloque"><div class="bloque__cab"><h3>' + titulo + '</h3><p>' + bajada + '</p></div><ol class="barras">' + filas.map(function (x) {
+        var d = ok(x.delta) ? x.delta * 100 : null;
+        return '<li>' + esc(x.equipo, 28) + '<span class="nb">' + E(x.equipo) + '</span><span class="pista" aria-hidden="true"><i style="width:' + w(x.p, mx) + '%"></i></span><span class="val">' + pct(x.p) +
+          (d == null ? '' : '<span class="dl ' + (d > 0.05 ? 'mas' : d < -0.05 ? 'menos' : '') + '">' + (Math.abs(d) < 0.05 ? 'igual' : sig(d, 1) + ' pts') + '</span>') + '</span></li>';
+      }).join('') + '</ol></div>';
+    }
+    var h = lista('Clasificar a la liguilla, al momento', 'Los que todavía se juegan el boleto. El cambio es frente al pronóstico de antes de estos partidos.', P.clasifica, 10) +
+      lista('Campeón, al momento', 'Recalculado con los marcadores de ahora.', P.campeon, 6);
+    return h ? '<div class="cuerpo">' + h + (ok(P.n_sim) ? '<p class="nota">' + miles(P.n_sim) + ' torneos simulados con los marcadores al momento.</p>' : '') + '</div>' : '';
+  });
+}
+function vivoCuadro() { /* el global y la probabilidad de avanzar al momento, sobre el cuadro de la liguilla */
+  var por = {}; if (V && !V.atrasado) V.series.forEach(function (x) { var y = serieVivo(x); if (y && y.llave && y.hoy) por[y.llave] = y; });
+  $$('[data-vivo-serie]').forEach(function (el) {
+    var h = lineaSerie(por[el.getAttribute('data-vivo-serie')]);
+    el.hidden = !h; el.innerHTML = h ? '<span class="chip chip--vivo"><i class="pulso" aria-hidden="true"></i>Al momento</span>' + h : '';
+  });
+}
+function anunciar(texto) {
+  var voz = id('aviso-voz'), av = id('aviso'); if (!texto) return;
+  if (voz) voz.textContent = texto;
+  if (av) { av.hidden = true; av.textContent = texto; void av.offsetWidth; av.hidden = false; clearTimeout(tmAviso); tmAviso = setTimeout(function () { av.hidden = true; }, 9000); }
+}
+function vivoCambios() { /* marcador que cambió: destello corto; evento nuevo: aviso */
+  if (!V) return;
+  V.partidos.forEach(function (p) {
+    var k = String(p.id), a = marcadores[k], n = [p.gl, p.gv];
+    if (a) n.forEach(function (g, i) {
+      if (!ok(g) || g === a[i]) return;
+      $$('[data-marc="' + k.replace(/"/g, '') + '"]').forEach(function (t) { var b = $$('b', t)[i]; if (b) b.classList.add('cambia'); });
+    });
+    marcadores[k] = n;
+  });
+  var ev = V.ultimo_evento, clave = ev ? txt(ev.utc) + '|' + txt(ev.texto) : '';
+  if (vistoEvento !== null && clave && clave !== vistoEvento) anunciar(txt(ev.texto));
+  vistoEvento = clave;
+}
+function pintarVivo() {
+  seguro('franja en vivo', null, vivoFranja);
+  seguro('bloque en vivo de cada partido', null, vivoTarjetas);
+  seguro('al momento', null, vivoSeccion);
+  seguro('cuadro al momento', null, vivoCuadro);
+  seguro('aviso en vivo', null, vivoCambios);
+  tic();
+}
+function hace(ms) {
+  if (!ok(ms) || ms < 5000) return 'ahora mismo';
+  var sg = Math.floor(ms / 1000); if (sg < 60) return 'hace ' + sg + ' s';
+  var mn = Math.floor(sg / 60); if (mn < 60) return 'hace ' + mn + ' min';
+  return 'a las ' + horaMX(V.generado_utc) + ' h';
+}
+function pintarConexion() {
+  var hv = V && V.activo && V.generado_utc ? horaMX(V.generado_utc) : '', hc = (/(\d{2}:\d{2})/.exec(D.meta.corte_local || '') || [])[1] || '', datos = hv || hc, modo = CX.modo, t;
+  if (modo === 'vivo') {
+    if (!V || !V.activo) t = 'Conexión en vivo lista · sin partidos en juego';
+    else if (V.atrasado) { t = 'Datos en vivo atrasados: última actualización a las ' + hv + ' h'; modo = 'espera'; }
+    else if (!V.deLaBase) t = 'Conectado, sin datos nuevos: se muestran los de las ' + hv;
+    else t = (V.hayJuego ? 'En vivo' : 'Conectado') + ' · actualizado ' + hace(edadVivo());
+  } else if (modo === 'conectando') t = 'Conectando en vivo…';
+  else t = 'Sin conexión en vivo' + (modo === 'espera' ? ' por ahora' : '') + (datos ? ': datos de las ' + datos : '');
+  if (V && V.activo && V.ejemplo) t += ' · datos de ejemplo';
+  $$('.js-conexion').forEach(function (el) { if (el.textContent !== t) el.textContent = t; if (el.getAttribute('data-modo') !== modo) el.setAttribute('data-modo', modo); });
+}
+function tic() { /* cada segundo: minuto de cada partido y antigüedad de los datos (sólo texto) */
+  if (V) {
+    var porId = {}, corre = CX.modo === 'vivo' && V.deLaBase && !V.atrasado; V.partidos.forEach(function (p) { porId[String(p.id)] = p; });
+    $$('[data-reloj]').forEach(function (el) {
+      var p = porId[el.getAttribute('data-reloj')]; if (!p) return;
+      var t = minutoVivo(p, corre); if (el.hasAttribute('data-corto') && t === 'Descanso') t = 'Desc.';
+      if (el.textContent !== t) el.textContent = t;
+    });
+  }
+  pintarConexion();
+}
+function conectar() {
+  var cl = window.claude, limite = 0, uso = null;
+  if (!cl || typeof cl.use !== 'function') { CX.modo = 'sin'; pintarConexion(); return; }
+  CX.modo = 'conectando'; pintarConexion();
+  limite = setTimeout(function () { if (CX.modo === 'conectando') { CX.modo = 'espera'; pintarConexion(); } }, 10000); /* 10 s para «conectando» */
+  function sinBase() { clearTimeout(limite); CX.modo = 'sin'; pintarConexion(); }
+  try { uso = cl.use('db'); } catch (e) { sinBase(); return; }
+  Promise.resolve(uso).then(function (db) {
+    if (!db || typeof db.doc !== 'function') { sinBase(); return; }
+    var ref; try { ref = db.doc('vivo/actual'); } catch (e) { sinBase(); return; }
+    ref.onSnapshot(function (snap) { /* una sola suscripción; la plataforma reintenta sola */
+      seguro('datos en vivo', null, function () {
+        var firme = !(snap && snap.metadata && snap.metadata.fromCache);
+        if (firme) { clearTimeout(limite); CX.modo = 'vivo'; }
+        CX.n++;
+        aplicarVivo(snap && snap.exists && typeof snap.data === 'function' ? snap.data() : null, true);
+      });
+    }, function (err) { console.warn('[Cerebro] sin datos en vivo:', err && err.code); sinBase(); });
+  }, sinBase);
+}
+function vivoInicio() {
+  aplicarVivo(D.vivo, false);
+  setInterval(tic, 1000);
+  conectar();
+}
+
 /* ---------- arranque ---------- */
 seguro('navegación', null, navegacion);
 try { D = JSON.parse(id('datos').textContent); M = JSON.parse(id('medios').textContent); }
@@ -1425,11 +2191,12 @@ catch (e) {
 }
 seguro('fondos', null, fondos);
 seguro('portada', 'b-portada', portada);
+seguro('confeti', null, confeti);
 seguro('próximo partido', 'b-sigue', sigue);
 seguro('próximos partidos', 'b-partidos', partidos);
 seguro('combinada de la jornada', 'b-combinada', combinadaJornada);
-seguro('liguilla al momento', 'b-llaves', llaves);
-seguro('cuadro de la liguilla', 'b-cuadro', cuadro);
+seguro('cuadro de la liguilla', 'b-llaves', llaves);
+seguro('cuadro: rondas y detalle', null, cuadroListo);
 seguro('quién será campeón', 'b-campeon', campeon);
 seguro('hasta dónde llega cada uno', 'b-embudo', embudo);
 seguro('cruces de cuartos', 'b-cruces', cruces);
@@ -1449,5 +2216,6 @@ seguro('créditos', 'b-creditos', creditos);
 seguro('pie', 'b-pie', pie);
 seguro('videos', null, videos);
 seguro('entradas', null, entradas);
+seguro('en vivo', null, vivoInicio);
 })();
 </script>

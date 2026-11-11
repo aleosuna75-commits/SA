@@ -6,3 +6,8 @@ modelo/pred/*.parquet
 __pycache__/
 .pytest_cache/
 *.log
+
+# Motor en vivo: candados, temporales y repeticiones de prueba
+salidas/*.lock
+salidas/.*.tmp
+salidas/vivo_prueba*
