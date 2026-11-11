@@ -47,45 +47,19 @@
   publicados y sólo se reenvían si cambian). Es privada: el usuario la comparte desde el menú Share.
 - [x] 8. Automatización: `pipeline.py auto` + `modelo/mejora.py ciclo` + tarea programada diaria (runbook abajo).
 
-## En curso (11-nov-2026, 03:00 UTC): correcciones del rediseño y revisión funcional
-Pedido del usuario (10-nov): la versión visual que le encantó es la del commit `5306055`; volver a ponerla a punto, que
-la liguilla tenga **estructura de torneo** con **pronóstico de ida y vuelta por partido**, y que la actualización **se
-vea en vivo**. Y (11-nov): **cada vez que se acabe el límite de la sesión, dejar programada la continuación**.
-
-Hecho:
-- [x] `liguilla.torneo` en `produccion/exportar.py`; motor en vivo (`vivo.py`, `produccion/en_juego.py`,
-  `produccion/VIVO.md`, 78 pruebas); rediseño de `web/plantilla.html` (portada por favorito, cuadro, capa en vivo;
-  157 revisiones en Chromium y WebKit). Workflow `notas/workflows/05_vivo_y_rediseno.js` (se cortó por el límite
-  antes de la crítica funcional y la corrección).
-- [x] Versión intermedia publicada (V4 de https://claude.ai/artifact/K3fNKhot24LUcwn6PfXGF6) con
-  `capabilities: {db: {rules: [{path: "vivo", read: "view", write: "admin"}]}, user: {}}` (está en
-  `web/capacidades.json`; **al republicar pasar siempre `url` y esas capabilities**). Documento `vivo/actual`
-  sembrado; la versión vigente está en `salidas/vivo_version.txt`. Lectura con nivel `view` comprobada y escritura
-  con nivel `interact` rechazada, como debe.
-- [x] Tarea de continuidad cada hora activada (`trig_011daxVc81g1dWPVNtuVKMCi`).
-
-Falta (en orden):
-1. [ ] Workflow `notas/workflows/06_correcciones.js`: corrección visual (los 16 defectos de
-   `notas/critica_visual_v4.md`; prioridad: portada que quepa en la primera pantalla del iPhone, mini-cuadro del
-   torneo en celular, cuadro entre 1160 y 1400 px) ∥ crítica funcional (página en vivo + `vivo.py` + `en_juego.py`)
-   → corrección funcional y verificación final. Lanzado el 11-nov 03:00 UTC: tarea `wzhgapr03`, corrida
-   `wf_0172a560-1c9`. Si se cortó: `Workflow({scriptPath: "/home/user/SA/ligamx/notas/workflows/06_correcciones.js",
-   resumeFromRunId: "wf_0172a560-1c9"})` (los agentes terminados salen de caché; cada agente revisa `git status`
-   y continúa lo que haya quedado a medias). Capturas finales en el scratchpad de la sesión, carpeta `final/`.
-2. [ ] Revisar capturas finales (WebKit iPhone y escritorio), `python3 -m pytest modelo/pruebas produccion/pruebas -q`,
-   `node web/pruebas/prueba.js chromium` y `webkit`.
-3. [ ] `python3 pipeline.py auto`, republicar (con `url` y capabilities), `python3 pipeline.py publicado`, volver a
-   escribir `vivo/actual` (`ArtifactData set` con `if_version` = `salidas/vivo_version.txt`).
-4. [ ] Runbook del día de partido en este archivo y en el prompt de la tarea diaria (procedimiento en
-   `produccion/VIVO.md`, sección 6): la corrida diaria corre `python3 pipeline.py vivo-plan` y programa con
-   `send_later` un despertar 10 min antes de cada inicio; ahí `python3 vivo.py observar` en segundo plano y
-   `python3 vivo.py esperar` (Bash en segundo plano, máx. 2 h); en cada evento: copiar `salidas/vivo.json` a
-   `salidas/vivo_relevo.json`, `ArtifactData set vivo/actual` con `if_version`, guardar versión, volver a esperar;
-   al final del día `pipeline.py auto`, republicar y commit. Primera prueba real: Querétaro–Monterrey, 14-nov
-   17:00 de México.
-5. [ ] Commit y push, avisar al usuario, **desactivar la tarea de continuidad** y marcar esta sección como hecha.
-6. Nota: por error se creó un Artifact duplicado sin imágenes (https://claude.ai/artifact/9Pa1hLxwQxgokdJJUowHqF);
-   no se usa. Decirle al usuario que lo puede borrar (no borrarlo sin que lo pida).
+## En curso
+Nada pendiente (11-nov-2026, 04:15 UTC). Lo último cerrado: rediseño a punto (portada por favorito que cabe en la
+primera pantalla del iPhone, mini-cuadro del torneo con ida y vuelta, cuadro por ancho, trofeo y confeti), liguilla con
+estructura de torneo y pronóstico de ida y vuelta por partido (`liguilla.torneo`), y capa EN VIVO (motor `vivo.py` +
+`produccion/en_juego.py`, documento `vivo/actual` en la base del Artifact, página con franja, tarjeta, «Al momento» y
+avance de series). Publicado como V5 de https://claude.ai/artifact/K3fNKhot24LUcwn6PfXGF6 con
+`capabilities` = `web/capacidades.json` (**al republicar pasar SIEMPRE `url` y esas capabilities**; sin `url` se crea
+un duplicado, como pasó con https://claude.ai/artifact/9Pa1hLxwQxgokdJJUowHqF, que no se usa y sólo se borra si el
+usuario lo pide). Workflows: `notas/workflows/05_vivo_y_rediseno.js` y `06_correcciones.js`; críticas en
+`notas/critica_visual_v4.md` y en el diario de la corrida `wf_0172a560-1c9`.
+Pruebas al cierre: 157 de pytest, 230 revisiones de página en Chromium y 230 en WebKit.
+**Sin probar todavía:** un partido real en juego y la página real recibiendo la base (sólo con base simulada). Primera
+prueba real: Querétaro–Monterrey, sábado 14-nov 17:00 de México (despertares ya programados, ver «Tareas programadas»).
 
 ## Pendientes de mejora
 - [ ] Fotos de campeón (`web/medios_parts/campeon.json`, unido a `web/medios.json`): sólo hay festejos libres de Toluca (Cl. 2025) y Pumas (Cl. 2011). Si aparecen fotos libres de otros equipos con el trofeo, agregarlas; la portada las toma sola cuando ese equipo es el favorito. (avanzar uno por corrida diaria si alcanza el presupuesto; marcar al cerrar)
@@ -103,22 +77,38 @@ Falta (en orden):
 - [ ] Sitio estático (Netlify): `netlify.toml` ya construye `sitio_f1/ligamx/` en cada despliegue.
 - [ ] Revisar la página en el Artifact real desde un iPhone (el usuario) y atender lo que reporte.
 
+- **Vivo, tras el primer partido real (14-nov):** revisar `salidas/vivo_observar.log` (nombres de estado y reloj de
+  ESPN en descanso y agregado) y lo que quedó sin arreglar de la crítica funcional: H14 (el evento se anota antes de
+  escribir `vivo.json`), H15 (vuelta sin `auto` tras la ida parte de 0-0 sin aviso), H16 (partido abandonado sale
+  como final), H17 (pausa a media parte sale como «Descanso»), descanso del tiempo extra en una final, y la portada a
+  320 px de ancho (se pasa 5 px). Costo estimado: 8 a 10 despertares por partido, 70 a 80 por jornada de 9.
+- **Demo del vivo a pedido:** `python3 vivo.py repetir 401876913 --velocidad 60` y escribir `salidas/vivo_prueba.json`
+  en `vivo/actual` (VIVO.md §6.6; nunca con partido real en las siguientes 3 h; al terminar volver a poner el real).
+
 ## Runbook de la tarea diaria ("Cerebro Liga MX diario", 01:20 hora de la Ciudad de México)
+0. Si «En curso» tiene pasos pendientes y no hay nada corriendo, retomarlos primero.
 1. `cd /home/user/SA/ligamx && python3 pipeline.py auto` (30 s a 2 min). Hace: datos de ESPN → variables → ciclo de
    mejora si hubo partidos nuevos (reevalúa producción y retadores; adopta sólo por regla) → pronósticos sellados,
-   calificación de lo jugado, simulación de tabla/liguilla/campeón → página.
+   calificación de lo jugado, simulación de tabla/liguilla/campeón → estado en vivo del día → página.
    Si el paso `datos` falla por red, reintentar una vez 10 minutos después; si vuelve a fallar, anotarlo aquí.
 2. Leer `salidas/ultimo_auto.json`. Si `publicar` es true: republicar el Artifact con
-   `file_path=/home/user/SA/ligamx/web/index.html` (y `url=https://claude.ai/artifact/K3fNKhot24LUcwn6PfXGF6` si la
-   conversación ya no recuerda la publicación; `files` sólo si cambió `web/archivos_publicados.json`, con
-   `root=/home/user/SA/ligamx/web`) y después `python3 pipeline.py publicado`.
-3. `git add ligamx && git commit && git push` (rama `claude/new-session-i9lrt6`).
-4. Si faltan 3 días o menos para el siguiente partido y `config/actualidad.json` no existe o tiene más de 4 días:
+   `file_path=/home/user/SA/ligamx/web/index.html`, **siempre** con
+   `url=https://claude.ai/artifact/K3fNKhot24LUcwn6PfXGF6` y `capabilities` = contenido de `web/capacidades.json`
+   (`files` sólo si cambió `web/archivos_publicados.json`, con `root=/home/user/SA/ligamx/web`); después
+   `python3 pipeline.py publicado`. Luego escribir `salidas/vivo.json` en la base: `ArtifactData set`, `collection`
+   `vivo`, `doc_id` `actual`, `if_version` = `salidas/vivo_version.txt`; guardar ahí la versión nueva.
+3. **En vivo:** `python3 pipeline.py vivo-plan --horas 48`. Por cada bloque de partidos (inicios con menos de 2 h 30
+   de diferencia) sin despertares ya programados (`list_triggers`): `send_later` «armar» 20 min antes del primer
+   inicio, «vigilar» 60 min después de cada inicio y «cierre» 2 h 30 después del último. El día de partido se sigue
+   **`produccion/VIVO.md` sección 6** (único procedimiento: `vivo.py observar` en segundo plano, `vivo.py esperar`
+   despierta a la sesión en cada evento y cada despertar es una sola escritura en `vivo/actual`).
+4. `git add ligamx && git commit && git push` (rama `claude/new-session-i9lrt6`).
+5. Si faltan 3 días o menos para el siguiente partido y `config/actualidad.json` no existe o tiene más de 4 días:
    actualizar lesionados (pendiente de arriba), volver a correr `python3 -m produccion.exportar` y
    `python3 web/construir.py`, republicar.
-5. Avisar al usuario SÓLO si: cambió el modelo de producción, se definieron los cruces de la liguilla, terminó una
+6. Avisar al usuario SÓLO si: cambió el modelo de producción, se definieron los cruces de la liguilla, terminó una
    serie o hay campeón, o algo falló dos días seguidos. Si no, terminar el turno sin escribirle.
-6. Cuando haya campeón: resumen final del desempeño sellado y desactivar la tarea.
+7. Cuando haya campeón: resumen final del desempeño sellado y desactivar la tarea.
 
 ## Cómo retomar una fase cortada
 - Los guiones de los workflows están copiados en `notas/workflows/` (los originales viven fuera del repo y se
@@ -130,9 +120,12 @@ Falta (en orden):
 - Hacer commit y push al cerrar cada fase (el contenedor es efímero).
 
 ## Tareas programadas
-- "Cerebro Liga MX diario" (`trig_0195ELWvAUmne2MKmr1ih8zi`): todos los días a la 01:20 (Ciudad de México), en esta sesión. Sigue el runbook de arriba.
-- "Continuar Cerebro Liga MX" (`trig_011daxVc81g1dWPVNtuVKMCi`, cada hora): **desactivada** el 10-nov-2026 al
-  quedar publicada la página y montada la automatización.
+- "Cerebro Liga MX diario" (`trig_0195ELWvAUmne2MKmr1ih8zi`): todos los días a la 01:20 (Ciudad de México), en esta
+  sesión. Sigue el runbook de arriba (prompt actualizado el 11-nov con el paso «en vivo»).
+- "Continuar Cerebro Liga MX" (`trig_011daxVc81g1dWPVNtuVKMCi`, cada hora): **desactivada** el 11-nov-2026 04:15 UTC al
+  cerrar el rediseño. **Activarla antes de cada trabajo largo** (regla del usuario sobre los límites).
+- Vivo Querétaro–Monterrey (14-nov, 23:00 UTC): «armar» 22:40 UTC (`trig_01HRW7Zit3S9kbXaBqsKQdQ9`), «vigilar»
+  15-nov 00:00 UTC (`trig_01G3g3g5wdeUR4T84Dgtu6ej`), «cierre» 15-nov 01:30 UTC (`trig_01ThJ9av3u9JitLJyj6o2mwG`).
 
 ## Bitácora
 - 2026-11-10 02:50 UTC · Reconocimiento: ESPN da resultados y estadísticas por partido; 143/153 jugados.
@@ -148,3 +141,7 @@ Falta (en orden):
 - 2026-11-10 10:20 UTC · Lanzado `04_pagina_y_auditoria.js`.
 - 2026-11-10 10:45 UTC · Página publicada (Artifact), auditoría hecha, producción = ensamble.
 - 2026-11-10 10:55 UTC · `pipeline.py auto` y `mejora ciclo` probados; tarea diaria programada.
+- 2026-11-11 04:15 UTC · Rediseño a punto y capa en vivo publicados (V5). Workflow 05 cortado por el límite (3 de 5
+  agentes); al volver el límite se publicó una intermedia (V4) y se corrió el 06 (corrección visual de 17 defectos ∥
+  crítica funcional con 23 hallazgos → cierre: 13 altos/medios atendidos). Base del Artifact: `vivo/actual` en
+  versión 2. El usuario pidió dejar siempre programada la continuación cuando se acaben los límites.
