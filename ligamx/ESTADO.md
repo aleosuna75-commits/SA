@@ -47,7 +47,7 @@
   publicados y sólo se reenvían si cambian). Es privada: el usuario la comparte desde el menú Share.
 - [x] 8. Automatización: `pipeline.py auto` + `modelo/mejora.py ciclo` + tarea programada diaria (runbook abajo).
 
-## En curso (11-nov-2026, 03:15 UTC): correcciones del rediseño y revisión funcional
+## En curso (11-nov-2026, 03:00 UTC): correcciones del rediseño y revisión funcional
 Pedido del usuario (10-nov): la versión visual que le encantó es la del commit `5306055`; volver a ponerla a punto, que
 la liguilla tenga **estructura de torneo** con **pronóstico de ida y vuelta por partido**, y que la actualización **se
 vea en vivo**. Y (11-nov): **cada vez que se acabe el límite de la sesión, dejar programada la continuación**.
@@ -68,7 +68,7 @@ Falta (en orden):
 1. [ ] Workflow `notas/workflows/06_correcciones.js`: corrección visual (los 16 defectos de
    `notas/critica_visual_v4.md`; prioridad: portada que quepa en la primera pantalla del iPhone, mini-cuadro del
    torneo en celular, cuadro entre 1160 y 1400 px) ∥ crítica funcional (página en vivo + `vivo.py` + `en_juego.py`)
-   → corrección funcional y verificación final. Lanzado el 11-nov 03:25 UTC: tarea `wzhgapr03`, corrida
+   → corrección funcional y verificación final. Lanzado el 11-nov 03:00 UTC: tarea `wzhgapr03`, corrida
    `wf_0172a560-1c9`. Si se cortó: `Workflow({scriptPath: "/home/user/SA/ligamx/notas/workflows/06_correcciones.js",
    resumeFromRunId: "wf_0172a560-1c9"})` (los agentes terminados salen de caché; cada agente revisa `git status`
    y continúa lo que haya quedado a medias). Capturas finales en el scratchpad de la sesión, carpeta `final/`.
