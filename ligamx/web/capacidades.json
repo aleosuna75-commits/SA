@@ -2,10 +2,11 @@
  "db": {
   "rules": [
    {
-    "path": "",
+    "path": "vivo",
     "read": "view",
     "write": "admin"
    }
   ]
- }
+ },
+ "user": {}
 }

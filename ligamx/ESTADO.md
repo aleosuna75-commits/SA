@@ -15,6 +15,11 @@
 - Ultracode activo: usar workflows para todo trabajo sustantivo. No abrir PR. Commits con las líneas de atribución
   de la sesión. Rama `claude/new-session-i9lrt6`.
 
+- **Límites de la sesión (11-nov-2026):** «cada que se lleguen a acabar los límites de la sesión, tienes que dejarlo
+  programado para la siguiente». Regla: **antes** de lanzar cualquier trabajo largo (workflow o agentes) activar la
+  tarea de continuidad cada hora (`trig_011daxVc81g1dWPVNtuVKMCi`, `update_trigger enabled=true`) y dejar en la
+  sección «En curso» los pasos que faltan; desactivarla sólo cuando todo esté publicado, con commit y avisado.
+
 ## Fases (marcar al cerrar)
 - [x] 1. Datos y reconocimiento
   - [x] Base de ESPN: `datos/` (8,767 partidos 2001-2026, `COBERTURA.md`, `espn_descarga.py actualizar`, `verificar` en verde).
@@ -42,23 +47,43 @@
   publicados y sólo se reenvían si cambian). Es privada: el usuario la comparte desde el menú Share.
 - [x] 8. Automatización: `pipeline.py auto` + `modelo/mejora.py ciclo` + tarea programada diaria (runbook abajo).
 
-## En curso (10-nov-2026, 22:00 UTC): en vivo y rediseño
-Pedido del usuario: la versión visual que le encantó es la del commit `5306055`; volver a ponerla a punto, que la
-liguilla tenga **estructura de torneo** con **pronóstico de ida y vuelta por partido**, y que la actualización **se vea
-en vivo**. Workflow `notas/workflows/05_vivo_y_rediseno.js` (motor en vivo ∥ rediseño → crítica visual ∥ crítica
-funcional → corrección). Ya hecho a mano: `liguilla.torneo` en `produccion/exportar.py` (siembra, rondas, series con
-ida/vuelta) y `salidas/vivo_ejemplo.json` (contrato del documento en vivo).
-Al terminar el workflow falta (lo hace la sesión principal):
-1. Revisar capturas y pruebas; `python3 -m produccion.exportar`, `python3 web/construir.py`.
-2. Republicar el Artifact con `capabilities: {db: {rules: [{path: "vivo", read: "view", write: "owner"}]}, user: {}}`
-   y los archivos nuevos de `web/archivos_publicados.json`.
-3. Sembrar `vivo/actual` con `ArtifactData set` (file_path = copia estable de `salidas/vivo.json`), verificar con
-   `list` y con `as_level: "view"`; guardar la versión devuelta en `salidas/vivo_version.txt`.
-4. Operación en día de partido (añadir al runbook): la corrida diaria programa con `send_later` un despertar 10 min
-   antes de cada inicio; ahí se lanza `python3 vivo.py observar` en segundo plano y `python3 vivo.py esperar --desde N`
-   (Bash en segundo plano, máx. 2 h); en cada evento: copiar `salidas/vivo.json` a `salidas/vivo_relevo.json`,
-   `ArtifactData set vivo/actual` con `if_version`, guardar versión, volver a esperar; al final del día
-   `pipeline.py auto`, republicar y commit.
+## En curso (11-nov-2026, 03:15 UTC): correcciones del rediseño y revisión funcional
+Pedido del usuario (10-nov): la versión visual que le encantó es la del commit `5306055`; volver a ponerla a punto, que
+la liguilla tenga **estructura de torneo** con **pronóstico de ida y vuelta por partido**, y que la actualización **se
+vea en vivo**. Y (11-nov): **cada vez que se acabe el límite de la sesión, dejar programada la continuación**.
+
+Hecho:
+- [x] `liguilla.torneo` en `produccion/exportar.py`; motor en vivo (`vivo.py`, `produccion/en_juego.py`,
+  `produccion/VIVO.md`, 78 pruebas); rediseño de `web/plantilla.html` (portada por favorito, cuadro, capa en vivo;
+  157 revisiones en Chromium y WebKit). Workflow `notas/workflows/05_vivo_y_rediseno.js` (se cortó por el límite
+  antes de la crítica funcional y la corrección).
+- [x] Versión intermedia publicada (V4 de https://claude.ai/artifact/K3fNKhot24LUcwn6PfXGF6) con
+  `capabilities: {db: {rules: [{path: "vivo", read: "view", write: "admin"}]}, user: {}}` (está en
+  `web/capacidades.json`; **al republicar pasar siempre `url` y esas capabilities**). Documento `vivo/actual`
+  sembrado; la versión vigente está en `salidas/vivo_version.txt`. Lectura con nivel `view` comprobada y escritura
+  con nivel `interact` rechazada, como debe.
+- [x] Tarea de continuidad cada hora activada (`trig_011daxVc81g1dWPVNtuVKMCi`).
+
+Falta (en orden):
+1. [ ] Workflow `notas/workflows/06_correcciones.js`: corrección visual (los 16 defectos de
+   `notas/critica_visual_v4.md`; prioridad: portada que quepa en la primera pantalla del iPhone, mini-cuadro del
+   torneo en celular, cuadro entre 1160 y 1400 px) ∥ crítica funcional (página en vivo + `vivo.py` + `en_juego.py`)
+   → corrección funcional y verificación final. Si se cortó: relanzar con `resumeFromRunId` (el id está en la
+   bitácora) o sólo las etapas que falten.
+2. [ ] Revisar capturas finales (WebKit iPhone y escritorio), `python3 -m pytest modelo/pruebas produccion/pruebas -q`,
+   `node web/pruebas/prueba.js chromium` y `webkit`.
+3. [ ] `python3 pipeline.py auto`, republicar (con `url` y capabilities), `python3 pipeline.py publicado`, volver a
+   escribir `vivo/actual` (`ArtifactData set` con `if_version` = `salidas/vivo_version.txt`).
+4. [ ] Runbook del día de partido en este archivo y en el prompt de la tarea diaria (procedimiento en
+   `produccion/VIVO.md`, sección 6): la corrida diaria corre `python3 pipeline.py vivo-plan` y programa con
+   `send_later` un despertar 10 min antes de cada inicio; ahí `python3 vivo.py observar` en segundo plano y
+   `python3 vivo.py esperar` (Bash en segundo plano, máx. 2 h); en cada evento: copiar `salidas/vivo.json` a
+   `salidas/vivo_relevo.json`, `ArtifactData set vivo/actual` con `if_version`, guardar versión, volver a esperar;
+   al final del día `pipeline.py auto`, republicar y commit. Primera prueba real: Querétaro–Monterrey, 14-nov
+   17:00 de México.
+5. [ ] Commit y push, avisar al usuario, **desactivar la tarea de continuidad** y marcar esta sección como hecha.
+6. Nota: por error se creó un Artifact duplicado sin imágenes (https://claude.ai/artifact/9Pa1hLxwQxgokdJJUowHqF);
+   no se usa. Decirle al usuario que lo puede borrar (no borrarlo sin que lo pida).
 
 ## Pendientes de mejora
 - [ ] Fotos de campeón (`web/medios_parts/campeon.json`, unido a `web/medios.json`): sólo hay festejos libres de Toluca (Cl. 2025) y Pumas (Cl. 2011). Si aparecen fotos libres de otros equipos con el trofeo, agregarlas; la portada las toma sola cuando ese equipo es el favorito. (avanzar uno por corrida diaria si alcanza el presupuesto; marcar al cerrar)

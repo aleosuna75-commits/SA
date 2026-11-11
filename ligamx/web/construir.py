@@ -75,7 +75,7 @@ PORTADAS_CAMPEON = {
 }
 PORTADA_RESPALDO = "banorte"  # si no hay favorito o su estadio no tiene fotos
 # Capacidades del Artifact que la página usa (se declaran al publicar; ver LEEME.md).
-CAPACIDADES = {"db": {"rules": [{"path": "", "read": "view", "write": "admin"}]}}
+CAPACIDADES = {"db": {"rules": [{"path": "vivo", "read": "view", "write": "admin"}]}, "user": {}}
 
 # Campos sin los que la página no tiene sentido (ruta con puntos; [] = lista no vacía en cada elemento).
 OBLIGATORIOS = [

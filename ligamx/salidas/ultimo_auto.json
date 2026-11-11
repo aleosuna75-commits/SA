@@ -1,5 +1,5 @@
 {
- "corrida_utc": "2026-11-10T23:05:25Z",
+ "corrida_utc": "2026-11-11T02:56:01Z",
  "pasos": {
   "datos": {
    "ok": true,
@@ -9,11 +9,11 @@
    "nuevos_en_calendario": 0,
    "momios_actualizados": 0,
    "tabla_coincide_con_espn": true,
-   "segundos": 7.1
+   "segundos": 8.0
   },
   "variables": {
    "ok": true,
-   "segundos": 4.3
+   "segundos": 11.7
   },
   "mejora": {
    "ok": true,
@@ -23,10 +23,10 @@
   "pronostico": {
    "ok": true,
    "salida": [
-    "/home/user/SA/ligamx/salidas/actual.json  232 KB  modelo=ensamble  pendientes=10  sellos nuevos=0  15.6 s",
+    "/home/user/SA/ligamx/salidas/actual.json  232 KB  modelo=ensamble  pendientes=10  sellos nuevos=1  12.8 s",
     "campeón: América 0.272, Cruz Azul 0.258, Chivas 0.198, Toluca 0.196, Pachuca 0.022"
    ],
-   "segundos": 16.8
+   "segundos": 18.3
   },
   "vivo": {
    "ok": true,
@@ -87,15 +87,15 @@
   "incrustado": true
  },
  "modelo": "ensamble",
- "corte_local": "2026-11-10 17:05",
+ "corte_local": "2026-11-10 20:56",
  "campeon_top": [
   [
    "América",
-   0.2724
+   0.2723
   ],
   [
    "Cruz Azul",
-   0.258
+   0.2581
   ],
   [
    "Chivas",
@@ -107,7 +107,7 @@
   ],
   [
    "Pachuca",
-   0.0221
+   0.0222
   ]
  ],
  "liguilla_en_curso": false,
@@ -118,8 +118,8 @@
    "n": 0
   }
  },
- "huella": "9797e6284f1d0bec443ec691cf834ce5",
+ "huella": "fd5e9431d28ddba8bc1ee9b500de4a1d",
  "publicar": true,
  "huella_publicada": "54c290217694e0b1dbcdb3f3e244c1d8",
- "segundos": 29.7
+ "segundos": 39.3
 }
