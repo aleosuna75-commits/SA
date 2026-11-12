@@ -1,5 +1,5 @@
 {
- "corrida_utc": "2026-11-11T07:26:25Z",
+ "corrida_utc": "2026-11-12T07:21:00Z",
  "pasos": {
   "datos": {
    "ok": true,
@@ -9,11 +9,11 @@
    "nuevos_en_calendario": 0,
    "momios_actualizados": 1,
    "tabla_coincide_con_espn": true,
-   "segundos": 8.8
+   "segundos": 7.5
   },
   "variables": {
    "ok": true,
-   "segundos": 13.2
+   "segundos": 13.4
   },
   "mejora": {
    "ok": true,
@@ -23,10 +23,10 @@
   "pronostico": {
    "ok": true,
    "salida": [
-    "/home/user/SA/ligamx/salidas/actual.json  232 KB  modelo=ensamble  pendientes=10  sellos nuevos=0  72.3 s",
+    "/home/user/SA/ligamx/salidas/actual.json  232 KB  modelo=ensamble  pendientes=10  sellos nuevos=3  71.5 s",
     "campeón: América 0.266, Cruz Azul 0.263, Toluca 0.200, Chivas 0.193, Pachuca 0.022"
    ],
-   "segundos": 79.0
+   "segundos": 78.3
   },
   "vivo": {
    "ok": true,
@@ -39,14 +39,14 @@
     "visitante": "Monterrey"
    },
    "incrustado": true,
-   "segundos": 2.5
+   "segundos": 2.2
   },
   "pagina": {
    "ok": true,
    "salida": [
     "listo en 0.02 s"
    ],
-   "segundos": 0.2
+   "segundos": 0.3
   }
  },
  "errores": [],
@@ -66,12 +66,12 @@
   "estadio": "Estadio Corregidora",
   "ciudad": "Santiago de Querétaro",
   "momios": {
-   "ml_l": 3.35,
-   "ml_e": 3.65,
-   "ml_v": 1.952,
+   "ml_l": 3.4,
+   "ml_e": 3.7,
+   "ml_v": 2.0,
    "total_linea": 2.5,
-   "over": 1.541,
-   "under": 2.25,
+   "over": 1.556,
+   "under": 2.3,
    "proveedor": "DraftKings"
   }
  },
@@ -87,15 +87,15 @@
   "incrustado": true
  },
  "modelo": "ensamble",
- "corte_local": "2026-11-11 01:26",
+ "corte_local": "2026-11-12 01:21",
  "campeon_top": [
   [
    "América",
-   0.2662
+   0.2661
   ],
   [
    "Cruz Azul",
-   0.2626
+   0.263
   ],
   [
    "Toluca",
@@ -103,7 +103,7 @@
   ],
   [
    "Chivas",
-   0.1931
+   0.1929
   ],
   [
    "Pachuca",
@@ -118,9 +118,9 @@
    "n": 0
   }
  },
- "huella": "cbd1b651b57525503ded2bf234704b10",
+ "huella": "a4cb1ecb7969ee274bc28cab419094ec",
  "publicar": false,
- "huella_publicada": "cbd1b651b57525503ded2bf234704b10",
- "segundos": 103.6,
- "publicado_utc": "2026-11-11T07:28:28Z"
+ "huella_publicada": "a4cb1ecb7969ee274bc28cab419094ec",
+ "segundos": 101.8,
+ "publicado_utc": "2026-11-12T07:23:07Z"
 }

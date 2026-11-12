@@ -1,6 +1,6 @@
 {
  "torneo": "Apertura 2026",
- "generado_utc": "2026-11-11T07:26:32Z",
+ "generado_utc": "2026-11-12T07:21:07Z",
  "fuente": "ESPN scoreboard mex.1",
  "partidos": [
   {
@@ -16,12 +16,12 @@
    "estadio": "Estadio Corregidora",
    "ciudad": "Santiago de Querétaro",
    "momios": {
-    "ml_l": 3.35,
-    "ml_e": 3.65,
-    "ml_v": 1.952,
+    "ml_l": 3.4,
+    "ml_e": 3.7,
+    "ml_v": 2.0,
     "total_linea": 2.5,
-    "over": 1.541,
-    "under": 2.25,
+    "over": 1.556,
+    "under": 2.3,
     "proveedor": "DraftKings"
    }
   },
