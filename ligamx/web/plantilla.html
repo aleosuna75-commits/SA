@@ -1477,12 +1477,14 @@ function bajas(c) {
       var a = (x.apercibidos || []).map(function (j) { return E(j.jugador) + (ok(j.amarillas) ? ' (' + j.amarillas + ')' : ''); }).join(', ');
       if (a) h += '<p class="nota"><b>A una amarilla de la suspensión:</b> ' + a + '</p>';
     }
-    if (Array.isArray(les) && les.length) h += '<p class="nota"><b>Lesionados:</b> ' + les.map(function (j) { return E(typeof j === 'string' ? j : (j && j.jugador) || ''); }).filter(Boolean).join(', ') + '</p>';
+    if (Array.isArray(les) && les.length) h += '<p class="nota"><b>Bajas reportadas:</b> ' + les.map(function (j) { var n = typeof j === 'string' ? j : (j && j.jugador) || ''; return n ? E(n) + (j && j.motivo ? ' (' + E(j.motivo) + ')' : '') : ''; }).filter(Boolean).join(', ') + '</p>';
     if (x.nota) h += '<p class="nota">' + E(x.nota) + '</p>';
     return h + '</div>';
   }
   var h = uno(c.suspendidos_local, c.lesionados_local) + uno(c.suspendidos_visitante, c.lesionados_visitante);
-  return h ? '<div class="sub"><h5>Suspendidos</h5><div class="dos">' + h + '</div></div>' : '';
+  var hayBajas = (Array.isArray(c.lesionados_local) && c.lesionados_local.length) || (Array.isArray(c.lesionados_visitante) && c.lesionados_visitante.length);
+  return h ? '<div class="sub"><h5>' + (hayBajas ? 'Suspendidos y bajas' : 'Suspendidos') + '</h5><div class="dos">' + h + '</div>' +
+    (hayBajas ? '<p class="nota">Las bajas (lesiones, convocados a selección y dudas) salen de notas de prensa y sólo se muestran: el modelo no las usa.</p>' : '') + '</div>' : '';
 }
 function momios(p) {
   var m = p.momios; if (!m) return '';
