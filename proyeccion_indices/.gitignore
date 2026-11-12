@@ -1,0 +1,13 @@
+# Datos confidenciales: nunca se versionan (el repositorio es publico)
+*.xlsx
+*.xlsm
+*.xlsb
+*.xls
+*.csv
+entradas/
+salidas/
+__pycache__/
+
+# Configuracion local de los scripts del area: rutas internas y parametros de capital
+reservas_area/config_local.py
+reservas_area/salidas_area/
