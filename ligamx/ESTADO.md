@@ -69,6 +69,15 @@ prueba real: Querétaro–Monterrey, sábado 14-nov 17:00 de México (despertare
 - [ ] Fotos de campeón (`web/medios_parts/campeon.json`, unido a `web/medios.json`): sólo hay festejos libres de Toluca (Cl. 2025) y Pumas (Cl. 2011). Si aparecen fotos libres de otros equipos con el trofeo, agregarlas; la portada las toma sola cuando ese equipo es el favorito. (avanzar uno por corrida diaria si alcanza el presupuesto; marcar al cerrar)
 - [ ] Lesionados y técnicos (`config/actualidad.json`, formato en `produccion/MERCADOS.md` §7): antes de la Jornada
   17 (20-22 nov) y de cada ronda de liguilla. Guion: parte "Actualidad" de `notas/workflows/01_reglas_actualidad.js`.
+  **Hecho el 12-nov sólo para Querétaro–Monterrey** (un agente de investigación, ~165 mil tokens): `equipos.<equipo>` con
+  `tecnico`, `nota` y `lesionados` = [{jugador, motivo, tipo: lesion | seleccion | duda | suspension | otro, fuente,
+  fecha_fuente}] más `fuentes`. La página lo muestra como «Bajas reportadas» con el motivo; el modelo no lo usa.
+  Falta repetirlo para los 18 equipos el 17 o 18-nov (Jornada 17) y antes de cada ronda de liguilla; revisar el 13-nov
+  el estado de Durdevic y Orellano (Monterrey).
+- [ ] **Tarjetas de ESPN incompletas:** la prensa da a Óliver Torres (Monterrey) suspendido por quinta amarilla y
+  `tarjetas.csv` le cuenta 4 en el Apertura 2026, así que la página lo marcaba sólo «a una amarilla». Se añadió a
+  mano en `actualidad.json` (tipo `suspension`). Al investigar bajas, pedir también los suspendidos reportados para
+  cotejarlos con `Contexto.suspendidos` y, si se repite, buscar la amarilla que falta (¿partido sin jugadas en ESPN?).
 - [ ] Mostrar en la página el rango de la probabilidad de campeón entre modelos (hoy Cruz Azul va de 21% a 33% según
   el modelo; ver `modelo/pruebas/auditoria_resultados/campeon_por_modelo.json`): que `produccion/exportar.py` lo
   calcule (`proyeccion.campeon_por_modelo`) y `web/plantilla.html` lo dibuje.
@@ -153,3 +162,6 @@ prueba real: Querétaro–Monterrey, sábado 14-nov 17:00 de México (despertare
   América 26.6%, Cruz Azul 26.3%, Toluca 20.0%, Chivas 19.3% (coherente con la corrida de 20,000: diferencias de menos
   de 1.7 errores estándar). `pipeline.py auto` tarda 68 s. Pruebas: 82 de producción, 230 + 230 de página. V6 publicada.
 - 2026-11-11 07:30 UTC · Corrida diaria: sin partidos nuevos; momios actualizados; V7 publicada, `vivo/actual` en versión 4. Sin partidos en 48 h (despertares del 14-nov ya programados). No se avanzó un pendiente de mejora: la ventana de límite de hoy ya se usó en el rediseño.
+- 2026-11-12 08:00 UTC · Corrida diaria: sin partidos nuevos; V8 publicada y `vivo/actual` en versión 5. Bajas de
+  Querétaro–Monterrey en `config/actualidad.json` (1 y 6, con fuentes) y en la tarjeta del partido (V9). Una revisión
+  de reconexión de `prueba.js` fallaba en WebKit por depender del reloj real: ahora avanza el reloj simulado.

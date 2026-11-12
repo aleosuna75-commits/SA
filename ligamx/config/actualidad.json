@@ -1,0 +1,149 @@
+{
+ "actualizado_utc": "2026-11-12T07:30:00Z",
+ "alcance": "Querétaro–Monterrey, 14-nov-2026 (Jornada 7 reprogramada, Fecha FIFA)",
+ "equipos": {
+  "Querétaro": {
+   "tecnico": "Esteban González",
+   "lesionados": [
+    {
+     "jugador": "Erik Dueñas",
+     "motivo": "lesión de rodilla desde el 21-sep (ante León); no ha vuelto a jugar y sigue sin fecha de regreso",
+     "tipo": "lesion",
+     "fuente": "https://bolavip.com/mx/ligamx/alineaciones-de-queretaro-y-puebla-por-la-liga-mx-formaciones-probables",
+     "fecha_fuente": "2026-11-08"
+    }
+   ],
+   "nota": "Parcial: el club no publica parte médico y ningún medio reporta convocados a selección mayor; la única lesión vigente localizada es la de Dueñas (previas del 24-oct y 8-nov, sin comunicado oficial). El juvenil Juan Carlos Martínez está citado al Mundial Sub-17, pero no se confirmó que sea baja el 14-nov."
+  },
+  "Monterrey": {
+   "tecnico": "Matías Almeyda",
+   "lesionados": [
+    {
+     "jugador": "Jesús Manuel Corona",
+     "motivo": "convocado con México (Nations League de Concacaf ante Jamaica, 14 y 17-nov)",
+     "tipo": "seleccion",
+     "fuente": "https://www.telediario.mx/liga-mx/club-monterrey/rayados-jugadores-que-no-estaran-disponibles-ante-queretaro",
+     "fecha_fuente": "2026-11-08"
+    },
+    {
+     "jugador": "Hugo Cuypers",
+     "motivo": "convocado con Bélgica (Nations League de la UEFA: Turquía el 12-nov e Italia el 15-nov)",
+     "tipo": "seleccion",
+     "fuente": "https://www.telediario.mx/liga-mx/club-monterrey/rayados-jugadores-que-no-estaran-disponibles-ante-queretaro",
+     "fecha_fuente": "2026-11-08"
+    },
+    {
+     "jugador": "Íker Fimbres",
+     "motivo": "convocado con México Sub-23 (amistosos ante Corea del Sur, 14 y 17-nov)",
+     "tipo": "seleccion",
+     "fuente": "https://www.telediario.mx/liga-mx/club-monterrey/rayados-jugadores-que-no-estaran-disponibles-ante-queretaro",
+     "fecha_fuente": "2026-11-08"
+    },
+    {
+     "jugador": "Uros Durdevic",
+     "motivo": "lesión (tobillo o aductor izquierdo, según el medio): no viajó a Toluca y el 9-nov seguía con trabajo diferenciado; un medio lo da por descartado",
+     "tipo": "lesion",
+     "fuente": "https://www.elporvenir.mx/deportes/entrena-rayados-en-el-barrial-con-cinco-ausencias/1042769",
+     "fecha_fuente": "2026-11-09"
+    },
+    {
+     "jugador": "Luca Orellano",
+     "motivo": "molestias físicas (se perdió el partido ante Toluca); el 10-nov ya entrenaba al parejo del grupo y se perfila para jugar",
+     "tipo": "duda",
+     "fuente": "https://www.elfutbolero.com.mx/ligamx/almeyda-ya-tacho-a-cuatro-extranjeros-de-rayados-pero-sin-cuypers-tecatito-salcedo-ni-oliver-dos-de-ellos-son-sus-cartas-para-salvar-la-liguilla-en-queretaro-20261111.html",
+     "fecha_fuente": "2026-11-10"
+    },
+    {
+     "jugador": "Óliver Torres",
+     "motivo": "suspendido por acumulación de amarillas según la prensa (con los datos de ESPN el conteo propio le marca 4)",
+     "tipo": "suspension",
+     "fuente": "https://www.elfutbolero.com.mx/ligamx/almeyda-ya-tacho-a-cuatro-extranjeros-de-rayados-pero-sin-cuypers-tecatito-salcedo-ni-oliver-dos-de-ellos-son-sus-cartas-para-salvar-la-liguilla-en-queretaro-20261111.html",
+     "fecha_fuente": "2026-11-10"
+    }
+   ],
+   "nota": "Bastante completa: los tres convocados coinciden en varios medios del 5 al 11-nov; no hay parte médico oficial del club, así que el estado de Durdevic y Orellano puede cambiar antes del viaje. Óliver Torres se añadió como suspendido reportado por la prensa: el conteo propio de tarjetas (ESPN) le da 4 amarillas, no 5."
+  }
+ },
+ "fuentes": [
+  {
+   "url": "https://www.telediario.mx/liga-mx/club-monterrey/rayados-jugadores-que-no-estaran-disponibles-ante-queretaro",
+   "titulo": "¿Peligra el pase? Estas serán las bajas de Rayados para el partido ante Querétaro durante la Fecha FIFA (Telediario)",
+   "fecha": "2026-11-08"
+  },
+  {
+   "url": "https://www.telediario.mx/liga-mx/club-monterrey/rayados-contara-con-orbelin-pineda-y-victor-guzman-ante-queretaro",
+   "titulo": "¡Lograron acuerdo! Rayados contará con Orbelín Pineda y Víctor Guzmán para el partido ante Querétaro (Telediario)",
+   "fecha": "2026-11-05"
+  },
+  {
+   "url": "https://www.elporvenir.mx/deportes/entrena-rayados-en-el-barrial-con-cinco-ausencias/1042769",
+   "titulo": "Entrena Rayados en El Barrial con cinco ausencias (El Porvenir)",
+   "fecha": "2026-11-09"
+  },
+  {
+   "url": "https://www.elporvenir.mx/deportes/viaja-rayados-a-toluca-sin-orellano-y-durdevic/1041948",
+   "titulo": "Viaja Rayados a Toluca sin Orellano y Durdevic (El Porvenir)",
+   "fecha": "2026-11-06"
+  },
+  {
+   "url": "https://www.elfutbolero.com.mx/ligamx/almeyda-ya-tacho-a-cuatro-extranjeros-de-rayados-pero-sin-cuypers-tecatito-salcedo-ni-oliver-dos-de-ellos-son-sus-cartas-para-salvar-la-liguilla-en-queretaro-20261111.html",
+   "titulo": "Almeyda ya tachó a cuatro extranjeros de Rayados, pero sin Cuypers, Tecatito, Salcedo ni Óliver... (El Futbolero, cita a Tribuna Norte)",
+   "fecha": "2026-11-10"
+  },
+  {
+   "url": "https://www.nacionfutbol.com.mx/liga-mx/matias-almeyda-pierde-a-fimbres-y-la-regla-de-menores-acorrala-a-rayados-en-queretaro-20261111.html",
+   "titulo": "Matías Almeyda pierde a Fimbres y la regla de menores acorrala a Rayados en Querétaro (Nación Fútbol)",
+   "fecha": "2026-11-11"
+  },
+  {
+   "url": "https://www.elfutbolero.com.mx/ligamx/cuypers-confiesa-que-eligio-mexico-para-llegar-a-belgica-rayados-decimo-visita-queretaro-sin-su-centro-delantero-20261112.html",
+   "titulo": "Cuypers confiesa que eligió México para llegar a Bélgica; Rayados, décimo, visita Querétaro sin su centro delantero (El Futbolero)",
+   "fecha": "2026-11-11"
+  },
+  {
+   "url": "https://www.excelsior.com.mx/deportes/hugo-cuypers-rayados-convocado-belgica-fecha-fifa",
+   "titulo": "Hugo Cuypers, delantero de Rayados, convocado por Bélgica para la Fecha FIFA (Excélsior)",
+   "fecha": "2026-11-06"
+  },
+  {
+   "url": "https://la-lista.com/deportes/mexico-sub-23-anuncia-convocatoria-de-24-jugadores-para-enfrentar-a-corea-del-sur-quienes-son-los-elegidos",
+   "titulo": "México Sub-23 anuncia convocatoria de 24 jugadores para enfrentar a Corea del Sur (La-Lista)",
+   "fecha": "2026-11-06"
+  },
+  {
+   "url": "https://soyreferee.com/futbolmx/2026/11/10/fecha-fifa-noviembre-2026-los-clubes-de-liga-mx-con-mas-convocados-60832.html",
+   "titulo": "Fecha FIFA noviembre 2026: los clubes de Liga MX con más convocados (Soy Referee)",
+   "fecha": "2026-11-10"
+  },
+  {
+   "url": "https://www.rotowire.com/soccer/headlines/tecatito-corona-injury-unavailable-due-to-nt-call-up-546484",
+   "titulo": "Tecatito Corona: Unavailable due to NT call-up (RotoWire)",
+   "fecha": "2026-11-11"
+  },
+  {
+   "url": "https://plazadearmas.com.mx/gallos-no-tendra-a-homenchenko-ante-rayados/",
+   "titulo": "Gallos no tendrá a Homenchenko ante Rayados (Plaza de Armas, Querétaro)",
+   "fecha": "2026-11-10"
+  },
+  {
+   "url": "https://bolavip.com/mx/ligamx/alineaciones-de-queretaro-y-puebla-por-la-liga-mx-formaciones-probables",
+   "titulo": "Alineaciones de Querétaro y Puebla por la Liga MX: formaciones confirmadas (Bolavip)",
+   "fecha": "2026-11-08"
+  },
+  {
+   "url": "https://www.si.com/es-us/lesionados-y-suspendidos-para-el-partido-queretaro-vs-cruz-azul",
+   "titulo": "Lesionados y suspendidos para el partido Querétaro vs Cruz Azul (Sports Illustrated en español)",
+   "fecha": "2026-10-24"
+  },
+  {
+   "url": "https://www.fotmob.com/players/1166561/erik-duenas",
+   "titulo": "Erik Dueñas: ficha del jugador, lesión de rodilla y último partido el 21-sep (FotMob, sin fecha de publicación; consultada el 12-nov)",
+   "fecha": "2026-11-12"
+  },
+  {
+   "url": "https://www.qfc.mx/",
+   "titulo": "Querétaro Futbol Club, sitio oficial: Esteban González como DT; sin partes médicos publicados (consultado el 12-nov)",
+   "fecha": "2026-11-12"
+  }
+ ]
+}

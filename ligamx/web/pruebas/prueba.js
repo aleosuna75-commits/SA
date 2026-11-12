@@ -652,6 +652,7 @@ async function correr(navegador, nombre, opciones) {
   await px.waitForTimeout(100);
   const k1 = await vista();
   await px.clock.fastForward(6000);
+  await px.clock.runFor(400);                                     /* la base simulada entrega 150 ms después de suscribirse: se avanza el reloj simulado en vez de confiar en el real */
   await px.waitForTimeout(400);
   const k2 = await vista();
   revisa(k0.min === "59'" && k1.min === "59'" && /^Sin conexión en vivo por ahora/.test(k1.con) && k1.subs === 1, 'en vivo: al caer la conexión el minuto no retrocede y lo dice', JSON.stringify([k0.min, k1.min, k1.con, k1.subs]));
