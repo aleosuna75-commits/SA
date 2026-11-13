@@ -1,0 +1,8 @@
+{
+  "name": "nuestro-nido",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@anthropic-ai/sdk": "^1.8.0"
+  }
+}

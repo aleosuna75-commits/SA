@@ -532,7 +532,8 @@ async function enrich(col, id, text, type, keepCat, keepIcon){
   }
   let found = null; const nk = norm(typeof r.marca === 'string' ? r.marca : ''), flat = nk.replace(/ /g,'');
   if (nk && !keepIcon) { const al = ALIAS.find(a => a[0] === nk || a[0] === flat); if (al) found = al[1]; else { await loadIdx(); const sl = X.byName && X.byName[flat]; if (sl) found = {k:'x',v:sl}; } }
-  const src = col === 'tx' ? (S.tx.find(x => x.id === id)) : col === 'bills' ? S.bills.find(x => x.id === id) : S.goals.find(x => x.id === id);
+  const find = () => col === 'tx' ? S.tx.find(x => x.id === id) : col === 'bills' ? S.bills.find(x => x.id === id) : S.goals.find(x => x.id === id);
+  let src = find(); if (!src) { await new Promise(r => setTimeout(r, 1500)); src = find(); }
   if (!src) return;
   const next = {...src}; delete next.id;
   if (!keepIcon) { if (found) next.icon = found; else if (typeof r.emoji === 'string' && r.emoji && r.emoji.length <= 8) next.icon = {k:'e',v:r.emoji}; }
@@ -808,7 +809,7 @@ function openWho(then){
   const ps = (isDemo() ? S.people : people());
   sheet('¿Quién eres?', `<p style="margin:0;color:var(--fg-2)">Cada movimiento queda a nombre de quien lo captura. Se recuerda en este dispositivo.</p>
     ${ps.length?`<div class="chips">${ps.map(p => `<button class="chip" data-a="pick-me" data-n="${esc(p)}" aria-pressed="${p===S.me}">${avatar(p,true)}${esc(p)}</button>`).join('')}</div>`:''}
-    <form data-f="who" class="fld"><label for="who-in">${ps.length?'O escribe otro nombre':'Tu nombre'}</label><div class="withic"><input class="inp" id="who-in" maxlength="24" autocomplete="given-name" placeholder="Por ejemplo: Ale"><button class="btn" type="submit">Listo</button></div></form>`);
+    <form data-f="who" class="fld"><label for="who-in">${ps.length?'O escribe otro nombre':'Tu nombre'}</label><div class="withic"><input class="inp" id="who-in" maxlength="24" autocomplete="given-name" placeholder="Por ejemplo: Ale"><button class="btn" type="submit">Listo</button></div></form>${window.nidoSalir ? '<div><button class="link" data-a="salir">Cerrar sesión en este dispositivo</button></div>' : ''}`);
   openWho.then = then || null; setTimeout(() => { const i = $('#who-in'); if (i && !ps.length) i.focus(); }, 50);
 }
 async function setMe(name){ name = name.trim().slice(0,24); if (!name) return; S.me = name; ls.set('lana.me', name); await ensurePerson(name); const th = openWho.then; closeSheet(); render(); if (th) th(); }
@@ -946,6 +947,7 @@ document.addEventListener('click', e => {
   else if (a === 'close') closeSheet();
   else if (a === 'who') openWho(F ? (f => () => { F = f; if (!people().includes(F.who) || true) F.who = S.me; drawForm(); })(F) : null);
   else if (a === 'pick-me') setMe(el.dataset.n);
+  else if (a === 'salir') window.nidoSalir && window.nidoSalir();
   else if (a === 'filter') { S.filter[el.dataset.k] = el.dataset.v; render(); }
   else if (a === 'edit-tx') { const t = S.tx.find(x => x.id === el.dataset.id); if (t) openAdd(t.type, t); else toast('Es un movimiento de ejemplo. Registra los suyos con el botón +.'); }
   else if (a === 'edit-bill') { const b = S.bills.find(x => x.id === el.dataset.id); if (b) openAdd('pago', b); else toast('Es un pago de ejemplo. Agrega los suyos con el botón +.'); }
