@@ -39,6 +39,7 @@ def main():
     (SALIDA / "index.html").write_text(pagina, encoding="utf-8")
     shutil.copytree(AQUI / "logos", SALIDA / "logos")
     shutil.copy(AQUI / "produccion" / "shim.js", SALIDA / "shim.js")
+    shutil.copy(AQUI / "oj.json", SALIDA / "oj.json")
     url, llave = os.environ.get("SUPABASE_URL", "").strip(), os.environ.get("SUPABASE_ANON_KEY", "").strip()
     (SALIDA / "config.js").write_text("window.NIDO_CONFIG=" + json.dumps({"supabaseUrl": url, "supabaseAnonKey": llave}) + ";\n", encoding="utf-8")
     if not (url and llave):
