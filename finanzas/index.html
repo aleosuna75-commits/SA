@@ -1,12 +1,12 @@
 <title>Nuestro Nido</title>
 <meta name="claude:viewport-fit-sides" content="cover">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&family=Nunito:wght@400;600;700;800&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap">
 <style>
 /* Layout: app de cuentas compartidas, clara y colorida. Cada sección toma un color propio, las formas son redondas y el saldo va en una tarjeta degradada; navegación abajo en el teléfono y arriba en escritorio. */
 :root{
   color-scheme:light;
   --violet:#e4487f; --coral:#f2709c; --sun:#d6336c; --mint:#f783ac; --sky:#e64980; --pink:#f06595; --azul:#3b8fe8;
-  --bg:#fdeff4; --surface:#ffffff; --surface-2:#fde3ec; --line:#f8cfdd; --line-2:#f0a9c2;
+  --bg:#fbe4ea; --surface:#ffffff; --surface-2:#fde3ec; --line:#f8cfdd; --line-2:#f0a9c2;
   --fg:#3b1d2a; --fg-2:#6b4756; --fg-3:#99717f;
   --accent:#e4487f; --accent-ink:#ffffff; --accent-soft:#ffe3ec;
   --oro:#e4487f; --oro-2:#f783ac;
@@ -14,7 +14,7 @@
   --good:#178a52; --good-soft:#dcf5e6; --warn:#a85f00; --warn-soft:#fff0cf; --bad:#c92a2a; --bad-soft:#ffe3e3;
   --s1:#2a78d6; --s2:#eb6834; --s3:#1baf7a; --s4:#eda100; --s5:#e87ba4; --s6:#008300; --s7:#6250d6; --s8:#e34948; --s9:#b39aa5;
   --shadow:0 10px 30px rgba(120,30,70,.16);
-  --display:"Baloo 2","Nunito",system-ui,sans-serif;
+  --display:"Nunito",system-ui,-apple-system,"Segoe UI",sans-serif;
   --body:"Nunito",system-ui,-apple-system,"Segoe UI",sans-serif;
   --r:22px;
 }
@@ -377,6 +377,96 @@ body::before{content:"";position:absolute;z-index:-1;left:0;right:0;top:calc(-1 
 .tile i .oj{width:52px;height:52px;vertical-align:0}
 .tile:active{transform:scale(.95)}
 @media (min-width:860px){ .tiles{grid-template-columns:repeat(5,minmax(0,1fr))} .tab-e{font-size:18px;height:auto} .tab-e .oj{width:22px;height:22px} .tab{opacity:1;gap:6px} }
+/* ---------- estructura tipo libreta rosa ---------- */
+.top{display:block;padding:0;border:0}
+body::before{height:calc(var(--band,250px) + env(safe-area-inset-top,0px));background:linear-gradient(170deg,#e4558a,#d93f79);border-radius:0}
+.hd-row{display:flex;align-items:center;gap:8px;min-height:40px}
+.hd-sp{flex:1}
+.hd-ic{width:40px;height:40px;display:grid;place-items:center;font-size:22px;color:#fff;font-weight:800;flex:none}
+.hd-ic .oj{width:26px;height:26px;filter:brightness(0) invert(1)}
+.hd-pill{display:flex;align-items:center;gap:6px;height:38px;padding:0 8px;border-radius:999px;font-weight:800;font-size:.92rem;color:var(--accent)}
+.hd-pill span{display:none}
+.hd-pill .oj{width:28px;height:28px}
+.hd-pill[aria-pressed="true"]{background:#fff;padding:0 14px 0 8px;box-shadow:0 4px 12px rgba(120,30,70,.2)}
+.hd-pill[aria-pressed="true"] span{display:inline}
+.hd-big{font:900 1.75rem/1.1 var(--display);color:#fff;margin:8px 0 12px 4px}
+.hd-title{flex:1;text-align:center;font:800 1.15rem/1 var(--display);color:#fff;margin:0}
+.hd-who{display:flex;gap:10px}
+.hd-who button{width:92px;padding:10px 4px 8px;border-radius:20px;display:flex;flex-direction:column;align-items:center;gap:4px;color:#fff;font-weight:700;font-size:.72rem;line-height:1.1;text-align:center}
+.hd-who button span{display:block;max-width:100%}
+.hd-who i{font-style:normal;font-size:34px;line-height:1}
+.hd-who .oj{width:46px;height:46px;vertical-align:0}
+.hd-who button[aria-pressed="true"]{background:rgba(255,255,255,.22)}
+.months{margin-top:4px}
+.app{gap:12px}
+.card{background:#fcf2f4;border:0;box-shadow:0 6px 18px rgba(120,30,70,.08);border-radius:26px}
+.col>.card.calcard{background:#fbf0f2;box-shadow:0 10px 26px rgba(120,30,70,.16)}
+.card-h h2::before{display:none}
+.card-h h2{font:800 1.1rem/1.1 var(--display)}
+.link{color:var(--accent)}
+.pct{color:var(--accent)}
+.cal-h{display:flex;align-items:center;justify-content:center;gap:14px;margin-bottom:10px;font-weight:600;color:var(--fg)}
+.cal-h button{width:34px;height:34px;color:var(--accent);font-size:20px;font-weight:800}
+.cal-h button:disabled{opacity:.3}
+.cal-h .mes{font-style:normal;margin-left:10px;padding:4px 12px;border-radius:999px;background:var(--accent);color:#fff;font-weight:700;font-size:.85rem}
+.cal .dow{font-weight:600;font-size:.82rem;color:var(--fg-2)}
+.cal-d{font-weight:500} .cal-d b{font-weight:500;width:34px;height:34px;font-size:1rem}
+.cal-d.today b{background:none;color:var(--accent);box-shadow:inset 0 0 0 1.5px var(--accent)}
+.cal-d.sel b{background:var(--accent);color:#fff;box-shadow:none}
+.cal-seg button{color:var(--accent);background:#f3dbe1;font-weight:600}
+.cal-seg button[aria-pressed="true"]{background:#f8c9d6;color:var(--accent)}
+.cal-tot{border-top:1px solid #ecd3da} .cal-tot b{font:800 1.05rem/1.2 var(--display)} .cal-tot span{font-weight:600}
+.recs{padding:0 6px}
+.recs .row{border-top-color:#f1cdd8}
+.nada{text-align:center;color:var(--accent);font-weight:600;padding:22px 0;margin:0}
+.nada span{display:block;font-size:40px;line-height:1.1;margin-bottom:4px} .nada .oj{width:48px;height:48px}
+.col>.card.det{position:relative;margin-top:26px;padding-top:14px}
+.det .det-ic{position:absolute;left:-4px;top:-26px;width:74px;height:74px;background:#f8c9d6;box-shadow:0 0 0 5px #fbf0f2}
+.det .det-ic .oj{width:50px;height:50px}
+.det .cal-h{justify-content:flex-start;padding-left:76px;margin-bottom:14px}
+.det .det-n{font:900 2.4rem/1 var(--display);padding-left:6px}
+.det-row{display:flex;gap:22px;margin-top:8px;padding-left:6px;color:var(--fg-2);font-weight:600}
+.home-seg{display:none}
+.tabs{background:var(--bg);box-shadow:none;border-radius:0;border-top:0}
+.tab{font-weight:600;font-size:.74rem;color:var(--fg-2)} .tab[aria-current="page"]{color:var(--accent)}
+.fab{border-radius:50%;width:60px;height:60px;animation:none}
+.tile{background:#f6d5dd}
+.quick{box-shadow:none;border-color:#f1cdd8}
+/* teclado */
+.pad-bar .seg{justify-content:flex-start;gap:14px;padding-left:10px}
+.seg button{padding:8px 10px;font-size:1rem}
+.seg button .oj{width:30px;height:30px}
+.seg button[aria-pressed="true"]{padding:6px 16px 6px 8px}
+.pad-bar .x[type="submit"],.pad-bar .x{font-size:24px}
+.pad-modes{display:flex;gap:4px;margin:0 12px 8px;padding:4px;border-radius:999px;background:#f6dfe5}
+.pad-modes button{flex:1;padding:9px 6px;border-radius:999px;font-weight:700;font-size:.88rem;color:var(--fg-2);white-space:nowrap}
+.pad-modes button[aria-pressed="true"]{background:#f8c9d6;color:var(--accent)}
+.pad-tip{margin:0 0 8px;padding:9px 12px;border-radius:14px;background:#f6dfe5;font-size:.82rem;color:var(--fg-2)}
+.catbtn{font-size:.72rem;font-weight:600;border-radius:22px}
+.catbtn[aria-pressed="true"]{background:#f8d6df;font-weight:800}
+.pad{background:#e2487f;gap:9px;padding-top:14px}
+.pad-a{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,3fr);gap:9px}
+.pad-a.one{grid-template-columns:minmax(0,1fr)}
+.pad-b{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:9px}
+.pad-note{border-radius:6px;min-height:46px}
+.k2{height:46px;border-radius:999px;background:#f3b3c7;color:#7a1a3f;font:800 .78rem/1.1 var(--body);display:flex;align-items:center;justify-content:center;gap:4px;position:relative;overflow:hidden;white-space:nowrap;padding:0 6px;box-shadow:0 3px 0 rgba(120,20,60,.28);min-width:0;text-overflow:ellipsis}
+.k2 .oj{width:24px;height:24px;flex:none}
+.k2 input[type="date"]{position:absolute;inset:0;width:100%;height:100%;opacity:0}
+.k2.go{font-size:1.5rem;color:#178a52}
+.k2:active{transform:translateY(3px);box-shadow:none}
+.keys{gap:9px}
+.key{font:700 1.4rem/1 var(--body);font-family:var(--display)}
+.key.op{background:#f3b3c7;color:#3b1d2a}
+.key.del{color:#d92d4a}
+@media (min-width:860px){
+  .tabs{position:fixed;left:0;right:0;bottom:0;background:var(--bg);padding:6px 16px;margin:0}
+  .tabs nav{display:grid;max-width:560px;margin:0 auto}
+  .tab{flex-direction:column;padding:6px 2px;border-radius:12px;font-size:.74rem;color:var(--fg-2);background:none!important}
+  .tab[aria-current="page"]{color:var(--accent)}
+  .tab-e{font-size:24px;height:30px} .tab-e .oj{width:30px;height:30px}
+  body{padding-bottom:120px} .fab{bottom:calc(76px + env(safe-area-inset-bottom,0px))}
+  .hd-big,.hd-row,.hd-who{max-width:none}
+}
 #confeti{position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:80}
 @media (prefers-reduced-motion:no-preference){
   .hero{animation:flow 14s ease infinite}
@@ -409,11 +499,7 @@ body::before{content:"";position:absolute;z-index:-1;left:0;right:0;top:calc(-1 
 </style>
 
 <div class="app">
-  <header class="top">
-    <div class="brand"><h1>Nuestro <b>Nido</b></h1><p>Lo que construimos juntos</p></div>
-    <div class="tabs"><nav id="tabs" aria-label="Secciones"></nav></div>
-    <button class="me" id="me-btn" data-a="who" aria-label="Cambiar quién captura"></button>
-  </header>
+  <header class="top"><div id="hd"></div><div class="tabs"><nav id="tabs" aria-label="Secciones"></nav></div></header>
   <div id="banner" class="banner" hidden></div>
   <div class="months">
     <button data-a="month" data-d="-1" aria-label="Mes anterior">‹</button>
@@ -765,7 +851,15 @@ function chrome(){
   $('#tabs').innerHTML = TABS.map(([k,l,e]) => `<button class="tab" data-a="tab" data-t="${k}" ${cur===k?'aria-current="page"':''}><span class="tab-e" aria-hidden="true">${e}</span>${l}</button>`).join('');
   $('#mlabel').textContent = cap(mName(S.month));
   $('#mnext').disabled = S.month >= addMonths(ym(new Date()), 12);
-  $('#me-btn').innerHTML = S.me ? avatar(S.me) + `<span>${esc(S.me)}</span>` : `<span class="av" style="background:var(--fg-3)" aria-hidden="true">?</span><span>¿Quién eres?</span>`;
+  const home = S.home === 'det' ? 'det' : 'cal', future = S.month > ym(new Date()), names = {cuentas:'Billetera', analisis:'Análisis', mas:'Más', movs:'Registros', metas:'Metas de ahorro', pagos:'Pagos y recordatorios', asesor:'Asesor IA'};
+  $('#hd').innerHTML = S.tab === 'inicio' ? `<div class="hd-row"><button class="hd-ic" data-a="search" aria-label="Buscar">🔍</button><span class="hd-sp"></span>
+      <button class="hd-pill" data-a="home" data-k="det" aria-pressed="${home==='det'}" aria-label="Detalles">🧾<span>Detalles</span></button><button class="hd-pill" data-a="home" data-k="cal" aria-pressed="${home==='cal'}" aria-label="Calendario">📅<span>Calendario</span></button></div>
+    <h1 class="hd-big">Nuestro Nido</h1>
+    <div class="hd-who">${FIXED.map(p => `<button data-a="pick-me" data-n="${esc(p)}" aria-pressed="${S.me===p}"><i aria-hidden="true">${FACE[p]}</i><span>${esc(p)}</span></button>`).join('')}</div>`
+    : `<div class="hd-row">${PARENT[S.tab] ? `<button class="hd-ic" data-a="tab" data-t="${PARENT[S.tab]}" aria-label="Volver">‹</button>` : '<span class="hd-ic"></span>'}<h1 class="hd-title">${names[S.tab] || ''}</h1><span class="hd-ic"></span></div>`;
+  const showM = ['analisis','movs','asesor'].includes(S.tab) || (S.tab === 'inicio' && future);
+  $('.months').hidden = !showM;
+  document.body.style.setProperty('--band', (S.tab === 'inicio' ? (future ? 290 : 250) : showM ? 150 : 100) + 'px');
   banner();
 }
 function banner(){
@@ -849,28 +943,22 @@ function vFuturo(){
       ${goals || '<p class="empty">Creen una meta para ver cuánto llevarían en esa fecha.</p>'}</section>
   </div></div>`;
 }
+function monthNav(label){ return `<div class="cal-h"><button data-a="month" data-d="-1" aria-label="Mes anterior">‹</button><span>${label}</span><button data-a="month" data-d="1" aria-label="Mes siguiente" ${S.month >= addMonths(ym(new Date()), 12) ? 'disabled' : ''}>›</button></div>`; }
+const NADA = '<p class="nada"><span>😆</span>¡No hay registros aún!</p>';
 function vInicio(){
   if (S.month > ym(new Date())) return vFuturo();
-  const st = monthStats(S.month), prev = monthStats(addMonths(S.month,-1)), home = S.home === 'det' ? 'det' : 'cal';
-  const disp = st.ing - st.gas - st.aho, isCur = S.month === ym(new Date());
-  const dlt = prev.gas ? Math.round((st.gas - prev.gas) / prev.gas * 100) : null, al = alertsList();
-  const recent = [...st.tx].sort((a,b) => b.date.localeCompare(a.date) || (b.ts||0)-(a.ts||0)).slice(0,5);
+  const st = monthStats(S.month), home = S.home === 'det' ? 'det' : 'cal', al = alertsList();
+  if (!S.selDay || !S.selDay.startsWith(S.month)) S.selDay = S.month === ym(new Date()) ? TODAY() : S.month + '-01';
+  const dayTx = st.tx.filter(t => t.date === S.selDay).sort((a,b) => (b.ts||0)-(a.ts||0));
+  const dayLbl = new Intl.DateTimeFormat('es-MX',{weekday:'long',day:'numeric',month:'long'}).format(parseD(S.selDay));
   return `<div class="grid">
   <div class="col">
-    <div class="home-seg"><button data-a="home" data-k="det" aria-pressed="${home==='det'}">🧾 Detalles</button><button data-a="home" data-k="cal" aria-pressed="${home==='cal'}">📅 Calendario</button></div>
-    ${home === 'det' ? vDetalles(st) : vCalendar(st)}
+    ${home === 'det' ? vDetalles(st) : vCalendar(st) + `<div class="recs"><div class="day-h">${esc(dayLbl)}</div><div class="rows">${dayTx.map(txRow).join('') || NADA}</div></div>`}
   </div>
   <div class="col">
-    <div><form class="quick" data-f="quick"><span aria-hidden="true">✨</span><input id="quick-in" autocomplete="off" enterkeyhint="send" aria-label="Captura rápida" placeholder="tacos 180 · sueldo 12000 · Claude 400 ayer"><button class="btn" type="submit">Anotar</button></form>
-    <p class="hint">Escribe qué fue y cuánto. La app le pone logo o dibujo y categoría sola.</p></div>
     ${al.length?`<div class="alerts">${al.map(a => `<div class="alert ${a[0]}"><i>${a[1]}</i><span>${esc(a[2])}</span></div>`).join('')}</div>`:''}
-    <section class="hero" aria-label="Resumen del mes">
-      <div><div class="lbl">Disponible ${isCur?'este mes':'en '+mName(S.month)}</div><div class="big num"><span data-count="${disp}">${money(disp)}</span><small>MXN</small></div>
-      <div class="delta">${dlt===null?'Ingresos menos gastos y aportes a metas':`Gasto ${dlt>=0?'↑':'↓'} ${Math.abs(dlt)}% vs. ${mName(addMonths(S.month,-1)).split(' ')[0]} completo`}</div></div>
-      <div class="hero-stats"><div><span>Ingresos</span><b class="num">${money(st.ing)}</b></div><div><span>Gastos</span><b class="num">${money(st.gas)}</b></div><div><span>A metas</span><b class="num">${money(st.aho)}</b></div></div>
-    </section>
-    ${home === 'det' ? '' : `<section class="card"><div class="card-h"><h2>Últimos movimientos</h2><button class="link" data-a="tab" data-t="movs">Ver todos</button></div>
-      <div class="rows">${recent.map(txRow).join('') || '<p class="empty">Sin movimientos este mes. Toca el lápiz para registrar el primero.</p>'}</div></section>`}
+    <div><form class="quick" data-f="quick"><span aria-hidden="true">✨</span><input id="quick-in" autocomplete="off" enterkeyhint="send" aria-label="Captura rápida" placeholder="tacos 180 · sueldo 12000 · Claude 400 ayer"><button class="btn" type="submit">Anotar</button></form>
+    <p class="hint">Captura rápida: escribe qué fue y cuánto, y la app le pone dibujo y categoría sola.</p></div>
   </div></div>`;
 }
 function vCuentas(){ return `<div class="grid"><div class="col">${vBalance()}${vPagos()}</div>${vMetas()}</div>`; }
@@ -881,8 +969,14 @@ function vAnalisis(){
   const buds = Object.keys(CATS).filter(c => d.budgets[c] > 0).map(c => { const lim = d.budgets[c], sp = st.byCat[c]||0, p = sp/lim, el = isCur ? new Date().getDate()/daysIn(S.month) : 1, risk = isCur && p <= 1 && p - el > .2; const k = p > 1 ? 'bad' : (risk || p > .9) ? 'warn' : '';
     return `<div class="bud"><div class="l1"><b>${CATS[c].e} ${esc(CATS[c].l)}</b><span class="num">${money(sp)} / ${money(lim)}</span></div><div class="pbar ${k}"><div style="width:${Math.min(100,p*100)}%"></div></div>${k==='bad'?`<div class="note bad">⚠️ Se pasaron por ${money(sp-lim)}</div>`:k==='warn'?`<div class="note warn">${risk?'En riesgo: a este ritmo cierran el mes en '+money(Math.round(sp/el)):'Quedan '+money(lim-sp)}</div>`:''}</div>`; }).join('');
   const who = Object.entries(st.byWho).sort((a,b) => b[1]-a[1]), wmax = who.length ? who[0][1] : 1;
+  const prev = monthStats(addMonths(S.month,-1)), disp = st.ing - st.gas - st.aho, dlt = prev.gas ? Math.round((st.gas - prev.gas) / prev.gas * 100) : null;
   return `<div class="grid"><div class="col">
-    <section class="card calcard"><div class="card-h"><h2>Gastos del mes</h2><span class="aside num">${money(st.gas)}</span></div>
+    <section class="hero" aria-label="Resumen del mes">
+      <div><div class="lbl">Disponible ${isCur?'este mes':'en '+mName(S.month)}</div><div class="big num"><span data-count="${disp}">${money(disp)}</span><small>MXN</small></div>
+      <div class="delta">${dlt===null?'Ingresos menos gastos y aportes a metas':`Gasto ${dlt>=0?'↑':'↓'} ${Math.abs(dlt)}% vs. ${mName(addMonths(S.month,-1)).split(' ')[0]} completo`}</div></div>
+      <div class="hero-stats"><div><span>Ingresos</span><b class="num">${money(st.ing)}</b></div><div><span>Gastos</span><b class="num">${money(st.gas)}</b></div><div><span>A metas</span><b class="num">${money(st.aho)}</b></div></div>
+    </section>
+    <section class="card"><div class="card-h"><h2>Gastos del mes</h2><span class="aside num">${money(st.gas)}</span></div>
       ${st.gas?`<div class="donut-wrap"><div class="donut" id="ch-donut"></div><div class="cats">${cats}</div></div>`:'<p class="empty">Aún no hay gastos en este mes.</p>'}</section>
     <section class="card"><div class="card-h"><h2>Ritmo de gasto</h2><span class="aside">acumulado por día</span></div>
       <div class="legend"><span><i style="background:var(--accent)"></i>${cap(mShort(S.month))}</span><span><i class="dash"></i>${cap(mShort(addMonths(S.month,-1)))}</span></div><div class="chart" id="ch-line"></div></section>
@@ -911,12 +1005,11 @@ function vCalendar(st){
   let cells = ['dom','lun','mar','mié','jue','vie','sáb'].map((d,i) => `<div class="dow${i===0||i===6?' we':''}">${d}</div>`).join('') + '<div></div>'.repeat(first);
   for (let d = 1; d <= dim; d++) { const date = S.month + '-' + pad(d), wd = (first + d - 1) % 7, G = g[d] || 0, I = inc[d] || 0, net = I - G;
     const tag = mode === 'gasto' ? (G ? `<small class="num">−${short(G)}</small>` : '') : mode === 'ingreso' ? (I ? `<small class="in num">+${short(I)}</small>` : '') : (G || I ? `<small class="${net >= 0 ? 'in ' : ''}num">${net >= 0 ? '+' : '−'}${short(Math.abs(net))}</small>` : '');
-    cells += `<button class="cal-d${wd===0||wd===6?' we':''}${date===today?' today':''}" data-a="day" data-d="${date}" aria-label="${d}: gastos ${money(G)}, ingresos ${money(I)}"><b>${d}</b>${tag}</button>`; }
+    cells += `<button class="cal-d${wd===0||wd===6?' we':''}${date===today?' today':''}${date===S.selDay?' sel':''}" data-a="day" data-d="${date}" aria-label="${d}: gastos ${money(G)}, ingresos ${money(I)}"><b>${d}</b>${tag}</button>`; }
   const seg = (k, l) => `<button data-a="calmode" data-k="${k}" aria-pressed="${mode===k}">${l}</button>`;
-  return `<section class="card calcard"><div class="cal">${cells}</div>
+  return `<section class="card calcard">${monthNav(mName(S.month) + '<i class="mes">Mes</i>')}<div class="cal">${cells}</div>
     <div class="cal-seg">${seg('gasto','Gastos')}${seg('ingreso','Ingresos')}${seg('total','Total')}</div>
-    <div class="cal-tot"><div><b class="num" style="color:${st.ing-st.gas<0?'var(--bad)':'var(--fg)'}">${money(st.ing - st.gas)}</b><span>Total</span></div><div><b class="num" style="color:var(--good)">${money(st.ing)}</b><span>Ingresos</span></div><div><b class="num" style="color:var(--bad)">${money(st.gas)}</b><span>Gastos</span></div></div>
-    <p class="hint" style="text-align:center">Toca un día para ver sus movimientos.</p></section>`;
+    <div class="cal-tot"><div style="text-align:left"><b class="num" style="color:${st.ing-st.gas<0?'var(--bad)':'var(--good)'}">${money(st.ing - st.gas)}</b><span>Total</span></div><div><b class="num" style="color:var(--good)">${money(st.ing)}</b><span>Ingresos</span></div><div style="text-align:right"><b class="num" style="color:var(--bad)">${money(st.gas)}</b><span>Gastos</span></div></div></section>`;
 }
 function dayRows(tx){
   const today = TODAY(); let last = '', rows = '';
@@ -927,11 +1020,11 @@ function dayRows(tx){
   return rows;
 }
 function vDetalles(st){
-  const tx = [...st.tx].sort((a,b) => b.date.localeCompare(a.date) || (b.ts||0)-(a.ts||0)), net = st.ing - st.gas;
-  return `<section class="card calcard"><div class="det-top"><span class="det-ic" aria-hidden="true">📒</span><div><div class="det-l">Total de ${mName(S.month).split(' ')[0]}</div><div class="det-n num" style="color:${net < 0 ? 'var(--bad)' : 'var(--good)'}"><span data-count="${net}">${money(net)}</span></div></div></div>
-    <div class="cal-tot" style="grid-template-columns:repeat(2,minmax(0,1fr))"><div><b class="num" style="color:var(--bad)">${money(st.gas)}</b><span>Gastos</span></div><div><b class="num" style="color:var(--good)">${money(st.ing)}</b><span>Ingresos</span></div></div></section>
-    <section class="card"><div class="card-h"><h2>Registros</h2><span class="aside">${tx.length} este mes</span></div>
-    <div class="rows">${dayRows(tx) || '<p class="empty" style="text-align:center;padding:26px 0"><span style="font-size:34px;display:block">😆</span>¡No hay registros aún!<br>Toca el lápiz para anotar el primero.</p>'}</div></section>`;
+  const tx = [...st.tx].sort((a,b) => b.date.localeCompare(a.date) || (b.ts||0)-(a.ts||0)), net = st.ing - st.gas, [y, m] = S.month.split('-');
+  return `<section class="card calcard det"><span class="det-ic" aria-hidden="true">📒</span>${monthNav(m + '/' + y)}
+    <div class="det-n num" style="color:${net < 0 ? 'var(--bad)' : 'var(--good)'}"><span data-count="${net}">${money(net)}</span></div>
+    <div class="det-row"><span>Gastos <b class="num" style="color:var(--bad)">${money(st.gas)}</b></span><span>Ingresos <b class="num" style="color:var(--good)">${money(st.ing)}</b></span></div></section>
+    <div class="recs"><div class="rows">${dayRows(tx) || NADA}</div></div>`;
 }
 function vMovs(){
   const f = S.filter, ps = people();
@@ -1070,7 +1163,10 @@ function previewIcon(){
   const h = $('#f-ichint'); if (h) h.textContent = F.photo ? 'Foto tuya. Se usará sola cada vez que escriban lo mismo.' : pid ? 'Usando la foto que ya habían elegido.' : !norm(F.desc) ? '' : r ? (r.hit==='marca' ? 'Reconocí la marca.' : 'Le puse un dibujo.') : (S.ai && !S.aiOff ? 'No lo reconozco: la IA le buscará imagen al guardar.' : '');
 }
 function drawCats(){ const el = $('#f-cats'); if (!el) return; const table = F.kind === 'ingreso' ? INCATS : CATS;
-  if (el.classList.contains('catgrid')) el.innerHTML = Object.keys(table).map(c => `<button type="button" class="catbtn" data-a="f-cat" data-c="${c}" aria-pressed="${F.cat===c}"><i>${table[c].e}</i>${esc(table[c].l)}</button>`).join('');
+  if (el.classList.contains('catgrid')) { const n = {}; S.tx.forEach(t => { if (t.type === F.kind) n[t.cat] = (n[t.cat] || 0) + 1; });
+    const order = Object.keys(table); if (F.catMode === 'rec') order.sort((a, b) => (n[b] || 0) - (n[a] || 0));
+    el.innerHTML = order.map(c => `<button type="button" class="catbtn" data-a="f-cat" data-c="${c}" aria-pressed="${F.cat===c}"><i>${table[c].e}</i>${esc(table[c].l)}</button>`).join(''); }
+  else if (0) el.innerHTML = Object.keys(table).map(c => `<button type="button" class="catbtn" data-a="f-cat" data-c="${c}" aria-pressed="${F.cat===c}"><i>${table[c].e}</i>${esc(table[c].l)}</button>`).join('');
   else el.innerHTML = Object.keys(table).map(c => `<button type="button" class="chip" data-a="f-cat" data-c="${c}" aria-pressed="${F.cat===c}">${table[c].e} ${esc(table[c].l)}</button>`).join(''); }
 /* calculadora del teclado */
 function evalExpr(e){
@@ -1092,24 +1188,29 @@ function padKey(k){
   else { if (ex.length >= 24) return; const cur = ex.split(/[+\-×÷]/).pop(); if (cur.includes('.') && cur.split('.')[1].length >= 2) return; ex = (cur === '0' ? ex.slice(0, -1) : ex) + k; }
   F.expr = ex; padShow();
 }
-const SPLITS = {mitad: '⚖️ A medias', mio: '🙋 Solo de quien pagó', otro: '🎁 Todo es del otro'};
+const SPLITS = {mitad: '⚖️ A medias', mio: '🙋 Personal', otro: '🎁 Del otro'}, SHORT = {'Mi negrito': 'Negrito', 'Mi princesa hermosa': 'Princesa'};
 function drawPad(){
   const k = F.kind, edit = !!F.id; F.pad = true;
   if (!F.cat) F.cat = k === 'ingreso' ? 'sueldo' : 'comida';
+  if (!F.catMode) F.catMode = 'rec';
   const keys = ['×','7','8','9','÷','4','5','6','-','1','2','3','+','.','0','⌫'];
+  const dlbl = F.date === TODAY() ? 'HOY' : new Intl.DateTimeFormat('es-MX',{day:'numeric',month:'short'}).format(parseD(F.date)).replace('.','');
   root.innerHTML = `<div class="veil"><div class="sheet full${root.firstChild ? '' : ' in'}" role="dialog" aria-modal="true" aria-label="${edit ? 'Editar' : 'Nuevo'} ${k}"><form data-f="add" class="pad-form">
     <div class="pad-bar"><button type="button" class="x" data-a="close" aria-label="Cerrar">✕</button>
-      <div class="seg">${edit ? `<button type="button" aria-pressed="true">${k==='gasto'?'💸 Gasto':'💰 Ingreso'}</button>` : `<button type="button" data-a="f-kind" data-k="gasto" aria-pressed="${k==='gasto'}">💸 Gasto</button><button type="button" data-a="f-kind" data-k="ingreso" aria-pressed="${k==='ingreso'}">💰 Ingreso</button><button type="button" data-a="f-kind" data-k="saldo" aria-pressed="false">⋯ Más</button>`}</div>
-      ${edit ? `<button type="button" class="x" data-a="f-del" aria-label="Borrar">🗑</button>` : '<span style="width:34px"></span>'}</div>
-    <div class="pad-who">${FIXED.map(p => `<button type="button" class="chip" data-a="f-who" data-n="${esc(p)}" aria-pressed="${F.who===p}">${avatar(p,true)}${esc(p)}</button>`).join('')}</div>
-    <div class="pad-body"><div class="catgrid" id="f-cats"></div></div>
+      <div class="seg">${edit ? `<button type="button" aria-pressed="true">${k==='gasto'?'💸 Gasto':'💰 Ingreso'}</button>` : `<button type="button" data-a="f-kind" data-k="gasto" aria-pressed="${k==='gasto'}" aria-label="Gasto">💸${k==='gasto'?' Gasto':''}</button><button type="button" data-a="f-kind" data-k="ingreso" aria-pressed="${k==='ingreso'}" aria-label="Ingreso">💰${k==='ingreso'?' Ingreso':''}</button><button type="button" data-a="f-kind" data-k="saldo" aria-pressed="false" aria-label="Más opciones">🤝</button>`}</div>
+      ${edit ? `<button type="button" class="x" data-a="f-del" aria-label="Borrar">🗑️</button>` : ''}<button type="submit" class="x" aria-label="Guardar">✓</button></div>
+    <div class="pad-modes"><button type="button" data-a="f-catmode" data-v="rec" aria-pressed="${F.catMode==='rec'}">✨ Recomendado</button><button type="button" data-a="f-catmode" data-v="all" aria-pressed="${F.catMode==='all'}">🗂️ Sin agrupar</button></div>
+    <div class="pad-body">${F.catMode === 'rec' ? '<p class="pad-tip">✨ Con base en sus hábitos, primero van las categorías que más usan.</p>' : ''}<div class="catgrid" id="f-cats"></div></div>
     <div class="pad">
       ${F.confirm ? `<div class="pad-del">¿Borrar este movimiento? <button type="button" class="btn sm danger" data-a="f-del-yes">Sí, borrar</button><button type="button" class="btn sm ghost" data-a="f-del-no">No</button></div>` : ''}
-      <div class="pad-note"><span id="f-icon"></span><input id="f-desc" maxlength="60" autocomplete="off" enterkeyhint="done" value="${esc(F.desc)}" placeholder="Nota: tacos, Netflix…" aria-label="Nota"><button type="button" class="cam" data-a="${F.photo?'f-nophoto':'f-photo'}" aria-label="${F.photo?'Quitar foto':'Poner foto'}">${F.photo?'✕':'📷'}</button><input type="file" id="f-file" accept="image/*" hidden><div class="pad-amt num" id="pad-amt"></div></div>
-      <div class="pad-opts">${k === 'gasto' ? `<button type="button" data-a="f-splitc">${SPLITS[F.split] || SPLITS.mio}</button>` : ''}<input type="date" id="f-date" value="${esc(F.date)}" max="${TODAY()}" aria-label="Fecha"></div>
+      <div class="pad-a${k === 'gasto' ? '' : ' one'}">${k === 'gasto' ? `<button type="button" class="k2" data-a="f-splitc">${SPLITS[F.split] || SPLITS.mio}</button>` : ''}
+        <div class="pad-note"><span id="f-icon"></span><input id="f-desc" maxlength="60" autocomplete="off" enterkeyhint="done" value="${esc(F.desc)}" placeholder="¡Escribe una nota!" aria-label="Nota"><div class="pad-amt num" id="pad-amt"></div></div></div>
       <div class="err" id="f-err" ${F.err ? '' : 'hidden'}>${esc(F.err)}</div>
-      <div class="keys">${keys.map(x => `<button type="button" class="key${'×÷-+⌫'.includes(x) ? ' op' : ''}" data-a="pad" data-k="${x}" aria-label="${x==='⌫'?'Borrar':x}">${x==='-'?'−':x}</button>`).join('')}</div>
-      <button type="submit" class="pad-ok">✓ Guardar ${k === 'gasto' ? 'gasto' : 'ingreso'}</button>
+      <div class="pad-b"><button type="button" class="k2" data-a="${F.photo?'f-nophoto':'f-photo'}" aria-label="${F.photo?'Quitar foto':'Poner foto'}">${F.photo?'✕ Foto':'📷'}</button><input type="file" id="f-file" accept="image/*" hidden>
+        <label class="k2"><span>${esc(dlbl.toUpperCase())}</span><input type="date" id="f-date" value="${esc(F.date)}" max="${TODAY()}" aria-label="Fecha"></label>
+        <button type="button" class="k2" data-a="f-whot" aria-label="Quién: ${esc(F.who)}. Toca para cambiar">${FACE[F.who] || ''} ${esc(SHORT[F.who] || F.who)}</button>
+        <button type="submit" class="k2 go" aria-label="Guardar">✓</button></div>
+      <div class="keys">${keys.map(x => `<button type="button" class="key${'×÷-+'.includes(x) ? ' op' : x === '⌫' ? ' op del' : ''}" data-a="pad" data-k="${x}" aria-label="${x==='⌫'?'Borrar':x}">${x==='-'?'−':x}</button>`).join('')}</div>
     </div></form></div></div>`;
   drawCats(); previewIcon(); padShow();
 }
@@ -1245,7 +1346,7 @@ document.addEventListener('click', e => {
   else if (a === 'search') { S.tab = 'movs'; render(); const q = $('#q'); if (q) q.focus(); }
   else if (a === 'forecast') { S.month = addMonths(ym(new Date()), 1); S.tab = 'inicio'; render(); scrollTo(0,0); }
   else if (a === 'calmode') { S.calMode = el.dataset.k; render(); }
-  else if (a === 'day') { S.filter.day = el.dataset.d; S.tab = 'movs'; render(); scrollTo(0,0); }
+  else if (a === 'day') { S.selDay = el.dataset.d; render(); }
   else if (a === 'add') openAdd(el.dataset.k || 'gasto');
   else if (a === 'close') closeSheet();
   else if (a === 'who') openWho();
@@ -1268,6 +1369,8 @@ document.addEventListener('click', e => {
   else if (F && a.startsWith('f-')) { readForm();
     if (a === 'f-kind') { F.kind = el.dataset.k; F.cat = ''; F.catTouched = false; F.err = ''; if (F.kind === 'ahorro' && !F.goalId && S.goals[0]) F.goalId = S.goals[0].id; drawForm(); }
     else if (a === 'f-who') { F.who = el.dataset.n; drawForm(); }
+    else if (a === 'f-whot') { F.who = FIXED[(FIXED.indexOf(F.who) + 1) % FIXED.length]; drawForm(); }
+    else if (a === 'f-catmode') { F.catMode = el.dataset.v; drawForm(); }
     else if (a === 'f-splitc') { const o = ['mitad','mio','otro']; F.split = o[(o.indexOf(F.split) + 1) % 3]; ls.set('lana.split', F.split); drawForm(); }
     else if (a === 'f-to') { F.to = el.dataset.n; drawForm(); }
     else if (a === 'f-split') { F.split = el.dataset.v; ls.set('lana.split', F.split); drawForm(); }
@@ -1295,6 +1398,7 @@ document.addEventListener('input', e => {
   else if (e.target.id === 'q') { S.filter.q = e.target.value; const pos = e.target.selectionStart; render(); const q = $('#q'); q.value = S.filter.q; q.focus(); try { q.setSelectionRange(pos,pos); } catch(_){} }
 });
 document.addEventListener('change', e => {
+  if (e.target.id === 'f-date' && F && F.pad) { readForm(); drawForm(); return; }
   if (e.target.id !== 'f-file' || !F || !e.target.files[0]) return;
   const url = URL.createObjectURL(e.target.files[0]), img = new Image();
   img.onload = () => { const n = 128, c = document.createElement('canvas'); c.width = c.height = n; const m = Math.min(img.naturalWidth, img.naturalHeight);
