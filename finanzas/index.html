@@ -102,7 +102,7 @@ button{cursor:pointer;border:0;background:none;padding:0}
 /* avisos */
 .alerts{display:flex;flex-direction:column;gap:8px}
 .alert{display:flex;gap:10px;align-items:center;border-radius:14px;padding:10px 14px;font-size:14px;font-weight:500}
-.alert.bad{background:var(--bad-soft)} .alert.warn{background:var(--warn-soft)} .alert.good{background:var(--good-soft)}
+.alert.info{background:var(--accent-soft)} .alert.bad{background:var(--bad-soft)} .alert.warn{background:var(--warn-soft)} .alert.good{background:var(--good-soft)}
 .alert i{font-style:normal;flex:none}
 
 /* iconos */
@@ -163,7 +163,7 @@ button{cursor:pointer;border:0;background:none;padding:0}
 .goal .pct{font-family:var(--display);font-weight:700;font-size:22px}
 .goal .line{display:flex;justify-content:space-between;gap:8px;font-size:13.5px;color:var(--fg-2)}
 .goal .line b{color:var(--fg)}
-.goal .acts{display:flex;gap:8px}
+.goal .acts{display:flex;gap:8px;flex-wrap:wrap} .goal .line b{text-align:right}
 
 /* filtros */
 .chips{display:flex;flex-wrap:wrap;gap:8px}
@@ -400,7 +400,7 @@ function parseQuick(raw){
 }
 
 /* ---------- estado ---------- */
-const S = { tab: 'inicio', month: ym(new Date()), me: ls.get('lana.me') || '', people: [], tx: [], ahorroAll: [], goals: [], bills: [], budgets: {},
+const S = { tab: 'inicio', month: ym(new Date()), me: ls.get('lana.me') || '', people: [], tx: [], ahorroAll: [], goals: [], bills: [], budgets: {}, rules: {},
   loaded: false, local: false, db: null, ai: null, aiOff: false, readOnly: false, filter: {type:'all', who:'all', q:''}, chat: [], chatBusy: false, got: {} };
 let F = null; /* formulario abierto */
 
@@ -438,7 +438,7 @@ const avatar = (name, sm) => `<span class="av${sm?' sm':''}" style="background:$
 const LOCAL = {tx:'tx', goals:'goals', bills:'bills'};
 async function put(col, id, data){
   if (S.db) { try { await S.db.collection(col).doc(id).set(data); return true; } catch (e) { writeFail(e); return false; } }
-  if (col === 'config') { if (id === 'people') S.people = data.names || []; if (id === 'budgets') S.budgets = data.limits || {}; }
+  if (col === 'config') { if (id === 'people') S.people = data.names || []; if (id === 'budgets') S.budgets = data.limits || {}; if (id === 'rules') S.rules = data.map || {}; }
   else { const arr = S[LOCAL[col]]; const i = arr.findIndex(x => x.id === id); const row = {id, ...data}; if (i >= 0) arr[i] = row; else arr.push(row); }
   render(); return true;
 }
@@ -488,10 +488,10 @@ async function saveTx(t, opts = {}){
   const id = t.id || uid('t'); const row = {...t}; delete row.id;
   let needAI = false;
   if (row.type !== 'ahorro' && !opts.keepIcon) { const r = resolveLocal(row.desc, row.type);
-    if (r) { row.icon = r.icon; if (!opts.catTouched) row.cat = r.cat; } else { row.cat = row.cat || 'otros'; row.icon = defIcon(row.type, row.cat); needAI = true; } }
+    if (r) { row.icon = r.icon; if (!opts.catTouched) row.cat = r.cat; } else { row.cat = row.cat || 'otros'; row.icon = defIcon(row.type, row.cat); needAI = true; } const rk = S.rules[row.type+':'+norm(row.desc)]; if (rk && !opts.catTouched) row.cat = rk; }
   row.ts = row.ts || Date.now();
   const ok = await put('tx', id, row);
-  if (ok && needAI) enrich('tx', id, row.desc, row.type, !!opts.catTouched);
+  if (ok && needAI) enrich('tx', id, row.desc, row.type, !!opts.catTouched || !!S.rules[row.type+':'+norm(row.desc)]);
   if (ok && row.type === 'gasto') budgetNudge(row);
   return ok ? id : null;
 }
@@ -518,11 +518,11 @@ function alertsList(){
   const d = D(), out = [], today = TODAY();
   [...d.bills].sort((a,b) => a.due.localeCompare(b.due)).forEach(b => { const n = dayDiff(b.due, today);
     if (n < 0) out.push(['bad','⏰', `${b.name} venció hace ${-n} día${n===-1?'':'s'} · ${money(b.amount)}`]);
-    else if (n <= 3) out.push(['warn','🔔', `${b.name} vence ${n===0?'hoy':n===1?'mañana':'en '+n+' días'} · ${money(b.amount)}`]); });
+    else if (n <= 7) out.push([n <= 2 ? 'warn' : 'info', n <= 2 ? '🔔' : '📅', `${b.name} vence ${n===0?'hoy':n===1?'mañana':'en '+n+' días'} · ${money(b.amount)}`]); });
   if (S.month === ym(new Date())) { const st = monthStats(S.month);
     for (const c in d.budgets) { const lim = d.budgets[c], sp = st.byCat[c]||0; if (!lim || !CATS[c]) continue;
       if (sp > lim) out.push(['bad','⚠️', `Se están pasando en ${CATS[c].l} por ${money(sp-lim)}`]); } }
-  return out.slice(0,4);
+  return out.slice(0,5);
 }
 
 /* ---------- vistas ---------- */
@@ -570,8 +570,8 @@ function vInicio(){
   const al = alertsList();
   const order = Object.keys(CATS).filter(c => st.byCat[c] > 0);
   const cats = order.map(c => `<div class="cat" data-tip="${esc(CATS[c].l)}\n${money(st.byCat[c])} · ${Math.round(st.byCat[c]/st.gas*100)}% del gasto"><i style="background:var(${CATS[c].c})"></i><span>${CATS[c].e} ${esc(CATS[c].l)}</span><span class="pc num">${Math.round(st.byCat[c]/st.gas*100)}%</span><b class="num">${money(st.byCat[c])}</b></div>`).join('');
-  const buds = Object.keys(CATS).filter(c => d.budgets[c] > 0).map(c => { const lim = d.budgets[c], sp = st.byCat[c]||0, p = sp/lim; const k = p > 1 ? 'bad' : p > .8 ? 'warn' : '';
-    return `<div class="bud"><div class="l1"><b>${CATS[c].e} ${esc(CATS[c].l)}</b><span class="num">${money(sp)} / ${money(lim)}</span></div><div class="pbar ${k}"><div style="width:${Math.min(100,p*100)}%"></div></div>${k==='bad'?`<div class="note bad">⚠️ Se pasaron por ${money(sp-lim)}</div>`:k==='warn'?`<div class="note warn">Quedan ${money(lim-sp)}</div>`:''}</div>`; }).join('');
+  const buds = Object.keys(CATS).filter(c => d.budgets[c] > 0).map(c => { const lim = d.budgets[c], sp = st.byCat[c]||0, p = sp/lim, el = isCur ? new Date().getDate()/daysIn(S.month) : 1, risk = isCur && p <= 1 && p - el > .2; const k = p > 1 ? 'bad' : (risk || p > .9) ? 'warn' : '';
+    return `<div class="bud"><div class="l1"><b>${CATS[c].e} ${esc(CATS[c].l)}</b><span class="num">${money(sp)} / ${money(lim)}</span></div><div class="pbar ${k}"><div style="width:${Math.min(100,p*100)}%"></div></div>${k==='bad'?`<div class="note bad">⚠️ Se pasaron por ${money(sp-lim)}</div>`:k==='warn'?`<div class="note warn">${risk?'En riesgo: a este ritmo cierran el mes en '+money(Math.round(sp/el)):'Quedan '+money(lim-sp)}</div>`:''}</div>`; }).join('');
   const bills = [...d.bills].sort((a,b) => a.due.localeCompare(b.due)).slice(0,4);
   const goal = d.goals[0], gs = goal ? goalSaved(goal) : 0;
   const who = Object.entries(st.byWho).sort((a,b) => b[1]-a[1]); const wmax = who.length ? who[0][1] : 1;
@@ -629,12 +629,16 @@ function vMovs(){
 function vMetas(){
   const d = D(), cur = ym(new Date());
   const cards = d.goals.map(g => { const s = goalSaved(g), p = Math.min(1, s / g.target), left = Math.max(0, g.target - s);
-    let pace = ''; if (g.deadline && left > 0) { const [y,m] = g.deadline.split('-').map(Number), [cy,cm] = cur.split('-').map(Number); const months = Math.max(1, (y-cy)*12 + (m-cm));
-      pace = `<div class="line"><span>Para llegar a ${new Intl.DateTimeFormat('es-MX',{month:'short',year:'numeric'}).format(parseD(g.deadline))}</span><b class="num">${money(Math.ceil(left/months))} al mes</b></div>`; }
+    let pace = ''; if (left > 0) { const avg = [1,2,3].reduce((a,n) => a + sum(d.ahorro.filter(t => t.goalId===g.id && t.date.startsWith(addMonths(cur,-n)))), 0) / 3;
+      if (g.deadline) { const [y,m] = g.deadline.split('-').map(Number), [cy,cm] = cur.split('-').map(Number); const months = Math.max(1, (y-cy)*12 + (m-cm)), need = Math.ceil(left/months);
+        pace = `<div class="line"><span>Para llegar a ${new Intl.DateTimeFormat('es-MX',{month:'short',year:'numeric'}).format(parseD(g.deadline))}</span><b class="num">${money(need)} al mes · ${money(Math.ceil(need/2))} por quincena</b></div>`;
+        const late = avg > 0 ? Math.ceil(left/avg) - months : null;
+        pace += `<p class="hint" style="margin:0">${late === null ? 'Sin aportes en los últimos 3 meses.' : late <= 0 ? '✅ Al ritmo de los últimos 3 meses llegan a tiempo.' : '⏳ Al ritmo de los últimos 3 meses llegan con ' + late + ' mes' + (late===1?'':'es') + ' de retraso.'}</p>`; }
+      else if (avg > 0) pace = `<p class="hint" style="margin:0">Al ritmo de los últimos 3 meses la completan en ${Math.ceil(left/avg)} meses.</p>`; }
     return `<section class="card goal"><div class="goal-top">${iconHTML(g.icon,'l')}<div class="mid"><h3>${esc(g.name)}</h3><div class="num" style="color:var(--fg-2);font-size:13.5px">${money(s)} de ${money(g.target)}</div></div><div class="pct num">${Math.round(p*100)}%</div></div>
       <div class="pbar good"><div style="width:${p*100}%"></div></div>
       <div class="line"><span>${left?'Faltan':'¡Meta cumplida! 🎉'}</span><b class="num">${left?money(left):''}</b></div>${pace}
-      <div class="acts"><button class="btn sm" data-a="aportar" data-id="${esc(g.id)}">Aportar</button><button class="btn sm ghost" data-a="edit-goal" data-id="${esc(g.id)}">Editar</button></div></section>`; }).join('');
+      <div class="acts"><button class="btn sm" data-a="aportar" data-id="${esc(g.id)}">Aportar</button><button class="btn sm ghost" data-a="edit-goal" data-id="${esc(g.id)}">Editar</button>${S.ai && left ? `<button class="btn sm ghost" data-a="gap" data-id="${esc(g.id)}">¿De dónde saco la diferencia?</button>` : ''}</div></section>`; }).join('');
   return `<div class="col"><div class="goals">${cards || '<section class="card"><p class="empty">Todavía no hay metas. Creen la primera: un viaje, el enganche, el fondo de emergencia.</p></section>'}</div>
     <div><button class="btn" data-a="add" data-k="meta">⭐ Nueva meta</button></div></div>`;
 }
@@ -734,7 +738,8 @@ function openAdd(kind, ex){
 }
 function previewIcon(){
   const type = F.kind === 'ingreso' ? 'ingreso' : 'gasto', r = resolveLocal(F.desc, type);
-  if (r && !F.catTouched && (F.kind==='gasto'||F.kind==='ingreso') && F.cat !== r.cat) { F.cat = r.cat; drawCats(); }
+  const auto = S.rules[type+':'+norm(F.desc)] || (r && r.cat);
+  if (auto && !F.catTouched && (F.kind==='gasto'||F.kind==='ingreso') && F.cat !== auto) { F.cat = auto; drawCats(); }
   const icon = r ? r.icon : (F.ex && F.ex.icon && norm(F.desc) === norm(F.ex.desc || F.ex.name) ? F.ex.icon : F.kind==='meta' ? {k:'e',v:'⭐'} : F.kind==='pago' ? {k:'e',v:'📅'} : defIcon(type, F.cat));
   const el = $('#f-icon'); if (el) el.innerHTML = iconHTML(icon, 'l');
   const h = $('#f-ichint'); if (h) h.textContent = !norm(F.desc) ? '' : r ? (r.hit==='marca' ? 'Reconocí la marca.' : 'Le puse un dibujo.') : (S.ai && !S.aiOff ? 'No lo reconozco: la IA le buscará imagen al guardar.' : '');
@@ -774,7 +779,8 @@ async function submitForm(){
   if (k !== 'ahorro' && !desc) return fail(k==='meta' ? 'Ponle nombre a la meta.' : 'Escribe qué fue.');
   const f = F, ex = f.ex || {}; closeSheet();
   if (k === 'gasto' || k === 'ingreso') {
-    const same = f.id && norm(desc) === norm(ex.desc);
+    const same = f.id && norm(desc) === norm(ex.desc), r0 = resolveLocal(desc, k), key = k+':'+norm(desc), auto = S.rules[key] || (r0 ? r0.cat : 'otros');
+    if (f.catTouched && f.cat && f.cat !== auto && norm(desc)) put('config', 'rules', {map: {...S.rules, [key]: f.cat}});
     const t = {id: f.id, type: k, desc, amount, who: f.who, date: f.date || TODAY(), cat: f.cat || 'otros', ts: ex.ts, icon: ex.icon}; if (ex.bank) t.bank = ex.bank;
     if (await saveTx(t, {catTouched: f.catTouched, keepIcon: same})) toast((k==='gasto'?'Gasto':'Ingreso') + ' guardado: ' + desc + ' ' + money(amount));
   } else if (k === 'ahorro') {
@@ -856,6 +862,7 @@ document.addEventListener('click', e => {
   else if (a === 'edit-goal') { const g = S.goals.find(x => x.id === el.dataset.id); if (g) openAdd('meta', {...g, amount: g.target, desc: g.name}); else toast('Es una meta de ejemplo. Creen la suya con "Nueva meta".'); }
   else if (a === 'aportar') { if (S.goals.find(x => x.id === el.dataset.id)) { openAdd('ahorro'); if (F) { F.goalId = el.dataset.id; drawForm(); } } else toast('Es una meta de ejemplo. Creen la suya con "Nueva meta".'); }
   else if (a === 'pay') payBill(el.dataset.id);
+  else if (a === 'gap') { const g = D().goals.find(x => x.id === el.dataset.id); if (g) { S.tab = 'asesor'; scrollTo(0,0); ask('Para la meta "' + g.name + '" nos faltan ' + money(g.target - goalSaved(g)) + (g.deadline ? ' y la fecha límite es ' + g.deadline : '') + '. ¿De dónde sacamos la diferencia? Propón recortes con montos concretos en las categorías donde más gastamos o nos pasamos del presupuesto.'); } }
   else if (a === 'budget') openBudget();
   else if (a === 'ask') ask(el.dataset.q);
   else if (a === 'undo') { const u = toast.undo; $('#toast').hidden = true; if (u) u(); }
@@ -902,7 +909,7 @@ async function boot(){
   db.collection('tx').where('type','==','ahorro').limit(1000).onSnapshot(s => { S.ahorroAll = rows(s); if (S.loaded) render(); }, () => {});
   db.collection('goals').onSnapshot(s => { S.goals = rows(s).sort((a,b) => (a.ts||0)-(b.ts||0)); ready('goals'); }, fail);
   db.collection('bills').onSnapshot(s => { S.bills = rows(s); ready('bills'); }, fail);
-  db.collection('config').onSnapshot(s => { s.docs.forEach(d => { const v = d.data() || {}; if (d.id === 'people') S.people = Array.isArray(v.names) ? v.names.filter(n => typeof n === 'string') : []; if (d.id === 'budgets') S.budgets = v.limits && typeof v.limits === 'object' ? v.limits : {}; }); if (S.loaded) render(); }, () => {});
+  db.collection('config').onSnapshot(s => { s.docs.forEach(d => { const v = d.data() || {}; if (d.id === 'people') S.people = Array.isArray(v.names) ? v.names.filter(n => typeof n === 'string') : []; if (d.id === 'budgets') S.budgets = v.limits && typeof v.limits === 'object' ? v.limits : {}; if (d.id === 'rules') S.rules = v.map && typeof v.map === 'object' ? v.map : {}; }); if (S.loaded) render(); }, () => {});
   c.use('user').then(async u => { if (u && (await u.can('data.write')) === false) { S.readOnly = true; banner(); } }).catch(() => {});
 }
 boot();
