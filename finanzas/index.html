@@ -340,13 +340,21 @@ body{font-size:15.5px;-webkit-text-size-adjust:100%;text-size-adjust:100%}
 .av{font-size:15px} .av.sm{font-size:10px}
 /* encabezado rosa a todo lo ancho; la primera tarjeta se monta sobre él */
 body{position:relative}
-body::before{content:"";position:absolute;z-index:-1;left:0;right:0;top:calc(-1 * env(safe-area-inset-top,0px));height:calc(210px + env(safe-area-inset-top,0px));background:linear-gradient(160deg,#e9558a,#dc3d77);border-radius:0 0 30px 30px}
+body::before{content:"";position:absolute;z-index:-1;left:0;right:0;top:calc(-1 * env(safe-area-inset-top,0px));height:calc(250px + env(safe-area-inset-top,0px));background:linear-gradient(160deg,#e9558a,#dc3d77);border-radius:0 0 30px 30px}
 .brand h1,.brand h1 b{color:#fff;background:none;-webkit-background-clip:border-box;background-clip:border-box}
 .brand p{color:rgba(255,255,255,.88)}
 .me{background:#fff;border-color:transparent}
 .months .mlabel{color:#fff}
 .months button{background:rgba(255,255,255,.25);border-color:transparent;color:#fff}
 .col>.card.calcard{--c:var(--violet);background:#fff8fa;box-shadow:0 12px 30px rgba(120,30,70,.18);border-color:transparent}
+.home-seg{display:flex;justify-content:flex-end;gap:6px}
+.home-seg button{padding:7px 14px;border-radius:999px;font-weight:800;font-size:.82rem;color:#fff;background:rgba(255,255,255,.22)}
+.home-seg button[aria-pressed="true"]{background:#fff;color:var(--accent);box-shadow:0 4px 12px rgba(120,30,70,.2)}
+.det-top{display:flex;align-items:center;gap:14px}
+.det-ic{width:60px;height:60px;border-radius:50%;background:var(--accent-soft);display:grid;place-items:center;font-size:30px;flex:none}
+.det-l{font-weight:700;color:var(--fg-3);font-size:.85rem}
+.det-n{font:800 2.3rem/1 var(--display)}
+.fab{font-size:26px;background:#fff;box-shadow:0 8px 22px rgba(120,30,70,.28)}
 .cal-seg{display:flex;justify-content:center;margin-top:10px}
 .cal-seg button{padding:7px 16px;font-weight:800;font-size:.82rem;color:var(--accent);background:var(--surface-2)}
 .cal-seg button:first-child{border-radius:999px 0 0 999px} .cal-seg button:last-child{border-radius:0 999px 999px 0}
@@ -399,7 +407,7 @@ body::before{content:"";position:absolute;z-index:-1;left:0;right:0;top:calc(-1 
   <main id="view"></main>
 </div>
 
-<button class="fab" data-a="add" aria-label="Agregar movimiento">+</button>
+<button class="fab" data-a="add" aria-label="Agregar movimiento">✏️</button>
 <div id="sheet-root"></div>
 <div id="tip" hidden></div>
 <div id="toast" hidden role="status"></div>
@@ -567,7 +575,7 @@ function parseQuick(raw){
 
 /* ---------- estado ---------- */
 const S = { tab: 'inicio', month: ym(new Date()), me: FIXED.includes(ls.get('lana.me')) ? ls.get('lana.me') : '', people: [], tx: [], ahorroAll: [], goals: [], bills: [], budgets: {}, rules: {}, pics: {},
-  loaded: false, local: false, db: null, ai: null, aiOff: false, readOnly: false, filter: {type:'all', who:'all', q:'', day:''}, chat: [], chatBusy: false, got: {} };
+  home: ls.get('lana.home') || 'cal', loaded: false, local: false, db: null, ai: null, aiOff: false, readOnly: false, filter: {type:'all', who:'all', q:'', day:''}, chat: [], chatBusy: false, got: {} };
 let F = null; /* formulario abierto */
 
 function demoData(){
@@ -808,6 +816,7 @@ function vFuturo(){
 function vInicio(){
   if (S.month > ym(new Date())) return vFuturo();
   const d = D(), st = monthStats(S.month), prev = monthStats(addMonths(S.month,-1));
+  const home = S.home === 'det' ? 'det' : 'cal';
   const disp = st.ing - st.gas - st.aho, isCur = S.month === ym(new Date());
   const dlt = prev.gas ? Math.round((st.gas - prev.gas) / prev.gas * 100) : null;
   const al = alertsList();
@@ -821,7 +830,8 @@ function vInicio(){
   const recent = [...st.tx].sort((a,b) => b.date.localeCompare(a.date) || (b.ts||0)-(a.ts||0)).slice(0,5);
   return `<div class="grid">
   <div class="col">
-    ${vCalendar(st)}
+    <div class="home-seg"><button data-a="home" data-k="det" aria-pressed="${home==='det'}">🧾 Detalles</button><button data-a="home" data-k="cal" aria-pressed="${home==='cal'}">📅 Calendario</button></div>
+    ${home === 'det' ? vDetalles(st) : vCalendar(st)}
     <section class="hero" aria-label="Resumen del mes">
       <div><div class="lbl">Disponible ${isCur?'este mes':'en '+mName(S.month)}</div><div class="big num"><span data-count="${disp}">${money(disp)}</span><small>MXN</small></div>
       <div class="delta">${dlt===null?'Ingresos menos gastos y aportes a metas':`Gasto ${dlt>=0?'↑':'↓'} ${Math.abs(dlt)}% vs. ${mName(addMonths(S.month,-1)).split(' ')[0]} completo`}</div></div>
@@ -835,8 +845,8 @@ function vInicio(){
       ${st.gas?`<div class="donut-wrap"><div class="donut" id="ch-donut"></div><div class="cats">${cats}</div></div>`:'<p class="empty">Aún no hay gastos en este mes.</p>'}</section>
     <section class="card"><div class="card-h"><h2>Ritmo de gasto</h2><span class="aside">acumulado por día</span></div>
       <div class="legend"><span><i style="background:var(--accent)"></i>${cap(mShort(S.month))}</span><span><i class="dash"></i>${cap(mShort(addMonths(S.month,-1)))}</span></div><div class="chart" id="ch-line"></div></section>
-    <section class="card"><div class="card-h"><h2>Últimos movimientos</h2><button class="link" data-a="tab" data-t="movs">Ver todos</button></div>
-      <div class="rows">${recent.map(txRow).join('') || '<p class="empty">Sin movimientos este mes. Usa el botón + para registrar el primero.</p>'}</div></section>
+    ${home === 'det' ? '' : `<section class="card"><div class="card-h"><h2>Últimos movimientos</h2><button class="link" data-a="tab" data-t="movs">Ver todos</button></div>
+      <div class="rows">${recent.map(txRow).join('') || '<p class="empty">Sin movimientos este mes. Usa el botón + para registrar el primero.</p>'}</div></section>`}
   </div>
   <div class="col">
     <section class="card"><div class="card-h"><h2>Próximos pagos</h2><button class="link" data-a="tab" data-t="pagos">Ver todos</button></div>
@@ -866,6 +876,21 @@ function vCalendar(st){
     <div class="cal-tot"><div><b class="num" style="color:${st.ing-st.gas<0?'var(--bad)':'var(--fg)'}">${money(st.ing - st.gas)}</b><span>Total</span></div><div><b class="num" style="color:var(--good)">${money(st.ing)}</b><span>Ingresos</span></div><div><b class="num" style="color:var(--bad)">${money(st.gas)}</b><span>Gastos</span></div></div>
     <p class="hint" style="text-align:center">Toca un día para ver sus movimientos.</p></section>`;
 }
+function dayRows(tx){
+  const today = TODAY(); let last = '', rows = '';
+  tx.forEach(t => { if (t.date !== last) { last = t.date; const n = dayDiff(today, t.date);
+      const lbl = n === 0 ? 'Hoy' : n === 1 ? 'Ayer' : new Intl.DateTimeFormat('es-MX',{weekday:'long',day:'numeric',month:'short'}).format(parseD(t.date));
+      const tot = sum(tx.filter(x => x.date===t.date && x.type==='gasto')); rows += `<div class="day-h">${esc(lbl)}${tot?` · <span class="num">−${money(tot)}</span>`:''}</div>`; }
+    rows += txRow(t); });
+  return rows;
+}
+function vDetalles(st){
+  const tx = [...st.tx].sort((a,b) => b.date.localeCompare(a.date) || (b.ts||0)-(a.ts||0)), net = st.ing - st.gas;
+  return `<section class="card calcard"><div class="det-top"><span class="det-ic" aria-hidden="true">📒</span><div><div class="det-l">Total de ${mName(S.month).split(' ')[0]}</div><div class="det-n num" style="color:${net < 0 ? 'var(--bad)' : 'var(--good)'}"><span data-count="${net}">${money(net)}</span></div></div></div>
+    <div class="cal-tot" style="grid-template-columns:repeat(2,minmax(0,1fr))"><div><b class="num" style="color:var(--bad)">${money(st.gas)}</b><span>Gastos</span></div><div><b class="num" style="color:var(--good)">${money(st.ing)}</b><span>Ingresos</span></div></div></section>
+    <section class="card"><div class="card-h"><h2>Registros</h2><span class="aside">${tx.length} este mes</span></div>
+    <div class="rows">${dayRows(tx) || '<p class="empty" style="text-align:center;padding:26px 0"><span style="font-size:34px;display:block">😆</span>¡No hay registros aún!<br>Toca el lápiz para anotar el primero.</p>'}</div></section>`;
+}
 function vMovs(){
   const f = S.filter, ps = people();
   let tx = D().tx.filter(t => t.date && t.date.startsWith(S.month));
@@ -874,11 +899,7 @@ function vMovs(){
   if (f.day) tx = tx.filter(t => t.date === f.day);
   if (f.q) { const q = norm(f.q); tx = tx.filter(t => norm(t.desc + ' ' + t.who + ' ' + ((CATS[t.cat]||INCATS[t.cat]||{}).l||'')).includes(q)); }
   tx.sort((a,b) => b.date.localeCompare(a.date) || (b.ts||0)-(a.ts||0));
-  const today = TODAY(); let last = '', rows = '';
-  tx.forEach(t => { if (t.date !== last) { last = t.date; const n = dayDiff(today, t.date);
-      const lbl = n === 0 ? 'Hoy' : n === 1 ? 'Ayer' : new Intl.DateTimeFormat('es-MX',{weekday:'long',day:'numeric',month:'short'}).format(parseD(t.date));
-      const tot = sum(tx.filter(x => x.date===t.date && x.type==='gasto')); rows += `<div class="day-h">${esc(lbl)}${tot?` · <span class="num">−${money(tot)}</span>`:''}</div>`; }
-    rows += txRow(t); });
+  const rows = dayRows(tx);
   const chip = (k, v, l) => `<button class="chip" data-a="filter" data-k="${k}" data-v="${esc(v)}" aria-pressed="${f[k]===v}">${l}</button>`;
   return `<div class="col"><input class="search" id="q" type="search" placeholder="Buscar: tacos, Netflix, súper…" aria-label="Buscar movimientos">
     <div class="chips">${chip('type','all','Todo')}${chip('type','gasto','💸 Gastos')}${chip('type','ingreso','💰 Ingresos')}${chip('type','ahorro','🎯 Aportes')}${chip('type','saldo','🤝 Pagos entre ustedes')}</div>
@@ -1177,6 +1198,7 @@ document.addEventListener('click', e => {
   if (a === 'veil') { if (e.target === el) closeSheet(); return; }
   if (a === 'tab') { S.tab = el.dataset.t; ls.set('lana.tab', S.tab); render(); scrollTo(0,0); }
   else if (a === 'month') { const n = addMonths(S.month, Number(el.dataset.d)); if (n <= addMonths(ym(new Date()), 12)) { S.month = n; S.filter.day = ''; render(); } }
+  else if (a === 'home') { S.home = el.dataset.k; ls.set('lana.home', S.home); render.key = ''; render(); }
   else if (a === 'calmode') { S.calMode = el.dataset.k; render(); }
   else if (a === 'day') { S.filter.day = el.dataset.d; S.tab = 'movs'; render(); scrollTo(0,0); }
   else if (a === 'add') openAdd(el.dataset.k || 'gasto');
