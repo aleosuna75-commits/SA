@@ -1,41 +1,21 @@
-<title>Morralla</title>
+<title>Nuestro Nido</title>
 <meta name="claude:viewport-fit-sides" content="cover">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Figtree:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=Big+Shoulders+Display:wght@700;800;900&display=swap">
 <style>
-/* Layout: una sola columna tipo app de teléfono (dos columnas en escritorio), tarjeta de saldo como única pieza fuerte, barra de pestañas fija abajo y botón + flotante. */
+/* Layout: cartel claro de la familia Cerebro Liga MX. Rótulos condensados en mayúsculas, líneas finas en vez de sombras, marcador oscuro como única pieza fuerte; navegación arriba en escritorio y abajo en el teléfono. */
 :root{
-  --bg:#f4f3fa; --surface:#ffffff; --surface-2:#edebf6; --line:#e0ddee;
-  --fg:#17142b; --fg-2:#55516d; --fg-3:#827e9b;
-  --accent:#5a45e0; --accent-ink:#ffffff; --accent-soft:#ebe8fd;
-  --hero:#2a2075; --hero-2:#3a2f93; --hero-fg:#ffffff; --hero-fg-2:#c9c3f3;
-  --good:#0b7f55; --good-soft:#dff5ec; --warn:#a85f00; --warn-soft:#fdf0d8; --bad:#c62f2f; --bad-soft:#fde6e6;
-  --s1:#2a78d6; --s2:#eb6834; --s3:#1baf7a; --s4:#eda100; --s5:#e87ba4; --s6:#008300; --s7:#6250d6; --s8:#e34948; --s9:#9a97ad;
-  --shadow:0 1px 2px rgba(23,20,43,.05),0 8px 24px rgba(23,20,43,.06);
-  --display:"Bricolage Grotesque","Figtree",system-ui,sans-serif;
-  --body:"Figtree",system-ui,-apple-system,"Segoe UI",sans-serif;
-  --r:18px;
-}
-@media (prefers-color-scheme: dark){
-  :root:not([data-theme="light"]){
-    --bg:#0f0e19; --surface:#191726; --surface-2:#232032; --line:#302c45;
-    --fg:#f1eff9; --fg-2:#b7b3cd; --fg-3:#8b87a4;
-    --accent:#9585f7; --accent-ink:#120f24; --accent-soft:#2a2552;
-    --hero:#2a2075; --hero-2:#3a2f93; --hero-fg:#ffffff; --hero-fg-2:#c9c3f3;
-    --good:#45cf9a; --good-soft:#12352a; --warn:#eaa844; --warn-soft:#3a2b10; --bad:#f27878; --bad-soft:#401c1f;
-    --s1:#3987e5; --s2:#d95926; --s3:#199e70; --s4:#c98500; --s5:#d55181; --s6:#008300; --s7:#9085e9; --s8:#e66767; --s9:#77738f;
-    --shadow:0 1px 2px rgba(0,0,0,.3),0 8px 24px rgba(0,0,0,.25);
-    color-scheme:dark;
-  }
-}
-:root[data-theme="dark"]{
-  --bg:#0f0e19; --surface:#191726; --surface-2:#232032; --line:#302c45;
-  --fg:#f1eff9; --fg-2:#b7b3cd; --fg-3:#8b87a4;
-  --accent:#9585f7; --accent-ink:#120f24; --accent-soft:#2a2552;
-  --hero:#2a2075; --hero-2:#3a2f93; --hero-fg:#ffffff; --hero-fg-2:#c9c3f3;
-  --good:#45cf9a; --good-soft:#12352a; --warn:#eaa844; --warn-soft:#3a2b10; --bad:#f27878; --bad-soft:#401c1f;
-  --s1:#3987e5; --s2:#d95926; --s3:#199e70; --s4:#c98500; --s5:#d55181; --s6:#008300; --s7:#9085e9; --s8:#e66767; --s9:#77738f;
-  --shadow:0 1px 2px rgba(0,0,0,.3),0 8px 24px rgba(0,0,0,.25);
-  color-scheme:dark;
+  color-scheme:light;
+  --bg:#f4f1e8; --surface:#fbfaf5; --surface-2:#ebe8de; --line:#dcd8ca; --line-2:#b9b5a6;
+  --fg:#06120e; --fg-2:#3d4f47; --fg-3:#66776f;
+  --accent:#00573f; --accent-ink:#f4f1e8; --accent-soft:#dde9e2;
+  --oro:#7a5a1f; --oro-2:#c9a961;
+  --hero:#0a1b15; --hero-2:#10261e; --hero-line:#2c4539; --hero-fg:#f4f1e8; --hero-fg-2:#a3b8ad;
+  --good:#0b7354; --good-soft:#dcefe6; --warn:#8a5700; --warn-soft:#f6e9c9; --bad:#b8352b; --bad-soft:#f8dedb;
+  --s1:#2a78d6; --s2:#eb6834; --s3:#1baf7a; --s4:#eda100; --s5:#e87ba4; --s6:#008300; --s7:#6250d6; --s8:#e34948; --s9:#9a9a8f;
+  --shadow:0 10px 30px rgba(6,18,14,.18);
+  --display:"Big Shoulders Display","Oswald","Roboto Condensed","Arial Narrow",Impact,sans-serif;
+  --body:"Archivo","Helvetica Neue",Helvetica,Arial,system-ui,sans-serif;
+  --r:10px;
 }
 *{box-sizing:border-box}
 body{background:var(--bg);color:var(--fg);font-family:var(--body);font-size:15px;line-height:1.45;
@@ -225,14 +205,77 @@ button{cursor:pointer;border:0;background:none;padding:0}
 #toast.bad{background:var(--bad);color:#fff}
 .skel{color:var(--fg-3);text-align:center;padding:60px 0}
 @media (prefers-reduced-motion:no-preference){ .pbar>div{transition:width .5s ease} .sheet.in{animation:up .22s ease} @keyframes up{from{transform:translateY(24px)}to{transform:none}} }
+
+/* ---------- estilo cartel ---------- */
+body{font-size:15.5px}
+.top{padding-bottom:10px;border-bottom:1px solid var(--line)}
+.brand{display:block}
+.brand h1{font:900 1.75rem/1 var(--display);text-transform:uppercase;letter-spacing:.05em;white-space:nowrap}
+.brand h1 b{color:var(--oro);font-weight:900}
+.brand p{font-size:.68rem;text-transform:uppercase;letter-spacing:.16em;margin-top:4px}
+.me{background:transparent;border-color:var(--line-2)}
+.months .mlabel{font:800 1.55rem/1 var(--display);text-transform:uppercase;letter-spacing:.04em}
+.months button{border-radius:50%;background:transparent;border-color:var(--line-2)}
+.banner{border:1px dashed var(--line-2);background:transparent;border-radius:var(--r)}
+.card{box-shadow:none;border:1px solid var(--line)}
+.card-h{align-items:center}
+.card-h h2{font:800 1.36rem/1.05 var(--display);text-transform:uppercase;letter-spacing:.04em;display:flex;align-items:center;gap:9px}
+.card-h h2::before{content:"";flex:none;width:9px;height:13px;border-left:1px solid var(--fg);background:linear-gradient(135deg,var(--oro-2) 50%,transparent 50%) top left/9px 7px no-repeat}
+.card-h .aside{font-size:.7rem;text-transform:uppercase;letter-spacing:.1em;font-weight:600}
+.link{font-size:.7rem;text-transform:uppercase;letter-spacing:.1em;font-weight:700;border-bottom:1px solid var(--oro-2);padding-bottom:2px;white-space:nowrap}
+.hero{border-radius:var(--r);padding:20px 18px 0;gap:16px;overflow:hidden}
+.hero .lbl{font:700 .74rem/1 var(--body);text-transform:uppercase;letter-spacing:.2em;color:var(--oro-2)}
+.hero .big{font:900 clamp(3.6rem,18vw,5.4rem)/.85 var(--display);letter-spacing:.005em;margin-top:12px}
+.hero .big small{font:600 .8rem/1 var(--body);letter-spacing:.16em;text-transform:uppercase}
+.hero .delta{margin-top:12px}
+.hero-stats{gap:1px;background:var(--hero-line);margin:0 -18px;border-top:1px solid var(--hero-line)}
+.hero-stats div{border-radius:0;background:var(--hero-2);padding:11px 12px 12px}
+.hero-stats span{font-size:.64rem;text-transform:uppercase;letter-spacing:.1em;font-weight:600}
+.hero-stats b{font:800 1.55rem/1.1 var(--display);letter-spacing:.02em;margin-top:3px}
+.quick{border-radius:999px;box-shadow:none;border:1px solid var(--line-2);padding-left:16px}
+.btn{border-radius:999px;font:700 .76rem/1 var(--body);text-transform:uppercase;letter-spacing:.1em;padding:13px 18px}
+.btn.sm{padding:9px 13px;font-size:.68rem;border-radius:999px}
+.btn.ghost{background:transparent;border:1px solid var(--line-2)}
+.btn.danger{border:1px solid var(--bad)}
+.chip{border-width:1px;border-color:var(--line-2);background:transparent;font-size:.82rem}
+.alert{border-radius:var(--r)}
+.ic{border-radius:10px} .ic.l{border-radius:12px} .ic.s{border-radius:7px}
+.row .amt{font:800 1.3rem/1 var(--display);letter-spacing:.02em}
+.row .amt small{font:500 .74rem/1.4 var(--body);letter-spacing:0;margin-top:3px}
+.day-h{color:var(--oro);letter-spacing:.13em}
+.goal h3{font:800 1.45rem/1 var(--display);text-transform:uppercase;letter-spacing:.03em}
+.goal .pct,.pct{font:900 1.9rem/1 var(--display)!important}
+.donut text.c1{font-weight:900;font-size:22px}
+.pbar{height:6px;border-radius:0} .pbar>div{border-radius:0}
+.cat b,.bud .l1 span,.who-row span.num{font-weight:700}
+.search{border-radius:999px;border-width:1px;border-color:var(--line-2)}
+.msg{border-radius:10px}
+.tab{font-size:.6rem;text-transform:uppercase;letter-spacing:.07em}
+.fab{border-radius:50%;box-shadow:0 8px 20px rgba(6,18,14,.3)}
+.sheet{border-radius:14px 14px 0 0}
+@media (min-width:640px){ .sheet{border-radius:14px} }
+.sheet-h h2{font:900 1.9rem/1 var(--display);text-transform:uppercase;letter-spacing:.03em}
+.fld>label,.fld>.lab{color:var(--oro);letter-spacing:.13em;font-size:.7rem}
+.inp,.money{border-radius:10px;border-width:1px;border-color:var(--line-2)}
+.money span,.money input{font-weight:900}
+.kind{border-radius:10px;border-width:1px;border-color:var(--line-2);background:transparent}
+.bank{border-radius:10px;border-width:1px}
+#tip,#toast{border-radius:8px}
+@media (min-width:860px){
+  body{padding-bottom:48px}
+  .tabs{position:static;border:0;padding:0;background:none;margin-left:auto}
+  .tabs nav{display:flex;gap:2px;max-width:none}
+  .tab{flex-direction:row;padding:14px 10px;border-radius:0;border-bottom:2px solid transparent;font-size:.72rem;letter-spacing:.1em}
+  .tab svg{display:none}
+  .tab[aria-current="page"]{color:var(--fg);border-bottom-color:var(--oro-2)}
+  .fab{bottom:28px}
+}
 </style>
 
 <div class="app">
   <header class="top">
-    <div class="brand">
-      <div class="brand-mark" aria-hidden="true">M</div>
-      <div><h1>Morralla</h1><p>Cuentas claras, amor largo</p></div>
-    </div>
+    <div class="brand"><h1>Nuestro <b>Nido</b></h1><p>Lo que construimos juntos</p></div>
+    <div class="tabs"><nav id="tabs" aria-label="Secciones"></nav></div>
     <button class="me" id="me-btn" data-a="who" aria-label="Cambiar quién captura"></button>
   </header>
   <div id="banner" class="banner" hidden></div>
@@ -245,7 +288,6 @@ button{cursor:pointer;border:0;background:none;padding:0}
 </div>
 
 <button class="fab" data-a="add" aria-label="Agregar movimiento">+</button>
-<div class="tabs"><nav id="tabs" aria-label="Secciones"></nav></div>
 <div id="sheet-root"></div>
 <div id="tip" hidden></div>
 <div id="toast" hidden role="status"></div>
@@ -882,7 +924,7 @@ function advisorContext(){
 async function ask(q){
   q = q.trim(); if (!q || S.chatBusy || !S.ai) return;
   S.chat.push({role:'user', content:q}); const a = {role:'assistant', content:''}; S.chat.push(a); S.chatBusy = true; render();
-  const intro = 'Eres el asesor financiero dentro de "Morralla", una app donde una pareja en México lleva sus finanzas. Responde en español de México, directo y cálido, en menos de 140 palabras, con cifras en pesos tomadas solo de estos datos; si falta un dato dilo. Usa viñetas con "- " cuando ayuden. No des asesoría de inversión específica.\n\nDatos (JSON):\n' + advisorContext() + '\n\nPregunta: ';
+  const intro = 'Eres el asesor financiero dentro de "Nuestro Nido", una app donde una pareja en México lleva sus finanzas. Responde en español de México, directo y cálido, en menos de 140 palabras, con cifras en pesos tomadas solo de estos datos; si falta un dato dilo. Usa viñetas con "- " cuando ayuden. No des asesoría de inversión específica.\n\nDatos (JSON):\n' + advisorContext() + '\n\nPregunta: ';
   const hist = S.chat.slice(0,-1).slice(-9).map(m => ({role: m.role, content: String(m.content)})); while (hist.length && hist[0].role !== 'user') hist.shift();
   hist[0] = {role:'user', content: intro + hist[0].content};
   const paint = () => { const box = $('#chat'); if (box && box.lastElementChild) { box.lastElementChild.innerHTML = md(a.content || 'Pensando…'); } };
