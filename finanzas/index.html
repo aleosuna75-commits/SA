@@ -107,7 +107,7 @@ button{cursor:pointer;border:0;background:none;padding:0}
 
 /* iconos */
 .ic{width:42px;height:42px;border-radius:13px;display:grid;place-items:center;flex:none;background:var(--surface-2);font-size:21px;line-height:1;overflow:hidden}
-.ic svg{width:56%;height:56%}
+.ic svg{width:56%;height:56%} .ic img{width:100%;height:100%;object-fit:cover;display:block}
 .ic.mono{font-family:var(--display);font-weight:700;font-size:11.5px;letter-spacing:-.02em}
 .ic.s{width:30px;height:30px;border-radius:9px;font-size:15px} .ic.s.mono{font-size:8.5px}
 .ic.l{width:54px;height:54px;border-radius:16px;font-size:27px} .ic.l.mono{font-size:14px}
@@ -371,8 +371,19 @@ function resolveLocal(text, type){
 }
 function kwCat(n, list){ for (const [e,cat,words] of list) for (const w of words) if (n.includes(' '+w)) return cat; return null; }
 function defIcon(type, cat){ return {k:'e', v: type==='ingreso' ? (INCATS[cat]||INCATS.otros).e : type==='ahorro' ? '🎯' : (CATS[cat]||CATS.otros).e}; }
+/* biblioteca grande de logos (archivos aparte, se cargan cuando hacen falta) y fotos propias */
+const X = {idx: null, byName: null, idxP: null, ch: {}, chP: {}};
+let rrT; const rerenderSoon = () => { clearTimeout(rrT); rrT = setTimeout(() => { render(); if (F) previewIcon(); }, 80); };
+function loadIdx(){ return X.idxP || (X.idxP = fetch('logos/index.json').then(r => r.json()).then(j => { X.idx = j; X.byName = {}; for (const k in j) { X.byName[k] = k; X.byName[norm(j[k]).replace(/ /g,'')] = k; } return j; }).catch(() => null)); }
+function loadChunk(c){ if (!/^[a-z0-9]$/.test(c) || X.chP[c]) return; X.chP[c] = fetch('logos/' + c + '.json').then(r => r.json()).then(j => { X.ch[c] = j; rerenderSoon(); }).catch(() => {}); }
+const PIC_OK = /^data:image\/(jpeg|webp|png);base64,[A-Za-z0-9+\/=]+$/;
+const picFor = text => { const n = norm(text); return n ? Object.keys(S.pics).find(id => S.pics[id] && S.pics[id].name === n) : undefined; };
 function iconHTML(icon, size){
   const cls = 'ic' + (size ? ' '+size : '');
+  if (icon && icon.k === 'p') { const pc = S.pics[icon.v]; if (pc && PIC_OK.test(pc.d)) return `<span class="${cls} ring" aria-hidden="true"><img src="${pc.d}" alt=""></span>`; return `<span class="${cls}" aria-hidden="true">🖼️</span>`; }
+  if (icon && icon.k === 'x' && /^[a-z0-9_]+$/.test(icon.v)) { const e = X.ch[icon.v[0]] && X.ch[icon.v[0]][icon.v];
+    if (e && /^[0-9a-fA-F]{6}$/.test(e[0])) return `<span class="${cls} ring" style="background:#${e[0]};color:${lum(e[0])<.6?'#fff':'#111'}" aria-hidden="true"><svg viewBox="0 0 24 24"><path fill="currentColor" d="${esc(e[1])}"/></svg></span>`;
+    loadChunk(icon.v[0]); return `<span class="${cls}" aria-hidden="true">🏷️</span>`; }
   if (icon && icon.k === 'b' && BRANDS[icon.v]) { const b = BRANDS[icon.v]; const dark = lum(b.h) < .6;
     return `<span class="${cls} ring" style="background:#${b.h};color:${dark?'#fff':'#111'}" aria-hidden="true"><svg viewBox="0 0 24 24"><path fill="currentColor" d="${b.p}"/></svg></span>`; }
   if (icon && icon.k === 'm' && MONO[icon.v]) { const b = MONO[icon.v]; return `<span class="${cls} mono" style="background:${b.bg};color:${b.fg}" aria-hidden="true">${esc(b.l)}</span>`; }
@@ -400,7 +411,7 @@ function parseQuick(raw){
 }
 
 /* ---------- estado ---------- */
-const S = { tab: 'inicio', month: ym(new Date()), me: ls.get('lana.me') || '', people: [], tx: [], ahorroAll: [], goals: [], bills: [], budgets: {}, rules: {},
+const S = { tab: 'inicio', month: ym(new Date()), me: ls.get('lana.me') || '', people: [], tx: [], ahorroAll: [], goals: [], bills: [], budgets: {}, rules: {}, pics: {},
   loaded: false, local: false, db: null, ai: null, aiOff: false, readOnly: false, filter: {type:'all', who:'all', q:''}, chat: [], chatBusy: false, got: {} };
 let F = null; /* formulario abierto */
 
@@ -438,6 +449,7 @@ const avatar = (name, sm) => `<span class="av${sm?' sm':''}" style="background:$
 const LOCAL = {tx:'tx', goals:'goals', bills:'bills'};
 async function put(col, id, data){
   if (S.db) { try { await S.db.collection(col).doc(id).set(data); return true; } catch (e) { writeFail(e); return false; } }
+  if (col === 'pics') { S.pics[id] = data; render(); return true; }
   if (col === 'config') { if (id === 'people') S.people = data.names || []; if (id === 'budgets') S.budgets = data.limits || {}; if (id === 'rules') S.rules = data.map || {}; }
   else { const arr = S[LOCAL[col]]; const i = arr.findIndex(x => x.id === id); const row = {id, ...data}; if (i >= 0) arr[i] = row; else arr.push(row); }
   render(); return true;
@@ -459,26 +471,26 @@ async function ensurePerson(name){
 }
 
 /* IA: completa logo y categoría cuando el diccionario local no alcanza */
-const aiCache = (() => { try { return JSON.parse(ls.get('lana.ai') || '{}'); } catch(e){ return {}; } })();
-async function enrich(col, id, text, type, keepCat){
+const aiCache = (() => { try { return JSON.parse(ls.get('lana.ai2') || '{}'); } catch(e){ return {}; } })();
+async function enrich(col, id, text, type, keepCat, keepIcon){
   const key = type + ':' + norm(text); let r = aiCache[key];
   if (!r) {
     if (!S.ai || S.aiOff || !norm(text)) return;
     const cats = Object.keys(type === 'ingreso' ? INCATS : CATS).join(', ');
     try {
       r = await S.ai.json('Clasifica este ' + (type==='ingreso'?'ingreso':'gasto') + ' de una app de finanzas personales en México: "' + text.slice(0,120) + '".\n' +
-        'Responde solo un objeto JSON: {"emoji": un solo emoji que represente el concepto, "categoria": una de [' + cats + '], "marca": el identificador de la lista si el texto es claramente esa marca, si no null}.\n' +
-        'Lista de marcas: ' + Object.keys(BRANDS).concat(Object.keys(MONO)).join(', ') + '\nEjemplo: {"emoji":"🌮","categoria":"comida","marca":null}', {modelTier:'quick'});
+        'Responde solo un objeto JSON: {"emoji": un solo emoji que represente el concepto, "categoria": una de [' + cats + '], "marca": el nombre comercial de la marca o empresa si el texto se refiere claramente a una (por ejemplo "Netflix", "Lidl", "Heineken"), si no null}.\n' +
+        'Ejemplos: "tacos" → {"emoji":"🌮","categoria":"comida","marca":null}; "chelas heineken" → {"emoji":"🍺","categoria":"comida","marca":"Heineken"}', {modelTier:'quick'});
     } catch (e) { if (e && (e.code === 'not_granted' || e.code === 'rate_limited')) S.aiOff = true; return; }
     if (!r || typeof r !== 'object') return;
-    aiCache[key] = r; ls.set('lana.ai', JSON.stringify(aiCache));
+    aiCache[key] = r; ls.set('lana.ai2', JSON.stringify(aiCache));
   }
+  let found = null; const nk = norm(typeof r.marca === 'string' ? r.marca : ''), flat = nk.replace(/ /g,'');
+  if (nk && !keepIcon) { const al = ALIAS.find(a => a[0] === nk || a[0] === flat); if (al) found = al[1]; else { await loadIdx(); const sl = X.byName && X.byName[flat]; if (sl) found = {k:'x',v:sl}; } }
   const src = col === 'tx' ? (S.tx.find(x => x.id === id)) : col === 'bills' ? S.bills.find(x => x.id === id) : S.goals.find(x => x.id === id);
   if (!src) return;
   const next = {...src}; delete next.id;
-  const slug = typeof r.marca === 'string' ? r.marca : '';
-  if (BRANDS[slug]) next.icon = {k:'b',v:slug}; else if (MONO[slug]) next.icon = {k:'m',v:slug};
-  else if (typeof r.emoji === 'string' && r.emoji && r.emoji.length <= 8) next.icon = {k:'e',v:r.emoji};
+  if (!keepIcon) { if (found) next.icon = found; else if (typeof r.emoji === 'string' && r.emoji && r.emoji.length <= 8) next.icon = {k:'e',v:r.emoji}; }
   const table = type === 'ingreso' ? INCATS : CATS;
   if (col === 'tx' && !keepCat && table[r.categoria]) next.cat = r.categoria;
   if (col === 'bills' && CATS[r.categoria]) next.cat = r.categoria;
@@ -486,12 +498,13 @@ async function enrich(col, id, text, type, keepCat){
 }
 async function saveTx(t, opts = {}){
   const id = t.id || uid('t'); const row = {...t}; delete row.id;
-  let needAI = false;
+  let needAI = false, hasPic = false;
   if (row.type !== 'ahorro' && !opts.keepIcon) { const r = resolveLocal(row.desc, row.type);
-    if (r) { row.icon = r.icon; if (!opts.catTouched) row.cat = r.cat; } else { row.cat = row.cat || 'otros'; row.icon = defIcon(row.type, row.cat); needAI = true; } const rk = S.rules[row.type+':'+norm(row.desc)]; if (rk && !opts.catTouched) row.cat = rk; }
+    if (r) { row.icon = r.icon; if (!opts.catTouched) row.cat = r.cat; } else { row.cat = row.cat || 'otros'; row.icon = defIcon(row.type, row.cat); needAI = true; } const rk = S.rules[row.type+':'+norm(row.desc)]; if (rk && !opts.catTouched) row.cat = rk;
+    const pid = picFor(row.desc); if (pid) { row.icon = {k:'p',v:pid}; hasPic = true; } }
   row.ts = row.ts || Date.now();
   const ok = await put('tx', id, row);
-  if (ok && needAI) enrich('tx', id, row.desc, row.type, !!opts.catTouched || !!S.rules[row.type+':'+norm(row.desc)]);
+  if (ok && needAI) enrich('tx', id, row.desc, row.type, !!opts.catTouched || !!S.rules[row.type+':'+norm(row.desc)], hasPic);
   if (ok && row.type === 'gasto') budgetNudge(row);
   return ok ? id : null;
 }
@@ -769,9 +782,10 @@ function previewIcon(){
   const type = F.kind === 'ingreso' ? 'ingreso' : 'gasto', r = resolveLocal(F.desc, type);
   const auto = S.rules[type+':'+norm(F.desc)] || (r && r.cat);
   if (auto && !F.catTouched && (F.kind==='gasto'||F.kind==='ingreso') && F.cat !== auto) { F.cat = auto; drawCats(); }
-  const icon = r ? r.icon : (F.ex && F.ex.icon && norm(F.desc) === norm(F.ex.desc || F.ex.name) ? F.ex.icon : F.kind==='meta' ? {k:'e',v:'⭐'} : F.kind==='pago' ? {k:'e',v:'📅'} : defIcon(type, F.cat));
-  const el = $('#f-icon'); if (el) el.innerHTML = iconHTML(icon, 'l');
-  const h = $('#f-ichint'); if (h) h.textContent = !norm(F.desc) ? '' : r ? (r.hit==='marca' ? 'Reconocí la marca.' : 'Le puse un dibujo.') : (S.ai && !S.aiOff ? 'No lo reconozco: la IA le buscará imagen al guardar.' : '');
+  const pid = picFor(F.desc);
+  const icon = pid ? {k:'p',v:pid} : r ? r.icon : (F.ex && F.ex.icon && norm(F.desc) === norm(F.ex.desc || F.ex.name) ? F.ex.icon : F.kind==='meta' ? {k:'e',v:'⭐'} : F.kind==='pago' ? {k:'e',v:'📅'} : defIcon(type, F.cat));
+  const el = $('#f-icon'); if (el) el.innerHTML = F.photo ? `<span class="ic l ring"><img src="${F.photo}" alt=""></span>` : iconHTML(icon, 'l');
+  const h = $('#f-ichint'); if (h) h.textContent = F.photo ? 'Foto tuya. Se usará sola cada vez que escriban lo mismo.' : pid ? 'Usando la foto que ya habían elegido.' : !norm(F.desc) ? '' : r ? (r.hit==='marca' ? 'Reconocí la marca.' : 'Le puse un dibujo.') : (S.ai && !S.aiOff ? 'No lo reconozco: la IA le buscará imagen al guardar.' : '');
 }
 function drawCats(){ const el = $('#f-cats'); if (!el) return; const table = F.kind === 'ingreso' ? INCATS : CATS;
   el.innerHTML = Object.keys(table).map(c => `<button type="button" class="chip" data-a="f-cat" data-c="${c}" aria-pressed="${F.cat===c}">${table[c].e} ${esc(table[c].l)}</button>`).join(''); }
@@ -783,7 +797,8 @@ function drawForm(){
   if (!edit) b += `<div class="fld"><span class="lab">¿Qué vas a registrar?</span><div class="kinds">${KINDS.map(([v,e,l]) => `<button type="button" class="kind" data-a="f-kind" data-k="${v}" aria-pressed="${k===v}"><i>${e}</i>${l}</button>`).join('')}</div></div>`;
   if (k === 'ahorro') b += goals.length ? `<div class="fld"><span class="lab">¿A qué meta?</span><div class="chips">${goals.map(g => `<button type="button" class="chip" data-a="f-goal" data-id="${esc(g.id)}" aria-pressed="${F.goalId===g.id}">${esc(g.icon&&g.icon.k==='e'?g.icon.v+' ':'')}${esc(g.name)}</button>`).join('')}</div></div>` : `<p class="empty">Primero crea una meta para poder aportarle.</p>`;
   if (k === 'gasto' || k === 'ingreso' || k === 'pago' || k === 'meta') b += `<div class="fld"><label for="f-desc">${k==='pago'?'¿Qué hay que pagar?':k==='meta'?'¿Para qué ahorran?':k==='ingreso'?'¿De dónde vino?':'¿En qué fue?'}</label>
-    <div class="withic"><span id="f-icon"></span><input class="inp" id="f-desc" maxlength="60" autocomplete="off" value="${esc(F.desc)}" placeholder="${k==='pago'?'Netflix, renta, tarjeta BBVA…':k==='meta'?'Viaje a Japón, enganche…':k==='ingreso'?'Sueldo, freelance, venta…':'Tacos, Uber, súper, Claude…'}"></div><span class="hint" id="f-ichint"></span></div>`;
+    <div class="withic"><span id="f-icon"></span><input class="inp" id="f-desc" maxlength="60" autocomplete="off" value="${esc(F.desc)}" placeholder="${k==='pago'?'Netflix, renta, tarjeta BBVA…':k==='meta'?'Viaje a Japón, enganche…':k==='ingreso'?'Sueldo, freelance, venta…':'Tacos, Uber, súper, Claude…'}"></div><span class="hint" id="f-ichint"></span>
+    <div><button type="button" class="btn sm ghost" data-a="${F.photo?'f-nophoto':'f-photo'}">${F.photo?'✕ Quitar foto':'📷 Poner mi propia foto'}</button><input type="file" id="f-file" accept="image/*" hidden></div></div>`;
   if (!(k === 'ahorro' && !goals.length)) b += `<div class="fld"><label for="f-amount">${k==='meta'?'¿Cuánto quieren juntar?':'Monto'}</label><div class="money"><span>$</span><input id="f-amount" inputmode="decimal" autocomplete="off" placeholder="0" value="${esc(F.amount)}"></div></div>`;
   if (k === 'gasto' || k === 'ingreso') b += `<div class="fld"><span class="lab">Categoría</span><div class="chips" id="f-cats"></div></div>`;
   if (k === 'gasto' || k === 'ingreso' || (k === 'ahorro' && goals.length)) b += `<div class="fld"><label for="f-date">Fecha</label><input class="inp" id="f-date" type="date" value="${esc(F.date)}" max="${TODAY()}"></div>`;
@@ -807,23 +822,24 @@ async function submitForm(){
   if (!(amount > 0)) return fail('Escribe un monto mayor a cero.');
   if (k !== 'ahorro' && !desc) return fail(k==='meta' ? 'Ponle nombre a la meta.' : 'Escribe qué fue.');
   const f = F, ex = f.ex || {}; closeSheet();
+  let pic = null; if (f.photo && PIC_OK.test(f.photo) && desc) { const pid = uid('p'); if (await put('pics', pid, {d: f.photo, name: norm(desc), ts: Date.now()})) pic = {k:'p',v:pid}; }
   if (k === 'gasto' || k === 'ingreso') {
     const same = f.id && norm(desc) === norm(ex.desc), r0 = resolveLocal(desc, k), key = k+':'+norm(desc), auto = S.rules[key] || (r0 ? r0.cat : 'otros');
     if (f.catTouched && f.cat && f.cat !== auto && norm(desc)) put('config', 'rules', {map: {...S.rules, [key]: f.cat}});
-    const t = {id: f.id, type: k, desc, amount, who: f.who, date: f.date || TODAY(), cat: f.cat || 'otros', ts: ex.ts, icon: ex.icon}; if (ex.bank) t.bank = ex.bank;
-    if (await saveTx(t, {catTouched: f.catTouched, keepIcon: same})) toast((k==='gasto'?'Gasto':'Ingreso') + ' guardado: ' + desc + ' ' + money(amount));
+    const t = {id: f.id, type: k, desc, amount, who: f.who, date: f.date || TODAY(), cat: f.cat || 'otros', ts: ex.ts, icon: pic || ex.icon}; if (ex.bank) t.bank = ex.bank;
+    if (await saveTx(t, {catTouched: f.catTouched, keepIcon: same || !!pic})) toast((k==='gasto'?'Gasto':'Ingreso') + ' guardado: ' + desc + ' ' + money(amount));
   } else if (k === 'ahorro') {
     if (await saveTx({id: f.id, type:'ahorro', goalId: f.goalId, desc:'Aporte a meta', amount, who: f.who, date: f.date || TODAY(), icon:{k:'e',v:'🎯'}, ts: ex.ts})) toast('Aporte guardado: ' + money(amount) + ' 🎯');
   } else if (k === 'meta') {
     const id = f.id || uid('g'), r = resolveLocal(desc, 'gasto'), same = f.id && norm(desc) === norm(ex.name);
-    const ok = await put('goals', id, {name: desc, target: amount, deadline: f.deadline || '', icon: same ? ex.icon : (r ? r.icon : {k:'e',v:'⭐'}), ts: ex.ts || Date.now()});
-    if (ok && !r && !same) enrich('goals', id, desc, 'gasto', true);
+    const ok = await put('goals', id, {name: desc, target: amount, deadline: f.deadline || '', icon: pic || (same ? ex.icon : (r ? r.icon : {k:'e',v:'⭐'})), ts: ex.ts || Date.now()});
+    if (ok && !r && !same && !pic) enrich('goals', id, desc, 'gasto', true);
     if (ok) { toast('Meta guardada: ' + desc); S.tab = 'metas'; render(); }
   } else if (k === 'pago') {
     if (!f.due) { openAdd('pago', ex.id ? ex : null); return; }
     const id = f.id || uid('b'), r = resolveLocal(desc, 'gasto'), same = f.id && norm(desc) === norm(ex.name);
-    const ok = await put('bills', id, {name: desc, amount, due: f.due, repeat: f.repeat, bank: f.bank || '', cat: same ? (ex.cat||'servicios') : (r ? r.cat : 'servicios'), icon: same ? ex.icon : (r ? r.icon : {k:'e',v:'📅'}), ts: ex.ts || Date.now()});
-    if (ok && !r && !same) enrich('bills', id, desc, 'gasto', true);
+    const ok = await put('bills', id, {name: desc, amount, due: f.due, repeat: f.repeat, bank: f.bank || '', cat: same ? (ex.cat||'servicios') : (r ? r.cat : 'servicios'), icon: pic || (same ? ex.icon : (r ? r.icon : {k:'e',v:'📅'})), ts: ex.ts || Date.now()});
+    if (ok && !r && !same) enrich('bills', id, desc, 'gasto', true, !!pic);
     if (ok) toast('Pago agendado: ' + desc);
   }
 }
@@ -898,6 +914,8 @@ document.addEventListener('click', e => {
   else if (F && a.startsWith('f-')) { readForm();
     if (a === 'f-kind') { F.kind = el.dataset.k; F.cat = ''; F.catTouched = false; F.err = ''; if (F.kind === 'ahorro' && !F.goalId && S.goals[0]) F.goalId = S.goals[0].id; drawForm(); }
     else if (a === 'f-who') { F.who = el.dataset.n; drawForm(); }
+    else if (a === 'f-photo') $('#f-file').click();
+    else if (a === 'f-nophoto') { F.photo = null; drawForm(); }
     else if (a === 'f-cat') { F.cat = el.dataset.c; F.catTouched = true; drawCats(); previewIcon(); }
     else if (a === 'f-goal') { F.goalId = el.dataset.id; drawForm(); }
     else if (a === 'f-rep') { F.repeat = el.dataset.v; drawForm(); }
@@ -917,6 +935,15 @@ document.addEventListener('submit', async e => {
 document.addEventListener('input', e => {
   if (e.target.id === 'f-desc' && F) { F.desc = e.target.value; previewIcon(); }
   else if (e.target.id === 'q') { S.filter.q = e.target.value; const pos = e.target.selectionStart; render(); const q = $('#q'); q.value = S.filter.q; q.focus(); try { q.setSelectionRange(pos,pos); } catch(_){} }
+});
+document.addEventListener('change', e => {
+  if (e.target.id !== 'f-file' || !F || !e.target.files[0]) return;
+  const url = URL.createObjectURL(e.target.files[0]), img = new Image();
+  img.onload = () => { const n = 128, c = document.createElement('canvas'); c.width = c.height = n; const m = Math.min(img.naturalWidth, img.naturalHeight);
+    c.getContext('2d').drawImage(img, (img.naturalWidth-m)/2, (img.naturalHeight-m)/2, m, m, 0, 0, n, n); URL.revokeObjectURL(url);
+    if (F) { readForm(); F.photo = c.toDataURL('image/jpeg', .72); drawForm(); } };
+  img.onerror = () => { URL.revokeObjectURL(url); toast('No pude leer esa imagen. Prueba con otra (JPG o PNG).', 'bad'); };
+  img.src = url;
 });
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && root.firstChild) closeSheet(); });
 
@@ -938,6 +965,7 @@ async function boot(){
   db.collection('tx').where('type','==','ahorro').limit(1000).onSnapshot(s => { S.ahorroAll = rows(s); if (S.loaded) render(); }, () => {});
   db.collection('goals').onSnapshot(s => { S.goals = rows(s).sort((a,b) => (a.ts||0)-(b.ts||0)); ready('goals'); }, fail);
   db.collection('bills').onSnapshot(s => { S.bills = rows(s); ready('bills'); }, fail);
+  db.collection('pics').limit(300).onSnapshot(s => { S.pics = Object.fromEntries(rows(s).map(r => [r.id, r])); if (S.loaded) render(); }, () => {});
   db.collection('config').onSnapshot(s => { s.docs.forEach(d => { const v = d.data() || {}; if (d.id === 'people') S.people = Array.isArray(v.names) ? v.names.filter(n => typeof n === 'string') : []; if (d.id === 'budgets') S.budgets = v.limits && typeof v.limits === 'object' ? v.limits : {}; if (d.id === 'rules') S.rules = v.map && typeof v.map === 'object' ? v.map : {}; }); if (S.loaded) render(); }, () => {});
   c.use('user').then(async u => { if (u && (await u.can('data.write')) === false) { S.readOnly = true; banner(); } }).catch(() => {});
 }
