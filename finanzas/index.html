@@ -338,6 +338,21 @@ body{font-size:15.5px;-webkit-text-size-adjust:100%;text-size-adjust:100%}
 .who-pick button[aria-pressed="true"]{border-color:var(--accent);background:var(--accent-soft)}
 .who-pick .av{width:44px;height:44px;font-size:24px}
 .av{font-size:15px} .av.sm{font-size:10px}
+/* encabezado rosa a todo lo ancho; la primera tarjeta se monta sobre él */
+body{position:relative}
+body::before{content:"";position:absolute;z-index:-1;left:0;right:0;top:calc(-1 * env(safe-area-inset-top,0px));height:calc(210px + env(safe-area-inset-top,0px));background:linear-gradient(160deg,#e9558a,#dc3d77);border-radius:0 0 30px 30px}
+.brand h1,.brand h1 b{color:#fff;background:none;-webkit-background-clip:border-box;background-clip:border-box}
+.brand p{color:rgba(255,255,255,.88)}
+.me{background:#fff;border-color:transparent}
+.months .mlabel{color:#fff}
+.months button{background:rgba(255,255,255,.25);border-color:transparent;color:#fff}
+.col>.card.calcard{--c:var(--violet);background:#fff8fa;box-shadow:0 12px 30px rgba(120,30,70,.18);border-color:transparent}
+.cal-seg{display:flex;justify-content:center;margin-top:10px}
+.cal-seg button{padding:7px 16px;font-weight:800;font-size:.82rem;color:var(--accent);background:var(--surface-2)}
+.cal-seg button:first-child{border-radius:999px 0 0 999px} .cal-seg button:last-child{border-radius:0 999px 999px 0}
+.cal-seg button[aria-pressed="true"]{background:var(--accent);color:#fff}
+.skel{color:var(--fg-2);background:#fff8fa;border-radius:22px;margin-top:6px}
+@media (min-width:860px){ .tab{color:#fff} .tab[aria-current="page"]{background:#fff;color:var(--accent)} }
 #confeti{position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:80}
 @media (prefers-reduced-motion:no-preference){
   .hero{animation:flow 14s ease infinite}
@@ -806,6 +821,7 @@ function vInicio(){
   const recent = [...st.tx].sort((a,b) => b.date.localeCompare(a.date) || (b.ts||0)-(a.ts||0)).slice(0,5);
   return `<div class="grid">
   <div class="col">
+    ${vCalendar(st)}
     <section class="hero" aria-label="Resumen del mes">
       <div><div class="lbl">Disponible ${isCur?'este mes':'en '+mName(S.month)}</div><div class="big num"><span data-count="${disp}">${money(disp)}</span><small>MXN</small></div>
       <div class="delta">${dlt===null?'Ingresos menos gastos y aportes a metas':`Gasto ${dlt>=0?'↑':'↓'} ${Math.abs(dlt)}% vs. ${mName(addMonths(S.month,-1)).split(' ')[0]} completo`}</div></div>
@@ -815,7 +831,6 @@ function vInicio(){
     <div><form class="quick" data-f="quick"><span aria-hidden="true">✨</span><input id="quick-in" autocomplete="off" enterkeyhint="send" aria-label="Captura rápida" placeholder="tacos 180 · sueldo 12000 · Claude 400 ayer"><button class="btn" type="submit">Anotar</button></form>
     <p class="hint">Escribe qué fue y cuánto. La app le pone logo o dibujo y categoría sola.</p></div>
     ${al.length?`<div class="alerts">${al.map(a => `<div class="alert ${a[0]}"><i>${a[1]}</i><span>${esc(a[2])}</span></div>`).join('')}</div>`:''}
-    ${vCalendar(st)}
     <section class="card"><div class="card-h"><h2>Gastos del mes</h2><span class="aside num">${money(st.gas)}</span></div>
       ${st.gas?`<div class="donut-wrap"><div class="donut" id="ch-donut"></div><div class="cats">${cats}</div></div>`:'<p class="empty">Aún no hay gastos en este mes.</p>'}</section>
     <section class="card"><div class="card-h"><h2>Ritmo de gasto</h2><span class="aside">acumulado por día</span></div>
@@ -840,11 +855,16 @@ function vInicio(){
 function vCalendar(st){
   const [y, mo] = S.month.split('-').map(Number), first = new Date(y, mo-1, 1).getDay(), dim = daysIn(S.month), today = TODAY(), g = {}, inc = {};
   st.tx.forEach(t => { const d = Number(t.date.slice(8)); if (t.type === 'gasto') g[d] = (g[d]||0) + t.amount; else if (t.type === 'ingreso') inc[d] = (inc[d]||0) + t.amount; });
+  const mode = S.calMode || 'total';
   let cells = ['dom','lun','mar','mié','jue','vie','sáb'].map((d,i) => `<div class="dow${i===0||i===6?' we':''}">${d}</div>`).join('') + '<div></div>'.repeat(first);
-  for (let d = 1; d <= dim; d++) { const date = S.month + '-' + pad(d), wd = (first + d - 1) % 7;
-    cells += `<button class="cal-d${wd===0||wd===6?' we':''}${date===today?' today':''}" data-a="day" data-d="${date}" aria-label="${d}: gastos ${money(g[d]||0)}, ingresos ${money(inc[d]||0)}"><b>${d}</b>${g[d] ? `<small class="num">${short(g[d]).replace('$','−$')}</small>` : inc[d] ? `<small class="in num">+${short(inc[d])}</small>` : ''}</button>`; }
-  return `<section class="card"><div class="card-h"><h2>Calendario</h2><span class="aside">toca un día para verlo</span></div><div class="cal">${cells}</div>
-    <div class="cal-tot"><div><b class="num" style="color:${st.ing-st.gas<0?'var(--bad)':'var(--fg)'}">${money(st.ing - st.gas)}</b><span>Total</span></div><div><b class="num" style="color:var(--good)">${money(st.ing)}</b><span>Ingresos</span></div><div><b class="num" style="color:var(--bad)">${money(st.gas)}</b><span>Gastos</span></div></div></section>`;
+  for (let d = 1; d <= dim; d++) { const date = S.month + '-' + pad(d), wd = (first + d - 1) % 7, G = g[d] || 0, I = inc[d] || 0, net = I - G;
+    const tag = mode === 'gasto' ? (G ? `<small class="num">−${short(G)}</small>` : '') : mode === 'ingreso' ? (I ? `<small class="in num">+${short(I)}</small>` : '') : (G || I ? `<small class="${net >= 0 ? 'in ' : ''}num">${net >= 0 ? '+' : '−'}${short(Math.abs(net))}</small>` : '');
+    cells += `<button class="cal-d${wd===0||wd===6?' we':''}${date===today?' today':''}" data-a="day" data-d="${date}" aria-label="${d}: gastos ${money(G)}, ingresos ${money(I)}"><b>${d}</b>${tag}</button>`; }
+  const seg = (k, l) => `<button data-a="calmode" data-k="${k}" aria-pressed="${mode===k}">${l}</button>`;
+  return `<section class="card calcard"><div class="cal">${cells}</div>
+    <div class="cal-seg">${seg('gasto','Gastos')}${seg('ingreso','Ingresos')}${seg('total','Total')}</div>
+    <div class="cal-tot"><div><b class="num" style="color:${st.ing-st.gas<0?'var(--bad)':'var(--fg)'}">${money(st.ing - st.gas)}</b><span>Total</span></div><div><b class="num" style="color:var(--good)">${money(st.ing)}</b><span>Ingresos</span></div><div><b class="num" style="color:var(--bad)">${money(st.gas)}</b><span>Gastos</span></div></div>
+    <p class="hint" style="text-align:center">Toca un día para ver sus movimientos.</p></section>`;
 }
 function vMovs(){
   const f = S.filter, ps = people();
@@ -1157,6 +1177,7 @@ document.addEventListener('click', e => {
   if (a === 'veil') { if (e.target === el) closeSheet(); return; }
   if (a === 'tab') { S.tab = el.dataset.t; ls.set('lana.tab', S.tab); render(); scrollTo(0,0); }
   else if (a === 'month') { const n = addMonths(S.month, Number(el.dataset.d)); if (n <= addMonths(ym(new Date()), 12)) { S.month = n; S.filter.day = ''; render(); } }
+  else if (a === 'calmode') { S.calMode = el.dataset.k; render(); }
   else if (a === 'day') { S.filter.day = el.dataset.d; S.tab = 'movs'; render(); scrollTo(0,0); }
   else if (a === 'add') openAdd(el.dataset.k || 'gasto');
   else if (a === 'close') closeSheet();
