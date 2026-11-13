@@ -113,3 +113,4 @@
 2026-11-12T07:22:38Z	accion=leer	quien=desconocido	modelo=ensamble	granularidad=dia	pid=178	argv=/home/user/SA/ligamx/produccion/exportar.py
 2026-11-12T07:31:59Z	accion=leer	quien=desconocido	modelo=ensamble	granularidad=dia	pid=599	argv=/home/user/SA/ligamx/produccion/exportar.py
 2026-11-12T07:33:38Z	accion=leer	quien=desconocido	modelo=ensamble	granularidad=dia	pid=660	argv=/home/user/SA/ligamx/produccion/exportar.py
+2026-11-13T07:22:52Z	accion=leer	quien=desconocido	modelo=ensamble	granularidad=dia	pid=191	argv=/home/user/SA/ligamx/produccion/exportar.py

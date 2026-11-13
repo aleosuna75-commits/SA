@@ -165,3 +165,4 @@ prueba real: Querétaro–Monterrey, sábado 14-nov 17:00 de México (despertare
 - 2026-11-12 08:00 UTC · Corrida diaria: sin partidos nuevos; V8 publicada y `vivo/actual` en versión 5. Bajas de
   Querétaro–Monterrey en `config/actualidad.json` (1 y 6, con fuentes) y en la tarjeta del partido (V9). Una revisión
   de reconexión de `prueba.js` fallaba en WebKit por depender del reloj real: ahora avanza el reloj simulado.
+- 2026-11-13 07:30 UTC · Corrida diaria: sin partidos nuevos; V10 publicada, `vivo/actual` en versión 6. Despertares del vivo de Querétaro–Monterrey (14-nov) confirmados. Bajas de Monterrey revisadas con una búsqueda: sin novedades desde el 11-nov (Orellano entrena al parejo y apunta a jugar, Durdevic sigue aparte; otro medio confirma a Óliver Torres suspendido), no se cambió `config/actualidad.json`.
