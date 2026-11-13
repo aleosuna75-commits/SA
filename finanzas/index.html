@@ -1,4 +1,4 @@
-<title>Lana Compartida</title>
+<title>Morralla</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Figtree:wght@400;500;600;700&display=swap">
 <style>
@@ -230,8 +230,8 @@ button{cursor:pointer;border:0;background:none;padding:0}
 <div class="app">
   <header class="top">
     <div class="brand">
-      <div class="brand-mark" aria-hidden="true">$</div>
-      <div><h1>Lana Compartida</h1><p>Las cuentas de los dos, claras</p></div>
+      <div class="brand-mark" aria-hidden="true">M</div>
+      <div><h1>Morralla</h1><p>Cuentas claras, amor largo</p></div>
     </div>
     <button class="me" id="me-btn" data-a="who" aria-label="Cambiar quién captura"></button>
   </header>
@@ -531,7 +531,7 @@ const TABS = [['inicio','Inicio','<path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V
 function chrome(){
   $('#tabs').innerHTML = TABS.map(([k,l,p]) => `<button class="tab" data-a="tab" data-t="${k}" ${S.tab===k?'aria-current="page"':''}><svg viewBox="0 0 24 24" aria-hidden="true">${p}</svg>${l}</button>`).join('');
   $('#mlabel').textContent = cap(mName(S.month));
-  $('#mnext').disabled = S.month >= ym(new Date());
+  $('#mnext').disabled = S.month >= addMonths(ym(new Date()), 12);
   $('#me-btn').innerHTML = S.me ? avatar(S.me) + `<span>${esc(S.me)}</span>` : `<span class="av" style="background:var(--fg-3)" aria-hidden="true">?</span><span>¿Quién eres?</span>`;
   banner();
 }
@@ -563,7 +563,36 @@ function billRow(b, withPay){
     <div class="s">${dt}${b.repeat==='mensual'?' · cada mes':''}${b.bank?` · ${bankIcon(b.bank,'s')} ${esc(bankName(b.bank))}`:''}</div></div></button>
     <div class="amt num">${money(b.amount)}<small class="due ${cls}">${when}</small></div>${withPay?`<button class="btn sm ghost" data-a="pay" data-id="${esc(b.id)}">Pagado</button>`:''}</div>`;
 }
+function forecastBase(){ const cur = ym(new Date()), ms = [1,2,3].map(n => monthStats(addMonths(cur,-n))).filter(x => x.tx.length), src = ms.length ? ms : [monthStats(cur)];
+  const avg = f => Math.round(sum(src, f) / src.length); return {ing: avg(x => x.ing), gas: avg(x => x.gas), aho: avg(x => x.aho), n: ms.length}; }
+function billsIn(m){ const out = []; D().bills.forEach(b => { if (b.repeat === 'mensual') { if (b.due.slice(0,7) <= m) out.push({...b, due: m + '-' + pad(Math.min(parseD(b.due).getDate(), daysIn(m)))}); } else if (b.due.startsWith(m)) out.push(b); });
+  return out.sort((a,b) => a.due.localeCompare(b.due)); }
+const monthsBetween = (a, b) => { const [ay,am] = a.split('-').map(Number), [by,bm] = b.split('-').map(Number); return (by-ay)*12 + (bm-am); };
+function vFuturo(){
+  const d = D(), cur = ym(new Date()), f = forecastBase(), k = monthsBetween(cur, S.month), bills = billsIn(S.month), free = f.ing - f.gas - f.aho;
+  const goals = d.goals.map(g => { const s = goalSaved(g), avg = [1,2,3].reduce((a,n) => a + sum(d.ahorro.filter(t => t.goalId===g.id && t.date.startsWith(addMonths(cur,-n)))), 0) / 3, proj = Math.min(g.target, Math.round(s + avg*k)), p = proj/g.target;
+    return `<div class="bud"><div class="l1"><b>${esc(g.icon&&g.icon.k==='e'?g.icon.v+' ':'')}${esc(g.name)}</b><span class="num">${money(proj)} / ${money(g.target)}</span></div><div class="pbar good"><div style="width:${p*100}%"></div></div><div class="note" style="color:var(--fg-3);font-weight:500">${p>=1?'Para entonces ya estaría cumplida 🎉':avg>0?'Llevarían '+Math.round(p*100)+'% (hoy '+Math.round(s/g.target*100)+'%)':'Sin aportes recientes: seguiría en '+Math.round(p*100)+'%'}</div></div>`; }).join('');
+  const rowsN = Math.max(6, Math.min(12, k)), mx = Math.max(1, Math.abs(free) * rowsN); let path = '';
+  for (let i = 1; i <= rowsN; i++) { const m = addMonths(cur, i), acc = free * i;
+    path += `<div class="who-row" style="grid-template-columns:minmax(0,70px) minmax(0,1fr) auto" ${m===S.month?'aria-current="true"':''}><b style="${m===S.month?'color:var(--accent)':''}">${cap(mShort(m))} ${m.slice(2,4)}</b><div class="pbar ${acc<0?'bad':''}"><div style="width:${Math.abs(acc)/mx*100}%"></div></div><span class="num" style="font-weight:600">${money(acc)}</span></div>`; }
+  return `<div class="grid"><div class="col">
+    <section class="hero" aria-label="Proyección del mes">
+      <div><div class="lbl">🔮 Proyección de ${mName(S.month)}</div><div class="big num">${money(free)}<small>MXN libres</small></div>
+      <div class="delta">${f.n ? 'Estimado con el promedio de sus últimos ' + f.n + (f.n===1?' mes':' meses') + '. No es un dato real.' : 'Estimado con lo que llevan de este mes. No es un dato real.'}</div></div>
+      <div class="hero-stats"><div><span>Ingresos esperados</span><b class="num">${money(f.ing)}</b></div><div><span>Gastos esperados</span><b class="num">${money(f.gas)}</b></div><div><span>Pagos fijos</span><b class="num">${money(sum(bills))}</b></div></div>
+    </section>
+    <section class="card"><div class="card-h"><h2>Pagos de ${mName(S.month).split(' ')[0]}</h2><span class="aside num">${money(sum(bills))}</span></div>
+      <div class="rows">${bills.map(b => billRow(b,false)).join('') || '<p class="empty">No hay pagos programados para ese mes. Agrégalos con el botón +.</p>'}</div>
+      <p class="hint">Los pagos fijos ya van incluidos dentro de los gastos esperados.</p></section>
+  </div><div class="col">
+    <section class="card"><div class="card-h"><h2>Si siguen a este ritmo</h2><span class="aside">dinero libre acumulado</span></div>${path}
+      <p class="hint">Cada mes suma ingresos menos gastos y aportes a metas, al promedio reciente.</p></section>
+    <section class="card"><div class="card-h"><h2>Metas para entonces</h2><button class="link" data-a="tab" data-t="metas">Ver metas</button></div>
+      ${goals || '<p class="empty">Creen una meta para ver cuánto llevarían en esa fecha.</p>'}</section>
+  </div></div>`;
+}
 function vInicio(){
+  if (S.month > ym(new Date())) return vFuturo();
   const d = D(), st = monthStats(S.month), prev = monthStats(addMonths(S.month,-1));
   const disp = st.ing - st.gas - st.aho, isCur = S.month === ym(new Date());
   const dlt = prev.gas ? Math.round((st.gas - prev.gas) / prev.gas * 100) : null;
@@ -837,7 +866,7 @@ function advisorContext(){
 async function ask(q){
   q = q.trim(); if (!q || S.chatBusy || !S.ai) return;
   S.chat.push({role:'user', content:q}); const a = {role:'assistant', content:''}; S.chat.push(a); S.chatBusy = true; render();
-  const intro = 'Eres el asesor financiero dentro de "Lana Compartida", una app donde una pareja en México lleva sus finanzas. Responde en español de México, directo y cálido, en menos de 140 palabras, con cifras en pesos tomadas solo de estos datos; si falta un dato dilo. Usa viñetas con "- " cuando ayuden. No des asesoría de inversión específica.\n\nDatos (JSON):\n' + advisorContext() + '\n\nPregunta: ';
+  const intro = 'Eres el asesor financiero dentro de "Morralla", una app donde una pareja en México lleva sus finanzas. Responde en español de México, directo y cálido, en menos de 140 palabras, con cifras en pesos tomadas solo de estos datos; si falta un dato dilo. Usa viñetas con "- " cuando ayuden. No des asesoría de inversión específica.\n\nDatos (JSON):\n' + advisorContext() + '\n\nPregunta: ';
   const hist = S.chat.slice(0,-1).slice(-9).map(m => ({role: m.role, content: String(m.content)})); while (hist.length && hist[0].role !== 'user') hist.shift();
   hist[0] = {role:'user', content: intro + hist[0].content};
   const paint = () => { const box = $('#chat'); if (box && box.lastElementChild) { box.lastElementChild.innerHTML = md(a.content || 'Pensando…'); } };
@@ -851,7 +880,7 @@ document.addEventListener('click', e => {
   const el = e.target.closest('[data-a]'); if (!el) return; const a = el.dataset.a;
   if (a === 'veil') { if (e.target === el) closeSheet(); return; }
   if (a === 'tab') { S.tab = el.dataset.t; ls.set('lana.tab', S.tab); render(); scrollTo(0,0); }
-  else if (a === 'month') { const n = addMonths(S.month, Number(el.dataset.d)); if (n <= ym(new Date())) { S.month = n; render(); } }
+  else if (a === 'month') { const n = addMonths(S.month, Number(el.dataset.d)); if (n <= addMonths(ym(new Date()), 12)) { S.month = n; render(); } }
   else if (a === 'add') openAdd(el.dataset.k || 'gasto');
   else if (a === 'close') closeSheet();
   else if (a === 'who') openWho(F ? (f => () => { F = f; if (!people().includes(F.who) || true) F.who = S.me; drawForm(); })(F) : null);
