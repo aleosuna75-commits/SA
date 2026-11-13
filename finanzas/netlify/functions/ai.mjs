@@ -9,6 +9,8 @@ async function signedIn(req) {
   const auth = req.headers.get("authorization") || "";
   const url = process.env.SUPABASE_URL, key = process.env.SUPABASE_ANON_KEY;
   if (!auth.startsWith("Bearer ") || !url || !key) return false;
+  // Modo abierto: no hay usuarios; basta la llave pública del proyecto (cualquiera con el enlace puede usar la IA).
+  if (process.env.NIDO_ABIERTO === "1") return auth === "Bearer " + key;
   try {
     const r = await fetch(url.replace(/\/$/, "") + "/auth/v1/user", { headers: { authorization: auth, apikey: key } });
     return r.ok;

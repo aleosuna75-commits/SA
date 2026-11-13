@@ -3,7 +3,8 @@
 
 Toma index.html (la misma página que se publica como artefacto de Claude), la envuelve en un
 documento completo y le conecta Supabase (datos) y la función de Netlify (IA) con produccion/shim.js.
-Lee SUPABASE_URL y SUPABASE_ANON_KEY del entorno (variables de Netlify)."""
+Lee SUPABASE_URL y SUPABASE_ANON_KEY del entorno (variables de Netlify). Con NIDO_ABIERTO=1 la página
+no pide contraseña: cualquiera con el enlace ve y edita (requiere produccion/supabase-abierto.sql)."""
 import json, os, shutil, sys
 from pathlib import Path
 
@@ -41,7 +42,7 @@ def main():
     shutil.copy(AQUI / "produccion" / "shim.js", SALIDA / "shim.js")
     shutil.copy(AQUI / "oj.json", SALIDA / "oj.json")
     url, llave = os.environ.get("SUPABASE_URL", "").strip(), os.environ.get("SUPABASE_ANON_KEY", "").strip()
-    (SALIDA / "config.js").write_text("window.NIDO_CONFIG=" + json.dumps({"supabaseUrl": url, "supabaseAnonKey": llave}) + ";\n", encoding="utf-8")
+    (SALIDA / "config.js").write_text("window.NIDO_CONFIG=" + json.dumps({"supabaseUrl": url, "supabaseAnonKey": llave, "abierto": os.environ.get("NIDO_ABIERTO", "").strip() == "1"}) + ";\n", encoding="utf-8")
     if not (url and llave):
         print("AVISO: faltan SUPABASE_URL o SUPABASE_ANON_KEY; la página abrirá sin datos compartidos.", file=sys.stderr)
     print(f"Listo: {SALIDA} ({len(pagina) // 1024} KB la página)")

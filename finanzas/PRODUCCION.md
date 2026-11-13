@@ -41,6 +41,18 @@ Todo lo que sigue se hace una sola vez y toma unos 20 minutos.
 5. Dominio propio (opcional): se compra aparte (unos 12 USD al año) y se conecta en
    **Domain management → Add a domain**; Netlify pone el HTTPS.
 
+## Modo abierto: sin contraseña, cualquiera con el enlace edita
+
+Si prefieren no usar correo y contraseña:
+
+1. En Supabase ejecuta `produccion/supabase-abierto.sql` en lugar de `supabase.sql` (o después de él).
+   No hace falta crear usuarios.
+2. En Netlify agrega la variable `NIDO_ABIERTO` con valor `1` y vuelve a desplegar.
+
+Qué implica: quien tenga la dirección puede ver, cambiar y borrar todos los movimientos, y también
+usar la IA con cargo a tu llave de Anthropic. No compartas la dirección en público y, si se filtra,
+quita `NIDO_ABIERTO`, vuelve a ejecutar `supabase.sql` y crea los usuarios (pasos 1.3 y 1.4).
+
 ## 4. Probar
 
 1. Abre la dirección: debe pedir correo y contraseña. Entra con uno de los dos usuarios.

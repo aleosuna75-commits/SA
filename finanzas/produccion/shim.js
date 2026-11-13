@@ -26,8 +26,10 @@
     });
   }
   function hideLogin() { var v = document.getElementById("nido-login"); if (v) v.remove(); }
-  sb.auth.onAuthStateChange(function (_e, session) { if (session) { hideLogin(); resolveReady(); } else if (document.body) showLogin(); });
-  function boot() { sb.auth.getSession().then(function (r) { if (r.data && r.data.session) { hideLogin(); resolveReady(); } else showLogin(); }); }
+  var abierto = !!cfg.abierto; /* modo abierto: sin contraseña, cualquiera con el enlace ve y edita */
+  if (abierto) resolveReady();
+  else sb.auth.onAuthStateChange(function (_e, session) { if (session) { hideLogin(); resolveReady(); } else if (document.body) showLogin(); });
+  function boot() { if (abierto) return; sb.auth.getSession().then(function (r) { if (r.data && r.data.session) { hideLogin(); resolveReady(); } else showLogin(); }); }
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", boot); else boot();
 
   /* ---- datos: una tabla docs(col, id, data) ---- */
@@ -70,7 +72,7 @@
   function ask(input, opts) {
     opts = opts || {};
     return sb.auth.getSession().then(function (r) {
-      var s = r.data && r.data.session; if (!s) throw { code: "not_granted", message: "sin sesión" };
+      var s = r.data && r.data.session; if (!s && abierto) s = { access_token: cfg.supabaseAnonKey }; if (!s) throw { code: "not_granted", message: "sin sesión" };
       return fetch("/.netlify/functions/ai", { method: "POST", signal: opts.signal, headers: { "content-type": "application/json", authorization: "Bearer " + s.access_token },
         body: JSON.stringify({ messages: typeof input === "string" ? [{ role: "user", content: input }] : input, tier: opts.modelTier || "default" }) });
     }).then(function (res) {
@@ -102,5 +104,5 @@
     if (name === "user") return Promise.resolve(user);
     return Promise.resolve(null);
   } };
-  window.nidoSalir = function () { return sb.auth.signOut().then(function () { location.reload(); }); };
+  if (!abierto) window.nidoSalir = function () { return sb.auth.signOut().then(function () { location.reload(); }); };
 })();
