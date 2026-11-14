@@ -11,3 +11,7 @@ __pycache__/
 salidas/*.lock
 salidas/.*.tmp
 salidas/vivo_prueba*
+# El documento en vivo se reescribe en cada consulta durante un partido: se regenera con vivo.py una-vez
+salidas/vivo.json
+salidas/vivo_eventos.jsonl
+salidas/vivo_estado.json
