@@ -1,6 +1,6 @@
 {
  "torneo": "Apertura 2026",
- "generado_utc": "2026-11-12T07:21:07Z",
+ "generado_utc": "2026-11-14T07:21:33Z",
  "fuente": "ESPN scoreboard mex.1",
  "partidos": [
   {
@@ -17,11 +17,11 @@
    "ciudad": "Santiago de Querétaro",
    "momios": {
     "ml_l": 3.4,
-    "ml_e": 3.7,
-    "ml_v": 2.0,
+    "ml_e": 3.65,
+    "ml_v": 2.05,
     "total_linea": 2.5,
-    "over": 1.556,
-    "under": 2.3,
+    "over": 1.741,
+    "under": 2.0,
     "proveedor": "DraftKings"
    }
   },

@@ -1,5 +1,5 @@
 {
- "corrida_utc": "2026-11-13T07:21:21Z",
+ "corrida_utc": "2026-11-14T07:21:26Z",
  "pasos": {
   "datos": {
    "ok": true,
@@ -7,13 +7,13 @@
    "nuevos_jugados": 0,
    "reprogramados": 0,
    "nuevos_en_calendario": 0,
-   "momios_actualizados": 0,
+   "momios_actualizados": 1,
    "tabla_coincide_con_espn": true,
-   "segundos": 7.2
+   "segundos": 7.7
   },
   "variables": {
    "ok": true,
-   "segundos": 13.3
+   "segundos": 11.1
   },
   "mejora": {
    "ok": true,
@@ -23,10 +23,10 @@
   "pronostico": {
    "ok": true,
    "salida": [
-    "/home/user/SA/ligamx/salidas/actual.json  237 KB  modelo=ensamble  pendientes=10  sellos nuevos=1  65.2 s",
+    "/home/user/SA/ligamx/salidas/actual.json  237 KB  modelo=ensamble  pendientes=10  sellos nuevos=1  58.9 s",
     "campeón: América 0.266, Cruz Azul 0.263, Toluca 0.200, Chivas 0.193, Pachuca 0.022"
    ],
-   "segundos": 72.0
+   "segundos": 64.3
   },
   "vivo": {
    "ok": true,
@@ -39,14 +39,14 @@
     "visitante": "Monterrey"
    },
    "incrustado": true,
-   "segundos": 1.5
+   "segundos": 2.2
   },
   "pagina": {
    "ok": true,
    "salida": [
     "listo en 0.19 s"
    ],
-   "segundos": 0.5
+   "segundos": 0.4
   }
  },
  "errores": [],
@@ -67,11 +67,11 @@
   "ciudad": "Santiago de Querétaro",
   "momios": {
    "ml_l": 3.4,
-   "ml_e": 3.7,
-   "ml_v": 2.0,
+   "ml_e": 3.65,
+   "ml_v": 2.05,
    "total_linea": 2.5,
-   "over": 1.556,
-   "under": 2.3,
+   "over": 1.741,
+   "under": 2.0,
    "proveedor": "DraftKings"
   }
  },
@@ -87,27 +87,27 @@
   "incrustado": true
  },
  "modelo": "ensamble",
- "corte_local": "2026-11-13 01:21",
+ "corte_local": "2026-11-14 01:21",
  "campeon_top": [
   [
    "América",
-   0.2659
+   0.2662
   ],
   [
    "Cruz Azul",
-   0.2628
+   0.2626
   ],
   [
    "Toluca",
-   0.1998
+   0.1999
   ],
   [
    "Chivas",
-   0.193
+   0.1926
   ],
   [
    "Pachuca",
-   0.0221
+   0.0222
   ]
  ],
  "liguilla_en_curso": false,
@@ -118,9 +118,9 @@
    "n": 0
   }
  },
- "huella": "eb351e8be0c20a256d51b8f201a5ad13",
+ "huella": "d646946cf1c1ed11302b1d9c63557a01",
  "publicar": false,
- "huella_publicada": "eb351e8be0c20a256d51b8f201a5ad13",
- "segundos": 94.5,
- "publicado_utc": "2026-11-13T07:23:23Z"
+ "huella_publicada": "d646946cf1c1ed11302b1d9c63557a01",
+ "segundos": 85.5,
+ "publicado_utc": "2026-11-14T07:23:06Z"
 }
