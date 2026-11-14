@@ -972,7 +972,9 @@ function billsIn(m){ const out = []; D().bills.forEach(b => { if (b.repeat === '
   return out.sort((a,b) => a.due.localeCompare(b.due)); }
 const monthsBetween = (a, b) => { const [ay,am] = a.split('-').map(Number), [by,bm] = b.split('-').map(Number); return (by-ay)*12 + (bm-am); };
 function vFuturo(){
-  const d = D(), cur = ym(new Date()), f = forecastBase(), k = monthsBetween(cur, S.month), bills = billsIn(S.month), free = f.ing - f.gas - f.aho;
+  const d = D(), cur = ym(new Date()), f = forecastBase(), k = monthsBetween(cur, S.month), bills = billsIn(S.month);
+  const seguros = sum(d.tx.filter(t => t.type === 'ingreso' && t.date.startsWith(S.month))); if (seguros > 0) f.ing = seguros; /* ingresos seguros ya anotados para ese mes */
+  const free = f.ing - f.gas - f.aho;
   const goals = d.goals.map(g => { const s = goalSaved(g), avg = [1,2,3].reduce((a,n) => a + sum(d.ahorro.filter(t => t.goalId===g.id && t.date.startsWith(addMonths(cur,-n)))), 0) / 3, proj = Math.min(g.target, Math.round(s + avg*k)), p = proj/g.target;
     return `<div class="bud"><div class="l1"><b>${esc(g.icon&&g.icon.k==='e'?g.icon.v+' ':'')}${esc(g.name)}</b><span class="num">${money(proj)} / ${money(g.target)}</span></div><div class="pbar good"><div style="width:${p*100}%"></div></div><div class="note" style="color:var(--fg-3);font-weight:500">${p>=1?'Para entonces ya estaría cumplida 🎉':avg>0?'Llevarían '+Math.round(p*100)+'% (hoy '+Math.round(s/g.target*100)+'%)':'Sin aportes recientes: seguiría en '+Math.round(p*100)+'%'}</div></div>`; }).join('');
   const rowsN = Math.max(6, Math.min(12, k)), mx = Math.max(1, Math.abs(free) * rowsN); let path = '';
@@ -1263,7 +1265,7 @@ function drawPad(){
         <div class="pad-note"><span id="f-icon"></span><input id="f-desc" maxlength="60" autocomplete="off" enterkeyhint="done" value="${esc(F.desc)}" placeholder="¡Escribe una nota!" aria-label="Nota"><div class="pad-amt num" id="pad-amt"></div></div></div>
       <div class="err" id="f-err" ${F.err ? '' : 'hidden'}>${esc(F.err)}</div>
       <div class="pad-b"><button type="button" class="k2" data-a="${F.photo?'f-nophoto':'f-photo'}" aria-label="${F.photo?'Quitar foto':'Poner foto'}">${F.photo?'✕ Foto':'📷'}</button><input type="file" id="f-file" accept="image/*" hidden>
-        <label class="k2"><span>${esc(dlbl.toUpperCase())}</span><input type="date" id="f-date" value="${esc(F.date)}" max="${TODAY()}" aria-label="Fecha"></label>
+        <label class="k2"><span>${esc(dlbl.toUpperCase())}</span><input type="date" id="f-date" value="${esc(F.date)}" ${k === 'ingreso' ? '' : `max="${TODAY()}"`} aria-label="Fecha"></label>
         <button type="button" class="k2" data-a="f-whot" aria-label="Quién: ${esc(F.who)}. Toca para cambiar">${cara(F.who)} ${esc(SHORT[F.who] || F.who)}</button>
         <button type="submit" class="k2 go" aria-label="Guardar">✓</button></div>
       <div class="keys">${keys.map(x => `<button type="button" class="key${'×÷-+'.includes(x) ? ' op' : x === '⌫' ? ' op del' : ''}" data-a="pad" data-k="${x}" aria-label="${x==='⌫'?'Borrar':x}">${x==='-'?'−':x}</button>`).join('')}</div>
