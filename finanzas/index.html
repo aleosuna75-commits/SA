@@ -237,7 +237,8 @@ body{font-size:15.5px;-webkit-text-size-adjust:100%;text-size-adjust:100%}
 .hero .big small{font:700 .9rem/1 var(--body);letter-spacing:.06em}
 .hero-stats div{border-radius:16px}
 .hero-stats b{font:800 clamp(.78rem,3.9vw,1.15rem)/1.2 var(--display);white-space:nowrap;text-overflow:clip}
-.hero-stats div{padding:10px 8px}
+.hero-stats div,.hero-stats button{padding:10px 8px}
+.hero-stats button{background:var(--hero-2);border-radius:16px;color:inherit;text-align:left;min-width:0;box-shadow:inset 0 0 0 1.5px rgba(255,255,255,.55)}
 .quick{border-radius:999px;border:1.5px solid var(--line);box-shadow:0 6px 18px rgba(228,72,127,.1);padding-left:16px}
 .btn{border-radius:999px;font:800 .9rem/1 var(--body);padding:12px 18px;background:linear-gradient(135deg,var(--violet),#f06a9a);color:#fff;box-shadow:0 6px 14px rgba(228,72,127,.3);transition:transform .12s}
 .btn.sm{padding:9px 14px;font-size:.8rem;border-radius:999px}
@@ -984,7 +985,7 @@ function vFuturo(){
     <section class="hero" aria-label="Proyección del mes">
       <div><div class="lbl">🔮 Proyección de ${mName(S.month)}</div><div class="big num">${money(free)}<small>MXN libres</small></div>
       <div class="delta">${f.n ? 'Estimado con el promedio de sus últimos ' + f.n + (f.n===1?' mes':' meses') + '. No es un dato real.' : 'Estimado con lo que llevan de este mes. No es un dato real.'}</div></div>
-      <div class="hero-stats"><div><span>Ingresos esperados</span><b class="num">${money(Math.round(f.ing))}</b></div><div><span>Gastos esperados</span><b class="num">${money(Math.round(f.gas))}</b></div><div><span>Pagos fijos</span><b class="num">${money(sum(bills))}</b></div></div>
+      <div class="hero-stats"><button data-a="fut-ing" aria-label="Ver y modificar los ingresos esperados"><span>Ingresos esperados ›</span><b class="num">${money(Math.round(f.ing))}</b></button><div><span>Gastos esperados</span><b class="num">${money(Math.round(f.gas))}</b></div><div><span>Pagos fijos</span><b class="num">${money(sum(bills))}</b></div></div>
     </section>
     <section class="card"><div class="card-h"><h2>Pagos de ${mName(S.month).split(' ')[0]}</h2><span class="aside num">${money(sum(bills))}</span></div>
       <div class="rows">${bills.map(b => billRow(b,false)).join('') || '<p class="empty">No hay pagos programados para ese mes. Agrégalos con el botón +.</p>'}</div>
@@ -998,6 +999,15 @@ function vFuturo(){
 }
 function monthNav(label){ return `<div class="cal-h"><button data-a="month" data-d="-1" aria-label="Mes anterior">‹</button><span>${label}</span><button data-a="month" data-d="1" aria-label="Mes siguiente" ${S.month >= addMonths(ym(new Date()), 12) ? 'disabled' : ''}>›</button></div>`; }
 const NADA = `<p class="nada">${cara('Negrita')}¡No hay registros aún!<br><small>Negrita está esperando el primero.</small></p>`;
+/* desglose de los ingresos esperados de un mes futuro: se ven, se tocan para modificarlos y se agregan más */
+function openFutIng(){
+  const tx = D().tx.filter(t => t.type === 'ingreso' && t.date.startsWith(S.month)).sort((a,b) => a.date.localeCompare(b.date)), mes = mName(S.month);
+  const fecha = t => new Intl.DateTimeFormat('es-MX',{day:'numeric',month:'short'}).format(parseD(t.date));
+  sheet('Ingresos de ' + mes, `${tx.length ? `<p style="margin:0;color:var(--fg-2)">Toca uno para cambiarlo o borrarlo.</p><div class="rows">${tx.map(t => `<button class="row" data-a="edit-tx" data-id="${esc(t.id)}">${iconHTML(t.icon, '', '--s3')}<div class="mid"><div class="t">${esc(t.desc)}</div><div class="s">${fecha(t)} · ${avatar(t.who,true)} ${esc(t.who||'')}</div></div><div class="amt in num">+${money(t.amount)}</div></button>`).join('')}</div>
+      <div class="cal-tot" style="grid-template-columns:1fr;margin-top:0"><div><b class="num" style="color:var(--good)">${money(sum(tx))}</b><span>Total esperado</span></div></div>`
+    : `<p style="margin:0;color:var(--fg-2)">Todavía no hay ingresos anotados para ${mes}. La cifra que ves es el promedio de sus meses recientes; en cuanto anoten uno, se usa lo anotado.</p>`}
+    <div class="sheet-acts"><button class="btn main" data-a="fut-add">Agregar ingreso de ${mes.split(' ')[0]}</button></div>`);
+}
 function vInicio(){
   if (S.month > ym(new Date())) return vFuturo();
   const st = monthStats(S.month), home = S.home === 'det' ? 'det' : 'cal', al = alertsList();
@@ -1415,6 +1425,8 @@ document.addEventListener('click', e => {
   else if (a === 'forecast') { S.month = addMonths(ym(new Date()), 1); S.tab = 'inicio'; render(); scrollTo(0,0); }
   else if (a === 'negrita') { if (S.readOnly) { toast('Solo lectura: no puedes capturar.', 'bad'); return; }
     const go = () => { openAdd('gasto'); if (F) { F.cat = 'negrita'; F.catTouched = true; drawForm(); } }; if (!S.me) openWho(go); else go(); }
+  else if (a === 'fut-ing') openFutIng();
+  else if (a === 'fut-add') { const m = S.month; closeSheet(); openAdd('ingreso'); if (F) { F.date = m + '-01'; drawForm(); } }
   else if (a === 'calmode') { S.calMode = el.dataset.k; render(); }
   else if (a === 'day') { S.selDay = el.dataset.d; render(); }
   else if (a === 'add') openAdd(el.dataset.k || 'gasto');
