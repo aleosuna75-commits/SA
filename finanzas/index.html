@@ -236,7 +236,8 @@ body{font-size:15.5px;-webkit-text-size-adjust:100%;text-size-adjust:100%}
 .hero .big{font:800 clamp(2.9rem,14vw,4.2rem)/1 var(--display);letter-spacing:-.02em}
 .hero .big small{font:700 .9rem/1 var(--body);letter-spacing:.06em}
 .hero-stats div{border-radius:16px}
-.hero-stats b{font:800 1.15rem/1.2 var(--display)}
+.hero-stats b{font:800 clamp(.78rem,3.9vw,1.15rem)/1.2 var(--display);white-space:nowrap;text-overflow:clip}
+.hero-stats div{padding:10px 8px}
 .quick{border-radius:999px;border:1.5px solid var(--line);box-shadow:0 6px 18px rgba(228,72,127,.1);padding-left:16px}
 .btn{border-radius:999px;font:800 .9rem/1 var(--body);padding:12px 18px;background:linear-gradient(135deg,var(--violet),#f06a9a);color:#fff;box-shadow:0 6px 14px rgba(228,72,127,.3);transition:transform .12s}
 .btn.sm{padding:9px 14px;font-size:.8rem;border-radius:999px}
@@ -503,15 +504,6 @@ body::before{height:calc(var(--band,250px) + env(safe-area-inset-top,0px));backg
   .bal-arrow{animation:nudge 1.4s ease-in-out infinite}
   @keyframes nudge{50%{transform:translateX(4px)}}
 }
-@media (min-width:860px){
-  body{padding-bottom:48px}
-  .tabs{position:static;padding:0;background:none;margin-left:auto;box-shadow:none;border-radius:0}
-  .tabs nav{display:flex;gap:4px;max-width:none}
-  .tab{flex-direction:row;padding:10px 14px;border-radius:999px;font-size:.85rem}
-  .tab svg{display:none}
-  .tab[aria-current="page"]{background:var(--accent-soft);color:var(--accent)}
-  .fab{bottom:28px}
-}
 </style>
 
 <div class="app">
@@ -754,9 +746,9 @@ function demoData(){
 }
 let DEMO = null;
 const isEmpty = () => !S.tx.length && !S.goals.length && !S.bills.length;
-const isDemo = () => S.loaded && isEmpty();
+const isDemo = () => S.loaded && isEmpty() && !S.failed; /* si la carga falló no se enseñan datos de ejemplo como si fueran suyos */
 function D(){
-  if (isDemo()) { DEMO = DEMO || demoData(); return DEMO; }
+  if (isDemo()) { DEMO = DEMO || demoData(); return Object.keys(S.budgets).length ? {...DEMO, budgets: S.budgets} : DEMO; }
   return { people: S.people, tx: S.tx, ahorro: S.db ? S.ahorroAll : S.tx.filter(x => x.type==='ahorro'), goals: S.goals, bills: S.bills, budgets: S.budgets };
 }
 function people(){ return FIXED.slice(); }
@@ -856,7 +848,7 @@ function debtTx(){
 }
 const debtFull = () => !!S.db && [S.debt.saldo, S.debt.mitad, S.debt.otro].some(l => l && l.length >= 1000);
 function debts(){
-  const ps = splitPeople(), o = {}, add = (a, b, v) => { if (a === b || !a || !b) return; o[a] = o[a] || {}; o[a][b] = (o[a][b] || 0) + v; };
+  const ps = splitPeople(), o = Object.create(null), add = (a, b, v) => { if (a === b || !a || !b) return; o[a] = o[a] || Object.create(null); o[a][b] = (o[a][b] || 0) + v; };
   debtTx().forEach(t => { if (t.type === 'saldo') add(t.who, t.to, -t.amount); else { const sh = sharesOf(t, ps); if (sh) for (const p in sh) add(p, t.who, sh[p]); } });
   return (a, b) => Math.round((((o[a]||{})[b] || 0) - ((o[b]||{})[a] || 0)) * 100) / 100; /* > 0: a le debe a b */
 }
@@ -918,8 +910,10 @@ addEventListener('resize', bandFit);
 if (document.fonts && document.fonts.ready) document.fonts.ready.then(bandFit);
 function banner(){
   const b = $('#banner'); let t = '';
-  if (S.readOnly) t = '<span>🔒</span><span><b>Solo lectura.</b> Puedes ver todo, pero para capturar necesitas acceso de edición.</span>';
-  else if (S.loaded && S.local) t = '<span>📴</span><span><b>Sin conexión a los datos compartidos.</b> Lo que captures aquí no se guarda. Abre la página con tu sesión de Claude iniciada.</span>';
+  const ej = isDemo() ? ' <b>Lo que ves son datos de ejemplo</b>, no sus cuentas.' : '';
+  if (S.readOnly) t = '<span>🔒</span><span><b>Solo lectura.</b> Puedes ver todo, pero para capturar necesitas acceso de edición.' + ej + '</span>';
+  else if (S.loaded && S.failed) t = '<span>📴</span><span><b>No se pudieron cargar sus datos.</b> Revisa tu conexión y vuelve a abrir la página. Lo que captures ahora no se guarda.</span>';
+  else if (S.loaded && S.local) t = '<span>📴</span><span><b>Sin conexión a los datos compartidos.</b> Lo que captures aquí no se guarda. Abre la página con tu sesión iniciada.' + ej + '</span>';
   else if (S.db && S.tx.length >= 1000 && S.month <= S.tx[S.tx.length - 1].date.slice(0,7)) t = '<span>🗂️</span><span><b>Mes antiguo.</b> Solo se cargan los 1,000 movimientos más recientes, así que este mes puede verse incompleto.</span>';
   else if (isDemo()) t = '<span>👀</span><span><b>Estos son datos de ejemplo.</b> Desaparecen en cuanto registren su primer movimiento, meta o pago.</span>';
   b.hidden = !t; b.innerHTML = t; bandFit();
@@ -929,13 +923,13 @@ function render(){
   const v = $('#view');
   if (!S.loaded) { v.innerHTML = '<div class="skel">Cargando sus cuentas…</div>'; return; }
   const key = S.tab + S.month + isDemo(), fresh = key !== render.key; render.key = key;
-  const qi = $('#quick-in'), keep = qi ? {v: qi.value, f: document.activeElement === qi, a: qi.selectionStart, b: qi.selectionEnd} : null;
+  const keep = ['quick-in', 'q', 'chat-in'].map(id => { const el = document.getElementById(id); return el ? {id, v: el.value, f: document.activeElement === el, a: el.selectionStart, b: el.selectionEnd} : null; }).filter(Boolean);
   v.classList.toggle('anim', fresh);
   v.innerHTML = (VIEWS[S.tab] || vInicio)();
-  if (keep) { const box = $('#quick-in'); if (box) { box.value = keep.v; if (keep.f) { box.focus({preventScroll: true}); try { box.setSelectionRange(keep.a, keep.b); } catch (_) {} } } }
+  keep.forEach(k => { const box = document.getElementById(k.id); if (!box) return; box.value = k.v; if (k.f) { box.focus({preventScroll: true}); try { box.setSelectionRange(k.a, k.b); } catch (_) {} } });
   drawCharts();
   if (fresh) countUp();
-  if (S.tab === 'movs') { const q = $('#q'); if (q && S.filter.q && document.activeElement !== q) q.value = S.filter.q; }
+  if (S.tab === 'movs') { const q = $('#q'); if (q && S.filter.q && !q.value) q.value = S.filter.q; }
 }
 const CALM = matchMedia('(prefers-reduced-motion: reduce)').matches;
 function countUp(){
@@ -988,7 +982,7 @@ function vFuturo(){
     <section class="hero" aria-label="Proyección del mes">
       <div><div class="lbl">🔮 Proyección de ${mName(S.month)}</div><div class="big num">${money(free)}<small>MXN libres</small></div>
       <div class="delta">${f.n ? 'Estimado con el promedio de sus últimos ' + f.n + (f.n===1?' mes':' meses') + '. No es un dato real.' : 'Estimado con lo que llevan de este mes. No es un dato real.'}</div></div>
-      <div class="hero-stats"><div><span>Ingresos esperados</span><b class="num">${money(f.ing)}</b></div><div><span>Gastos esperados</span><b class="num">${money(f.gas)}</b></div><div><span>Pagos fijos</span><b class="num">${money(sum(bills))}</b></div></div>
+      <div class="hero-stats"><div><span>Ingresos esperados</span><b class="num">${money(Math.round(f.ing))}</b></div><div><span>Gastos esperados</span><b class="num">${money(Math.round(f.gas))}</b></div><div><span>Pagos fijos</span><b class="num">${money(sum(bills))}</b></div></div>
     </section>
     <section class="card"><div class="card-h"><h2>Pagos de ${mName(S.month).split(' ')[0]}</h2><span class="aside num">${money(sum(bills))}</span></div>
       <div class="rows">${bills.map(b => billRow(b,false)).join('') || '<p class="empty">No hay pagos programados para ese mes. Agrégalos con el botón +.</p>'}</div>
@@ -1031,7 +1025,7 @@ function vAnalisis(){
     <section class="hero" aria-label="Resumen del mes">
       <div><div class="lbl">Disponible ${isCur?'este mes':'en '+mName(S.month)}</div><div class="big num"><span data-count="${disp}">${money(disp)}</span><small>MXN</small></div>
       <div class="delta">${dlt===null?'Ingresos menos gastos y aportes a metas':`Gasto ${dlt>=0?'↑':'↓'} ${Math.abs(dlt)}% vs. ${mName(addMonths(S.month,-1)).split(' ')[0]} completo`}</div></div>
-      <div class="hero-stats"><div><span>Ingresos</span><b class="num">${money(st.ing)}</b></div><div><span>Gastos</span><b class="num">${money(st.gas)}</b></div><div><span>A metas</span><b class="num">${money(st.aho)}</b></div></div>
+      <div class="hero-stats"><div><span>Ingresos</span><b class="num">${money(Math.round(st.ing))}</b></div><div><span>Gastos</span><b class="num">${money(Math.round(st.gas))}</b></div><div><span>A metas</span><b class="num">${money(Math.round(st.aho))}</b></div></div>
     </section>
     <section class="card"><div class="card-h"><h2>Gastos del mes</h2><span class="aside num">${money(st.gas)}</span></div>
       ${st.gas?`<div class="donut-wrap"><div class="donut" id="ch-donut"></div><div class="cats">${cats}</div></div>`:'<p class="empty">Aún no hay gastos en este mes.</p>'}</section>
@@ -1050,7 +1044,7 @@ function vMas(){
   const t = (e, l, attrs) => `<button class="tile" ${attrs}><i aria-hidden="true">${e}</i>${l}</button>`;
   return `<div class="col"><section class="card calcard"><div class="tiles">
     ${t('📒','Registros','data-a="tab" data-t="movs"')}${t('🔍','Buscar','data-a="search"')}${t('🎯','Metas de ahorro','data-a="tab" data-t="metas"')}
-    ${t('🔔','Pagos y recordatorios','data-a="tab" data-t="pagos"')}${t('💵','Presupuesto','data-a="budget"')}${t('🤝','Saldar cuentas','data-a="add" data-k="saldo"')}
+    ${t('🔔','Pagos y recordatorios','data-a="tab" data-t="pagos"')}${t('💵','Presupuesto','data-a="budget"')}${t('🤝','Saldar cuentas','data-a="settle" data-n="' + esc(FIXED.find(p => p !== myName()) || FIXED[1]) + '"')}
     ${t('📈','Pronóstico','data-a="forecast"')}${t('🤖','Asesor IA','data-a="tab" data-t="asesor"')}${t('👫','¿Quién soy?','data-a="who"')}
     ${window.nidoSalir ? t('🚪','Cerrar sesión','data-a="salir"') : ''}
   </div></section><p class="hint" style="text-align:center">Emojis de OpenMoji, licencia CC BY-SA 4.0.</p></div>`;
@@ -1208,7 +1202,7 @@ function openAdd(kind, ex){
   /* un gasto guardado sin nota lleva el nombre de su categoría: se abre sin nota para que al cambiar de categoría cambien también nombre e ícono */
   const sinNota = !!ex && (kind === 'gasto' || kind === 'ingreso') && ex.desc === ((kind === 'ingreso' ? INCATS : CATS)[ex.cat] || {}).l;
   F = { kind: kind || 'gasto', id: ex ? ex.id : null, ex: ex || null, who: (ex && ex.who) || S.me, amount: ex ? (ex.amount ?? ex.target ?? '') : '', desc: ex ? (sinNota ? '' : ex.desc || ex.name || '') : '',
-    cat: ex ? ex.cat : '', catTouched: !!ex, date: (ex && ex.date) || TODAY(), goalId: (ex && ex.goalId) || '', deadline: (ex && ex.deadline) || '', due: (ex && ex.due) || TODAY(), repeat: (ex && ex.repeat) || 'mensual', bank: (ex && ex.bank) || '', expr: ex && ex.amount ? String(ex.amount) : '', split: kind === 'pago' ? (ex && ex.split === 'mio' ? 'mio' : 'mitad') : ex ? (ex.split || 'mio') : defSplit(), catPicked: false, to: (ex && ex.to) || '', confirm: false, err: '' };
+    cat: ex ? ex.cat : '', catTouched: !!ex, date: (ex && ex.date) || (S.tab === 'inicio' && S.home !== 'det' && S.selDay && S.selDay < TODAY() ? S.selDay : TODAY()), goalId: (ex && ex.goalId) || '', deadline: (ex && ex.deadline) || '', due: (ex && ex.due) || TODAY(), repeat: (ex && ex.repeat) || 'mensual', bank: (ex && ex.bank) || '', expr: ex && ex.amount ? String(ex.amount) : '', split: kind === 'pago' ? (ex && ex.split === 'mio' ? 'mio' : 'mitad') : ex ? (ex.split || 'mio') : defSplit(), catPicked: false, to: (ex && ex.to) || '', confirm: false, err: '' };
   if (kind === 'ahorro' && !F.goalId && S.goals[0]) F.goalId = S.goals[0].id;
   drawForm();
   setTimeout(() => { const i = $('#f-amount') || $('#f-desc'); if (i && !ex && F && !F.pad) i.focus(); }, 60);
@@ -1353,9 +1347,9 @@ async function submitForm(){
 }
 async function deleteForm(){ const f = F; closeSheet(); const col = f.kind === 'meta' ? 'goals' : f.kind === 'pago' ? 'bills' : 'tx'; if (await del(col, f.id)) toast('Borrado.'); }
 function openBudget(){
-  if (S.readOnly) return; const lim = isDemo() ? {} : D().budgets;
+  if (S.readOnly) return; const lim = S.budgets; /* siempre lo real, también mientras se ven datos de ejemplo */
   sheet('Presupuesto mensual', `<p style="margin:0;color:var(--fg-2)">Tope por categoría. Deja en blanco las que no quieran limitar.</p><form data-f="budget" style="display:flex;flex-direction:column;gap:10px">
-    ${Object.keys(CATS).map(c => `<div class="withic"><span class="ic">${catE(CATS,c)}</span><label for="bg-${c}" style="flex:1;font-weight:600;min-width:0">${esc(CATS[c].l)}</label><input class="inp num" style="max-width:130px" id="bg-${c}" inputmode="numeric" placeholder="Sin tope" value="${lim[c]||''}"></div>`).join('')}
+    ${Object.keys(CATS).map(c => `<div class="withic"><span class="ic">${catE(CATS,c)}</span><label for="bg-${c}" style="flex:1;font-weight:600;min-width:0">${esc(CATS[c].l)}</label><input class="inp num" style="max-width:130px" id="bg-${c}" inputmode="numeric" placeholder="Sin tope" value="${Number(lim[c]) > 0 ? Number(lim[c]) : ''}"></div>`).join('')}
     <div class="sheet-acts"><button class="btn main" type="submit">Guardar presupuesto</button></div></form>`);
 }
 async function payBill(id){
@@ -1437,7 +1431,7 @@ document.addEventListener('click', e => {
   else if (a === 'pad') { if (F && F.pad) padKey(el.dataset.k); }
   else if (a === 'settle') { const p = el.dataset.n, me = myName();
     if (isDemo()) toast('Es un ejemplo. Con sus gastos reales aquí podrán saldar cuentas.');
-    else { const v = debts()(p, me); openAdd('saldo'); if (F) { if (v > 0) { F.who = p; F.to = me; } else { F.who = me; F.to = p; } F.amount = Math.abs(v); drawForm(); } } }
+    else { const v = debts()(p, me); openAdd('saldo'); if (F) { if (v > 0) { F.who = p; F.to = me; } else { F.who = me; F.to = p; } F.amount = Math.abs(v) || ''; drawForm(); } } }
   else if (a === 'ask') ask(el.dataset.q);
   else if (a === 'undo') { const u = toast.undo; $('#toast').hidden = true; if (u) u(); }
   else if (F && a.startsWith('f-')) { readForm();
@@ -1469,8 +1463,9 @@ document.addEventListener('submit', async e => {
 });
 document.addEventListener('input', e => {
   if (e.target.id === 'f-desc' && F) { F.desc = e.target.value; previewIcon(); }
-  else if (e.target.id === 'q') { S.filter.q = e.target.value; const pos = e.target.selectionStart; render(); const q = $('#q'); q.value = S.filter.q; q.focus(); try { q.setSelectionRange(pos,pos); } catch(_){} }
+  else if (e.target.id === 'q') { S.filter.q = e.target.value; if (!e.isComposing) render(); } /* a media composición (acentos, teclado predictivo) no se redibuja */
 });
+document.addEventListener('compositionend', e => { if (e.target.id === 'q') { S.filter.q = e.target.value; render(); } });
 document.addEventListener('change', e => {
   if (e.target.id === 'f-date' && F && F.pad) { readForm(); drawForm(); return; }
   if (e.target.id !== 'f-file' || !F || !e.target.files[0]) return;
@@ -1498,22 +1493,29 @@ async function boot(){
   render();
   const c = window.claude;
   if (!c || !c.use) { S.loaded = true; S.local = true; render(); return; }
-  const timer = setTimeout(() => { if (!S.loaded) { S.loaded = true; S.local = true; render(); } }, 10000);
+  const timer = setTimeout(() => { if (!S.loaded) { S.loaded = true; S.local = true; S.failed = true; render(); } }, 10000);
   c.use('sample').then(ai => { S.ai = ai; if (S.loaded) render(); }).catch(() => {});
   let db = null; try { db = await c.use('db'); } catch (e) {}
   if (!db) { clearTimeout(timer); S.loaded = true; S.local = true; render(); return; }
   S.db = db; S.local = false;
-  const rows = snap => snap.docs.map(d => ({id: d.id, ...d.data()}));
-  const ready = k => { S.got[k] = 1; if (S.got.tx && S.got.goals && S.got.bills) { clearTimeout(timer); S.loaded = true; S.local = false; } if (S.loaded) render(); };
-  const fail = () => { if (!S.loaded) { clearTimeout(timer); S.loaded = true; S.local = true; S.db = null; render(); } };
+  const raw = snap => snap.docs.map(d => ({...(d.data() || {}), id: d.id}));
+  const isDate = v => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v) && !isNaN(parseD(v)), txt = (v, n) => typeof v === 'string' ? v.slice(0, n || 80) : '', who = v => FIXED.includes(v) ? v : txt(v, 40).replace(/^(__proto__|constructor|prototype)$/, '') || '—';
+  const num = v => { const n = typeof v === 'number' ? v : parseFloat(v); return isFinite(n) && n >= 0 && n < 1e12 ? n : NaN; }, ico = v => v && typeof v === 'object' && typeof v.k === 'string' && typeof v.v === 'string' ? {k: v.k, v: v.v} : null;
+  /* lo que llega de la base compartida no es de fiar: se descarta lo que no tiene forma de movimiento y se normaliza el resto */
+  const rows = snap => raw(snap).map(t => ({...t, amount: num(t.amount), who: who(t.who), to: t.type === 'saldo' ? who(t.to) : undefined, desc: txt(t.desc), cat: txt(t.cat, 20), icon: ico(t.icon), goalId: txt(t.goalId, 40), split: ['mitad','mio','otro'].includes(t.split) ? t.split : undefined}))
+    .filter(t => ['gasto','ingreso','ahorro','saldo'].includes(t.type) && isDate(t.date) && !isNaN(t.amount));
+  const billRows = snap => raw(snap).map(b => ({...b, name: txt(b.name) || 'Pago', amount: num(b.amount), icon: ico(b.icon), cat: txt(b.cat, 20), bank: txt(b.bank, 20), day: Number.isInteger(b.day) && b.day >= 1 && b.day <= 31 ? b.day : undefined})).filter(b => isDate(b.due) && !isNaN(b.amount));
+  const goalRows = snap => raw(snap).map(g => ({...g, name: txt(g.name) || 'Meta', target: num(g.target), icon: ico(g.icon), deadline: isDate(g.deadline) ? g.deadline : ''})).filter(g => g.target > 0);
+  const ready = k => { S.got[k] = 1; if (S.got.tx && S.got.goals && S.got.bills) { clearTimeout(timer); S.loaded = true; S.local = false; S.failed = false; S.db = db; } if (S.loaded) render(); }; /* al recuperarse la conexión se vuelve a guardar en la base */
+  const fail = () => { if (!S.loaded) { clearTimeout(timer); S.loaded = true; S.local = true; S.failed = true; S.db = null; render(); } };
   db.collection('tx').orderBy('date','desc').limit(1000).onSnapshot(s => { S.tx = rows(s); ready('tx'); }, fail);
   const debtSub = (k, f, v) => db.collection('tx').where(f,'==',v).limit(1000).onSnapshot(s => { S.debt[k] = rows(s); if (S.loaded) render(); }, () => {});
   debtSub('saldo', 'type', 'saldo'); debtSub('mitad', 'split', 'mitad'); debtSub('otro', 'split', 'otro');
   db.collection('tx').where('type','==','ahorro').limit(1000).onSnapshot(s => { S.ahorroAll = rows(s); if (S.loaded) render(); }, () => {});
-  db.collection('goals').onSnapshot(s => { S.goals = rows(s).sort((a,b) => (a.ts||0)-(b.ts||0)); ready('goals'); }, fail);
-  db.collection('bills').onSnapshot(s => { S.bills = rows(s); ready('bills'); }, fail);
+  db.collection('goals').onSnapshot(s => { S.goals = goalRows(s).sort((a,b) => (a.ts||0)-(b.ts||0)); ready('goals'); }, fail);
+  db.collection('bills').onSnapshot(s => { S.bills = billRows(s); ready('bills'); }, fail);
   db.collection('pics').limit(300).onSnapshot(s => { S.pics = Object.fromEntries(rows(s).map(r => [r.id, r])); if (S.loaded) render(); }, () => {});
-  db.collection('config').onSnapshot(s => { s.docs.forEach(d => { const v = d.data() || {}; if (d.id === 'people') S.people = Array.isArray(v.names) ? v.names.filter(n => typeof n === 'string') : []; if (d.id === 'budgets') S.budgets = v.limits && typeof v.limits === 'object' ? v.limits : {}; if (d.id === 'rules') S.rules = v.map && typeof v.map === 'object' ? v.map : {}; }); if (S.loaded) render(); }, () => {});
+  db.collection('config').onSnapshot(s => { s.docs.forEach(d => { const v = d.data() || {}; if (d.id === 'people') S.people = Array.isArray(v.names) ? v.names.filter(n => typeof n === 'string') : []; if (d.id === 'budgets') S.budgets = Object.fromEntries(Object.entries(v.limits && typeof v.limits === 'object' ? v.limits : {}).filter(([k, n]) => Object.hasOwn(CATS, k) && typeof n === 'number' && isFinite(n) && n > 0)); if (d.id === 'rules') S.rules = Object.fromEntries(Object.entries(v.map && typeof v.map === 'object' ? v.map : {}).filter(([k, c]) => typeof c === 'string' && (Object.hasOwn(CATS, c) || Object.hasOwn(INCATS, c)))); }); if (S.loaded) render(); }, () => {});
   c.use('user').then(async u => { if (u && (await u.can('data.write')) === false) { S.readOnly = true; banner(); } }).catch(() => {});
 }
 boot();

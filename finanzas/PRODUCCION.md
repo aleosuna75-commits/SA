@@ -64,7 +64,8 @@ quita `NIDO_ABIERTO`, vuelve a ejecutar `supabase.sql` y crea los usuarios (paso
 
 - Los datos de esta versión viven en Supabase; no se mezclan con los del artefacto de Claude.
 - La IA se cobra a tu llave de Anthropic.
-- Para cerrar sesión: toca tu nombre arriba → *Cerrar sesión en este dispositivo*.
+- Para cerrar sesión: pestaña **Más** → *Cerrar sesión* (solo cierra la de ese dispositivo).
+- Si después de entrar aparece "No se pudieron cargar sus datos", vuelve a ejecutar el SQL del paso 1.2: se puede ejecutar las veces que haga falta.
 - Cada cambio que llegue a la rama desplegada se publica solo.
 
 ## Archivos

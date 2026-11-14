@@ -38,19 +38,24 @@ export default async (req) => {
     messages: messages.map((m) => ({ role: m.role, content: m.content })),
   });
 
+  // Se espera el primer fragmento antes de responder: así una llave inválida, la falta de saldo o un límite de uso
+  // llegan a la página como error (401/429/502) y no como una respuesta vacía con 200.
   const enc = new TextEncoder();
+  const it = stream[Symbol.asyncIterator]();
+  const nextText = async () => { for (;;) { const r = await it.next(); if (r.done) return null; const ev = r.value; if (ev.type === "content_block_delta" && ev.delta.type === "text_delta") return ev.delta.text; } };
+  let first;
+  try { first = await nextText(); } catch (err) {
+    if (err instanceof Anthropic.RateLimitError) return new Response("Límite de uso de la IA alcanzado", { status: 429 });
+    if (err instanceof Anthropic.AuthenticationError || err instanceof Anthropic.PermissionDeniedError) { console.error("IA: la llave ANTHROPIC_API_KEY no es válida o no tiene permiso"); return new Response("La llave de la IA no es válida", { status: 502 }); }
+    if (err instanceof Anthropic.APIError) { console.error("IA: error", err.status, err.message); return new Response("La IA no está disponible", { status: 502 }); }
+    console.error("IA: error de red", err); return new Response("La IA no está disponible", { status: 502 });
+  }
+  if (first === null) return new Response("La IA no devolvió texto", { status: 502 });
   const out = new ReadableStream({
     async start(controller) {
-      try {
-        for await (const event of stream) {
-          if (event.type === "content_block_delta" && event.delta.type === "text_delta") controller.enqueue(enc.encode(event.delta.text));
-        }
-      } catch (err) {
-        if (err instanceof Anthropic.RateLimitError) console.error("IA: límite de uso alcanzado");
-        else if (err instanceof Anthropic.AuthenticationError) console.error("IA: la llave ANTHROPIC_API_KEY no es válida");
-        else if (err instanceof Anthropic.APIError) console.error("IA: error", err.status, err.message);
-        else console.error("IA: error de red", err);
-      }
+      controller.enqueue(enc.encode(first));
+      try { for (;;) { const text = await nextText(); if (text === null) break; controller.enqueue(enc.encode(text)); } }
+      catch (err) { console.error("IA: se cortó la respuesta", err instanceof Anthropic.APIError ? err.status + " " + err.message : err); }
       controller.close();
     },
     cancel() { stream.abort(); },

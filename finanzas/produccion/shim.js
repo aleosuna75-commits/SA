@@ -72,7 +72,7 @@
   function ask(input, opts) {
     opts = opts || {};
     return sb.auth.getSession().then(function (r) {
-      var s = r.data && r.data.session; if (!s && abierto) s = { access_token: cfg.supabaseAnonKey }; if (!s) throw { code: "not_granted", message: "sin sesión" };
+      var s = abierto ? { access_token: cfg.supabaseAnonKey } : (r.data && r.data.session); /* en modo abierto siempre la llave pública, aunque quede una sesión vieja guardada */ if (!s) throw { code: "not_granted", message: "sin sesión" };
       return fetch("/.netlify/functions/ai", { method: "POST", signal: opts.signal, headers: { "content-type": "application/json", authorization: "Bearer " + s.access_token },
         body: JSON.stringify({ messages: typeof input === "string" ? [{ role: "user", content: input }] : input, tier: opts.modelTier || "default" }) });
     }).then(function (res) {
@@ -104,5 +104,5 @@
     if (name === "user") return Promise.resolve(user);
     return Promise.resolve(null);
   } };
-  if (!abierto) window.nidoSalir = function () { return sb.auth.signOut().then(function () { location.reload(); }); };
+  if (!abierto) window.nidoSalir = function () { return sb.auth.signOut({ scope: "local" }).then(function () { location.reload(); }); };
 })();

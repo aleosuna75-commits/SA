@@ -13,5 +13,12 @@ drop policy if exists "solo con sesion" on public.docs;
 drop policy if exists "abierto" on public.docs;
 create policy "abierto" on public.docs for all to anon, authenticated using (true) with check (true);
 
--- Para que lo que captura uno le aparezca al otro al instante (si ya estaba agregada, este paso marca error y se puede ignorar).
-alter publication supabase_realtime add table public.docs;
+-- Permisos sobre la tabla: los proyectos nuevos de Supabase ya no los dan solos.
+grant select, insert, update, delete on public.docs to anon, authenticated;
+
+-- Para que lo que captura uno le aparezca al otro al instante. Todo el archivo se puede ejecutar más de una vez.
+do $$ begin
+  if not exists (select 1 from pg_publication_tables where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'docs') then
+    alter publication supabase_realtime add table public.docs;
+  end if;
+end $$;
