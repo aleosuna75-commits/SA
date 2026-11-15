@@ -273,6 +273,10 @@ quedan en `mercados.py` para repetir la medición; no se probaron más variantes
   mercado y reparto por mitades según el total). Todas reducen los sesgos, pero la mejor mejora el log-loss de sus
   mercados 1.6 errores estándar (se exigían más de 2) y tres fallan además otra condición. El motor de mercados y la
   combinada quedan como estaban (`MERCADOS_ENSAMBLE.md` §9).
+- **Auditoría independiente (2026-11-15, `MERCADOS_ENSAMBLE.md` §10)**: sin fugas y con las cifras reproducidas por
+  otro camino; no adoptar se sostiene, con reservas. En la única lectura de PRUEBA (481 partidos) las combinadas
+  quedan calibradas (z de −0.4 a 1.5), pero «ambos anotan» sale 5.8 puntos corto (z = 3.2) y la corrección de forma
+  habría mejorado sus mercados más de 2 ee: queda como candidata para una decisión del responsable, no descartada.
 - Los comandos `validar <modelo>` de `mercados` y `combinada` corren con rho = 0 cuando el archivo de predicciones no
   trae `x_rho` (es el caso de `ensamble`): `MERCADOS_ENSAMBLE.md` §1.
 - La regla de suspensiones no se contrastó aquí contra las alineaciones siguientes (`modelo/VARIABLES.md` documenta

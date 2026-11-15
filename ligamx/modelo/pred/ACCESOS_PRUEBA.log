@@ -124,3 +124,6 @@
 2026-11-15T01:31:37Z	accion=lectura_pareadas	quien=mejora.adoptar	modelo=ensamble	pid=153	argv=pipeline.py auto
 2026-11-15T01:32:33Z	accion=leer	quien=desconocido	modelo=ensamble	granularidad=dia	pid=193	argv=/home/user/SA/ligamx/produccion/exportar.py
 2026-11-15T07:22:55Z	accion=leer	quien=desconocido	modelo=ensamble	granularidad=dia	pid=177	argv=/home/user/SA/ligamx/produccion/exportar.py
+2026-11-15T08:25:09Z	accion=leer	quien=auditoria_mercados	modelo=ensamble	granularidad=dia	pid=2417	argv=c_replica.py prueba
+2026-11-15T08:32:56Z	accion=leer	quien=desconocido	modelo=ensamble	granularidad=dia	pid=2660	argv=/home/user/SA/ligamx/produccion/exportar.py
+2026-11-15T08:39:13Z	accion=leer	quien=desconocido	modelo=ensamble	granularidad=dia	pid=2982	argv=/home/user/SA/ligamx/produccion/exportar.py

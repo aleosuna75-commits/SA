@@ -1,6 +1,6 @@
 {
  "torneo": "Apertura 2026",
- "generado_utc": "2026-11-15T01:31:04Z",
+ "generado_utc": "2026-11-15T08:38:01Z",
  "fuente": "ESPN scoreboard mex.1",
  "partidos": [
   {
@@ -117,7 +117,15 @@
    "visitante": "Monterrey",
    "estadio": "Estadio Olímpico Universitario",
    "ciudad": "Mexico City",
-   "momios": null
+   "momios": {
+    "ml_l": 2.5,
+    "ml_e": 3.5,
+    "ml_v": 2.5,
+    "total_linea": 2.5,
+    "over": 1.588,
+    "under": 2.15,
+    "proveedor": "DraftKings"
+   }
   },
   {
    "id": "401877048",

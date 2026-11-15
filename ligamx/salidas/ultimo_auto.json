@@ -1,5 +1,5 @@
 {
- "corrida_utc": "2026-11-15T07:21:24Z",
+ "corrida_utc": "2026-11-15T08:37:55Z",
  "pasos": {
   "datos": {
    "ok": true,
@@ -7,13 +7,13 @@
    "nuevos_jugados": 0,
    "reprogramados": 0,
    "nuevos_en_calendario": 0,
-   "momios_actualizados": 0,
+   "momios_actualizados": 1,
    "tabla_coincide_con_espn": true,
-   "segundos": 7.3
+   "segundos": 6.6
   },
   "variables": {
    "ok": true,
-   "segundos": 11.1
+   "segundos": 5.0
   },
   "mejora": {
    "ok": true,
@@ -23,10 +23,10 @@
   "pronostico": {
    "ok": true,
    "salida": [
-    "/home/user/SA/ligamx/salidas/actual.json  225 KB  modelo=ensamble  pendientes=9  sellos nuevos=0  66.7 s",
+    "/home/user/SA/ligamx/salidas/actual.json  225 KB  modelo=ensamble  pendientes=9  sellos nuevos=0  65.7 s",
     "campeón: América 0.265, Cruz Azul 0.261, Toluca 0.199, Chivas 0.191, Monterrey 0.027"
    ],
-   "segundos": 73.2
+   "segundos": 66.9
   },
   "vivo": {
    "ok": true,
@@ -39,14 +39,14 @@
     "visitante": "Atlético San Luis"
    },
    "incrustado": true,
-   "segundos": 22.5
+   "segundos": 22.7
   },
   "pagina": {
    "ok": true,
    "salida": [
-    "listo en 0.16 s"
+    "listo en 0.02 s"
    ],
-   "segundos": 0.3
+   "segundos": 0.1
   }
  },
  "errores": [],
@@ -87,11 +87,11 @@
   "incrustado": true
  },
  "modelo": "ensamble",
- "corte_local": "2026-11-15 01:21",
+ "corte_local": "2026-11-15 02:38",
  "campeon_top": [
   [
    "América",
-   0.2645
+   0.2646
   ],
   [
    "Cruz Azul",
@@ -99,7 +99,7 @@
   ],
   [
    "Toluca",
-   0.199
+   0.1989
   ],
   [
    "Chivas",
@@ -154,9 +154,9 @@
    }
   }
  },
- "huella": "2cc5fea4ad6c09681acdf45b828149c5",
+ "huella": "f6fe14b9c75b8dbe7a2e65a85e435fda",
  "publicar": false,
- "huella_publicada": "2cc5fea4ad6c09681acdf45b828149c5",
- "segundos": 114.4,
- "publicado_utc": "2026-11-15T07:23:33Z"
+ "huella_publicada": "f6fe14b9c75b8dbe7a2e65a85e435fda",
+ "segundos": 101.2,
+ "publicado_utc": "2026-11-15T08:39:59Z"
 }

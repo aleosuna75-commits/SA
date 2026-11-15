@@ -490,8 +490,10 @@ def _avisos(meta_modelo: dict, des: dict, reglas: dict, sim: dict, pendientes: l
         "Lesiones, convocatorias y alineaciones del día no se modelan (sólo se muestran si existen en config/actualidad.json).",
         "Los momios de ESPN son de referencia. En la historia el mercado de cierre ha sido mejor que cualquier modelo propio; "
         "una diferencia entre el modelo y el momio NO es por sí misma una apuesta con valor.",
-        "Mercados de cantidad de goles (más/menos, ambos anotan, goles por mitad) discriminan poco: con Poisson, "
-        "«ambos anotan» sale subestimado unos 3 puntos (0.509 pronosticado vs 0.543 observado en desarrollo). "
+        "«Ambos anotan» y «anota / no anota» salen por debajo de lo que ocurre: 2 puntos en 2016-2025 (0.524 pronosticado "
+        "vs 0.543 observado) y casi 6 en los últimos tres torneos (0.535 vs 0.593); ganar por 2 o más sale 1 a 2 puntos "
+        "de más. Los goles reales son más parejos de lo que supone el modelo. Se probaron cuatro correcciones el "
+        "15-nov-2026 y ninguna pasó la regla fijada de antemano, así que no se aplicó ninguna. "
         "No se ofrecen picks de córners ni de tarjetas: no le ganan a la frecuencia de la liga.",
         "Las combinadas usan la probabilidad conjunta exacta del modelo de marcador (no el producto de las marginales); "
         "entre partidos distintos se suponen independientes.",

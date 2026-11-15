@@ -51,6 +51,9 @@ nada**; el código de producción no cambió.
 9. **Correcciones probadas** (§8 y §9): con la regla escrita antes, cuatro variantes en walk-forward (forma de la
    matriz con 1 y con 2 parámetros, recalibración por mercado, reparto por mitades según el total). Todas reducen
    los sesgos, pero la mejor mejora el log-loss de sus mercados 1.6 ee (se exigían más de 2). **No se adoptó nada.**
+10. **Auditoría independiente** (§10): sin fugas, cifras reproducidas, nada que revertir; **se sostiene con
+    reservas**. La lectura única de PRUEBA (481 partidos) confirma las combinadas, pero «ambos anotan» sale 5.8 puntos
+    corto (z = 3.2) y tres de las cuatro variantes rechazadas habrían mejorado sus mercados más de 2 ee ahí.
 
 ## 1. Aviso: los comandos existentes miden `ensamble` con rho = 0
 
@@ -571,6 +574,9 @@ debe registrarse (`arnes.registrar`) y contar sus variantes.
   sesgos de 2 ee, del tamaño del redondeo que ve el usuario, y la combinada los absorbe (queda calibrada).
 - No se midió nada en PRUEBA: con 480 partidos un sesgo de 2 puntos tiene un error de ≈ 2.3 puntos y no se
   distinguiría de cero.
+- *Nota de la auditoría (§10.6)*: PRUEBA se leyó después, una vez. «Ambos anotan» queda +5.8 puntos (ee 1.8) corto
+  ahí, no 2: el renglón anterior sobre «el tamaño del redondeo» no vale para los últimos tres torneos. Las combinadas
+  sí quedan calibradas en PRUEBA.
 
 ## 8. Regla de adopción de correcciones (escrita el 2026-11-15, ANTES de probar ninguna)
 
@@ -745,6 +751,11 @@ Parámetros estimados en el recorrido:
    largo y «gol en el 2T» ≈ 1.5 puntos corto, sesgos de 2 ee y del tamaño del redondeo; las combinadas siguen
    calibradas con la matriz de hoy.
 
+*Nota de la auditoría (§10.6 y §10.7)*: los puntos 1, 2 y 5 valen para DESARROLLO. La lectura única de PRUEBA dio
+un efecto cuatro veces mayor (`forma_1` −0.0068 ± 0.0028; `forma_2` −0.0087 ± 0.0033) y «ambos anotan» 5.8 puntos
+corto: PRUEBA sí podía decir algo, y lo que dice es que la corrección de forma queda como candidata, no descartada.
+La decisión de §9 (no adoptar con la regla escrita) se mantiene.
+
 ### 9.4 Conteo y archivos
 
 - **Variantes probadas: 4 correcciones** (todas informadas arriba; ninguna adoptada), además de lo ya contado en la
@@ -766,3 +777,212 @@ Parámetros estimados en el recorrido:
   `modelo.mejora` (ahí también movería el 1X2) o repitiendo `forma_1` tal cual, con esta misma regla, cuando haya
   bastantes más partidos pronosticados fuera de muestra.
 - El aviso de §1 (los comandos `validar` corren con rho = 0) sigue pendiente.
+
+## 10. Auditoría independiente (2026-11-15)
+
+Hecha por otro agente, después de §8 y §9 y sin fiarse de sus cifras. Todo se recalculó con código propio que no
+importa nada de `produccion/`, de `modelo/` ni de los guiones de quien corrigió (sólo lee los parquet, el npz de
+matrices y los CSV): `/tmp/claude-0/-home-user-SA/2bd39326-8617-5400-b04f-4c3059628357/scratchpad/mercados/auditoria/`
+(`a_comun.py`, `b_basicos.py`, `c_replica.py`, `d_combinadas.py`, `e_publicado.py`). El buscador de combinadas de
+producción sí se usa (es lo que se audita), pero cada conjunta se recalcula aparte.
+
+### 10.1 Plan de la lectura única de PRUEBA (escrito ANTES de leerla)
+
+Este apartado se escribió con los guiones ya cerrados y probados sólo con DESARROLLO (modo `ensayo`: se califican los
+tres últimos torneos de DESARROLLO por el mismo camino de código). Hasta aquí `ACCESOS_PRUEBA.log` tiene 126 líneas y
+ninguna es de esta auditoría. md5 de los guiones al cerrar el plan: `a_comun.py` bcefb8ae…, `c_replica.py` b71b27b6…,
+`d_combinadas.py` 2b4f597c….
+
+- **Qué se lee, una vez**: `modelo/pred/ensamble__prueba__dia.parquet` con `arnes.leer_pred` (queda anotado como
+  `quien=auditoria_mercados`) y su matriz en caché para recuperar el rho. Todos los partidos jugados de PRUEBA.
+- **Para qué sirve y para qué no**: §9 no adoptó nada, así que no hay corrección publicada que confirmar. La lectura
+  contesta dos preguntas y **no puede cambiar ninguna decisión** (la regla de §8 exige pasar en DESARROLLO; con PRUEBA
+  no se adopta, no se reajusta ni se elige nada):
+  - **A. ¿Lo que se publica se sostiene fuera de muestra?** Con la matriz de hoy (`ensamble` con su rho, reparto por
+    mitades de los 6 años anteriores a cada corte, corte por día): sesgo (observado − pronosticado), ee por bloques y
+    z de los seis sucesos objetivo; cuántos de los 52 mercados binarios pasan de 2 ee; y en las tres combinadas,
+    conjunta anunciada, frecuencia, diferencia, ee y z.
+  - **B. ¿Rechazar las cuatro variantes fue un error?** Cada variante con el procedimiento de §8.2 prolongado tal
+    cual: en cada corte los parámetros se estiman con todos los partidos con predicción guardada anteriores al corte
+    (DESARROLLO por bloque más los de PRUEBA ya jugados), encogidos por n/(n + 300). Se informa la diferencia del
+    log-loss sumado de sus objetivos con ee pareado y z, el sesgo después, el marcador exacto y las combinadas.
+- **Cómo se leerá (fijado de antemano)**:
+  - A queda **confirmada** si las tres combinadas caen dentro de 2 ee de lo anunciado; **desmentida** si alguna queda
+    fuera. Los sesgos de los sucesos objetivo se informan con su signo: mismo signo que en DESARROLLO = coherente; no
+    se espera que ninguno llegue a 2 ee por sí solo (con ≈ 480 partidos el ee de un sesgo es ≈ 2.2 puntos).
+  - B **confirma no adoptar** si ninguna variante mejora sus objetivos en más de 2 ee pareados. Si alguna los
+    mejorara en más de 2 ee, se anota como motivo para repetir la medición con más partidos; no se adopta.
+  - Potencia, dicha antes: el ee pareado esperado en PRUEBA es ≈ 0.003 contra efectos de 0.0004 a 0.002 en DESARROLLO.
+    Lo más probable es que B no distinga nada; sólo detectaría un daño o una mejora gruesos.
+- **Una sola corrida**: `python3 c_replica.py prueba` (mercados y combinadas en el mismo proceso). Sin repeticiones,
+  sin variantes nuevas, sin tocar parámetros después de ver el resultado.
+
+(Nota posterior: así se hizo. No hay commit entre este plan y la lectura de las 08:25:09 UTC; la constancia es el
+orden de la sesión y que los md5 de los guiones al correr eran los de arriba.)
+
+### 10.2 Fugas: no hay
+
+- **Truncamiento físico en los 510 cortes.** Recorrido rehecho desde cero: para cada corte se arma un subconjunto que
+  sólo contiene los partidos con inicio anterior al corte (se comprueba dentro del guion) y con él se estiman `nu`,
+  (`nu`, `kappa`) y los seis interceptos con optimizadores de `scipy` (no con la malla de quien corrigió). Contra los
+  parámetros que guardó (`params_forma_*.pkl`): `nu` de `forma_1` igual a **1.4e-5** en los 2,981 partidos; en
+  `forma_2`, `nu` a 0.0018 y `kappa` a 0.0010 (malla de 0.01 con parábola contra óptimo continuo); el número de
+  partidos previos coincide en los 2,981. Con todo DESARROLLO: `nu` = 1.114; (`nu`, `kappa`) = (1.121, 0.035).
+- **Cortes.** Ningún partido empieza antes del corte de su propio bloque (mínimo 9.5 h después) y ningún partido del
+  pasado empezó a menos de 2.5 h de un corte: nadie se pronostica con su bloque ni con un partido sin terminar.
+- **Reparto por mitades** (`mitades_total` y la referencia): recalculado desde `goles.csv` corte por corte, sin sumas
+  acumuladas; medias 0.427 / 0.416 (1 o 2 goles) y 0.456 / 0.456 (3 o más), y 0.4487 / 0.4453 el reparto único.
+- Las lambdas y el rho son los del arnés (auditados en `modelo/AUDITORIA.md` §1); la matriz guardada se reconstruye a
+  7.9e-9 con el rho recuperado por tres celdas distintas (coinciden entre sí).
+
+### 10.3 Sesgo de selección: no pudo inflar nada, porque no se adoptó nada
+
+- **Variantes**: 4, las declaradas. En la carpeta temporal hay un solo juego de salidas; las dos corridas empezaron a
+  las 07:56:50 UTC, después de la última edición de `evaluar_variantes.py` (07:56:29) y de `forma.py` (07:55:17), y
+  los guiones de §1 a §7 dejaron de tocarse a las 07:48. No hay rastro de corridas previas ni de otra configuración.
+- **Lo que no se puede verificar**: la hora en que se escribió §8 (el archivo no está en git y no hay commit
+  intermedio). Las fechas de los archivos son coherentes con que se escribió antes. Con resultado nulo importa poco:
+  una regla retocada después sólo habría servido para adoptar, y no se adoptó.
+- **Cuánto es elección sobre ruido**: la mejor de las cuatro quedó en z = −1.59. Si ninguna valiera nada, la
+  probabilidad de ver al menos eso en la mejor de cuatro independientes es 0.21 (0.056 con una sola; las cuatro están
+  correlacionadas, así que queda entre las dos). Además los sucesos objetivo se eligieron por estar sesgados en ese
+  mismo DESARROLLO, lo que favorece a la corrección. En DESARROLLO solo, la mejora no se distingue del ruido: bien
+  rechazada con la regla escrita.
+- Decisiones de implementación que la regla no detalla (encoger `nu` en escala logarítmica; mallas acotadas en
+  `nu` 0.5–2, `kappa` −0.1–0.2 e intercepto ±0.8): no cambian nada (el óptimo continuo da lo mismo).
+
+### 10.4 Reproducción independiente en DESARROLLO (2,981 partidos, 510 bloques)
+
+Errores estándar con un bootstrap de bloques propio (otra semilla) y, entre paréntesis en la z, con la fórmula de
+conglomerados. Las diferencias con §9 son de la semilla (≤ 0.1 en z).
+
+| Cifra | §9 | Auditoría |
+|---|---|---|
+| Sesgo hoy, z: ambos anotan / local anota / visita anota | 2.03 / 1.98 / 1.16 | 2.04 / 1.99 / 1.14 |
+| Sesgo hoy, z: local por 2+ / visita por 2+ / gol 2T | −2.18 / −2.46 / 1.94 | −2.26 / −2.46 / 1.94 |
+| Mercados con sesgo de más de 2 ee (de 52) | 6 | 6 |
+| `forma_1`, objetivos | −0.00159 (0.00113), z = −1.41 | −0.00159 (0.00112), z = −1.42 (−1.39) |
+| `forma_2`, objetivos | −0.00211 (0.00133), z = −1.59 | −0.00210 (0.00132), z = −1.59 (−1.56) |
+| `recal_6`, objetivos | −0.00112 (0.00146), z = −0.77 | −0.00112 (0.00147), z = −0.76 (−0.75) |
+| `mitades_total`, objetivo | −0.00044 (0.00038), z = −1.16 | −0.00044 (0.00037), z = −1.18 (−1.18) |
+| Marcador exacto, `forma_1` / `forma_2` | +0.00136 (1.6 ee) / +0.00145 (1.4 ee) | +0.00136 (1.5 ee) / +0.00145 (1.4 ee) |
+| Falla 3c: `descanso` con `forma_1`; `gana_mitad` con `mitades_total` | z = +1.39; +1.24 | z = +1.36; +1.24 |
+| Combinadas hoy (anunciada / frecuencia / z) | 0.481 / 0.486 / 0.5; 0.333 / 0.343 / 1.3; 0.203 / 0.209 / 0.7 | 0.4814 / 0.4864 / 0.52; 0.3325 / 0.3432 / 1.28; 0.2033 / 0.2087 / 0.73 |
+| Falla 3d: `equilibrada` con `forma_2` | 2.2 ee corta; log-loss +0.0041 (z = +1.3) | 2.27 ee corta; +0.0043 (z = +1.5) |
+| Sesgo después, mayor \|z\| en objetivos (`forma_1` / `forma_2` / `recal_6` / `mitades_total`) | 1.96 / 1.46 / 1.16 / 0.90 | 1.96 / 1.47 / 1.17 / 0.91 |
+
+Las cuatro variantes fallan la condición 1 también con mis cifras. **La regla se aplicó como está escrita.**
+
+### 10.5 Coherencia
+
+- **Producción no cambió**: desde antes de la medición (commit `3522e60`) el diff de `produccion/`, `modelo/` y `web/`
+  sólo toca `MERCADOS.md`, este archivo, `modelo/registro_variantes.jsonl` (4 líneas) y la bitácora de PRUEBA;
+  `mercados.py`, `combinada.py`, `exportar.py` y `sellos.py` están intactos. El 1X2 y el marcador sellados
+  (`salidas/sellos.jsonl`, 47 líneas) no cambiaron, tampoco después de volver a exportar (§10.8).
+- **El catálogo dice lo que dice su etiqueta**: los 52 mercados binarios reescritos desde la etiqueta dan exactamente
+  las mismas máscaras y familias; mis celdas contra `mercados.celdas`, 5e-17; las 52 probabilidades, 8e-16.
+- **La conjunta de cada combinada es la de la distribución**: en las 8,943 combinadas de DESARROLLO (y en las 1,443
+  de PRUEBA) la conjunta anunciada es idéntica a la suma de mis celdas donde se cumplen los cuatro picks; cero
+  reglas rotas (familias distintas, banda, pares implicados o excluidos, condicionales ≤ 0.97); banda ampliada 1 vez.
+- **Lo publicado** (`salidas/actual.json`, 9 partidos, 261 mercados, 27 combinadas), recalculado desde las lambdas, el
+  rho y el reparto por mitades que publica: diferencia máxima 7e-5 en 1X2, mercados, picks, conjuntas y marcador (el
+  JSON redondea a 4 decimales) y 5e-5 en las celdas de la matriz 7×7; los complementarios publicados suman 1 exacto;
+  nada fuera de [0, 1]; el marcador más probable coincide en los 9; el reparto por mitades publicado (0.4562 /
+  0.4512) es el que sale de `goles.csv` con los 6 años anteriores al corte.
+- Las variantes rechazadas también habrían sido coherentes (complementarios a 3e-15, 1X2 idéntico a 2e-15).
+
+### 10.6 Resultado de la lectura única de PRUEBA (481 partidos, 76 bloques, corte por día)
+
+Corrida única conforme a §10.1 (`ACCESOS_PRUEBA.log`, 2026-11-15T08:25:09Z, `quien=auditoria_mercados`). El 1X2 y el
+marcador de mi tabla coinciden con lo publicado para PRUEBA (log-loss 1.0222, marcador −2.9881).
+
+**A. Lo que se publica.**
+
+| Suceso | Pronosticado | Observado | dif (ee) | z | En DESARROLLO |
+|---|---:|---:|---:|---:|---:|
+| Ambos anotan | 0.535 | 0.593 | **+0.058 (0.018)** | **3.2** | +0.019, z = 2.0 |
+| Local anota | 0.781 | 0.811 | +0.030 (0.018) | 1.6 | +0.014, z = 2.0 |
+| Visita anota | 0.687 | 0.724 | +0.037 (0.020) | 1.8 | +0.010, z = 1.1 |
+| Local gana por 2+ | 0.255 | 0.241 | −0.014 (0.019) | −0.8 | −0.017, z = −2.3 |
+| Visita gana por 2+ | 0.137 | 0.110 | −0.027 (0.017) | −1.6 | −0.014, z = −2.5 |
+| Gol en el 2T | 0.782 | 0.788 | +0.006 (0.019) | 0.3 | +0.015, z = 1.9 |
+
+Los seis tienen el mismo signo que en DESARROLLO. De los 52 mercados, 2 pasan de 2 ee (ambos anotan y su
+complemento). Los totales también quedan algo cortos (más de 2.5: +0.014, z = 0.8; más de 3.5: +0.027, z = 1.4), en
+línea con el retraso del nivel de goles de §5.6: el hueco de ambos anotan en PRUEBA es en parte forma y en parte nivel.
+
+| Combinada (hoy) | Anunciada | Frecuencia | dif (ee) | z |
+|---|---:|---:|---:|---:|
+| segura | 0.496 | 0.489 | −0.008 (0.021) | −0.4 |
+| equilibrada | 0.320 | 0.316 | −0.004 (0.023) | −0.2 |
+| atrevida | 0.208 | 0.237 | +0.030 (0.020) | 1.5 |
+
+**A queda confirmada para las combinadas** (las tres dentro de 2 ee). **Ambos anotan no**: pasó de 2 ee por sí solo,
+cosa que el plan no esperaba; en los últimos tres torneos la página lo anuncia casi 6 puntos por debajo de lo que
+ocurre, no 2.
+
+**B. Las variantes rechazadas** (`d` del log-loss sumado de sus objetivos, ee pareado, z):
+
+| Variante | DESARROLLO | PRUEBA | Sesgo de ambos anotan después (z) | Marcador exacto en PRUEBA | Otros efectos en PRUEBA |
+|---|---|---|---:|---|---|
+| `forma_1` | −0.00159 (0.00112), −1.4 | **−0.0068 (0.0028), z = −2.5** | 2.3 | +0.0023 (0.0023), 1.0 ee | más/menos de 3.5 empeora más de 1 ee; `atrevida`: log-loss −0.030 (0.013) |
+| `forma_2` | −0.00210 (0.00132), −1.6 | **−0.0087 (0.0033), z = −2.7** | 2.1 | +0.0072 (0.0027), 2.7 ee | lo mismo; `atrevida`: −0.035 (0.013) |
+| `recal_6` | −0.00112 (0.00147), −0.8 | **−0.0098 (0.0047), z = −2.1** | 2.1 | no lo toca | no toca nada más |
+| `mitades_total` | −0.00044 (0.00037), −1.2 | −0.00004 (0.00067), −0.1 | — | no lo toca | `gana_mitad` +1.1 ee |
+
+Combinadas con las variantes en PRUEBA: las tres siguen dentro de 2 ee (z de −0.6 a 1.5) en todas.
+
+**B no confirma que rechazar saliera gratis**: tres de las cuatro mejoran sus objetivos en más de 2 ee en PRUEBA.
+Conforme al plan, **no se adopta nada** y queda anotado como motivo para repetir la medición. Lo que pesa en cada
+sentido:
+
+- A favor de que la corrección de forma vale: PRUEBA es independiente de DESARROLLO, el efecto tiene el mismo signo
+  y es cuatro veces mayor, y mejora el marcador exacto. Como aritmética descriptiva (no prerregistrada, no es base para adoptar), juntando los dos periodos:
+  `forma_1` −0.0023 (0.0010), z = −2.2; `forma_2` −0.0030 (0.0012), z = −2.5; `recal_6` z = −1.6; `mitades_total` −1.2.
+- En contra de adoptarla ya: son 481 partidos y tres variantes que suben por lo mismo (el único suceso que mejora
+  más de 2 ee por sí solo es ambos anotan: −0.003, z = −2.6; es casi la mitad de la ganancia); ni así queda corregido
+  ambos anotan (sigue 2.1 a 2.3 ee corto, la condición 2 fallaría); empeora más de 3.5; y parte del hueco es nivel de
+  goles, que la forma no arregla. Y PRUEBA no elige.
+
+### 10.7 Veredicto: se sostiene, con reservas
+
+**Se sostiene** que no se adoptara nada: no hay fugas, no hubo selección que inflara un resultado, las cifras salen
+iguales por otro camino, la regla se aplicó como estaba escrita y lo que se publica es coherente y es lo mismo de
+antes. No hay nada que revertir.
+
+**Reservas** (quedan también como notas en §0, §7 y §9):
+
+1. **El sesgo de «ambos anotan» es real y hoy es más grande de lo que dicen §7 y §9.3**: +5.8 puntos (ee 1.8) en los
+   481 partidos de PRUEBA contra +1.9 en DESARROLLO. No es «del tamaño del redondeo». La página lo sigue mostrando
+   corto, y con él «anota / no anota» (≈ 3 puntos).
+2. **§9.3 leyó de más el resultado nulo.** «Lo que ganan no se distingue del ruido» vale para DESARROLLO; y «los 480
+   de PRUEBA no pueden confirmarla ni desmentirla» resultó falso: el efecto en PRUEBA fue cuatro veces mayor y pasó de
+   2 ee. La regla, con 2,981 partidos, tenía poca potencia para un efecto de este tamaño (§6 ya lo decía).
+3. **La corrección de forma queda como candidata seria, no como descartada.** La decisión de adoptarla es del
+   responsable del proyecto, por la vía de `modelo.mejora` (todo el periodo; ahí también cambia el marcador sellado)
+   o por decisión manual con motivo escrito, sabiendo que el umbral de 2 ee sólo se cruza al sumar PRUEBA después de
+   haberla visto. Esta lectura ya gastó PRUEBA para esta familia: una confirmación limpia sólo puede venir de los
+   pronósticos sellados hacia adelante.
+4. **La hora del prerregistro de §8 no se puede verificar** (archivo sin historial en git).
+5. **El código de evaluación (el de §9 y el de esta auditoría) vive sólo en la carpeta temporal.**
+6. Siguen pendientes de antes: los comandos `validar ensamble` corren con rho = 0 (comprobado: `ensamble.parquet` no
+   tiene `x_rho`) y la combinada de jornada no tiene validación propia.
+
+### 10.8 Estado final
+
+- **Producción: igual.** No se adoptó ni se revirtió nada; no hubo commit ni push ni publicación.
+- `python3 -m pytest produccion/pruebas modelo/pruebas -q`: **`1 failed, 156 passed in 241.03s (0:04:01)`**. La que
+  falla es `produccion/pruebas/test_simulador.py::test_ultimos_resultados_usan_el_sello_oficial` (línea 470,
+  `assert 8 == 9`): la prueba marca como jugado uno de los pendientes y espera 9 pendientes de fase regular, cifra
+  escrita a mano cuando había 10; hoy hay 9 en `datos/partidos.csv` y quedan 8. Es anterior a esta tarea y ajena a los
+  mercados; no se tocó.
+- `python3 -m produccion.exportar`: **`salidas/actual.json  225 KB  modelo=ensamble  pendientes=9  sellos nuevos=0
+  63.5 s`** y `campeón: América 0.265, Cruz Azul 0.261, Toluca 0.199, Chivas 0.191, Monterrey 0.027`. Contra la
+  exportación de las 07:22: `sellos.jsonl` idéntico; en los 9 partidos pendientes, mismo pick de 1X2, mismo marcador
+  más probable y mismos picks en las 27 combinadas; lambdas y probabilidades difieren a lo más en 0.0001 (el corte se
+  movió 70 minutos). La exportación reescribió `salidas/actual.json`, `salidas/desempeno.json` (sólo la hora) y agregó
+  `salidas/historial/actual_20261115T0831Z.json`; la sesión principal decide si los versiona o los descarta.
+- `ACCESOS_PRUEBA.log`: dos líneas nuevas, la lectura de esta auditoría (08:25:09Z) y la rutinaria de `exportar`.
+- `modelo/registro_variantes.jsonl`: cuatro líneas nuevas (familia `mercados_correccion`, `periodo` = prueba), una por
+  variante calificada en la lectura única; ninguna variante nueva. Conteo total de esta familia: 4 variantes, cada
+  una calificada una vez en DESARROLLO (§9) y una vez en PRUEBA (§10.6).

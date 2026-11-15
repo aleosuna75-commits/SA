@@ -1,0 +1,65 @@
+== A. dispersion por partido: media de (obs - E)^2 - Var_modelo  (negativo = menos dispersion que el modelo)
+                    que  var_modelo_media  cuadrado_obs_medio  razon     dif     ee       z
+                  local            1.5132              1.3805 0.9123 -0.1328 0.0400 -3.3220
+                 visita            1.1511              1.0979 0.9538 -0.0531 0.0317 -1.6741
+                  total            2.6776              2.5726 0.9608 -0.1050 0.0703 -1.4930
+             diferencia            2.6509              2.3842 0.8994 -0.2668 0.0659 -4.0478
+covarianza local-visita            0.0067              0.0471    NaN  0.0404 0.0221  1.8307
+corr(lam_l, lam_v) entre partidos: -0.770 ; corr(gl, gv) observada: -0.0096
+
+== B. por tramos: nivel de goles y ceros con el nivel corregido (diagnostico dentro de muestra)
+                        0        1        2      3
+tramo             2016-18  2019-21  2022-25   todo
+n                     835      954     1192   2981
+media_l_pron        1.514    1.516    1.511  1.513
+media_l_obs         1.483    1.478    1.554   1.51
+cero_l_dif         -0.004   -0.009   -0.025 -0.014
+cero_l_z           -0.299    -0.69   -2.297 -1.977
+cero_l_dif_nivel   -0.011   -0.017   -0.016 -0.015
+disp_l              0.942    0.912    0.896  0.914
+media_v_pron        1.152    1.135    1.163  1.151
+media_v_obs         1.122    1.107    1.215  1.154
+cero_v_dif         -0.004      0.0   -0.022  -0.01
+cero_v_z           -0.224    0.026   -1.633 -1.162
+cero_v_dif_nivel   -0.013   -0.009   -0.007 -0.009
+disp_v              0.918    0.969    0.956  0.951
+total_dif          -0.061   -0.066    0.094 -0.001
+total_z            -1.195   -1.324    2.081 -0.023
+AA_SI_dif           0.009    0.001    0.041  0.019
+AA_SI_z             0.532    0.066    2.676   2.03
+H_L-1.5_dif        -0.016   -0.012   -0.022 -0.017
+H_L-1.5_z          -1.215    -0.94   -1.651 -2.178
+H_V-1.5_dif        -0.022   -0.015   -0.008 -0.014
+H_V-1.5_z          -1.979   -1.462   -0.867 -2.461
+G2T_SI_dif          0.004    0.024    0.016  0.015
+G2T_SI_z             0.24    1.712    1.427  1.937
+O25_dif            -0.017   -0.015    0.037  0.005
+O25_z              -1.016   -0.985    2.614  0.604
+torneo      Apertura 2016  Clausura 2017  Apertura 2017  Clausura 2018  Apertura 2018  Clausura 2019  Apertura 2019  Clausura 2020  Apertura 2020  Clausura 2021  Apertura 2021  Clausura 2022  Apertura 2022  Clausura 2023  Apertura 2023  Clausura 2024  Apertura 2024  Clausura 2025
+n                 167.000        167.000        167.000        167.000        167.000        167.000        185.000         90.000        171.000        170.000        171.000        170.000        171.000        171.000        170.000        170.000        170.000        170.000
+total_pron          2.682          2.689          2.686          2.636          2.637          2.661          2.665          2.700          2.698          2.630          2.573          2.539          2.584          2.672          2.708          2.714          2.740          2.764
+total_obs           2.778          2.461          2.515          2.599          2.671          2.689          2.941          2.889          2.520          2.394          2.193          2.594          2.813          2.795          2.829          2.859          2.682          2.806
+dif                 0.096         -0.228         -0.171         -0.037          0.033          0.028          0.276          0.189         -0.178         -0.236         -0.380          0.055          0.229          0.123          0.121          0.145         -0.057          0.042
+autocorrelacion de la diferencia por torneo (rezago 1): 0.41
+
+== C. mitades: proporcion del 1T segun el total del partido (bootstrap de bloques)
+ partidos    n  goles  prop_1T     ee
+total 1-2 1267   2005   0.4219 0.0113
+ total 3+ 1496   5936   0.4579 0.0065
+  total 1  529    529   0.4064 0.0213
+  total 2  738   1476   0.4275 0.0131
+prop_1T(total 1-2) - prop_1T(total 3+) = -0.0359 (ee 0.0123, z -2.91)
+sin gol en el 2T: {'pron': 0.2326, 'obs': 0.2174, 'binomial_con_marcador_obs': 0.2296, 'dif_reparto': -0.0122, 'z_reparto': -1.9194}
+sin gol en el 1T: {'pron': 0.3063, 'obs': 0.3083, 'binomial_con_marcador_obs': 0.3035, 'dif_reparto': 0.0048, 'z_reparto': 0.6577}
+
+== D. ensayo exploratorio (1 variante, DENTRO de muestra; el mismo de MERCADOS.md §3.3): encoger el total a la mitad
+  clave    d_ll     ee       z
+  AA_SI -0.0003 0.0006 -0.4988
+    O15  0.0013 0.0008  1.7353
+    O25  0.0023 0.0009  2.4888
+    O35  0.0008 0.0009  0.8808
+L_ANOTA  0.0002 0.0005  0.4916
+V_ANOTA -0.0002 0.0005 -0.3143
+ G1T_SI  0.0002 0.0005  0.3460
+ G2T_SI  0.0008 0.0005  1.5339
+    1X2  0.0008 0.0003  3.1524

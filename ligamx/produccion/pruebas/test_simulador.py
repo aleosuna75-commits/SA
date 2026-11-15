@@ -467,4 +467,7 @@ def test_ultimos_resultados_usan_el_sello_oficial(df, pron, tmp_path):
     assert u["pronostico"]["logloss"] == pytest.approx(-math.log(nuevos[0]["p_v"]), abs=1e-3)
     assert doc["desempeno"]["n_calificados"] == 1 and doc["desempeno"]["acumulado"]["n"] == 1
     assert pid not in [p["id"] for p in doc["pendientes"]]
-    assert doc["proyeccion"]["partidos_pendientes_regular"] == 9
+    # los pendientes de fase regular se cuentan en los datos del día (antes era un 9 escrito a mano, del 10-nov)
+    torneo = d.loc[m, "torneo"].iloc[0]
+    quedan = int(((d["torneo"] == torneo) & (d["fase"] == "regular") & d["estado"].isin(S.ESTADOS_PENDIENTES)).sum())
+    assert doc["proyeccion"]["partidos_pendientes_regular"] == quedan
