@@ -194,3 +194,4 @@ en la base quedaron aceptadas.
   Modelo en juego: al descanso 0-0 daba 26.5 / 38.2 / 35.3. Cierre: `pipeline.py auto` (ciclo de mejora sin cambio de
   modelo), primer pronóstico sellado calificado: acertó el ganador (Monterrey, 42.9%), no el marcador (1-1), y la
   combinada «equilibrada» salió completa (4 de 4). V12 publicada. Siguiente partido: Puebla–San Luis, 21-nov 01:00 UTC.
+- 2026-11-15 07:40 UTC · Corrida diaria: sin partidos nuevos; V13 publicada, `vivo/actual` en versión 19. Lanzado el workflow `07_mercados_ensamble.js` (tarea `wegjk24p6`, corrida `wf_0ce44788-b0f`): medición → corrección → auditoría de mercados y combinadas con `ensamble`. Para reanudarlo: `Workflow({scriptPath: "/home/user/SA/ligamx/notas/workflows/07_mercados_ensamble.js", resumeFromRunId: "wf_0ce44788-b0f"})`.
