@@ -1,126 +1,248 @@
 {
- "corrida_utc": "2026-11-14T07:21:26Z",
+ "corrida_utc": "2026-11-15T01:30:58Z",
  "pasos": {
   "datos": {
    "ok": true,
    "codigo": 0,
-   "nuevos_jugados": 0,
+   "nuevos_jugados": 1,
    "reprogramados": 0,
    "nuevos_en_calendario": 0,
-   "momios_actualizados": 1,
+   "momios_actualizados": 4,
    "tabla_coincide_con_espn": true,
-   "segundos": 7.7
+   "segundos": 6.7
   },
   "variables": {
    "ok": true,
-   "segundos": 11.1
+   "segundos": 4.5
   },
   "mejora": {
    "ok": true,
-   "omitido": "sin partidos nuevos",
-   "segundos": 0.0
+   "adoptado": null,
+   "segundos": 28.3
   },
   "pronostico": {
    "ok": true,
    "salida": [
-    "/home/user/SA/ligamx/salidas/actual.json  237 KB  modelo=ensamble  pendientes=10  sellos nuevos=1  58.9 s",
-    "campeón: América 0.266, Cruz Azul 0.263, Toluca 0.200, Chivas 0.193, Pachuca 0.022"
+    "/home/user/SA/ligamx/salidas/actual.json  225 KB  modelo=ensamble  pendientes=9  sellos nuevos=9  55.1 s",
+    "campeón: América 0.265, Cruz Azul 0.261, Toluca 0.199, Chivas 0.191, Monterrey 0.027"
    ],
-   "segundos": 64.3
+   "segundos": 56.4
   },
   "vivo": {
    "ok": true,
-   "estado": "sin_partidos",
-   "partidos": 0,
+   "estado": "terminado_hoy",
+   "partidos": 1,
    "siguiente": {
-    "id": 401876988,
-    "inicio_utc": "2026-11-14T23:00:00Z",
-    "local": "Querétaro",
-    "visitante": "Monterrey"
+    "id": 401877054,
+    "inicio_utc": "2026-11-21T01:00:00Z",
+    "local": "Puebla",
+    "visitante": "Atlético San Luis"
    },
    "incrustado": true,
-   "segundos": 2.2
+   "segundos": 17.8
   },
   "pagina": {
    "ok": true,
    "salida": [
-    "listo en 0.19 s"
+    "listo en 0.02 s"
    ],
    "segundos": 0.4
   }
  },
  "errores": [],
- "nuevos_jugados": [],
+ "nuevos_jugados": [
+  {
+   "id": "401876988",
+   "fecha_local": "2026-11-14",
+   "torneo": "Apertura 2026",
+   "fase": "regular",
+   "local": "Querétaro",
+   "visitante": "Monterrey",
+   "gl": 0,
+   "gv": 1,
+   "tiene_stats": true,
+   "tiene_eventos": true
+  }
+ ],
  "reprogramados": [],
  "nuevos_en_calendario": [],
  "proximo_partido": {
-  "id": "401876988",
-  "fecha_utc": "2026-11-14T23:00Z",
-  "fecha_local": "2026-11-14",
-  "hora_local": "17:00",
+  "id": "401877054",
+  "fecha_utc": "2026-11-21T01:00Z",
+  "fecha_local": "2026-11-20",
+  "hora_local": "19:00",
   "fase": "regular",
   "pierna": "",
   "estado": "programado",
-  "local": "Querétaro",
-  "visitante": "Monterrey",
-  "estadio": "Estadio Corregidora",
-  "ciudad": "Santiago de Querétaro",
+  "local": "Puebla",
+  "visitante": "Atlético San Luis",
+  "estadio": "Estadio Cuauhtémoc",
+  "ciudad": "Puebla",
   "momios": {
-   "ml_l": 3.4,
-   "ml_e": 3.65,
-   "ml_v": 2.05,
+   "ml_l": 2.7,
+   "ml_e": 3.4,
+   "ml_v": 2.4,
    "total_linea": 2.5,
-   "over": 1.741,
-   "under": 2.0,
+   "over": 1.645,
+   "under": 2.1,
    "proveedor": "DraftKings"
   }
  },
+ "mejora": {
+  "produccion": "ensamble",
+  "adoptado": null,
+  "tabla": [
+   {
+    "modelo": "ensamble",
+    "rol": "producción",
+    "n": 3462,
+    "logloss": 1.0249,
+    "logv_marcador": -2.8834
+   },
+   {
+    "modelo": "ajuste",
+    "rol": "retador",
+    "n": 3462,
+    "logloss": 1.0231,
+    "logv_marcador": -2.8893,
+    "d_logloss_vs_produccion": -0.0019,
+    "ee": 0.001,
+    "z": -1.96,
+    "d_ultimos_bloques": 0.0175,
+    "cumple_regla": false
+   },
+   {
+    "modelo": "elo",
+    "rol": "retador",
+    "n": 3462,
+    "logloss": 1.0303,
+    "logv_marcador": -2.892,
+    "d_logloss_vs_produccion": 0.0053,
+    "ee": 0.001,
+    "z": 5.48,
+    "d_ultimos_bloques": -0.0108,
+    "cumple_regla": false
+   },
+   {
+    "modelo": "dc2",
+    "rol": "retador",
+    "n": 3462,
+    "logloss": 1.0284,
+    "logv_marcador": -2.8937,
+    "d_logloss_vs_produccion": 0.0034,
+    "ee": 0.0011,
+    "z": 3.27,
+    "d_ultimos_bloques": -0.0035,
+    "cumple_regla": false
+   },
+   {
+    "modelo": "dc",
+    "rol": "retador",
+    "n": 3462,
+    "logloss": 1.0292,
+    "logv_marcador": -2.8942,
+    "d_logloss_vs_produccion": 0.0043,
+    "ee": 0.0009,
+    "z": 4.54,
+    "d_ultimos_bloques": 0.0032,
+    "cumple_regla": false
+   },
+   {
+    "modelo": "tiros",
+    "rol": "retador",
+    "n": 3462,
+    "logloss": 1.0311,
+    "logv_marcador": -2.8927,
+    "d_logloss_vs_produccion": 0.0062,
+    "ee": 0.0013,
+    "z": 4.59,
+    "d_ultimos_bloques": 0.0005,
+    "cumple_regla": false
+   }
+  ]
+ },
  "vivo": {
-  "estado": "sin_partidos",
-  "partidos": 0,
+  "estado": "terminado_hoy",
+  "partidos": 1,
   "siguiente": {
-   "id": 401876988,
-   "inicio_utc": "2026-11-14T23:00:00Z",
-   "local": "Querétaro",
-   "visitante": "Monterrey"
+   "id": 401877054,
+   "inicio_utc": "2026-11-21T01:00:00Z",
+   "local": "Puebla",
+   "visitante": "Atlético San Luis"
   },
   "incrustado": true
  },
  "modelo": "ensamble",
- "corte_local": "2026-11-14 01:21",
+ "corte_local": "2026-11-14 19:31",
  "campeon_top": [
   [
    "América",
-   0.2662
+   0.2647
   ],
   [
    "Cruz Azul",
-   0.2626
+   0.2606
   ],
   [
    "Toluca",
-   0.1999
+   0.1989
   ],
   [
    "Chivas",
-   0.1926
+   0.1905
   ],
   [
-   "Pachuca",
-   0.0222
+   "Monterrey",
+   0.0273
   ]
  ],
  "liguilla_en_curso": false,
- "pendientes": 10,
+ "pendientes": 9,
  "desempeno": {
-  "n_calificados": 0,
+  "n_calificados": 1,
   "acumulado": {
-   "n": 0
+   "n": 1,
+   "aciertos_1x2": 1,
+   "acierto_1x2": 1.0,
+   "marcadores_exactos": 0,
+   "marcador_exacto": 0.0,
+   "logloss": 0.8473,
+   "ee_logloss": null,
+   "brier": 0.4904,
+   "rps": 0.2094,
+   "prob_media_del_pick": 0.4286,
+   "logloss_referencia_tercios": 1.0986,
+   "combinadas": {
+    "segura": {
+     "n": 1,
+     "completas": 0,
+     "frecuencia": 0.0,
+     "prob_anunciada": 0.4606,
+     "picks_acertados_media": 3.0,
+     "picks_por_combinada": 4
+    },
+    "equilibrada": {
+     "n": 1,
+     "completas": 1,
+     "frecuencia": 1.0,
+     "prob_anunciada": 0.3077,
+     "picks_acertados_media": 4.0,
+     "picks_por_combinada": 4
+    },
+    "atrevida": {
+     "n": 1,
+     "completas": 0,
+     "frecuencia": 0.0,
+     "prob_anunciada": 0.2441,
+     "picks_acertados_media": 1.0,
+     "picks_por_combinada": 4
+    }
+   }
   }
  },
- "huella": "d646946cf1c1ed11302b1d9c63557a01",
+ "huella": "32c4631ef66be1af7d648ba38d588906",
  "publicar": false,
- "huella_publicada": "d646946cf1c1ed11302b1d9c63557a01",
- "segundos": 85.5,
- "publicado_utc": "2026-11-14T07:23:06Z"
+ "huella_publicada": "32c4631ef66be1af7d648ba38d588906",
+ "segundos": 114.1,
+ "publicado_utc": "2026-11-15T01:33:36Z"
 }

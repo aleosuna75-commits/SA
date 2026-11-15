@@ -1,30 +1,8 @@
 {
  "torneo": "Apertura 2026",
- "generado_utc": "2026-11-14T07:21:33Z",
+ "generado_utc": "2026-11-15T01:31:04Z",
  "fuente": "ESPN scoreboard mex.1",
  "partidos": [
-  {
-   "id": "401876988",
-   "fecha_utc": "2026-11-14T23:00Z",
-   "fecha_local": "2026-11-14",
-   "hora_local": "17:00",
-   "fase": "regular",
-   "pierna": "",
-   "estado": "programado",
-   "local": "Querétaro",
-   "visitante": "Monterrey",
-   "estadio": "Estadio Corregidora",
-   "ciudad": "Santiago de Querétaro",
-   "momios": {
-    "ml_l": 3.4,
-    "ml_e": 3.65,
-    "ml_v": 2.05,
-    "total_linea": 2.5,
-    "over": 1.741,
-    "under": 2.0,
-    "proveedor": "DraftKings"
-   }
-  },
   {
    "id": "401877054",
    "fecha_utc": "2026-11-21T01:00Z",
@@ -37,7 +15,15 @@
    "visitante": "Atlético San Luis",
    "estadio": "Estadio Cuauhtémoc",
    "ciudad": "Puebla",
-   "momios": null
+   "momios": {
+    "ml_l": 2.7,
+    "ml_e": 3.4,
+    "ml_v": 2.4,
+    "total_linea": 2.5,
+    "over": 1.645,
+    "under": 2.1,
+    "proveedor": "DraftKings"
+   }
   },
   {
    "id": "401877052",
@@ -51,7 +37,15 @@
    "visitante": "Atlante",
    "estadio": "Estadio Caliente",
    "ciudad": "Tijuana",
-   "momios": null
+   "momios": {
+    "ml_l": 1.625,
+    "ml_e": 4.1,
+    "ml_v": 4.6,
+    "total_linea": 2.5,
+    "over": 1.625,
+    "under": 2.1,
+    "proveedor": "DraftKings"
+   }
   },
   {
    "id": "401877053",
@@ -65,7 +59,15 @@
    "visitante": "Atlas",
    "estadio": "Estadio Olímpico Benito Juárez",
    "ciudad": "Ciudad Juárez",
-   "momios": null
+   "momios": {
+    "ml_l": 3.35,
+    "ml_e": 3.45,
+    "ml_v": 2.05,
+    "total_linea": 2.5,
+    "over": 1.645,
+    "under": 2.05,
+    "proveedor": "DraftKings"
+   }
   },
   {
    "id": "401877050",
@@ -79,7 +81,15 @@
    "visitante": "Toluca",
    "estadio": "Estadio Hidalgo",
    "ciudad": "Pachuca",
-   "momios": null
+   "momios": {
+    "ml_l": 2.8,
+    "ml_e": 3.9,
+    "ml_v": 2.15,
+    "total_linea": 3.5,
+    "over": 2.05,
+    "under": 1.645,
+    "proveedor": "DraftKings"
+   }
   },
   {
    "id": "401877051",

@@ -213,10 +213,14 @@ Escribir una primera vez el documento (ver 6.4) para que la página muestre «pr
 
 ### 6.4 Escribir el documento en la base del Artifact
 
-Una sola llamada, sin copiar ni leer nada antes (`salidas/vivo.json` se escribe de forma atómica: nunca se lee a medias):
+Dos pasos: **copiar a un archivo estable y escribir desde la copia**. `observar` reemplaza `salidas/vivo.json` en
+cada consulta (cada 20 s con partido en juego) y la herramienta rechaza la escritura si el archivo cambió entre que se
+aprueba y se envía («file_path no longer names the file that was approved»): pasó en el descanso del primer partido
+real (14-nov-2026). La copia no se versiona.
 
+    cp salidas/vivo.json salidas/vivo_relevo.json        # en el mismo Bash en que se lee la línea del evento
     ArtifactData  action=set  url=<la del Artifact>  collection=vivo  doc_id=actual
-                  file_path=/home/user/SA/ligamx/salidas/vivo.json  if_version=<V>
+                  file_path=/home/user/SA/ligamx/salidas/vivo_relevo.json  if_version=<V>
 
 - `<V>` es la `version` que devolvió la escritura anterior (está en el resultado de esa llamada; la primera del
   día sale de `salidas/vivo_version.txt`). La herramienta la exige para un documento que ya existe.

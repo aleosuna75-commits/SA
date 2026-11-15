@@ -1,14 +1,261 @@
 {
- "generado_utc": "2026-11-14T07:22:00.627787+00:00",
- "n_sellos": 38,
+ "generado_utc": "2026-11-15T01:31:48.762638+00:00",
+ "n_sellos": 47,
  "n_partidos_sellados": 10,
- "n_calificados": 0,
+ "n_calificados": 1,
  "primer_sello_utc": "2026-11-10T09:57:18.747707+00:00",
  "acumulado": {
-  "n": 0
+  "n": 1,
+  "aciertos_1x2": 1,
+  "acierto_1x2": 1.0,
+  "marcadores_exactos": 0,
+  "marcador_exacto": 0.0,
+  "logloss": 0.8472941937272592,
+  "ee_logloss": null,
+  "brier": 0.490438168106,
+  "rps": 0.209372446285,
+  "prob_media_del_pick": 0.428573,
+  "logloss_referencia_tercios": 1.0986122886681098,
+  "combinadas": {
+   "segura": {
+    "n": 1,
+    "completas": 0,
+    "frecuencia": 0.0,
+    "prob_anunciada": 0.460579,
+    "picks_acertados_media": 3.0,
+    "picks_por_combinada": 4
+   },
+   "equilibrada": {
+    "n": 1,
+    "completas": 1,
+    "frecuencia": 1.0,
+    "prob_anunciada": 0.307675,
+    "picks_acertados_media": 4.0,
+    "picks_por_combinada": 4
+   },
+   "atrevida": {
+    "n": 1,
+    "completas": 0,
+    "frecuencia": 0.0,
+    "prob_anunciada": 0.244111,
+    "picks_acertados_media": 1.0,
+    "picks_por_combinada": 4
+   }
+  }
  },
- "por_modelo": {},
- "por_torneo": {},
+ "por_modelo": {
+  "ensamble": {
+   "n": 1,
+   "aciertos_1x2": 1,
+   "acierto_1x2": 1.0,
+   "marcadores_exactos": 0,
+   "marcador_exacto": 0.0,
+   "logloss": 0.8472941937272592,
+   "ee_logloss": null,
+   "brier": 0.490438168106,
+   "rps": 0.209372446285,
+   "prob_media_del_pick": 0.428573,
+   "logloss_referencia_tercios": 1.0986122886681098,
+   "combinadas": {
+    "segura": {
+     "n": 1,
+     "completas": 0,
+     "frecuencia": 0.0,
+     "prob_anunciada": 0.460579,
+     "picks_acertados_media": 3.0,
+     "picks_por_combinada": 4
+    },
+    "equilibrada": {
+     "n": 1,
+     "completas": 1,
+     "frecuencia": 1.0,
+     "prob_anunciada": 0.307675,
+     "picks_acertados_media": 4.0,
+     "picks_por_combinada": 4
+    },
+    "atrevida": {
+     "n": 1,
+     "completas": 0,
+     "frecuencia": 0.0,
+     "prob_anunciada": 0.244111,
+     "picks_acertados_media": 1.0,
+     "picks_por_combinada": 4
+    }
+   }
+  }
+ },
+ "por_torneo": {
+  "Apertura 2026": {
+   "n": 1,
+   "aciertos_1x2": 1,
+   "acierto_1x2": 1.0,
+   "marcadores_exactos": 0,
+   "marcador_exacto": 0.0,
+   "logloss": 0.8472941937272592,
+   "ee_logloss": null,
+   "brier": 0.490438168106,
+   "rps": 0.209372446285,
+   "prob_media_del_pick": 0.428573,
+   "logloss_referencia_tercios": 1.0986122886681098,
+   "combinadas": {
+    "segura": {
+     "n": 1,
+     "completas": 0,
+     "frecuencia": 0.0,
+     "prob_anunciada": 0.460579,
+     "picks_acertados_media": 3.0,
+     "picks_por_combinada": 4
+    },
+    "equilibrada": {
+     "n": 1,
+     "completas": 1,
+     "frecuencia": 1.0,
+     "prob_anunciada": 0.307675,
+     "picks_acertados_media": 4.0,
+     "picks_por_combinada": 4
+    },
+    "atrevida": {
+     "n": 1,
+     "completas": 0,
+     "frecuencia": 0.0,
+     "prob_anunciada": 0.244111,
+     "picks_acertados_media": 1.0,
+     "picks_por_combinada": 4
+    }
+   }
+  }
+ },
  "nota": "Sólo cuentan pronósticos sellados antes del inicio de cada partido; con pocos partidos el error estándar es grande y ninguna cifra es concluyente.",
- "partidos": []
+ "partidos": [
+  {
+   "id": 401876988,
+   "fecha_utc": "2026-11-14T23:00:00+00:00",
+   "torneo": "Apertura 2026",
+   "fase": "regular",
+   "local": "Querétaro",
+   "visitante": "Monterrey",
+   "gl": 0,
+   "gv": 1,
+   "gl_ht": 0,
+   "gv_ht": 0,
+   "resultado": "V",
+   "modelo": "ensamble",
+   "sellado_utc": "2026-11-12T07:21:39.260587+00:00",
+   "lam_l": 1.218495,
+   "lam_v": 1.490747,
+   "p_l": 0.303671,
+   "p_e": 0.267756,
+   "p_v": 0.428573,
+   "pick": "V",
+   "prob_pick": 0.428573,
+   "acierto_1x2": 1,
+   "marcador_pronosticado": {
+    "gl": 1,
+    "gv": 1,
+    "prob": 0.127377
+   },
+   "marcador_exacto": 0,
+   "logloss": 0.8472941937272592,
+   "brier": 0.490438168106,
+   "rps": 0.209372446285,
+   "combinadas": {
+    "segura": {
+     "prob_conjunta": 0.460579,
+     "n_picks": 4,
+     "aciertos": 3,
+     "completa": false,
+     "picks": [
+      {
+       "clave": "V_ANOTA",
+       "etiqueta": "Monterrey anota",
+       "prob": 0.774795,
+       "acerto": true
+      },
+      {
+       "clave": "G2T_SI",
+       "etiqueta": "Hay gol en el segundo tiempo",
+       "prob": 0.770543,
+       "acerto": true
+      },
+      {
+       "clave": "O15",
+       "etiqueta": "Más de 1.5 goles",
+       "prob": 0.759435,
+       "acerto": false
+      },
+      {
+       "clave": "D_X2",
+       "etiqueta": "Monterrey o empate al descanso",
+       "prob": 0.744567,
+       "acerto": true
+      }
+     ]
+    },
+    "equilibrada": {
+     "prob_conjunta": 0.307675,
+     "n_picks": 4,
+     "aciertos": 4,
+     "completa": true,
+     "picks": [
+      {
+       "clave": "D_1X",
+       "etiqueta": "Querétaro o empate al descanso",
+       "prob": 0.670858,
+       "acerto": true
+      },
+      {
+       "clave": "U15_1T",
+       "etiqueta": "Menos de 1.5 goles en el primer tiempo",
+       "prob": 0.650916,
+       "acerto": true
+      },
+      {
+       "clave": "V_U15",
+       "etiqueta": "Monterrey anota menos de 1.5",
+       "prob": 0.560927,
+       "acerto": true
+      },
+      {
+       "clave": "U25",
+       "etiqueta": "Menos de 2.5 goles",
+       "prob": 0.491364,
+       "acerto": true
+      }
+     ]
+    },
+    "atrevida": {
+     "prob_conjunta": 0.244111,
+     "n_picks": 4,
+     "aciertos": 1,
+     "completa": false,
+     "picks": [
+      {
+       "clave": "D_12",
+       "etiqueta": "No hay empate al descanso",
+       "prob": 0.584575,
+       "acerto": false
+      },
+      {
+       "clave": "GM_V",
+       "etiqueta": "Monterrey gana alguna mitad",
+       "prob": 0.569169,
+       "acerto": true
+      },
+      {
+       "clave": "O25",
+       "etiqueta": "Más de 2.5 goles",
+       "prob": 0.508636,
+       "acerto": false
+      },
+      {
+       "clave": "V_2MAS",
+       "etiqueta": "Monterrey anota 2 o más",
+       "prob": 0.439073,
+       "acerto": false
+      }
+     ]
+    }
+   }
+  }
+ ]
 }

@@ -62,8 +62,9 @@ Pruebas al cierre: 157 de pytest, 230 revisiones de página en Chromium y 230 en
 parámetros (`produccion/simulador.py`: `N_SIM`, `N_MUESTRAS`; ~55 s y ~4.4 GB; error de P(campeón) ±0.06 puntos, antes
 ±0.36). La proyección en vivo usa 100,000 en 10,000 muestras (`vivo.py`; ~7 s por actualización; con 1,000,000 cada gol
 llegaría ~40 s tarde). Publicado como V6; `vivo/actual` en versión 3.
-**Sin probar todavía:** un partido real en juego y la página real recibiendo la base (sólo con base simulada). Primera
-prueba real: Querétaro–Monterrey, sábado 14-nov 17:00 de México (despertares ya programados, ver «Tareas programadas»).
+**Primera prueba real del vivo (14-nov, Querétaro 0-1 Monterrey): funcionó de punta a punta** (detalle en la bitácora).
+Falta que el usuario confirme que la página se movió sola en su teléfono: desde aquí sólo se ve que las escrituras
+en la base quedaron aceptadas.
 
 ## Pendientes de mejora
 - [ ] Fotos de campeón (`web/medios_parts/campeon.json`, unido a `web/medios.json`): sólo hay festejos libres de Toluca (Cl. 2025) y Pumas (Cl. 2011). Si aparecen fotos libres de otros equipos con el trofeo, agregarlas; la portada las toma sola cuando ese equipo es el favorito. (avanzar uno por corrida diaria si alcanza el presupuesto; marcar al cerrar)
@@ -108,8 +109,9 @@ prueba real: Querétaro–Monterrey, sábado 14-nov 17:00 de México (despertare
    `file_path=/home/user/SA/ligamx/web/index.html`, **siempre** con
    `url=https://claude.ai/artifact/K3fNKhot24LUcwn6PfXGF6` y `capabilities` = contenido de `web/capacidades.json`
    (`files` sólo si cambió `web/archivos_publicados.json`, con `root=/home/user/SA/ligamx/web`); después
-   `python3 pipeline.py publicado`. Luego escribir `salidas/vivo.json` en la base: `ArtifactData set`, `collection`
-   `vivo`, `doc_id` `actual`, `if_version` = `salidas/vivo_version.txt`; guardar ahí la versión nueva.
+   `python3 pipeline.py publicado`. Luego `cp salidas/vivo.json salidas/vivo_relevo.json` y escribir la copia en la
+   base: `ArtifactData set`, `collection` `vivo`, `doc_id` `actual`, `file_path` = la copia, `if_version` =
+   `salidas/vivo_version.txt`; guardar ahí la versión nueva.
 3. **En vivo:** `python3 pipeline.py vivo-plan --horas 48`. Por cada bloque de partidos (inicios con menos de 2 h 30
    de diferencia) sin despertares ya programados (`list_triggers`): `send_later` «armar» 20 min antes del primer
    inicio, «vigilar» 60 min después de cada inicio y «cierre» 2 h 30 después del último. El día de partido se sigue
@@ -167,3 +169,14 @@ prueba real: Querétaro–Monterrey, sábado 14-nov 17:00 de México (despertare
   de reconexión de `prueba.js` fallaba en WebKit por depender del reloj real: ahora avanza el reloj simulado.
 - 2026-11-13 07:30 UTC · Corrida diaria: sin partidos nuevos; V10 publicada, `vivo/actual` en versión 6. Despertares del vivo de Querétaro–Monterrey (14-nov) confirmados. Bajas de Monterrey revisadas con una búsqueda: sin novedades desde el 11-nov (Orellano entrena al parejo y apunta a jugar, Durdevic sigue aparte; otro medio confirma a Óliver Torres suspendido), no se cambió `config/actualidad.json`.
 - 2026-11-14 07:25 UTC · Corrida diaria (día de partido): sin partidos nuevos; V11 publicada, `vivo/actual` en versión 7. Hoy 23:00 UTC Querétaro–Monterrey: «armar» 22:40, «vigilar» 00:00 y «cierre» 01:30 UTC programados. Ojo: a esta hora `vivo.py estado` dice sin_partidos porque el día de partido cambia a las 04:00 de México.
+- 2026-11-15 01:40 UTC · **Primera prueba real del vivo: Querétaro 0-1 Monterrey.** `observar` corrió de 22:40 a 01:14 UTC
+  sin caídas ni respuestas raras de ESPN; 9 eventos: inicio (23:02:43), refresco 26', descanso (23:49:39), segundo tiempo
+  (00:07:42), gol de Monterrey 48' (00:09:52; ESPN lo dio primero sin goleador y después «Diego Rossi»), roja 51' de
+  Querétaro (ESPN la publicó hasta el 54'), refresco 79', roja 80' (al 82') y final (01:03:50). 11 despertares de la
+  sesión (armar, vigilar y 9 eventos) y 11 escrituras en `vivo/actual` (versiones 8 a 18). De evento detectado a
+  escritura: 15 a 20 s en goles y rojas, 50 a 80 s en lo que se agrupa (inicio, descanso, refresco). **Una falla:** en
+  el descanso la herramienta rechazó la escritura porque `observar` reemplazó `vivo.json` en ese instante; se resolvió
+  escribiendo desde una copia (`vivo_relevo.json`) y así quedó en VIVO.md §6.4. `vivo.json` dejó de versionarse.
+  Modelo en juego: al descanso 0-0 daba 26.5 / 38.2 / 35.3. Cierre: `pipeline.py auto` (ciclo de mejora sin cambio de
+  modelo), primer pronóstico sellado calificado: acertó el ganador (Monterrey, 42.9%), no el marcador (1-1), y la
+  combinada «equilibrada» salió completa (4 de 4). V12 publicada. Siguiente partido: Puebla–San Luis, 21-nov 01:00 UTC.
