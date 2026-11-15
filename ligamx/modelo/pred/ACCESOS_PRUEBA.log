@@ -123,3 +123,4 @@
 2026-11-15T01:31:34Z	accion=evaluar	quien=mejora.ciclo	modelo=tiros	periodo=prueba	granularidad=dia	partidos=481	parcial=False	pid=153	argv=pipeline.py auto
 2026-11-15T01:31:37Z	accion=lectura_pareadas	quien=mejora.adoptar	modelo=ensamble	pid=153	argv=pipeline.py auto
 2026-11-15T01:32:33Z	accion=leer	quien=desconocido	modelo=ensamble	granularidad=dia	pid=193	argv=/home/user/SA/ligamx/produccion/exportar.py
+2026-11-15T07:22:55Z	accion=leer	quien=desconocido	modelo=ensamble	granularidad=dia	pid=177	argv=/home/user/SA/ligamx/produccion/exportar.py
