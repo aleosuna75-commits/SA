@@ -263,9 +263,18 @@ quedan en `mercados.py` para repetir la medición; no se probaron más variantes
 
 ## 9. Pendientes y dudas
 
-- Repetir las dos validaciones con el modelo campeón (su `rho` y sus lambdas cambian la calibración de totales y de
-  ambos anotan).
-- El sesgo de ambos anotan y la poca discriminación de los totales (sección 3) son del modelo de goles.
+- **Hecho el 2026-11-15**: las dos validaciones se repitieron con el modelo de producción (`ensamble`, con su rho);
+  están en `MERCADOS_ENSAMBLE.md`. Las tablas de las secciones 3 y 4 de este documento siguen siendo las del
+  provisional `poisson_simple`. Con `ensamble` los totales ya discriminan y la combinada sigue calibrada; quedan
+  sesgos de unas 2 ee: ambos anotan ≈ 2 puntos corto, «gana por 2 o más» ≈ 1.5 puntos largo y gol en el 2T ≈ 1.5
+  puntos corto. Su origen (goles menos dispersos que Poisson) es del modelo de goles.
+- **Correcciones probadas y NO adoptadas (2026-11-15)**: con la regla escrita de antemano (`MERCADOS_ENSAMBLE.md` §8)
+  se evaluaron en walk-forward cuatro variantes (forma de la matriz con 1 y con 2 parámetros, recalibración por
+  mercado y reparto por mitades según el total). Todas reducen los sesgos, pero la mejor mejora el log-loss de sus
+  mercados 1.6 errores estándar (se exigían más de 2) y tres fallan además otra condición. El motor de mercados y la
+  combinada quedan como estaban (`MERCADOS_ENSAMBLE.md` §9).
+- Los comandos `validar <modelo>` de `mercados` y `combinada` corren con rho = 0 cuando el archivo de predicciones no
+  trae `x_rho` (es el caso de `ensamble`): `MERCADOS_ENSAMBLE.md` §1.
 - La regla de suspensiones no se contrastó aquí contra las alineaciones siguientes (`modelo/VARIABLES.md` documenta
   esa comprobación para la misma regla).
 - El tope 8 de la variante equilibrada y la regla 4 son decisiones de diseño, no parámetros ajustados con datos.
@@ -278,5 +287,7 @@ quedan en `mercados.py` para repetir la medición; no se probaron más variantes
   combinada del partido (3 variantes) con su validación, combinada de jornada, `paquete_partidos`, contexto,
   pronosticador provisional y `obtener_pronosticador`.
 - **Hecho y descartado por los datos**: córners y tarjetas (sección 8).
-- **Falta**: repetir las validaciones con el modelo campeón cuando exista `modelo/campeon.json`; `config/actualidad.json`
-  (lesionados) no existe; la combinada de jornada no tiene validación propia.
+- **Falta**: `config/actualidad.json` (lesionados) no existe; la combinada de jornada no tiene validación propia.
+
+Actualización del 2026-11-15: validación repetida con el modelo de producción y cuatro correcciones de sesgo
+probadas, ninguna adoptada (`MERCADOS_ENSAMBLE.md`). El código de `mercados.py` y `combinada.py` no cambió.
