@@ -47,7 +47,21 @@
   publicados y sólo se reenvían si cambian). Es privada: el usuario la comparte desde el menú Share.
 - [x] 8. Automatización: `pipeline.py auto` + `modelo/mejora.py ciclo` + tarea programada diaria (runbook abajo).
 
-## En curso
+## En curso (15-nov-2026, 07:35 UTC): revalidar mercados y combinadas con el modelo de producción
+Mejora pendiente elegida en la corrida diaria (no hay partidos hasta el 20-nov). Tarea de continuidad cada hora
+**activada**. Workflow `notas/workflows/07_mercados_ensamble.js`:
+1. [ ] `medicion`: validación walk-forward (DESARROLLO) de los 56 mercados y de las tres combinadas con `ensamble`;
+   qué mercados siguen sesgados (antes, con poisson_simple: «ambos anotan» −3.4 puntos; totales con poca discriminación).
+2. [ ] `correccion`: probar correcciones con regla escrita de antemano (adoptar sólo si mejora más de 2 errores
+   estándar pareados sin empeorar el 1X2 ni otros mercados), integrarla en `produccion/` con pruebas y documentación.
+3. [ ] `auditoria`: revisión independiente (fugas, sesgo de selección, reproducir cifras, confirmación única en PRUEBA);
+   si no se sostiene, revertir.
+Después (sesión principal): `python3 -m pytest produccion/pruebas -q`, `python3 pipeline.py auto`, pruebas de página si
+cambió `web/`, republicar (con `url` y capabilities), escribir `vivo/actual` desde la copia, commit y push, marcar el
+pendiente y **desactivar la tarea de continuidad**. Si el workflow se cortó: relanzarlo con `resumeFromRunId` (el id
+queda en la bitácora).
+
+### Último cierre (11 a 15-nov)
 Nada pendiente (11-nov-2026, 04:15 UTC). Lo último cerrado: rediseño a punto (portada por favorito que cabe en la
 primera pantalla del iPhone, mini-cuadro del torneo con ida y vuelta, cuadro por ancho, trofeo y confeti), liguilla con
 estructura de torneo y pronóstico de ida y vuelta por partido (`liguilla.torneo`), y capa EN VIVO (motor `vivo.py` +
