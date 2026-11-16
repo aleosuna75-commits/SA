@@ -1,5 +1,5 @@
 {
- "corrida_utc": "2026-11-15T08:37:55Z",
+ "corrida_utc": "2026-11-16T07:21:27Z",
  "pasos": {
   "datos": {
    "ok": true,
@@ -7,13 +7,13 @@
    "nuevos_jugados": 0,
    "reprogramados": 0,
    "nuevos_en_calendario": 0,
-   "momios_actualizados": 1,
+   "momios_actualizados": 7,
    "tabla_coincide_con_espn": true,
-   "segundos": 6.6
+   "segundos": 7.3
   },
   "variables": {
    "ok": true,
-   "segundos": 5.0
+   "segundos": 13.1
   },
   "mejora": {
    "ok": true,
@@ -23,15 +23,15 @@
   "pronostico": {
    "ok": true,
    "salida": [
-    "/home/user/SA/ligamx/salidas/actual.json  225 KB  modelo=ensamble  pendientes=9  sellos nuevos=0  65.7 s",
-    "campeón: América 0.265, Cruz Azul 0.261, Toluca 0.199, Chivas 0.191, Monterrey 0.027"
+    "/home/user/SA/ligamx/salidas/actual.json  226 KB  modelo=ensamble  pendientes=9  sellos nuevos=2  57.6 s",
+    "campeón: América 0.265, Cruz Azul 0.260, Toluca 0.199, Chivas 0.191, Monterrey 0.027"
    ],
-   "segundos": 66.9
+   "segundos": 63.8
   },
   "vivo": {
    "ok": true,
-   "estado": "terminado_hoy",
-   "partidos": 1,
+   "estado": "sin_partidos",
+   "partidos": 0,
    "siguiente": {
     "id": 401877054,
     "inicio_utc": "2026-11-21T01:00:00Z",
@@ -39,14 +39,14 @@
     "visitante": "Atlético San Luis"
    },
    "incrustado": true,
-   "segundos": 22.7
+   "segundos": 2.2
   },
   "pagina": {
    "ok": true,
    "salida": [
-    "listo en 0.02 s"
+    "listo en 0.11 s"
    ],
-   "segundos": 0.1
+   "segundos": 0.3
   }
  },
  "errores": [],
@@ -66,9 +66,9 @@
   "estadio": "Estadio Cuauhtémoc",
   "ciudad": "Puebla",
   "momios": {
-   "ml_l": 2.7,
+   "ml_l": 2.45,
    "ml_e": 3.4,
-   "ml_v": 2.4,
+   "ml_v": 2.65,
    "total_linea": 2.5,
    "over": 1.645,
    "under": 2.1,
@@ -76,8 +76,8 @@
   }
  },
  "vivo": {
-  "estado": "terminado_hoy",
-  "partidos": 1,
+  "estado": "sin_partidos",
+  "partidos": 0,
   "siguiente": {
    "id": 401877054,
    "inicio_utc": "2026-11-21T01:00:00Z",
@@ -87,27 +87,27 @@
   "incrustado": true
  },
  "modelo": "ensamble",
- "corte_local": "2026-11-15 02:38",
+ "corte_local": "2026-11-16 01:21",
  "campeon_top": [
   [
    "América",
-   0.2646
+   0.2648
   ],
   [
    "Cruz Azul",
-   0.2606
+   0.2603
   ],
   [
    "Toluca",
-   0.1989
+   0.199
   ],
   [
    "Chivas",
-   0.1905
+   0.1906
   ],
   [
    "Monterrey",
-   0.0274
+   0.0273
   ]
  ],
  "liguilla_en_curso": false,
@@ -154,9 +154,9 @@
    }
   }
  },
- "huella": "f6fe14b9c75b8dbe7a2e65a85e435fda",
+ "huella": "d14e45110246a8b7adc14d6c78672745",
  "publicar": false,
- "huella_publicada": "f6fe14b9c75b8dbe7a2e65a85e435fda",
- "segundos": 101.2,
- "publicado_utc": "2026-11-15T08:39:59Z"
+ "huella_publicada": "d14e45110246a8b7adc14d6c78672745",
+ "segundos": 86.6,
+ "publicado_utc": "2026-11-16T07:23:44Z"
 }

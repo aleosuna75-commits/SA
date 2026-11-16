@@ -47,8 +47,15 @@
   publicados y sólo se reenvían si cambian). Es privada: el usuario la comparte desde el menú Share.
 - [x] 8. Automatización: `pipeline.py auto` + `modelo/mejora.py ciclo` + tarea programada diaria (runbook abajo).
 
-## En curso
-Nada pendiente (15-nov-2026, 08:45 UTC). Tarea de continuidad desactivada.
+## En curso (16-nov-2026, 07:40 UTC): momios en los sellos y mercado calificado hacia adelante
+Mejora elegida en la corrida diaria (paso previo del pendiente «retador con mercado»). Tarea de continuidad **activada**.
+Workflow `notas/workflows/08_momios_en_sellos.js`:
+1. [ ] `implementar`: cada sello guarda los momios disponibles al sellar y su probabilidad sin margen (Shin);
+   `desempeno` califica también al mercado en los mismos partidos (pareado contra el modelo); la página lo muestra.
+2. [ ] `revisar`: revisión independiente (sin fugas: momios capturados antes del partido; sellos viejos siguen válidos;
+   pruebas de producción y de página en los dos navegadores).
+Después (sesión principal): `python3 pipeline.py auto`, republicar con `url` y capabilities, escribir `vivo/actual` desde
+la copia, commit y push, marcar el pendiente y **desactivar la tarea de continuidad**.
 
 ### Último cierre (11 a 15-nov)
 Nada pendiente (11-nov-2026, 04:15 UTC). Lo último cerrado: rediseño a punto (portada por favorito que cabe en la
@@ -198,3 +205,4 @@ en la base quedaron aceptadas.
   de PRUEBA: combinadas confirmadas, «ambos anotan» 5.8 puntos corto). Producción sin cambios en los pronósticos. Se
   arregló `test_ultimos_resultados_usan_el_sello_oficial` (tenía un 9 escrito a mano), se actualizó la nota honesta de
   la página sobre esos mercados y se publicó V14 (`vivo/actual` en versión 20). 82 pruebas de producción en verde.
+- 2026-11-16 07:35 UTC · Corrida diaria: sin partidos nuevos; V15 publicada, `vivo/actual` en versión 21. Se revisó el pendiente del sesgo del simulador tras la ida: ya se probó un factor de vuelta con las 119 series y no pasó (1.1 ee); sin datos nuevos no se reintenta hasta tener la liguilla real.

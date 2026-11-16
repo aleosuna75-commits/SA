@@ -1,6 +1,6 @@
 {
  "torneo": "Apertura 2026",
- "generado_utc": "2026-11-15T08:38:01Z",
+ "generado_utc": "2026-11-16T07:21:34Z",
  "fuente": "ESPN scoreboard mex.1",
  "partidos": [
   {
@@ -16,9 +16,9 @@
    "estadio": "Estadio Cuauhtémoc",
    "ciudad": "Puebla",
    "momios": {
-    "ml_l": 2.7,
+    "ml_l": 2.45,
     "ml_e": 3.4,
-    "ml_v": 2.4,
+    "ml_v": 2.65,
     "total_linea": 2.5,
     "over": 1.645,
     "under": 2.1,
@@ -38,12 +38,12 @@
    "estadio": "Estadio Caliente",
    "ciudad": "Tijuana",
    "momios": {
-    "ml_l": 1.625,
-    "ml_e": 4.1,
-    "ml_v": 4.6,
+    "ml_l": 1.588,
+    "ml_e": 4.2,
+    "ml_v": 4.7,
     "total_linea": 2.5,
-    "over": 1.625,
-    "under": 2.1,
+    "over": 1.606,
+    "under": 2.15,
     "proveedor": "DraftKings"
    }
   },
@@ -82,9 +82,9 @@
    "estadio": "Estadio Hidalgo",
    "ciudad": "Pachuca",
    "momios": {
-    "ml_l": 2.8,
+    "ml_l": 2.7,
     "ml_e": 3.9,
-    "ml_v": 2.15,
+    "ml_v": 2.2,
     "total_linea": 3.5,
     "over": 2.05,
     "under": 1.645,
@@ -103,7 +103,15 @@
    "visitante": "León",
    "estadio": "Estadio Corona",
    "ciudad": "Torreón",
-   "momios": null
+   "momios": {
+    "ml_l": 2.4,
+    "ml_e": 3.7,
+    "ml_v": 2.55,
+    "total_linea": 3.5,
+    "over": 2.2,
+    "under": 1.571,
+    "proveedor": "DraftKings"
+   }
   },
   {
    "id": "401877049",
@@ -139,7 +147,15 @@
    "visitante": "América",
    "estadio": "Estadio Universitario",
    "ciudad": "San Nicolás de los Garza",
-   "momios": null
+   "momios": {
+    "ml_l": 3.3,
+    "ml_e": 3.55,
+    "ml_v": 2.0,
+    "total_linea": 2.5,
+    "over": 1.588,
+    "under": 2.15,
+    "proveedor": "DraftKings"
+   }
   },
   {
    "id": "401877047",
@@ -153,7 +169,15 @@
    "visitante": "Cruz Azul",
    "estadio": "Estadio Akron",
    "ciudad": "Guadalajara",
-   "momios": null
+   "momios": {
+    "ml_l": 2.35,
+    "ml_e": 4.0,
+    "ml_v": 2.45,
+    "total_linea": 3.5,
+    "over": 2.3,
+    "under": 1.526,
+    "proveedor": "DraftKings"
+   }
   },
   {
    "id": "401877046",
@@ -167,7 +191,15 @@
    "visitante": "Necaxa",
    "estadio": "Estadio Corregidora",
    "ciudad": "Santiago de Querétaro",
-   "momios": null
+   "momios": {
+    "ml_l": 1.8,
+    "ml_e": 4.1,
+    "ml_v": 3.5,
+    "total_linea": 2.5,
+    "over": 1.541,
+    "under": 2.25,
+    "proveedor": "DraftKings"
+   }
   }
  ]
 }
