@@ -251,6 +251,8 @@ def _ultimos(df_t: pd.DataFrame, corte, jornadas: dict[int, str], oficiales: dic
     """
     Últimos resultados del torneo (los grupos de fechas más recientes hasta juntar `minimo` partidos)
     con lo que el modelo había pronosticado: del sello oficial o, si no hay, de modelo/pred.
+    `pronostico.mercado`: los momios guardados en ESE sello y su 1X2 sin margen, calificados contra el
+    resultado; None si el sello no los trae o el pronóstico no viene de un sello.
     """
     jug = df_t[(df_t["estado"] == "jugado") & (df_t["fecha_utc"] < corte) & df_t["gl"].notna()].sort_values(["fecha_utc", "id"])
     if jug.empty:
@@ -286,6 +288,12 @@ def _ultimos(df_t: pd.DataFrame, corte, jornadas: dict[int, str], oficiales: dic
                     "marcador": mg, "acierto_1x2": bool(kk == y),
                     "marcador_exacto": bool(mg["gl"] == int(r["gl"]) and mg["gv"] == int(r["gv"])),
                     "prob_del_resultado": float(P[y]), "logloss": float(-math.log(max(P[y], 1e-12)))}
+            mc = sellos.calificar_mercado(s, y, pron["logloss"]) if pid in oficiales else None
+            pron["mercado"] = None if mc is None else {
+                "proveedor": mc["proveedor"], "ml_local": mc["ml_l"], "ml_empate": mc["ml_e"], "ml_visitante": mc["ml_v"],
+                "margen": mc["margen"], "p_local": mc["p_l"], "p_empate": mc["p_e"], "p_visitante": mc["p_v"],
+                "pick": mc["pick"], "acierto_1x2": bool(mc["acierto_1x2"]), "prob_del_resultado": mc["prob_resultado"],
+                "logloss": mc["logloss"], "dif_logloss": mc["dif_logloss"]}
         local_t = r["fecha_utc"].tz_convert(datos.ZONA)
         out.append({"id": pid, "fecha_local": local_t.strftime("%Y-%m-%d"), "hora_local": local_t.strftime("%H:%M"),
                     "fase": r["fase"], "etiqueta": etiqueta_partido(r, jornadas), "local": r["local"],
@@ -615,11 +623,12 @@ def construir(corte=None, n_sim: int = simulador.N_SIM, sellar: bool | None = No
     des = sellos.calificar(df, ruta_sellos, ruta_desempeno, escribir=not retro or ruta_desempeno is not None)
     oficiales = sellos.sellos_oficiales(df, ruta_sellos)
     desempeno = {k: des[k] for k in ("generado_utc", "n_sellos", "n_partidos_sellados", "n_calificados", "primer_sello_utc",
-                                     "acumulado", "por_modelo", "por_torneo", "nota")}
+                                     "acumulado", "por_modelo", "por_torneo", "nota", "contra_mercado")}
     desempeno["partidos"] = [{k: f[k] for k in ("id", "fecha_utc", "local", "visitante", "gl", "gv", "resultado", "pick",
                                                 "acierto_1x2", "marcador_exacto", "logloss")} |
                              {"combinadas": {v: (None if c is None else {"aciertos": c["aciertos"], "completa": c["completa"]})
-                                             for v, c in f["combinadas"].items()}}
+                                             for v, c in f["combinadas"].items()},
+                              "logloss_mercado": f["mercado"]["logloss"] if f.get("mercado") else None}
                              for f in des["partidos"][-40:]]
 
     # ---- simulación ----
@@ -742,6 +751,54 @@ def _probabilidades(o, ruta=""):
             yield from _probabilidades(v, f"{ruta}[{i}]")
 
 
+def _validar_mercado(doc: dict) -> list[str]:
+    """Errores de `desempeno.contra_mercado` y del `mercado` sellado de cada resultado reciente."""
+    err = []
+    num = lambda x: isinstance(x, (int, float)) and not isinstance(x, bool) and math.isfinite(x)      # noqa: E731
+    des = doc["desempeno"] if isinstance(doc["desempeno"], dict) else {}
+    cm = des.get("contra_mercado")
+    if not isinstance(cm, dict):
+        return ["desempeno.contra_mercado falta"]
+    n, falta = cm.get("n"), [k for k in ("n", "n_sin_mercado", "n_sellados_con_mercado", "primer_sello_con_mercado_utc", "desde_local",
+                                         "n_minimo", "mercado", "modelo", "dif_logloss", "ee_dif_logloss", "lectura") if k not in cm]
+    if falta:
+        return [f"desempeno.contra_mercado: falta {falta}"]
+    if not isinstance(n, int) or isinstance(n, bool) or n < 0:
+        return [f"desempeno.contra_mercado.n inválido: {n}"]
+    if cm["lectura"] not in sellos.LECTURAS_MERCADO:
+        err.append(f"desempeno.contra_mercado.lectura desconocida: {cm['lectura']}")
+    if n + cm["n_sin_mercado"] != des.get("n_calificados"):
+        err.append("desempeno.contra_mercado: n + n_sin_mercado no es n_calificados")
+    if cm["n_sellados_con_mercado"] < n or (cm["n_sellados_con_mercado"] > 0) != bool(cm["desde_local"]):
+        err.append("desempeno.contra_mercado: n_sellados_con_mercado y desde_local no cuadran")
+    if n == 0:
+        if any(cm[k] is not None for k in ("mercado", "modelo", "dif_logloss", "ee_dif_logloss")) or cm["lectura"] != "sin_partidos":
+            err.append("desempeno.contra_mercado: sin partidos pareados no debe traer cifras")
+    else:
+        mo, me = cm["modelo"] or {}, cm["mercado"] or {}
+        if not all(num(o.get(k)) and o[k] >= 0 for o in (mo, me) for k in ("logloss", "brier", "rps")) or not num(cm["dif_logloss"]):
+            err.append("desempeno.contra_mercado: métricas ausentes o negativas")
+        elif abs(mo["logloss"] - me["logloss"] - cm["dif_logloss"]) > 2e-4:
+            err.append("desempeno.contra_mercado: dif_logloss no es modelo − mercado")
+        if mo.get("n") != n or me.get("n") != n:
+            err.append("desempeno.contra_mercado: modelo y mercado deben contar los mismos partidos")
+        if (cm["ee_dif_logloss"] is None) != (n < 2) or (cm["ee_dif_logloss"] is not None and not (num(cm["ee_dif_logloss"]) and cm["ee_dif_logloss"] >= 0)):
+            err.append("desempeno.contra_mercado: ee_dif_logloss debe ser null sólo con menos de 2 partidos")
+        if (cm["lectura"] == "pocos_partidos") != (n < cm["n_minimo"]):
+            err.append("desempeno.contra_mercado: lectura no corresponde a n")
+    for u in doc["ultimos_resultados"]:
+        m = (u.get("pronostico") or {}).get("mercado")
+        if m is None:
+            continue
+        if u["pronostico"].get("origen") != "sello":
+            err.append(f"resultado {u.get('id')}: mercado en un pronóstico que no viene de un sello")
+        if not all(num(m.get(k)) for k in ("p_local", "p_empate", "p_visitante", "logloss", "dif_logloss")):
+            err.append(f"resultado {u.get('id')}: mercado sellado incompleto")
+        elif abs(m["p_local"] + m["p_empate"] + m["p_visitante"] - 1.0) > 2e-4 or m["logloss"] < 0 or m.get("pick") not in PICKS:
+            err.append(f"resultado {u.get('id')}: mercado sellado inválido")
+    return err
+
+
 def validar(doc: dict, peso: int | None = None) -> list[str]:
     """Lista de errores del documento (vacía = válido): campos, rangos, sumas y peso."""
     err = []
@@ -793,6 +850,7 @@ def validar(doc: dict, peso: int | None = None) -> list[str]:
         err.append(f"las probabilidades de clasificar suman {s} (deben sumar 8)")
     if not isinstance(doc["avisos"], list) or not doc["avisos"]:
         err.append("avisos vacío")
+    err += _validar_mercado(doc)
     if peso is None:
         peso = len(json.dumps(doc, ensure_ascii=False, separators=(",", ":")).encode("utf-8"))
     if peso >= PESO_MAXIMO:

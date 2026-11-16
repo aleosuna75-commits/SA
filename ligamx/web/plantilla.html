@@ -1919,6 +1919,17 @@ function tablaFinal() {
 }
 
 /* ---------- 5. última jornada y desempeño ---------- */
+function mercadoSellado(u) { /* momios guardados en el sello de ese partido; Python ya los calificó (aquí sólo se da formato) */
+  var p = u.pronostico, m = obj(p.mercado);
+  if (!m) return p.origen === 'sello' ? '<p class="nota" data-mercado="no">Sin comparación con el mercado: el sello de este partido no guardó momios.</p>' : '';
+  var barra = x12(m.p_local, m.p_empate, m.p_visitante, true);
+  if (!barra) return '';
+  var cerca = !ok(m.dif_logloss) ? '' : m.dif_logloss < 0 ? ' Aquí estuvo más cerca el modelo.' : m.dif_logloss > 0 ? ' Aquí estuvo más cerca el mercado.' : ' Aquí quedaron iguales.';
+  return '<div class="compara__f antes" data-mercado="si"><span>Mercado al sellar' + (m.proveedor ? ' (' + E(m.proveedor) + ')' : '') + '</span>' + barra +
+    '<small><span>' + pct(m.p_local) + '</span><span>' + pct(m.p_empate) + '</span><span>' + pct(m.p_visitante) + '</span></small></div>' +
+    '<p class="nota">' + (ok(m.prob_del_resultado) ? 'El mercado le daba ' + pct(m.prob_del_resultado) + ' a lo que pasó. ' : '') +
+    (ok(m.logloss) && ok(p.logloss) ? 'Log-loss de este partido: modelo ' + n2(p.logloss, 3) + ', mercado ' + n2(m.logloss, 3) + ' (menos es mejor).' + cerca : '') + '</p>';
+}
 function resultado(u) {
   var p = u.pronostico;
   var h = '<article class="res corner a"><p class="mini">' + E(u.etiqueta || '') + (u.fecha_local ? ' · ' + fechaCorta(u.fecha_local) : '') + '</p>' +
@@ -1928,7 +1939,8 @@ function resultado(u) {
   return h + x12(p.p_local, p.p_empate, p.p_visitante, true) +
     '<p class="nota">El modelo decía: <b>' + (nom ? 'gana ' + E(nom) : 'empate') + '</b> (' + pct(pp) + ')' + (m && ok(m.gl) ? ', marcador ' + m.gl + '-' + m.gv : '') + '.' +
     (ok(p.prob_del_resultado) ? ' A lo que pasó le daba ' + pct(p.prob_del_resultado) + '.' : '') + '</p>' +
-    '<div class="sellos"><span class="sello-r ' + (p.acierto_1x2 ? 'si">Resultado acertado' : 'no">Resultado fallado') + '</span>' + (p.marcador_exacto ? '<span class="sello-r si">Marcador exacto</span>' : '') + '</div></article>';
+    '<div class="sellos"><span class="sello-r ' + (p.acierto_1x2 ? 'si">Resultado acertado' : 'no">Resultado fallado') + '</span>' + (p.marcador_exacto ? '<span class="sello-r si">Marcador exacto</span>' : '') + '</div>' +
+    parcial('mercado sellado', function () { return mercadoSellado(u); }) + '</article>';
 }
 function ultima() {
   var us = D.ultimos_resultados;
@@ -1940,10 +1952,37 @@ function ultima() {
     '<div class="rej rej--3">' + us.map(function (u) { return parcial(u.local + ' vs ' + u.visitante, function () { return resultado(u); }); }).join('') + '</div>' +
     (noSellado ? '<p class="nota">Estos pronósticos salen de la validación histórica del modelo (hechos sólo con información anterior a cada partido), no de un sello en vivo. Los pronósticos sellados empiezan a contar con el próximo partido.</p>' : '');
 }
+var LECTURA_MERCADO = {
+  pocos_partidos: function (n, min) { return '<b>Con ' + n + (n === 1 ? ' partido' : ' partidos') + ' no se puede concluir nada.</b> A este tamaño la diferencia es sobre todo ruido: hacen falta al menos ' + min + ' partidos para empezar a leerla, y muchos más para confiar en ella.'; },
+  sin_diferencia_clara: function (n) { return '<b>Con ' + n + ' partidos no hay una diferencia clara.</b> Es menor a dos errores estándar: todavía no distingue al modelo del mercado.'; },
+  mercado_mejor: function (n) { return '<b>Con ' + n + ' partidos el mercado va mejor</b>, por más de dos errores estándar. Coincide con la validación histórica, donde el mercado de cierre le gana al modelo.'; },
+  modelo_mejor: function (n) { return '<b>Con ' + n + ' partidos el modelo va mejor</b>, por más de dos errores estándar. Tómese con cautela: la cuenta se revisa cada jornada, así que una racha puede cruzar ese umbral por azar, y en la validación histórica gana el mercado.'; }
+};
+function contraMercado(d) { /* todo viene calculado en desempeno.contra_mercado; aquí no se compara ni se promedia nada */
+  var m = obj(d.contra_mercado); if (!m) return '';
+  var cab = '<div class="sub" id="contra-mercado" data-lectura="' + E(m.lectura || '') + '"><h4>Modelo contra mercado</h4>';
+  var mo = obj(m.modelo), me = obj(m.mercado), desde = m.desde_local ? fechaCorta(m.desde_local, true) : '', n = m.n;
+  if (!ok(n) || n < 1 || !mo || !me) {
+    var ya = ok(m.n_sellados_con_mercado) && m.n_sellados_con_mercado > 0 ? ' Ya ' + (m.n_sellados_con_mercado === 1 ? 'los trae 1 partido pendiente' : 'los traen ' + m.n_sellados_con_mercado + ' partidos pendientes') + '.' : '';
+    return cab + '<p class="nota">' + (desde
+      ? 'Todavía no hay ningún partido calificado con mercado sellado. Los momios de cada partido se guardan en su sello desde el ' + E(desde) + '.' + ya + ' La comparación empieza cuando se juegue el primero.'
+      : 'Todavía ningún sello trae momios del mercado: se guardan junto al pronóstico en cuanto existen antes del partido, y a partir de ahí se compara.') + '</p></div>';
+  }
+  var min = ok(m.n_minimo) ? m.n_minimo : 30, lee = typeof m.lectura === 'string' && LECTURA_MERCADO.hasOwnProperty(m.lectura) ? LECTURA_MERCADO[m.lectura] : null, mismos = n === 1 ? 'El mismo partido' : 'Los mismos ' + n + ' partidos';
+  var fuera = ok(m.n_sin_mercado) && m.n_sin_mercado > 0 ? ' Quedan fuera ' + m.n_sin_mercado + (m.n_sin_mercado === 1 ? ' partido calificado cuyo sello no guardó momios.' : ' partidos calificados cuyo sello no guardó momios.') : '';
+  var ac = ok(mo.aciertos_1x2) && ok(me.aciertos_favorito) ? '<ul class="lista"><li><span>Resultados acertados en esos partidos</span><span>modelo ' + mo.aciertos_1x2 + ' de ' + n + ' · favorito del mercado ' + me.aciertos_favorito + ' de ' + n + '</span></li></ul>' : '';
+  return cab + '<p class="nota">' + mismos + ', contra los momios guardados en cada sello: los que había al sellar (no los de cierre), ya sin el margen de la casa' + (desde ? '. Se guardan desde el ' + E(desde) : '') + '.' + fuera + '</p>' +
+    '<dl class="datos"><div><dt>Partidos comparados</dt><dd>' + n + '</dd></div>' +
+    '<div><dt>Log-loss del modelo</dt><dd>' + n2(mo.logloss, 3) + '</dd></div>' +
+    '<div><dt>Log-loss del mercado</dt><dd>' + n2(me.logloss, 3) + '</dd></div>' +
+    '<div><dt>Diferencia (modelo − mercado)</dt><dd>' + sig(m.dif_logloss, 3) + ' <small>' + (ok(m.ee_dif_logloss) ? '± ' + n2(m.ee_dif_logloss, 3) + ' (error estándar)' : 'un solo partido: sin error estándar') + '</small></dd></div></dl>' + ac +
+    '<p class="nota">' + (lee ? lee(n, min) + ' ' : '') + 'Menos log-loss es mejor: una diferencia positiva favorece al mercado.</p></div>';
+}
 function desempeno() {
   var d = D.desempeno || {}, a = d.acumulado || {};
+  var mercado = parcial('modelo contra mercado', function () { return contraMercado(d); });
   var cab = '<div class="bloque a"><div class="bloque__cab"><h3>Desempeño sellado</h3><p>Sólo cuentan los pronósticos publicados antes del silbatazo inicial. Sin trampas: lo sellado no se edita.</p></div>';
-  if (!a.n) return cab + vacio('Todavía no hay partidos calificados', 'Ya hay ' + c(d.n_partidos_sellados) + ' partidos con pronóstico sellado. La medición real empieza con el próximo partido que se juegue.') + (d.nota ? '<p class="nota">' + E(d.nota) + '</p>' : '') + '</div>';
+  if (!a.n) return cab + vacio('Todavía no hay partidos calificados', 'Ya hay ' + c(d.n_partidos_sellados) + ' partidos con pronóstico sellado. La medición real empieza con el próximo partido que se juegue.') + (d.nota ? '<p class="nota">' + E(d.nota) + '</p>' : '') + mercado + '</div>';
   var h = '<div class="resumen"><div><b>' + pct(a.acierto_1x2, 0) + '</b><span>resultados acertados (' + c(a.aciertos_1x2) + ' de ' + a.n + ')</span></div>' +
     '<div><b>' + c(a.marcadores_exactos) + '<small> de ' + a.n + '</small></b><span>marcadores exactos</span></div>' +
     (ok(a.logloss) ? '<div><b>' + n2(a.logloss, 3) + '</b><span>log-loss' + (ok(a.logloss_referencia_tercios) ? ' (al azar: ' + n2(a.logloss_referencia_tercios, 3) + '; menos es mejor)' : '') + '</span></div>' : '') +
@@ -1951,7 +1990,7 @@ function desempeno() {
   var cb = a.combinadas || {}, filas = ['segura', 'equilibrada', 'atrevida'].filter(function (k) { return cb[k] && cb[k].n; }).map(function (k) {
     return '<li><span>Combinada ' + NOMBRES[k].toLowerCase() + ': completas ' + c(cb[k].completas) + ' de ' + cb[k].n + '</span><span>' + pct(cb[k].frecuencia, 0) + ' real · ' + pct(cb[k].prob_anunciada, 0) + ' anunciada</span></li>';
   }).join('');
-  return cab + h + (filas ? '<ul class="lista">' + filas + '</ul>' : '') + (d.nota ? '<p class="nota">' + E(d.nota) + '</p>' : '') + '</div>';
+  return cab + h + (filas ? '<ul class="lista">' + filas + '</ul>' : '') + (d.nota ? '<p class="nota">' + E(d.nota) + '</p>' : '') + mercado + '</div>';
 }
 
 /* ---------- 6. estadios ---------- */
