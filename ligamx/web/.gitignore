@@ -1,1 +1,4 @@
 documento.html
+# temporales de las pruebas de la página (se borran al terminar; que un punto de control a media corrida no se los lleve)
+_variante_*.html
+_rev_*.html

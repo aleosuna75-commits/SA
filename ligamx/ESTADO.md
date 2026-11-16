@@ -47,15 +47,8 @@
   publicados y sólo se reenvían si cambian). Es privada: el usuario la comparte desde el menú Share.
 - [x] 8. Automatización: `pipeline.py auto` + `modelo/mejora.py ciclo` + tarea programada diaria (runbook abajo).
 
-## En curso (16-nov-2026, 07:40 UTC): momios en los sellos y mercado calificado hacia adelante
-Mejora elegida en la corrida diaria (paso previo del pendiente «retador con mercado»). Tarea de continuidad **activada**.
-Workflow `notas/workflows/08_momios_en_sellos.js`:
-1. [ ] `implementar`: cada sello guarda los momios disponibles al sellar y su probabilidad sin margen (Shin);
-   `desempeno` califica también al mercado en los mismos partidos (pareado contra el modelo); la página lo muestra.
-2. [ ] `revisar`: revisión independiente (sin fugas: momios capturados antes del partido; sellos viejos siguen válidos;
-   pruebas de producción y de página en los dos navegadores).
-Después (sesión principal): `python3 pipeline.py auto`, republicar con `url` y capabilities, escribir `vivo/actual` desde
-la copia, commit y push, marcar el pendiente y **desactivar la tarea de continuidad**.
+## En curso
+Nada pendiente (16-nov-2026, 08:30 UTC). Tarea de continuidad desactivada.
 
 ### Último cierre (11 a 15-nov)
 Nada pendiente (11-nov-2026, 04:15 UTC). Lo último cerrado: rediseño a punto (portada por favorito que cabe en la
@@ -67,7 +60,8 @@ avance de series). Publicado en https://claude.ai/artifact/K3fNKhot24LUcwn6PfXGF
 un duplicado, como pasó con https://claude.ai/artifact/9Pa1hLxwQxgokdJJUowHqF, que no se usa y sólo se borra si el
 usuario lo pide). Workflows: `notas/workflows/05_vivo_y_rediseno.js` y `06_correcciones.js`; críticas en
 `notas/critica_visual_v4.md` y en el diario de la corrida `wf_0172a560-1c9`.
-Pruebas al cierre: 157 de pytest, 230 revisiones de página en Chromium y 230 en WebKit.
+Pruebas al cierre: 157 de pytest, 230 revisiones de página en Chromium y 230 en WebKit (desde el 16-nov: 110 de
+producción y 254 revisiones de página por motor).
 **Simulaciones (pedido del usuario, 11-nov):** el pronóstico usa **1,000,000 de torneos** en 50,000 muestras de
 parámetros (`produccion/simulador.py`: `N_SIM`, `N_MUESTRAS`; ~55 s y ~4.4 GB; error de P(campeón) ±0.06 puntos, antes
 ±0.36). La proyección en vivo usa 100,000 en 10,000 muestras (`vivo.py`; ~7 s por actualización; con 1,000,000 cada gol
@@ -106,7 +100,13 @@ en la base quedaron aceptadas.
   `modelo/cache/M_ensamble.npz`.
 - [ ] Sesgo del simulador tras la ida (subestima ~10 puntos al que cierra en casa): reevaluar con la liguilla real.
 - [ ] Retador "con mercado" (mezclar el modelo con los momios disponibles al pronosticar) evaluado sólo con
-  pronósticos sellados.
+  pronósticos sellados. **Paso previo hecho el 16-nov (workflow 08):** cada sello guarda los momios del momento y su
+  1X2 sin margen (Shin) en `mercado`; `desempeno.contra_mercado` califica al mercado en los mismos partidos (pareado,
+  con error estandar y `lectura`), y la página lo muestra («Modelo contra mercado»). Los 9 partidos de la Jornada 17
+  ya están sellados con momios. Falta: (a) decidir con el usuario si el pronóstico final (picks, marcador,
+  combinadas) debe usar los momios; en la historia el mercado de cierre gana por 0.019 de log-loss; los de apertura
+  sólo existen desde dic-2025; (b) si se hace, sellar también cerca del inicio (en «armar») para usar momios casi de
+  cierre. La tarjeta de pendientes muestra el reparto proporcional y el sello guarda Shin: unificar.
 - [ ] Sitio estático (Netlify): `netlify.toml` ya construye `sitio_f1/ligamx/` en cada despliegue.
 - [ ] Revisar la página en el Artifact real desde un iPhone (el usuario) y atender lo que reporte.
 
@@ -207,3 +207,9 @@ en la base quedaron aceptadas.
   la página sobre esos mercados y se publicó V14 (`vivo/actual` en versión 20). 82 pruebas de producción en verde.
 - 2026-11-16 07:35 UTC · Corrida diaria: sin partidos nuevos; V15 publicada, `vivo/actual` en versión 21. Se revisó el pendiente del sesgo del simulador tras la ida: ya se probó un factor de vuelta con las 119 series y no pasó (1.1 ee); sin datos nuevos no se reintenta hasta tener la liguilla real.
 - 2026-11-16 07:42 UTC · Lanzado `08_momios_en_sellos.js` (tarea `w71jro89s`, corrida `wf_dcc3775a-252`). Para reanudarlo: `Workflow({scriptPath: "/home/user/SA/ligamx/notas/workflows/08_momios_en_sellos.js", resumeFromRunId: "wf_dcc3775a-252"})`.
+- 2026-11-16 08:30 UTC · Workflow 08 terminado tras un corte del servicio (error 529; se relanzó con `resumeFromRunId`):
+  sellos con momios y «Modelo contra mercado» en el desempeño y en la página; revisión independiente «listo con
+  arreglos» (sin fugas, Shin y métricas reproducidos, 49 sellos viejos intactos). 9 sellos nuevos con mercado
+  (Jornada 17). 110 pruebas de producción y 254 + 254 de página en verde. V16 publicada; `vivo/actual` en versión 22.
+  Lección: los puntos de control automáticos a media revisión pueden llevarse archivos temporales (`web/.gitignore`
+  ya ignora `_rev_*.html` y `_variante_*.html`).
