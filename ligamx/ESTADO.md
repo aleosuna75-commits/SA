@@ -206,3 +206,4 @@ en la base quedaron aceptadas.
   arregló `test_ultimos_resultados_usan_el_sello_oficial` (tenía un 9 escrito a mano), se actualizó la nota honesta de
   la página sobre esos mercados y se publicó V14 (`vivo/actual` en versión 20). 82 pruebas de producción en verde.
 - 2026-11-16 07:35 UTC · Corrida diaria: sin partidos nuevos; V15 publicada, `vivo/actual` en versión 21. Se revisó el pendiente del sesgo del simulador tras la ida: ya se probó un factor de vuelta con las 119 series y no pasó (1.1 ee); sin datos nuevos no se reintenta hasta tener la liguilla real.
+- 2026-11-16 07:42 UTC · Lanzado `08_momios_en_sellos.js` (tarea `w71jro89s`, corrida `wf_dcc3775a-252`). Para reanudarlo: `Workflow({scriptPath: "/home/user/SA/ligamx/notas/workflows/08_momios_en_sellos.js", resumeFromRunId: "wf_dcc3775a-252"})`.
