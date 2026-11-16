@@ -17,7 +17,10 @@
    - en vivo con un window.claude simulado (db.doc("vivo/actual").onSnapshot): franja, minuto que avanza,
      gol nuevo con aviso, tabla al momento, documentos corruptos, límite de 10 s y página sin base de datos;
    - variantes: liguilla en curso (una ida jugada, una serie terminada), sin liguilla.torneo, datos
-     opcionales en null, «vivo» incrustado, movimiento reducido.
+     opcionales en null, «vivo» incrustado, movimiento reducido;
+   - desempeño sellado, modelo contra mercado: con los datos de hoy (lo que diga desempeno.contra_mercado) y con
+     variantes de 3, 1 y 40 partidos comparados, sin ningún sello con momios, documento viejo sin el campo y
+     mercado con basura; tarjeta de cada resultado con y sin mercado en su sello.
    Con --capturas guarda PNG en web/pruebas/capturas/. Sale con código 1 si algo falla. */
 'use strict';
 const path = require('path');
@@ -83,6 +86,45 @@ function conLiguillaEnCurso(d) {
   d.desempeno.acumulado = { n: 12, aciertos_1x2: 6, acierto_1x2: 0.5, marcadores_exactos: 2, marcador_exacto: 0.1667, logloss: 1.02, ee_logloss: 0.05, brier: 0.6, rps: 0.2,
     prob_media_del_pick: 0.47, logloss_referencia_tercios: 1.0986, combinadas: { segura: { n: 12, completas: 5, frecuencia: 0.4167, prob_anunciada: 0.45, picks_acertados_media: 3.1 } } };
   d.dominios = d.dominios.filter(x => !(x.a === 'América' && x.b === 'Cruz Azul'));
+}
+
+/* ---- modelo contra mercado sellado: la página sólo da formato a desempeno.contra_mercado y a pronostico.mercado ---- */
+function datosDocumento() { return JSON.parse(/<script type="application\/json" id="datos">([\s\S]*?)<\/script>/.exec(fs.readFileSync(path.join(WEB, 'documento.html'), 'utf8'))[1]); }
+function fechaCortaEsperada(iso) { const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso); return +m[3] + ' ' + ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'][+m[2] - 1] + ' ' + m[1]; }
+const P_MODELO = { L: 0.5, E: 0.3, V: 0.2 }, P_MERCADO = { L: 0.4, E: 0.3, V: 0.3 };      /* pronósticos INVENTADOS para las variantes */
+const PRON_PRUEBA = res => ({ origen: 'sello', sellado_utc: '2026-11-16T08:00:00+00:00', modelo: 'de_prueba', p_local: P_MODELO.L, p_empate: P_MODELO.E, p_visitante: P_MODELO.V, pick: 'L',
+  marcador: { gl: 1, gv: 0, prob: 0.12 }, acierto_1x2: res === 'L', marcador_exacto: false, prob_del_resultado: P_MODELO[res], logloss: -Math.log(P_MODELO[res]), mercado: null });
+const MERCADO_VACIO = (desde, sellados) => ({ n: 0, n_sin_mercado: 0, n_sellados_con_mercado: sellados, primer_sello_con_mercado_utc: desde ? desde + 'T08:00:00+00:00' : null, desde_local: desde, metodo: 'shin', n_minimo: 30,
+  mercado: null, modelo: null, dif_logloss: null, ee_dif_logloss: null, lectura: 'sin_partidos', nota: 'Variante de prueba.' });
+/* n partidos comparados, con cifras INVENTADAS como las que exporta Python (redondeadas a 4 decimales). Con 3, el log-loss
+   es el del caso a mano de produccion/pruebas/test_sellos_mercado.py (los aciertos son distintos a propósito, para que
+   no se puedan confundir); con 1, sin error estándar; con 40, el mercado mejor por más de dos errores estándar. */
+function conMercado(d, n) {
+  const caso = { 1: { fuera: 0, mo: 1.8971, me: 1.6094, dif: 0.2877, ee: null, eeMo: null, eeMe: null, acMo: 0, acMe: 0, lectura: 'pocos_partidos' },
+    3: { fuera: 1, mo: 1.2647, me: 1.304, dif: -0.0393, ee: 0.1639, eeMo: 0.3489, eeMe: 0.2043, acMo: 1, acMe: 2, lectura: 'pocos_partidos' },
+    40: { fuera: 1, mo: 1.0412, me: 1.0098, dif: 0.0314, ee: 0.0121, eeMo: 0.0431, eeMe: 0.0402, acMo: 17, acMe: 19, lectura: 'mercado_mejor' } }[n];
+  const total = n + caso.fuera;
+  d.desempeno.n_calificados = total;
+  d.desempeno.acumulado = { n: total, aciertos_1x2: caso.acMo, acierto_1x2: caso.acMo / total, marcadores_exactos: 0, marcador_exacto: 0, logloss: caso.mo, ee_logloss: caso.eeMo, brier: 0.66, rps: 0.23,
+    prob_media_del_pick: 0.46, logloss_referencia_tercios: 1.0986, combinadas: {} };
+  d.desempeno.contra_mercado = Object.assign(MERCADO_VACIO('2026-11-16', n + 9), { n: n, n_sin_mercado: caso.fuera, lectura: caso.lectura, dif_logloss: caso.dif, ee_dif_logloss: caso.ee,
+    mercado: { n: n, logloss: caso.me, ee_logloss: caso.eeMe, brier: 0.7983, rps: 0.2754, aciertos_favorito: caso.acMe, acierto_favorito: caso.acMe / n },
+    modelo: { n: n, logloss: caso.mo, ee_logloss: caso.eeMo, brier: 0.7683, rps: 0.2771, aciertos_1x2: caso.acMo, acierto_1x2: caso.acMo / n } });
+  const us = d.ultimos_resultados, res = us[0].resultado, ll = -Math.log(P_MODELO[res]), llm = -Math.log(P_MERCADO[res]);
+  us[0].pronostico = Object.assign(PRON_PRUEBA(res), { mercado: { proveedor: 'Casa de prueba', ml_local: 2.4, ml_empate: 3.3, ml_visitante: 3.0, margen: 0.053, p_local: P_MERCADO.L, p_empate: P_MERCADO.E, p_visitante: P_MERCADO.V,
+    pick: 'L', acierto_1x2: res === 'L', prob_del_resultado: P_MERCADO[res], logloss: llm, dif_logloss: ll - llm } });
+  if (us[1]) us[1].pronostico = PRON_PRUEBA(us[1].resultado);                                  /* sello sin momios */
+  if (us[2]) us[2].pronostico = Object.assign(PRON_PRUEBA(us[2].resultado), { origen: 'modelo/pred (walk-forward, no sellado)', sellado_utc: null });
+}
+/* lo que la página dice del mercado sellado: el bloque del desempeño y cada tarjeta de resultado (textContent: igual en los dos motores) */
+function leeMercado(pg) {
+  return pg.evaluate(() => {
+    const t = e => (e ? e.textContent : '').replace(/\s+/g, ' ').trim(), b = document.getElementById('contra-mercado');
+    return { hay: !!b, enDesempeno: !!document.querySelector('#b-desempeno .bloque #contra-mercado'), lectura: b ? b.getAttribute('data-lectura') : null, texto: t(b),
+      datos: b ? Array.from(b.querySelectorAll('.datos > div')).map(x => [t(x.querySelector('dt')), t(x.querySelector('dd'))]) : [],
+      tarjetas: Array.from(document.querySelectorAll('#b-ultima .res')).map(r => ({ marca: r.querySelector('[data-mercado="si"]') ? 'si' : r.querySelector('[data-mercado="no"]') ? 'no' : '', barras: r.querySelectorAll('.x12').length, texto: t(r) })),
+      respaldos: document.querySelectorAll('#b-ultima .respaldo, #b-desempeno .respaldo').length, textoDesempeno: t(document.getElementById('b-desempeno')) };
+  });
 }
 
 /* window.claude simulado: use("db") entrega una base cuyo doc().onSnapshot manda PRIMERO el documento vigente
@@ -712,7 +754,7 @@ async function correr(navegador, nombre, opciones) {
   const v = await pl.evaluate(() => {
     const q = s => document.querySelector(s), c1 = q('.llave[data-llave="C1"]'), c2 = q('.llave[data-llave="C2"]'), c3 = q('.llave[data-llave="C3"]'), s1 = q('.llave[data-llave="S1"]');
     const piernas = Array.from(c1.querySelectorAll('.pierna'));
-    return { llaves: document.querySelectorAll('#cuadro .llave').length, tarjetas: document.querySelectorAll('.partido').length, respaldos: document.querySelectorAll('.respaldo').length,
+    return { llaves: document.querySelectorAll('#cuadro .llave').length, tarjetas: document.querySelectorAll('.partido').length, pendientes: JSON.parse(document.getElementById('datos').textContent).pendientes.length, respaldos: document.querySelectorAll('.respaldo').length,
       idaReal: !!piernas[0].querySelector('.tablero--real') && /Resultado/.test(piernas[0].textContent) && Array.from(piernas[0].querySelectorAll('.tablero b')).map(b => b.textContent).join('-') === '1-0',
       vueltaPron: !piernas[1].querySelector('.tablero--real') && !!piernas[1].querySelector('.x12') && /28 nov/.test(piernas[1].textContent),
       chips: [c1, c2, c3, s1].map(l => (l.querySelector('.llave__id .chip') || {}).textContent), globalIda: /Global hasta hoy/.test(c1.textContent) && !!c1.querySelector('.llave__global .tablero--real') && !/Cierre probable|Global probable/.test(c1.textContent) && !c3.querySelector('.llave__global'), leyenda: !!q('.leyenda-m'),
@@ -725,7 +767,7 @@ async function correr(navegador, nombre, opciones) {
   revisa(JSON.stringify(v.mini) === JSON.stringify([1, true, 2, true, false, '2-1']), 'liguilla en curso: el mini-cuadro pone en blanco lo jugado y, en la serie terminada, el global real con el eliminado atenuado', JSON.stringify(v.mini));
   revisa(v.chips[0] === 'En curso' && v.chips[1] === 'Terminada' && v.chips[2] === 'Definida' && v.chips[3] === 'Proyectada' && v.avanza && /en curso/i.test(v.estado), 'liguilla en curso: estados por serie (en curso, terminada con quien avanza, definida, proyectada)', JSON.stringify(v.chips));
   revisa(sinElegir === 0 && v.sel === 'C1' && v.legs === 2 && v.legReal === 1, 'liguilla en curso: el detalle de la serie en curso trae la ida real y la vuelta en pronóstico', JSON.stringify([sinElegir, v.sel, v.legs, v.legReal]));
-  revisa(v.tarjetas === 10 && v.respaldos === 0 && errL.length === 0, 'variante: datos en null no rompen nada', JSON.stringify([v.tarjetas, v.respaldos]) + ' ' + errL.slice(0, 3).join(' || '));
+  revisa(v.tarjetas === v.pendientes && v.tarjetas >= 3 && v.respaldos === 0 && errL.length === 0, 'variante: datos en null no rompen nada', JSON.stringify([v.tarjetas, v.pendientes, v.respaldos]) + ' ' + errL.slice(0, 3).join(' || '));
   revisa(v.grupos.includes('Cuartos de final, ida'), 'variante: los partidos de liguilla forman su grupo', v.grupos.join(', '));
   for (const k of ['C2', 'C4', 'S2', 'F']) { await pl.evaluate(k => document.querySelector('.serie-sel [data-serie="' + k + '"]').click(), k); await pl.waitForTimeout(60); }
   const desbL = await desbordes(pl);
@@ -744,6 +786,9 @@ async function correr(navegador, nombre, opciones) {
   const st = await ps.evaluate(() => ({ vacio: !!document.querySelector('#b-llaves .vacio'), respaldos: document.querySelectorAll('.respaldo').length, tarjetas: document.querySelectorAll('.partido').length }));
   revisa(st.vacio && st.respaldos === 0 && st.tarjetas > 0 && errL.length === 0, 'sin liguilla.torneo: estado vacío en lugar del cuadro, sin errores', JSON.stringify(st) + errL.slice(0, 2).join('|'));
   await ps.close();
+
+  /* ---------- desempeño: modelo contra mercado sellado ---------- */
+  await mercadoSellado(ctx, capElDe);
   await ctx.close();
 
   /* ---------- movimiento reducido ---------- */
@@ -756,6 +801,86 @@ async function correr(navegador, nombre, opciones) {
     return { anim: im.getAnimations ? im.getAnimations().length : 0, raf: window.__raf, confeti: n, animadas: document.querySelectorAll('.entra').length, videos: Array.from(document.querySelectorAll('video')).filter(v => !v.paused).length }; });
   revisa(red.anim === 0 && red.raf === 0 && red.confeti > 40 && red.animadas === 0 && red.videos === 0, 'movimiento reducido: foto quieta, confeti fijo, sin animaciones ni video', JSON.stringify(red));
   await ctxR.close();
+}
+
+/* Desempeño sellado, modelo contra mercado: datos de hoy y variantes (ver conMercado). Todo lo que se revisa es formato:
+   las cifras esperadas son las que trae el documento, nunca algo que la página tenga que calcular. */
+async function mercadoSellado(ctx, capElDe) {
+  const errM = [];
+  const pb = await abrir(ctx, errM);
+  await pb.goto(URL_DOC, { waitUntil: 'load' });
+  await pb.waitForTimeout(400);
+  const real = datosDocumento(), cmR = (real.desempeno || {}).contra_mercado || {}, mb = await leeMercado(pb);
+  const marcas = us => us.map(u => !u.pronostico ? '' : u.pronostico.mercado ? 'si' : u.pronostico.origen === 'sello' ? 'no' : '');
+  revisa(typeof cmR.n === 'number' && mb.hay && mb.enDesempeno && mb.lectura === cmR.lectura && /Modelo contra mercado/.test(mb.texto) && mb.respaldos === 0, 'mercado sellado: el documento exportado trae desempeno.contra_mercado y la página lo muestra dentro del desempeño sellado', JSON.stringify([cmR.n, mb.hay, mb.lectura]));
+  if (cmR.n > 0) {
+    const esp = [String(cmR.n), cmR.modelo.logloss.toFixed(3), cmR.mercado.logloss.toFixed(3)];
+    revisa(mb.datos.length === 4 && esp.every((x, i) => mb.datos[i][1] === x) && /no los de cierre/.test(mb.texto) && (cmR.lectura === 'pocos_partidos') === /no se puede concluir nada/.test(mb.texto),
+      'mercado sellado (datos de hoy): ' + cmR.n + ' partidos comparados con el log-loss de los dos tal como se exportó' + (cmR.lectura === 'pocos_partidos' ? ', y la advertencia de que no se puede concluir nada' : ''), JSON.stringify(mb.datos) + ' ' + mb.texto.slice(0, 200));
+  } else {
+    const desde = cmR.desde_local ? fechaCortaEsperada(cmR.desde_local) : null;
+    revisa(mb.datos.length === 0 && !/Log-loss del mercado/.test(mb.texto) && (desde ? mb.texto.includes('se guardan en su sello desde el ' + desde) && (cmR.n_sellados_con_mercado > 0) === mb.texto.includes(cmR.n_sellados_con_mercado === 1 ? 'los trae 1 partido pendiente' : 'los traen ' + cmR.n_sellados_con_mercado + ' partidos pendientes') : /ningún sello trae momios/.test(mb.texto)),
+      'mercado sellado (datos de hoy): sin partidos comparados no hay cifras, sólo ' + (desde ? 'desde cuándo se guardan los momios (' + desde + ') y cuántos partidos pendientes los traen (' + cmR.n_sellados_con_mercado + ')' : 'el aviso de que ningún sello trae momios todavía'), mb.texto);
+  }
+  revisa(JSON.stringify(mb.tarjetas.map(x => x.marca)) === JSON.stringify(marcas(real.ultimos_resultados)), 'mercado sellado (datos de hoy): cada resultado dice si su sello guardó momios; los que no vienen de un sello no dicen nada', JSON.stringify(mb.tarjetas.map(x => x.marca)));
+  await pb.close();
+
+  /* tres partidos comparados (cifras INVENTADAS; son las del caso a mano de produccion/pruebas/test_sellos_mercado.py) */
+  const pm = await abrir(ctx, errM);
+  await pm.goto(variante('mercado', d => conMercado(d, 3)), { waitUntil: 'load' });
+  await pm.waitForTimeout(400);
+  const m3 = await leeMercado(pm), u0 = real.ultimos_resultados[0], k0 = u0.resultado, ll0 = -Math.log(P_MODELO[k0]), llm0 = -Math.log(P_MERCADO[k0]);
+  revisa(m3.hay && m3.enDesempeno && m3.lectura === 'pocos_partidos' && JSON.stringify(m3.datos.map(x => x[1])) === JSON.stringify(['3', '1.265', '1.304', '−0.039 ± 0.164']) && /Diferencia \(modelo − mercado\)/.test(m3.datos[3][0]),
+    'modelo contra mercado: partidos comparados, log-loss del modelo y del mercado y la diferencia con su error estándar, tal como vienen en los datos', JSON.stringify(m3.datos));
+  revisa(/Con 3 partidos no se puede concluir nada/.test(m3.texto) && /al menos 30 partidos/.test(m3.texto) && /Los mismos 3 partidos/.test(m3.texto) && /no los de cierre/.test(m3.texto) && /desde el 16 nov 2026/.test(m3.texto) && /Quedan fuera 1 partido calificado/.test(m3.texto) && /modelo 1 de 3 · favorito del mercado 2 de 3/.test(m3.texto) && /una diferencia positiva favorece al mercado/.test(m3.texto) && /El ± es el error estándar de esa diferencia/.test(m3.texto),
+    'modelo contra mercado: texto franco (con 3 partidos no se puede concluir nada; momios al sellar, no de cierre; cuántos quedan fuera; aciertos de cada uno)', m3.texto);
+  const t0 = m3.tarjetas[0] || { texto: '' }, cerca = llm0 < ll0 ? 'más cerca el mercado' : llm0 > ll0 ? 'más cerca el modelo' : 'quedaron iguales';
+  revisa(t0.marca === 'si' && t0.barras === 2 && t0.texto.includes('Mercado al sellar (Casa de prueba)') && t0.texto.includes('40.0%30.0%30.0%') && t0.texto.includes('El mercado le daba ' + (P_MERCADO[k0] * 100).toFixed(1) + '% a lo que pasó') && t0.texto.includes('modelo ' + ll0.toFixed(3) + ', mercado ' + llm0.toFixed(3)) && t0.texto.includes(cerca),
+    'resultado con mercado sellado: barra del mercado junto a la del modelo, sus tres probabilidades y el log-loss de los dos en ese partido', t0.texto);
+  revisa((m3.tarjetas[1] || {}).marca === 'no' && m3.tarjetas[1].barras === 1 && /el sello de este partido no guardó momios/.test(m3.tarjetas[1].texto) && (m3.tarjetas[2] || {}).marca === '' && !/[Mm]ercado/.test(m3.tarjetas[2].texto),
+    'resultado sin mercado sellado: lo dice si viene de un sello y calla si el pronóstico no es sellado', JSON.stringify(m3.tarjetas.slice(1, 3)));
+  const desbM = await desbordes(pm), malaM = palabrasMalas(m3.texto + ' ' + m3.tarjetas.map(x => x.texto).join(' ') + ' ' + m3.textoDesempeno);
+  revisa(desbM.sw <= desbM.ancho + 1 && desbM.malos.length === 0 && !malaM && m3.respaldos === 0 && errM.length === 0, 'modelo contra mercado: sin desbordes, sin "undefined"/"NaN"/"null" y sin errores', desbM.sw + ' ' + desbM.malos.join(' | ') + (malaM || '') + errM.slice(0, 2).join('|'));
+  await capElDe(pm)('15-contra-mercado', '#contra-mercado', 900);
+  await capElDe(pm)('15b-resultado-con-mercado', '#b-ultima .res', 700);
+  await pm.close();
+
+  /* un solo partido (sin error estándar) y cuarenta con el mercado claramente mejor */
+  const p1m = await abrir(ctx, errM);
+  await p1m.goto(variante('mercado1', d => conMercado(d, 1)), { waitUntil: 'load' });
+  await p1m.waitForTimeout(300);
+  const m1 = await leeMercado(p1m);
+  revisa(m1.lectura === 'pocos_partidos' && m1.datos.length === 4 && m1.datos[0][1] === '1' && m1.datos[3][1] === '+0.288' && /Con un solo partido la diferencia no tiene error estándar/.test(m1.texto) && !/±/.test(m1.texto) && /Con 1 partido no se puede concluir nada/.test(m1.texto) && /El mismo partido/.test(m1.texto) && !/Quedan fuera/.test(m1.texto) && !palabrasMalas(m1.texto),
+    'modelo contra mercado con un solo partido: diferencia sin error estándar (no se inventa) y la misma advertencia', JSON.stringify(m1.datos) + ' ' + m1.texto.slice(0, 160));
+  await p1m.close();
+  const p40 = await abrir(ctx, errM);
+  /* el nombre de la casa viene de ESPN: uno larguísimo y sin espacios (INVENTADO) no debe ensanchar la tarjeta del resultado */
+  const CASA_LARGA = 'Casa de apuestas ' + 'Sportsbook'.repeat(7);
+  await p40.goto(variante('mercado40', d => { conMercado(d, 40); d.ultimos_resultados[0].pronostico.mercado.proveedor = CASA_LARGA; }), { waitUntil: 'load' });
+  await p40.waitForTimeout(300);
+  const m40 = await leeMercado(p40);
+  const caja40 = await p40.evaluate(() => { const r = document.querySelector('#b-ultima .res [data-mercado="si"]'), t = r && r.closest('.res'); return t ? [Math.round(t.getBoundingClientRect().right), Math.round(r.querySelector('span').getBoundingClientRect().right), window.innerWidth] : null; });
+  revisa(m40.lectura === 'mercado_mejor' && m40.datos[0][1] === '40' && m40.datos[3][1] === '+0.031 ± 0.012' && /Con 40 partidos el mercado va mejor/.test(m40.texto) && !/no se puede concluir nada/.test(m40.texto) && !palabrasMalas(m40.texto) &&
+    !!caja40 && caja40[0] <= caja40[2] + 1 && caja40[1] <= caja40[0] + 1 && m40.tarjetas[0].texto.includes(CASA_LARGA),
+    'modelo contra mercado con 40 partidos: la lectura (mercado mejor por más de dos errores estándar) viene de los datos, no la decide la página; y una casa de nombre larguísimo no ensancha la tarjeta del resultado', m40.texto.slice(-260) + ' ' + JSON.stringify(caja40));
+  await p40.close();
+
+  /* sin ningún sello con momios, documento viejo sin el campo y datos rotos: nada se cae */
+  const pv0 = await abrir(ctx, errM);
+  await pv0.goto(variante('mercado0', d => { d.desempeno.acumulado = { n: 0 }; d.desempeno.n_calificados = 0; d.desempeno.contra_mercado = MERCADO_VACIO(null, 0); d.ultimos_resultados.forEach(u => { if (u.pronostico) delete u.pronostico.mercado; }); }), { waitUntil: 'load' });
+  await pv0.waitForTimeout(300);
+  const m0 = await leeMercado(pv0);
+  revisa(m0.hay && m0.enDesempeno && m0.lectura === 'sin_partidos' && m0.datos.length === 0 && /Todavía ningún sello trae momios del mercado/.test(m0.texto) && /Todavía no hay partidos calificados/.test(m0.textoDesempeno) && !palabrasMalas(m0.textoDesempeno) && m0.respaldos === 0,
+    'modelo contra mercado sin ningún sello con momios (y sin partidos calificados): una línea que lo dice, sin cifras', m0.textoDesempeno.slice(-260));
+  await pv0.close();
+  const errRoto = [];
+  const pvr = await abrir(ctx, errRoto);
+  await pvr.goto(variante('mercadoroto', d => { delete d.desempeno.contra_mercado; d.ultimos_resultados[0].pronostico = Object.assign({}, PRON_PRUEBA(d.ultimos_resultados[0].resultado), { mercado: { proveedor: 7, p_local: 'x', p_empate: null, logloss: 'y' } }); if (d.ultimos_resultados[1]) d.ultimos_resultados[1].pronostico = Object.assign({}, PRON_PRUEBA(d.ultimos_resultados[1].resultado), { mercado: 'no es un objeto' }); }), { waitUntil: 'load' });
+  await pvr.waitForTimeout(300);
+  const mr = await leeMercado(pvr);
+  revisa(!mr.hay && mr.respaldos === 0 && errRoto.length === 0 && mr.tarjetas.length === real.ultimos_resultados.length && mr.tarjetas[0].marca === '' && mr.tarjetas[0].barras === 1 && /Resultado (acertado|fallado)/.test(mr.tarjetas[0].texto) && !palabrasMalas(mr.tarjetas.map(x => x.texto).join(' ') + mr.textoDesempeno) && /Desempeño sellado/.test(mr.textoDesempeno),
+    'documento viejo sin contra_mercado y mercado sellado con basura: el bloque no sale, las tarjetas siguen con el pronóstico del modelo y nada se rompe', JSON.stringify(mr.tarjetas.slice(0, 2)) + errRoto.slice(0, 2).join('|'));
+  await pvr.close();
 }
 
 (async () => {

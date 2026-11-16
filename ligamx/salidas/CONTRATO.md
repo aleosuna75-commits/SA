@@ -661,7 +661,41 @@ más reciente al más antiguo, con lo que el modelo había dicho ANTES del parti
 si no hubo pronóstico sellado (ni guardado en `modelo/pred`): no se reconstruye después de conocer el
 resultado. Cuando existe: `origen` (`"sello"` o `"modelo/pred (walk-forward, no sellado)"`),
 `sellado_utc`, `modelo`, `p_local`, `p_empate`, `p_visitante`, `pick`, `marcador`, `acierto_1x2`,
-`marcador_exacto`, `prob_del_resultado` y `logloss`.
+`marcador_exacto`, `prob_del_resultado`, `logloss` y `mercado`.
+
+`pronostico.mercado` es el mercado guardado en ESE sello (los momios que había al sellar, no los de
+cierre), ya calificado contra el resultado; `null` si el sello no guardó momios (todos los anteriores
+al 16-nov-2026) o si el pronóstico no viene de un sello. Nunca se rellena con momios vistos después.
+
+| campo | significado |
+|---|---|
+| `proveedor`, `ml_local`, `ml_empate`, `ml_visitante`, `margen` | casa, momios decimales y margen (suma de 1/momio − 1) tal como quedaron en el sello |
+| `p_local`, `p_empate`, `p_visitante` | 1X2 del mercado sin margen por el método de Shin (suman 1) |
+| `pick`, `acierto_1x2` | favorito del mercado (`L`, `E` o `V`; en un empate exacto, el primero en ese orden) y si acertó |
+| `prob_del_resultado`, `logloss` | probabilidad que el mercado daba a lo que pasó y su log-loss en ese partido |
+| `dif_logloss` | `pronostico.logloss` − `mercado.logloss`: positiva = estuvo más cerca el mercado |
+
+```json
+"mercado": {
+ "proveedor": "DraftKings",
+ "ml_local": 2.45,
+ "ml_empate": 3.4,
+ "ml_visitante": 2.65,
+ "margen": 0.0796,
+ "p_local": 0.3807,
+ "p_empate": 0.2689,
+ "p_visitante": 0.3505,
+ "pick": "L",
+ "acierto_1x2": true,
+ "prob_del_resultado": 0.3807,
+ "logloss": 0.9657,
+ "dif_logloss": -0.0412
+}
+```
+
+(Forma del campo: los momios y probabilidades son los del sello de Puebla vs Atlético San Luis del
+16-nov-2026; `acierto_1x2`, `prob_del_resultado`, `logloss` y `dif_logloss` son ILUSTRATIVOS, porque ese
+partido aún no se juega. El ejemplo de abajo es de un pronóstico sin sello: `mercado` va en `null`.)
 
 ```json
 {
@@ -693,7 +727,8 @@ resultado. Cuando existe: `origen` (`"sello"` o `"modelo/pred (walk-forward, no 
   "acierto_1x2": false,
   "marcador_exacto": true,
   "prob_del_resultado": 0.2669,
-  "logloss": 1.321
+  "logloss": 1.321,
+  "mercado": null
  }
 }
 ```
@@ -1137,25 +1172,85 @@ inicio). `acumulado` (y lo mismo en `por_modelo` y `por_torneo`): `n`, `aciertos
 `prob_media_del_pick`, `logloss_referencia_tercios` (ln 3 = 1.0986) y `combinadas` por variante (`n`,
 `completas`, `frecuencia`, `prob_anunciada`, `picks_acertados_media`). Con cero partidos calificados
 `acumulado` es `{"n": 0}`. `partidos`: los últimos 40 calificados (`id`, `fecha_utc`, equipos, `gl`,
-`gv`, `resultado`, `pick`, `acierto_1x2`, `marcador_exacto`, `logloss`, y por combinada `aciertos` de 4
-y `completa`). El detalle completo está en `salidas/desempeno.json`.
+`gv`, `resultado`, `pick`, `acierto_1x2`, `marcador_exacto`, `logloss`, por combinada `aciertos` de 4
+y `completa`, y `logloss_mercado`: el log-loss del mercado sellado en ese partido, `null` si su sello no
+guardó momios). El detalle completo está en `salidas/desempeno.json`.
+
+### desempeno.contra_mercado (modelo contra mercado, hacia adelante)
+
+Desde el 16-nov-2026 cada sello guarda los momios que el partido tenía AL SELLAR (ver `sellos.jsonl`
+abajo). `contra_mercado` compara al modelo con ese mercado SÓLO en los partidos calificados cuyo sello
+oficial trae momios: los mismos partidos para los dos, cada uno con lo que quedó congelado en el mismo
+instante (no son momios de cierre). Lo calcula `produccion.sellos.contra_mercado`; la página no calcula nada.
+
+| campo | significado |
+|---|---|
+| `n`, `n_sin_mercado` | partidos calificados con y sin mercado en su sello oficial (`n` + `n_sin_mercado` = `n_calificados`) |
+| `n_sellados_con_mercado` | partidos, jugados o por jugar, cuyo sello oficial trae mercado |
+| `primer_sello_con_mercado_utc`, `desde_local` | cuándo se escribió el primer sello con momios (fecha de México en `desde_local`); `null` si ninguno los trae |
+| `metodo` | `"shin"`: cómo se quitó el margen (`modelo.base.prob_shin`) |
+| `n_minimo` | 30: con menos partidos comparados la diferencia no se lee |
+| `mercado` | del mercado sellado en esos `n` partidos: `n`, `logloss`, `ee_logloss`, `brier`, `rps`, `aciertos_favorito`, `acierto_favorito`; `null` si `n` = 0 |
+| `modelo` | del modelo en ESOS MISMOS partidos: `n`, `logloss`, `ee_logloss`, `brier`, `rps`, `aciertos_1x2`, `acierto_1x2`; `null` si `n` = 0 |
+| `dif_logloss`, `ee_dif_logloss` | media pareada de (log-loss del modelo − log-loss del mercado) y su error estándar (desviación de las diferencias entre raíz de `n`). Positiva = va mejor el mercado. `ee_dif_logloss` es `null` si `n` < 2; los dos son `null` si `n` = 0 |
+| `lectura` | `sin_partidos` (`n` = 0) · `pocos_partidos` (`n` < `n_minimo`) · `sin_diferencia_clara` (menos de 2 errores estándar) · `mercado_mejor` · `modelo_mejor` |
+| `nota` | texto con las advertencias anteriores |
 
 ```json
 {
- "generado_utc": "2026-11-10T10:12:22.746041+00:00",
- "n_sellos": 22,
+ "generado_utc": "2026-11-16T07:45:52.721473+00:00",
+ "n_sellos": 58,
  "n_partidos_sellados": 10,
- "n_calificados": 0,
+ "n_calificados": 1,
  "primer_sello_utc": "2026-11-10T09:57:18.747707+00:00",
  "acumulado": {
-  "n": 0
+  "n": 1,
+  "…": "…"
  },
- "por_modelo": {},
- "por_torneo": {},
+ "por_modelo": {"…": "…"},
+ "por_torneo": {"…": "…"},
  "nota": "Sólo cuentan pronósticos sellados antes del inicio de cada partido; con pocos partidos el error estándar es grande y ninguna cifra es concluyente.",
- "partidos": []
+ "contra_mercado": {
+  "n": 0,
+  "n_sin_mercado": 1,
+  "n_sellados_con_mercado": 9,
+  "primer_sello_con_mercado_utc": "2026-11-16T07:45:52.665105+00:00",
+  "desde_local": "2026-11-16",
+  "metodo": "shin",
+  "n_minimo": 30,
+  "mercado": null,
+  "modelo": null,
+  "dif_logloss": null,
+  "ee_dif_logloss": null,
+  "lectura": "sin_partidos",
+  "nota": "Sólo partidos cuyo sello oficial guardó momios: los del momento de sellar, no los de cierre. Probabilidades del mercado sin margen (Shin). dif_logloss = modelo − mercado: positiva favorece al mercado. Con menos de 30 partidos no se puede concluir nada."
+ },
+ "partidos": [
+  {
+   "id": 401876988,
+   "fecha_utc": "2026-11-14T23:00:00+00:00",
+   "local": "Querétaro",
+   "visitante": "Monterrey",
+   "gl": 0,
+   "gv": 1,
+   "resultado": "V",
+   "pick": "V",
+   "acierto_1x2": 1,
+   "marcador_exacto": 0,
+   "logloss": 0.8473,
+   "combinadas": {
+    "segura": {"aciertos": 3, "completa": false},
+    "equilibrada": {"aciertos": 4, "completa": true},
+    "atrevida": {"aciertos": 1, "completa": false}
+   },
+   "logloss_mercado": null
+  }
+ ]
 }
 ```
+
+(Al 16-nov-2026 hay 1 partido calificado y su sello es anterior a los momios: `n` = 0. Los 9 partidos de la
+Jornada 17 ya tienen mercado en su sello; la comparación empieza con ellos.)
 
 ## calibracion_series
 
@@ -1253,8 +1348,8 @@ penales a 50/50), `delta_avanza_mejor` (frente a `actual.json`), `favorito`, `p_
 
 | archivo | contenido |
 |---|---|
-| `sellos.jsonl` | un renglón por sello: `id`, `sellado_utc`, `corte_modelo_utc`, `modelo`, `torneo`, `fase`, `pierna`, `fecha_utc`, `local`, `visitante`, `lam_l`, `lam_v`, `rho`, `p1_l`, `p1_v`, `p_l`, `p_e`, `p_v`, `pick`, `marcador`, `top5`, `combinadas` (por variante: `prob_conjunta` y `picks` con `clave`, `etiqueta`, `prob`). Sólo se agrega |
-| `desempeno.json` | lo de `desempeno` con todos los partidos calificados y el detalle de cada pick |
+| `sellos.jsonl` | un renglón por sello: `id`, `sellado_utc`, `corte_modelo_utc`, `modelo`, `torneo`, `fase`, `pierna`, `fecha_utc`, `local`, `visitante`, `lam_l`, `lam_v`, `rho`, `p1_l`, `p1_v`, `p_l`, `p_e`, `p_v`, `pick`, `marcador`, `top5`, `combinadas` (por variante: `prob_conjunta` y `picks` con `clave`, `etiqueta`, `prob`) y `mercado` (abajo). Sólo se agrega |
+| `desempeno.json` | lo de `desempeno` con todos los partidos calificados y el detalle de cada pick; cada partido trae además `mercado` (`null` o el mercado de su sello calificado: `proveedor`, `ml_l`, `ml_e`, `ml_v`, `margen`, `metodo`, `p_l`, `p_e`, `p_v`, `pick`, `acierto_1x2`, `prob_resultado`, `logloss`, `brier`, `rps`, `dif_logloss`) |
 | `calibracion_series.json` | salida completa de la calibración histórica de series |
 | `historial/actual_<corte>.json` | copia de cada corrida |
 | `vivo.json` | último documento en vivo (contrato arriba); lo escribe `vivo.py` |
@@ -1263,3 +1358,37 @@ penales a 50/50), `delta_avanza_mejor` (frente a `actual.json`), `favorito`, `p_
 | `vivo_prueba.json`, `vivo_prueba_eventos.jsonl` | lo mismo para `vivo.py repetir` (no van al repositorio) |
 | `en_juego_parametros.json` | parámetros del modelo en juego: curva de goles por casilla (`w`), `efectos` (multiplicadores) y de dónde salieron; la reajusta `vivo.py una-vez` (el de `pipeline.py auto`) cuando cambia el contenido de los datos y no hay nada en juego; `observar` nunca la toca |
 | `en_juego_validacion.json` | validación sin fuga del modelo en juego (`python3 -m produccion.en_juego validar`) |
+
+### `mercado` de cada sello (desde el 16-nov-2026)
+
+Los momios del partido tal como estaban en `datos/partidos.csv` en el momento de sellar (lo único que se
+conoce entonces), o `null` si no había un 1X2 utilizable. Los sellos anteriores no traen el campo: se leen
+y califican igual, sin mercado.
+
+| campo | significado |
+|---|---|
+| `proveedor` | casa de apuestas (`null` si ESPN no la dice) |
+| `ml_l`, `ml_e`, `ml_v` | momios decimales de local, empate y visitante |
+| `total_linea`, `over`, `under` | línea de goles con sus dos momios: se guarda completa o las tres en `null` |
+| `metodo`, `p_l`, `p_e`, `p_v` | 1X2 sin margen por el método de Shin (`"shin"`, `modelo.base.prob_shin`); suman 1 |
+| `margen` | suma de 1/momio − 1 del 1X2 |
+
+```json
+"mercado": {"proveedor": "DraftKings", "ml_l": 2.45, "ml_e": 3.4, "ml_v": 2.65, "total_linea": 2.5, "over": 1.645,
+            "under": 2.1, "metodo": "shin", "p_l": 0.380673, "p_e": 0.268867, "p_v": 0.350461, "margen": 0.079639}
+```
+
+Reglas (`produccion.sellos.mercado_de` y `_repetido`):
+
+- Va en `null` si falta algún momio del 1X2 o alguno es ≤ 1, y también si los momios tienen pinta de haberse
+  capturado con el partido en juego: la misma regla de `modelo.datos.momios_en_vivo` (favorito por debajo de
+  1.08, empate por debajo de 2.0 o por encima de 12, o un lado de la línea de 2.5 goles por debajo de 1.15).
+- Sólo se sellan partidos que aún no empiezan, así que los momios de un sello siempre son anteriores al
+  silbatazo; lo que se mueva después no entra. El sello oficial sigue siendo el último anterior al inicio.
+- Un sello idéntico al último de su partido no se repite. Un cambio de momios (o que aparezcan donde no
+  había) SÍ escribe un sello nuevo, para que el oficial lleve los últimos vistos antes del partido. Si los
+  momios desaparecen y el pronóstico es el mismo no se escribe nada (el sello anterior los conserva); si
+  además cambió el pronóstico, el sello nuevo dice la verdad: `mercado` en `null`.
+- Son los momios del momento de sellar, NO los de cierre: la corrida diaria suele sellar horas o días antes
+  del partido. La comparación con el modelo es justa (los dos quedan congelados en el mismo instante), pero no
+  es la misma medición que la validación histórica contra el mercado de cierre.

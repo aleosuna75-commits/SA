@@ -769,7 +769,9 @@ def _validar_mercado(doc: dict) -> list[str]:
         err.append(f"desempeno.contra_mercado.lectura desconocida: {cm['lectura']}")
     if n + cm["n_sin_mercado"] != des.get("n_calificados"):
         err.append("desempeno.contra_mercado: n + n_sin_mercado no es n_calificados")
-    if cm["n_sellados_con_mercado"] < n or (cm["n_sellados_con_mercado"] > 0) != bool(cm["desde_local"]):
+    # desde_local sale de TODOS los sellos y n_sellados_con_mercado sólo de los oficiales de partidos que siguen
+    # en los datos: puede haber fecha sin partidos (si ESPN cambia un id), nunca partidos sin fecha
+    if cm["n_sellados_con_mercado"] < n or (cm["n_sellados_con_mercado"] > 0 and not cm["desde_local"]):
         err.append("desempeno.contra_mercado: n_sellados_con_mercado y desde_local no cuadran")
     if n == 0:
         if any(cm[k] is not None for k in ("mercado", "modelo", "dif_logloss", "ee_dif_logloss")) or cm["lectura"] != "sin_partidos":

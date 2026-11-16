@@ -555,7 +555,7 @@ tbody th{background:var(--noche-3);color:var(--oro);padding-top:11px}
 .ico{display:inline-block;width:11px;height:11px;margin:0 5px;border-radius:50%;background:var(--cal);box-shadow:inset 0 0 0 2px var(--noche-2),inset 0 0 0 5px var(--cal);vertical-align:-1px}
 .compara{display:grid;gap:12px}
 .compara__f{display:grid;gap:6px}
-.compara__f>span{font:700 var(--t-0)/1.2 var(--f-texto);text-transform:uppercase;letter-spacing:.12em;color:var(--oro)}
+.compara__f>span{font:700 var(--t-0)/1.2 var(--f-texto);text-transform:uppercase;letter-spacing:.12em;color:var(--oro);overflow-wrap:anywhere}
 .compara__f.antes>span{color:var(--gris)}
 .compara__f small{display:flex;justify-content:space-between;gap:8px;font-size:var(--t-0);color:var(--gris);font-variant-numeric:tabular-nums}
 .ley .dl{display:block;font:700 var(--t-0)/1.1 var(--f-texto);font-variant-numeric:tabular-nums;color:var(--gris)}
@@ -1975,8 +1975,9 @@ function contraMercado(d) { /* todo viene calculado en desempeno.contra_mercado;
     '<dl class="datos"><div><dt>Partidos comparados</dt><dd>' + n + '</dd></div>' +
     '<div><dt>Log-loss del modelo</dt><dd>' + n2(mo.logloss, 3) + '</dd></div>' +
     '<div><dt>Log-loss del mercado</dt><dd>' + n2(me.logloss, 3) + '</dd></div>' +
-    '<div><dt>Diferencia (modelo − mercado)</dt><dd>' + sig(m.dif_logloss, 3) + ' <small>' + (ok(m.ee_dif_logloss) ? '± ' + n2(m.ee_dif_logloss, 3) + ' (error estándar)' : 'un solo partido: sin error estándar') + '</small></dd></div></dl>' + ac +
-    '<p class="nota">' + (lee ? lee(n, min) + ' ' : '') + 'Menos log-loss es mejor: una diferencia positiva favorece al mercado.</p></div>';
+    '<div><dt>Diferencia (modelo − mercado)</dt><dd>' + sig(m.dif_logloss, 3) + (ok(m.ee_dif_logloss) ? ' <small>± ' + n2(m.ee_dif_logloss, 3) + '</small>' : '') + '</dd></div></dl>' + ac +
+    '<p class="nota">' + (lee ? lee(n, min) + ' ' : '') + 'Menos log-loss es mejor: una diferencia positiva favorece al mercado. ' +
+    (ok(m.ee_dif_logloss) ? 'El ± es el error estándar de esa diferencia.' : n === 1 ? 'Con un solo partido la diferencia no tiene error estándar.' : '') + '</p></div>';
 }
 function desempeno() {
   var d = D.desempeno || {}, a = d.acumulado || {};

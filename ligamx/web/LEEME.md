@@ -163,7 +163,7 @@ Chromium y WebKit, en iPhone 13 y en escritorio 1440x900 (abre `web/documento.ht
     PLAYWRIGHT_BROWSERS_PATH=<carpeta con webkit> node web/pruebas/prueba.js webkit
     # con --capturas guarda PNG en web/pruebas/capturas/ (ignoradas por git)
 
-Revisa (230 comprobaciones por motor): fragmento válido y contrato de la plataforma, sin colores
+Revisa (254 comprobaciones por motor): fragmento válido y contrato de la plataforma, sin colores
 literales, portada (foto, Ken Burns, trofeo, confeti, nada encimado; en celular, que quepa en la primera
 pantalla a 390x664, 360x700 y 375x620, con y sin franja en vivo; en escritorio, que quepa y que la copa
 no toque el título), el cuadro (4 + 2 + 1 series con ida y vuelta, sin «global probable»; en celular el
@@ -178,7 +178,10 @@ en el cuadro, en el mini-cuadro y en el detalle, documentos corruptos, límite d
 «vivo» incrustado; y la robustez: documento viejo que no reemplaza al vigente, lectura que no salta
 cuando «Al momento» crece, error del oyente con nueva suscripción, flujo cortado que caduca en
 `vence_utc`, documento de prueba, tiempos extra y penales, aviso que no estorba), más las variantes de liguilla en curso, sin `liguilla.torneo`, opcionales en `null` y
-movimiento reducido. Sale con código 1 si algo falla. Tarda unos 2 minutos por motor. Si la máquina no
+movimiento reducido; y «Modelo contra mercado» en el desempeño sellado (lo que diga `desempeno.contra_mercado`
+con los datos de hoy, y variantes con 3, 1 y 40 partidos comparados, sin ningún sello con momios, documento
+viejo sin el campo y mercado con basura; en cada resultado, la barra del mercado sellado o la nota de que su
+sello no guardó momios). Sale con código 1 si algo falla. Tarda unos 2 minutos por motor. Si la máquina no
 tiene salida a internet las fuentes de Google no cargan y se prueba con la pila de respaldo.
 
 Para revisar la portada de otro favorito: `python3 web/construir.py --portada Toluca` (escribe sólo

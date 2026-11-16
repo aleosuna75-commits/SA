@@ -372,3 +372,28 @@ def test_ultimos_resultados_y_validador(tmp_path):
     assert any("no debe traer cifras" in e for e in roto(lambda d: cm(d).update(n=0, n_sin_mercado=3)))
     assert any("mercado sellado inválido" in e for e in roto(lambda d: con_mercado(d)["mercado"].update(p_local=0.9)))
     assert any("no viene de un sello" in e for e in roto(lambda d: con_mercado(d).update(origen="modelo/pred (walk-forward, no sellado)")))
+    assert any("no cuadran" in e for e in roto(lambda d: cm(d).update(desde_local=None)))             # partidos con mercado y sin fecha
+    assert any("no cuadran" in e for e in roto(lambda d: cm(d).update(n_sellados_con_mercado=1)))     # menos sellados que comparados
+    # fecha sin partidos sí puede pasar (un sello con momios de un partido que ya no está en los datos): es válido
+    vacio = dict(n=0, n_sin_mercado=3, n_sellados_con_mercado=0, mercado=None, modelo=None, dif_logloss=None,
+                 ee_dif_logloss=None, lectura="sin_partidos")
+    assert roto(lambda d: (cm(d).update(vacio), [u["pronostico"].update(mercado=None) for u in d["ultimos_resultados"]])) == []
+
+
+def test_el_documento_exportado_trae_la_comparacion():
+    """salidas/actual.json (lo que lee la página) pasa el validador, y los sellos reales con mercado están bien formados."""
+    doc = json.loads((datos.RAIZ / "salidas" / "actual.json").read_text(encoding="utf-8"))
+    assert ex._validar_mercado(doc) == []
+    cm = doc["desempeno"]["contra_mercado"]
+    assert cm["n"] + cm["n_sin_mercado"] == doc["desempeno"]["n_calificados"]
+    if len(doc["desempeno"]["partidos"]) == doc["desempeno"]["n_calificados"]:              # caben todos (son los últimos 40)
+        assert sum(p["logloss_mercado"] is not None for p in doc["desempeno"]["partidos"]) == cm["n"]
+    # los sellos con mercado guardan momios mayores que 1 y su 1X2 por Shin; ninguno se selló después de su partido
+    con = [s for s in sellos.leer_sellos() if s.get("mercado")]
+    assert len(con) >= 9 and cm["desde_local"] is not None                                    # los 9 de la Jornada 17, del 16-nov-2026
+    assert min(s["sellado_utc"] for s in con) >= "2026-11-16"
+    for s in con:
+        m = s["mercado"]
+        assert min(m["ml_l"], m["ml_e"], m["ml_v"]) > 1.0 and m["p_l"] + m["p_e"] + m["p_v"] == pytest.approx(1.0, abs=2e-6)
+        assert pd.Timestamp(s["sellado_utc"]) < pd.Timestamp(s["fecha_utc"])
+        assert [m["p_l"], m["p_e"], m["p_v"]] == pytest.approx(list(base.prob_shin([[m["ml_l"], m["ml_e"], m["ml_v"]]])[0][0]), abs=1e-6)

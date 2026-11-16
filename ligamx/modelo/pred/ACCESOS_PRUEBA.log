@@ -128,3 +128,9 @@
 2026-11-15T08:32:56Z	accion=leer	quien=desconocido	modelo=ensamble	granularidad=dia	pid=2660	argv=/home/user/SA/ligamx/produccion/exportar.py
 2026-11-15T08:39:13Z	accion=leer	quien=desconocido	modelo=ensamble	granularidad=dia	pid=2982	argv=/home/user/SA/ligamx/produccion/exportar.py
 2026-11-16T07:22:50Z	accion=leer	quien=desconocido	modelo=ensamble	granularidad=dia	pid=177	argv=/home/user/SA/ligamx/produccion/exportar.py
+2026-11-16T07:46:40Z	accion=leer	quien=desconocido	modelo=ensamble	granularidad=dia	pid=1167	argv=/home/user/SA/ligamx/produccion/exportar.py
+2026-11-16T07:54:26Z	accion=leer	quien=desconocido	modelo=ensamble	granularidad=dia	pid=1918	argv=/home/user/SA/ligamx/produccion/exportar.py
+2026-11-16T08:06:33Z	accion=leer	quien=desconocido	modelo=ensamble	granularidad=dia	pid=5209	argv=/tmp/claude-0/-home-user-SA/2bd39326-8617-5400-b04f-4c3059628357/scratchpad/rev_momios/ab.py /tmp/claude-0/-home-user-SA/2bd39326-8617-5400-b04f-4c3059628357/scratchpad/rev_momios/antes /tmp/claude-0/-home-user-SA/2bd39326-8617-5400-b04f-4c3059628357/scratchpad/rev_momios/ab_antes.json 2026-11-16T07:53:30.305063+00:00
+2026-11-16T08:06:37Z	accion=leer	quien=desconocido	modelo=ensamble	granularidad=dia	pid=5212	argv=/tmp/claude-0/-home-user-SA/2bd39326-8617-5400-b04f-4c3059628357/scratchpad/rev_momios/ab.py /home/user/SA/ligamx /tmp/claude-0/-home-user-SA/2bd39326-8617-5400-b04f-4c3059628357/scratchpad/rev_momios/ab_despues.json 2026-11-16T07:53:30.305063+00:00
+2026-11-16T08:13:11Z	accion=leer	quien=desconocido	modelo=ensamble	granularidad=dia	pid=7320	argv=/home/user/SA/ligamx/produccion/exportar.py
+2026-11-16T08:14:03Z	accion=leer	quien=desconocido	modelo=ensamble	granularidad=dia	pid=7347	argv=/home/user/SA/ligamx/produccion/exportar.py
