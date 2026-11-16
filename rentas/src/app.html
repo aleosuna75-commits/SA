@@ -1,0 +1,718 @@
+<title>Busca Nido</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Outfit:wght@500;600;700;800&family=Inter:wght@400;500;600;700&display=swap">
+<style>
+/*MAPLIBRE_CSS*/
+</style>
+<style>
+/* Layout: el mapa ocupa toda la pantalla; encima flotan la barra de búsqueda con filtros (arriba), los botones de capas (derecha)
+   y una hoja inferior con la lista y el detalle. En escritorio la hoja se vuelve un panel a la izquierda.
+   Un solo tema claro a propósito: el mapa es claro y la interfaz lo acompaña. Acento jacaranda, el árbol morado de la CDMX. */
+:root{
+  color-scheme:light;
+  --bg:#f6f5f8; --surface:#ffffff; --surface-2:#f1eff5; --line:#e4e0ec; --line-2:#cdc6da;
+  --fg:#1d1a24; --fg-2:#545066; --fg-3:#837e93;
+  --accent:#7b3fc4; --accent-2:#9b6ad8; --accent-soft:#efe6fb; --accent-ink:#ffffff;
+  --good:#0f7b4c; --good-soft:#dcf3e7; --bad:#b4322f; --bad-soft:#fbe3e2; --warn:#8a5a00; --warn-soft:#fdf0d2;
+  --metro:#e8681e; --tren:#1f6fd1; --cable:#0b8f8a;
+  --shadow:0 6px 20px rgba(29,26,36,.16); --shadow-2:0 2px 8px rgba(29,26,36,.14);
+  --display:"Outfit","Inter",system-ui,sans-serif; --body:"Inter",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --gl:max(16px, env(safe-area-inset-left, 0px)); --gr:max(16px, env(safe-area-inset-right, 0px));
+  --top:env(safe-area-inset-top, 0px); --bot:env(safe-area-inset-bottom, 0px);
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font:400 15px/1.45 var(--body);-webkit-font-smoothing:antialiased;overflow:hidden;overscroll-behavior:none}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer;border:0;background:none;padding:0}
+:focus-visible{outline:2.5px solid var(--accent);outline-offset:2px;border-radius:10px}
+.num{font-variant-numeric:tabular-nums}
+.oj{width:1.25em;height:1.25em;vertical-align:-.28em;display:inline-block}
+#map{position:fixed;inset:0;background:#e9e6df}
+#ui{position:fixed;inset:0;pointer-events:none;padding-left:var(--gl);padding-right:var(--gr)}
+#ui>*{pointer-events:auto}
+
+/* barra superior */
+.top{position:absolute;left:var(--gl);right:var(--gr);top:calc(10px + var(--top));display:flex;flex-direction:column;gap:8px;z-index:5;pointer-events:none}
+.top>*{pointer-events:auto}
+.search{display:flex;align-items:center;gap:8px;background:var(--surface);border-radius:999px;box-shadow:var(--shadow);padding:6px 6px 6px 14px;position:relative}
+.brand{font:800 15px/1 var(--display);color:var(--accent);white-space:nowrap;display:flex;align-items:center;gap:6px}
+.brand .oj{width:22px;height:22px}
+.search input{flex:1;min-width:0;border:0;outline:0;background:none;padding:9px 2px;font-size:15px}
+.search input::placeholder{color:var(--fg-3)}
+.iconbtn{width:40px;height:40px;border-radius:50%;display:grid;place-items:center;flex:none;color:var(--fg-2);font-size:18px}
+.iconbtn:hover{background:var(--surface-2)}
+.iconbtn .oj{width:24px;height:24px}
+.badge{position:absolute;top:4px;right:4px;min-width:18px;height:18px;border-radius:9px;background:var(--accent);color:#fff;font:700 11px/18px var(--body);text-align:center;padding:0 5px}
+.sug{position:absolute;left:0;right:0;top:calc(100% + 6px);background:var(--surface);border-radius:18px;box-shadow:var(--shadow);max-height:min(60vh,420px);overflow:auto;padding:6px}
+.sug button{display:flex;gap:10px;align-items:center;width:100%;text-align:left;padding:10px 12px;border-radius:12px}
+.sug button:hover,.sug button.on{background:var(--surface-2)}
+.sug small{color:var(--fg-3);margin-left:auto;font-size:12px;white-space:nowrap}
+.chips{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;padding:2px 2px 6px;margin:0 -2px}
+.chips::-webkit-scrollbar{display:none}
+.chip{flex:none;display:inline-flex;align-items:center;gap:6px;padding:8px 13px;border-radius:999px;background:var(--surface);box-shadow:var(--shadow-2);font-weight:600;font-size:13.5px;white-space:nowrap;color:var(--fg)}
+.chip[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink)}
+.chip .oj{width:18px;height:18px}
+
+/* botones flotantes del mapa */
+.mapbtns{position:absolute;right:var(--gr);top:calc(122px + var(--top));display:flex;flex-direction:column;gap:8px;z-index:4}
+.mapbtn{width:44px;height:44px;border-radius:14px;background:var(--surface);box-shadow:var(--shadow-2);display:grid;place-items:center;font:700 13px/1 var(--display);color:var(--fg-2)}
+.mapbtn[aria-pressed="true"]{background:var(--accent);color:#fff}
+.mapbtn .oj{width:24px;height:24px}
+
+/* hoja inferior / panel lateral */
+#sheet{position:absolute;left:0;right:0;bottom:0;height:calc(100% - 64px - var(--top));background:var(--surface);border-radius:22px 22px 0 0;box-shadow:0 -6px 24px rgba(29,26,36,.14);z-index:6;display:flex;flex-direction:column;transform:translateY(calc(100% - var(--peek)));transition:transform .28s cubic-bezier(.2,.8,.2,1);--peek:150px;touch-action:none}
+#sheet[data-s="mid"]{transform:translateY(48%)}
+#sheet[data-s="full"]{transform:translateY(0)}
+#sheet.drag{transition:none}
+.handle{padding:9px 0 4px;display:grid;place-items:center;cursor:grab;flex:none}
+.handle i{width:42px;height:5px;border-radius:3px;background:var(--line-2)}
+.sheet-in{flex:1;min-height:0;display:flex;flex-direction:column;padding-left:var(--gl);padding-right:var(--gr)}
+.lh{display:flex;align-items:center;gap:10px;padding:2px 0 10px;flex:none;flex-wrap:wrap}
+.lh h2{margin:0;font:700 19px/1.15 var(--display);letter-spacing:-.01em;flex:1;min-width:160px}
+.lh h2 small{display:block;font:500 12.5px/1.3 var(--body);color:var(--fg-3);margin-top:3px}
+.sel{border:1px solid var(--line);border-radius:999px;padding:7px 12px;background:var(--surface);font-size:13px;font-weight:600}
+.scroll{flex:1;min-height:0;overflow:auto;touch-action:pan-y;padding-bottom:calc(90px + var(--bot));margin:0 calc(-1 * var(--gr)) 0 calc(-1 * var(--gl));padding-left:var(--gl);padding-right:var(--gr)}
+.toggle{display:inline-flex;align-items:center;gap:8px;font-size:13px;font-weight:600;color:var(--fg-2)}
+.toggle input{accent-color:var(--accent);width:18px;height:18px}
+
+/* tarjetas */
+.card{display:grid;grid-template-columns:96px minmax(0,1fr) auto;gap:12px;padding:12px 0;border-top:1px solid var(--line);width:100%;text-align:left;align-items:start}
+.card:first-child{border-top:0}
+.card.on{background:linear-gradient(90deg,var(--accent-soft),transparent 70%)}
+.thumb{width:96px;height:96px;border-radius:14px;background:var(--surface-2);display:grid;place-items:center;overflow:hidden;position:relative}
+.thumb img{width:100%;height:100%;object-fit:cover;display:block}
+.thumb .oj{width:46px;height:46px}
+.thumb .src{position:absolute;left:5px;bottom:5px;right:5px;background:rgba(255,255,255,.92);border-radius:7px;font:700 10px/1.2 var(--body);padding:3px 5px;color:var(--fg-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:center}
+.price{font:800 19px/1.1 var(--display);letter-spacing:-.01em}
+.price small{font:500 12px var(--body);color:var(--fg-3)}
+.mant{font-size:12px;color:var(--fg-3)}
+.ttl{font-weight:600;font-size:14px;line-height:1.3;margin-top:3px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.where{font-size:12.5px;color:var(--fg-2);margin-top:3px}
+.facts{display:flex;flex-wrap:wrap;gap:4px 10px;margin-top:5px;font-size:12.5px;color:var(--fg-2)}
+.facts .oj{width:16px;height:16px;vertical-align:-.22em;margin-right:2px}
+.pet{display:inline-flex;align-items:center;gap:3px;font-weight:700;font-size:11.5px;padding:2px 7px;border-radius:999px}
+.pet.si{background:var(--good-soft);color:var(--good)} .pet.no{background:var(--bad-soft);color:var(--bad)} .pet.nd{background:var(--surface-2);color:var(--fg-3)}
+.st{display:inline-block;font-weight:700;font-size:11px;padding:2px 7px;border-radius:999px;background:var(--accent-soft);color:var(--accent);margin-top:5px}
+.fav{width:38px;height:38px;border-radius:50%;display:grid;place-items:center;font-size:20px;color:var(--fg-3)}
+.fav[aria-pressed="true"]{color:#e0245e}
+.more{width:100%;padding:14px;font-weight:700;color:var(--accent)}
+.empty{text-align:center;color:var(--fg-2);padding:26px 10px}
+.empty .oj{width:56px;height:56px;display:block;margin:0 auto 8px}
+
+/* detalle */
+.det-top{display:flex;align-items:center;gap:8px;margin-bottom:8px;flex:none}
+.back{display:inline-flex;align-items:center;gap:4px;font-weight:700;color:var(--accent);padding:6px 4px}
+.gal{display:flex;gap:8px;overflow-x:auto;scroll-snap-type:x mandatory;border-radius:16px;margin-bottom:12px}
+.gal img{height:220px;width:auto;max-width:100%;border-radius:16px;scroll-snap-align:start;object-fit:cover;flex:none}
+.nophoto{height:150px;border-radius:16px;background:linear-gradient(135deg,var(--accent-soft),var(--surface-2));display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;margin-bottom:12px;color:var(--fg-2);font-weight:600;text-align:center;padding:10px}
+.nophoto .oj{width:54px;height:54px}
+.dprice{font:800 30px/1.05 var(--display);letter-spacing:-.02em}
+.dttl{font:600 17px/1.3 var(--body);margin:6px 0 2px}
+.grid2{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:8px;margin:12px 0}
+.fact{background:var(--surface-2);border-radius:14px;padding:10px 12px;font-size:12.5px;color:var(--fg-2)}
+.fact b{display:block;font:700 16px/1.2 var(--display);color:var(--fg)}
+.box{border:1px solid var(--line);border-radius:16px;padding:12px 14px;margin:10px 0;font-size:14px}
+.box h3{margin:0 0 6px;font:700 14px var(--display)}
+.acts{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:12px 0}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:12px 14px;border-radius:14px;font-weight:700;font-size:14.5px;background:var(--surface-2);color:var(--fg);text-decoration:none;text-align:center}
+.btn.main{background:var(--accent);color:#fff;grid-column:1/-1}
+.btn.ghost{background:transparent;border:1.5px solid var(--line)}
+.btn.danger{color:var(--bad);background:var(--bad-soft)}
+.btn .oj{width:20px;height:20px}
+.btn:disabled{opacity:.5}
+.pipe{display:flex;flex-wrap:wrap;gap:6px}
+.pipe button{padding:7px 11px;border-radius:999px;border:1.5px solid var(--line);font-size:13px;font-weight:600}
+.pipe button[aria-pressed="true"]{border-color:var(--accent);background:var(--accent);color:#fff}
+textarea,.inp{width:100%;border:1.5px solid var(--line);border-radius:14px;padding:10px 12px;background:var(--surface);outline:0;resize:vertical}
+textarea:focus,.inp:focus{border-color:var(--accent)}
+.note{font-size:12.5px;color:var(--fg-3)}
+.warnbox{background:var(--warn-soft);color:#5c3c00;border-radius:14px;padding:10px 12px;font-size:13px;margin:10px 0}
+
+/* botón agregar */
+body.det #add{display:none}
+body[data-sheet="mid"] #add,body[data-sheet="full"] #add{bottom:calc(18px + var(--bot))}
+@media (min-width:900px){ body #add{display:flex!important} }
+#add{position:absolute;right:var(--gr);bottom:calc(var(--peek, 150px) + 14px + var(--bot));z-index:7;display:flex;align-items:center;gap:8px;padding:13px 18px;border-radius:999px;background:var(--accent);color:#fff;font:700 15px/1 var(--display);box-shadow:0 8px 22px rgba(123,63,196,.4)}
+#add .oj{width:22px;height:22px}
+
+/* modales */
+.veil{position:fixed;inset:0;background:rgba(20,16,28,.42);z-index:20;display:flex;align-items:flex-end;justify-content:center}
+.modal{background:var(--surface);width:100%;max-width:560px;max-height:92%;overflow:auto;border-radius:24px 24px 0 0;padding:16px var(--gr) calc(20px + var(--bot)) var(--gl);box-shadow:var(--shadow)}
+@media (min-width:700px){ .veil{align-items:center} .modal{border-radius:24px;max-height:88%;padding:20px 22px} }
+.mh{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px}
+.mh h2{margin:0;font:800 21px/1.15 var(--display)}
+.x{width:38px;height:38px;border-radius:50%;background:var(--surface-2);font-size:16px;flex:none}
+.fld{margin:14px 0}
+.fld>label,.fld>.lab{display:block;font:700 12px/1 var(--body);letter-spacing:.06em;text-transform:uppercase;color:var(--fg-3);margin-bottom:8px}
+.opts{display:flex;flex-wrap:wrap;gap:8px}
+.opt{padding:9px 13px;border-radius:999px;border:1.5px solid var(--line);font-weight:600;font-size:13.5px;display:inline-flex;align-items:center;gap:6px}
+.opt[aria-pressed="true"]{border-color:var(--accent);background:var(--accent-soft);color:var(--accent)}
+.opt .oj{width:18px;height:18px}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.presets{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.presets button{font-size:12.5px;padding:5px 10px;border-radius:999px;background:var(--surface-2);font-weight:600}
+.mfoot{position:sticky;bottom:calc(-20px - var(--bot));background:var(--surface);padding:12px 0 4px;display:flex;gap:8px;margin-top:10px}
+.mfoot .btn{flex:1}
+.plat{display:flex;align-items:center;gap:12px;padding:12px 0;border-top:1px solid var(--line)}
+.plat:first-of-type{border-top:0}
+.plat .pn{flex:1;min-width:0}
+.plat b{display:block;font-size:15px}
+.plat small{color:var(--fg-3);font-size:12.5px}
+.logo{width:42px;height:42px;border-radius:12px;display:grid;place-items:center;font:800 13px/1 var(--display);color:#fff;flex:none}
+.thumbs{display:flex;gap:8px;flex-wrap:wrap}
+.thumbs img{width:72px;height:72px;object-fit:cover;border-radius:12px}
+
+/* modo elegir punto */
+.pickbar{position:absolute;left:var(--gl);right:var(--gr);bottom:calc(20px + var(--bot));z-index:9;background:var(--fg);color:#fff;border-radius:18px;padding:12px 14px;display:flex;align-items:center;gap:10px;box-shadow:var(--shadow)}
+.pickbar span{flex:1;font-weight:600;font-size:14px}
+.pickbar .btn{padding:9px 12px}
+.cross{position:fixed;left:50%;top:50%;width:34px;height:34px;margin:-34px 0 0 -17px;z-index:8;pointer-events:none}
+.cross .oj{width:34px;height:34px}
+
+#toast{position:fixed;left:50%;transform:translateX(-50%);top:calc(130px + var(--top));z-index:30;background:var(--fg);color:#fff;padding:10px 16px;border-radius:14px;font-weight:600;font-size:14px;max-width:min(92vw,440px);box-shadow:var(--shadow);text-align:center}
+.loading{position:fixed;inset:0;display:grid;place-items:center;z-index:40;background:var(--bg);font:700 18px var(--display);color:var(--accent);transition:opacity .3s}
+.loading div{display:flex;flex-direction:column;align-items:center;gap:10px}
+.loading .oj{width:64px;height:64px}
+.maplibregl-ctrl-attrib{font-size:10.5px}
+.maplibregl-ctrl-bottom-right{bottom:calc(var(--peek,150px) - 4px)}
+
+@media (min-width:900px){
+  .top{left:20px;right:auto;width:420px}
+  #sheet{left:20px;right:auto;top:calc(128px + var(--top));bottom:20px;height:auto;width:420px;border-radius:22px;transform:none!important;box-shadow:var(--shadow)}
+  .handle{display:none}
+  .sheet-in{padding:14px 16px 0}
+  .scroll{margin:0 -16px;padding:0 16px 20px}
+  #add{bottom:24px;right:24px}
+  .mapbtns{top:20px;right:20px}
+  .maplibregl-ctrl-bottom-right{bottom:0}
+  #toast{top:24px}
+}
+@media (prefers-reduced-motion:reduce){ #sheet{transition:none} }
+</style>
+
+<div id="map" role="region" aria-label="Mapa de rentas de la Ciudad de México"></div>
+<div id="ui">
+  <div class="top">
+    <div class="search">
+      <span class="brand" aria-hidden="true" data-e="🏘"></span>
+      <input id="q" type="search" autocomplete="off" placeholder="Busca colonia, alcaldía o metro" aria-label="Buscar colonia, alcaldía o estación de metro">
+      <button class="iconbtn" data-a="filtros" aria-label="Filtros" style="position:relative"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2.4"/><circle cx="10" cy="17" r="2.4"/></svg><span class="badge" id="nf" hidden></span></button>
+      <div class="sug" id="sug" hidden role="listbox"></div>
+    </div>
+    <div class="chips" id="chips"></div>
+  </div>
+  <div class="mapbtns">
+    <button class="mapbtn" data-a="3d" aria-pressed="false" aria-label="Vista 3D">3D</button>
+    <button class="mapbtn" data-a="metro" aria-pressed="true" aria-label="Mostrar estaciones de metro" data-e="🚇"></button>
+    <button class="mapbtn" data-a="plataformas" aria-label="Buscar en otras plataformas" data-e="🔗"></button>
+    <button class="mapbtn" data-a="cdmx" aria-label="Ver toda la ciudad" data-e="🧭"></button>
+  </div>
+  <section id="sheet" data-s="peek" aria-label="Resultados">
+    <div class="handle" id="handle" aria-hidden="true"><i></i></div>
+    <div class="sheet-in" id="sheetin"></div>
+  </section>
+  <button id="add" data-a="agregar" aria-label="Agregar un anuncio que encontraste"><span aria-hidden="true" style="font-size:22px;line-height:1">＋</span><span>Agregar</span></button>
+</div>
+<div id="modal-root"></div>
+<div id="toast" hidden role="status"></div>
+<div class="loading" id="loading"><div><span aria-hidden="true" data-e="🏘"></span>Cargando el mapa de la CDMX…</div></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/4.7.1/maplibre-gl.js"></script>
+<script>
+"use strict";
+/* ============ íconos (OpenMoji, CC BY-SA 4.0) ============ */
+const ICON = /*ICONOS*/{};
+const ICON_URL = {};
+const ic = e => { const k = e.replace(/️/g, ''); if (!ICON[k]) return e; ICON_URL[k] = ICON_URL[k] || URL.createObjectURL(new Blob([ICON[k]], {type: 'image/svg+xml'})); return `<img class="oj" src="${ICON_URL[k]}" alt="">`; };
+function ojify(root){ /* reemplaza emojis sueltos en el HTML estático por los dibujos */
+  root.querySelectorAll('[data-e]').forEach(el => { el.innerHTML = ic(el.dataset.e) + (el.dataset.t ? ' ' + el.dataset.t : ''); });
+}
+
+/* ============ utilidades ============ */
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const norm = s => String(s || '').toLowerCase().replace(/ñ/g, '\u0001').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\u0001/g, 'ñ').replace(/[^a-z0-9ñ ]/g, ' ').replace(/\s+/g, ' ').trim();
+const slug = s => norm(s).replace(/ñ/g, 'n').replace(/ /g, '-');
+const money = n => '$' + Math.round(Number(n) || 0).toLocaleString('es-MX');
+const short = n => n >= 100000 ? '$' + Math.round(n / 1000) + 'k' : n >= 10000 ? '$' + (Math.round(n / 100) / 10).toString().replace(/\.0$/, '') + 'k' : money(n);
+const ls = { get(k){ try { return JSON.parse(localStorage.getItem(k)); } catch(e){ return null; } }, set(k, v){ try { localStorage.setItem(k, JSON.stringify(v)); } catch(e){} } };
+const hav = (a, b) => { const R = 6371000, r = Math.PI / 180, dLat = (b.lat - a.lat) * r, dLon = (b.lon - a.lon) * r; const h = Math.sin(dLat/2)**2 + Math.cos(a.lat*r) * Math.cos(b.lat*r) * Math.sin(dLon/2)**2; return 2 * R * Math.asin(Math.sqrt(h)); };
+const hash = s => { let h = 2166136261; for (const c of String(s)) { h ^= c.codePointAt(0); h = Math.imul(h, 16777619); } return h >>> 0; };
+const fmtDist = m => m < 1000 ? Math.round(m / 10) * 10 + ' m' : (m / 1000).toFixed(1).replace('.0', '') + ' km';
+let toastT;
+function toast(msg){ const t = $('#toast'); t.textContent = msg; t.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => t.hidden = true, 3400); }
+const TIPOS = {departamento: ['Departamento', '🏢'], casa: ['Casa', '🏠'], cuarto: ['Cuarto', '🛏'], loft: ['Loft', '🏙'], estudio: ['Estudio', '🛋'], otro: ['Otro', '🏘']};
+const ESTADOS = [['interesa', 'Me interesa'], ['contactado', 'Ya escribí'], ['visita', 'Visita agendada'], ['visitado', 'Ya lo vi'], ['descartado', 'Descartado']];
+const ESTADO_L = Object.fromEntries(ESTADOS);
+
+/* ============ estado ============ */
+const DEF = () => ({min: null, max: null, tipos: [], rec: 0, banos: 0, mascotas: 'todas', alcaldias: [], metro: 0, amueblado: false, estac: false, fuentes: [], fav: false, mios: false, ocultos: false});
+const S = { anuncios: [], mios: [], estado: {}, lug: null, f: Object.assign(DEF(), ls.get('bn.f') || {}), orden: ls.get('bn.orden') || 'recientes', visible: ls.get('bn.visible') ?? true,
+  vista: 'lista', sel: null, limite: 40, db: null, assets: null, ai: null, aiImg: false, readOnly: false, meta: {} };
+let map, mapReady = false;
+
+/* ============ mapa: teselas, letras e íconos servidos desde los archivos del propio artefacto ============ */
+const BASE = location.href.replace(/[?#].*$/, '').replace(/[^/]*$/, '');
+const packs = {};
+function packFor(z, x, y){ return z <= 11 ? 'low' : z <= 13 ? `a-${x >> (z - 12)}-${y >> (z - 12)}` : `b-${x >> 1}-${y >> 1}`; }
+function loadPack(k){ return packs[k] || (packs[k] = fetch(BASE + 't/' + k + '.json').then(r => r.ok ? r.json() : {}).catch(() => { delete packs[k]; return {}; })); }
+const b64 = s => { const bin = atob(s), u = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i); return u.buffer; };
+maplibregl.addProtocol('pack', async (params) => {
+  const m = params.url.match(/pack:\/\/(\d+)\/(\d+)\/(\d+)/); if (!m) return {data: new ArrayBuffer(0)};
+  const [z, x, y] = m.slice(1).map(Number), p = await loadPack(packFor(z, x, y)), s = p[`${z}/${x}/${y}`];
+  return {data: s ? b64(s) : new ArrayBuffer(0)};
+});
+const glyphs = {};
+maplibregl.addProtocol('glyph', async (params) => {
+  const m = params.url.match(/glyph:\/\/([^/]+)\/(\d+-\d+)/); if (!m) return {data: new ArrayBuffer(0)};
+  const font = decodeURIComponent(m[1]).split(',')[0].trim().replace(/ /g, '_'), k = font + '_' + m[2];
+  glyphs[k] = glyphs[k] || fetch(BASE + 'f/' + k + '.json').then(r => r.ok ? r.json() : '').catch(() => '');
+  const s = await glyphs[k]; return {data: s ? b64(s) : new ArrayBuffer(0)};
+});
+
+/* ============ datos ============ */
+async function getJSON(p){ const r = await fetch(BASE + p); if (!r.ok) throw new Error(p + ' ' + r.status); return r.json(); }
+function prep(a, mio){
+  const t = TIPOS[a.tipo] ? a.tipo : 'otro';
+  const o = {...a, tipo: t, precio: Number(a.precio) || 0, mio: !!mio, lat: Number(a.lat), lon: Number(a.lon)};
+  if (!isFinite(o.lat) || !isFinite(o.lon)) return null;
+  if (S.lug) { let best = null, bd = 1e9; for (const e of S.lug.estaciones) { const d = hav(o, e); if (d < bd) { bd = d; best = e; } } o.est = best ? {n: best.n, t: best.t, d: bd} : null; }
+  if (!o.alcaldia && S.lug) o.alcaldia = alcaldiaDe(o.lon, o.lat) || '';
+  return o;
+}
+function inside(pt, ring){ let c = false; for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) { const [x1, y1] = ring[i], [x2, y2] = ring[j]; if ((y1 > pt[1]) !== (y2 > pt[1]) && pt[0] < (x2 - x1) * (pt[1] - y1) / (y2 - y1) + x1) c = !c; } return c; }
+function alcaldiaDe(lon, lat){ for (const a of S.lug.alcaldias) for (const poly of a.p) if (inside([lon, lat], poly[0]) && !poly.slice(1).some(h => inside([lon, lat], h))) return a.n; return null; }
+const todos = () => S.anuncios.concat(S.mios);
+const est = id => S.estado[id] || {};
+
+/* ============ filtros ============ */
+function pasa(a, f = S.f){
+  const e = est(a.id);
+  if (!f.ocultos && (e.oculto || e.st === 'descartado')) return false;
+  if (f.fav && !e.fav) return false;
+  if (f.mios && !a.mio) return false;
+  if (f.min && a.precio < f.min) return false;
+  if (f.max && a.precio > f.max) return false;
+  if (f.tipos.length && !f.tipos.includes(a.tipo)) return false;
+  if (f.rec && !(a.recamaras >= f.rec)) return false;
+  if (f.banos && !(a.banos >= f.banos)) return false;
+  if (f.mascotas === 'si' && a.mascotas !== 'si') return false;
+  if (f.mascotas === 'nono' && a.mascotas === 'no') return false;
+  if (f.alcaldias.length && !f.alcaldias.includes(a.alcaldia)) return false;
+  if (f.metro && !(a.est && a.est.d <= f.metro)) return false;
+  if (f.amueblado && a.amueblado !== true) return false;
+  if (f.estac && !(a.estacionamientos >= 1)) return false;
+  if (f.fuentes.length && !f.fuentes.includes(a.fuente)) return false;
+  return true;
+}
+function nFiltros(f = S.f){ return (f.min || f.max ? 1 : 0) + (f.tipos.length ? 1 : 0) + (f.rec ? 1 : 0) + (f.banos ? 1 : 0) + (f.mascotas !== 'todas' ? 1 : 0) + (f.alcaldias.length ? 1 : 0) + (f.metro ? 1 : 0) + (f.amueblado ? 1 : 0) + (f.estac ? 1 : 0) + (f.fuentes.length ? 1 : 0) + (f.fav ? 1 : 0) + (f.mios ? 1 : 0) + (f.ocultos ? 1 : 0); }
+function guardarF(){ ls.set('bn.f', S.f); }
+function filtrados(){ return todos().filter(a => pasa(a)); }
+function enVista(list){ if (!S.visible || !mapReady) return list; const b = map.getBounds(); return list.filter(a => b.contains([a.lon, a.lat])); }
+function ordenar(list){
+  const o = S.orden, k = {precio: (a, b) => a.precio - b.precio, precio_d: (a, b) => b.precio - a.precio, metro: (a, b) => (a.est ? a.est.d : 9e9) - (b.est ? b.est.d : 9e9), m2: (a, b) => ((b.m2 || 0) && (a.m2 || 0) ? a.precio / a.m2 - b.precio / b.m2 : (b.m2 || 0) - (a.m2 || 0)),
+    recientes: (a, b) => String(b.creado || b.fecha_publicacion || b.visto || '').localeCompare(String(a.creado || a.fecha_publicacion || a.visto || '')) }[o] || (() => 0);
+  return list.slice().sort(k);
+}
+
+/* ============ capas del mapa ============ */
+function pillImage(fill, stroke, textOnly){
+  const s = 2, w = 44, h = 28, c = document.createElement('canvas'); c.width = w * s; c.height = h * s; const x = c.getContext('2d'); x.scale(s, s);
+  const r = 12; x.beginPath(); x.moveTo(r + 1, 1); x.arcTo(w - 1, 1, w - 1, h - 1, r); x.arcTo(w - 1, h - 1, 1, h - 1, r); x.arcTo(1, h - 1, 1, 1, r); x.arcTo(1, 1, w - 1, 1, r); x.closePath();
+  x.shadowColor = 'rgba(0,0,0,.25)'; x.shadowBlur = 3; x.shadowOffsetY = 1; x.fillStyle = fill; x.fill(); x.shadowColor = 'transparent'; x.lineWidth = 1.5; x.strokeStyle = stroke; x.stroke();
+  return {img: x.getImageData(0, 0, w * s, h * s), opt: {pixelRatio: s, stretchX: [[14 * s, 30 * s]], stretchY: [[12 * s, 16 * s]], content: [8 * s, 5 * s, 36 * s, 23 * s]}};
+}
+function geo(list){
+  return {type: 'FeatureCollection', features: list.map(a => ({type: 'Feature', id: hash(a.id), geometry: {type: 'Point', coordinates: [a.lon, a.lat]},
+    properties: {id: a.id, pl: short(a.precio), k: S.sel === a.id ? 'sel' : est(a.id).fav ? 'fav' : a.mio ? 'mio' : est(a.id).st ? 'st' : 'n'}}))};
+}
+function capas(){
+  for (const [k, f, s] of [['n', '#ffffff', '#cdc6da'], ['fav', '#ffe3ec', '#e0245e'], ['mio', '#e3f5ea', '#0f7b4c'], ['st', '#efe6fb', '#7b3fc4'], ['sel', '#1d1a24', '#1d1a24']]) { const p = pillImage(f, s); map.addImage('pill-' + k, p.img, p.opt); }
+  map.addSource('alcaldias', {type: 'geojson', data: {type: 'FeatureCollection', features: S.lug.alcaldias.map(a => ({type: 'Feature', properties: {n: a.n}, geometry: {type: 'MultiPolygon', coordinates: a.p}}))}});
+  map.addLayer({id: 'alc-fill', type: 'fill', source: 'alcaldias', paint: {'fill-color': '#7b3fc4', 'fill-opacity': ['case', ['in', ['get', 'n'], ['literal', S.f.alcaldias]], .07, 0]}});
+  map.addLayer({id: 'alc-line', type: 'line', source: 'alcaldias', paint: {'line-color': '#7b3fc4', 'line-width': ['case', ['in', ['get', 'n'], ['literal', S.f.alcaldias]], 2.5, .8], 'line-opacity': ['case', ['in', ['get', 'n'], ['literal', S.f.alcaldias]], .9, .35], 'line-dasharray': [3, 2]}});
+  map.addSource('est', {type: 'geojson', data: {type: 'FeatureCollection', features: S.lug.estaciones.map(e => ({type: 'Feature', properties: {n: e.n, t: e.t}, geometry: {type: 'Point', coordinates: [e.lon, e.lat]}}))}});
+  const col = ['match', ['get', 't'], 'Metro', '#e8681e', 'Tren', '#1f6fd1', 'Cablebús', '#0b8f8a', '#545066'];
+  map.addLayer({id: 'est-c', type: 'circle', source: 'est', minzoom: 12.8, paint: {'circle-radius': ['interpolate', ['linear'], ['zoom'], 12.8, 2.5, 15, 6.5], 'circle-color': '#fff', 'circle-stroke-color': col, 'circle-stroke-width': ['interpolate', ['linear'], ['zoom'], 12.8, 1.8, 15, 3.2]}});
+  map.addLayer({id: 'est-l', type: 'symbol', source: 'est', minzoom: 13.5, layout: {'text-field': ['get', 'n'], 'text-font': ['Noto Sans Bold'], 'text-size': 11.5, 'text-offset': [0, 1.15], 'text-anchor': 'top', 'text-optional': true}, paint: {'text-color': col, 'text-halo-color': '#fff', 'text-halo-width': 1.6}});
+  map.addSource('r', {type: 'geojson', data: geo([]), cluster: true, clusterMaxZoom: 13, clusterRadius: 40});
+  map.addLayer({id: 'r-cl', type: 'circle', source: 'r', filter: ['has', 'point_count'], paint: {'circle-color': '#7b3fc4', 'circle-opacity': .92, 'circle-radius': ['step', ['get', 'point_count'], 17, 10, 21, 30, 26, 80, 31], 'circle-stroke-color': '#fff', 'circle-stroke-width': 2.5}});
+  map.addLayer({id: 'r-cn', type: 'symbol', source: 'r', filter: ['has', 'point_count'], layout: {'text-field': ['get', 'point_count_abbreviated'], 'text-font': ['Noto Sans Bold'], 'text-size': 13, 'text-allow-overlap': true}, paint: {'text-color': '#fff'}});
+  map.addLayer({id: 'r-p', type: 'symbol', source: 'r', filter: ['!', ['has', 'point_count']], layout: {'icon-image': ['concat', 'pill-', ['get', 'k']], 'icon-text-fit': 'both', 'icon-text-fit-padding': [3, 7, 3, 7], 'text-field': ['get', 'pl'], 'text-font': ['Noto Sans Bold'], 'text-size': 12.5, 'icon-allow-overlap': true, 'text-allow-overlap': true, 'symbol-sort-key': ['match', ['get', 'k'], 'sel', 3, 'fav', 2, 1], 'symbol-z-order': 'source'}, paint: {'text-color': ['match', ['get', 'k'], 'sel', '#ffffff', 'fav', '#a0173f', 'mio', '#0b5e3a', '#1d1a24']}});
+  map.on('click', 'r-cl', e => { const f = e.features[0]; map.getSource('r').getClusterExpansionZoom(f.properties.cluster_id).then(z => map.easeTo({center: f.geometry.coordinates, zoom: z + .3})).catch(() => {}); });
+  map.on('click', 'r-p', e => { abrir(e.features[0].properties.id, false); });
+  for (const l of ['r-cl', 'r-p']) { map.on('mouseenter', l, () => map.getCanvas().style.cursor = 'pointer'); map.on('mouseleave', l, () => map.getCanvas().style.cursor = ''); }
+  map.on('click', e => { if (S.picking) return; const hit = map.queryRenderedFeatures(e.point, {layers: ['r-p', 'r-cl']}); if (!hit.length && S.vista === 'detalle') { cerrarDetalle(); } });
+}
+function pintarMapa(){
+  if (!mapReady) return;
+  map.getSource('r').setData(geo(filtrados()));
+  const sel = ['in', ['get', 'n'], ['literal', S.f.alcaldias]];
+  map.setPaintProperty('alc-fill', 'fill-opacity', ['case', sel, .07, 0]);
+  map.setPaintProperty('alc-line', 'line-width', ['case', sel, 2.5, .8]);
+  map.setPaintProperty('alc-line', 'line-opacity', ['case', sel, .9, .35]);
+}
+
+/* ============ interfaz ============ */
+function chips(){
+  const f = S.f, n = nFiltros();
+  const pr = f.min || f.max ? (f.min ? short(f.min) : '$0') + '–' + (f.max ? short(f.max) : 'más') : 'Precio';
+  const tp = f.tipos.length ? f.tipos.map(t => TIPOS[t][0]).join(', ') : 'Tipo';
+  const items = [
+    ['precio', pr, !!(f.min || f.max)], ['tipo', tp, !!f.tipos.length],
+    ['mascotas', '🐾 Acepta mascotas', f.mascotas === 'si'], ['rec', f.rec ? f.rec + '+ recámaras' : 'Recámaras', !!f.rec],
+    ['zona', f.alcaldias.length ? f.alcaldias.length === 1 ? f.alcaldias[0] : f.alcaldias.length + ' alcaldías' : 'Zona', !!f.alcaldias.length],
+    ['metrof', '🚇 Cerca del metro', !!f.metro], ['fav', '❤ Guardados', f.fav], ['plataformas', '🔗 Buscar en otras plataformas', false]];
+  $('#chips').innerHTML = items.map(([k, l, on]) => `<button class="chip" data-a="chip" data-k="${k}" aria-pressed="${on}">${l.replace(/^(🐾|🚇|❤|🔗) /, (m, e) => ic(e) + ' ')}</button>`).join('');
+  const b = $('#nf'); b.hidden = !n; b.textContent = n;
+}
+function thumb(a, big){
+  const fotos = (a.fotos || []).filter(Boolean);
+  const src = esc(FUENTES[a.fuente] ? FUENTES[a.fuente].n : a.fuente || (a.mio ? 'Agregado por ustedes' : ''));
+  return `<div class="thumb">${fotos.length ? `<img src="${esc('/_blob/' + fotos[0])}" alt="" loading="lazy">` : ic(TIPOS[a.tipo][1])}${src ? `<span class="src">${src}</span>` : ''}</div>`;
+}
+const petTag = a => a.mascotas === 'si' ? `<span class="pet si">${ic('🐾')} Acepta mascotas</span>` : a.mascotas === 'no' ? `<span class="pet no">Sin mascotas</span>` : '';
+function card(a){
+  const e = est(a.id);
+  return `<div class="card${S.sel === a.id ? ' on' : ''}" role="button" tabindex="0" data-a="abrir" data-id="${esc(a.id)}">${thumb(a)}
+    <div style="min-width:0"><div class="price num">${money(a.precio)}<small> /mes</small></div>
+      ${a.mantenimiento ? `<div class="mant num">+ ${money(a.mantenimiento)} mantenimiento</div>` : a.mantenimiento_incluido ? '<div class="mant">Mantenimiento incluido</div>' : ''}
+      <div class="ttl">${esc(a.titulo)}</div>
+      <div class="where">${esc(a.colonia)}${a.alcaldia ? ' · ' + esc(a.alcaldia) : ''}</div>
+      <div class="facts">${a.recamaras ? `<span>${ic('🛏')}${a.recamaras} rec.</span>` : ''}${a.banos ? `<span>${ic('🛁')}${a.banos}</span>` : ''}${a.m2 ? `<span>${ic('📐')}${a.m2} m²</span>` : ''}${a.est && a.est.d < 1500 ? `<span>${ic(a.est.t === 'Cablebús' ? '🚡' : a.est.t === 'Tren' ? '🚆' : '🚇')}${fmtDist(a.est.d)}</span>` : ''}${petTag(a)}</div>
+      ${e.st ? `<span class="st">${esc(ESTADO_L[e.st])}</span>` : ''}</div>
+    <button class="fav" data-a="fav" data-id="${esc(a.id)}" aria-pressed="${!!e.fav}" aria-label="${e.fav ? 'Quitar de guardados' : 'Guardar'}">${e.fav ? '♥' : '♡'}</button></div>`;
+}
+function lista(){
+  const all = filtrados(), vis = ordenar(enVista(all)), n = vis.length;
+  const sub = S.visible ? `${all.length} con tus filtros en toda la ciudad · ${n} en la zona del mapa` : `${all.length} con tus filtros`;
+  const datos = S.meta.fecha ? `Anuncios encontrados en internet el ${esc(S.meta.fecha)}. Confirma con el anunciante que sigan disponibles.` : '';
+  $('#sheetin').innerHTML = `<div class="lh"><h2>${n === 1 ? '1 renta' : n.toLocaleString('es-MX') + ' rentas'}<small>${sub}</small></h2>
+      <select class="sel" id="orden" aria-label="Ordenar">${[['recientes', 'Más recientes'], ['precio', 'Precio: menor a mayor'], ['precio_d', 'Precio: mayor a menor'], ['metro', 'Más cerca del metro'], ['m2', 'Mejor precio por m²']].map(([v, l]) => `<option value="${v}" ${S.orden === v ? 'selected' : ''}>${l}</option>`).join('')}</select>
+      <label class="toggle" style="width:100%"><input type="checkbox" id="vis" ${S.visible ? 'checked' : ''}> Solo lo que se ve en el mapa</label></div>
+    <div class="scroll" id="scroll">${n ? vis.slice(0, S.limite).map(card).join('') + (n > S.limite ? `<button class="more" data-a="mas">Ver ${Math.min(40, n - S.limite)} más</button>` : '') : `<div class="empty">${ic('🔍')}No hay rentas con estos filtros${S.visible ? ' en esta parte del mapa' : ''}.<br><br>${S.visible ? '<button class="btn ghost" data-a="vertodo">Ver toda la ciudad</button> ' : ''}${nFiltros() ? '<button class="btn ghost" data-a="limpiar">Quitar filtros</button>' : ''}</div>`}
+    ${datos ? `<p class="note" style="margin:14px 0 4px">${datos} <button class="note" style="text-decoration:underline" data-a="acerca">Sobre los datos</button></p>` : ''}</div>`;
+}
+function render(){ chips(); pintarMapa(); document.body.classList.toggle('det', S.vista === 'detalle'); if (S.vista === 'lista') lista(); else detalle(); }
+
+/* ============ detalle ============ */
+function abrir(id, volar){
+  const a = todos().find(x => x.id === id); if (!a) return;
+  S.sel = id; S.vista = 'detalle'; render(); setSheet(window.innerWidth >= 900 ? 'full' : 'mid');
+  if (volar !== false || !map.getBounds().contains([a.lon, a.lat])) map.easeTo({center: [a.lon, a.lat], zoom: Math.max(map.getZoom(), 14.5), offset: window.innerWidth >= 900 ? [200, 0] : [0, -window.innerHeight * .22], duration: 700});
+}
+function cerrarDetalle(){ S.sel = null; S.vista = 'lista'; render(); }
+function detalle(){
+  const a = todos().find(x => x.id === S.sel); if (!a) { S.vista = 'lista'; return lista(); }
+  const e = est(a.id), fotos = (a.fotos || []).filter(Boolean), F = FUENTES[a.fuente];
+  const facts = [[TIPOS[a.tipo][0], 'Tipo'], [a.recamaras, 'Recámaras'], [a.banos, 'Baños'], [a.m2 && a.m2 + ' m²', 'Superficie'], [a.estacionamientos != null && (a.estacionamientos || 'No'), 'Estacionamiento'], [a.amueblado == null ? null : a.amueblado ? 'Sí' : 'No', 'Amueblado'], [a.m2 && a.precio ? money(a.precio / a.m2) : null, 'Por m²']].filter(f => f[0] != null && f[0] !== '' && f[0] !== 0);
+  const dir = `https://www.google.com/maps/dir/?api=1&destination=${a.lat},${a.lon}`;
+  $('#sheetin').innerHTML = `<div class="det-top"><button class="back" data-a="volver">‹ Resultados</button><span style="flex:1"></span><button class="fav" data-a="fav" data-id="${esc(a.id)}" aria-pressed="${!!e.fav}" aria-label="${e.fav ? 'Quitar de guardados' : 'Guardar'}">${e.fav ? '♥' : '♡'}</button></div>
+  <div class="scroll">
+    ${fotos.length ? `<div class="gal">${fotos.map(f => `<img src="${esc('/_blob/' + f)}" alt="Foto del anuncio">`).join('')}</div>` : `<div class="nophoto">${ic(TIPOS[a.tipo][1])}${a.url ? `<a class="btn ghost" href="${esc(a.url)}" target="_blank" rel="noopener">${ic('📷')} Ver las fotos en ${esc(F ? F.n : 'el anuncio')} ↗</a>` : 'Sin fotos'}</div>`}
+    <div class="dprice num">${money(a.precio)} <small style="font:500 14px var(--body);color:var(--fg-3)">al mes</small></div>
+    ${a.mantenimiento ? `<div class="mant num">+ ${money(a.mantenimiento)} de mantenimiento</div>` : a.mantenimiento_incluido ? '<div class="mant">Mantenimiento incluido</div>' : ''}
+    <div class="dttl">${esc(a.titulo)}</div>
+    <div class="where">${ic('📍')} ${a.calle ? esc(a.calle) + ', ' : ''}${esc(a.colonia)}${a.alcaldia ? ', ' + esc(a.alcaldia) : ''}</div>
+    <div class="note">${a.prec === 'calle' ? 'Ubicación aproximada por calle.' : a.prec === 'exacta' ? 'Ubicación marcada por ustedes.' : 'Ubicación aproximada: centro de la colonia.'}</div>
+    <div style="margin-top:8px">${petTag(a) || `<span class="pet nd">Mascotas: el anuncio no lo dice</span>`}${a.mascotas_detalle ? ` <span class="note">${esc(a.mascotas_detalle)}</span>` : ''}</div>
+    <div class="grid2">${facts.map(([v, l]) => `<div class="fact"><b class="num">${esc(v)}</b>${l}</div>`).join('')}</div>
+    ${a.est ? `<div class="box">${ic(a.est.t === 'Cablebús' ? '🚡' : a.est.t === 'Tren' ? '🚆' : '🚇')} <b>${esc(a.est.t)} ${esc(a.est.n)}</b> a ${fmtDist(a.est.d)} en línea recta (unos ${Math.max(1, Math.round(a.est.d * 1.3 / 80))} min caminando).</div>` : ''}
+    <div class="acts">
+      ${a.url ? `<a class="btn main" href="${esc(a.url)}" target="_blank" rel="noopener">${ic('🔗')} Ver anuncio y contactar ↗</a>` : ''}
+      ${a.contacto ? `<div class="box" style="grid-column:1/-1;margin:0">${ic('📞')} <b>Contacto:</b> <span style="user-select:all">${esc(a.contacto)}</span></div>` : ''}
+      <a class="btn" href="${dir}" target="_blank" rel="noopener">${ic('🧭')} Cómo llegar</a>
+      <button class="btn" data-a="copiar" data-id="${esc(a.id)}">${ic('📋')} Copiar datos</button>
+    </div>
+    ${a.requisitos ? `<div class="box"><h3>Requisitos</h3>${esc(a.requisitos)}</div>` : ''}
+    ${a.amenidades ? `<div class="box"><h3>Amenidades</h3>${esc(a.amenidades)}</div>` : ''}
+    <div class="box"><h3>¿Cómo va?</h3><div class="pipe">${ESTADOS.map(([k, l]) => `<button data-a="st" data-id="${esc(a.id)}" data-v="${k}" aria-pressed="${e.st === k}">${l}</button>`).join('')}</div>
+      <textarea id="nota" rows="3" style="margin-top:10px" placeholder="Notas: qué les dijeron, día de la visita, dudas…" data-id="${esc(a.id)}">${esc(e.nota || '')}</textarea></div>
+    <p class="note">${a.mio ? `Agregado por ustedes${a.creado ? ' el ' + esc(new Date(a.creado).toLocaleDateString('es-MX', {day: 'numeric', month: 'long'})) : ''}.` : `Publicado en ${esc(F ? F.n : a.fuente)}${a.fecha_publicacion ? ' · ' + esc(a.fecha_publicacion) : ''}. Encontrado en internet el ${esc(S.meta.fecha || '')}; puede haberse rentado ya.`}${a.anunciante && a.anunciante !== 'no_dice' ? ' Anunciante: ' + (a.anunciante === 'inmobiliaria' ? 'inmobiliaria o asesor.' : 'particular.') : ''}</p>
+    <div class="acts">${a.mio ? `<button class="btn" data-a="editar" data-id="${esc(a.id)}">${ic('📝')} Editar</button><button class="btn danger" data-a="borrar" data-id="${esc(a.id)}">${ic('🗑')} Borrar</button>` : `<button class="btn ghost" data-a="ocultar" data-id="${esc(a.id)}" style="grid-column:1/-1">${e.oculto ? 'Volver a mostrar' : 'Ocultar: ya no está disponible o no me interesa'}</button>`}</div>
+  </div>`;
+}
+
+/* ============ hoja inferior arrastrable (teléfono) ============ */
+const sheet = $('#sheet');
+function setSheet(s){ sheet.dataset.s = s; document.body.dataset.sheet = s; }
+(function(){ /* el arrastre empieza solo cuando el dedo se mueve: así los toques en botones siguen funcionando */
+  let st = null;
+  const H = () => sheet.getBoundingClientRect().height, pos = s => s === 'full' ? 0 : s === 'mid' ? H() * .48 : H() - 150;
+  sheet.addEventListener('pointerdown', e => { if (window.innerWidth >= 900 || e.button > 0) return; if (e.target.closest('input,select,textarea')) return;
+    st = {y: e.clientY, x: e.clientX, start: sheet.dataset.s, t0: pos(sheet.dataset.s), h: H(), id: e.pointerId, on: false, sc: e.target.closest('.scroll'), handle: !!e.target.closest('.handle')}; });
+  window.addEventListener('pointermove', e => { if (!st || e.pointerId !== st.id) return; const dy = e.clientY - st.y;
+    if (!st.on) {
+      if (Math.abs(dy) < 8 || Math.abs(dy) < Math.abs(e.clientX - st.x)) return;
+      /* dentro de la lista en pantalla completa, el gesto es desplazar la lista, salvo que esté arriba y se jale hacia abajo */
+      if (!st.handle && st.sc && st.start === 'full' && !(st.sc.scrollTop <= 0 && dy > 0)) { st = null; return; }
+      st.on = true; sheet.classList.add('drag'); try { sheet.setPointerCapture(st.id); } catch (_) {} }
+    sheet.style.transform = `translateY(${Math.min(st.h - 150, Math.max(0, st.t0 + dy))}px)`; e.preventDefault(); }, {passive: false});
+  const up = e => { if (!st || e.pointerId !== st.id) return; const s0 = st; st = null; if (!s0.on) return;
+    sheet.classList.remove('drag'); sheet.style.transform = ''; try { sheet.releasePointerCapture(s0.id); } catch (_) {}
+    const dy = e.clientY - s0.y, t = s0.t0 + dy, hh = H(), opts = [['full', 0], ['mid', hh * .48], ['peek', hh - 150]];
+    let best = opts.reduce((a, b) => Math.abs(b[1] - t) < Math.abs(a[1] - t) ? b : a)[0];
+    if (Math.abs(dy) > 60) { const i = ['full', 'mid', 'peek'].indexOf(s0.start); best = ['full', 'mid', 'peek'][Math.max(0, Math.min(2, i + (dy > 0 ? 1 : -1)))]; }
+    setSheet(best); sheet.dataset.justDragged = '1'; setTimeout(() => delete sheet.dataset.justDragged, 60); };
+  window.addEventListener('pointerup', up); window.addEventListener('pointercancel', up);
+  sheet.addEventListener('click', e => {
+    if (sheet.dataset.justDragged) { e.stopPropagation(); e.preventDefault(); return; }
+    if (window.innerWidth >= 900) return;
+    if (e.target.closest('.handle')) { const s = sheet.dataset.s; setSheet(s === 'peek' ? 'mid' : s === 'mid' ? 'full' : 'mid'); return; }
+    if (sheet.dataset.s === 'peek' && !e.target.closest('button,a,input,select,textarea,label,.card')) setSheet('mid');
+  }, true);
+})();
+
+/* ============ modales ============ */
+const mroot = $('#modal-root');
+function modal(title, body, foot){ mroot.innerHTML = `<div class="veil" data-a="veil"><div class="modal" role="dialog" aria-modal="true" aria-label="${esc(title)}"><div class="mh"><h2>${esc(title)}</h2><button class="x" data-a="cerrar" aria-label="Cerrar">✕</button></div>${body}${foot ? `<div class="mfoot">${foot}</div>` : ''}</div></div>`; }
+function cerrarModal(){ mroot.innerHTML = ''; S.draft = null; }
+let FT = null; /* filtros en edición */
+function abrirFiltros(foco){
+  FT = JSON.parse(JSON.stringify(S.f)); pintarFiltros(); if (foco) setTimeout(() => { const el = document.getElementById('fl-' + foco); if (el) el.scrollIntoView({block: 'center'}); }, 30);
+}
+function pintarFiltros(){
+  const f = FT, n = todos().filter(a => pasa(a, f)).length, op = (k, v, l, on) => `<button class="opt" data-a="ft" data-k="${k}" data-v="${esc(v)}" aria-pressed="${on}">${l}</button>`;
+  const fuentes = [...new Set(todos().map(a => a.fuente).filter(Boolean))].sort();
+  modal('Filtros', `
+    <div class="fld" id="fl-precio"><span class="lab">Presupuesto mensual (MXN)</span><div class="row2"><input class="inp num" id="fmin" inputmode="numeric" placeholder="Mínimo" value="${f.min || ''}" aria-label="Mínimo"><input class="inp num" id="fmax" inputmode="numeric" placeholder="Máximo" value="${f.max || ''}" aria-label="Máximo"></div>
+      <div class="presets">${[[0, 8000], [8000, 15000], [15000, 25000], [25000, 40000], [40000, 0]].map(([a, b]) => `<button data-a="preset" data-min="${a}" data-max="${b}">${a ? short(a) : 'Hasta'}${a && b ? '–' : a ? ' o más' : ' '}${b ? short(b) : ''}</button>`).join('')}</div></div>
+    <div class="fld" id="fl-tipo"><span class="lab">Tipo</span><div class="opts">${Object.entries(TIPOS).map(([k, [l, e]]) => op('tipos', k, ic(e) + l, f.tipos.includes(k))).join('')}</div></div>
+    <div class="fld" id="fl-mascotas"><span class="lab">Mascotas</span><div class="opts">${op('mascotas', 'todas', 'Indistinto', f.mascotas === 'todas')}${op('mascotas', 'si', ic('🐾') + 'Solo si dice que acepta', f.mascotas === 'si')}${op('mascotas', 'nono', ic('🐶') + 'Ocultar las que no aceptan', f.mascotas === 'nono')}</div><p class="note" style="margin:6px 0 0">Muchos anuncios no lo dicen; "Ocultar las que no aceptan" deja esos para que preguntes.</p></div>
+    <div class="fld" id="fl-rec"><span class="lab">Recámaras</span><div class="opts">${[0, 1, 2, 3, 4].map(v => op('rec', v, v ? v + '+' : 'Cualquiera', f.rec === v)).join('')}</div></div>
+    <div class="fld"><span class="lab">Baños</span><div class="opts">${[0, 1, 2, 3].map(v => op('banos', v, v ? v + '+' : 'Cualquiera', f.banos === v)).join('')}</div></div>
+    <div class="fld" id="fl-zona"><span class="lab">Zona (alcaldías)</span><div class="opts">${S.lug.alcaldias.map(a => a.n).sort((x, y) => x.localeCompare(y, 'es')).map(n => op('alcaldias', n, esc(n), f.alcaldias.includes(n))).join('')}</div></div>
+    <div class="fld" id="fl-metrof"><span class="lab">Cerca del metro, tren ligero o cablebús</span><div class="opts">${[[0, 'Indistinto'], [500, 'A 500 m o menos'], [1000, 'A 1 km o menos'], [2000, 'A 2 km o menos']].map(([v, l]) => op('metro', v, l, f.metro === v)).join('')}</div></div>
+    <div class="fld"><span class="lab">Más</span><div class="opts">${op('amueblado', '1', 'Amueblado', f.amueblado)}${op('estac', '1', ic('🚗') + 'Con estacionamiento', f.estac)}${op('fav', '1', '♥ Solo guardados', f.fav)}${op('mios', '1', 'Solo los que agregamos', f.mios)}${op('ocultos', '1', 'Mostrar ocultos y descartados', f.ocultos)}</div></div>
+    ${fuentes.length > 1 ? `<div class="fld"><span class="lab">Plataforma</span><div class="opts">${fuentes.map(s => op('fuentes', s, esc(FUENTES[s] ? FUENTES[s].n : s), f.fuentes.includes(s))).join('')}</div></div>` : ''}`,
+    `<button class="btn ghost" data-a="ft-limpiar">Limpiar</button><button class="btn main" data-a="ft-ok" style="grid-column:auto">Ver ${n} renta${n === 1 ? '' : 's'}</button>`);
+}
+function leerPrecio(){ const v = id => { const n = parseInt(String($('#' + id)?.value || '').replace(/[^\d]/g, ''), 10); return n > 0 ? n : null; }; if ($('#fmin')) { FT.min = v('fmin'); FT.max = v('fmax'); } }
+
+/* ============ plataformas: buscar lo mismo en cada portal ============ */
+/*PLATAFORMAS*/
+function abrirPlataformas(){
+  const f = S.f, z = f.alcaldias.length === 1 ? f.alcaldias[0] : null;
+  const desc = [f.tipos.length ? f.tipos.map(t => TIPOS[t][0].toLowerCase()).join(' o ') : 'cualquier tipo', z ? 'en ' + z : 'en la CDMX', f.min || f.max ? 'de ' + (f.min ? money(f.min) : '$0') + ' a ' + (f.max ? money(f.max) : 'más') : '', f.rec ? f.rec + '+ recámaras' : '', f.mascotas === 'si' ? 'que acepten mascotas' : ''].filter(Boolean).join(', ');
+  modal('Buscar en otras plataformas', `<p style="margin:0 0 6px;color:var(--fg-2)">Abre cada portal con tu búsqueda: <b>${esc(desc)}</b>. Lo que no se pueda filtrar en la liga, ajústalo allá.</p>
+    ${PLATAFORMAS.map(p => { const u = p.url(f, z); return `<div class="plat"><span class="logo" style="background:${p.c}">${esc(p.l)}</span><div class="pn"><b>${esc(p.n)}</b><small>${esc(p.nota(f, z))}${p.g ? ` <a href="${esc(google(p.g, f, z))}" target="_blank" rel="noopener" style="color:var(--accent);font-weight:600">Buscar en Google ↗</a>` : ''}</small></div><a class="btn" href="${esc(u)}" target="_blank" rel="noopener">Abrir ↗</a></div>`; }).join('')}
+    <p class="note" style="margin-top:14px">¿Encontraste algo bueno? Usa <b>＋ Agregar</b>: sube la captura de pantalla o pega el texto del anuncio y se llena solo.</p>`);
+}
+
+/* ============ agregar / editar un anuncio propio ============ */
+function nuevoDraft(a){ return Object.assign({titulo: '', url: '', fuente: '', tipo: 'departamento', precio: '', mantenimiento: '', colonia: '', alcaldia: '', calle: '', recamaras: null, banos: null, m2: '', estacionamientos: null, amueblado: null, mascotas: 'no_dice', contacto: '', notas: '', lat: null, lon: null, prec: 'colonia', fotos: [], nuevas: []}, a ? JSON.parse(JSON.stringify(a)) : {}); }
+function abrirAgregar(a){
+  if (S.readOnly) return toast('Solo lectura: pide permiso de edición para agregar anuncios.');
+  if (!S.db) return toast('Para guardar anuncios abre esta página con tu sesión de Claude iniciada.');
+  S.draft = nuevoDraft(a); S.draft.editId = a ? a.docId : null; pintarAgregar();
+}
+function fuenteDe(url){ try { const h = new URL(url).hostname.replace(/^www\./, ''); for (const [k, v] of Object.entries(FUENTES)) if (v.d.some(d => h.endsWith(d))) return k; return h; } catch (e) { return ''; } }
+function pintarAgregar(){
+  const d = S.draft, op = (k, v, l) => `<button class="opt" data-a="dr" data-k="${k}" data-v="${esc(v)}" aria-pressed="${String(d[k]) === String(v)}">${l}</button>`;
+  modal(d.editId ? 'Editar anuncio' : 'Agregar un anuncio', `
+    ${!d.editId && S.ai ? `<div class="box" style="background:var(--accent-soft);border:0"><h3>${ic('🤖')} Llénalo con una captura o con el texto</h3><p class="note" style="margin:0 0 8px">Sube capturas del anuncio (Facebook, Inmuebles24, WhatsApp…) o pega su texto. Claude lee precio, colonia, recámaras, mascotas y contacto. Las capturas quedan como fotos.</p>
+      <input type="file" id="ai-img" accept="image/*" multiple ${S.aiImg ? '' : 'hidden'}><textarea id="ai-txt" rows="3" placeholder="Pega aquí el texto del anuncio (opcional)" style="margin-top:8px"></textarea>
+      <button class="btn main" data-a="ai-llenar" style="width:100%;margin-top:8px">${ic('✨')} Llenar con Claude</button></div>` : ''}
+    <div class="fld"><label for="d-url">Liga del anuncio</label><input class="inp" id="d-url" inputmode="url" placeholder="https://…" value="${esc(d.url)}"></div>
+    <div class="fld"><label for="d-titulo">Título</label><input class="inp" id="d-titulo" maxlength="120" placeholder="Depa con balcón en Narvarte" value="${esc(d.titulo)}"></div>
+    <div class="row2"><div class="fld"><label for="d-precio">Renta al mes</label><input class="inp num" id="d-precio" inputmode="numeric" placeholder="15000" value="${esc(d.precio)}"></div><div class="fld"><label for="d-mant">Mantenimiento</label><input class="inp num" id="d-mant" inputmode="numeric" placeholder="Opcional" value="${esc(d.mantenimiento || '')}"></div></div>
+    <div class="fld"><span class="lab">Tipo</span><div class="opts">${Object.entries(TIPOS).map(([k, [l, e]]) => op('tipo', k, ic(e) + l)).join('')}</div></div>
+    <div class="fld"><span class="lab">Recámaras y baños</span><div class="opts">${[1, 2, 3, 4].map(v => op('recamaras', v, v + ' rec.')).join('')}</div><div class="opts" style="margin-top:8px">${[1, 1.5, 2, 3].map(v => op('banos', v, v + (v === 1 ? ' baño' : ' baños'))).join('')}</div></div>
+    <div class="fld"><span class="lab">Mascotas</span><div class="opts">${op('mascotas', 'si', ic('🐾') + 'Sí acepta')}${op('mascotas', 'no', 'No acepta')}${op('mascotas', 'no_dice', 'No dice')}</div></div>
+    <div class="row2"><div class="fld"><label for="d-m2">m²</label><input class="inp num" id="d-m2" inputmode="numeric" value="${esc(d.m2 || '')}"></div><div class="fld"><span class="lab">Estacionamiento</span><div class="opts">${op('estacionamientos', 0, 'No')}${op('estacionamientos', 1, '1')}${op('estacionamientos', 2, '2+')}</div></div></div>
+    <div class="fld"><label for="d-col">Colonia</label><input class="inp" id="d-col" autocomplete="off" placeholder="Escribe y elige la colonia" value="${esc(d.colonia)}"><div class="sug" id="d-sug" hidden style="position:static;box-shadow:none;border:1px solid var(--line);margin-top:6px"></div>
+      <p class="note" style="margin:6px 0 0">${d.lat ? (d.prec === 'exacta' ? '📍 Punto marcado en el mapa.' : `📍 ${esc(d.colonia)}${d.alcaldia ? ', ' + esc(d.alcaldia) : ''} (centro de la colonia).`) : 'Elige la colonia de la lista o marca el punto.'} <button class="note" style="text-decoration:underline;color:var(--accent)" data-a="d-pick">Marcar el punto exacto en el mapa</button></p></div>
+    <div class="fld"><label for="d-contacto">Contacto (opcional)</label><input class="inp" id="d-contacto" maxlength="120" placeholder="WhatsApp, teléfono o nombre del asesor" value="${esc(d.contacto || '')}"></div>
+    <div class="fld"><label for="d-notas">Notas</label><textarea id="d-notas" rows="2" placeholder="Requisitos, depósito, lo que sea">${esc(d.notas || '')}</textarea></div>
+    ${S.assets ? `<div class="fld"><span class="lab">Fotos</span><div class="thumbs">${d.fotos.map(f => `<img src="${esc('/_blob/' + f)}" alt="">`).join('')}${d.nuevas.map(f => `<img src="${f.url}" alt="">`).join('')}</div><input type="file" id="d-fotos" accept="image/*" multiple style="margin-top:8px"></div>` : ''}
+    <div class="err" id="d-err" hidden style="color:var(--bad);font-weight:600"></div>`,
+    `<button class="btn ghost" data-a="cerrar">Cancelar</button><button class="btn main" data-a="d-guardar" style="grid-column:auto">Guardar</button>`);
+}
+function leerDraft(){ const d = S.draft; if (!d) return; const g = id => $('#' + id); if (!g('d-titulo')) return;
+  d.url = g('d-url').value.trim(); d.titulo = g('d-titulo').value.trim(); d.precio = g('d-precio').value; d.mantenimiento = g('d-mant').value; d.m2 = g('d-m2').value; d.contacto = g('d-contacto').value.trim(); d.notas = g('d-notas').value.trim(); if (g('d-col').value.trim() !== d.colonia) { d.colonia = g('d-col').value.trim(); if (d.prec !== 'exacta') { d.lat = d.lon = null; } } }
+const numero = v => { const n = parseFloat(String(v ?? '').replace(/[^\d.]/g, '')); return isFinite(n) && n > 0 ? n : null; };
+function ubicarColonia(nombre){
+  const n = norm(nombre); if (!n) return null;
+  const c = S.lug.colonias.find(x => norm(x.n) === n) || S.lug.colonias.find(x => norm(x.n).startsWith(n)) || S.lug.colonias.find(x => n.includes(norm(x.n)) && norm(x.n).length > 4);
+  return c || null;
+}
+async function achicar(file, max){ /* reduce la imagen antes de subirla */
+  const url = URL.createObjectURL(file); const img = new Image(); img.src = url; await img.decode();
+  const k = Math.min(1, max / Math.max(img.naturalWidth, img.naturalHeight)), c = document.createElement('canvas'); c.width = Math.round(img.naturalWidth * k); c.height = Math.round(img.naturalHeight * k);
+  c.getContext('2d').drawImage(img, 0, 0, c.width, c.height); URL.revokeObjectURL(url);
+  return new Promise(ok => c.toBlob(b => ok(b), 'image/jpeg', .82));
+}
+async function guardarDraft(){
+  leerDraft(); const d = S.draft, err = m => { const e = $('#d-err'); e.textContent = m; e.hidden = false; };
+  const precio = numero(d.precio); if (!precio) return err('Escribe la renta mensual.');
+  if (!d.lat) { const c = ubicarColonia(d.colonia); if (c) { d.lat = c.lat + ((hash(d.titulo + d.url) % 200) - 100) / 60000; d.lon = c.lon + ((hash(d.url + d.titulo) % 200) - 100) / 60000; d.alcaldia = c.a; d.colonia = c.n; d.prec = 'colonia'; } }
+  if (!d.lat) return err('Elige la colonia de la lista o marca el punto en el mapa.');
+  const btn = document.querySelector('[data-a="d-guardar"]'); if (btn) { btn.disabled = true; btn.textContent = 'Guardando…'; }
+  const fotos = d.fotos.slice();
+  for (const f of d.nuevas) { try { const r = await S.assets.upload(f.blob, {type: 'image/jpeg'}); fotos.push(r.id); } catch (e) { toast('Una foto no se pudo subir.'); } }
+  const doc = {titulo: d.titulo || (TIPOS[d.tipo][0] + ' en ' + d.colonia), url: d.url, fuente: d.url ? fuenteDe(d.url) : '', tipo: d.tipo, precio, mantenimiento: numero(d.mantenimiento), colonia: d.colonia, alcaldia: d.alcaldia || alcaldiaDe(d.lon, d.lat) || '', calle: d.calle || null,
+    recamaras: d.recamaras, banos: d.banos, m2: numero(d.m2), estacionamientos: d.estacionamientos, amueblado: d.amueblado, mascotas: d.mascotas, contacto: d.contacto, requisitos: d.notas || null, lat: d.lat, lon: d.lon, prec: d.prec, fotos, creado: d.creado || new Date().toISOString()};
+  const id = d.editId || ('m' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6));
+  try { await S.db.collection('mios').doc(id).set(doc); } catch (e) { if (btn) { btn.disabled = false; btn.textContent = 'Guardar'; } return err(e && e.code === 'invalid_argument' ? 'No tienes permiso para guardar aquí.' : 'No se pudo guardar. Revisa tu conexión.'); }
+  cerrarModal(); toast(d.editId ? 'Cambios guardados.' : 'Anuncio agregado al mapa.');
+  setTimeout(() => abrir('m-' + id), 400);
+}
+async function llenarConIA(){
+  leerDraft(); const files = [...($('#ai-img')?.files || [])].slice(0, 4), txt = ($('#ai-txt')?.value || '').trim();
+  if (!files.length && !txt) return toast('Sube una captura o pega el texto del anuncio.');
+  const b = document.querySelector('[data-a="ai-llenar"]'); if (b) { b.disabled = true; b.textContent = 'Leyendo el anuncio…'; }
+  try {
+    const imgs = []; for (const f of files) { const bl = await achicar(f, 1400); imgs.push(bl); if (S.assets) S.draft.nuevas.push({blob: bl, url: URL.createObjectURL(bl)}); }
+    const r = await S.ai.json(`Eres asistente para buscar renta en la Ciudad de México. ${imgs.length ? 'Te paso capturas de pantalla de un anuncio' : 'Te paso el texto de un anuncio'} de renta. Extrae SOLO lo que diga el anuncio; lo que no diga, ponlo en null. Responde únicamente un objeto JSON con: {"titulo": texto corto, "precio": número mensual en pesos, "mantenimiento": número o null, "tipo": "departamento"|"casa"|"cuarto"|"loft"|"estudio"|"otro", "colonia": nombre de la colonia, "calle": calle o null, "recamaras": número o null, "banos": número o null, "m2": número o null, "estacionamientos": número o null, "amueblado": true|false|null, "mascotas": "si"|"no"|"no_dice", "contacto": teléfono, WhatsApp o nombre tal como aparece, o null, "url": liga si aparece o null, "notas": requisitos y datos útiles en una línea}.${txt ? '\n\nTexto del anuncio:\n' + txt.slice(0, 6000) : ''}`, imgs.length ? {images: imgs} : {});
+    const d = S.draft, set = (k, v) => { if (v !== null && v !== undefined && v !== '') d[k] = v; };
+    for (const k of ['titulo', 'precio', 'mantenimiento', 'colonia', 'calle', 'recamaras', 'banos', 'm2', 'estacionamientos', 'amueblado', 'contacto', 'url', 'notas']) set(k, r[k]);
+    if (TIPOS[r.tipo]) d.tipo = r.tipo; if (['si', 'no', 'no_dice'].includes(r.mascotas)) d.mascotas = r.mascotas;
+    const c = ubicarColonia(d.colonia); if (c) { d.colonia = c.n; d.alcaldia = c.a; d.lat = c.lat; d.lon = c.lon; d.prec = 'colonia'; }
+    pintarAgregar(); toast('Listo. Revisa los datos antes de guardar.');
+  } catch (e) { if (b) { b.disabled = false; b.textContent = 'Llenar con Claude'; } toast(e && e.code === 'not_granted' ? 'Hace falta aceptar el permiso de IA de la página.' : 'No pude leer el anuncio. Llénalo a mano.'); }
+}
+function elegirPunto(){
+  leerDraft(); const d = S.draft; mroot.innerHTML = ''; S.picking = true;
+  const ui = $('#ui'); const bar = document.createElement('div'); bar.className = 'pickbar'; bar.innerHTML = `<span>Mueve el mapa hasta que el pin quede sobre la vivienda.</span><button class="btn" data-a="pick-no">Cancelar</button><button class="btn main" data-a="pick-ok" style="grid-column:auto">Listo</button>`;
+  const cr = document.createElement('div'); cr.className = 'cross'; cr.innerHTML = ic('📍'); ui.appendChild(bar); document.body.appendChild(cr);
+  if (d.lat) map.jumpTo({center: [d.lon, d.lat], zoom: 16}); else if (map.getZoom() < 14) map.easeTo({zoom: 15});
+  setSheet('peek'); S.pickEls = [bar, cr];
+}
+function finPunto(ok){
+  S.picking = false; (S.pickEls || []).forEach(e => e.remove());
+  if (ok) { const c = map.getCenter(), d = S.draft; d.lat = c.lat; d.lon = c.lng; d.prec = 'exacta'; d.alcaldia = alcaldiaDe(c.lng, c.lat) || d.alcaldia; if (!d.colonia) { let best = null, bd = 1e9; for (const x of S.lug.colonias) { const dd = hav({lat: c.lat, lon: c.lng}, x); if (dd < bd) { bd = dd; best = x; } } if (best) d.colonia = best.n; } }
+  pintarAgregar();
+}
+
+/* ============ guardar estado (favoritos, avance, notas) ============ */
+async function setEstado(id, patch){
+  const cur = Object.assign({}, est(id), patch, {t: Date.now()}); S.estado[id] = cur; render();
+  const key = 'e-' + hash(id).toString(36);
+  if (S.db) { try { await S.db.collection('estado').doc(key).set({id, ...cur}); } catch (e) { toast('No se pudo guardar en la nube; queda en este teléfono.'); ls.set('bn.estado', S.estado); } }
+  else ls.set('bn.estado', S.estado);
+}
+
+/* ============ búsqueda ============ */
+function sugerencias(q){
+  const n = norm(q); if (n.length < 2) return [];
+  const out = [], add = (t, l, sub, d) => out.push({t, l, sub, d});
+  for (const a of S.lug.alcaldias) if (norm(a.n).includes(n)) add('alc', a.n, 'Alcaldía', a);
+  for (const e of S.lug.estaciones) if (norm(e.n).includes(n)) add('est', e.n, e.t, e);
+  for (const c of S.lug.colonias) if (norm(c.n).includes(n)) add('col', c.n, c.a, c);
+  for (const a of todos()) if (norm(a.titulo).includes(n)) add('anu', a.titulo, money(a.precio), a);
+  const rank = x => (norm(x.l).startsWith(n) ? 0 : 1) + ({alc: 0, est: .2, col: .4, anu: .6})[x.t];
+  return out.sort((a, b) => rank(a) - rank(b)).slice(0, 12);
+}
+let SUG = [], sugI = -1;
+function pintarSug(){ const el = $('#sug'); el.hidden = !SUG.length; el.innerHTML = SUG.map((s, i) => `<button role="option" class="${i === sugI ? 'on' : ''}" data-a="sug" data-i="${i}">${ic(s.t === 'alc' ? '🗺' : s.t === 'est' ? (s.sub === 'Cablebús' ? '🚡' : s.sub === 'Tren' ? '🚆' : '🚇') : s.t === 'anu' ? '🏠' : '📍')}<span>${esc(s.l)}</span><small>${esc(s.sub)}</small></button>`).join(''); }
+function irA(s){
+  $('#q').value = s.l; SUG = []; pintarSug(); $('#q').blur();
+  if (s.t === 'alc') { const a = s.d, b = a.p.flat(2).reduce((m, [x, y]) => [Math.min(m[0], x), Math.min(m[1], y), Math.max(m[2], x), Math.max(m[3], y)], [180, 90, -180, -90]); map.fitBounds([[b[0], b[1]], [b[2], b[3]]], {padding: pad()});
+    if (!S.f.alcaldias.includes(a.n)) { S.f.alcaldias = [a.n]; guardarF(); render(); toast('Filtrando por ' + a.n + '. Quítalo en Zona.'); } }
+  else if (s.t === 'anu') abrir(s.d.id);
+  else map.flyTo({center: [s.d.lon, s.d.lat], zoom: s.t === 'est' ? 15 : 14.6, padding: pad()});
+}
+const pad = () => window.innerWidth >= 900 ? {left: 460, top: 40, right: 40, bottom: 40} : {top: 130, bottom: 170, left: 20, right: 20};
+
+/* ============ eventos ============ */
+document.addEventListener('click', async e => {
+  const el = e.target.closest('[data-a]'); if (!el) return; const a = el.dataset.a, id = el.dataset.id;
+  if (a === 'veil') { if (e.target === el) cerrarModal(); return; }
+  if (a === 'cerrar') cerrarModal();
+  else if (a === 'abrir') abrir(id);
+  else if (a === 'volver') cerrarDetalle();
+  else if (a === 'fav') { e.stopPropagation(); const v = !est(id).fav; setEstado(id, {fav: v}); toast(v ? 'Guardado en ♥' : 'Quitado de guardados'); }
+  else if (a === 'st') setEstado(id, {st: est(id).st === el.dataset.v ? '' : el.dataset.v});
+  else if (a === 'ocultar') { const v = !est(id).oculto; setEstado(id, {oculto: v}); if (v) { cerrarDetalle(); toast('Oculto. Lo ves de nuevo con el filtro "Mostrar ocultos".'); } }
+  else if (a === 'copiar') { const x = todos().find(t => t.id === id); const txt = `${x.titulo}\n${money(x.precio)} al mes${x.mantenimiento ? ' + ' + money(x.mantenimiento) + ' mant.' : ''}\n${x.colonia}, ${x.alcaldia}\n${x.url || ''}`; try { await navigator.clipboard.writeText(txt); toast('Datos copiados.'); } catch (_) { toast('No se pudo copiar en este navegador.'); } }
+  else if (a === 'mas') { S.limite += 40; lista(); }
+  else if (a === 'vertodo') { S.visible = false; ls.set('bn.visible', false); render(); }
+  else if (a === 'limpiar') { S.f = DEF(); guardarF(); render(); }
+  else if (a === 'filtros') abrirFiltros();
+  else if (a === 'chip') { const k = el.dataset.k;
+    if (k === 'mascotas') { S.f.mascotas = S.f.mascotas === 'si' ? 'todas' : 'si'; guardarF(); render(); }
+    else if (k === 'fav') { S.f.fav = !S.f.fav; guardarF(); render(); }
+    else if (k === 'metrof') { S.f.metro = S.f.metro ? 0 : 1000; guardarF(); render(); toast(S.f.metro ? 'A 1 km o menos de una estación.' : 'Sin filtro de metro.'); }
+    else if (k === 'plataformas') abrirPlataformas();
+    else abrirFiltros(k); }
+  else if (a === 'ft') { leerPrecio(); const k = el.dataset.k, v = el.dataset.v;
+    if (Array.isArray(FT[k])) FT[k] = FT[k].includes(v) ? FT[k].filter(x => x !== v) : FT[k].concat(v);
+    else if (typeof FT[k] === 'boolean') FT[k] = !FT[k];
+    else if (typeof FT[k] === 'number') FT[k] = Number(v); else FT[k] = v;
+    const sc = document.querySelector('.modal').scrollTop; pintarFiltros(); document.querySelector('.modal').scrollTop = sc; }
+  else if (a === 'preset') { FT.min = Number(el.dataset.min) || null; FT.max = Number(el.dataset.max) || null; const sc = document.querySelector('.modal').scrollTop; pintarFiltros(); document.querySelector('.modal').scrollTop = sc; }
+  else if (a === 'ft-limpiar') { FT = DEF(); pintarFiltros(); }
+  else if (a === 'ft-ok') { leerPrecio(); if (FT.min && FT.max && FT.min > FT.max) [FT.min, FT.max] = [FT.max, FT.min]; S.f = FT; FT = null; guardarF(); S.limite = 40; cerrarModal(); S.vista = 'lista'; render();
+    if (S.f.alcaldias.length && mapReady) { const ps = S.lug.alcaldias.filter(x => S.f.alcaldias.includes(x.n)).flatMap(x => x.p.flat(2)); const b = ps.reduce((m, [x, y]) => [Math.min(m[0], x), Math.min(m[1], y), Math.max(m[2], x), Math.max(m[3], y)], [180, 90, -180, -90]); map.fitBounds([[b[0], b[1]], [b[2], b[3]]], {padding: pad()}); } }
+  else if (a === 'plataformas') abrirPlataformas();
+  else if (a === '3d') { const on = el.getAttribute('aria-pressed') !== 'true'; el.setAttribute('aria-pressed', on); map.easeTo({pitch: on ? 58 : 0, bearing: on ? -17 : 0, zoom: on ? Math.max(map.getZoom(), 15.2) : map.getZoom(), duration: 900}); }
+  else if (a === 'metro') { const on = el.getAttribute('aria-pressed') !== 'true'; el.setAttribute('aria-pressed', on); for (const l of ['est-c', 'est-l']) map.setLayoutProperty(l, 'visibility', on ? 'visible' : 'none'); }
+  else if (a === 'cdmx') map.fitBounds([[-99.33, 19.18], [-98.97, 19.57]], {padding: pad()});
+  else if (a === 'sug') irA(SUG[Number(el.dataset.i)]);
+  else if (a === 'acerca') acerca();
+  else if (a === 'agregar') abrirAgregar();
+  else if (a === 'editar') { const x = S.mios.find(t => t.id === id); if (x) abrirAgregar(x); }
+  else if (a === 'borrar') { if (el.dataset.ok !== '1') { el.dataset.ok = '1'; el.textContent = '¿Seguro? Toca otra vez'; return; } const x = S.mios.find(t => t.id === id); try { await S.db.collection('mios').doc(x.docId).delete(); cerrarDetalle(); toast('Anuncio borrado.'); } catch (_) { toast('No se pudo borrar.'); } }
+  else if (a === 'dr') { leerDraft(); const k = el.dataset.k, v = el.dataset.v, d = S.draft; const val = ['recamaras', 'banos', 'estacionamientos'].includes(k) ? Number(v) : v; d[k] = String(d[k]) === String(val) && k !== 'tipo' && k !== 'mascotas' ? null : val; const sc = document.querySelector('.modal').scrollTop; pintarAgregar(); document.querySelector('.modal').scrollTop = sc; }
+  else if (a === 'd-pick') elegirPunto();
+  else if (a === 'pick-ok') finPunto(true);
+  else if (a === 'pick-no') finPunto(false);
+  else if (a === 'd-guardar') guardarDraft();
+  else if (a === 'ai-llenar') llenarConIA();
+  else if (a === 'd-col-op') { leerDraft(); const c = S.lug.colonias[Number(el.dataset.i)]; const d = S.draft; d.colonia = c.n; d.alcaldia = c.a; d.lat = c.lat + ((hash(d.titulo + d.url) % 200) - 100) / 60000; d.lon = c.lon + ((hash(d.url + d.titulo) % 200) - 100) / 60000; d.prec = 'colonia'; pintarAgregar(); }
+});
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') { if (S.picking) finPunto(false); else if (mroot.firstChild) cerrarModal(); else if (S.vista === 'detalle') cerrarDetalle(); }
+  if (e.key === 'Enter' && e.target.classList.contains('card')) abrir(e.target.dataset.id);
+  if (e.target.id === 'q') { if (e.key === 'ArrowDown') { sugI = Math.min(SUG.length - 1, sugI + 1); pintarSug(); e.preventDefault(); } else if (e.key === 'ArrowUp') { sugI = Math.max(0, sugI - 1); pintarSug(); e.preventDefault(); } else if (e.key === 'Enter' && SUG.length) { irA(SUG[Math.max(0, sugI)]); e.preventDefault(); } }
+});
+document.addEventListener('input', e => {
+  if (e.target.id === 'q') { SUG = sugerencias(e.target.value); sugI = -1; pintarSug(); }
+  else if (e.target.id === 'd-col') { const n = norm(e.target.value), el = $('#d-sug'); if (n.length < 2) { el.hidden = true; return; } const r = S.lug.colonias.map((c, i) => [c, i]).filter(([c]) => norm(c.n).includes(n)).sort((a, b) => (norm(a[0].n).startsWith(n) ? 0 : 1) - (norm(b[0].n).startsWith(n) ? 0 : 1)).slice(0, 8); el.hidden = !r.length; el.innerHTML = r.map(([c, i]) => `<button data-a="d-col-op" data-i="${i}">${ic('📍')}<span>${esc(c.n)}</span><small>${esc(c.a)}</small></button>`).join(''); }
+});
+let notaT;
+document.addEventListener('change', async e => {
+  if (e.target.id === 'orden') { S.orden = e.target.value; ls.set('bn.orden', S.orden); lista(); }
+  else if (e.target.id === 'vis') { S.visible = e.target.checked; ls.set('bn.visible', S.visible); lista(); }
+  else if (e.target.id === 'nota') { setEstado(e.target.dataset.id, {nota: e.target.value.slice(0, 2000)}); toast('Nota guardada.'); }
+  else if (e.target.id === 'd-fotos') { leerDraft(); for (const f of [...e.target.files].slice(0, 8)) { try { const b = await achicar(f, 1600); S.draft.nuevas.push({blob: b, url: URL.createObjectURL(b)}); } catch (_) { toast('Una imagen no se pudo leer.'); } } pintarAgregar(); }
+});
+document.addEventListener('focusin', e => { if (e.target.id === 'q' && e.target.value) { SUG = sugerencias(e.target.value); pintarSug(); } });
+document.addEventListener('focusout', e => { if (e.target.id === 'q') setTimeout(() => { if (!document.activeElement || !document.activeElement.closest('#sug')) { SUG = []; pintarSug(); } }, 150); });
+
+function acerca(){
+  const por = {}; S.anuncios.forEach(a => por[a.fuente] = (por[a.fuente] || 0) + 1);
+  modal('Sobre los datos', `<p style="margin-top:0">Los <b>${S.anuncios.length} anuncios</b> del mapa se buscaron en internet el ${esc(S.meta.fecha)} y cada uno se revisó contra lo que muestra el buscador. Cada uno lleva a su anuncio original, donde están las fotos y el contacto.</p>
+    <ul style="padding-left:18px;color:var(--fg-2)">${Object.entries(por).sort((a, b) => b[1] - a[1]).map(([k, v]) => `<li>${esc(FUENTES[k] ? FUENTES[k].n : k)}: ${v}</li>`).join('')}</ul>
+    <div class="warnbox">Pueden haberse rentado ya, y el pin está en el centro de la colonia, no en la dirección exacta. Confirma siempre con el anunciante y nunca pagues antes de ver el lugar.</div>
+    <p class="note">Facebook Marketplace y los portales bloquean que una app lea sus anuncios automáticamente, así que no se copian de ahí. Para lo más reciente usa "Buscar en otras plataformas" y agrega aquí lo que te guste con una captura.</p>
+    <p class="note">Mapa: OpenFreeMap, OpenMapTiles y © colaboradores de OpenStreetMap. Íconos: OpenMoji (CC BY-SA 4.0).</p>`);
+}
+
+/* ============ arranque ============ */
+async function boot(){
+  ojify(document); chips();
+  let style;
+  try { [style, S.lug] = await Promise.all([getJSON('map/style.json'), getJSON('data/lugares.json')]); }
+  catch (e) { $('#loading').innerHTML = '<div>No se pudo cargar el mapa. Recarga la página.</div>'; return; }
+  style.sprite = BASE + 's/ofm';
+  map = new maplibregl.Map({container: 'map', style, center: [-99.165, 19.395], zoom: 11.6, minZoom: 9.5, maxZoom: 18.5, maxBounds: [[-99.75, 18.85], [-98.55, 19.85]], attributionControl: {compact: true}, dragRotate: true, pitchWithRotate: true});
+  map.addControl(new maplibregl.NavigationControl({showCompass: true, visualizePitch: true}), 'bottom-right');
+  map.on('load', () => { capas(); mapReady = true; render(); $('#loading').style.opacity = 0; setTimeout(() => $('#loading').remove(), 350); });
+  let mt; map.on('moveend', () => { clearTimeout(mt); mt = setTimeout(() => { if (S.vista === 'lista' && S.visible) lista(); }, 120); });
+  setTimeout(() => { if (!mapReady && $('#loading')) $('#loading').innerHTML = '<div>El mapa tarda en cargar… revisa tu conexión.</div>'; }, 20000);
+  try { const d = await getJSON('data/anuncios.json'); S.meta = d.meta || {}; S.anuncios = d.anuncios.map(a => prep(a, false)).filter(Boolean); } catch (e) { S.anuncios = []; }
+  S.estado = ls.get('bn.estado') || {};
+  render();
+  const c = window.claude; if (!c || !c.use) return;
+  c.use('sample').then(async ai => { S.ai = ai; try { const lim = ai && await ai.limits(); S.aiImg = !!(lim && lim.images); } catch (_) {} }).catch(() => {});
+  c.use('assets').then(a => { S.assets = a; }).catch(() => {});
+  c.use('user').then(async u => { if (u && (await u.can('data.write')) === false) S.readOnly = true; }).catch(() => {});
+  const db = await c.use('db').catch(() => null); if (!db) return;
+  S.db = db;
+  db.collection('mios').onSnapshot(s => { S.mios = s.docs.map(d => { const v = d.data() || {}; return prep({...v, id: 'm-' + d.id, docId: d.id}, true); }).filter(Boolean); render(); }, () => {});
+  db.collection('estado').onSnapshot(s => { const m = {}; s.docs.forEach(d => { const v = d.data() || {}; if (typeof v.id === 'string') m[v.id] = {fav: !!v.fav, st: typeof v.st === 'string' ? v.st : '', nota: typeof v.nota === 'string' ? v.nota : '', oculto: !!v.oculto, t: v.t}; }); S.estado = m; render(); }, () => {});
+}
+boot();
+</script>
