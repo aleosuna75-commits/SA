@@ -68,7 +68,7 @@ for f in SRC:
 
 ok, motivos, por_lote = [], collections.Counter(), []
 for l in lotes:
-    m = (l['muestra'] or {}).get('revisados') or []
+    m = [x for x in ((l['muestra'] or {}).get('revisados') or []) if '403' not in str(x.get('nota') or '')]  # 403: el portal no deja abrirla; no cuenta
     malos = sum(1 for x in m if not x.get('abre', x.get('encontrado', True)) or x.get('coincide_precio') is False or x.get('vigente', x.get('vigente_segun_buscador')) == 'no')
     if m and malos >= 2 and malos >= len(m) * .6:
         por_lote.append((l['key'], len(l['anuncios']), 0, f'lote descartado: muestra {malos}/{len(m)} mal')); motivos['lote reprobado'] += len(l['anuncios']); continue
