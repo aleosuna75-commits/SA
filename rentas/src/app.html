@@ -276,23 +276,27 @@ maplibregl.addProtocol('glyph', async (params) => {
   const m = params.url.match(/glyph:\/\/([^/]+)\/(\d+-\d+)/); if (!m) return {data: new ArrayBuffer(0)};
   const font = decodeURIComponent(m[1]).split(',')[0].trim().replace(/ /g, '_'), k = font + '_' + m[2];
   /* reintenta: MapLibre no vuelve a pedir un rango que ya entregó, así que un corte de red dejaría los precios en blanco toda la sesión */
-  if (!glyphs[k]) glyphs[k] = (async () => { for (let i = 0; ; i++) { try { const r = await fetch(BASE + 'f/' + k + '.json'); if (r.ok) return await r.json(); if (r.status === 404) return ''; } catch (e) {} if (i >= 3) return ''; await new Promise(ok => setTimeout(ok, 700 * (i + 1))); } })().then(s => { if (!s) delete glyphs[k]; return s; });
+  if (!glyphs[k]) glyphs[k] = (async () => { for (let i = 0; ; i++) { const ac = new AbortController(), to = setTimeout(() => ac.abort(), 8000); try { const r = await fetch(BASE + 'f/' + k + '.json', {signal: ac.signal}); if (r.ok) return await r.json(); if (r.status === 404) return ''; } catch (e) {} finally { clearTimeout(to); } if (i >= 3) return ''; await new Promise(ok => setTimeout(ok, 700 * (i + 1))); } })().then(s => { if (!s) delete glyphs[k]; return s; });
   const s = await glyphs[k]; if (!s && /Bold_0-255/.test(k)) toast('No cargó la letra de los precios; recarga la página.'); return {data: s ? b64(s) : new ArrayBuffer(0)};
 });
 
 /* ============ datos ============ */
-async function getJSON(p){ const r = await fetch(BASE + p); if (!r.ok) throw new Error(p + ' ' + r.status); return r.json(); }
+async function getJSON(p, opts){ const r = await fetch(BASE + p, opts); if (!r.ok) throw new Error(p + ' ' + r.status); return r.json(); }
 /* número no negativo o null (acepta 0, que en estacionamientos quiere decir "No") */
-const num = v => { if (v === null || v === undefined || v === '' || typeof v === 'boolean') return null; const n = typeof v === 'number' ? v : parseFloat(v); return isFinite(n) && n >= 0 ? n : null; };
+/* texto a número: "$17,800" → 17800, "1,5" → 1.5, "2" → 2 */
+const aNum = v => { const t = String(v).replace(/[^\d.,]/g, ''); if (/^\d{1,3}([.,]\d{3})+$/.test(t)) return Number(t.replace(/[.,]/g, '')); if (/^\d+[.,]\d+$/.test(t)) return Number(t.replace(',', '.')); return parseFloat(t.replace(/,/g, '')); };
+const num = v => { if (v === null || v === undefined || v === '' || typeof v === 'boolean' || typeof v === 'object') return null; const n = typeof v === 'number' ? v : aNum(v); return isFinite(n) && n >= 0 ? n : null; };
+const tieneTipo = t => typeof t === 'string' && Object.prototype.hasOwnProperty.call(TIPOS, t);
+/* liga: solo http(s); "www.sitio.com/…" se completa con https:// */
+const normUrl = u => { if (typeof u !== 'string') return ''; u = u.trim(); if (/^https?:\/\/\S+$/i.test(u)) return u; return /^(www\.)?[a-z0-9-]+(\.[a-z0-9-]+)+(\/\S*)?$/i.test(u) ? 'https://' + u : ''; };
 const txt = v => typeof v === 'string' ? v : v == null ? null : typeof v === 'number' ? String(v) : null;
-const esUrl = u => typeof u === 'string' && /^https?:\/\//i.test(u.trim());
 function prep(a, mio){
   if (!a || typeof a !== 'object') return null;
-  const t = Object.hasOwn(TIPOS, a.tipo) ? a.tipo : 'otro';
+  const t = tieneTipo(a.tipo) ? a.tipo : 'otro';
   const o = {...a, tipo: t, precio: num(a.precio) || 0, mio: !!mio, lat: Number(a.lat), lon: Number(a.lon),
     recamaras: num(a.recamaras), banos: num(a.banos), m2: num(a.m2), estacionamientos: num(a.estacionamientos), mantenimiento: num(a.mantenimiento),
     amueblado: typeof a.amueblado === 'boolean' ? a.amueblado : null, mascotas: ['si', 'no'].includes(a.mascotas) ? a.mascotas : 'no_dice',
-    fotos: Array.isArray(a.fotos) ? a.fotos.filter(f => typeof f === 'string') : [], url: esUrl(a.url) ? a.url.trim() : '',
+    fotos: Array.isArray(a.fotos) ? a.fotos.filter(f => typeof f === 'string') : [], url: normUrl(a.url),
     titulo: txt(a.titulo), colonia: txt(a.colonia), calle: txt(a.calle), contacto: txt(a.contacto), requisitos: txt(a.requisitos), mascotas_detalle: txt(a.mascotas_detalle), amenidades: txt(a.amenidades),
     anunciante: txt(a.anunciante), fecha_publicacion: txt(a.fecha_publicacion), visto: txt(a.visto), fuente: txt(a.fuente) || '', alcaldia: txt(a.alcaldia) || ''};
   for (const k of Object.keys(o)) if (o[k] === null) delete o[k];
@@ -409,12 +413,13 @@ function card(a){
 }
 function lista(){
   const all = filtrados(), vis = ordenar(enVista(all)), n = vis.length;
-  const sub = S.visible ? `${all.length} con tus filtros en toda la ciudad · ${n} en la zona del mapa` : `${all.length} con tus filtros`;
+  const sub = S.cargando ? 'Cargando anuncios…' : S.errDatos ? 'Faltan los anuncios de internet (error de conexión)' : S.visible ? `${all.length} con tus filtros en toda la ciudad · ${n} en la zona del mapa` : `${all.length} con tus filtros`;
+  const aviso = S.errDatos ? `<div class="warnbox" role="alert" style="width:100%;margin:6px 0 0">${ic('⚠️')} No se pudieron cargar los anuncios de internet. <button class="btn ghost" data-a="reintentar">Reintentar</button></div>` : '';
   const datos = S.meta.fecha ? `Anuncios encontrados en internet el ${esc(S.meta.fecha)}. Confirma con el anunciante que sigan disponibles.` : '';
   $('#sheetin').innerHTML = `<div class="lh"><h2>${n === 1 ? '1 renta' : n.toLocaleString('es-MX') + ' rentas'}<small>${sub}</small></h2>
       <select class="sel" id="orden" aria-label="Ordenar">${[['recientes', 'Más recientes'], ['precio', 'Precio: menor a mayor'], ['precio_d', 'Precio: mayor a menor'], ['metro', 'Más cerca del metro'], ['m2', 'Mejor precio por m²']].map(([v, l]) => `<option value="${v}" ${S.orden === v ? 'selected' : ''}>${l}</option>`).join('')}</select>
-      <label class="toggle" style="width:100%"><input type="checkbox" id="vis" ${S.visible ? 'checked' : ''}> Solo lo que se ve en el mapa</label></div>
-    <div class="scroll" id="scroll">${n ? vis.slice(0, S.limite).map(card).join('') + (n > S.limite ? `<button class="more" data-a="mas">Ver ${Math.min(40, n - S.limite)} más</button>` : '') : S.errDatos && !S.anuncios.length ? `<div class="empty">${ic('⚠️')}No se pudieron cargar los anuncios. Revisa tu conexión.<br><br><button class="btn ghost" data-a="reintentar">Reintentar</button></div>` : `<div class="empty">${ic('🔍')}No hay rentas con estos filtros${S.visible ? ' en esta parte del mapa' : ''}.<br><br>${S.visible ? '<button class="btn ghost" data-a="vertodo">Ver toda la ciudad</button> ' : ''}${nFiltros() ? '<button class="btn ghost" data-a="limpiar">Quitar filtros</button>' : ''}</div>`}
+      <label class="toggle" style="width:100%"><input type="checkbox" id="vis" ${S.visible ? 'checked' : ''}> Solo lo que se ve en el mapa</label>${aviso}</div>
+    <div class="scroll" id="scroll">${n ? vis.slice(0, S.limite).map(card).join('') + (n > S.limite ? `<button class="more" data-a="mas">Ver ${Math.min(40, n - S.limite)} más</button>` : '') : S.cargando ? `<div class="empty">${ic('🔍')}Cargando anuncios…</div>` : S.errDatos ? `<div class="empty">${ic('⚠️')}Sin los anuncios de internet no hay qué mostrar aquí.</div>` : `<div class="empty">${ic('🔍')}No hay rentas con estos filtros${S.visible ? ' en esta parte del mapa' : ''}.<br><br>${S.visible ? '<button class="btn ghost" data-a="vertodo">Ver toda la ciudad</button> ' : ''}${nFiltros() ? '<button class="btn ghost" data-a="limpiar">Quitar filtros</button>' : ''}</div>`}
     ${datos ? `<p class="note" style="margin:14px 0 4px">${datos} <button class="note" style="text-decoration:underline" data-a="acerca">Sobre los datos</button></p>` : ''}</div>`;
   arriba();
 }
@@ -441,7 +446,7 @@ function abrir(id, volar){
 function cerrarDetalle(){
   if (S.picking) return;  /* mientras se marca el punto, el mapa no se mueve */
   S.sel = null; S.vista = 'lista'; const b = S.antes; S.antes = null; S._k = null;
-  if (b && mapReady) { S.restaurando = true; try { map.jumpTo({center: b.c, zoom: b.z, pitch: b.p, bearing: b.b}, {restaurar: true}); } finally { S.restaurando = false; } clearTimeout(S.mt); setSheet(b.s); S.limite = Math.max(S.limite, b.lim); }
+  if (b && mapReady) { S.restaurando = true; try { map.jumpTo({center: b.c, zoom: b.z}, {restaurar: true}); } finally { S.restaurando = false; } clearTimeout(S.mt); setSheet(b.s); S.limite = Math.max(S.limite, b.lim); }
   render(); if (b && $('#scroll')) { $('#scroll').scrollTop = b.y; arriba(); }
 }
 function detalle(){
@@ -619,7 +624,8 @@ async function guardarDraft(){
   const btn = document.querySelector('[data-a="d-guardar"]'); if (btn) { btn.disabled = true; btn.textContent = 'Guardando…'; }
   const fotos = d.fotos.slice();
   for (const f of d.nuevas) { try { const r = await S.assets.upload(f.blob, {type: 'image/jpeg'}); fotos.push(r.id); } catch (e) { toast('Una foto no se pudo subir.'); } }
-  const url = esUrl(d.url) ? d.url.trim() : '', tipo = Object.hasOwn(TIPOS, d.tipo) ? d.tipo : 'otro';
+  const url = normUrl(d.url); if (d.url && !url) return err('La liga no parece válida; cópiala completa desde el navegador.');
+  const tipo = tieneTipo(d.tipo) ? d.tipo : 'otro';
   const doc = {titulo: d.titulo || (TIPOS[tipo][0] + ' en ' + d.colonia), url, fuente: url ? fuenteDe(url) : '', tipo, precio, mantenimiento: numero(d.mantenimiento), colonia: d.colonia, alcaldia: d.alcaldia || alcaldiaDe(d.lon, d.lat) || '', calle: d.calle || null,
     recamaras: numero(d.recamaras), banos: numero(d.banos), m2: numero(d.m2), estacionamientos: num(d.estacionamientos), amueblado: typeof d.amueblado === 'boolean' ? d.amueblado : null, mascotas: ['si', 'no'].includes(d.mascotas) ? d.mascotas : 'no_dice', contacto: d.contacto, requisitos: d.notas || null, lat: d.lat, lon: d.lon, prec: d.prec, fotos, creado: d.creado || new Date().toISOString()};
   const id = d.editId || ('m' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6));
@@ -641,11 +647,11 @@ async function llenarConIA(){
     const libre = k => String(d[k] ?? '') === String(antes[k] ?? '');
     const set = (k, v) => { if (v !== null && v !== undefined && v !== '' && libre(k)) d[k] = v; };
     for (const k of ['titulo', 'colonia', 'calle', 'contacto', 'notas']) if (typeof x[k] === 'string') set(k, x[k].trim().slice(0, k === 'notas' ? 600 : 120));
-    for (const k of ['precio', 'mantenimiento', 'recamaras', 'banos', 'm2']) if (typeof x[k] === 'number' && isFinite(x[k]) && x[k] > 0) set(k, x[k]);
-    if (typeof x.estacionamientos === 'number' && x.estacionamientos >= 0) set('estacionamientos', x.estacionamientos);
+    for (const k of ['precio', 'mantenimiento', 'recamaras', 'banos', 'm2']) { const v = num(x[k]); if (v > 0) set(k, v); }  /* número o texto numérico; nunca HTML */
+    { const v = num(x.estacionamientos); if (v !== null) set('estacionamientos', v); }
     if (typeof x.amueblado === 'boolean') set('amueblado', x.amueblado);
-    if (esUrl(x.url)) set('url', x.url.trim());
-    if (Object.hasOwn(TIPOS, x.tipo) && libre('tipo')) d.tipo = x.tipo;
+    if (normUrl(x.url)) set('url', normUrl(x.url));
+    if (tieneTipo(x.tipo) && libre('tipo')) d.tipo = x.tipo;
     if (['si', 'no', 'no_dice'].includes(x.mascotas) && libre('mascotas')) d.mascotas = x.mascotas;
     if (d.colonia !== antes.colonia && !(d.lat && d.lat !== antes.lat)) {  /* si la persona eligió colonia mientras leía, se respeta */
       const [nc, alcTxt] = limpiarColonia(d.colonia), c = ubicarColonia(nc, typeof x.alcaldia === 'string' && x.alcaldia ? x.alcaldia : alcTxt);
@@ -679,21 +685,25 @@ function finPunto(ok){
 /* ============ guardar estado (favoritos, avance, notas) ============ */
 /* lo que no se pudo subir se guarda aquí y se mezcla con lo de la nube hasta que se logre subir */
 const pend = () => ls.get('bn.estado.pend') || {};
-function mezclar(m){ const p = pend(); for (const k in p) if (!m[k] || (p[k].t || 0) >= (m[k].t || 0)) m[k] = p[k]; return m; }
+/* gana lo más nuevo: si la nube ya trae un cambio posterior, el pendiente local se descarta para no pisarlo después */
+function mezclar(m){ const p = pend(); let cambio = false; for (const k in p) { if (!m[k] || (p[k].t || 0) >= (m[k].t || 0)) m[k] = p[k]; else { delete p[k]; cambio = true; } } if (cambio) ls.set('bn.estado.pend', p); return m; }
+function quitarPend(id, t){ const p = pend(); if (p[id] && p[id].t === t) { delete p[id]; ls.set('bn.estado.pend', p); } }
 async function setEstado(id, patch, pintar = true){
   const cur = Object.assign({}, est(id), patch, {t: Date.now()}); S.estado[id] = cur;
   if (pintar) render(); else pintarMapa();
   if (!S.db) return ls.set('bn.estado', S.estado);
-  const p = pend();
-  if (!S.readOnly) { try { await S.db.collection('estado').doc('e-' + hash(id).toString(36)).set({id, ...cur}); if (p[id]) { delete p[id]; ls.set('bn.estado.pend', p); } return; } catch (e) { if (e && e.code === 'invalid_argument') S.readOnly = true; } }
-  p[id] = cur; ls.set('bn.estado.pend', p);
-  toast(S.readOnly ? 'Sin permiso para guardar en la nube: queda solo en este dispositivo.' : 'No se pudo guardar en la nube; queda en este dispositivo y se reintenta después.');
+  const p = pend(); p[id] = cur; ls.set('bn.estado.pend', p);  /* se guarda ANTES de intentar: si la base no responde o falla, ya está */
+  if (!S.readOnly) { try { await S.db.collection('estado').doc('e-' + hash(id).toString(36)).set({id, ...cur}); quitarPend(id, cur.t); subirPendientes(); return; } catch (e) { if (e && e.code === 'invalid_argument') S.readOnly = true; } }
+  const msg = S.readOnly ? 'Sin permiso para guardar en la nube: queda solo en este dispositivo.' : 'No se pudo guardar en la nube; queda en este dispositivo y se reintenta después.';
+  setTimeout(() => toast(msg), 0);  /* después del aviso de quien llamó ("Guardado en ♥", "Nota guardada.") */
 }
+let subiendo = false;
 async function subirPendientes(){
-  if (!S.db || S.readOnly) return; const p = pend();
-  for (const id of Object.keys(p)) { try { await S.db.collection('estado').doc('e-' + hash(id).toString(36)).set({id, ...p[id]}); delete p[id]; } catch (e) { if (e && e.code === 'invalid_argument') { S.readOnly = true; break; } } }
-  ls.set('bn.estado.pend', p);
+  if (!S.db || S.readOnly || subiendo) return; subiendo = true;
+  try { for (const [id, v] of Object.entries(pend())) { try { await S.db.collection('estado').doc('e-' + hash(id).toString(36)).set({id, ...v}); quitarPend(id, v.t); } catch (e) { if (e && e.code === 'invalid_argument') { S.readOnly = true; break; } } } }
+  finally { subiendo = false; }
 }
+setInterval(() => { if (Object.keys(pend()).length) subirPendientes(); }, 15000); addEventListener('online', () => subirPendientes());
 
 /* ============ búsqueda ============ */
 function sugerencias(q){
@@ -802,25 +812,30 @@ function acerca(){
 
 /* ============ arranque ============ */
 async function cargarAnuncios(){
-  try { const d = await getJSON('data/anuncios.json'); S.meta = d && typeof d.meta === 'object' && d.meta || {};
-    S.anuncios = (Array.isArray(d && d.anuncios) ? d.anuncios : []).map(a => { try { return prep(a, false); } catch (_) { return null; } }).filter(Boolean); S.errDatos = false; }
-  catch (e) { S.anuncios = []; S.errDatos = true; }
+  S.cargando = true; S.errDatos = false; render();
+  const ac = new AbortController(), to = setTimeout(() => ac.abort(), 20000);
+  try { const d = await getJSON('data/anuncios.json', {signal: ac.signal}); if (!d || !Array.isArray(d.anuncios)) throw new Error('formato');
+    S.meta = typeof d.meta === 'object' && d.meta || {}; let malo = false;
+    S.anuncios = d.anuncios.map(a => { try { return prep(a, false); } catch (e) { if (!malo) { malo = true; console.warn('Anuncio descartado', a, e); } return null; } }).filter(Boolean); }
+  catch (e) { S.anuncios = []; S.errDatos = true; console.warn('No se pudieron cargar los anuncios', e); }
+  finally { clearTimeout(to); S.cargando = false; }
   render();
 }
 async function boot(){
   ojify(document); chips();
   let style;
-  setTimeout(() => { if (!mapReady && $('#loading')) $('#loading').innerHTML = '<div>El mapa tarda en cargar… revisa tu conexión.</div>'; }, 20000);
+  const tLento = setTimeout(() => { if (!mapReady && $('#loading')) $('#loading').innerHTML = '<div>El mapa tarda en cargar… revisa tu conexión.</div>'; }, 20000);
   try { [style, S.lug] = await Promise.all([getJSON('map/style.json'), getJSON('data/lugares.json')]); }
-  catch (e) { $('#loading').innerHTML = '<div>No se pudo cargar el mapa. Recarga la página.</div>'; return; }
+  catch (e) { clearTimeout(tLento); $('#loading').innerHTML = '<div>No se pudo cargar el mapa. Recarga la página.</div>'; return; }
   for (const e of S.lug.estaciones) e.fuera = !alcaldiaDe(e.lon, e.lat);  /* estaciones del Edomex van al final de la búsqueda */
   style.sprite = BASE + 's/ofm';
   map = new maplibregl.Map({container: 'map', style, center: [-99.165, 19.395], zoom: 11.6, minZoom: 9.5, maxZoom: 18.5, maxBounds: [[-99.75, 18.85], [-98.55, 19.85]], attributionControl: {compact: true}, dragRotate: true, pitchWithRotate: true});
   map.addControl(new maplibregl.NavigationControl({showCompass: true, visualizePitch: true}), 'bottom-right');
+  map.on('pitchend', () => { const b = $('[data-a="3d"]'); if (b) b.setAttribute('aria-pressed', map.getPitch() > 5); });
   map.on('load', () => { capas(); mapReady = true; try { render(); } finally { const l = $('#loading'); if (l) { l.style.opacity = 0; setTimeout(() => l.remove(), 350); } } });
   map.on('moveend', e => { if (e.restaurar || S.restaurando) return; clearTimeout(S.mt); S.mt = setTimeout(() => { if (S.vista === 'lista' && S.visible) lista(); }, 120); });
   S.estado = ls.get('bn.estado') || {};
-  await cargarAnuncios();
+  cargarAnuncios();  /* no detiene la conexión con la base: render() se llama al terminar */
   const c = window.claude; if (!c || !c.use) return;
   c.use('sample').then(async ai => { S.ai = ai; try { const lim = ai && await ai.limits(); S.aiImg = !!(lim && lim.images); } catch (_) {} }).catch(() => {});
   c.use('assets').then(a => { S.assets = a; }).catch(() => {});
