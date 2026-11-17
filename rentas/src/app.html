@@ -472,11 +472,24 @@ let FT = null; /* filtros en edición */
 function abrirFiltros(foco){
   FT = JSON.parse(JSON.stringify(S.f)); pintarFiltros(); if (foco) setTimeout(() => { const el = document.getElementById('fl-' + foco); if (el) el.scrollIntoView({block: 'center'}); }, 30);
 }
+/* distribución de rentas por precio: barras moradas = dentro del presupuesto elegido */
+function histo(f){
+  const W = 320, H = 86, B = 5000, N = 17, base = H - 18, cnt = new Array(N).fill(0);
+  todos().forEach(a => { cnt[Math.min(N - 1, Math.floor(a.precio / B))]++; });
+  const mx = Math.max(1, ...cnt), bw = W / N, lo = f.min || 0, hi = f.max || Infinity;
+  const bars = cnt.map((c, i) => { const a = i * B, b = i === N - 1 ? Infinity : (i + 1) * B, on = b > lo && a <= hi, h = c ? Math.max(3, (base - 6) * c / mx) : 0, x = i * bw + 1, w = bw - 2, y = base - h, r = Math.min(4, h, w / 2);
+    const lab = (i === N - 1 ? 'Más de ' + short(a) : short(a) + ' a ' + short(b)) + ': ' + c + (c === 1 ? ' renta' : ' rentas');
+    return `<g data-a="hbin" data-i="${i}" role="button" tabindex="0" aria-label="${esc(lab)}" style="cursor:pointer"><title>${esc(lab)}</title><rect x="${i * bw}" y="0" width="${bw}" height="${base}" fill="transparent"/>${h ? `<path d="M${x},${base}V${y + r}Q${x},${y} ${x + r},${y}H${x + w - r}Q${x + w},${y} ${x + w},${y + r}V${base}Z" fill="${on ? '#7b3fc4' : '#b9a6d9'}"/>` : ''}</g>`; }).join('');
+  const ticks = [0, 4, 8, 12, 16].map(i => `<text x="${Math.min(W - 2, Math.max(2, i * bw + (i === 16 ? bw / 2 : 0)))}" y="${H - 4}" font-size="10.5" fill="#837e93" text-anchor="${i === 0 ? 'start' : i === 16 ? 'end' : 'middle'}">${i === 16 ? '$80k+' : short(i * B).replace('$0', '$0')}</text>`).join('');
+  const dentro = todos().filter(a => a.precio >= lo && a.precio <= hi).length;
+  return `<svg viewBox="0 0 ${W} ${H}" width="100%" style="display:block;max-width:100%" role="group" aria-label="Cuántas rentas hay en cada rango de precio">${bars}<line x1="0" x2="${W}" y1="${base + .5}" y2="${base + .5}" stroke="#e4e0ec"/>${ticks}</svg>
+    <p class="note" style="margin:2px 0 0">${dentro} de ${todos().length} rentas en tu rango. Toca una barra para elegir ese rango.</p>`;
+}
 function pintarFiltros(){
   const f = FT, n = todos().filter(a => pasa(a, f)).length, op = (k, v, l, on) => `<button class="opt" data-a="ft" data-k="${k}" data-v="${esc(v)}" aria-pressed="${on}">${l}</button>`;
   const fuentes = [...new Set(todos().map(a => a.fuente).filter(Boolean))].sort();
   modal('Filtros', `
-    <div class="fld" id="fl-precio"><span class="lab">Presupuesto mensual (MXN)</span><div class="row2"><input class="inp num" id="fmin" inputmode="numeric" placeholder="Mínimo" value="${f.min || ''}" aria-label="Mínimo"><input class="inp num" id="fmax" inputmode="numeric" placeholder="Máximo" value="${f.max || ''}" aria-label="Máximo"></div>
+    <div class="fld" id="fl-precio"><span class="lab">Presupuesto mensual (MXN)</span><div id="histo" style="margin:4px 0 10px">${histo(f)}</div><div class="row2"><input class="inp num" id="fmin" inputmode="numeric" placeholder="Mínimo" value="${f.min || ''}" aria-label="Mínimo"><input class="inp num" id="fmax" inputmode="numeric" placeholder="Máximo" value="${f.max || ''}" aria-label="Máximo"></div>
       <div class="presets">${[[0, 8000], [8000, 15000], [15000, 25000], [25000, 40000], [40000, 0]].map(([a, b]) => `<button data-a="preset" data-min="${a}" data-max="${b}">${a ? short(a) : 'Hasta'}${a && b ? '–' : a ? ' o más' : ' '}${b ? short(b) : ''}</button>`).join('')}</div></div>
     <div class="fld" id="fl-tipo"><span class="lab">Tipo</span><div class="opts">${Object.entries(TIPOS).map(([k, [l, e]]) => op('tipos', k, ic(e) + l, f.tipos.includes(k))).join('')}</div></div>
     <div class="fld" id="fl-mascotas"><span class="lab">Mascotas</span><div class="opts">${op('mascotas', 'todas', 'Indistinto', f.mascotas === 'todas')}${op('mascotas', 'si', ic('🐾') + 'Solo si dice que acepta', f.mascotas === 'si')}${op('mascotas', 'nono', ic('🐶') + 'Ocultar las que no aceptan', f.mascotas === 'nono')}</div><p class="note" style="margin:6px 0 0">Muchos anuncios no lo dicen; "Ocultar las que no aceptan" deja esos para que preguntes.</p></div>
@@ -641,6 +654,7 @@ document.addEventListener('click', async e => {
     else if (typeof FT[k] === 'boolean') FT[k] = !FT[k];
     else if (typeof FT[k] === 'number') FT[k] = Number(v); else FT[k] = v;
     const sc = document.querySelector('.modal').scrollTop; pintarFiltros(); document.querySelector('.modal').scrollTop = sc; }
+  else if (a === 'hbin') { const i = Number(el.dataset.i); FT.min = i * 5000 || null; FT.max = i >= 16 ? null : (i + 1) * 5000; const sc = document.querySelector('.modal').scrollTop; pintarFiltros(); document.querySelector('.modal').scrollTop = sc; }
   else if (a === 'preset') { FT.min = Number(el.dataset.min) || null; FT.max = Number(el.dataset.max) || null; const sc = document.querySelector('.modal').scrollTop; pintarFiltros(); document.querySelector('.modal').scrollTop = sc; }
   else if (a === 'ft-limpiar') { FT = DEF(); pintarFiltros(); }
   else if (a === 'ft-ok') { leerPrecio(); if (FT.min && FT.max && FT.min > FT.max) [FT.min, FT.max] = [FT.max, FT.min]; S.f = FT; FT = null; guardarF(); S.limite = 40; cerrarModal(); S.vista = 'lista'; render();
@@ -665,10 +679,12 @@ document.addEventListener('click', async e => {
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape') { if (S.picking) finPunto(false); else if (mroot.firstChild) cerrarModal(); else if (S.vista === 'detalle') cerrarDetalle(); }
   if (e.key === 'Enter' && e.target.classList.contains('card')) abrir(e.target.dataset.id);
+  if ((e.key === 'Enter' || e.key === ' ') && e.target.dataset && e.target.dataset.a === 'hbin') { e.preventDefault(); e.target.dispatchEvent(new MouseEvent('click', {bubbles: true})); }
   if (e.target.id === 'q') { if (e.key === 'ArrowDown') { sugI = Math.min(SUG.length - 1, sugI + 1); pintarSug(); e.preventDefault(); } else if (e.key === 'ArrowUp') { sugI = Math.max(0, sugI - 1); pintarSug(); e.preventDefault(); } else if (e.key === 'Enter' && SUG.length) { irA(SUG[Math.max(0, sugI)]); e.preventDefault(); } }
 });
 document.addEventListener('input', e => {
   if (e.target.id === 'q') { SUG = sugerencias(e.target.value); sugI = -1; pintarSug(); }
+  else if ((e.target.id === 'fmin' || e.target.id === 'fmax') && FT) { leerPrecio(); const h = $('#histo'); if (h) h.innerHTML = histo(FT); const b = document.querySelector('[data-a="ft-ok"]'); if (b) { const n = todos().filter(a => pasa(a, FT)).length; b.textContent = 'Ver ' + n + ' renta' + (n === 1 ? '' : 's'); } }
   else if (e.target.id === 'd-col') { const n = norm(e.target.value), el = $('#d-sug'); if (n.length < 2) { el.hidden = true; return; } const r = S.lug.colonias.map((c, i) => [c, i]).filter(([c]) => norm(c.n).includes(n)).sort((a, b) => (norm(a[0].n).startsWith(n) ? 0 : 1) - (norm(b[0].n).startsWith(n) ? 0 : 1)).slice(0, 8); el.hidden = !r.length; el.innerHTML = r.map(([c, i]) => `<button data-a="d-col-op" data-i="${i}">${ic('📍')}<span>${esc(c.n)}</span><small>${esc(c.a)}</small></button>`).join(''); }
 });
 let notaT;
