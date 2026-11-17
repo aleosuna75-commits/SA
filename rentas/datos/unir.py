@@ -4,10 +4,12 @@ Quita repetidos: misma URL, o el mismo inmueble en dos portales (mismo precio, c
 Los anuncios que ya estaban conservan su fecha "visto".
 
 Uso: python3 -I unir.py salida.json "fecha legible" base.json nuevo1.json [nuevo2.json ...]
+Los archivos con "portales" en el nombre vienen de leer directo los resultados de icasas/Homie: sus anuncios se marcan vigentes.
 """
 import json, sys, re, unicodedata, urllib.parse, collections
 
 OUT, FECHA, *SRC = sys.argv[1:]
+VIGENTES, VIG = {'icasas', 'homie'}, '17 nov 2026'
 def norm(s):
     s = ''.join(c for c in unicodedata.normalize('NFD', str(s or '').lower()) if unicodedata.category(c) != 'Mn')
     return re.sub(r'\s+', ' ', re.sub(r'[^a-z0-9]+', ' ', s)).strip()
@@ -22,6 +24,7 @@ for f in SRC:
         if k in urls: quitados['misma url'] += 1; continue
         firma = (round(a['precio'], -1), norm(a.get('colonia')), a.get('recamaras'), a.get('m2'))
         if a.get('m2') and firma in firmas: quitados['mismo inmueble en otro portal'] += 1; continue
+        if 'portales' in f and a.get('fuente') in VIGENTES and not a.get('vig'): a['vig'] = VIG  # leído hoy directo de resultados que solo muestran anuncios activos
         urls.add(k); firmas.add(firma); out.append(a)
 json.dump({'meta': {'fecha': FECHA, 'total': len(out)}, 'anuncios': out}, open(OUT, 'w', encoding='utf8'), ensure_ascii=False, separators=(',', ':'))
 print('total', len(out), dict(quitados))

@@ -26,7 +26,7 @@ INDIVIDUAL = [
     r'(departamento|casa|inmueble|articulo|loft)\.mercadolibre\.com\.mx/MLM-?\d{6,}',
     r'lamudi\.com\.mx/(en/)?(property|detalle|propiedad)/',
     r'pincali\.com/(en/)?(home|inmueble|propiedad)/',
-    r'easybroker\.com/.*(listings|inmueble|propiedad)/',
+    r'easybroker\.com/.*(listings|inmueble|propiedad|property)',
     r'icasas\.mx/propiedad/',
     r'homie\.mx/detalle/',
     r'casasyterrenos\.com/.*propiedad',

@@ -104,6 +104,7 @@ button{cursor:pointer;border:0;background:none;padding:0}
 .facts .oj{width:16px;height:16px;vertical-align:-.22em;margin-right:3px}
 .pet{display:inline-flex;align-items:center;gap:3px;font-weight:500;font-size:12px;padding:2px 8px;border-radius:999px}
 .pet.si{background:var(--good-soft);color:var(--good)} .pet.no{background:var(--bad-soft);color:var(--bad)} .pet.nd{background:var(--surface-2);color:var(--fg-2)}
+.vig{display:inline-flex;align-items:center;gap:3px;font-weight:500;font-size:12px;padding:2px 8px;border-radius:999px;background:var(--good-soft);color:var(--good);white-space:nowrap}
 .st{display:inline-block;font-weight:500;font-size:12px;padding:2px 8px;border-radius:999px;background:var(--blue-soft);color:var(--blue-ink);margin-top:6px}
 .fav{width:38px;height:38px;border-radius:50%;display:grid;place-items:center;font-size:21px;color:var(--fg-2);background:var(--surface)}
 .card .fav{position:absolute;right:6px;top:20px;width:32px;height:32px;font-size:18px;box-shadow:var(--shadow-2)}
@@ -287,7 +288,7 @@ const ESTADOS = [['interesa', 'Me interesa'], ['contactado', 'Ya escribí'], ['v
 const ESTADO_L = Object.fromEntries(ESTADOS);
 
 /* ============ estado ============ */
-const DEF = () => ({min: null, max: null, tipos: [], rec: 0, banos: 0, mascotas: 'todas', alcaldias: [], metro: 0, amueblado: false, estac: false, fuentes: [], fav: false, mios: false, ocultos: false});
+const DEF = () => ({min: null, max: null, tipos: [], rec: 0, banos: 0, mascotas: 'todas', alcaldias: [], metro: 0, amueblado: false, estac: false, fuentes: [], fav: false, mios: false, ocultos: false, vig: false});
 const S = { anuncios: [], mios: [], estado: {}, lug: null, f: Object.assign(DEF(), ls.get('bn.f') || {}), orden: ls.get('bn.orden') || 'recientes', visible: ls.get('bn.visible') ?? true,
   vista: 'lista', sel: null, limite: 40, db: null, assets: null, ai: null, aiImg: false, readOnly: false, meta: {} };
 let map, mapReady = false;
@@ -645,7 +646,7 @@ function prep(a, mio){
     amueblado: typeof a.amueblado === 'boolean' ? a.amueblado : null, mascotas: ['si', 'no'].includes(a.mascotas) ? a.mascotas : 'no_dice',
     fotos: Array.isArray(a.fotos) ? a.fotos.filter(f => typeof f === 'string') : [], url: normUrl(a.url),
     titulo: txt(a.titulo), colonia: txt(a.colonia), calle: txt(a.calle), contacto: txt(a.contacto), requisitos: txt(a.requisitos), mascotas_detalle: txt(a.mascotas_detalle), amenidades: txt(a.amenidades),
-    anunciante: txt(a.anunciante), fecha_publicacion: txt(a.fecha_publicacion), visto: txt(a.visto), creado: txt(a.creado), fuente: txt(a.fuente) || '', alcaldia: txt(a.alcaldia) || ''};
+    anunciante: txt(a.anunciante), fecha_publicacion: txt(a.fecha_publicacion), visto: txt(a.visto), vig: txt(a.vig), creado: txt(a.creado), fuente: txt(a.fuente) || '', alcaldia: txt(a.alcaldia) || ''};
   for (const k of Object.keys(o)) if (o[k] === null) delete o[k];
   if (!(o.lat >= 18.85 && o.lat <= 19.85 && o.lon >= -99.75 && o.lon <= -98.55)) return null;  // mismos límites que el mapa
   if (S.lug) { let best = null, bd = 1e9; for (const e of S.lug.estaciones) { const d = hav(o, e); if (d < bd) { bd = d; best = e; } } o.est = best ? {n: best.n, t: best.t, d: bd} : null; }
@@ -675,15 +676,16 @@ function pasa(a, f = S.f){
   if (f.amueblado && a.amueblado !== true) return false;
   if (f.estac && !(a.estacionamientos >= 1)) return false;
   if (f.fuentes.length && !f.fuentes.includes(a.fuente)) return false;
+  if (f.vig && !a.vig && !a.mio) return false;
   return true;
 }
-function nFiltros(f = S.f){ return (f.min || f.max ? 1 : 0) + (f.tipos.length ? 1 : 0) + (f.rec ? 1 : 0) + (f.banos ? 1 : 0) + (f.mascotas !== 'todas' ? 1 : 0) + (f.alcaldias.length ? 1 : 0) + (f.metro ? 1 : 0) + (f.amueblado ? 1 : 0) + (f.estac ? 1 : 0) + (f.fuentes.length ? 1 : 0) + (f.fav ? 1 : 0) + (f.mios ? 1 : 0) + (f.ocultos ? 1 : 0); }
+function nFiltros(f = S.f){ return (f.min || f.max ? 1 : 0) + (f.tipos.length ? 1 : 0) + (f.rec ? 1 : 0) + (f.banos ? 1 : 0) + (f.mascotas !== 'todas' ? 1 : 0) + (f.alcaldias.length ? 1 : 0) + (f.metro ? 1 : 0) + (f.amueblado ? 1 : 0) + (f.estac ? 1 : 0) + (f.fuentes.length ? 1 : 0) + (f.fav ? 1 : 0) + (f.mios ? 1 : 0) + (f.ocultos ? 1 : 0) + (f.vig ? 1 : 0); }
 function guardarF(){ ls.set('bn.f', S.f); }
 function filtrados(){ return todos().filter(a => pasa(a)); }
 function enVista(list){ if (!S.visible || !mapReady) return list; const b = map.getBounds(); return list.filter(a => b.contains([a.lon, a.lat])); }
 function ordenar(list){
   const o = S.orden, k = {precio: (a, b) => a.precio - b.precio, precio_d: (a, b) => b.precio - a.precio, metro: (a, b) => (a.est ? a.est.d : 9e9) - (b.est ? b.est.d : 9e9), m2: (a, b) => ((b.m2 || 0) && (a.m2 || 0) ? a.precio / a.m2 - b.precio / b.m2 : (b.m2 || 0) - (a.m2 || 0)),
-    recientes: (a, b) => String(b.creado || b.fecha_publicacion || b.visto || '').localeCompare(String(a.creado || a.fecha_publicacion || a.visto || '')) }[o] || (() => 0);
+    recientes: (a, b) => (b.vig ? 1 : 0) - (a.vig ? 1 : 0) || String(b.creado || b.fecha_publicacion || b.visto || '').localeCompare(String(a.creado || a.fecha_publicacion || a.visto || '')) }[o] || (() => 0);
   return list.slice().sort(k);
 }
 
@@ -745,7 +747,7 @@ function chips(){
   const pr = f.min || f.max ? (f.min ? short(f.min) : '$0') + '–' + (f.max ? short(f.max) : 'más') : 'Precio';
   const tp = f.tipos.length ? f.tipos.map(t => TIPOS[t][0]).join(', ') : 'Tipo';
   const items = [
-    ['precio', pr, !!(f.min || f.max)], ['tipo', tp, !!f.tipos.length],
+    ['precio', pr, !!(f.min || f.max)], ['vig', '✓ Vigentes hoy', !!f.vig], ['tipo', tp, !!f.tipos.length],
     ['mascotas', '🐾 Acepta mascotas', f.mascotas === 'si'], ['rec', f.rec ? f.rec + '+ recámaras' : 'Recámaras', !!f.rec],
     ['zona', f.alcaldias.length ? f.alcaldias.length === 1 ? f.alcaldias[0] : f.alcaldias.length + ' alcaldías' : 'Zona', !!f.alcaldias.length],
     ['metrof', '🚇 Cerca del metro', !!f.metro], ['fav', '❤ Guardados', f.fav], ['plataformas', '🔗 Buscar en otras plataformas', false]];
@@ -757,6 +759,7 @@ function thumb(a){
   const src = esc(F ? F.n : a.fuente || (a.mio ? 'Agregado por ustedes' : ''));
   return `<div class="thumb" style="background:linear-gradient(160deg,${col}2b,${col}0d)">${fotos.length ? `<img src="${esc('/_blob/' + fotos[0])}" alt="" loading="lazy">` : ic(TIPOS[a.tipo][1])}${src ? `<span class="src" style="background:${col}">${src}</span>` : ''}</div>`;
 }
+const vigTag = a => a.vig ? `<span class="vig">✓ Vigente al ${esc(a.vig)}</span>` : '';
 const petTag = a => a.mascotas === 'si' ? `<span class="pet si">${ic('🐾')} Acepta mascotas</span>` : a.mascotas === 'no' ? `<span class="pet no">Sin mascotas</span>` : '';
 function card(a){
   const e = est(a.id);
@@ -765,7 +768,7 @@ function card(a){
       ${a.mantenimiento ? `<div class="mant num">+ ${money(a.mantenimiento)} mantenimiento</div>` : a.mantenimiento_incluido ? '<div class="mant">Mantenimiento incluido</div>' : ''}
       <div class="ttl">${esc(a.titulo)}</div>
       <div class="where">${esc(a.colonia)}${a.alcaldia ? ' · ' + esc(a.alcaldia) : ''}</div>
-      <div class="facts">${a.recamaras ? `<span>${ic('🛏')}${esc(a.recamaras)} rec.</span>` : ''}${a.banos ? `<span>${ic('🛁')}${esc(a.banos)}</span>` : ''}${a.m2 ? `<span>${ic('📐')}${esc(a.m2)} m²</span>` : ''}${a.est && a.est.d < 1500 ? `<span>${ic(icEst(a.est.t))}${fmtDist(a.est.d)}</span>` : ''}${petTag(a)}</div>
+      <div class="facts">${a.recamaras ? `<span>${ic('🛏')}${esc(a.recamaras)} rec.</span>` : ''}${a.banos ? `<span>${ic('🛁')}${esc(a.banos)}</span>` : ''}${a.m2 ? `<span>${ic('📐')}${esc(a.m2)} m²</span>` : ''}${a.est && a.est.d < 1500 ? `<span>${ic(icEst(a.est.t))}${fmtDist(a.est.d)}</span>` : ''}${petTag(a)}${vigTag(a)}</div>
       ${e.st ? `<span class="st">${esc(ESTADO_L[e.st])}</span>` : ''}</div>
     ${thumb(a)}
     <button class="fav" data-a="fav" data-id="${esc(a.id)}" aria-pressed="${!!e.fav}" aria-label="${e.fav ? 'Quitar de guardados' : 'Guardar'}">${e.fav ? '♥' : '♡'}</button></div>`;
@@ -871,7 +874,7 @@ function detalle(){
     <div class="dprice num">${money(a.precio)} <small>al mes${a.mantenimiento ? ' + ' + money(a.mantenimiento) + ' de mantenimiento' : a.mantenimiento_incluido ? ' · mantenimiento incluido' : ''}</small></div>
     ${meta ? `<div class="dmeta">${meta}</div>` : ''}
     <div class="dwhere">${a.calle ? esc(a.calle) + ', ' : ''}${esc(a.colonia)}${a.alcaldia ? ', ' + esc(a.alcaldia) : ''} · <b>${prec}</b></div>
-    <div style="margin-top:8px">${petTag(a) || `<span class="pet nd">Mascotas: el anuncio no lo dice</span>`}${a.mascotas_detalle ? ` <span class="note">${esc(a.mascotas_detalle)}</span>` : ''}${e.st ? ` <span class="st">${esc(ESTADO_L[e.st])}</span>` : ''}</div>
+    <div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:6px;align-items:center">${vigTag(a)}${petTag(a) || `<span class="pet nd">Mascotas: el anuncio no lo dice</span>`}${a.mascotas_detalle ? ` <span class="note">${esc(a.mascotas_detalle)}</span>` : ''}${e.st ? ` <span class="st">${esc(ESTADO_L[e.st])}</span>` : ''}</div>
     <div class="pills" role="group" aria-label="Acciones">
       <a class="pill azul" href="${dir}" target="_blank" rel="noopener">${svg('dir')} Cómo llegar</a>
       ${a.url ? `<a class="pill" href="${esc(a.url)}" target="_blank" rel="noopener">${svg('ext')} ${a.mio ? 'Ver anuncio' : 'Fotos y contacto en ' + esc(F ? F.n : 'el anuncio')}</a>` : ''}
@@ -888,7 +891,7 @@ function detalle(){
     ${a.amenidades ? `<div class="sec"><h3>Amenidades</h3>${esc(a.amenidades)}</div>` : ''}
     <div class="sec"><h3>¿Cómo va?</h3><div class="pipe">${ESTADOS.map(([k, l]) => `<button data-a="st" data-id="${esc(a.id)}" data-v="${k}" aria-pressed="${e.st === k}">${l}</button>`).join('')}</div>
       <textarea id="nota" rows="3" style="margin-top:10px" placeholder="Notas: qué les dijeron, día de la visita, dudas…" data-id="${esc(a.id)}">${esc(e.nota || '')}</textarea></div>
-    <p class="note">${a.mio ? `Agregado por ustedes${a.creado ? ' el ' + esc(new Date(a.creado).toLocaleDateString('es-MX', {day: 'numeric', month: 'long'})) : ''}.` : `Publicado en ${esc(F ? F.n : a.fuente)}${a.fecha_publicacion ? ' · ' + esc(a.fecha_publicacion) : ''}. Encontrado en internet el ${esc(a.visto || S.meta.fecha || '')}; los anuncios se quitan en cuanto se rentan, así que puede ya no estar. Si al abrirlo dice que ya no está publicado, toca "Ya no está" y desaparece del mapa para los dos.`}${a.anunciante && a.anunciante !== 'no_dice' ? ' Anunciante: ' + (a.anunciante === 'inmobiliaria' ? 'inmobiliaria o asesor.' : 'particular.') : ''}</p>
+    <p class="note">${a.mio ? `Agregado por ustedes${a.creado ? ' el ' + esc(new Date(a.creado).toLocaleDateString('es-MX', {day: 'numeric', month: 'long'})) : ''}.` : a.vig ? `Publicado en ${esc(F ? F.n : a.fuente)}. Seguía vigente el ${esc(a.vig)}: se leyó directo de los resultados del portal, que solo muestra anuncios activos. Aun así, si ya se rentó, toca "Ya no está".` : `Publicado en ${esc(F ? F.n : a.fuente)}${a.fecha_publicacion ? ' · ' + esc(a.fecha_publicacion) : ''}. Encontrado en un buscador el ${esc(a.visto || S.meta.fecha || '')}; los anuncios se quitan en cuanto se rentan, así que puede ya no estar. Si al abrirlo dice que ya no está publicado, toca "Ya no está" y desaparece del mapa para los dos.`}${a.anunciante && a.anunciante !== 'no_dice' ? ' Anunciante: ' + (a.anunciante === 'inmobiliaria' ? 'inmobiliaria o asesor.' : 'particular.') : ''}</p>
     <div class="acts">${a.mio ? `<button class="btn" data-a="editar" data-id="${esc(a.id)}">${ic('📝')} Editar</button><button class="btn danger" data-a="borrar" data-id="${esc(a.id)}">${ic('🗑')} Borrar</button>` : `<button class="btn ghost" data-a="ocultar" data-id="${esc(a.id)}" style="grid-column:1/-1">${e.oculto ? 'Volver a mostrar' : 'Ocultar: no me interesa'}</button>`}</div>
   </div>`;
 }
@@ -959,7 +962,7 @@ function pintarFiltros(){
     <div class="fld"><span class="lab">Baños</span><div class="opts">${[0, 1, 2, 3].map(v => op('banos', v, v ? v + '+' : 'Cualquiera', f.banos === v)).join('')}</div></div>
     <div class="fld" id="fl-zona"><span class="lab">Zona (alcaldías)</span><div class="opts">${S.lug.alcaldias.map(a => a.n).sort((x, y) => x.localeCompare(y, 'es')).map(n => op('alcaldias', n, esc(n), f.alcaldias.includes(n))).join('')}</div></div>
     <div class="fld" id="fl-metrof"><span class="lab">Cerca del metro, tren ligero o cablebús</span><div class="opts">${[[0, 'Indistinto'], [500, 'A 500 m o menos'], [1000, 'A 1 km o menos'], [2000, 'A 2 km o menos']].map(([v, l]) => op('metro', v, l, f.metro === v)).join('')}</div></div>
-    <div class="fld"><span class="lab">Más</span><div class="opts">${op('amueblado', '1', 'Amueblado', f.amueblado)}${op('estac', '1', ic('🚗') + 'Con estacionamiento', f.estac)}${op('fav', '1', '♥ Solo guardados', f.fav)}${op('mios', '1', 'Solo los que agregamos', f.mios)}${op('ocultos', '1', 'Mostrar ocultos y descartados', f.ocultos)}</div></div>
+    <div class="fld"><span class="lab">Más</span><div class="opts">${op('vig', '1', '✓ Solo confirmados vigentes', f.vig)}${op('amueblado', '1', 'Amueblado', f.amueblado)}${op('estac', '1', ic('🚗') + 'Con estacionamiento', f.estac)}${op('fav', '1', '♥ Solo guardados', f.fav)}${op('mios', '1', 'Solo los que agregamos', f.mios)}${op('ocultos', '1', 'Mostrar ocultos y descartados', f.ocultos)}</div></div>
     ${fuentes.length > 1 ? `<div class="fld"><span class="lab">Plataforma</span><div class="opts">${fuentes.map(s => op('fuentes', s, esc(FUENTES[s] ? FUENTES[s].n : s), f.fuentes.includes(s))).join('')}</div></div>` : ''}`,
     `<button class="btn ghost" data-a="ft-limpiar">Limpiar</button><button class="btn main" data-a="ft-ok" style="grid-column:auto">Ver ${n} renta${n === 1 ? '' : 's'}</button>`);
 }
@@ -1166,6 +1169,7 @@ document.addEventListener('click', async e => {
   else if (a === 'chip') { const k = el.dataset.k; S._k = null;
     if (k === 'mascotas') { S.f.mascotas = S.f.mascotas === 'si' ? 'todas' : 'si'; guardarF(); render(); }
     else if (k === 'fav') { S.f.fav = !S.f.fav; guardarF(); render(); }
+    else if (k === 'vig') { S.f.vig = !S.f.vig; guardarF(); render(); toast(S.f.vig ? 'Solo anuncios que seguían publicados al revisarlos hoy.' : 'Todos los anuncios.'); }
     else if (k === 'metrof') { S.f.metro = S.f.metro ? 0 : 1000; guardarF(); render(); toast(S.f.metro ? 'A 1 km o menos de una estación.' : 'Sin filtro de metro.'); }
     else if (k === 'plataformas') abrirPlataformas();
     else abrirFiltros(k); }
