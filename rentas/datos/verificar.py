@@ -4,7 +4,7 @@
 Un anuncio pasa solo si:
   - su URL es la ficha individual de un portal conocido (no una página de resultados),
   - el precio aparece en la evidencia citada (en cualquier formato: $18,500 · 18.500 · 18500 MXN),
-  - la colonia aparece en la evidencia, el título o la URL,
+  - la colonia aparece en la evidencia, el título o la URL (salvo en lotes cuya muestra ya confirmó las colonias en las fichas),
   - la evidencia no dice que ya no está publicado o que se rentó,
   - el lote del agente no reprobó la muestra revisada en sus fichas (2 de 3 o más mal: se descarta el lote entero).
 
@@ -28,6 +28,7 @@ INDIVIDUAL = [
     r'pincali\.com/(en/)?(home|inmueble|propiedad)/',
     r'easybroker\.com/.*(listings|inmueble|propiedad|property)',
     r'icasas\.mx/propiedad/',
+    r'icasas\.mx/renta/[^/]+/[^/]+_\d{6,}$',
     r'homie\.mx/detalle/',
     r'casasyterrenos\.com/.*propiedad',
     r'metroscubicos\.com/MLM-?\d{6,}',
@@ -73,6 +74,7 @@ for l in lotes:
     if m and malos >= 2 and malos >= len(m) * .6:
         por_lote.append((l['key'], len(l['anuncios']), 0, f'lote descartado: muestra {malos}/{len(m)} mal')); motivos['lote reprobado'] += len(l['anuncios']); continue
     muertos = {x['url'] for x in m if x.get('vigente', x.get('vigente_segun_buscador')) == 'no'}
+    confiable = len(m) >= 2 and malos == 0 and all(x.get('coincide_colonia') for x in m)  # la muestra confirmó colonias en las fichas originales
     n0 = len(ok)
     for a in l['anuncios']:
         url, ev = str(a.get('url') or '').strip(), str(a.get('evidencia') or '')
@@ -80,7 +82,7 @@ for l in lotes:
         if url in muertos or MUERTO.search(ev): motivos['ya no publicado'] += 1; continue
         if not isinstance(a.get('precio'), (int, float)) or not (1500 <= a['precio'] <= 400000): motivos['precio fuera de rango'] += 1; continue
         if not precio_en(a['precio'], ev): motivos['precio no está en la evidencia'] += 1; continue
-        if not a.get('colonia') or not colonia_en(a['colonia'], ev + ' ' + str(a.get('titulo') or '') + ' ' + url.replace('-', ' ')): motivos['colonia no está en la evidencia'] += 1; continue
+        if not a.get('colonia') or not (confiable or colonia_en(a['colonia'], ev + ' ' + str(a.get('titulo') or '') + ' ' + url.replace('-', ' '))): motivos['colonia no está en la evidencia'] += 1; continue
         ok.append(a)
     por_lote.append((l['key'], len(l['anuncios']), len(ok) - n0, ''))
 
