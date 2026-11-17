@@ -74,8 +74,12 @@ button{cursor:pointer;border:0;background:none;padding:0}
 .lh h2 small{display:block;font:500 12.5px/1.3 var(--body);color:var(--fg-3);margin-top:3px}
 .sel{border:1px solid var(--line);border-radius:999px;padding:7px 12px;background:var(--surface);font-size:13px;font-weight:600}
 .scroll{flex:1;min-height:0;overflow:auto;touch-action:pan-y;padding-bottom:calc(90px + var(--bot));margin:0 calc(-1 * var(--gr)) 0 calc(-1 * var(--gl));padding-left:var(--gl);padding-right:var(--gr)}
+@media (max-width:899.98px){ /* en el teléfono el arrastre de la hoja lo maneja el JS; el panel de escritorio se recorre normal */
 #sheet:not([data-s="full"]) .scroll{touch-action:none}
 #sheet[data-s="full"].arriba .scroll{touch-action:pan-down}
+#sheet:not([data-s="full"]) .gal{touch-action:pan-x}
+#sheet[data-s="full"].arriba .gal{touch-action:pan-x pan-down}
+}
 .toggle{display:inline-flex;align-items:center;gap:8px;font-size:13px;font-weight:600;color:var(--fg-2)}
 .toggle input{accent-color:var(--accent);width:18px;height:18px}
 
@@ -134,7 +138,7 @@ textarea:focus,.inp:focus{border-color:var(--accent)}
 
 /* botón agregar */
 body.det #add{display:none}
-body.pick #add,body.pick #chips,body.pick .mapbtns{display:none!important}
+body.pick #add,body.pick #chips,body.pick .mapbtns,body.pick #sheet{display:none!important}
 body[data-sheet="mid"] #add,body[data-sheet="full"] #add{bottom:calc(18px + var(--bot))}
 @media (min-width:900px){ body #add{display:flex!important} }
 #add{position:absolute;right:var(--gr);bottom:calc(var(--peek, 150px) + 14px + var(--bot));z-index:7;display:flex;align-items:center;gap:8px;padding:13px 18px;border-radius:999px;background:var(--accent);color:#fff;font:700 15px/1 var(--display);box-shadow:0 8px 22px rgba(123,63,196,.4)}
@@ -174,7 +178,7 @@ body[data-sheet="mid"] #add,body[data-sheet="full"] #add{bottom:calc(18px + var(
 .cross{position:fixed;left:50%;top:50%;width:34px;height:34px;margin:-34px 0 0 -17px;z-index:8;pointer-events:none}
 .cross .oj{width:34px;height:34px}
 
-#toast{position:fixed;left:50%;transform:translateX(-50%);top:calc(130px + var(--top));z-index:30;background:var(--fg);color:#fff;padding:10px 16px;border-radius:14px;font-weight:600;font-size:14px;max-width:min(92vw,440px);box-shadow:var(--shadow);text-align:center}
+#toast{pointer-events:none;position:fixed;left:50%;transform:translateX(-50%);top:calc(130px + var(--top));z-index:30;background:var(--fg);color:#fff;padding:10px 16px;border-radius:14px;font-weight:600;font-size:14px;max-width:min(92vw,440px);box-shadow:var(--shadow);text-align:center}
 .loading{position:fixed;inset:0;display:grid;place-items:center;z-index:40;background:var(--bg);font:700 18px var(--display);color:var(--accent);transition:opacity .3s}
 .loading div{display:flex;flex-direction:column;align-items:center;gap:10px}
 .loading .oj{width:64px;height:64px}
@@ -362,7 +366,7 @@ function capas(){
   map.on('click', 'r-cl', e => { if (S.picking) return; const f = e.features[0]; map.getSource('r').getClusterExpansionZoom(f.properties.cluster_id).then(z => map.easeTo({center: f.geometry.coordinates, zoom: z + .3})).catch(() => {}); });
   map.on('click', 'r-p', e => { if (S.picking) return; abrir(e.features[0].properties.id, false); });
   for (const l of ['r-cl', 'r-p']) { map.on('mouseenter', l, () => map.getCanvas().style.cursor = 'pointer'); map.on('mouseleave', l, () => map.getCanvas().style.cursor = ''); }
-  map.on('click', e => { if (S.picking) return; const hit = map.queryRenderedFeatures(e.point, {layers: ['r-p', 'r-cl']}); if (!hit.length && S.vista === 'detalle') { cerrarDetalle(); } });
+  map.on('click', e => { if (S.picking) return; const hit = map.queryRenderedFeatures(e.point, {layers: ['r-p', 'r-cl']}); if (!hit.length && S.vista === 'detalle') { S.antes = null; cerrarDetalle(); } });
 }
 function pintarMapa(){
   if (!mapReady) return;
@@ -412,6 +416,7 @@ function lista(){
       <label class="toggle" style="width:100%"><input type="checkbox" id="vis" ${S.visible ? 'checked' : ''}> Solo lo que se ve en el mapa</label></div>
     <div class="scroll" id="scroll">${n ? vis.slice(0, S.limite).map(card).join('') + (n > S.limite ? `<button class="more" data-a="mas">Ver ${Math.min(40, n - S.limite)} más</button>` : '') : S.errDatos && !S.anuncios.length ? `<div class="empty">${ic('⚠️')}No se pudieron cargar los anuncios. Revisa tu conexión.<br><br><button class="btn ghost" data-a="reintentar">Reintentar</button></div>` : `<div class="empty">${ic('🔍')}No hay rentas con estos filtros${S.visible ? ' en esta parte del mapa' : ''}.<br><br>${S.visible ? '<button class="btn ghost" data-a="vertodo">Ver toda la ciudad</button> ' : ''}${nFiltros() ? '<button class="btn ghost" data-a="limpiar">Quitar filtros</button>' : ''}</div>`}
     ${datos ? `<p class="note" style="margin:14px 0 4px">${datos} <button class="note" style="text-decoration:underline" data-a="acerca">Sobre los datos</button></p>` : ''}</div>`;
+  arriba();
 }
 function render(){
   /* misma vista (la lista, o el mismo anuncio): conserva dónde iba la persona en vez de regresar arriba */
@@ -419,6 +424,11 @@ function render(){
   chips(); pintarMapa(); document.body.classList.toggle('det', S.vista === 'detalle'); if (S.vista === 'lista') lista(); else detalle();
   const sc1 = document.querySelector('#sheetin .scroll'); if (sc1 && k === S._k) sc1.scrollTop = y; S._k = k; arriba();
 }
+/* actualiza ♥, avance y ocultar del detalle sin rehacerlo (para no tocar la nota que se está escribiendo) */
+function botonesDetalle(){ if (S.vista !== 'detalle' || !S.sel) return; const e = est(S.sel);
+  const f = document.querySelector('.det-top .fav'); if (f) { f.setAttribute('aria-pressed', !!e.fav); f.setAttribute('aria-label', e.fav ? 'Quitar de guardados' : 'Guardar'); f.textContent = e.fav ? '♥' : '♡'; }
+  document.querySelectorAll('.pipe [data-a="st"]').forEach(b => b.setAttribute('aria-pressed', e.st === b.dataset.v));
+  const o = document.querySelector('[data-a="ocultar"]'); if (o) o.textContent = e.oculto ? 'Volver a mostrar' : 'Ocultar: ya no está disponible o no me interesa'; }
 function arriba(){ const sc = document.querySelector('#sheetin .scroll'); sheet.classList.toggle('arriba', !sc || sc.scrollTop <= 0); }
 
 /* ============ detalle ============ */
@@ -429,8 +439,9 @@ function abrir(id, volar){
   if (volar !== false || !map.getBounds().contains([a.lon, a.lat])) map.easeTo({center: [a.lon, a.lat], zoom: Math.max(map.getZoom(), 14.5), offset: window.innerWidth >= 900 ? [200, 0] : [0, -window.innerHeight * .22], duration: 700});
 }
 function cerrarDetalle(){
+  if (S.picking) return;  /* mientras se marca el punto, el mapa no se mueve */
   S.sel = null; S.vista = 'lista'; const b = S.antes; S.antes = null; S._k = null;
-  if (b && mapReady) { map.jumpTo({center: b.c, zoom: b.z, pitch: b.p, bearing: b.b}, {restaurar: true}); setSheet(b.s); S.limite = Math.max(S.limite, b.lim); }
+  if (b && mapReady) { S.restaurando = true; try { map.jumpTo({center: b.c, zoom: b.z, pitch: b.p, bearing: b.b}, {restaurar: true}); } finally { S.restaurando = false; } clearTimeout(S.mt); setSheet(b.s); S.limite = Math.max(S.limite, b.lim); }
   render(); if (b && $('#scroll')) { $('#scroll').scrollTop = b.y; arriba(); }
 }
 function detalle(){
@@ -590,6 +601,8 @@ function ubicarColonia(nombre, alc){
   const ex = enAlc(S.lug.colonias.filter(x => norm(x.n) === n)); if (ex.length === 1) return ex[0]; if (ex.length > 1) return null;
   const pre = enAlc(S.lug.colonias.filter(x => norm(x.n).startsWith(n + ' '))); return pre.length === 1 ? pre[0] : null;
 }
+/* "Col. Álamos", "Colonia Álamos, Benito Juárez", "Narvarte Poniente, CDMX" → nombre y, si viene, la alcaldía */
+function limpiarColonia(s){ const [n, ...r] = String(s || '').split(','), e = r.join(',').trim(); return [n.replace(/^\s*(col\.?|colonia)\s+/i, '').trim(), S.lug.alcaldias.some(a => norm(a.n) === norm(e)) ? e : '']; }
 /* centro de la colonia con un pequeño desplazamiento fijo por anuncio, para que dos anuncios de la misma colonia no queden en el mismo punto */
 function enColonia(d, c){ const sem = (d.semilla || '') + d.titulo + d.url; d.colonia = c.n; d.alcaldia = c.a; d.lat = c.lat + ((hash(sem) % 200) - 100) / 60000; d.lon = c.lon + ((hash(d.url + sem + 'x') % 200) - 100) / 60000; d.prec = 'colonia'; }
 async function achicar(file, max){ /* reduce la imagen antes de subirla */
@@ -601,8 +614,8 @@ async function achicar(file, max){ /* reduce la imagen antes de subirla */
 async function guardarDraft(){
   leerDraft(); const d = S.draft, err = m => { const e = $('#d-err'); e.textContent = m; e.hidden = false; };
   const precio = numero(d.precio); if (!precio) return err('Escribe la renta mensual.');
-  if (!d.lat) { const c = ubicarColonia(d.colonia, d.alcaldia); if (c) enColonia(d, c); }
-  if (!d.lat) return err('Elige la colonia de la lista o marca el punto en el mapa.');
+  if (!d.lat) { const [nc, alcTxt] = limpiarColonia(d.colonia), c = ubicarColonia(nc, d.alcaldia || alcTxt); if (c) enColonia(d, c); }
+  if (!d.lat) { if (d.colonia && $('#d-col')) $('#d-col').dispatchEvent(new Event('input', {bubbles: true})); return err('Elige la colonia de la lista o marca el punto en el mapa.'); }
   const btn = document.querySelector('[data-a="d-guardar"]'); if (btn) { btn.disabled = true; btn.textContent = 'Guardando…'; }
   const fotos = d.fotos.slice();
   for (const f of d.nuevas) { try { const r = await S.assets.upload(f.blob, {type: 'image/jpeg'}); fotos.push(r.id); } catch (e) { toast('Una foto no se pudo subir.'); } }
@@ -618,11 +631,11 @@ async function llenarConIA(){
   leerDraft(); const files = [...($('#ai-img')?.files || [])].slice(0, 4), txt = ($('#ai-txt')?.value || '').trim();
   if (!files.length && !txt) return toast('Sube una captura o pega el texto del anuncio.');
   const b = document.querySelector('[data-a="ai-llenar"]'); if (b) { b.disabled = true; b.textContent = 'Leyendo el anuncio…'; }
-  const antes = JSON.parse(JSON.stringify({...S.draft, nuevas: []}));
+  const draft = S.draft, antes = JSON.parse(JSON.stringify({...S.draft, nuevas: []}));
   try {
     const imgs = []; for (const f of files) imgs.push(await achicar(f, 1400));  /* se agregan como fotos solo si la lectura sale bien */
     const r = await S.ai.json(`Eres asistente para buscar renta en la Ciudad de México. ${imgs.length ? 'Te paso capturas de pantalla de un anuncio' : 'Te paso el texto de un anuncio'} de renta. Extrae SOLO lo que diga el anuncio; lo que no diga, ponlo en null. Responde únicamente un objeto JSON con: {"titulo": texto corto, "precio": número mensual en pesos, "mantenimiento": número o null, "tipo": "departamento"|"casa"|"cuarto"|"loft"|"estudio"|"otro", "colonia": nombre de la colonia, "alcaldia": alcaldía de la CDMX si aparece o null, "calle": calle o null, "recamaras": número o null, "banos": número o null, "m2": número o null, "estacionamientos": número o null, "amueblado": true|false|null, "mascotas": "si"|"no"|"no_dice", "contacto": teléfono, WhatsApp o nombre tal como aparece, o null, "url": liga si aparece o null, "notas": requisitos y datos útiles en una línea}.${txt ? '\n\nTexto del anuncio:\n' + txt.slice(0, 6000) : ''}`, imgs.length ? {images: imgs} : {});
-    if (!S.draft) return;  /* se cerró el formulario mientras leía */
+    if (S.draft !== draft) return;  /* se cerró (o se abrió otro) mientras leía */
     leerDraft(); const d = S.draft, x = r && typeof r === 'object' ? r : {};
     /* lo que la persona escribió mientras Claude leía se respeta */
     const libre = k => String(d[k] ?? '') === String(antes[k] ?? '');
@@ -634,15 +647,22 @@ async function llenarConIA(){
     if (esUrl(x.url)) set('url', x.url.trim());
     if (Object.hasOwn(TIPOS, x.tipo) && libre('tipo')) d.tipo = x.tipo;
     if (['si', 'no', 'no_dice'].includes(x.mascotas) && libre('mascotas')) d.mascotas = x.mascotas;
-    if (d.prec !== 'exacta' && d.colonia !== antes.colonia) {
-      const c = ubicarColonia(d.colonia, typeof x.alcaldia === 'string' ? x.alcaldia : '');
-      if (c) enColonia(d, c); else { d.lat = d.lon = null; d.alcaldia = ''; }  /* sin coincidencia clara: que la elija de la lista */
+    if (d.colonia !== antes.colonia && !(d.lat && d.lat !== antes.lat)) {  /* si la persona eligió colonia mientras leía, se respeta */
+      const [nc, alcTxt] = limpiarColonia(d.colonia), c = ubicarColonia(nc, typeof x.alcaldia === 'string' && x.alcaldia ? x.alcaldia : alcTxt);
+      /* un punto marcado a mano se conserva si la colonia nueva queda cerca; si queda lejos, se mueve */
+      const lejos = d.prec === 'exacta' && d.lat && (!c || hav({lat: d.lat, lon: d.lon}, c) > 1000);
+      if (d.prec !== 'exacta' || lejos) { if (c) enColonia(d, c); else { d.colonia = nc; d.lat = d.lon = null; d.alcaldia = ''; d.prec = 'colonia'; } }  /* sin coincidencia clara: que la elija de la lista */
     }
     if (S.assets) for (const bl of imgs) d.nuevas.push({blob: bl, url: URL.createObjectURL(bl)});
-    pintarAgregar(); toast(d.lat ? 'Listo. Revisa los datos antes de guardar.' : 'Listo. Elige la colonia de la lista para ubicarlo.');
-  } catch (e) { if (!S.draft) return; if (b) { b.disabled = false; b.textContent = 'Llenar con Claude'; } toast(e && e.code === 'not_granted' ? 'Hace falta aceptar el permiso de IA de la página.' : 'No pude leer el anuncio. Llénalo a mano.'); }
+    if (S.picking) return toast('Claude llenó el anuncio; lo verás al tocar Listo.');  /* finPunto() pinta el formulario */
+    const act = document.activeElement, fid = act && act.id, ss = act && act.selectionStart, se = act && act.selectionEnd;
+    pintarAgregar(); const el = fid && $('#' + fid); if (el && el.focus) { el.focus(); try { el.setSelectionRange(ss, se); } catch (_) {} }
+    if (!d.lat && d.colonia) $('#d-col').dispatchEvent(new Event('input', {bubbles: true}));  /* muestra la lista de colonias para elegir */
+    toast(d.lat ? 'Listo. Revisa los datos antes de guardar.' : 'Listo. Elige la colonia de la lista para ubicarlo.');
+  } catch (e) { if (S.draft !== draft) return; if (b) { b.disabled = false; b.textContent = 'Llenar con Claude'; } toast(e && e.code === 'not_granted' ? 'Hace falta aceptar el permiso de IA de la página.' : 'No pude leer el anuncio. Llénalo a mano.'); }
 }
 function elegirPunto(){
+  if (S.picking) return;
   leerDraft(); const d = S.draft; if (!d) return; mroot.innerHTML = ''; S.picking = true; document.body.classList.add('pick'); SUG = []; pintarSug();
   const ui = $('#ui'); const bar = document.createElement('div'); bar.className = 'pickbar'; bar.innerHTML = `<span>Mueve el mapa hasta que el pin quede sobre la vivienda.</span><button class="btn" data-a="pick-no">Cancelar</button><button class="btn main" data-a="pick-ok" style="grid-column:auto">Listo</button>`;
   const cr = document.createElement('div'); cr.className = 'cross'; cr.innerHTML = ic('📍'); ui.appendChild(bar); document.body.appendChild(cr);
@@ -684,15 +704,18 @@ function sugerencias(q){
   for (const c of S.lug.colonias) if (norm(c.n).includes(n)) add('col', c.n, c.a, c);
   for (const a of todos()) if (norm(a.titulo).includes(n)) add('anu', a.titulo, money(a.precio), a);
   const rank = x => (norm(x.l) === n ? -.5 : norm(x.l).startsWith(n) ? 0 : 1) + ({alc: 0, est: .2, col: .4, anu: .6})[x.t] + (x.t === 'est' && x.d.fuera ? 1.5 : 0);
-  return out.sort((a, b) => rank(a) - rank(b)).slice(0, 12);
+  const cuenta = {}; for (const a of todos()) { const k = norm(a.colonia) + '|' + a.alcaldia; cuenta[k] = (cuenta[k] || 0) + 1; }
+  const nAnu = x => x.t === 'col' ? cuenta[norm(x.l) + '|' + x.sub] || 0 : 0;  /* entre homónimos, primero la colonia con rentas */
+  return out.sort((a, b) => rank(a) - rank(b) || nAnu(b) - nAnu(a)).slice(0, 12);
 }
 let SUG = [], sugI = -1;
-function pintarSug(){ const el = $('#sug'); el.hidden = !SUG.length; document.querySelector('.top').classList.toggle('abierta', SUG.length > 0); el.innerHTML = SUG.map((s, i) => `<button role="option" class="${i === sugI ? 'on' : ''}" data-a="sug" data-i="${i}">${ic(s.t === 'alc' ? '🗺' : s.t === 'est' ? (s.sub === 'Cablebús' ? '🚡' : s.sub === 'Tren' ? '🚆' : '🚇') : s.t === 'anu' ? '🏠' : '📍')}<span>${esc(s.l)}</span><small>${esc(s.sub)}</small></button>`).join(''); }
+function pintarSug(){ const el = $('#sug'); el.hidden = !SUG.length; document.querySelector('.top').classList.toggle('abierta', SUG.length > 0); el.innerHTML = SUG.map((s, i) => `<button role="option" class="${i === sugI ? 'on' : ''}" data-a="sug" data-i="${i}">${ic(s.t === 'alc' ? '🗺' : s.t === 'est' ? (s.sub === 'Cablebús' ? '🚡' : s.sub === 'Tren' ? '🚆' : '🚇') : s.t === 'anu' ? '🏠' : '📍')}<span>${esc(s.l)}</span><small>${esc(s.sub)}</small></button>`).join(''); const on = el.querySelector('.on'); if (on) on.scrollIntoView({block: 'nearest'}); }
 function irA(s){
   $('#q').value = s.l; SUG = []; pintarSug(); $('#q').blur();
+  if (s.t !== 'anu' && S.vista === 'detalle') { S.antes = null; cerrarDetalle(); }  /* buscar un lugar sustituye a la vista anterior */
   if (window.innerWidth < 900 && s.t !== 'anu') setSheet('peek');
   if (s.t === 'alc') { const a = s.d, b = a.p.flat(2).reduce((m, [x, y]) => [Math.min(m[0], x), Math.min(m[1], y), Math.max(m[2], x), Math.max(m[3], y)], [180, 90, -180, -90]); map.fitBounds([[b[0], b[1]], [b[2], b[3]]], {padding: pad()});
-    if (!S.f.alcaldias.includes(a.n)) { S.f.alcaldias = [a.n]; guardarF(); render(); toast('Filtrando por ' + a.n + '. Quítalo en Zona.'); } }
+    if (!S.f.alcaldias.includes(a.n)) { S.f.alcaldias = [a.n]; guardarF(); S._k = null; render(); toast('Filtrando por ' + a.n + '. Quítalo en Zona.'); } }
   else if (s.t === 'anu') abrir(s.d.id);
   else map.flyTo({center: [s.d.lon, s.d.lat], zoom: s.t === 'est' ? 15 : 14.6, padding: pad()});
 }
@@ -756,7 +779,7 @@ document.addEventListener('keydown', e => {
 document.addEventListener('input', e => {
   if (e.target.id === 'q') { SUG = sugerencias(e.target.value); sugI = -1; pintarSug(); }
   else if ((e.target.id === 'fmin' || e.target.id === 'fmax') && FT) { leerPrecio(); const h = $('#histo'); if (h) h.innerHTML = histo(FT); const b = document.querySelector('[data-a="ft-ok"]'); if (b) { const n = todos().filter(a => pasa(a, FT)).length; b.textContent = 'Ver ' + n + ' renta' + (n === 1 ? '' : 's'); } }
-  else if (e.target.id === 'd-col') { const n = norm(e.target.value), el = $('#d-sug'); if (n.length < 2) { el.hidden = true; return; } const r = S.lug.colonias.map((c, i) => [c, i]).filter(([c]) => norm(c.n).includes(n)).sort((a, b) => (norm(a[0].n).startsWith(n) ? 0 : 1) - (norm(b[0].n).startsWith(n) ? 0 : 1)).slice(0, 8); el.hidden = !r.length; el.innerHTML = r.map(([c, i]) => `<button data-a="d-col-op" data-i="${i}">${ic('📍')}<span>${esc(c.n)}</span><small>${esc(c.a)}</small></button>`).join(''); }
+  else if (e.target.id === 'd-col') { const n = norm(limpiarColonia(e.target.value)[0]), el = $('#d-sug'); if (n.length < 2) { el.hidden = true; return; } const r = S.lug.colonias.map((c, i) => [c, i]).filter(([c]) => norm(c.n).includes(n)).sort((a, b) => (norm(a[0].n).startsWith(n) ? 0 : 1) - (norm(b[0].n).startsWith(n) ? 0 : 1)).slice(0, 8); el.hidden = !r.length; el.innerHTML = r.map(([c, i]) => `<button data-a="d-col-op" data-i="${i}">${ic('📍')}<span>${esc(c.n)}</span><small>${esc(c.a)}</small></button>`).join(''); }
 });
 let notaT;
 document.addEventListener('change', async e => {
@@ -795,7 +818,7 @@ async function boot(){
   map = new maplibregl.Map({container: 'map', style, center: [-99.165, 19.395], zoom: 11.6, minZoom: 9.5, maxZoom: 18.5, maxBounds: [[-99.75, 18.85], [-98.55, 19.85]], attributionControl: {compact: true}, dragRotate: true, pitchWithRotate: true});
   map.addControl(new maplibregl.NavigationControl({showCompass: true, visualizePitch: true}), 'bottom-right');
   map.on('load', () => { capas(); mapReady = true; try { render(); } finally { const l = $('#loading'); if (l) { l.style.opacity = 0; setTimeout(() => l.remove(), 350); } } });
-  let mt; map.on('moveend', e => { if (e.restaurar) return; clearTimeout(mt); mt = setTimeout(() => { if (S.vista === 'lista' && S.visible) lista(); }, 120); });
+  map.on('moveend', e => { if (e.restaurar || S.restaurando) return; clearTimeout(S.mt); S.mt = setTimeout(() => { if (S.vista === 'lista' && S.visible) lista(); }, 120); });
   S.estado = ls.get('bn.estado') || {};
   await cargarAnuncios();
   const c = window.claude; if (!c || !c.use) return;
@@ -805,10 +828,10 @@ async function boot(){
   const db = await c.use('db').catch(() => null); if (!db) return;
   S.db = db;
   /* un documento mal formado se salta; nunca tumba la app */
-  db.collection('mios').onSnapshot(s => { S.mios = s.docs.map(d => { try { const v = d.data() || {}; return prep({...v, id: 'm-' + d.id, docId: d.id}, true); } catch (_) { return null; } }).filter(Boolean); render(); }, () => {});
+  db.collection('mios').onSnapshot(s => { S.mios = s.docs.map(d => { try { const v = d.data() || {}; return prep({...v, id: 'm-' + d.id, docId: d.id}, true); } catch (_) { return null; } }).filter(Boolean); if (document.activeElement && document.activeElement.id === 'nota') { chips(); pintarMapa(); } else render(); }, () => {});
   db.collection('estado').onSnapshot(s => { const m = {}; s.docs.forEach(d => { const v = d.data() || {}; if (typeof v.id === 'string') m[v.id] = {fav: !!v.fav, st: typeof v.st === 'string' ? v.st : '', nota: typeof v.nota === 'string' ? v.nota : '', oculto: !!v.oculto, t: Number(v.t) || 0}; }); S.estado = mezclar(m);
     /* si se está escribiendo una nota, no se reconstruye el detalle (se perdería el texto y el teclado) */
-    if (document.activeElement && document.activeElement.id === 'nota') { chips(); pintarMapa(); } else render(); }, () => {});
+    if (document.activeElement && document.activeElement.id === 'nota') { chips(); pintarMapa(); botonesDetalle(); } else render(); }, () => {});
   setTimeout(subirPendientes, 3000);
 }
 boot();
