@@ -126,7 +126,7 @@ button{cursor:pointer;border:0;background:none;padding:0}
 .dwhere b{color:var(--pin-ink);font-weight:500}
 .pills{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;margin:14px calc(-1 * var(--gr)) 4px calc(-1 * var(--gl));padding:2px var(--gr) 6px var(--gl)}
 .pills::-webkit-scrollbar{display:none}
-.pill{flex:none;display:inline-flex;align-items:center;gap:7px;height:38px;padding:0 15px;border-radius:19px;border:1px solid var(--line-2);background:var(--surface);color:var(--blue-ink);font:500 14px/1 var(--body);text-decoration:none;white-space:nowrap}
+.pill{flex:none;width:auto;display:inline-flex;align-items:center;gap:7px;height:38px;padding:0 15px;border-radius:19px;border:1px solid var(--line-2);background:var(--surface);color:var(--blue-ink);font:500 14px/1 var(--body);text-decoration:none;white-space:nowrap}
 .pill.azul{background:var(--blue);border-color:var(--blue);color:#fff}
 .pill[aria-pressed="true"]{background:var(--blue-soft);border-color:var(--blue-line)}
 .pill.fav[aria-pressed="true"]{color:var(--heart);background:#fdecf1;border-color:#f5c2d1}
@@ -214,6 +214,11 @@ body[data-sheet="mid"] #add,body[data-sheet="full"] #add{bottom:calc(18px + var(
 .loading .oj{width:64px;height:64px}
 .maplibregl-ctrl-attrib{font-size:10.5px}
 .maplibregl-ctrl-bottom-right{bottom:calc(var(--peek,150px) - 4px)}
+@media (max-width:899.98px){ /* en peek, arriba del botón Agregar; en mid, justo arriba de la hoja */
+body:not(.det) .maplibregl-ctrl-bottom-right{bottom:calc(var(--peek,150px) + 66px + var(--bot))}
+body[data-sheet="mid"] .maplibregl-ctrl-bottom-right{bottom:calc((100% - 66px - var(--top)) * .52 - 4px)}
+body[data-sheet="mid"] .maplibregl-ctrl-group{display:none}
+}
 .maplibregl-ctrl-group{border-radius:22px!important;box-shadow:var(--shadow-2)!important;overflow:hidden}
 
 @media (min-width:900px){
@@ -225,7 +230,7 @@ body[data-sheet="mid"] #add,body[data-sheet="full"] #add{bottom:calc(18px + var(
   .pills{margin-left:-18px;margin-right:-18px;padding-left:18px;padding-right:18px}
   #add{bottom:24px;right:24px}
   .mapbtns{top:20px;right:20px}
-  .maplibregl-ctrl-bottom-right{bottom:0}
+  .maplibregl-ctrl-bottom-right{bottom:84px}
   #toast{top:24px}
 }
 @media (prefers-reduced-motion:reduce){ #sheet{transition:none} .pinsel .in,.pinsel .pulso{animation:none} }
@@ -236,7 +241,7 @@ body[data-sheet="mid"] #add,body[data-sheet="full"] #add{bottom:calc(18px + var(
   <div class="top">
     <div class="search">
       <span class="brand" aria-hidden="true" data-e="🏘"></span>
-      <input id="q" type="search" autocomplete="off" placeholder="Busca colonia, alcaldía o metro" aria-label="Buscar colonia, alcaldía o estación de metro">
+      <input id="q" type="search" autocomplete="off" placeholder="Colonia, alcaldía o metro" aria-label="Buscar colonia, alcaldía o estación de metro">
       <button class="iconbtn" data-a="filtros" aria-label="Filtros" style="position:relative"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2.4"/><circle cx="10" cy="17" r="2.4"/></svg><span class="badge" id="nf" hidden></span></button>
       <div class="sug" id="sug" hidden role="listbox"></div>
     </div>
@@ -556,7 +561,7 @@ const CAMINABLE = new Set(['minor', 'service', 'track', 'path', 'primary', 'seco
 const RUTAS = {};
 async function rutaA(a){
   const e = a.est; if (!e || e.d > 2600) return null;
-  const key = a.id + '|' + e.n; if (RUTAS[key] !== undefined) return RUTAS[key];
+  const key = a.id + '|' + a.lon + ',' + a.lat + '|' + e.n; if (RUTAS[key] !== undefined) return RUTAS[key];
   return RUTAS[key] = (async () => {
     const lon0 = a.lon, lat0 = a.lat, kx = 111320 * Math.cos(lat0 * Math.PI / 180), ky = 110574;
     const loc = ([lo, la]) => [(lo - lon0) * kx, (la - lat0) * ky], geo = ([x, y]) => [lon0 + x / kx, lat0 + y / ky];
@@ -567,11 +572,12 @@ async function rutaA(a){
     const lo0 = Math.min(lon0, est.lon) - M / kx, lo1 = Math.max(lon0, est.lon) + M / kx, la0 = Math.min(lat0, est.lat) - M / ky, la1 = Math.max(lat0, est.lat) + M / ky;
     const [x0, y0] = t(lo0, la1), [x1, y1] = t(lo1, la0); if ((x1 - x0 + 1) * (y1 - y0 + 1) > 9) return null;
     const segs = [];  /* [x1, y1, x2, y2, línea] */
-    let li = 0;
+    let li = 0, falta = false;
     for (let x = x0; x <= x1; x++) for (let y = y0; y <= y1; y++) {
-      const pk = await loadPack(packFor(14, x, y)), s = pk[`14/${x}/${y}`]; if (!s) continue;
+      const kp = packFor(14, x, y), pk = await loadPack(kp), s = pk[`14/${x}/${y}`]; if (!packs[kp]) falta = true; if (!s) continue;
       for (const l of leerCalles(b64(s), 14, x, y)) { const q = l.map(loc); li++; for (let i = 1; i < q.length; i++) if (q[i][0] !== q[i - 1][0] || q[i][1] !== q[i - 1][1]) segs.push([q[i - 1][0], q[i - 1][1], q[i][0], q[i][1], li]); }
     }
+    if (falta) { delete RUTAS[key]; return null; }  /* sin red: se vuelve a intentar la próxima vez */
     if (segs.length < 2 || segs.length > 60000) return null;
     /* rejilla de 40 m para buscar cruces y extremos cercanos */
     const C = 40, grid = new Map(), cel = (x, y) => Math.floor(x / C) + ',' + Math.floor(y / C);
@@ -730,7 +736,8 @@ function capas(){
   map.on('click', 'r-cl', e => { if (S.picking) return; const f = e.features[0]; map.getSource('r').getClusterExpansionZoom(f.properties.cluster_id).then(z => map.easeTo({center: f.geometry.coordinates, zoom: z + .3})).catch(() => {}); });
   map.on('click', 'r-p', e => { if (S.picking) return; abrir(e.features[0].properties.id, false); });
   for (const l of ['r-cl', 'r-p']) { map.on('mouseenter', l, () => map.getCanvas().style.cursor = 'pointer'); map.on('mouseleave', l, () => map.getCanvas().style.cursor = ''); }
-  map.on('click', e => { if (S.picking) return; const hit = map.queryRenderedFeatures(e.point, {layers: ['r-p', 'r-cl']}); if (!hit.length && S.vista === 'detalle') { const s = S.antes && S.antes.s; S.antes = null; cerrarDetalle(); if (s && window.innerWidth < 900) setSheet(s); } });
+  map.on('click', e => { if (S.picking) return; const hit = map.queryRenderedFeatures(e.point, {layers: ['r-p', 'r-cl']}); const enPin = pinSel && (() => { const r = pinSel.getElement().firstElementChild.getBoundingClientRect(), c = map.getCanvas().getBoundingClientRect(), x = c.left + e.point.x, y = c.top + e.point.y; return x > r.left - 8 && x < r.right + 8 && y > r.top - 8 && y < r.bottom + 8; })();
+    if (!hit.length && !enPin && S.vista === 'detalle') { const s = S.antes && S.antes.s; S.antes = null; cerrarDetalle(); if (s && window.innerWidth < 900) setSheet(s); } });
 }
 function pintarMapa(){
   if (!mapReady) return;
@@ -801,9 +808,9 @@ function arriba(){ const sc = document.querySelector('#sheetin .scroll'); sheet.
 
 /* ============ detalle ============ */
 const reducido = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
-const padDetalle = () => window.innerWidth >= 900 ? {left: 480, top: 80, right: 80, bottom: 80} : {top: 150, bottom: Math.round(window.innerHeight * .5) + 30, left: 46, right: 46};
+const padDetalle = () => window.innerWidth >= 900 ? {left: 480, top: 80, right: 80, bottom: 80} : {top: 150, bottom: Math.round(window.innerHeight * .5) + 30, left: 30, right: 70};
 const azimut = (a, b) => Math.atan2((b.lon - a.lon) * Math.cos(a.lat * Math.PI / 180), b.lat - a.lat) * 180 / Math.PI;
-function vuela(c){ if (reducido()) map.jumpTo(c); else map.flyTo({...c, duration: 1900, curve: 1.25, essential: true}); }
+function vuela(c){ if (reducido()) map.easeTo({...c, duration: 0}); else map.flyTo({...c, duration: 1900, curve: 1.25, essential: true}); }
 /* cámara de la ficha: si hay ruta, la renta abajo y la estación arriba, inclinada; si no, de cerca alrededor del pin */
 function camaraDe(a, r){
   if (r) { const c = encuadre(r.coords, azimut(a, r.est), 56); if (c) return c; }
@@ -824,11 +831,12 @@ function encuadre(pts, bearing, pitch){
     for (let i = 0; i < 12; i++) {
       map.jumpTo({center, zoom: z, pitch, bearing});
       const ps = pts.map(p => map.project(p)), xs = ps.map(p => p.x), ys = ps.map(p => p.y);
+      xs.push(ps[0].x - 40, ps[0].x + 40); ys.push(ps[0].y - 92);  /* el pin grande y su precio, encima de la renta */
       const x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys);
       center = map.unproject([W / 2 + (x0 + x1) / 2 - (pad.left + aw / 2), H / 2 + (y0 + y1) / 2 - (pad.top + ah / 2)]);
       const f = Math.min(aw / Math.max(1, x1 - x0), ah / Math.max(1, y1 - y0));
       if (i && f >= 1 && f < 1.2) break;
-      const nz = Math.max(14.8, Math.min(17.2, z + Math.log2(f) * .85)); if (Math.abs(nz - z) < .02 && f >= 1) break; z = nz;
+      const nz = Math.max(14.2, Math.min(17.2, z + Math.log2(f) * .85)); if (Math.abs(nz - z) < .02 && f >= 1) break; z = nz;
     }
   } finally { map.jumpTo(orig); S.restaurando = false; }
   return {center, zoom: z, pitch, bearing};
@@ -844,7 +852,9 @@ async function abrir(id, volar){
   if (tok !== S.tok || S.sel !== id) return;
   const lista = rr => { if (tok !== S.tok || S.sel !== id) return; S.ruta = rr || null; S.rutaEst = rr ? 'ok' : 'no'; pintarRuta(S.ruta); const el = $('#ruta-ficha'); if (el) el.innerHTML = rutaHTML(a); };
   void volar; vuela(camaraDe(a, r && r !== 'tarde' ? r : null));
-  if (r === 'tarde') pr.then(lista); else lista(r);
+  if (r === 'tarde') { let movio = false; const nota = ev => { if (ev.originalEvent) movio = true; }; map.on('movestart', nota);
+    pr.then(rr => { map.off('movestart', nota); lista(rr); if (rr && !movio && tok === S.tok && S.sel === id) vuela(camaraDe(a, rr)); }); }
+  else lista(r);
 }
 function limpiarSel(){ marcarSel(null); marcarZona(null); pintarRuta(null); S.ruta = null; S.tok = (S.tok || 0) + 1; }
 function cerrarDetalle(){
@@ -862,7 +872,7 @@ function rutaHTML(a){
   return `<div class="ri">${svg('walk')}</div><div>${S.rutaDe === a.id && S.rutaEst === 'calc' ? '<span class="dmeta">Calculando la ruta a pie…</span><br>' : ''}${recta}</div>`;
 }
 function detalle(){
-  const a = todos().find(x => x.id === S.sel); if (!a) { S.vista = 'lista'; limpiarSel(); return lista(); }
+  const a = todos().find(x => x.id === S.sel); if (!a) { S.vista = 'lista'; S.sel = null; document.body.classList.remove('det'); limpiarSel(); return lista(); }
   const e = est(a.id), fotos = (a.fotos || []).filter(Boolean), F = FUENTES[a.fuente];
   const facts = [[TIPOS[a.tipo][0], 'Tipo'], [a.recamaras, 'Recámaras'], [a.banos, 'Baños'], [a.m2 && a.m2 + ' m²', 'Superficie'], [a.estacionamientos == null ? null : (a.estacionamientos || 'No'), 'Estacionamiento'], [a.amueblado == null ? null : a.amueblado ? 'Sí' : 'No', 'Amueblado'], [a.m2 && a.precio ? money(a.precio / a.m2) : null, 'Por m²']].filter(f => f[0] != null && f[0] !== '' && f[0] !== 0);
   const dir = `https://www.google.com/maps/dir/?api=1&destination=${a.lat},${a.lon}`;
@@ -898,7 +908,7 @@ function detalle(){
 
 /* ============ hoja inferior arrastrable (teléfono) ============ */
 const sheet = $('#sheet');
-function setSheet(s){ sheet.dataset.s = s; document.body.dataset.sheet = s; }
+function setSheet(s){ sheet.dataset.s = s; document.body.dataset.sheet = s; if (s === 'mid' && innerWidth < 900) document.querySelector('.maplibregl-ctrl-attrib')?.classList.remove('maplibregl-compact-show'); }
 sheet.addEventListener('scroll', e => { if (e.target.classList && e.target.classList.contains('scroll')) arriba(); }, true);
 (function(){ /* el arrastre empieza solo cuando el dedo se mueve: así los toques en botones siguen funcionando */
   let st = null;
@@ -1144,7 +1154,7 @@ function irA(s){
   if (s.t === 'alc') { const a = s.d, b = a.p.flat(2).reduce((m, [x, y]) => [Math.min(m[0], x), Math.min(m[1], y), Math.max(m[2], x), Math.max(m[3], y)], [180, 90, -180, -90]); map.fitBounds([[b[0], b[1]], [b[2], b[3]]], {padding: pad()});
     if (!S.f.alcaldias.includes(a.n)) { S.f.alcaldias = [a.n]; guardarF(); S._k = null; render(); toast('Filtrando por ' + a.n + '. Quítalo en Zona.'); } }
   else if (s.t === 'anu') abrir(s.d.id);
-  else map.flyTo({center: [s.d.lon, s.d.lat], zoom: s.t === 'est' ? 15.6 : 15, pitch: Math.max(map.getPitch(), 50), padding: pad(), essential: true});
+  else map.flyTo({center: [s.d.lon, s.d.lat], zoom: s.t === 'est' ? 15.6 : 15, pitch: Math.max(map.getPitch(), 50), offset: (q => [(q.left - q.right) / 2, (q.top - q.bottom) / 2])(pad()), essential: true});
 }
 const pad = () => window.innerWidth >= 900 ? {left: 460, top: 40, right: 40, bottom: 40} : {top: 130, bottom: 170, left: 20, right: 20};
 
@@ -1181,7 +1191,7 @@ document.addEventListener('click', async e => {
   else if (a === 'hbin') { const i = Number(el.dataset.i); FT.min = i * 5000 || null; FT.max = i >= 16 ? null : (i + 1) * 5000; const sc = document.querySelector('.modal').scrollTop; pintarFiltros(); document.querySelector('.modal').scrollTop = sc; }
   else if (a === 'preset') { FT.min = Number(el.dataset.min) || null; FT.max = Number(el.dataset.max) || null; const sc = document.querySelector('.modal').scrollTop; pintarFiltros(); document.querySelector('.modal').scrollTop = sc; }
   else if (a === 'ft-limpiar') { FT = DEF(); pintarFiltros(); }
-  else if (a === 'ft-ok') { leerPrecio(); if (FT.min && FT.max && FT.min > FT.max) [FT.min, FT.max] = [FT.max, FT.min]; S.f = FT; FT = null; guardarF(); S.limite = 40; cerrarModal(); S.vista = 'lista'; S._k = null; render();
+  else if (a === 'ft-ok') { leerPrecio(); if (FT.min && FT.max && FT.min > FT.max) [FT.min, FT.max] = [FT.max, FT.min]; S.f = FT; FT = null; guardarF(); S.limite = 40; cerrarModal(); S.vista = 'lista'; S.sel = null; S.antes = null; S._k = null; render();
     if (S.f.alcaldias.length && mapReady) { const ps = S.lug.alcaldias.filter(x => S.f.alcaldias.includes(x.n)).flatMap(x => x.p.flat(2)); const b = ps.reduce((m, [x, y]) => [Math.min(m[0], x), Math.min(m[1], y), Math.max(m[2], x), Math.max(m[3], y)], [180, 90, -180, -90]); map.fitBounds([[b[0], b[1]], [b[2], b[3]]], {padding: pad()}); } }
   else if (a === 'plataformas') abrirPlataformas();
   else if (a === '3d') { const on = el.getAttribute('aria-pressed') !== 'true'; el.setAttribute('aria-pressed', on); map.easeTo({pitch: on ? 60 : 0, bearing: on ? map.getBearing() - 25 : 0, zoom: on ? Math.max(map.getZoom(), 16.2) : map.getZoom(), duration: reducido() ? 0 : 1400}); }
