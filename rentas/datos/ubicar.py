@@ -60,13 +60,15 @@ def alc_norm(s):
     return None
 
 COL = {}
-for c in lug['colonias']: COL.setdefault(norm(c['n']), []).append(c)
+COL_SIN = {}
+for c in lug['colonias']: COL.setdefault(norm(c['n']), []).append(c); COL_SIN.setdefault(norm(c['n']).replace(' ', ''), []).append(c)
 def colonia(nombre, alc):
     n = re.sub(r'\b(i|ii|iii|iv|v|1a|2a|3a|1|2|3|primera|segunda|tercera)\b( seccion| secc)?$|\bseccion\b|\bsecc\b', '', norm(nombre)).strip() if norm(nombre) not in COL else norm(nombre)
     if not n: return None
     cands = COL.get(n, [])
     if not cands:  # variantes: "narvarte" → "narvarte poniente"; "del valle centro" → "del valle"
         cands = [c for k, v in COL.items() for c in v if k.startswith(n + ' ') or n.startswith(k + ' ') and len(k) > 5]
+    if not cands: cands = COL_SIN.get(n.replace(' ', ''), [])  # "Nochebuena" = "Noche Buena"
     if alc: cands = [c for c in cands if c['a'] == alc]  # nunca un homónimo de otra alcaldía
     return cands[0] if cands else None
 
