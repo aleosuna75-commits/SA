@@ -1,6 +1,6 @@
 {
  "torneo": "Apertura 2026",
- "generado_utc": "2026-11-16T07:21:34Z",
+ "generado_utc": "2026-11-17T14:58:24Z",
  "fuente": "ESPN scoreboard mex.1",
  "partidos": [
   {
@@ -21,29 +21,7 @@
     "ml_v": 2.65,
     "total_linea": 2.5,
     "over": 1.645,
-    "under": 2.1,
-    "proveedor": "DraftKings"
-   }
-  },
-  {
-   "id": "401877052",
-   "fecha_utc": "2026-11-21T03:00Z",
-   "fecha_local": "2026-11-20",
-   "hora_local": "21:00",
-   "fase": "regular",
-   "pierna": "",
-   "estado": "programado",
-   "local": "Tijuana",
-   "visitante": "Atlante",
-   "estadio": "Estadio Caliente",
-   "ciudad": "Tijuana",
-   "momios": {
-    "ml_l": 1.588,
-    "ml_e": 4.2,
-    "ml_v": 4.7,
-    "total_linea": 2.5,
-    "over": 1.606,
-    "under": 2.15,
+    "under": 2.05,
     "proveedor": "DraftKings"
    }
   },
@@ -70,6 +48,28 @@
    }
   },
   {
+   "id": "401877052",
+   "fecha_utc": "2026-11-21T03:10Z",
+   "fecha_local": "2026-11-20",
+   "hora_local": "21:10",
+   "fase": "regular",
+   "pierna": "",
+   "estado": "programado",
+   "local": "Tijuana",
+   "visitante": "Atlante",
+   "estadio": "Estadio Caliente",
+   "ciudad": "Tijuana",
+   "momios": {
+    "ml_l": 1.606,
+    "ml_e": 4.1,
+    "ml_v": 4.6,
+    "total_linea": 2.5,
+    "over": 1.606,
+    "under": 2.1,
+    "proveedor": "DraftKings"
+   }
+  },
+  {
    "id": "401877050",
    "fecha_utc": "2026-11-21T22:50Z",
    "fecha_local": "2026-11-21",
@@ -83,11 +83,11 @@
    "ciudad": "Pachuca",
    "momios": {
     "ml_l": 2.7,
-    "ml_e": 3.9,
+    "ml_e": 3.95,
     "ml_v": 2.2,
     "total_linea": 3.5,
     "over": 2.05,
-    "under": 1.645,
+    "under": 1.667,
     "proveedor": "DraftKings"
    }
   },
@@ -170,20 +170,20 @@
    "estadio": "Estadio Akron",
    "ciudad": "Guadalajara",
    "momios": {
-    "ml_l": 2.35,
+    "ml_l": 2.15,
     "ml_e": 4.0,
-    "ml_v": 2.45,
+    "ml_v": 2.7,
     "total_linea": 3.5,
-    "over": 2.3,
-    "under": 1.526,
+    "over": 2.25,
+    "under": 1.541,
     "proveedor": "DraftKings"
    }
   },
   {
    "id": "401877046",
-   "fecha_utc": "2026-11-23T01:00Z",
+   "fecha_utc": "2026-11-23T01:10Z",
    "fecha_local": "2026-11-22",
-   "hora_local": "19:00",
+   "hora_local": "19:10",
    "fase": "regular",
    "pierna": "",
    "estado": "programado",
@@ -192,9 +192,9 @@
    "estadio": "Estadio Corregidora",
    "ciudad": "Santiago de Querétaro",
    "momios": {
-    "ml_l": 1.8,
-    "ml_e": 4.1,
-    "ml_v": 3.5,
+    "ml_l": 1.952,
+    "ml_e": 3.8,
+    "ml_v": 3.2,
     "total_linea": 2.5,
     "over": 1.541,
     "under": 2.25,

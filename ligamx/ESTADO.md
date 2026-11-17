@@ -213,3 +213,4 @@ en la base quedaron aceptadas.
   (Jornada 17). 110 pruebas de producción y 254 + 254 de página en verde. V16 publicada; `vivo/actual` en versión 22.
   Lección: los puntos de control automáticos a media revisión pueden llevarse archivos temporales (`web/.gitignore`
   ya ignora `_rev_*.html` y `_variante_*.html`).
+- 2026-11-17 15:00 UTC · Corrida diaria (la tarea llegó 7 h 38 min tarde: programada 07:20 UTC, entregada 14:58): sin partidos nuevos; Tijuana–Atlante y Querétaro–Necaxa se recorrieron 10 min; V17 publicada, `vivo/actual` en versión 23. Mañana (≤ 3 días para la Jornada 17) toca actualizar `config/actualidad.json` para los 18 equipos y programar los despertares del vivo del viernes.
