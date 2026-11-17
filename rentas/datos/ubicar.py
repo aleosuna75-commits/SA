@@ -27,7 +27,9 @@ def hav(a, b):
     return 2 * 6371000 * math.asin(math.sqrt(h))
 
 FUENTES = {'inmuebles24': 'inmuebles24.com', 'vivanuncios': 'vivanuncios.com.mx', 'lamudi': 'lamudi.com.mx', 'propiedades': 'propiedades.com',
-           'mercadolibre': 'mercadolibre.com.mx', 'pincali': 'pincali.com', 'trovit': 'trovit.com.mx', 'mitula': 'mitula.mx', 'easybroker': 'easybroker.com'}
+           'mercadolibre': 'mercadolibre.com.mx', 'pincali': 'pincali.com', 'trovit': 'trovit.com.mx', 'mitula': 'mitula.mx', 'easybroker': 'easybroker.com',
+           'icasas': 'icasas.mx', 'homie': 'homie.mx', 'casasyterrenos': 'casasyterrenos.com', 'metroscubicos': 'metroscubicos.com', 'century21': 'century21mexico.com',
+           'remax': 'remax.com.mx', 'segundamano': 'segundamano.mx', 'dadaroom': 'dadaroom.com', 'compartodepa': 'compartodepa.com.mx', 'roomgo': 'roomgo.com.mx'}
 def fuente(url, txt):
     try: h = urllib.parse.urlparse(url).hostname or ''
     except Exception: h = ''

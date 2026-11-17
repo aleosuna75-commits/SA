@@ -13,6 +13,16 @@ const FUENTES = {
   mitula: {n: 'Mitula', d: ['mitula.mx'], c: '#d8453a', l: 'M'},
   easybroker: {n: 'EasyBroker', d: ['easybroker.com'], c: '#2f6fe0', l: 'EB'},
   facebook: {n: 'Facebook Marketplace', d: ['facebook.com', 'fb.com', 'fb.me'], c: '#1877f2', l: 'f'},
+  icasas: {n: 'icasas', d: ['icasas.mx'], c: '#d8352a', l: 'ic'},
+  homie: {n: 'Homie', d: ['homie.mx'], c: '#5b3df5', l: 'H'},
+  casasyterrenos: {n: 'Casas y Terrenos', d: ['casasyterrenos.com'], c: '#d96a00', l: 'CyT'},
+  metroscubicos: {n: 'Metros Cúbicos', d: ['metroscubicos.com'], c: '#e3500e', l: 'm³'},
+  century21: {n: 'Century 21', d: ['century21mexico.com'], c: '#7d6b3d', l: 'C21'},
+  remax: {n: 'RE/MAX', d: ['remax.com.mx'], c: '#c8102e', l: 'RE'},
+  segundamano: {n: 'Segundamano', d: ['segundamano.mx'], c: '#3d8b37', l: '2m'},
+  dadaroom: {n: 'Dada Room', d: ['dadaroom.com'], c: '#ef5b5b', l: 'DR'},
+  compartodepa: {n: 'CompartoDepa', d: ['compartodepa.com.mx'], c: '#2b7de9', l: 'CD'},
+  roomgo: {n: 'Roomgo', d: ['roomgo.com.mx'], c: '#0aa5a5', l: 'Rg'},
 };
 const TIPO_TXT = {departamento: 'departamento', casa: 'casa', cuarto: 'cuarto', loft: 'loft', estudio: 'estudio', otro: ''};
 function palabras(f, z){
@@ -37,7 +47,14 @@ function nota(f, z, hechos){
 const I24_ALC = {'Gustavo A. Madero': 'gustavo-a.-madero', 'Cuauhtémoc': 'cuauhtemoc-ciudad-de-cuauhtemoc'};
 const VIV_ID = {'Benito Juárez': ['benito-juarez', 10267], 'Coyoacán': ['coyoacan', 10268], 'Cuauhtémoc': ['cuauhtemoc-df', 10270], 'Iztacalco': ['iztacalco', 10272]};
 const PROP_ALC = {'Benito Juárez': 'benito-juarez-df', 'Coyoacán': 'coyoacan', 'Xochimilco': 'xochimilco', 'Iztapalapa': 'iztapalapa'};
+const IC_ALC = {'Álvaro Obregón': [264, 'alvaro-obregon'], 'Azcapotzalco': [265, 'azcapotzalco'], 'Benito Juárez': [266, 'benito-juarez'], 'Coyoacán': [267, 'coyoacan'], 'Cuajimalpa': [268, 'cuajimalpa-morelos'], 'Cuauhtémoc': [269, 'cuauhtemoc'], 'Gustavo A. Madero': [270, 'gustavo-a-madero'], 'Iztacalco': [271, 'iztacalco'], 'Iztapalapa': [272, 'iztapalapa'], 'Magdalena Contreras': [273, 'magdalena-contreras'], 'Miguel Hidalgo': [274, 'miguel-hidalgo'], 'Milpa Alta': [275, 'milpa-alta'], 'Tláhuac': [276, 'tlahuac'], 'Tlalpan': [277, 'tlalpan'], 'Venustiano Carranza': [278, 'venustiano-carranza'], 'Xochimilco': [279, 'xochimilco']};
 const PLATAFORMAS = [
+  {...FUENTES.icasas, g: 'icasas.mx',
+    url: (f, z) => { const [t, n] = esCasa(f) ? ['casas', 5] : ['departamentos', 3], a = z && IC_ALC[z]; return a ? `https://www.icasas.mx/renta/habitacionales-${t}-distrito-federal-${a[1]}-2_${n}_1_0_${a[0]}_0` : `https://www.icasas.mx/renta/habitacionales-${t}-2_${n}_0_0_0_0`; },
+    nota: (f, z) => 'Anuncios vigentes de inmobiliarias. ' + nota(f, z && IC_ALC[z] ? z : null, ['zona', ...T(f, ['casa', 'departamento'])]) + (z ? '' : ' Elige Distrito Federal allá.')},
+  {...FUENTES.homie, g: 'homie.mx',
+    url: (f, z) => z ? `https://homie.mx/inmuebles-en-renta-en-${slug(z)}-cdmx` : `https://homie.mx/${esCasa(f) ? 'casas' : 'departamentos'}-en-renta-en-ciudad-de-mexico-cdmx`,
+    nota: (f, z) => 'Rentas en línea; muchas aceptan mascotas. ' + nota(f, z, ['zona', ...(z ? [] : T(f, ['casa', 'departamento'])), ...(f.mascotas === 'si' ? ['mascotas'] : [])])},
   {...FUENTES.inmuebles24, g: 'inmuebles24.com',
     url: (f, z) => { const t = esCasa(f) ? 'casas' : esCuarto(f) ? 'departamento-compartido' : tipoUno(f) ? 'departamentos' : 'inmuebles';
       const lugar = z ? (I24_ALC[z] || slug(z)) : 'ciudad-de-mexico';
