@@ -47,12 +47,12 @@ def nominatim(q):
     last[0] = time.time(); cache[q] = r; json.dump(cache, open(CACHE, 'w'))
     return r
 
+lug['colonias'] = [c for c in lug['colonias'] if c.get('c') != 'anuncios']  # se recalculan cada vez
 hay = {(norm(c['n']), c['a']) for c in lug['colonias']}
 grupos = defaultdict(list)
 for a in anu:
     if (norm(a['colonia']), a['alcaldia']) not in hay: grupos[(a['colonia'], a['alcaldia'])].append(a)
 
-lug['colonias'] = [c for c in lug['colonias'] if c.get('c') != 'anuncios']  # se recalculan cada vez
 nuevas = []
 for (col, alc), xs in sorted(grupos.items()):
     pt = None
