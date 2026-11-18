@@ -165,8 +165,11 @@ en la base quedaron aceptadas.
   sesión. Sigue el runbook de arriba (prompt actualizado el 11-nov con el paso «en vivo»).
 - "Continuar Cerebro Liga MX" (`trig_011daxVc81g1dWPVNtuVKMCi`, cada hora): **desactivada** el 11-nov-2026 04:15 UTC al
   cerrar el rediseño. **Activarla antes de cada trabajo largo** (regla del usuario sobre los límites).
-- Vivo Querétaro–Monterrey (14-nov, 23:00 UTC): «armar» 22:40 UTC (`trig_01HRW7Zit3S9kbXaBqsKQdQ9`), «vigilar»
-  15-nov 00:00 UTC (`trig_01G3g3g5wdeUR4T84Dgtu6ej`), «cierre» 15-nov 01:30 UTC (`trig_01ThJ9av3u9JitLJyj6o2mwG`).
+- Vivo Jornada 17, bloque del viernes (UTC del 21-nov: Puebla–San Luis 01:00, Juárez–Atlas 03:00, Tijuana–Atlante 03:10):
+  «armar» 00:40 (`trig_01KNLxumakWo1kKD8wPqKi5d`), «vigilar» 02:00 (`trig_01HmozNf6ETpQcTjQ2RrMp37`) y 04:05
+  (`trig_01Hd1AJJcvj4fDPvpJz9fenf`), «cierre» 05:40 (`trig_01Hed1CuE5iUFPyC3CyQpx7A`). Los bloques del sábado
+  (Pachuca–Toluca 22:50, Santos–León 23:00, Pumas–Monterrey 01:00, Tigres–América 03:00) y del domingo (Chivas–Cruz
+  Azul 23:07, Querétaro–Necaxa 01:10) los programa la corrida diaria del 19 y del 20-nov.
 
 ## Bitácora
 - 2026-11-10 02:50 UTC · Reconocimiento: ESPN da resultados y estadísticas por partido; 143/153 jugados.
@@ -222,3 +225,4 @@ en la base quedaron aceptadas.
   ya ignora `_rev_*.html` y `_variante_*.html`).
 - 2026-11-17 15:00 UTC · Corrida diaria (la tarea llegó 7 h 38 min tarde: programada 07:20 UTC, entregada 14:58): sin partidos nuevos; Tijuana–Atlante y Querétaro–Necaxa se recorrieron 10 min; V17 publicada, `vivo/actual` en versión 23. Mañana (≤ 3 días para la Jornada 17) toca actualizar `config/actualidad.json` para los 18 equipos y programar los despertares del vivo del viernes.
 - 2026-11-18 07:30 UTC · Corrida diaria: sin partidos nuevos; V18 publicada, `vivo/actual` en versión 24.
+- 2026-11-18 07:35 UTC · Lanzado `09_bajas_jornada17.js` (tarea `w76vvdy83`, corrida `wf_454f2f0b-55a`); para reanudarlo: `Workflow({scriptPath: "/home/user/SA/ligamx/notas/workflows/09_bajas_jornada17.js", resumeFromRunId: "wf_454f2f0b-55a"})`. Programados los cuatro despertares del vivo del viernes.
