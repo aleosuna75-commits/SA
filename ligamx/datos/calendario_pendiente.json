@@ -1,6 +1,6 @@
 {
  "torneo": "Apertura 2026",
- "generado_utc": "2026-11-17T14:58:24Z",
+ "generado_utc": "2026-11-18T07:21:11Z",
  "fuente": "ESPN scoreboard mex.1",
  "partidos": [
   {
@@ -17,11 +17,11 @@
    "ciudad": "Puebla",
    "momios": {
     "ml_l": 2.45,
-    "ml_e": 3.4,
+    "ml_e": 3.45,
     "ml_v": 2.65,
     "total_linea": 2.5,
-    "over": 1.645,
-    "under": 2.05,
+    "over": 1.667,
+    "under": 2.1,
     "proveedor": "DraftKings"
    }
   },
@@ -38,12 +38,12 @@
    "estadio": "Estadio Olímpico Benito Juárez",
    "ciudad": "Ciudad Juárez",
    "momios": {
-    "ml_l": 3.35,
-    "ml_e": 3.45,
+    "ml_l": 3.4,
+    "ml_e": 3.5,
     "ml_v": 2.05,
     "total_linea": 2.5,
-    "over": 1.645,
-    "under": 2.05,
+    "over": 1.667,
+    "under": 2.1,
     "proveedor": "DraftKings"
    }
   },
@@ -60,12 +60,12 @@
    "estadio": "Estadio Caliente",
    "ciudad": "Tijuana",
    "momios": {
-    "ml_l": 1.606,
-    "ml_e": 4.1,
-    "ml_v": 4.6,
+    "ml_l": 1.625,
+    "ml_e": 4.2,
+    "ml_v": 4.7,
     "total_linea": 2.5,
-    "over": 1.606,
-    "under": 2.1,
+    "over": 1.625,
+    "under": 2.15,
     "proveedor": "DraftKings"
    }
   },
@@ -152,7 +152,7 @@
     "ml_e": 3.55,
     "ml_v": 2.0,
     "total_linea": 2.5,
-    "over": 1.588,
+    "over": 1.606,
     "under": 2.15,
     "proveedor": "DraftKings"
    }
@@ -196,7 +196,7 @@
     "ml_e": 3.8,
     "ml_v": 3.2,
     "total_linea": 2.5,
-    "over": 1.541,
+    "over": 1.556,
     "under": 2.25,
     "proveedor": "DraftKings"
    }

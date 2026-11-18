@@ -47,8 +47,15 @@
   publicados y sólo se reenvían si cambian). Es privada: el usuario la comparte desde el menú Share.
 - [x] 8. Automatización: `pipeline.py auto` + `modelo/mejora.py ciclo` + tarea programada diaria (runbook abajo).
 
-## En curso
-Nada pendiente (16-nov-2026, 08:30 UTC). Tarea de continuidad desactivada.
+## En curso (18-nov-2026, 07:30 UTC): bajas de los 18 equipos para la Jornada 17
+Paso 5 del runbook (faltan menos de 3 días y `config/actualidad.json` tenía 6 días). Tarea de continuidad **activada**.
+Workflow `notas/workflows/09_bajas_jornada17.js`: tres agentes de investigación (3 partidos cada uno) devuelven, por
+equipo, técnico, lesionados y dudas con fuente y fecha, y los suspendidos que reporta la prensa (para cotejar con
+`Contexto.suspendidos`, porque las tarjetas de ESPN pueden venir incompletas).
+1. [ ] Workflow terminado (si se cortó: `resumeFromRunId`, el id queda en la bitácora).
+2. [ ] Sesión principal: unir el resultado en `config/actualidad.json` (formato de la entrada del 12-nov; los suspendidos
+   de prensa que el sistema no deduce van con `tipo: suspension`), `python3 -m produccion.exportar`,
+   `python3 web/construir.py`, republicar con `url` y capabilities, commit y push, **desactivar la tarea de continuidad**.
 
 ### Último cierre (11 a 15-nov)
 Nada pendiente (11-nov-2026, 04:15 UTC). Lo último cerrado: rediseño a punto (portada por favorito que cabe en la
@@ -214,3 +221,4 @@ en la base quedaron aceptadas.
   Lección: los puntos de control automáticos a media revisión pueden llevarse archivos temporales (`web/.gitignore`
   ya ignora `_rev_*.html` y `_variante_*.html`).
 - 2026-11-17 15:00 UTC · Corrida diaria (la tarea llegó 7 h 38 min tarde: programada 07:20 UTC, entregada 14:58): sin partidos nuevos; Tijuana–Atlante y Querétaro–Necaxa se recorrieron 10 min; V17 publicada, `vivo/actual` en versión 23. Mañana (≤ 3 días para la Jornada 17) toca actualizar `config/actualidad.json` para los 18 equipos y programar los despertares del vivo del viernes.
+- 2026-11-18 07:30 UTC · Corrida diaria: sin partidos nuevos; V18 publicada, `vivo/actual` en versión 24.
