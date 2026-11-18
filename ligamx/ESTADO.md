@@ -47,15 +47,8 @@
   publicados y sólo se reenvían si cambian). Es privada: el usuario la comparte desde el menú Share.
 - [x] 8. Automatización: `pipeline.py auto` + `modelo/mejora.py ciclo` + tarea programada diaria (runbook abajo).
 
-## En curso (18-nov-2026, 07:30 UTC): bajas de los 18 equipos para la Jornada 17
-Paso 5 del runbook (faltan menos de 3 días y `config/actualidad.json` tenía 6 días). Tarea de continuidad **activada**.
-Workflow `notas/workflows/09_bajas_jornada17.js`: tres agentes de investigación (3 partidos cada uno) devuelven, por
-equipo, técnico, lesionados y dudas con fuente y fecha, y los suspendidos que reporta la prensa (para cotejar con
-`Contexto.suspendidos`, porque las tarjetas de ESPN pueden venir incompletas).
-1. [ ] Workflow terminado (si se cortó: `resumeFromRunId`, el id queda en la bitácora).
-2. [ ] Sesión principal: unir el resultado en `config/actualidad.json` (formato de la entrada del 12-nov; los suspendidos
-   de prensa que el sistema no deduce van con `tipo: suspension`), `python3 -m produccion.exportar`,
-   `python3 web/construir.py`, republicar con `url` y capabilities, commit y push, **desactivar la tarea de continuidad**.
+## En curso
+Nada pendiente (18-nov-2026, 07:45 UTC). Tarea de continuidad desactivada.
 
 ### Último cierre (11 a 15-nov)
 Nada pendiente (11-nov-2026, 04:15 UTC). Lo último cerrado: rediseño a punto (portada por favorito que cabe en la
@@ -84,8 +77,10 @@ en la base quedaron aceptadas.
   **Hecho el 12-nov sólo para Querétaro–Monterrey** (un agente de investigación, ~165 mil tokens): `equipos.<equipo>` con
   `tecnico`, `nota` y `lesionados` = [{jugador, motivo, tipo: lesion | seleccion | duda | suspension | otro, fuente,
   fecha_fuente}] más `fuentes`. La página lo muestra como «Bajas reportadas» con el motivo; el modelo no lo usa.
-  Falta repetirlo para los 18 equipos el 17 o 18-nov (Jornada 17) y antes de cada ronda de liguilla; revisar el 13-nov
-  el estado de Durdevic y Orellano (Monterrey).
+  **Hecho para los 18 equipos el 18-nov (Jornada 17)** con `notas/workflows/09_bajas_jornada17.js` (3 agentes, 0.54 M
+  de tokens, 68 fuentes): el guion devuelve JSON y la sesión principal lo une en `config/actualidad.json` (también
+  `cotejo_suspendidos` y `no_confirmado`). Repetir antes de cada ronda de liguilla (sólo los equipos vivos: mucho
+  más barato). Casi todo sale de fichas de FotMob; no se encontró el boletín de la Disciplinaria.
 - [ ] **Tarjetas de ESPN incompletas:** la prensa da a Óliver Torres (Monterrey) suspendido por quinta amarilla y
   `tarjetas.csv` le cuenta 4 en el Apertura 2026, así que la página lo marcaba sólo «a una amarilla». Se añadió a
   mano en `actualidad.json` (tipo `suspension`). Al investigar bajas, pedir también los suspendidos reportados para
@@ -226,3 +221,4 @@ en la base quedaron aceptadas.
 - 2026-11-17 15:00 UTC · Corrida diaria (la tarea llegó 7 h 38 min tarde: programada 07:20 UTC, entregada 14:58): sin partidos nuevos; Tijuana–Atlante y Querétaro–Necaxa se recorrieron 10 min; V17 publicada, `vivo/actual` en versión 23. Mañana (≤ 3 días para la Jornada 17) toca actualizar `config/actualidad.json` para los 18 equipos y programar los despertares del vivo del viernes.
 - 2026-11-18 07:30 UTC · Corrida diaria: sin partidos nuevos; V18 publicada, `vivo/actual` en versión 24.
 - 2026-11-18 07:35 UTC · Lanzado `09_bajas_jornada17.js` (tarea `w76vvdy83`, corrida `wf_454f2f0b-55a`); para reanudarlo: `Workflow({scriptPath: "/home/user/SA/ligamx/notas/workflows/09_bajas_jornada17.js", resumeFromRunId: "wf_454f2f0b-55a"})`. Programados los cuatro despertares del vivo del viernes.
+- 2026-11-18 07:45 UTC · Bajas de la Jornada 17 integradas (18 equipos; 9 de 9 partidos con bajas en su tarjeta) y V19 publicada. Cotejo de suspendidos: los 13 que deduce el sistema aparecen en alguna fuente; un agregador da además a Gorriarán (Tigres) por quinta amarilla, el sistema cuenta 4 (la amarilla de una doble amonestación no acumula) y nadie más lo confirma: quedó como duda.
