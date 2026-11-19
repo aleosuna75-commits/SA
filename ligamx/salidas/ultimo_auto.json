@@ -1,5 +1,5 @@
 {
- "corrida_utc": "2026-11-18T07:21:04Z",
+ "corrida_utc": "2026-11-19T07:21:33Z",
  "pasos": {
   "datos": {
    "ok": true,
@@ -7,13 +7,13 @@
    "nuevos_jugados": 0,
    "reprogramados": 0,
    "nuevos_en_calendario": 0,
-   "momios_actualizados": 3,
+   "momios_actualizados": 5,
    "tabla_coincide_con_espn": true,
-   "segundos": 7.9
+   "segundos": 7.1
   },
   "variables": {
    "ok": true,
-   "segundos": 12.6
+   "segundos": 12.7
   },
   "mejora": {
    "ok": true,
@@ -23,10 +23,10 @@
   "pronostico": {
    "ok": true,
    "salida": [
-    "/home/user/SA/ligamx/salidas/actual.json  226 KB  modelo=ensamble  pendientes=9  sellos nuevos=7  49.3 s",
-    "campeón: América 0.264, Cruz Azul 0.260, Toluca 0.199, Chivas 0.191, Monterrey 0.027"
+    "/home/user/SA/ligamx/salidas/actual.json  237 KB  modelo=ensamble  pendientes=9  sellos nuevos=5  53.1 s",
+    "campeón: América 0.264, Cruz Azul 0.261, Toluca 0.199, Chivas 0.191, Monterrey 0.028"
    ],
-   "segundos": 55.7
+   "segundos": 59.6
   },
   "vivo": {
    "ok": true,
@@ -39,14 +39,14 @@
     "visitante": "Atlético San Luis"
    },
    "incrustado": true,
-   "segundos": 2.7
+   "segundos": 2.5
   },
   "pagina": {
    "ok": true,
    "salida": [
-    "listo en 0.17 s"
+    "listo en 0.11 s"
    ],
-   "segundos": 0.6
+   "segundos": 0.4
   }
  },
  "errores": [],
@@ -87,27 +87,27 @@
   "incrustado": true
  },
  "modelo": "ensamble",
- "corte_local": "2026-11-18 01:21",
+ "corte_local": "2026-11-19 01:21",
  "campeon_top": [
   [
    "América",
-   0.2638
+   0.2641
   ],
   [
    "Cruz Azul",
-   0.2604
+   0.2606
   ],
   [
    "Toluca",
-   0.1988
+   0.1985
   ],
   [
    "Chivas",
-   0.1914
+   0.1907
   ],
   [
    "Monterrey",
-   0.0274
+   0.0277
   ]
  ],
  "liguilla_en_curso": false,
@@ -154,9 +154,9 @@
    }
   }
  },
- "huella": "00be25e85514f7bc38dde7cbf7346815",
+ "huella": "ed99fbbbeb0702f1d0763dba11cc5aac",
  "publicar": false,
- "huella_publicada": "00be25e85514f7bc38dde7cbf7346815",
- "segundos": 79.5,
- "publicado_utc": "2026-11-18T07:22:49Z"
+ "huella_publicada": "ed99fbbbeb0702f1d0763dba11cc5aac",
+ "segundos": 82.2,
+ "publicado_utc": "2026-11-19T07:23:38Z"
 }

@@ -1,6 +1,6 @@
 {
  "torneo": "Apertura 2026",
- "generado_utc": "2026-11-18T07:21:11Z",
+ "generado_utc": "2026-11-19T07:21:40Z",
  "fuente": "ESPN scoreboard mex.1",
  "partidos": [
   {
@@ -60,11 +60,11 @@
    "estadio": "Estadio Caliente",
    "ciudad": "Tijuana",
    "momios": {
-    "ml_l": 1.625,
-    "ml_e": 4.2,
-    "ml_v": 4.7,
+    "ml_l": 1.588,
+    "ml_e": 4.3,
+    "ml_v": 4.9,
     "total_linea": 2.5,
-    "over": 1.625,
+    "over": 1.606,
     "under": 2.15,
     "proveedor": "DraftKings"
    }
@@ -82,9 +82,9 @@
    "estadio": "Estadio Hidalgo",
    "ciudad": "Pachuca",
    "momios": {
-    "ml_l": 2.7,
+    "ml_l": 2.65,
     "ml_e": 3.95,
-    "ml_v": 2.2,
+    "ml_v": 2.25,
     "total_linea": 3.5,
     "over": 2.05,
     "under": 1.667,
@@ -104,12 +104,12 @@
    "estadio": "Estadio Corona",
    "ciudad": "Torreón",
    "momios": {
-    "ml_l": 2.4,
-    "ml_e": 3.7,
+    "ml_l": 2.45,
+    "ml_e": 3.75,
     "ml_v": 2.55,
     "total_linea": 3.5,
-    "over": 2.2,
-    "under": 1.571,
+    "over": 2.25,
+    "under": 1.588,
     "proveedor": "DraftKings"
    }
   },
@@ -126,12 +126,12 @@
    "estadio": "Estadio Olímpico Universitario",
    "ciudad": "Mexico City",
    "momios": {
-    "ml_l": 2.5,
-    "ml_e": 3.5,
-    "ml_v": 2.5,
+    "ml_l": 2.55,
+    "ml_e": 3.55,
+    "ml_v": 2.55,
     "total_linea": 2.5,
-    "over": 1.588,
-    "under": 2.15,
+    "over": 1.606,
+    "under": 2.2,
     "proveedor": "DraftKings"
    }
   },
@@ -149,8 +149,8 @@
    "ciudad": "San Nicolás de los Garza",
    "momios": {
     "ml_l": 3.3,
-    "ml_e": 3.55,
-    "ml_v": 2.0,
+    "ml_e": 3.6,
+    "ml_v": 2.05,
     "total_linea": 2.5,
     "over": 1.606,
     "under": 2.15,
