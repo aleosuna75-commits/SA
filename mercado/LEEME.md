@@ -1,9 +1,14 @@
-# Mercado · proyección del valor de futbolistas
+# Mercado · inteligencia de valor de futbolistas
 
-- `pipeline.py` baja los datos abiertos (transfermarkt-datasets, CC0), ajusta el modelo, corre el
-  backtest y escribe `web/datos/*.json`. Requiere `pandas` y `numpy`. Tarda ~1 minuto.
-- `web/` es el sitio estático (mapa, buscador, filtros, ficha de jugador). Netlify lo copia a `/mercado/`.
-- Para verlo en local: `cd mercado/web && python3 -m http.server` y abrir http://localhost:8000
+- `pipeline.py` baja dos bases abiertas derivadas de Transfermarkt (dcaribou/transfermarkt-datasets y
+  salimt/football-datasets), las une, ajusta el modelo, corre la prueba retrospectiva y escribe
+  `web/datos/`. Requiere `pandas`, `numpy` y `git`. Tarda ~2 minutos.
+- `web/` es el sitio estático: mapa, radar, explorador, ficha de jugador, club, lista de seguimiento
+  y metodología. Netlify lo copia a `/mercado/`.
+- En local: `cd mercado/web && python3 -m http.server` y abrir http://localhost:8000
 
-Alcance real de la v0: primera división de 31 ligas, ~15.7 mil jugadores. El modelo sólo usa
-posición, edad y valor actual; los límites y el backtest se publican en la propia página.
+`web/datos/det/` son 256 archivos con el detalle por jugador (historia de valor, fichajes, lesiones,
+precedentes); la página pide sólo el que necesita. Pesan ~30 MB en total y se regeneran completos en
+cada corrida.
+
+El modelo, su prueba retrospectiva y sus límites están en la pestaña Metodología del propio sitio.

@@ -3,50 +3,50 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Mercado · Proyección de valor de futbolistas</title>
+<title>Mercado · Inteligencia de valor de futbolistas</title>
 <link rel="stylesheet" href="estilos.css">
 </head>
 <body>
-<header>
-  <div class="marca">
-    <h1>Mercado</h1>
-    <span id="resumen" class="tenue"></span>
-  </div>
+<header class="barra">
+  <a class="logo" href="#/mapa"><span class="logo-marca">M</span>Mercado</a>
+  <nav id="nav">
+    <a href="#/mapa" data-v="mapa">Mapa</a>
+    <a href="#/radar" data-v="radar">Radar</a>
+    <a href="#/explorar" data-v="explorar">Explorador</a>
+    <a href="#/lista" data-v="lista">Mi lista <span id="n-lista" class="cuenta"></span></a>
+    <a href="#/metodo" data-v="metodo">Metodología</a>
+  </nav>
   <div class="buscador">
     <input id="buscar" type="search" placeholder="Buscar jugador o club…" autocomplete="off" aria-label="Buscar jugador o club">
     <ul id="sugerencias" hidden></ul>
   </div>
-  <details id="caja-filtros"><summary>Filtros</summary><div class="filtros">
-    <label>Región<select id="f-region"><option value="">Todas</option></select></label>
-    <label>País<select id="f-pais"><option value="">Todos</option></select></label>
-    <label>Liga<select id="f-liga"><option value="">Todas</option></select></label>
-    <label>Posición<select id="f-pos"><option value="">Todas</option></select></label>
-    <label>Perfil<select id="f-perfil"><option value="">Todos</option></select></label>
-    <label>Edad<span class="rango"><input id="f-emin" type="number" min="16" max="45" value="16"><span>–</span><input id="f-emax" type="number" min="16" max="45" value="45"></span></label>
-    <label>Valor mín.<select id="f-vmin">
-      <option value="0">Cualquiera</option><option value="1000000">€1M</option><option value="5000000">€5M</option>
-      <option value="20000000">€20M</option><option value="50000000">€50M</option></select></label>
-    <label>Ordenar<select id="f-orden">
-      <option value="pico">Valor máximo proyectado</option><option value="valor">Valor actual</option>
-      <option value="alza">Mayor revalorización a 3 años</option></select></label>
-    <button id="limpiar" type="button">Limpiar</button>
-  </div></details>
 </header>
 
-<main>
-  <section id="mapa" aria-label="Mapa del mundo">
-    <svg></svg>
-    <div class="controles">
-      <button id="z-mas" type="button" aria-label="Acercar">+</button>
-      <button id="z-menos" type="button" aria-label="Alejar">−</button>
-      <button id="z-mundo" type="button" aria-label="Ver el mundo">⌂</button>
-    </div>
-    <p class="leyenda tenue">Color = valor total de los jugadores que pasan los filtros. Toca un país.</p>
-  </section>
-  <aside id="panel"></aside>
-</main>
+<details id="caja-filtros" class="filtros-caja">
+  <summary><span>Filtros</span><span id="resumen-filtros" class="tenue"></span></summary>
+  <div class="filtros">
+    <label>Región<select id="f-region"></select></label>
+    <label>País de la liga<select id="f-pais"></select></label>
+    <label>Liga<select id="f-liga"></select></label>
+    <label>División<select id="f-nivel"></select></label>
+    <label>Posición<select id="f-pos"></select></label>
+    <label>Rol<select id="f-subpos"></select></label>
+    <label>Nacionalidad<select id="f-nac"></select></label>
+    <label>Pie<select id="f-pie"></select></label>
+    <label>Edad<span class="rango"><input id="f-emin" type="number" min="15" max="50" value="15"><span>–</span><input id="f-emax" type="number" min="15" max="50" value="50"></span></label>
+    <label>Valor (€M)<span class="rango"><input id="f-vmin" type="number" min="0" step="0.1" placeholder="mín"><span>–</span><input id="f-vmax" type="number" min="0" step="0.1" placeholder="máx"></span></label>
+    <label>Contrato vence<select id="f-contrato"></select></label>
+    <label>Perfil<select id="f-perfil"></select></label>
+    <label>Señal a 3 años<select id="f-senal"></select></label>
+    <button id="limpiar" type="button">Limpiar</button>
+  </div>
+</details>
 
-<section id="confianza"></section>
+<main id="vista"></main>
+<aside id="ficha" hidden aria-label="Ficha del jugador"></aside>
+<div id="velo" hidden></div>
+
+<footer class="pie tenue" id="pie"></footer>
 
 <script src="lib/d3.min.js"></script>
 <script src="lib/topojson-client.min.js"></script>
