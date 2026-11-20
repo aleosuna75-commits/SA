@@ -2,8 +2,9 @@
 # Netlify publica la carpeta sitio_f1; el único paso de build arma dentro la página de Liga MX (/ligamx/).
 [build]
   publish = "sitio_f1"
+  # Mercado (valor de futbolistas): sitio estático ya generado por mercado/pipeline.py; sólo se copia a /mercado/
   # Cerebro Liga MX: se arma en cada despliegue dentro de sitio_f1/ligamx (no se versiona duplicado)
-  command = "python3 ligamx/web/construir.py --documento --salida sitio_f1/ligamx"
+  command = "python3 ligamx/web/construir.py --documento --salida sitio_f1/ligamx && cp -r mercado/web sitio_f1/mercado"
 
 [[headers]]
   for = "/*"

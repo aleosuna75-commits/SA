@@ -14,3 +14,6 @@ world.tar.gz
 
 # Credenciales locales de SIREC (nunca al repositorio)
 sirec_config.py
+
+# Mercado: CSV crudos (se bajan con mercado/pipeline.py)
+mercado/datos_crudos/
