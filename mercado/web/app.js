@@ -1,7 +1,7 @@
 /* Mercado: todo se calcula en el navegador a partir de datos/*.json (ver mercado/pipeline.py) */
 (async function () {
-  const [meta, crudos, clubes, perfiles, mundo] = await Promise.all(
-    ["datos/meta.json", "datos/jugadores.json", "datos/clubes.json", "datos/perfiles.json", "lib/countries-50m.json"]
+  const [meta, crudos, clubes, mundo] = await Promise.all(
+    ["datos/meta.json", "datos/jugadores.json", "datos/clubes.json", "lib/countries-50m.json"]
       .map((u) => fetch(u).then((r) => r.json())));
 
   // ================================================================ catálogos
@@ -60,48 +60,26 @@
   const INFL_RECIENTE = Math.pow(IM.valor.at(-1) / IM.valor[i19], 1 / (IM.anios.at(-1) - 2019)) - 1;   // ritmo desde 2019
   const eq = (n) => `${n} equipo${n === 1 ? "" : "s"}`;
 
-  // ================================================================ modelo en el cliente
+  // ================================================================ jugadores (las proyecciones vienen calculadas del pipeline)
   const club = new Map(clubes.map((c) => [c.id, c]));
-  const logBins = meta.bins.map(Math.log);
-  const AJ = meta.ajuste;                                   // horizontes [1,2,3,5] y betas por factor
-
-  function perfilDe(j) {
-    const e = Math.min(Math.max(j.edad, meta.edad_min), meta.edad_max - 1), lx = Math.log(j.valor);
-    let b = 0;
-    for (let i = 1; i < logBins.length; i++) if (Math.abs(logBins[i] - lx) < Math.abs(logBins[b] - lx)) b = i;
-    return perfiles[`${j.pos}_${e}_${b}`] || null;
+  const HK = [1, 2, 3, 5, 8];                               // horizontes con mediana en la fila; la curva completa va en el detalle
+  const nulo = (v) => (v < 0 ? null : v);
+  function med(j, h) {                                      // mediana a h años interpolando entre los horizontes de la fila
+    const pts = [[0, j.valor]].concat(HK.map((k, i) => [k, j.V[i]]).filter((p) => p[1] != null));
+    if (h > pts[pts.length - 1][0]) return null;
+    for (let i = 1; i < pts.length; i++) if (h <= pts[i][0]) return pts[i - 1][1] + (pts[i][1] - pts[i - 1][1]) * (h - pts[i - 1][0]) / (pts[i][0] - pts[i - 1][0]);
+    return null;
   }
-  const factoresDe = (j) => [1, j.mom, j.edad < 23 ? j.mom : 0, j.dd, j.les];
-  function ajuste(j, h) {                                    // desplazamiento log de la mediana, interpolado entre horizontes
-    const s = j.s, H = AJ.horizontes;
-    if (h <= H[0]) return s[0] * h / H[0];
-    for (let i = 1; i < H.length; i++) if (h <= H[i]) return s[i - 1] + (s[i] - s[i - 1]) * (h - H[i - 1]) / (H[i] - H[i - 1]);
-    return s[s.length - 1];
-  }
-  function proy(j, h, k = 1, infl = 0) {                     // valor a h años; k: 0 pesimista, 1 mediana, 2 optimista
-    const q = j.p && j.p.q[h - 1];
-    return !q || q[k] == null ? null : j.valor * q[k] * Math.exp(ajuste(j, h)) * Math.pow(1 + infl, h);
-  }
-  const sigue = (j, h) => (j.p && j.p.s[h - 1] != null ? j.p.s[h - 1] : null);
-
   const jugadores = crudos.map((r) => {
     const j = { id: r[0], nombre: r[1], club: r[2], pos: r[3], subpos: r[4], edad: r[5], nac: r[6], valor: r[7], maxHist: r[8],
-      pj: r[9], min: r[10], goles: r[11], asist: r[12], contrato: r[13], fecha: r[14], pie: r[15], altura: r[16],
-      mom: r[17], dd: r[19], les: r[20] / 100, les24: r[21], cedido: r[22] };
+      pj: r[9], min: r[10], goles: r[11], asist: r[12], contrato: r[13], fecha: r[14], pie: r[15], altura: r[16], les24: r[17], cedido: r[18],
+      V: [r[19], r[20], r[21], r[22], r[23]].map(nulo), s3: nulo(r[24]), pico: r[25], techo: r[26], edadPico: r[27] || null, cubierta: r[28], H: r[29] };
     const c = club.get(j.club);
     j.c = c; j.pais = c.pais; j.liga = c.liga; j.nivel = c.nivel;
-    j.p = perfilDe(j);
-    const f = factoresDe(j);
-    j.s = AJ.betas.map((b) => b.reduce((a, x, i) => a + x * f[i], 0));
-    j.H = j.p ? j.p.q.filter((q) => q[1] != null).length : 0;        // horizonte máximo con proyección
-    j.v1 = proy(j, 1); j.v3 = proy(j, Math.min(3, j.H) || 1); j.v5 = proy(j, Math.min(5, j.H) || 1);
-    const hp = j.p ? Math.max(0, j.p.ep - Math.min(Math.max(j.edad, meta.edad_min), meta.edad_max - 1)) : 0;
-    const aj = hp ? Math.exp(ajuste(j, hp)) : 1;
-    j.pico = Math.max(j.maxHist, j.p ? j.valor * Math.max(1, j.p.pico[0] * aj) : j.valor);
-    j.techo = Math.max(j.maxHist, j.p ? j.valor * Math.max(1, j.p.pico[1] * aj) : j.valor);
-    j.edadPico = j.p && j.pico > j.maxHist * 1.02 ? j.p.ep : null;
-    j.r3 = j.v3 ? j.v3 / j.valor - 1 : null;
-    j.d3 = j.v3 ? j.v3 - j.valor : null;
+    j.v1 = j.V[0]; j.v3 = j.V[2] ?? j.V[1] ?? j.V[0]; j.v5 = j.V[3] ?? j.v3;
+    j.h3 = Math.min(3, j.H) || 1;
+    j.r3 = j.v3 != null ? j.v3 / j.valor - 1 : null;
+    j.d3 = j.v3 != null ? j.v3 - j.valor : null;
     j.senal = j.r3 == null ? 1 : j.r3 > 0.15 ? 0 : j.r3 < -0.15 ? 2 : 1;
     j.etq = ETQ.findIndex((e) => j.pico >= e[1]);
     j.meses = j.contrato ? (+j.contrato.slice(0, 4) - Math.floor(corteYM / 100)) * 12 + (+j.contrato.slice(5, 7) - (corteYM % 100)) : null;
@@ -109,6 +87,7 @@
     return j;
   });
   const porId = new Map(jugadores.map((j) => [j.id, j]));
+  const RT = meta.retro, mediaDe = (arr, k) => d3.mean(arr, (x) => x[k]);
 
   // ================================================================ lista de seguimiento
   let lista = new Set();
@@ -335,6 +314,10 @@
 
   // ================================================================ vista: radar
   const TABLEROS = [
+    { id: "apuestas", t: "Apuestas del modelo", d: `Hasta 23 años, €1–25M, en liga con datos completos: los de mayor alza esperada. En las pruebas retrospectivas, las 50 apuestas de cada año multiplicaron su valor por ${mediaDe(RT.picks, "sel_mult").toFixed(1)} en tres años (mediana), contra ${mediaDe(RT.picks, "pob_mult").toFixed(1)} del grupo.`,
+      f: (j) => j.edad <= 23 && j.valor >= 1e6 && j.valor <= 25e6 && j.cubierta && j.r3 != null, k: (j) => -j.r3, r: (j) => `${eur(j.valor)} → ${eur(j.v3)}<small class="sube">${pct(j.r3)} · techo ${eur(j.techo)}</small>`, o: "r3", fl: { emax: 23, vmin: 1, vmax: 25, nivel: 1 } },
+    { id: "alertas", t: "Alertas de devaluación", d: `27 años o más, desde €5M, en liga con datos completos: los de mayor caída esperada. En las pruebas, ${Math.round(100 * mediaDe(RT.picks, "al_cae"))}% de las 50 alertas de cada año perdió al menos 40% en tres años, contra ${Math.round(100 * mediaDe(RT.picks, "viej_cae"))}% del grupo.`,
+      f: (j) => j.edad >= 27 && j.valor >= 5e6 && j.cubierta && j.r3 != null, k: (j) => j.r3, r: (j) => `${eur(j.valor)} → ${eur(j.v3)}<small class="baja">${pct(j.r3)} · ${eur(j.d3)}</small>`, o: "r3", asc: true, fl: { emin: 27, vmin: 5, nivel: 1 } },
     { id: "alza", t: "Mayor revalorización esperada", d: "Ganancia mediana a 3 años, en euros de hoy.", f: (j) => j.d3 > 0, k: (j) => -j.d3, r: (j) => `${eur(j.valor)} → ${eur(j.v3)}<small class="sube">${eur(j.d3)} · ${pct(j.r3)}</small>`, o: "d3" },
     { id: "promesas", t: "Promesas sub-21 con mayor techo", d: "Valor máximo de carrera esperado (mediana) y escenario optimista.", f: (j) => j.edad <= 21, k: (j) => -j.pico, r: (j) => `${eur(j.valor)} → ${eur(j.pico)}<small>techo ${eur(j.techo)}</small>`, o: "pico", fl: { emax: 21 } },
     { id: "gangas", t: "Fuera de primera división, al alza", d: "Divisiones inferiores con mayor crecimiento porcentual esperado (valor ≥ €300k).", f: (j) => j.nivel >= 2 && j.nivel <= 8 && j.valor >= 3e5 && j.r3 > 0, k: (j) => -j.r3, r: (j) => `${eur(j.valor)} → ${eur(j.v3)}<small class="sube">${pct(j.r3)} · ${esc(j.liga)}</small>`, o: "r3" },
@@ -345,7 +328,7 @@
     { id: "rebote", t: "Lejos de su máximo y repuntando", d: "Valen menos de la mitad de su máximo histórico, pero el modelo espera subida.", f: (j) => j.valor < j.maxHist * 0.5 && j.r3 > 0.1 && j.valor >= 5e5, k: (j) => -j.d3, r: (j) => `${eur(j.valor)} → ${eur(j.v3)}<small>máx. ${eur(j.maxHist)}</small>`, o: "d3" },
   ];
   function vistaRadar() {
-    $("#vista").innerHTML = `<div class="pagina"><div class="cabecera"><div><h1>Radar</h1><p class="tenue">Ocho lecturas del mercado sobre los ${mil(filtrados.length)} jugadores que pasan los filtros. Cámbialos arriba para acotar por liga, posición o edad.</p></div></div>
+    $("#vista").innerHTML = `<div class="pagina"><div class="cabecera"><div><h1>Radar</h1><p class="tenue">Diez lecturas del mercado sobre los ${mil(filtrados.length)} jugadores que pasan los filtros. Cámbialos arriba para acotar por liga, posición o edad.</p></div></div>
       <div class="rejilla">${TABLEROS.map((t) => {
         const top = filtrados.filter(t.f).sort((a, b) => t.k(a) - t.k(b)).slice(0, 8);
         return `<section class="tarjeta tablero"><h2>${t.t}<a href="#/explorar" data-tablero="${t.id}">Ver todos →</a></h2><p class="nota">${t.d}</p>
@@ -401,7 +384,7 @@
     comparar = new Set([...comparar].filter((id) => lista.has(id)));
     if (!comparar.size) js.slice(0, 4).forEach((j) => comparar.add(j.id));
     $("#vista").innerHTML = `<div class="pagina"><div class="cabecera"><div><h1>Mi lista</h1><p class="tenue">Jugadores que marcaste con ★. Se guarda sólo en este navegador.</p></div></div>
-      ${js.length ? `<div class="tarjeta"><h2>Comparar trayectorias</h2><p class="nota">Mediana proyectada en euros de hoy. Elige hasta 6.</p>
+      ${js.length ? `<div class="tarjeta"><h2>Comparar trayectorias</h2><p class="nota">Mediana proyectada a 8 años en euros de hoy. Elige hasta 6.</p>
         <div class="chips">${js.map((j) => `<span class="chip ${comparar.has(j.id) ? "on" : ""}" data-comparar="${j.id}">${esc(j.nombre)}</span>`).join("")}</div>
         <svg class="grafica" id="comparacion"></svg></div>
         <h3>Seguimiento</h3>${tabla("lista", js, ["nombre", "pos", "edad", "liga", "valor", "v1", "v3", "r3", "v5", "pico", "techo", "perfil", "contrato"], "valor")}`
@@ -410,9 +393,9 @@
     const sel = js.filter((j) => comparar.has(j.id)).slice(0, 6);
     const el = d3.select("#comparacion"), W = el.node().clientWidth, H = 280, m = { t: 10, r: 110, b: 26, l: 50 };
     el.attr("viewBox", `0 0 ${W} ${H}`).attr("height", H);
-    const series = sel.map((j) => ({ j, pts: [[0, j.valor]].concat(d3.range(1, Math.min(10, j.H) + 1).map((h) => [h, proy(j, h)])) }));
-    const x = d3.scaleLinear([0, 10], [m.l, W - m.r]), y = d3.scaleLinear([0, (d3.max(series, (s) => d3.max(s.pts, (p) => p[1])) || 1) * 1.08], [H - m.b, m.t]);
-    el.append("g").attr("class", "eje").attr("transform", `translate(0,${H - m.b})`).call(d3.axisBottom(x).ticks(10).tickFormat((d) => (d ? "+" + d + " a" : "hoy")));
+    const series = sel.map((j) => ({ j, pts: [[0, j.valor]].concat(d3.range(1, 9).map((h) => [h, med(j, h)]).filter((p) => p[1] != null)) }));
+    const x = d3.scaleLinear([0, 8], [m.l, W - m.r]), y = d3.scaleLinear([0, (d3.max(series, (s) => d3.max(s.pts, (p) => p[1])) || 1) * 1.08], [H - m.b, m.t]);
+    el.append("g").attr("class", "eje").attr("transform", `translate(0,${H - m.b})`).call(d3.axisBottom(x).ticks(8).tickFormat((d) => (d ? "+" + d + " a" : "hoy")));
     el.append("g").attr("class", "eje").attr("transform", `translate(${m.l},0)`).call(d3.axisLeft(y).ticks(5).tickFormat(eur));
     series.forEach((s, i) => {
       el.append("path").attr("fill", "none").attr("stroke", PALETA[i]).attr("stroke-width", 2).attr("d", d3.line().x((p) => x(p[0])).y((p) => y(p[1]))(s.pts));
@@ -423,39 +406,66 @@
 
   // ================================================================ vista: metodología
   function vistaMetodo() {
-    const bt = meta.backtest, G = { todos: "Todos", sub23: "Menores de 23", "23a28": "23 a 28", "29a33": "29 a 33", "34mas": "34 o más" };
-    const viejos = jugadores.filter((j) => j.fecha < corteYM - 100 + 0).length, sinPais = jugadores.filter((j) => !j.pais).length;
-    const N = ["", "tendencia del último año", "tendencia × menor de 23", "distancia a su propio máximo", "100 días de lesión"];
-    $("#vista").innerHTML = `<div class="pagina" style="max-width:980px"><h1>Metodología y límites</h1>
-      <p class="tenue">Qué hace el modelo, cuánto acierta y dónde no se le debe creer.</p>
-      <div class="kpis"><div class="kpi"><b>${mil(meta.jugadores)}</b><span>jugadores vigentes</span></div><div class="kpi"><b>${mil(meta.clubes)}</b><span>clubes · ${meta.paises_liga} países</span></div>
-        <div class="kpi"><b>${mil(meta.valuaciones)}</b><span>valuaciones históricas de ${mil(meta.jugadores_historia)} jugadores</span></div><div class="kpi"><b>${mil(meta.transiciones)}</b><span>transiciones año a año para entrenar</span></div></div>
-      <h3>El modelo en tres capas</h3>
-      <div class="tarjeta"><p><b>1. Curva base.</b> Como un triángulo de desarrollo, pero la «antigüedad» es la edad: para cada posición, edad y tramo de valor se toma cómo cambió de un año al siguiente el valor real (ya descontada la inflación del mercado) de todos los jugadores históricos en esa situación. Esos cambios se remuestrean ${mil(3000)} veces por perfil para obtener la banda pesimista–optimista (8 de cada 10 casos), el valor máximo de carrera y la probabilidad de seguir valuado.</p>
-        <p><b>2. Ajuste individual.</b> Una regresión a la mediana corrige la curva base con tres datos del jugador: ${N.slice(1, 2)}, ${N[3]} y días de lesión. Es lineal a propósito: en cada ficha se ve cuánto mueve cada factor.</p>
-        <p><b>3. Precedentes.</b> Para cada jugador se muestran los históricos más parecidos (misma posición y edad, valor real y tendencia cercanos) y qué fue de ellos. No alimentan el número: sirven para juzgarlo.</p></div>
-      <h3>Prueba retrospectiva</h3>
-      <p class="nota">El modelo se entrenó sólo con lo conocido a julio de ${bt.origen} y se comparó con el valor real 1, 3 y 5 años después. «Error típico» es la mediana de la desviación entre la proyección central y el valor real. «Ingenuo» = suponer que el valor no cambia.</p>
-      <div class="tabla-caja"><table class="plana"><thead><tr><th class="izq">Horizonte</th><th class="izq">Grupo</th><th>Jugadores</th><th>Error del modelo</th><th>Sólo curva base</th><th>Ingenuo</th><th>Real dentro de la banda (meta 80%)</th></tr></thead>
-      <tbody>${bt.filas.map((r) => `<tr><td class="izq">${r.horizonte} año${r.horizonte > 1 ? "s" : ""}</td><td class="izq">${G[r.grupo]}</td><td>${mil(r.n)}</td>
-        <td><b>${Math.round(r.error_modelo * 100)}%</b></td><td>${Math.round(r.error_base * 100)}%</td><td>${Math.round(r.error_ingenuo * 100)}%</td><td>${Math.round(r.cobertura * 100)}%</td></tr>`).join("")}</tbody></table></div>
-      <h3>Cuánto pesa cada factor individual</h3>
-      <div class="tabla-caja"><table class="plana"><thead><tr><th class="izq">Efecto sobre la mediana</th>${AJ.horizontes.map((h) => `<th>${h} año${h > 1 ? "s" : ""}</th>`).join("")}</tr></thead>
-        <tbody>${[["Valor duplicado en el último año", (b) => b[1] * Math.LN2], ["Ídem, en un menor de 23", (b) => (b[1] + b[2]) * Math.LN2], ["Valer la mitad de su máximo", (b) => -b[3] * Math.LN2], ["100 días de lesión en 12 meses", (b) => b[4]]]
-          .map(([t, f]) => `<tr><td class="izq">${t}</td>${AJ.betas.map((b) => `<td>${pct(Math.exp(f(b)) - 1)}</td>`).join("")}</tr>`).join("")}</tbody></table></div>
+    const G = { liga: "En ligas con datos completos", sub23: "· menores de 23", "23a28": "· 23 a 28 años", "29mas": "· 29 años o más", "10M": "Valor ≥ €10M", todos: "Todos (incluye divisiones sin datos de club)" };
+    const p100 = (x) => Math.round(x * 100) + "%";
+    const viejos = jugadores.filter((j) => j.fecha < corteYM - 100).length, sinPais = jugadores.filter((j) => !j.pais).length, sinCob = jugadores.filter((j) => !j.cubierta).length;
+    const ag = (h, g) => RT.agregada.find((r) => r.h === h && r.grupo === g);
+    const P = RT.picks, casos = RT.casos;
+    const veredicto = (c) => (c.real == null ? "sin valor" : c.real > c.p98 ? "por encima de todo lo previsto" : c.real > c.p90 ? "por encima de la banda" : c.real < c.p02 ? "por debajo de todo lo previsto" : c.real < c.p10 ? "por debajo de la banda" : "dentro de la banda");
+    $("#vista").innerHTML = `<div class="pagina" style="max-width:1040px"><h1>Metodología, precisión y límites</h1>
+      <p class="tenue">Qué hace el modelo, cuánto acierta medido contra el pasado y dónde no se le debe creer.</p>
+      <div class="kpis"><div class="kpi"><b>${mil(meta.jugadores)}</b><span>jugadores vigentes</span></div><div class="kpi"><b>${mil(meta.valuaciones)}</b><span>valuaciones históricas de ${mil(meta.jugadores_historia)} jugadores</span></div>
+        <div class="kpi"><b>${mil(meta.filas_modelo)}</b><span>observaciones jugador-año para entrenar</span></div><div class="kpi"><b>${meta.rasgos}</b><span>variables por jugador</span></div></div>
+
+      <h3>La respuesta corta</h3>
+      <div class="tarjeta"><p><b>Nadie puede proyectar el valor de un futbolista «al centavo», y este modelo tampoco.</b> A tres años, la proyección central se desvía típicamente ${p100(ag(3, "liga").modelo)} del valor real (contra ${p100(ag(3, "liga").ingenuo)} de suponer que el valor no cambia). En 2018 Haaland valía €300 mil y ningún dato disponible ese día apuntaba a €200 millones.</p>
+        <p><b>Lo que sí hace bien es ordenar.</b> En cada año de prueba, sus 50 apuestas sub-23 multiplicaron su valor por ${mediaDe(P, "sel_mult").toFixed(1)} en tres años (mediana), contra ${mediaDe(P, "pob_mult").toFixed(1)} del grupo del que salieron; y ${p100(mediaDe(P, "al_cae"))} de sus 50 alertas de devaluación perdió al menos 40% de valor. Sirve para decidir dónde mirar y qué vender, no para fijar un precio.</p></div>
+
+      <h3>Cómo funciona</h3>
+      <div class="tarjeta"><p><b>1. Modelo de precisión.</b> Árboles de decisión potenciados (gradient boosting) entrenados por cuantiles: uno para el escenario pesimista, otro para la mediana y otro para el optimista, a 1, 3, 5 y 8 años (los intermedios se interpolan). Cada jugador-año aporta ${meta.rasgos} variables: edad exacta, posición, valor y su trayectoria (6 meses, 1, 2 y 3 años, distancia a su máximo), club y liga en esa fecha (valor de la plantilla, su lugar dentro de ella, nivel de la liga), minutos, goles y asistencias de los 12 meses previos, minutos europeos y de selección, acumulados de carrera, fichajes recientes y días de lesión. Todo en valor real: se descuenta la inflación del mercado.</p>
+        <p><b>2. Curva de largo plazo.</b> Más allá de 8 años no hay datos suficientes para un modelo individual; la proyección se prolonga con la forma típica por edad, posición y nivel de valor (factores de desarrollo edad a edad, como un triángulo actuarial).</p>
+        <p><b>3. Bandas calibradas.</b> Las bandas pesimista–optimista se ensanchan con el error observado en las pruebas retrospectivas hasta contener 8 de cada 10 resultados reales. Medido dejando fuera cada año evaluado, contienen ${Object.entries(RT.cobertura).map(([h, c]) => `${p100(c)} a ${h} año${h > 1 ? "s" : ""}`).join(", ")}.</p>
+        <p><b>4. Precedentes.</b> En cada ficha, los cinco jugadores históricos más parecidos y qué fue de ellos. No alimentan el número: sirven para juzgarlo.</p></div>
+
+      <h3>Precisión: prueba retrospectiva de origen móvil</h3>
+      <p class="nota">Para cada año de ${RT.origenes[0]} a ${RT.origenes[1]} el modelo se reentrenó usando sólo lo que se sabía ese 1 de julio y se comparó con el valor real 1, 3 y 5 años después. «Error típico» = mediana de la desviación de la proyección central. «Ingenuo» = suponer que el valor no cambia. «Orden» = correlación de rangos entre el cambio previsto y el real (0 = azar, 1 = perfecto).</p>
+      <div class="tabla-caja"><table class="plana"><thead><tr><th class="izq">Horizonte</th><th class="izq">Grupo</th><th>Casos</th><th>Error típico</th><th>Ingenuo</th><th>Error descontando el mercado</th><th>Orden</th></tr></thead>
+      <tbody>${[1, 3, 5].flatMap((h) => Object.keys(G).map((g) => ag(h, g)).filter(Boolean).map((r) => `<tr><td class="izq">${r.h} año${r.h > 1 ? "s" : ""}</td><td class="izq">${G[r.grupo]}</td><td>${mil(r.n)}</td>
+        <td><b>${p100(r.modelo)}</b></td><td>${p100(r.ingenuo)}</td><td>${p100(r.modelo_real)}</td><td>${r.spearman.toFixed(2)}</td></tr>`)).join("")}</tbody></table></div>
+      <p class="nota">«Descontando el mercado» mide sólo el acierto sobre el jugador, como si la inflación general se conociera. La diferencia con la columna anterior es lo que cuesta no saber hacia dónde irá el mercado.</p>
+
+      <h3>¿Sirve para elegir?</h3>
+      <p class="nota">Cada año, entre los sub-23 de €1–25M en ligas con datos completos, se tomaron las 50 mayores alzas previstas; y entre los de 27 años o más desde €5M, las 50 mayores caídas previstas. Resultado tres años después (sólo quienes seguían valuados).</p>
+      <div class="tabla-caja"><table class="plana"><thead><tr><th class="izq">Año de la apuesta</th><th>Múltiplo mediano: 50 apuestas</th><th>Grupo completo</th><th>Duplicaron valor: apuestas</th><th>Grupo</th><th>Valor de la cartera: apuestas</th><th>Grupo</th><th>Alertas que cayeron ≥40%</th><th>Grupo</th></tr></thead>
+      <tbody>${P.map((r) => `<tr><td class="izq">${r.origen}</td><td><b>×${r.sel_mult.toFixed(2)}</b></td><td>×${r.pob_mult.toFixed(2)}</td><td><b>${p100(r.sel_doble)}</b></td><td>${p100(r.pob_doble)}</td>
+        <td><b>×${r.sel_cartera.toFixed(2)}</b></td><td>×${r.pob_cartera.toFixed(2)}</td><td><b>${p100(r.al_cae)}</b></td><td>${p100(r.viej_cae)}</td></tr>`).join("")}</tbody></table></div>
+      <p class="nota">Son valuaciones de Transfermarkt, no precios pagados: comprar a ese valor no siempre es posible y los traspasos reales incluyen primas. El múltiplo de cartera es una medida de selección, no un rendimiento financiero.</p>
+
+      <h3>Lo que habría dicho de casos conocidos</h3>
+      <div class="tabla-caja"><table class="plana"><thead><tr><th class="izq">Jugador</th><th class="izq">Proyección hecha en</th><th>Valía</th><th>Pesimista</th><th>Mediana</th><th>Optimista</th><th>Extremo (1 de 50)</th><th>Valor real</th><th class="izq">Resultado</th></tr></thead>
+      <tbody>${casos.map((c) => `<tr><td class="izq">${esc(c.nombre)} <span class="tenue">(${c.edad})</span></td><td class="izq">${c.origen} → ${c.origen + c.h}</td><td>${eur(c.valor)}</td><td>${eur(c.p10)}</td><td>${eur(c.p50)}</td><td>${eur(c.p90)}</td><td>${eur(c.p98)}</td>
+        <td><b>${eur(c.real)}</b></td><td class="izq ${c.real > c.p90 ? "sube" : c.real < c.p10 ? "baja" : ""}">${veredicto(c)}</td></tr>`).join("")}</tbody></table></div>
+      <p class="nota">Los casos se eligieron antes de ver el resultado del modelo e incluyen fracasos sonados a propósito. Las grandes estrellas quedan casi siempre fuera de la banda: son, por definición, lo que nadie veía venir.</p>
+
+      <h3>Detalle por año de origen (ligas con datos completos)</h3>
+      <div class="tabla-caja"><table class="plana"><thead><tr><th class="izq">Origen</th>${[1, 3, 5].map((h) => `<th>Error a ${h}a</th><th>Ingenuo</th><th>Orden</th>`).join("")}</tr></thead>
+      <tbody>${[...new Set(RT.por_origen.map((r) => r.origen))].map((o) => `<tr><td class="izq">${o}</td>${[1, 3, 5].map((h) => { const r = RT.por_origen.find((x) => x.origen === o && x.h === h); return r ? `<td><b>${p100(r.modelo)}</b></td><td>${p100(r.ingenuo)}</td><td>${r.spearman.toFixed(2)}</td>` : "<td>—</td><td>—</td><td>—</td>"; }).join("")}</tr>`).join("")}</tbody></table></div>
+
       <h3>Índice del mercado</h3>
-      <div class="tarjeta"><p class="nota">Valor medio de los 500 jugadores más caros de cada año (${meta.indice_mercado.anios[0]} = 1). Es el deflactor del modelo; subió ${(meta.inflacion_10a * 100).toFixed(1)}% anual en los últimos 10 años, pero casi todo fue el salto de 2017–2019: desde 2019 el ritmo es ${(INFL_RECIENTE * 100).toFixed(1)}% anual. Por eso las proyecciones se muestran en euros de hoy y la inflación futura es un supuesto que eliges en cada ficha.</p><svg class="grafica" id="indice"></svg></div>
+      <div class="tarjeta"><p class="nota">Valor medio de los 500 jugadores más caros de cada año (${meta.indice_mercado.anios[0]} = 1). Es el deflactor del modelo. Subió ${(meta.inflacion_10a * 100).toFixed(1)}% anual en 10 años, casi todo en el salto de 2017–2019; desde 2019, ${(INFL_RECIENTE * 100).toFixed(1)}% anual. Por eso las proyecciones se muestran en euros de hoy y la inflación futura es un supuesto que eliges en cada ficha; el que menos falló históricamente es la mitad del ritmo de los últimos 10 años (${(RT.inflacion_supuesta * 100).toFixed(1)}%).</p><svg class="grafica" id="indice"></svg></div>
+
       <h3>Límites</h3>
       <div class="tarjeta"><ul>
-        <li><b>No son todos los futbolistas del mundo.</b> Son los ${mil(meta.jugadores)} con una valuación de Transfermarkt desde enero de 2025 en dos bases abiertas. La cobertura es buena en primeras divisiones y pareja en segundas y terceras de Europa; el resto es parcial.</li>
-        <li><b>${mil(viejos)} valores tienen más de un año</b> (una de las fuentes se actualizó por última vez en septiembre de 2025). Cada ficha muestra la fecha de su valor.</li>
-        <li><b>${mil(sinPais)} jugadores no tienen país de liga</b> (agentes libres o clubes que la fuente no clasifica) y no aparecen en el mapa; sí en el explorador. En otros clubes el país es inferido por la nacionalidad dominante de la plantilla.</li>
+        <li><b>El techo de precisión lo ponen los datos, no el modelo.</b> Se probaron modelos más grandes, la identidad del club y la nacionalidad: ninguno mejoró. Para bajar más el error haría falta información que no es pública (datos de evento, salarios, cláusulas, informes de scouting).</li>
         <li><b>Se proyecta la valuación de Transfermarkt</b>, una estimación de su comunidad, no precios de traspaso.</li>
-        <li><b>A un año el modelo empata con la referencia ingenua.</b> Su ventaja real está a 3–5 años, donde aun así el error típico ronda un factor de 2. En menores de 23 es donde más falla.</li>
-        <li><b>Sesgo de supervivencia.</b> Cada año ${Math.round(meta.salida_anual * 100)}% de los jugadores deja de estar valuado (retiro, ligas no cubiertas). Las bandas son para quien sigue; por eso cada horizonte muestra la probabilidad de seguir valuado.</li>
-        <li><b>No entran al modelo</b> minutos, goles, nivel de la liga, duración del contrato ni exposición mediática. Minutos y goles sólo existen para primeras divisiones; la mediaticidad no existe como dato abierto.</li>
-        <li><b>Por encima de €100M y por encima de 38 años</b> hay muy pocos casos: ahí el modelo extrapola.</li>
-        <li>Los perfiles (Estrella ≥ €60M, Élite ≥ €25M, Cumplidor ≥ €8M, Regular ≥ €2M, De rol) son cortes convencionales sobre el valor máximo de carrera esperado.</li></ul></div>
+        <li><b>${mil(sinCob)} jugadores están fuera de las ligas con datos completos.</b> Para ellos el modelo no ve club, minutos ni goles y sus proyecciones son menos finas; la ficha lo avisa.</li>
+        <li><b>${mil(viejos)} valores tienen más de un año</b> (una fuente dejó de actualizar valuaciones en septiembre de 2025). Cada ficha muestra la fecha de su valor.</li>
+        <li><b>${mil(sinPais)} jugadores no tienen país de liga</b> y no aparecen en el mapa; sí en el explorador. En otros clubes el país es inferido por la nacionalidad dominante de la plantilla.</li>
+        <li><b>Sesgo de supervivencia.</b> Cada año ${Math.round(meta.salida_anual * 100)}% de los jugadores deja de estar valuado. Las bandas son para quien sigue; cada horizonte muestra la probabilidad de seguir valuado.</li>
+        <li><b>Sesgo de selección corregido.</b> Una de las fuentes sólo incluye a un jugador si alguna vez llegó a una liga cubierta; sus años previos se excluyeron de entrenamiento y evaluación, porque sólo existen gracias a que después triunfó.</li>
+        <li><b>No entran al modelo</b> duración del contrato (sólo se conoce la actual), salario ni exposición mediática.</li>
+        <li><b>Por encima de €100M, por encima de 38 años y más allá de 8 años</b> hay pocos casos: ahí el modelo extrapola.</li>
+        <li>Los perfiles (Estrella ≥ €60M, Élite ≥ €25M, Cumplidor ≥ €8M, Regular ≥ €2M, De rol) son cortes convencionales sobre el valor máximo esperado en los próximos 8 años o el ya alcanzado.</li></ul></div>
       <p class="nota">Fuentes: dcaribou/transfermarkt-datasets (corte ${meta.corte}) y salimt/football-datasets (valuaciones a septiembre de 2025, lesiones a septiembre de 2026).</p></div>`;
     const el = d3.select("#indice"), W = el.node().clientWidth, H = 200, m = { t: 8, r: 10, b: 22, l: 36 }, I = meta.indice_mercado;
     el.attr("viewBox", `0 0 ${W} ${H}`).attr("height", H);
@@ -480,16 +490,15 @@
     if (!j) return;
     const d = await detalle(j.id);
     if (ruta.j !== j.id) return;
-    const c = j.c, p = j.p, eP = Math.min(Math.max(j.edad, meta.edad_min), meta.edad_max - 1);
+    const c = j.c, Q = d.q || [], Sv = d.s || [];
+    const proy = (h, k = 1, infl = 0) => (Q[h - 1] ? j.valor * Q[h - 1][k] * Math.pow(1 + infl, h) : null);
     const viejo = j.fecha < corteYM - 100;
-    const horizontes = [1, 2, 3, 5, 8, 10, 15].filter((h) => h <= j.H);
-    const fila = (h) => `<tr><td class="izq">${h} año${h > 1 ? "s" : ""} · ${j.edad + h} de edad</td><td>${eur(proy(j, h, 0, inflacion))}</td><td><b>${eur(proy(j, h, 1, inflacion))}</b></td>
-      <td>${eur(proy(j, h, 2, inflacion))}</td><td class="${tono(proy(j, h) / j.valor - 1)}">${pct(proy(j, h, 1, inflacion) / j.valor - 1)}</td><td>${sigue(j, h) == null ? "—" : Math.round(sigue(j, h) * 100) + "%"}</td></tr>`;
-    // contribución de cada factor a la mediana a 3 años (o al horizonte disponible)
-    const hf = Math.min(3, j.H) || 1, ih = AJ.horizontes.indexOf(hf) >= 0 ? AJ.horizontes.indexOf(hf) : 0, b = AJ.betas[ih], f = factoresDe(j);
-    const baseQ = p && p.q[hf - 1] && p.q[hf - 1][1];
-    const contrib = baseQ ? [["Curva por edad, posición y valor", Math.log(baseQ) + b[0]], ["Tendencia del último año", b[1] * f[1] + b[2] * f[2]],
-      ["Distancia a su propio máximo", b[3] * f[3]], ["Lesiones (12 meses)", b[4] * f[4]]] : [];
+    const horizontes = [1, 2, 3, 5, 8, 10, 15].filter((h) => h <= Q.length);
+    const fila = (h) => `<tr><td class="izq">${h} año${h > 1 ? "s" : ""} · ${j.edad + h} de edad</td><td>${eur(proy(h, 0, inflacion))}</td><td><b>${eur(proy(h, 1, inflacion))}</b></td>
+      <td>${eur(proy(h, 2, inflacion))}</td><td class="${tono(proy(h) / j.valor - 1)}">${pct(proy(h, 1, inflacion) / j.valor - 1)}</td><td>${Sv[h - 1] == null ? "—" : Math.round(Sv[h - 1] * 100) + "%"}</td></tr>`;
+    // contribución de cada grupo de factores a la mediana a 3 años (descomposición exacta del modelo)
+    const hf = 3, F_ = d.f || [];
+    const contrib = j.H >= 3 && F_.length ? [["Punto de partida: cambio típico de un jugador", F_[0]]].concat(meta.grupos.map((g, i) => [g, F_[i + 1]])) : [];
     const mxc = Math.max(0.05, ...contrib.map((x) => Math.abs(x[1])));
     const pr = d.p;
     el.innerHTML = `<div class="ficha-top"><div>
@@ -500,22 +509,23 @@
       </div><div class="acciones">${estrella(j)}<button class="cerrar" data-cerrar aria-label="Cerrar">×</button></div></div>
       <div class="kpis">
         <div class="kpi"><b>${eur(j.valor)}</b><span>valor actual · ${fechaYM(j.fecha)}</span></div>
-        <div class="kpi"><b class="${tono(j.r3)}">${eur(j.v3)}</b><span>mediana a ${hf} año${hf > 1 ? "s" : ""} (${pct(j.r3)})</span></div>
-        <div class="kpi"><b>${eur(j.pico)}</b><span>máximo de carrera esperado${j.edadPico ? " · hacia los " + j.edadPico : " · ya alcanzado"}</span></div>
+        <div class="kpi"><b class="${tono(j.r3)}">${eur(j.v3)}</b><span>mediana a ${j.h3} año${j.h3 > 1 ? "s" : ""} (${pct(j.r3)})</span></div>
+        <div class="kpi"><b>${eur(j.pico)}</b><span>valor máximo esperado${j.edadPico ? " · hacia los " + j.edadPico : " · ya alcanzado"}</span></div>
         <div class="kpi"><b>${eur(j.techo)}</b><span>techo optimista (1 de cada 10)</span></div>
       </div>
       ${viejo ? `<div class="aviso">El último valor disponible es de ${fechaYM(j.fecha)}. La proyección parte de ahí y puede estar desfasada.</div>` : ""}
       ${j.valor >= 1e8 ? `<div class="aviso">Por encima de €100M casi no hay precedentes: el modelo extrapola.</div>` : ""}
       ${j.edad >= 38 ? `<div class="aviso">A esta edad hay muy pocos casos históricos; se muestra la devaluación típica de quienes siguieron activos.</div>` : ""}
       <h3>Historia y proyección</h3>
-      <label class="nota">Proyección en <select id="inflacion"><option value="0">euros de hoy (sin inflación)</option><option value="${INFL_RECIENTE}">euros corrientes, mercado +${(INFL_RECIENTE * 100).toFixed(1)}% anual (ritmo desde 2019)</option>
+      <label class="nota">Proyección en <select id="inflacion"><option value="0">euros de hoy (sin inflación)</option><option value="${RT.inflacion_supuesta}">euros corrientes, mercado +${(RT.inflacion_supuesta * 100).toFixed(1)}% anual (supuesto con menor error histórico)</option><option value="${INFL_RECIENTE}">euros corrientes, mercado +${(INFL_RECIENTE * 100).toFixed(1)}% anual (ritmo desde 2019)</option>
         <option value="${meta.inflacion_10a}">euros corrientes, +${(meta.inflacion_10a * 100).toFixed(1)}% anual (ritmo de los últimos 10 años)</option></select></label>
       <svg class="grafica" id="g-jugador"></svg>
       ${horizontes.length ? `<div class="tabla-caja"><table class="plana"><thead><tr><th class="izq">Horizonte</th><th>Pesimista</th><th>Mediana</th><th>Optimista</th><th>Cambio</th><th>Sigue valuado</th></tr></thead><tbody>${horizontes.map(fila).join("")}</tbody></table></div>
         <p class="nota">Banda = 8 de cada 10 trayectorias históricas comparables. «Sigue valuado» = probabilidad de seguir con valor publicado; los importes son para ese caso.</p>` : `<p class="nota">Sin proyección disponible.</p>`}
+      ${!j.cubierta ? `<div class="aviso">Juega fuera de las ligas con datos completos: el modelo no ve su club, sus minutos ni sus goles, sólo su edad, posición, lesiones y la trayectoria de su valor. La proyección es menos fina.</div>` : ""}
       ${contrib.length ? `<h3>Por qué esta proyección (a ${hf} año${hf > 1 ? "s" : ""})</h3>${contrib.map(([t, x]) => `<div class="factor"><span>${t}</span>
         <span class="pista"><i style="${x >= 0 ? "left:50%" : "right:50%"};width:${Math.min(50, 50 * Math.abs(x) / mxc)}%;background:${x >= 0 ? "var(--acento)" : "var(--malo)"}"></i></span><b class="${tono(Math.exp(x) - 1)}">${pct(Math.exp(x) - 1)}</b></div>`).join("")}
-        <p class="nota">Los efectos se multiplican. La curva base domina; los factores individuales mueven poco porque históricamente explican poco.</p>` : ""}
+        <p class="nota">Los efectos se multiplican y juntos dan la mediana a 3 años. Es la descomposición exacta de lo que calculó el modelo para este jugador, no una explicación causal.</p>` : ""}
       ${pr ? `<h3>Precedentes: ${pr.n} jugadores parecidos a su edad</h3>
         <p>${pr.sube == null ? "" : `De los que siguieron valuados tres años después, <b>${Math.round(pr.sube * 100)}% valía más</b>; el caso mediano multiplicó su valor por <b>${pr.med}</b>. `}${Math.round((1 - pr.sigue) * 100)}% dejó de estar valuado en ese plazo.</p>
         <div class="tabla-caja"><table class="plana"><thead><tr><th class="izq">Jugador (año)</th><th>Valía entonces</th><th>3 años después</th><th>Máximo posterior</th></tr></thead>
@@ -535,14 +545,14 @@
     const sel = $("#inflacion");
     sel.value = String(inflacion);
     sel.onchange = () => { inflacion = +sel.value; const y = el.scrollTop; pintarFicha().then(() => { el.scrollTop = y; }); };
-    graficaJugador(j, d, eP);
+    graficaJugador(j, d);
   }
   function graficaJugador(j, d) {
     const el = d3.select("#g-jugador"), W = el.node().clientWidth, H = 250, m = { t: 12, r: 12, b: 24, l: 50 };
     el.attr("viewBox", `0 0 ${W} ${H}`).attr("height", H);
     const hist = d.h[0].map((ym, i) => [anioDec(ym), d.h[1][i] * 1e3]);
-    const t0 = anioDec(j.fecha), n = Math.min(12, j.H);
-    const fut = [{ t: t0, q: [j.valor, j.valor, j.valor] }].concat(d3.range(1, n + 1).map((h) => ({ t: t0 + h, q: [0, 1, 2].map((k) => proy(j, h, k, inflacion)) })));
+    const Q = d.q || [], t0 = anioDec(j.fecha), n = Math.min(12, Q.length);
+    const fut = [{ t: t0, q: [j.valor, j.valor, j.valor] }].concat(d3.range(1, n + 1).map((h) => ({ t: t0 + h, q: Q[h - 1].map((x) => j.valor * x * Math.pow(1 + inflacion, h)) })));
     const x = d3.scaleLinear([hist.length ? Math.min(hist[0][0], t0 - 1) : t0 - 1, t0 + Math.max(n, 1)], [m.l, W - m.r]);
     const y = d3.scaleLinear([0, Math.max(d3.max(hist, (p) => p[1]) || 0, d3.max(fut, (p) => p.q[2]) || 0, j.valor) * 1.06], [H - m.b, m.t]);
     el.append("g").attr("class", "eje").attr("transform", `translate(0,${H - m.b})`).call(d3.axisBottom(x).ticks(Math.min(10, W / 60)).tickFormat(d3.format("d")));

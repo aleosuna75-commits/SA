@@ -6,7 +6,7 @@ Fuentes (ambas derivadas de Transfermarkt, abiertas):
   B. salimt/football-datasets         -> 92 mil perfiles, divisiones inferiores, lesiones
 Se bajan a mercado/datos_crudos/ (no se versionan) y de ahí sale todo lo que consume la página.
 
-Modelo, en tres capas:
+Modelo, en tres capas (la 2 vive en modelo.py):
   1. Base: factores de desarrollo edad-a-edad del valor REAL (deflactado por un índice del mercado),
      por posición y tramo de valor, remuestreados en simulación -> bandas p10/p50/p90 por horizonte,
      máximo de carrera y probabilidad de seguir valuado.
@@ -26,6 +26,8 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+import modelo as M
+
 RAIZ = Path(__file__).resolve().parent
 CRUDOS = RAIZ / "datos_crudos"
 SALIDA = RAIZ / "web" / "datos"
@@ -44,8 +46,6 @@ HMAX = EDAD_MAX - EDAD_MIN
 N_SIM = 3000
 MIN_OBS = 40
 PRIMER_ANIO = 2010                               # transiciones anteriores: cobertura pobre
-H_AJUSTE = [1, 2, 3, 5]
-FACTORES = ["mom", "mom_joven", "dd", "les"]
 VIGENTE_DESDE = "2025-01-01"                     # última valuación mínima para aparecer en el sitio
 N_TROZOS = 256
 
@@ -106,7 +106,9 @@ def cargar():
     jug = pd.concat([a_fresco, resto_b, resto_a], ignore_index=True)
     jug = jug[jug.pos.isin(POSICIONES) & jug.nac.notna() & jug.nombre.notna() & ~jug.nombre.isin(["nan", ""])]
 
-    va = leer_a("player_valuations")[["player_id", "date", "market_value_in_eur"]]
+    # La fuente A trae el club y la liga del jugador EN LA FECHA de cada valuación (club_t, comp_t).
+    va = leer_a("player_valuations").rename(columns={"current_club_id": "club_t", "player_club_domestic_competition_id": "comp_t"})
+    va = va[["player_id", "date", "market_value_in_eur", "club_t", "comp_t"]]
     cols = {"date_unix": "date", "value": "market_value_in_eur"}
     val = pd.concat([va, leer_b("player_market_value").rename(columns=cols),
                      leer_b("player_latest_market_value").rename(columns=cols)])
@@ -151,7 +153,8 @@ def cargar():
 
     les = leer_b("player_injuries", "player_injuries_updated_20260929", parse_dates=["from_date"])
     les = les[les.from_date.notna() & les.player_id.isin(jug.player_id)]
-    apar = leer_a("appearances", usecols=["game_id", "player_id", "date", "goals", "assists", "minutes_played"], parse_dates=["date"])
+    apar = leer_a("appearances", usecols=["game_id", "player_id", "date", "goals", "assists", "minutes_played", "competition_id"],
+                  parse_dates=["date"])
     fich = leer_a("transfers", parse_dates=["transfer_date"])
     return jug, val, clubes, les, apar, fich
 
@@ -195,7 +198,7 @@ def armar_panel(fotos, log_idx, anio_base, ultimo_anio):
     f["les"] = (f.les_dias / 100).clip(upper=3)
     f["pico_futuro"] = f[::-1].groupby("player_id").x.cummax()[::-1]
     base = f[["player_id", "anio", "x"]]
-    for h in sorted(set(H_AJUSTE) | {1}):
+    for h in (1, 3):
         f = f.merge(base.assign(anio=base.anio - h).rename(columns={"x": f"x{h}"}), on=["player_id", "anio"], how="left")
     f["tramo"] = np.digitize(np.exp(f.x), TRAMOS)
     f["e"] = f.edad.clip(upper=EDAD_MAX)
@@ -264,68 +267,58 @@ def simular(celdas, rng):
     return Q, S, PICO, EP
 
 
-# ---------------------------------------------------------------- capa 2: ajuste individual
-def mediana_base(Q, d, h):
-    e = d.e.to_numpy().clip(EDAD_MIN, EDAD_MAX - 1) - EDAD_MIN
-    with np.errstate(all="ignore"):
-        return np.log(Q[d.pi.to_numpy(), e, d.b.to_numpy(), h - 1, :])
+# ---------------------------------------------------------------- capa 2: modelo de precisión (modelo.py)
+def proyectar(act, modelos, k, sim, c_pico):
+    """Curvas por jugador a partir de los modelos por cuantiles.
 
-
-def regresion_mediana(X, y, vueltas=25):
-    """Regresión a la mediana (mínimos desvíos absolutos) por mínimos cuadrados reponderados.
-
-    El cambio de valor es asimétrico (unos pocos se disparan): la media sesga la proyección central.
+    act: última foto de cada jugador vigente, con rasgos. Devuelve cocientes reales valor futuro/actual:
+    R[n, HP, 3] (pesimista, mediana, optimista), SV[n, HP] (prob. de seguir valuado), pico y contribuciones.
+    Hasta 8 años manda el modelo; más allá se prolonga con la forma de la curva base por edad.
     """
-    b = np.linalg.lstsq(X, y, rcond=None)[0]
-    for _ in range(vueltas):
-        w = 1 / np.maximum(np.abs(y - X @ b), 1e-3)
-        b = np.linalg.lstsq(X * w[:, None] ** 0.5, y * w ** 0.5, rcond=None)[0]
-    return b
+    Q, S, _, _ = sim
+    HM, n, HP = M.H_MODELO, len(act), HMAX
+    lr = np.stack([np.stack([M.predecir(modelos, act, h, q) for q in M.CUANTILES], axis=1) for h in HM], axis=1)
+    kk = np.interp(HM, sorted(k), [k[h] for h in sorted(k)])[None, :]          # ensanche calibrado de la banda
+    med = lr[:, :, 1]
+    puntos = [med - kk * np.maximum(med - lr[:, :, 0], 0.02), med, med + kk * np.maximum(lr[:, :, 2] - med, 0.02),
+              np.stack([M.predecir(modelos, act, h, "s") for h in HM], axis=1)]
+    hs = np.arange(1, HM[-1] + 1)
+    interp = lambda a: np.stack([np.interp(hs, HM, fila) for fila in a])        # (n, 8)
+    lo, md, hi, sv = (interp(a) for a in puntos)
+    sv = np.minimum.accumulate(np.clip(sv, 0, 1), axis=1)
+    R, SV = np.full((n, HP, 3), np.nan), np.full((n, HP), np.nan)
+    R[:, :8] = np.exp(np.stack([lo, md, hi], axis=2))
+    SV[:, :8] = sv
+    pi = act.pi.to_numpy().astype(int)
+    e = act.edad.to_numpy().clip(EDAD_MIN, EDAD_MAX - 1) - EDAD_MIN
+    bb = bin_de(np.log(act.valor.to_numpy()))
+    Qb, Sb = Q[pi, e, bb], S[pi, e, bb]                                         # (n, HMAX, 3), (n, HMAX)
+    with np.errstate(all="ignore"):
+        R[:, 8:] = R[:, 7:8] * Qb[:, 8:HP] / Qb[:, 7:8]
+        SV[:, 8:] = SV[:, 7:8] * Sb[:, 8:HP] / Sb[:, 7:8]
+    fuera = act.edad.to_numpy()[:, None] + np.arange(1, HP + 1)[None, :] > EDAD_MAX + 1
+    R[fuera], SV[fuera] = np.nan, np.nan
+    p50 = np.exp(c_pico[0] * np.maximum(M.predecir(modelos, act, "pico", 0.5), 0))
+    p90 = np.maximum(np.exp(c_pico[1] * np.maximum(M.predecir(modelos, act, "pico", 0.9), 0)), p50)
+    with np.errstate(all="ignore"):
+        h_pico = np.nanargmax(np.where(np.isnan(R[:, :, 1]), -1, R[:, :, 1]), axis=1) + 1
+    c = modelos[(3, 0.5)].predict(act[M.RASGOS], pred_contrib=True)
+    contrib = np.column_stack([c[:, -1]] + [c[:, [M.RASGOS.index(r) for r in rs]].sum(axis=1) for rs in M.GRUPOS.values()])
+    return {"R": R, "SV": SV, "pico50": p50, "pico90": p90, "h_pico": h_pico, "contrib": contrib}
 
 
-def ajustar_factores(panel, Q, ultimo_anio):
-    """Regresión mediana del residuo (cambio real observado - mediana de la capa 1) contra los factores, por horizonte."""
-    betas = {}
-    for h in H_AJUSTE:
-        d = panel[(panel.anio >= PRIMER_ANIO + 1) & (panel.anio + h <= ultimo_anio) & panel[f"x{h}"].notna() & (panel.e + h <= EDAD_MAX)]
-        y = (d[f"x{h}"] - d.x).to_numpy() - mediana_base(Q, d, h)[:, 1]
-        ok = np.isfinite(y)
-        X = np.column_stack([np.ones(ok.sum())] + [d[c].to_numpy()[ok] for c in FACTORES])
-        betas[h] = regresion_mediana(X, y[ok])
-    return betas
-
-
-def backtest(fotos, log_idx, rng, origen=2021):
-    """Entrena sólo con lo conocido a jul-`origen` y compara contra lo que pasó después."""
-    panel = armar_panel(fotos, log_idx, origen, origen)
-    celdas, _, _ = ajustar_celdas(panel, origen)
-    Q, *_ = simular(celdas, rng)
-    betas = ajustar_factores(panel, Q, origen)
-    infl = (log_idx[origen] - log_idx[origen - 10]) / 10
-    base = panel[(panel.anio == origen) & (panel.e < EDAD_MAX)]
-    filas = []
-    for h in (1, 3, 5):
-        real = fotos[fotos.anio == origen + h][["player_id", "valor"]].rename(columns={"valor": "real"})
-        d = base.merge(real, on="player_id", how="left")
-        d = d[d.e + h <= EDAD_MAX]
-        q = mediana_base(Q, d, h)
-        s = betas[h][0] + sum(betas[h][i + 1] * d[c].to_numpy() for i, c in enumerate(FACTORES))
-        lv = np.log(d.valor.to_numpy())
-        obs = d.real.notna().to_numpy() & np.isfinite(q[:, 1])
-        y = np.log(d.real.to_numpy()[obs])
-        e_base = np.abs(lv[obs] + q[obs, 1] + infl * h - y)
-        e_aj = np.abs(lv[obs] + q[obs, 1] + s[obs] + infl * h - y)
-        e_ing = np.abs(lv[obs] - y)
-        dentro = (y >= lv[obs] + q[obs, 0] + s[obs] + infl * h) & (y <= lv[obs] + q[obs, 2] + s[obs] + infl * h)
-        ed = d.edad.to_numpy()[obs]
-        grupos = {"todos": ed > 0, "sub23": ed < 23, "23a28": (ed >= 23) & (ed <= 28), "29a33": (ed >= 29) & (ed <= 33), "34mas": ed >= 34}
-        err = lambda v, m: round(float(np.exp(np.median(v[m])) - 1), 3)
-        for g, m in grupos.items():
-            if m.sum() < 30:
-                continue
-            filas.append({"horizonte": h, "grupo": g, "n": int(m.sum()), "error_modelo": err(e_aj, m), "error_base": err(e_base, m),
-                          "error_ingenuo": err(e_ing, m), "cobertura": round(float(dentro[m].mean()), 3)})
-    return {"origen": origen, "inflacion_supuesta": round(float(np.exp(infl) - 1), 4), "filas": filas}
+def resumen_retro(filas, picks, casos, cob, k, li, corte):
+    """Compacta la prueba retrospectiva para la página."""
+    prom = lambda g, c: float(np.average(g[c], weights=g.n))
+    agregada = [{"h": int(h), "grupo": gr, "n": int(g.n.sum()), **{c: round(prom(g, c), 3) for c in ["modelo", "ingenuo", "modelo_real", "ingenuo_real", "spearman"]}}
+                for (h, gr), g in filas.groupby(["h", "grupo"])]
+    liga = filas[filas.grupo == "liga"]
+    por_origen = [{"origen": int(r.origen), "h": int(r.h), "n": int(r.n), "modelo": round(r.modelo, 3), "ingenuo": round(r.ingenuo, 3),
+                   "spearman": round(r.spearman, 3)} for r in liga.itertuples()]
+    return {"agregada": agregada, "por_origen": por_origen, "picks": picks.round(3).to_dict("records"), "casos": casos,
+            "cobertura": {str(h): round(v, 3) for h, v in cob.items()}, "ensanche": {str(h): round(v, 3) for h, v in k.items()},
+            "origenes": [int(filas.origen.min()), int(filas.origen.max())],
+            "inflacion_supuesta": round(float(np.exp(M.inflacion_supuesta(li, corte.year)) - 1), 4)}
 
 
 # ---------------------------------------------------------------- capa 3: precedentes
@@ -365,8 +358,7 @@ def precedentes(panel, actuales, nombres, anio_tope):
 
 
 # ---------------------------------------------------------------- exportación
-def exportar(jug, val, clubes, les, apar, fich, panel, sim, betas, log_idx, bt, corte, stats):
-    Q, S, PICO, EP = sim
+def exportar(jug, val, clubes, les, apar, fich, panel, act, pr, log_idx, retro, corte, stats):
     if SALIDA.exists():
         shutil.rmtree(SALIDA)
     (SALIDA / "det").mkdir(parents=True)
@@ -378,12 +370,24 @@ def exportar(jug, val, clubes, les, apar, fich, panel, sim, betas, log_idx, bt, 
     j["fecha_valor"] = j.player_id.map(ult.date)
     j["max_hist"] = j.player_id.map(maximo)
     j["edad"] = ((corte - j.nac).dt.days / 365.25).astype(int)
-    j = j[(j.edad >= 15) & j.club_id.isin(clubes.index)]
+    fila_de = {int(pid): i for i, pid in enumerate(act.player_id)}
+    j = j[(j.edad >= 15) & j.club_id.isin(clubes.index) & j.player_id.isin(fila_de)]
+    f = panel.sort_values("anio").groupby("player_id").tail(1).set_index("player_id")       # para los precedentes
+    for c in ["mom", "x"]:
+        j[c] = j.player_id.map(f[c]).fillna(0)
+    R, SV = pr["R"], pr["SV"]
+    cubierta = act.comp_t.notna().to_numpy()
 
-    # factores individuales: los de la foto más reciente de cada jugador
-    f = panel.sort_values("anio").groupby("player_id").tail(1).set_index("player_id")
-    for c in ["mom", "nuevo", "dd", "les", "x"]:
-        j[c] = j.player_id.map(f[c]).fillna(0 if c != "nuevo" else 1)
+    def proyeccion(r):
+        """Columnas de proyección de la fila: medianas a 1,2,3,5,8 años, supervivencia, pico, techo."""
+        i = fila_de[int(r.player_id)]
+        H = int(np.isfinite(R[i, :, 1]).sum())
+        v = [int(r.valor * R[i, h - 1, 1]) if h <= H else -1 for h in (1, 2, 3, 5, 8)]
+        h3 = min(3, H)
+        s3 = int(round(100 * SV[i, h3 - 1])) if H else -1
+        pico, techo = max(r.max_hist, r.valor * pr["pico50"][i]), max(r.max_hist, r.valor * pr["pico90"][i])
+        edad_pico = int(r.edad + pr["h_pico"][i]) if H and r.valor * pr["pico50"][i] > 1.03 * r.max_hist and R[i, pr["h_pico"][i] - 1, 1] > 1.03 else 0
+        return v + [s3, int(pico), int(techo), edad_pico, int(cubierta[i]), H]
 
     a = apar[apar.date > corte - pd.Timedelta(days=365)]
     a = a.groupby("player_id").agg(pj=("game_id", "count"), minutos=("minutes_played", "sum"), goles=("goals", "sum"), asist=("assists", "sum"))
@@ -403,7 +407,7 @@ def exportar(jug, val, clubes, les, apar, fich, panel, sim, betas, log_idx, bt, 
         ip.get(str(r.pais), -1), int(r.valor), int(r.max_hist), n(r.pj), n(r.minutos), n(r.goles), n(r.asist),
         r.contrato if isinstance(r.contrato, str) else "", int(r.fecha_valor.strftime("%Y%m")),
         pies.index(r.pie) if r.pie in pies else -1, int(r.altura) if r.altura and r.altura > 100 else 0,
-        round(float(r.mom), 2), int(r.nuevo), round(float(r.dd), 2), int(r.les * 100), int(r.les24), 1 if r.cedido_de else 0,
+        int(r.les24), 1 if r.cedido_de else 0, *proyeccion(r),
     ] for r in j.itertuples()]
 
     cl = clubes[clubes.index.isin(j.club_id)].copy()
@@ -438,7 +442,10 @@ def exportar(jug, val, clubes, les, apar, fich, panel, sim, betas, log_idx, bt, 
     trozos = [{} for _ in range(N_TROZOS)]
     for pid in j.player_id:
         pid = int(pid)
-        d = {"h": hist.get(pid, [[], []])}
+        i = fila_de[pid]
+        H = int(np.isfinite(R[i, :, 1]).sum())
+        d = {"h": hist.get(pid, [[], []]), "q": [[round(float(x), 3) for x in R[i, h]] for h in range(H)],
+             "s": [round(float(x), 2) for x in SV[i, :H]], "f": [round(float(x), 3) for x in pr["contrib"][i]]}
         for k, src in (("t", tras), ("l", lesiones), ("p", prec), ("a", agentes), ("c", cedidos)):
             if pid in src:
                 d[k] = src[pid]
@@ -456,28 +463,17 @@ def exportar(jug, val, clubes, les, apar, fich, panel, sim, betas, log_idx, bt, 
     for i, t in enumerate(trozos):
         volcar(SALIDA / "det" / f"{i}.json", t)
 
-    # ---- perfiles: sólo los (posición, edad, bin) que algún jugador usa
-    red = lambda arr: [None if not np.isfinite(v) else round(float(v), 3) for v in arr]
-    perf = {}
-    usados = set(zip(act.pi, act.e.clip(upper=EDAD_MAX - 1), bin_de(np.log(j.valor.to_numpy()))))
-    for p, e, b in usados:
-        i = e - EDAD_MIN
-        H = EDAD_MAX - e
-        perf[f"{p}_{e}_{b}"] = {"q": [red(Q[p, i, b, h]) for h in range(H)], "s": red(S[p, i, b, :H]),
-                                "pico": red(PICO[p, i, b]), "ep": int(EP[p, i, b])}
-
     anios = [int(a_) for a_ in log_idx.index if a_ >= 2006]
     meta = {
         "corte": corte.strftime("%Y-%m-%d"), "jugadores": len(filas), "clubes": len(lista_clubes),
         "ligas": int(cl[cl.nivel.between(1, 8)].groupby(["pais", "liga"]).ngroups), "paises_liga": int(cl[cl.pais != ""].pais.nunique()),
         "posiciones": POSICIONES, "subposiciones": subpos, "paises": paises,
-        "bins": [round(float(b)) for b in BINS], "edad_min": EDAD_MIN, "edad_max": EDAD_MAX, "trozos": N_TROZOS,
+        "edad_min": EDAD_MIN, "edad_max": EDAD_MAX, "trozos": N_TROZOS,
         "indice_mercado": {"anios": anios, "valor": [round(float(np.exp(log_idx[a_] - log_idx[anios[0]])), 3) for a_ in anios]},
         "inflacion_10a": round(float(np.exp((log_idx.iloc[-1] - log_idx.iloc[-11]) / 10) - 1), 4),
-        "ajuste": {"horizontes": H_AJUSTE, "factores": ["base"] + FACTORES, "betas": [[round(float(v), 4) for v in betas[h]] for h in H_AJUSTE]},
-        "backtest": bt, **stats,
+        "grupos": list(M.GRUPOS), "retro": retro, **stats,
     }
-    for nombre, obj in [("meta", meta), ("jugadores", filas), ("clubes", lista_clubes), ("perfiles", perf)]:
+    for nombre, obj in [("meta", meta), ("jugadores", filas), ("clubes", lista_clubes)]:
         volcar(SALIDA / f"{nombre}.json", obj)
     return meta
 
@@ -485,26 +481,45 @@ def exportar(jug, val, clubes, les, apar, fich, panel, sim, betas, log_idx, bt, 
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--sin-descarga", action="store_true")
-    if not ap.parse_args().sin_descarga:
+    ap.add_argument("--sin-retro", action="store_true", help="reutiliza la prueba retrospectiva de la corrida anterior")
+    args = ap.parse_args()
+    if not args.sin_descarga:
         descargar()
     jug, val, clubes, les, apar, fich = cargar()
     corte = val.date.max()
     rng = np.random.default_rng(2026)
 
+    # curva base por celdas: da la forma de largo plazo (más de 8 años) y alimenta los precedentes
     fotos = fotos_anuales(val, jug, les, corte)
     log_idx = indice_inflacion(fotos)
-    bt = backtest(fotos, log_idx, rng)
     panel = armar_panel(fotos, log_idx, corte.year, corte.year)
     celdas, n_trans, p_salida = ajustar_celdas(panel, corte.year)
     sim = simular(celdas, rng)
-    betas = ajustar_factores(panel, sim[0], corte.year)
-    stats = {"transiciones": n_trans, "salida_anual": round(p_salida, 3), "valuaciones": len(val), "jugadores_historia": int(val.player_id.nunique())}
-    meta = exportar(jug, val, clubes, les, apar, fich, panel, sim, betas, log_idx, bt, corte, stats)
+
+    # modelo de precisión
+    fm, li = M.construir(val, jug, les, apar, fich, corte, indice_inflacion)
+    previo = SALIDA / "meta.json"
+    if args.sin_retro and previo.exists() and "retro" in json.loads(previo.read_text()):
+        retro = json.loads(previo.read_text())["retro"]
+    else:
+        filas, picks, casos, zs = M.retro(fm, li, jug.set_index("player_id").nombre)
+        k, cob = M.calibrar(zs)
+        retro = resumen_retro(filas, picks, casos, cob, k, li, corte)
+    if "pico_c" not in retro:
+        retro["pico_c"] = [round(c, 3) for c in M.calibrar_pico(fm, corte.year)]
+    k = {int(h): v for h, v in retro["ensanche"].items()}
+    modelos = M.entrenar(fm, corte.year, pico=True)
+    act = fm.sort_values("anio").groupby("player_id").tail(1).reset_index(drop=True)
+    pr = proyectar(act, modelos, k, sim, retro["pico_c"])
+
+    stats = {"transiciones": n_trans, "salida_anual": round(p_salida, 3), "valuaciones": len(val), "jugadores_historia": int(val.player_id.nunique()),
+             "filas_modelo": int((~fm.pre).sum()), "rasgos": len(M.RASGOS)}
+    meta = exportar(jug, val, clubes, les, apar, fich, panel, act, pr, log_idx, retro, corte, stats)
 
     print(f"corte {meta['corte']} | {meta['jugadores']} jugadores, {meta['clubes']} clubes, {meta['ligas']} ligas, {meta['paises_liga']} países")
-    print(f"transiciones {n_trans} | deja de estar valuado {p_salida:.1%}/año | inflación 10a {meta['inflacion_10a']:.1%}")
-    print(pd.DataFrame(meta["ajuste"]["betas"], columns=meta["ajuste"]["factores"], index=H_AJUSTE).to_string())
-    print(pd.DataFrame(bt["filas"]).to_string(index=False))
+    print("cobertura fuera de muestra:", retro["cobertura"], "| ensanche:", retro["ensanche"], "| ajuste del pico:", retro["pico_c"])
+    print(pd.DataFrame(retro["agregada"]).to_string(index=False))
+    print(pd.DataFrame(retro["picks"]).to_string(index=False))
 
 
 if __name__ == "__main__":
