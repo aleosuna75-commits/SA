@@ -1,7 +1,12 @@
 """Modelo de precisión: gradient boosting por cuantiles sobre rasgos del jugador y su contexto.
 
 Sustituye la proyección central de la curva por celdas (pipeline.py) cuando hay señal individual.
-Cada fila es un jugador en una foto anual (1-jul); los objetivos son el cambio de valor REAL a h años.
+Cada fila es un jugador en una foto anual (1-jul); los objetivos son el cambio de valor a h años.
+
+Se trabaja en euros corrientes. Se probó deflactar con el índice de los 500 y de los 5,000 jugadores más
+caros: la precisión fue prácticamente la misma (algo peor a 1 y 3 años) y el valor máximo quedó peor
+calibrado, porque la élite se infló mucho más que el resto en 2017-2019. Sin deflactor hay un supuesto
+menos: el modelo aprende el cambio nominal típico de cada tipo de jugador.
 """
 import numpy as np
 import pandas as pd
@@ -28,7 +33,11 @@ GRUPOS = {
 }
 
 
-def construir(val, jug, les, apar, fich, corte, log_idx_de):
+def sin_deflactor(fotos):
+    return fotos.groupby("anio").valor.apply(lambda s: 0.0)
+
+
+def construir(val, jug, les, apar, fich, corte, log_idx_de=sin_deflactor):
     """Panel jugador-año con rasgos. `log_idx_de(fotos)` devuelve el log-índice del mercado por año."""
     val = val.sort_values(["player_id", "date"]).copy()
     # La fuente B no trae club por fecha: se arrastra el último club conocido de A (hasta 400 días).
@@ -190,7 +199,7 @@ CASOS = [("Erling Haaland", 2018, 8), ("Kylian Mbappé", 2018, 8), ("Kylian Mbap
 
 
 def inflacion_supuesta(li, origen):
-    """Mitad del ritmo de los 10 años previos: la regla que menos falló al pronosticar el índice (ver LEEME)."""
+    """Sólo aplica si se entrena con deflactor (con `sin_deflactor` vale 0): mitad del ritmo de 10 años."""
     return 0.5 * (li[origen] - li[origen - 10]) / 10
 
 
@@ -292,4 +301,6 @@ def calibrar_pico(f, tope):
         rejilla = np.linspace(0.3, 1.5, 121)
         cob = np.array([(y[dice] <= c * pred[dice]).mean() for c in rejilla])
         factores.append(float(rejilla[np.abs(cob - q).argmin()]))
+    # tope de cordura: ningún techo puede superar el múltiplo que sólo 1 de cada 200 jugadores alcanzó
+    factores.append(float(np.quantile(np.maximum(ft.pico8 - ft.x, 0), 0.995)))
     return factores

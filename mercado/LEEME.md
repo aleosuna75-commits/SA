@@ -15,13 +15,15 @@
     cd mercado/web && python3 -m http.server    # http://localhost:8000
 
 ## Decisiones de fondo (y por qué)
-- **Valor real, no nominal.** Todo se entrena descontando un índice del mercado (500 jugadores más
-  caros de cada año). La inflación futura es un supuesto aparte: la regla que menos falló al
-  pronosticar el índice fue "la mitad del ritmo de los 10 años previos".
+- **Euros corrientes, sin deflactor.** Se probó descontar un índice del mercado (500 y 5,000
+  jugadores más caros): la precisión no mejoró y el valor máximo quedó peor calibrado, porque la
+  élite se infló mucho más que el resto en 2017-2019. Sin deflactor hay un supuesto menos.
 - **Modelos directos por horizonte y por cuantil** (1, 3, 5 y 8 años; p10, p50, p90), no una
   cadena año a año: los errores no se componen y cada banda se calibra contra el pasado.
 - **Sesgo de selección.** La fuente A sólo incluye a un jugador si alguna vez llegó a una liga
   cubierta; sus fotos anteriores a esa entrada se excluyen de entrenamiento y evaluación.
+- **Valor máximo calibrado.** El modelo del máximo a 8 años se corrige con una prueba fuera de
+  muestra (`calibrar_pico`), porque sin corregir era optimista.
 - **Bandas calibradas fuera de muestra.** Se ensanchan con el error de la prueba retrospectiva; la
   cobertura que se publica deja fuera el año que evalúa.
 - **Lo que se probó y no mejoró:** modelos más grandes o más chicos, identidad del club como

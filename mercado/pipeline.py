@@ -268,10 +268,13 @@ def simular(celdas, rng):
 
 
 # ---------------------------------------------------------------- capa 2: modelo de precisión (modelo.py)
+RECORD = 200e6                                   # mayor valor de mercado registrado; se actualiza en main
+
+
 def proyectar(act, modelos, k, sim, c_pico):
     """Curvas por jugador a partir de los modelos por cuantiles.
 
-    act: última foto de cada jugador vigente, con rasgos. Devuelve cocientes reales valor futuro/actual:
+    act: última foto de cada jugador vigente, con rasgos. Devuelve cocientes valor futuro/actual en euros corrientes:
     R[n, HP, 3] (pesimista, mediana, optimista), SV[n, HP] (prob. de seguir valuado), pico y contribuciones.
     Hasta 8 años manda el modelo; más allá se prolonga con la forma de la curva base por edad.
     """
@@ -298,8 +301,16 @@ def proyectar(act, modelos, k, sim, c_pico):
         SV[:, 8:] = SV[:, 7:8] * Sb[:, 8:HP] / Sb[:, 7:8]
     fuera = act.edad.to_numpy()[:, None] + np.arange(1, HP + 1)[None, :] > EDAD_MAX + 1
     R[fuera], SV[fuera] = np.nan, np.nan
-    p50 = np.exp(c_pico[0] * np.maximum(M.predecir(modelos, act, "pico", 0.5), 0))
-    p90 = np.maximum(np.exp(c_pico[1] * np.maximum(M.predecir(modelos, act, "pico", 0.9), 0)), p50)
+    # Topes de cordura: el múltiplo máximo observado (1 de cada 200) y 1.5 veces el récord histórico de valor.
+    valor = act.valor.to_numpy()
+    tope = np.minimum(np.exp(c_pico[2]), np.maximum(1.0, 1.5 * RECORD / valor))
+    p50 = np.minimum(np.exp(c_pico[0] * np.maximum(M.predecir(modelos, act, "pico", 0.5), 0)), tope)
+    p90 = np.minimum(np.maximum(np.exp(c_pico[1] * np.maximum(M.predecir(modelos, act, "pico", 0.9), 0)), p50), tope)
+    R = np.minimum(R, np.maximum(1.0, 1.5 * RECORD / valor)[:, None, None])
+    # coherencia: el máximo de una trayectoria nunca es menor que cualquiera de sus puntos
+    with np.errstate(all="ignore"):
+        p50 = np.maximum(p50, np.nan_to_num(np.nanmax(R[:, :8, 1], axis=1), nan=1.0))
+    p90 = np.maximum(p90, p50)
     with np.errstate(all="ignore"):
         h_pico = np.nanargmax(np.where(np.isnan(R[:, :, 1]), -1, R[:, :, 1]), axis=1) + 1
     c = modelos[(3, 0.5)].predict(act[M.RASGOS], pred_contrib=True)
@@ -497,7 +508,7 @@ def main():
     sim = simular(celdas, rng)
 
     # modelo de precisión
-    fm, li = M.construir(val, jug, les, apar, fich, corte, indice_inflacion)
+    fm, li = M.construir(val, jug, les, apar, fich, corte)                    # euros corrientes (ver modelo.py)
     previo = SALIDA / "meta.json"
     if args.sin_retro and previo.exists() and "retro" in json.loads(previo.read_text()):
         retro = json.loads(previo.read_text())["retro"]
@@ -505,7 +516,9 @@ def main():
         filas, picks, casos, zs = M.retro(fm, li, jug.set_index("player_id").nombre)
         k, cob = M.calibrar(zs)
         retro = resumen_retro(filas, picks, casos, cob, k, li, corte)
-    if "pico_c" not in retro:
+    global RECORD
+    RECORD = float(val.market_value_in_eur.max())
+    if len(retro.get("pico_c", [])) < 3:
         retro["pico_c"] = [round(c, 3) for c in M.calibrar_pico(fm, corte.year)]
     k = {int(h): v for h, v in retro["ensanche"].items()}
     modelos = M.entrenar(fm, corte.year, pico=True)
