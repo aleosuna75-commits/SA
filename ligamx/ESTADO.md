@@ -167,8 +167,10 @@ en la base quedaron aceptadas.
   Tigres–América 03:00 del 22-nov): «armar» 22:30 (`trig_011n63HrTmpQVKFtZVDfaEVr`), «vigilar» 23:55
   (`trig_013bHnMryjJuocPPUs5goXUQ`), 02:00 (`trig_01HcUY9WJgfE24dn12Tc26XE`) y 04:00 (`trig_01GxT4KPm1aWzXyWpkhXaFSy`),
   «cierre» 05:30 (`trig_014JET1Wrb7v6JyHPHSZdWrM`).
-- Falta programar el bloque del domingo (UTC: Chivas–Cruz Azul 23:07 del 22-nov y Querétaro–Necaxa 01:10 del 23-nov):
-  lo hace la corrida diaria del 20-nov («armar» 22:47, «vigilar» 00:07 y 02:10, «cierre» 03:40).
+- Vivo Jornada 17, bloque del domingo (UTC: Chivas–Cruz Azul 23:07 del 22-nov y Querétaro–Necaxa 01:10 del 23-nov):
+  «armar» 22:47 (`trig_01AP7JNKs65oqAw1mWRHicRP`), «vigilar» 00:07 (`trig_0198eLmrnHmHFtrPeXAKtxcu`) y 02:10
+  (`trig_018H9mDfPPPnQfPM8S31UEpM`), «cierre» 03:40 (`trig_01CGwZtpXxFi73qvKfSYhPMz`; ese cierre avisa al usuario de
+  los clasificados y los cruces de cuartos).
 
 ## Bitácora
 - 2026-11-10 02:50 UTC · Reconocimiento: ESPN da resultados y estadísticas por partido; 143/153 jugados.
@@ -227,3 +229,4 @@ en la base quedaron aceptadas.
 - 2026-11-18 07:35 UTC · Lanzado `09_bajas_jornada17.js` (tarea `w76vvdy83`, corrida `wf_454f2f0b-55a`); para reanudarlo: `Workflow({scriptPath: "/home/user/SA/ligamx/notas/workflows/09_bajas_jornada17.js", resumeFromRunId: "wf_454f2f0b-55a"})`. Programados los cuatro despertares del vivo del viernes.
 - 2026-11-18 07:45 UTC · Bajas de la Jornada 17 integradas (18 equipos; 9 de 9 partidos con bajas en su tarjeta) y V19 publicada. Cotejo de suspendidos: los 13 que deduce el sistema aparecen en alguna fuente; un agregador da además a Gorriarán (Tigres) por quinta amarilla, el sistema cuenta 4 (la amarilla de una doble amonestación no acumula) y nadie más lo confirma: quedó como duda.
 - 2026-11-19 07:25 UTC · Corrida diaria: sin partidos nuevos; V20 publicada, `vivo/actual` en versión 25. Programado el vivo del sábado (5 despertares). No se avanzó un pendiente de mejora: se guarda el presupuesto para el fin de semana de 9 partidos en vivo.
+- 2026-11-20 07:25 UTC · Corrida diaria (hoy arranca la Jornada 17): sin partidos nuevos; V21 publicada, `vivo/actual` en versión 26; 83 sellos. Programado el vivo del domingo (4 despertares): los tres bloques del fin de semana ya tienen sus despertares. Esta sesión también atiende las tareas de F1 de Las Vegas (20 a 22-nov), que se intercalan con el vivo.

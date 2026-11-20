@@ -1,5 +1,5 @@
 {
- "corrida_utc": "2026-11-19T07:21:33Z",
+ "corrida_utc": "2026-11-20T07:21:36Z",
  "pasos": {
   "datos": {
    "ok": true,
@@ -9,11 +9,11 @@
    "nuevos_en_calendario": 0,
    "momios_actualizados": 5,
    "tabla_coincide_con_espn": true,
-   "segundos": 7.1
+   "segundos": 8.3
   },
   "variables": {
    "ok": true,
-   "segundos": 12.7
+   "segundos": 15.3
   },
   "mejora": {
    "ok": true,
@@ -23,10 +23,10 @@
   "pronostico": {
    "ok": true,
    "salida": [
-    "/home/user/SA/ligamx/salidas/actual.json  237 KB  modelo=ensamble  pendientes=9  sellos nuevos=5  53.1 s",
+    "/home/user/SA/ligamx/salidas/actual.json  237 KB  modelo=ensamble  pendientes=9  sellos nuevos=5  66.6 s",
     "campeón: América 0.264, Cruz Azul 0.261, Toluca 0.199, Chivas 0.191, Monterrey 0.028"
    ],
-   "segundos": 59.6
+   "segundos": 73.2
   },
   "vivo": {
    "ok": true,
@@ -39,14 +39,14 @@
     "visitante": "Atlético San Luis"
    },
    "incrustado": true,
-   "segundos": 2.5
+   "segundos": 2.7
   },
   "pagina": {
    "ok": true,
    "salida": [
-    "listo en 0.11 s"
+    "listo en 0.08 s"
    ],
-   "segundos": 0.4
+   "segundos": 0.3
   }
  },
  "errores": [],
@@ -66,12 +66,12 @@
   "estadio": "Estadio Cuauhtémoc",
   "ciudad": "Puebla",
   "momios": {
-   "ml_l": 2.45,
-   "ml_e": 3.45,
+   "ml_l": 2.5,
+   "ml_e": 3.55,
    "ml_v": 2.65,
    "total_linea": 2.5,
-   "over": 1.667,
-   "under": 2.1,
+   "over": 1.769,
+   "under": 2.0,
    "proveedor": "DraftKings"
   }
  },
@@ -87,7 +87,7 @@
   "incrustado": true
  },
  "modelo": "ensamble",
- "corte_local": "2026-11-19 01:21",
+ "corte_local": "2026-11-20 01:22",
  "campeon_top": [
   [
    "América",
@@ -99,15 +99,15 @@
   ],
   [
    "Toluca",
-   0.1985
+   0.1987
   ],
   [
    "Chivas",
-   0.1907
+   0.1905
   ],
   [
    "Monterrey",
-   0.0277
+   0.0276
   ]
  ],
  "liguilla_en_curso": false,
@@ -154,9 +154,9 @@
    }
   }
  },
- "huella": "ed99fbbbeb0702f1d0763dba11cc5aac",
+ "huella": "68cd5e7db146bdf2c663f306cf8b396a",
  "publicar": false,
- "huella_publicada": "ed99fbbbeb0702f1d0763dba11cc5aac",
- "segundos": 82.2,
- "publicado_utc": "2026-11-19T07:23:38Z"
+ "huella_publicada": "68cd5e7db146bdf2c663f306cf8b396a",
+ "segundos": 99.9,
+ "publicado_utc": "2026-11-20T07:24:34Z"
 }

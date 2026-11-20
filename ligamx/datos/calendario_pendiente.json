@@ -1,6 +1,6 @@
 {
  "torneo": "Apertura 2026",
- "generado_utc": "2026-11-19T07:21:40Z",
+ "generado_utc": "2026-11-20T07:21:44Z",
  "fuente": "ESPN scoreboard mex.1",
  "partidos": [
   {
@@ -16,12 +16,12 @@
    "estadio": "Estadio Cuauhtémoc",
    "ciudad": "Puebla",
    "momios": {
-    "ml_l": 2.45,
-    "ml_e": 3.45,
+    "ml_l": 2.5,
+    "ml_e": 3.55,
     "ml_v": 2.65,
     "total_linea": 2.5,
-    "over": 1.667,
-    "under": 2.1,
+    "over": 1.769,
+    "under": 2.0,
     "proveedor": "DraftKings"
    }
   },
@@ -38,11 +38,11 @@
    "estadio": "Estadio Olímpico Benito Juárez",
    "ciudad": "Ciudad Juárez",
    "momios": {
-    "ml_l": 3.4,
-    "ml_e": 3.5,
-    "ml_v": 2.05,
+    "ml_l": 3.5,
+    "ml_e": 3.65,
+    "ml_v": 2.0,
     "total_linea": 2.5,
-    "over": 1.667,
+    "over": 1.69,
     "under": 2.1,
     "proveedor": "DraftKings"
    }
@@ -60,12 +60,12 @@
    "estadio": "Estadio Caliente",
    "ciudad": "Tijuana",
    "momios": {
-    "ml_l": 1.588,
-    "ml_e": 4.3,
-    "ml_v": 4.9,
+    "ml_l": 1.625,
+    "ml_e": 4.1,
+    "ml_v": 5.0,
     "total_linea": 2.5,
-    "over": 1.606,
-    "under": 2.15,
+    "over": 1.8,
+    "under": 1.952,
     "proveedor": "DraftKings"
    }
   },
@@ -170,12 +170,12 @@
    "estadio": "Estadio Akron",
    "ciudad": "Guadalajara",
    "momios": {
-    "ml_l": 2.15,
+    "ml_l": 2.2,
     "ml_e": 4.0,
-    "ml_v": 2.7,
+    "ml_v": 2.75,
     "total_linea": 3.5,
-    "over": 2.25,
-    "under": 1.541,
+    "over": 2.3,
+    "under": 1.556,
     "proveedor": "DraftKings"
    }
   },
@@ -192,11 +192,11 @@
    "estadio": "Estadio Corregidora",
    "ciudad": "Santiago de Querétaro",
    "momios": {
-    "ml_l": 1.952,
-    "ml_e": 3.8,
-    "ml_v": 3.2,
+    "ml_l": 2.0,
+    "ml_e": 3.85,
+    "ml_v": 3.25,
     "total_linea": 2.5,
-    "over": 1.556,
+    "over": 1.571,
     "under": 2.25,
     "proveedor": "DraftKings"
    }
