@@ -1,0 +1,40 @@
+{
+ "slug": "lasvegas2026",
+ "meeting_key": 1300,
+ "pasos": {
+  "pre_qualy": {
+   "hecho": "2026-11-20T05:53:23Z",
+   "corte": "2026-11-21T00:30:00Z",
+   "modelo": "Random Forest",
+   "top10": [
+    "RUS",
+    "LEC",
+    "ANT",
+    "NOR",
+    "HAM",
+    "VER",
+    "HAD",
+    "PIA",
+    "GAS",
+    "COL"
+   ],
+   "top10_carrera": [
+    "RUS",
+    "LEC",
+    "ANT",
+    "NOR",
+    "HAM",
+    "VER",
+    "HAD",
+    "PIA",
+    "LAW",
+    "GAS"
+   ],
+   "archivos": [
+    "gp.json",
+    "carrera.json",
+    "historial.json"
+   ]
+  }
+ }
+}

@@ -1,5 +1,5 @@
 {
- "actualizado": "2026-11-20T01:51:13Z",
+ "actualizado": "2026-11-20T05:42:03Z",
  "actual": "lasvegas2026",
  "gps": [
   {
@@ -193,7 +193,7 @@
      "fin_utc": "2026-11-20T05:00:00Z",
      "fecha_local": "Jueves 19 de noviembre",
      "hora_local": "8:00 PM",
-     "estado": "proximo"
+     "estado": "terminado"
     },
     {
      "clave": "fp3",
@@ -231,8 +231,14 @@
    "pais": "United States",
    "qualy_texto": "Viernes 20 de noviembre de 2026, 8:00 PM (hora local, UTC−8)",
    "carrera_texto": "Sábado 21 de noviembre de 2026, 8:00 PM (hora local, UTC−8)",
-   "pasos": {},
-   "docs": {}
+   "pasos": {
+    "pre_qualy": "2026-11-20T05:53:23Z"
+   },
+   "docs": {
+    "gp": "gp/lasvegas2026",
+    "carrera": "carrera/lasvegas2026",
+    "historial": "historial/lasvegas2026"
+   }
   },
   {
    "slug": "qatar2026",

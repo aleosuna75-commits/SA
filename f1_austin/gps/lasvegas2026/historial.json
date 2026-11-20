@@ -1,0 +1,46 @@
+{
+ "actualizado": "2026-11-20T05:53:23Z",
+ "fases": [
+  {
+   "fase": "FP2",
+   "actualizado": "2026-11-20T05:53:23Z",
+   "qualy": {
+    "top10": [
+     "RUS",
+     "LEC",
+     "ANT",
+     "NOR",
+     "HAM",
+     "VER",
+     "HAD",
+     "PIA",
+     "GAS",
+     "COL"
+    ],
+    "pole": "RUS",
+    "modelo": "Random Forest"
+   },
+   "carrera": {
+    "top10": [
+     "RUS",
+     "LEC",
+     "ANT",
+     "NOR",
+     "HAM",
+     "VER",
+     "HAD",
+     "PIA",
+     "LAW",
+     "GAS"
+    ],
+    "ganador": "RUS",
+    "preliminar": true,
+    "parrilla_fuente": "pronóstico de qualy (FP2)"
+   },
+   "cambios": {
+    "qualy": [],
+    "carrera": []
+   }
+  }
+ ]
+}
