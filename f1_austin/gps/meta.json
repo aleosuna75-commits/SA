@@ -1,6 +1,6 @@
 {
- "actualizado": "2026-11-09T04:52:34Z",
- "actual": "brasil2026",
+ "actualizado": "2026-11-20T01:51:13Z",
+ "actual": "lasvegas2026",
  "gps": [
   {
    "slug": "mexico2026",
@@ -173,7 +173,7 @@
    "circuito": "Circuito urbano de Las Vegas (Las Vegas Strip)",
    "ciudad": "Las Vegas, Nevada",
    "fecha_texto": "Sábado 21 de noviembre de 2026",
-   "estado": "proximo",
+   "estado": "en_curso",
    "fases": [
     {
      "clave": "fp1",
@@ -183,7 +183,7 @@
      "fin_utc": "2026-11-20T01:30:00Z",
      "fecha_local": "Jueves 19 de noviembre",
      "hora_local": "4:30 PM",
-     "estado": "proximo"
+     "estado": "terminado"
     },
     {
      "clave": "fp2",
