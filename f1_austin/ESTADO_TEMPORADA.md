@@ -103,3 +103,5 @@ Cambios al RUNBOOK (verificados 9/11 ~05 UTC; además de lo anterior):
 05:15 UTC 9/11: Artifact v20 (9 reglas db), docs historial/{mexico2026,brasil2026}, bitacora/actual v1, carrera/mexico2026 v5,
 carrera/brasil2026 v2, meta/actual v2. Tareas nuevas: RB-0 LV 20/11 01:50 · QAT 27/11 14:50 · ABU 04/12 10:50; RB-7 LV 22/11 08:00 ·
 QAT 29/11 20:00 · ABU 06/12 17:00 (UTC). Total 24 tareas programadas. Primer ciclo de mejora (regla corregida): 0 adopciones.
+
+20/11 02:25 UTC · Las Vegas RB-0: primer intento 401 de OpenF1 (01:51); reintento 02:23 bajó los datos pero la FP1 fue con lluvia (36 de 84 registros de clima con lluvia, todos en neumático WET) y sólo hay 20 vueltas de instalación sin tiempo: `modelo_qualy_austin.py 1300 --fp1` termina con «datos de sólo 0 pilotos». No hay pronóstico con sólo la FP1 y NO se reintenta más: lo recoge RB-1 (05:40 UTC, tras la FP2; post_fp1 no bloquea a pre_qualy). Si la FP2 también sale mojada, avisar al usuario que el pronóstico de qualy se apoya sólo en el historial.
