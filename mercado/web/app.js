@@ -73,11 +73,13 @@
   const jugadores = crudos.map((r) => {
     const j = { id: r[0], nombre: r[1], club: r[2], pos: r[3], subpos: r[4], edad: r[5], nac: r[6], valor: r[7], maxHist: r[8],
       pj: r[9], min: r[10], goles: r[11], asist: r[12], contrato: r[13], fecha: r[14], pie: r[15], altura: r[16], les24: r[17], cedido: r[18],
+      pLo: r[30], precio: r[31], pHi: r[32],
       V: [r[19], r[20], r[21], r[22], r[23]].map(nulo), s3: nulo(r[24]), pico: r[25], techo: r[26], edadPico: r[27] || null, cubierta: r[28], H: r[29] };
     const c = club.get(j.club);
     j.c = c; j.pais = c.pais; j.liga = c.liga; j.nivel = c.nivel;
     j.v1 = j.V[0]; j.v3 = j.V[2] ?? j.V[1] ?? j.V[0]; j.v5 = j.V[3] ?? j.v3;
     j.h3 = Math.min(3, j.H) || 1;
+    j.prima = j.precio / j.valor - 1;                         // cuánto más (o menos) se paga que su valor de Transfermarkt
     j.r3 = j.v3 != null ? j.v3 / j.valor - 1 : null;
     j.d3 = j.v3 != null ? j.v3 - j.valor : null;
     j.senal = j.r3 == null ? 1 : j.r3 > 0.15 ? 0 : j.r3 < -0.15 ? 2 : 1;
@@ -167,7 +169,8 @@
     pos: ["Pos", (j) => j.pos, (j) => POS_C[j.pos]],
     edad: ["Edad", (j) => j.edad, (j) => j.edad],
     liga: ["Liga", (j) => es(j.pais) + j.liga, (j) => `${esc(j.liga)}<span class="sub">${esc(es(j.pais)) || "—"}</span>`, "izq"],
-    valor: ["Valor", (j) => j.valor, (j) => eur(j.valor)],
+    valor: ["Valor TM", (j) => j.valor, (j) => eur(j.valor)],
+    precio: ["Precio est.", (j) => j.precio, (j) => `${eur(j.precio)}<span class="sub ${tono(j.prima)}">${pct(j.prima)} vs TM</span>`],
     v1: ["1 año", (j) => j.v1 ?? -1, (j) => eur(j.v1)],
     v3: ["3 años", (j) => j.v3 ?? -1, (j) => eur(j.v3)],
     r3: ["Δ 3 años", (j) => j.r3 ?? -9, (j) => `<span class="${tono(j.r3)}">${pct(j.r3)}</span>`],
@@ -200,9 +203,9 @@
   }
   function csv(id) {
     const t = tablas[id];
-    const cab = ["id", "jugador", "club", "liga", "pais_liga", "division", "posicion", "edad", "valor", "fecha_valor", "mediana_1a", "mediana_3a", "mediana_5a",
+    const cab = ["id", "jugador", "club", "liga", "pais_liga", "division", "posicion", "edad", "valor_tm", "fecha_valor", "precio_estimado", "precio_bajo", "precio_alto", "mediana_1a", "mediana_3a", "mediana_5a",
       "max_carrera", "techo_p90", "contrato", "minutos_12m"];
-    const fila = (j) => [j.id, j.nombre, j.c.nombre, j.liga, j.pais, j.nivel, POS[j.pos], j.edad, j.valor, j.fecha, j.v1, j.v3, j.v5, j.pico, j.techo, j.contrato, j.min < 0 ? "" : j.min]
+    const fila = (j) => [j.id, j.nombre, j.c.nombre, j.liga, j.pais, j.nivel, POS[j.pos], j.edad, j.valor, j.fecha, j.precio, j.pLo, j.pHi, j.v1, j.v3, j.v5, j.pico, j.techo, j.contrato, j.min < 0 ? "" : j.min]
       .map((v) => (v == null ? "" : typeof v === "number" ? Math.round(v) : `"${String(v).replace(/"/g, '""')}"`)).join(",");
     const a = document.createElement("a");
     a.href = URL.createObjectURL(new Blob(["﻿" + cab.join(",") + "\n" + t.datos.map(fila).join("\n")], { type: "text/csv" }));
@@ -318,6 +321,8 @@
       f: (j) => j.edad <= 23 && j.valor >= 1e6 && j.valor <= 25e6 && j.cubierta && j.r3 != null, k: (j) => -j.r3, r: (j) => `${eur(j.valor)} → ${eur(j.v3)}<small class="sube">${pct(j.r3)} · techo ${eur(j.techo)}</small>`, o: "r3", fl: { emax: 23, vmin: 1, vmax: 25, nivel: 1 } },
     { id: "alertas", t: "Alertas de devaluación", d: `27 años o más, desde €5M, en liga con datos completos: los de mayor caída esperada. En las pruebas, ${Math.round(100 * mediaDe(RT.picks, "al_cae"))}% de las 50 alertas de cada año perdió al menos 40% en tres años, contra ${Math.round(100 * mediaDe(RT.picks, "viej_cae"))}% del grupo.`,
       f: (j) => j.edad >= 27 && j.valor >= 5e6 && j.cubierta && j.r3 != null, k: (j) => j.r3, r: (j) => `${eur(j.valor)} → ${eur(j.v3)}<small class="baja">${pct(j.r3)} · ${eur(j.d3)}</small>`, o: "r3", asc: true, fl: { emin: 27, vmin: 5, nivel: 1 } },
+    { id: "prima", t: "Se pagan por encima de su valor", d: "Desde €2M en liga con datos completos: mayor diferencia entre el precio de traspaso estimado y el valor de Transfermarkt.",
+      f: (j) => j.valor >= 2e6 && j.cubierta, k: (j) => -j.prima, r: (j) => `${eur(j.valor)} TM → ${eur(j.precio)}<small class="sube">${pct(j.prima)} · hasta ${eur(j.pHi)}</small>`, o: "precio", fl: { vmin: 2, nivel: 1 } },
     { id: "alza", t: "Mayor revalorización esperada", d: "Ganancia mediana esperada a 3 años.", f: (j) => j.d3 > 0, k: (j) => -j.d3, r: (j) => `${eur(j.valor)} → ${eur(j.v3)}<small class="sube">${eur(j.d3)} · ${pct(j.r3)}</small>`, o: "d3" },
     { id: "promesas", t: "Promesas sub-21 con mayor techo", d: "Valor máximo de carrera esperado (mediana) y escenario optimista.", f: (j) => j.edad <= 21, k: (j) => -j.pico, r: (j) => `${eur(j.valor)} → ${eur(j.pico)}<small>techo ${eur(j.techo)}</small>`, o: "pico", fl: { emax: 21 } },
     { id: "gangas", t: "Fuera de primera división, al alza", d: "Divisiones inferiores con mayor crecimiento porcentual esperado (valor ≥ €300k).", f: (j) => j.nivel >= 2 && j.nivel <= 8 && j.valor >= 3e5 && j.r3 > 0, k: (j) => -j.r3, r: (j) => `${eur(j.valor)} → ${eur(j.v3)}<small class="sube">${pct(j.r3)} · ${esc(j.liga)}</small>`, o: "r3" },
@@ -328,7 +333,7 @@
     { id: "rebote", t: "Lejos de su máximo y repuntando", d: "Valen menos de la mitad de su máximo histórico, pero el modelo espera subida.", f: (j) => j.valor < j.maxHist * 0.5 && j.r3 > 0.1 && j.valor >= 5e5, k: (j) => -j.d3, r: (j) => `${eur(j.valor)} → ${eur(j.v3)}<small>máx. ${eur(j.maxHist)}</small>`, o: "d3" },
   ];
   function vistaRadar() {
-    $("#vista").innerHTML = `<div class="pagina"><div class="cabecera"><div><h1>Radar</h1><p class="tenue">Diez lecturas del mercado sobre los ${mil(filtrados.length)} jugadores que pasan los filtros. Cámbialos arriba para acotar por liga, posición o edad.</p></div></div>
+    $("#vista").innerHTML = `<div class="pagina"><div class="cabecera"><div><h1>Radar</h1><p class="tenue">Once lecturas del mercado sobre los ${mil(filtrados.length)} jugadores que pasan los filtros. Cámbialos arriba para acotar por liga, posición o edad.</p></div></div>
       <div class="rejilla">${TABLEROS.map((t) => {
         const top = filtrados.filter(t.f).sort((a, b) => t.k(a) - t.k(b)).slice(0, 8);
         return `<section class="tarjeta tablero"><h2>${t.t}<a href="#/explorar" data-tablero="${t.id}">Ver todos →</a></h2><p class="nota">${t.d}</p>
@@ -339,7 +344,7 @@
   // ================================================================ vista: explorador
   function vistaExplorar() {
     $("#vista").innerHTML = `<div class="pagina"><div class="cabecera"><div><h1>Explorador</h1><p class="tenue">Ordena por cualquier columna. Las proyecciones son medianas en euros corrientes.</p></div></div>
-      ${tabla("explorar", filtrados, ["nombre", "pos", "edad", "liga", "valor", "v1", "v3", "r3", "d3", "v5", "pico", "techo", "perfil", "contrato", "min"])}</div>`;
+      ${tabla("explorar", filtrados, ["nombre", "pos", "edad", "liga", "valor", "precio", "v1", "v3", "r3", "d3", "v5", "pico", "techo", "perfil", "contrato", "min"])}</div>`;
   }
 
   // ================================================================ vista: club
@@ -359,6 +364,7 @@
         <div class="kpi"><b>${edadPond.toFixed(1)}</b><span>edad ponderada por valor</span></div>
         <div class="kpi"><b>${eur(d3.sum(vence, (j) => j.valor))}</b><span>valor con contrato que vence en 12 meses (${vence.length})</span></div>
         <div class="kpi"><b class="baja">${eur(d3.sum(js, (j) => Math.min(0, j.d3 ?? 0)))}</b><span>devaluación esperada a 3 años de quienes bajan</span></div>
+        <div class="kpi"><b>${eur(d3.sum(js, (j) => j.precio))}</b><span>precio de venta estimado de la plantilla (${pct(d3.sum(js, (j) => j.precio) / v - 1)} vs TM)</span></div>
       </div>
       <div class="tarjeta"><h2>Edad y valor de la plantilla</h2><p class="nota">Cada punto es un jugador; el color es la señal a 3 años. Arriba a la izquierda están los activos por revalorizar; abajo a la derecha, los que se deprecian.</p><svg class="grafica" id="dispersion"></svg></div>
       <h3>Plantilla</h3>${tabla("club" + c.id, js, ["nombre", "pos", "edad", "valor", "v1", "v3", "r3", "d3", "pico", "perfil", "contrato", "min"], "valor", 60)}</div>`;
@@ -387,7 +393,7 @@
       ${js.length ? `<div class="tarjeta"><h2>Comparar trayectorias</h2><p class="nota">Mediana proyectada a 8 años. Elige hasta 6.</p>
         <div class="chips">${js.map((j) => `<span class="chip ${comparar.has(j.id) ? "on" : ""}" data-comparar="${j.id}">${esc(j.nombre)}</span>`).join("")}</div>
         <svg class="grafica" id="comparacion"></svg></div>
-        <h3>Seguimiento</h3>${tabla("lista", js, ["nombre", "pos", "edad", "liga", "valor", "v1", "v3", "r3", "v5", "pico", "techo", "perfil", "contrato"], "valor")}`
+        <h3>Seguimiento</h3>${tabla("lista", js, ["nombre", "pos", "edad", "liga", "valor", "precio", "v1", "v3", "r3", "v5", "pico", "techo", "perfil", "contrato"], "valor")}`
         : `<div class="tarjeta"><p>Tu lista está vacía. Marca jugadores con ★ desde el explorador, el radar o su ficha.</p></div>`}</div>`;
     if (!js.length) return;
     const sel = js.filter((j) => comparar.has(j.id)).slice(0, 6);
@@ -433,6 +439,15 @@
       <tbody>${[1, 3, 5].flatMap((h) => Object.keys(G).map((g) => ag(h, g)).filter(Boolean).map((r) => `<tr><td class="izq">${r.h} año${r.h > 1 ? "s" : ""}</td><td class="izq">${G[r.grupo]}</td><td>${mil(r.n)}</td>
         <td><b>${p100(r.modelo)}</b></td><td>${p100(r.ingenuo)}</td><td>${r.spearman.toFixed(2)}</td></tr>`)).join("")}</tbody></table></div>
 
+
+      <h3>Precio pagado frente a valor de Transfermarkt</h3>
+      <p class="nota">El valor de Transfermarkt es una estimación de su comunidad; lo que un club paga es otra cosa. Con ${mil(RT.precio.n)} traspasos que tienen cuota divulgada y valor en la fecha se modela cuánto se paga por un jugador así. Cociente observado cuota ÷ valor en los últimos años:</p>
+      <div class="tabla-caja"><table class="plana"><thead><tr><th class="izq">Edad al traspaso</th><th>Traspasos</th><th>Se paga (mediana)</th><th>Cuartil bajo</th><th>Cuartil alto</th></tr></thead>
+      <tbody>${RT.precio.por_edad.map((r) => `<tr><td class="izq">${r.grupo}</td><td>${mil(r.n)}</td><td><b>×${r.multiplo.toFixed(2)}</b></td><td>×${r.bajo.toFixed(2)}</td><td>×${r.alto.toFixed(2)}</td></tr>`).join("")}</tbody></table></div>
+      <p class="nota">Prueba retrospectiva: para cada temporada el modelo se entrenó sólo con traspasos anteriores y se comparó con las cuotas reales de esa temporada. «Pagar el valor de TM» es la referencia.</p>
+      <div class="tabla-caja"><table class="plana"><thead><tr><th class="izq">Temporada</th><th>Traspasos</th><th>Error típico del modelo</th><th>Suponer cuota = valor TM</th><th>Menores de 22: modelo</th><th>Menores de 22: valor TM</th><th>Orden</th></tr></thead>
+      <tbody>${RT.precio.por_temporada.map((r) => `<tr><td class="izq">${r.temporada}/${String(r.temporada + 1).slice(2)}</td><td>${mil(r.n)}</td><td><b>${p100(r.modelo)}</b></td><td>${p100(r.tm)}</td><td><b>${p100(r.modelo_sub22)}</b></td><td>${p100(r.tm_sub22)}</td><td>${r.orden.toFixed(2)}</td></tr>`).join("")}</tbody></table></div>
+      <p class="nota">La banda de precio contiene ${p100(RT.precio.cobertura)} de las cuotas reales fuera de muestra. <b>Límite importante:</b> sólo se observan traspasos con cuota divulgada; los libres, las cesiones y los jugadores que nadie compró no están. El precio estimado se lee como «si se vende con cuota, esto se paga por alguien así», no como el precio al que cualquiera lo conseguiría. No ve la duración del contrato ni cláusulas.</p>
 
       <h3>¿Sirve para elegir?</h3>
       <p class="nota">Cada año, entre los sub-23 de €1–25M en ligas con datos completos, se tomaron las 50 mayores alzas previstas; y entre los de 27 años o más desde €5M, las 50 mayores caídas previstas. Resultado tres años después (sólo quienes seguían valuados).</p>
@@ -513,6 +528,11 @@
         <div class="kpi"><b>${eur(j.pico)}</b><span>valor máximo esperado${j.edadPico ? " · hacia los " + j.edadPico : " · ya alcanzado"}</span></div>
         <div class="kpi"><b>${eur(j.techo)}</b><span>techo optimista (1 de cada 10)</span></div>
       </div>
+      <div class="precio"><div><span class="rot">Precio de traspaso estimado hoy</span><b>${eur(j.precio)}</b>
+          <span class="${tono(j.prima)}">${pct(j.prima)} respecto a su valor de Transfermarkt</span></div>
+        <div class="rango"><span>entre <b>${eur(j.pLo)}</b> y <b>${eur(j.pHi)}</b></span>
+          <span class="nota">8 de cada 10 traspasos con cuota de jugadores así. Lo que se paga, no lo que TM estima.</span></div>
+      </div>
       ${viejo ? `<div class="aviso">El último valor disponible es de ${fechaYM(j.fecha)}. La proyección parte de ahí y puede estar desfasada.</div>` : ""}
       ${j.valor >= 1e8 ? `<div class="aviso">Por encima de €100M casi no hay precedentes: el modelo extrapola.</div>` : ""}
       ${j.edad >= 38 ? `<div class="aviso">A esta edad hay muy pocos casos históricos; se muestra la devaluación típica de quienes siguieron activos.</div>` : ""}
@@ -536,8 +556,8 @@
         : `<p><b>${j.pj}</b> partidos · <b>${mil(j.min)}</b> min · <b>${j.goles}</b> goles · <b>${j.asist}</b> asistencias</p>`}
         <p class="${j.les24 > 120 ? "baja" : "tenue"}">${j.les24 ? `${j.les24} días de baja por lesión en 24 meses` : "Sin lesiones registradas en 24 meses"}</p></div></div>
       ${d.l ? `<h3>Últimas lesiones</h3><div class="tabla-caja"><table class="plana"><tbody>${[...d.l].reverse().map((x) => `<tr><td class="izq">${fechaYM(+x[0].replace("-", ""))}</td><td class="izq">${esc(x[1])}</td><td>${x[2] < 0 ? "—" : x[2] + " días"}</td></tr>`).join("")}</tbody></table></div>` : ""}
-      ${d.t ? `<h3>Últimos fichajes</h3><div class="tabla-caja"><table class="plana"><thead><tr><th class="izq">Fecha</th><th class="izq">De → a</th><th>Traspaso</th><th>Valor entonces</th></tr></thead>
-        <tbody>${[...d.t].reverse().map((x) => `<tr><td class="izq">${fechaYM(+x[0].replace("-", ""))}</td><td class="izq">${esc(x[1])} → ${esc(x[2])}</td><td>${x[3] < 0 ? "—" : x[3] === 0 ? "libre / cesión" : eur(x[3])}</td><td>${x[4] < 0 ? "—" : eur(x[4])}</td></tr>`).join("")}</tbody></table></div>` : ""}
+      ${d.t ? `<h3>Últimos fichajes</h3><div class="tabla-caja"><table class="plana"><thead><tr><th class="izq">Fecha</th><th class="izq">De → a</th><th>Pagado</th><th>Valor TM entonces</th></tr></thead>
+        <tbody>${[...d.t].reverse().map((x) => `<tr><td class="izq">${fechaYM(+x[0].replace("-", ""))}</td><td class="izq">${esc(x[1])} → ${esc(x[2])}</td><td>${x[5] === 1 ? "cesión" : x[5] === 2 ? "fin de cesión" : x[3] > 0 ? `<b>${eur(x[3])}</b>${x[4] > 0 ? ` <span class="${tono(x[3] / x[4] - 1)}">(${pct(x[3] / x[4] - 1)})</span>` : ""}` : "libre o sin divulgar"}</td><td>${x[4] > 0 ? eur(x[4]) : "—"}</td></tr>`).join("")}</tbody></table></div>` : ""}
       <p class="nota" style="margin-top:18px"><a class="sube" href="https://www.transfermarkt.com/-/profil/spieler/${j.id}" target="_blank" rel="noopener">Ver en Transfermarkt ↗</a></p>`;
     el.scrollTop = 0;
     graficaJugador(j, d);

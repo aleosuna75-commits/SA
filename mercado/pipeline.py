@@ -27,12 +27,14 @@ import numpy as np
 import pandas as pd
 
 import modelo as M
+import precio as PR
 
 RAIZ = Path(__file__).resolve().parent
 CRUDOS = RAIZ / "datos_crudos"
 SALIDA = RAIZ / "web" / "datos"
 URL_A = "https://pub-e682421888d945d684bcae8890b0ec20.r2.dev/data/{}.csv.gz"
-TABLAS_A = ["players", "player_valuations", "clubs", "competitions", "appearances", "transfers"]
+TABLAS_A = ["players", "player_valuations", "clubs", "competitions", "appearances", "transfers",
+            "games", "club_games", "game_lineups", "game_events"]
 REPO_B = "https://github.com/salimt/football-datasets"
 TABLAS_B = ["player_latest_market_value", "player_market_value", "player_profiles", "team_details",
             "player_injuries", "team_competitions_seasons"]
@@ -369,7 +371,7 @@ def precedentes(panel, actuales, nombres, anio_tope):
 
 
 # ---------------------------------------------------------------- exportación
-def exportar(jug, val, clubes, les, apar, fich, panel, act, pr, log_idx, retro, corte, stats):
+def exportar(jug, val, clubes, les, apar, traspasos, panel, act, pr, precios, log_idx, retro, corte, stats):
     if SALIDA.exists():
         shutil.rmtree(SALIDA)
     (SALIDA / "det").mkdir(parents=True)
@@ -419,6 +421,7 @@ def exportar(jug, val, clubes, les, apar, fich, panel, act, pr, log_idx, retro, 
         r.contrato if isinstance(r.contrato, str) else "", int(r.fecha_valor.strftime("%Y%m")),
         pies.index(r.pie) if r.pie in pies else -1, int(r.altura) if r.altura and r.altura > 100 else 0,
         int(r.les24), 1 if r.cedido_de else 0, *proyeccion(r),
+        *[int(r.valor * x) for x in precios[fila_de[int(r.player_id)]]],          # precio de traspaso estimado: bajo, mediana, alto
     ] for r in j.itertuples()]
 
     cl = clubes[clubes.index.isin(j.club_id)].copy()
@@ -441,9 +444,10 @@ def exportar(jug, val, clubes, les, apar, fich, panel, act, pr, log_idx, retro, 
     vj = val[val.player_id.isin(j.player_id)]
     hist = {pid: [[int(d.strftime("%Y%m")) for d in g.date][-44:], [int(v // 1000) for v in g.market_value_in_eur][-44:]]
             for pid, g in vj.groupby("player_id")}
-    fj = fich[fich.player_id.isin(j.player_id) & (fich.transfer_date <= corte + pd.Timedelta(days=120))].sort_values("transfer_date")
-    tras = {pid: [[d.strftime("%Y-%m"), a_, b_, n(c), n(m)] for d, a_, b_, c, m in
-                  zip(g.transfer_date, g.from_club_name, g.to_club_name, g.transfer_fee, g.market_value_in_eur)][-5:]
+    tipos = {"Transfer": 0, "Loan": 1, "Return from loan": 2, "Draft": 3}
+    fj = traspasos[traspasos.player_id.isin(j.player_id) & (traspasos.fecha <= corte + pd.Timedelta(days=120))].sort_values("fecha")
+    tras = {pid: [[d.strftime("%Y-%m"), a_, b_, n(c), n(m), tipos.get(tp, 0)] for d, a_, b_, c, m, tp in
+                  zip(g.fecha, g.de, g.a, g.pagado, g.valor_t, g.tipo)][-6:]
             for pid, g in fj.groupby("player_id")}
     lj = les[les.player_id.isin(j.player_id)].sort_values("from_date")
     lesiones = {pid: [[d.strftime("%Y-%m"), str(m), n(dd)] for d, m, dd in zip(g.from_date, g.injury_reason, g.days_missed)][-4:]
@@ -508,7 +512,7 @@ def main():
     sim = simular(celdas, rng)
 
     # modelo de precisión
-    fm, li = M.construir(val, jug, les, apar, fich, corte)                    # euros corrientes (ver modelo.py)
+    fm, li = M.construir(val, jug, les, apar, fich, corte, partidos=M.cargar_partidos(CRUDOS))   # euros corrientes
     previo = SALIDA / "meta.json"
     if args.sin_retro and previo.exists() and "retro" in json.loads(previo.read_text()):
         retro = json.loads(previo.read_text())["retro"]
@@ -525,14 +529,26 @@ def main():
     act = fm.sort_values("anio").groupby("player_id").tail(1).reset_index(drop=True)
     pr = proyectar(act, modelos, k, sim, retro["pico_c"])
 
+    # precio de traspaso pagado frente al valor de TM (precio.py)
+    traspasos = PR.tabla_traspasos(CRUDOS)
+    muestra, codigos = PR.muestra(fm, traspasos, clubes, corte)
+    if "precio" not in retro:
+        filas_p, k_p, cob_p = PR.retro(muestra)
+        retro["precio"] = {"por_temporada": [{c: (round(v, 3) if isinstance(v, float) else v) for c, v in f_.items()} for f_ in filas_p],
+                           "ensanche": round(k_p, 3), "cobertura": round(cob_p, 3), "n": int(len(muestra)),
+                           "por_edad": PR.resumen_por_grupo(muestra)}
+    act["club_actual"] = act.player_id.map(jug.set_index("player_id").club_id)
+    precios = PR.proyectar(muestra, codigos, act, clubes, retro["precio"]["ensanche"])
+
     stats = {"transiciones": n_trans, "salida_anual": round(p_salida, 3), "valuaciones": len(val), "jugadores_historia": int(val.player_id.nunique()),
              "filas_modelo": int((~fm.pre).sum()), "rasgos": len(M.RASGOS)}
-    meta = exportar(jug, val, clubes, les, apar, fich, panel, act, pr, log_idx, retro, corte, stats)
+    meta = exportar(jug, val, clubes, les, apar, traspasos, panel, act, pr, precios, log_idx, retro, corte, stats)
 
     print(f"corte {meta['corte']} | {meta['jugadores']} jugadores, {meta['clubes']} clubes, {meta['ligas']} ligas, {meta['paises_liga']} países")
     print("cobertura fuera de muestra:", retro["cobertura"], "| ensanche:", retro["ensanche"], "| ajuste del pico:", retro["pico_c"])
     print(pd.DataFrame(retro["agregada"]).to_string(index=False))
     print(pd.DataFrame(retro["picks"]).to_string(index=False))
+    print("precio pagado: cobertura", retro["precio"]["cobertura"]); print(pd.DataFrame(retro["precio"]["por_temporada"]).to_string(index=False))
 
 
 if __name__ == "__main__":

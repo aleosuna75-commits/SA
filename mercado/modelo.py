@@ -20,6 +20,8 @@ RASGOS = [
     "mom6", "mom1", "mom2", "mom3", "dd", "anios_max", "exp", "edad_debut", "nval12", "meses_val",
     "les12", "les24",
     "comp", "club_x", "club_n", "rango", "cuota", "liga_med", "cambio_club", "d_liga", "estuvo",
+    "club_ppg", "club_dg", "club_asist",
+    "tit12", "cuota_tit", "cap12", "tit_sel12", "conv_sel12", "sale12", "entra12", "tarjetas12",
     "min12", "pj12", "ga90", "g90", "min_eu", "min_prev", "min_sel", "cuota_min", "min_carrera", "min_eu_carrera", "ga_carrera",
     "fichado12", "log_fee", "fee_x",
 ]
@@ -27,8 +29,10 @@ CATEGORICAS = ["pi", "sub", "pie", "comp"]
 GRUPOS = {
     "Edad, posición y nivel de valor": ["edad_f", "pi", "sub", "altura", "pie", "x", "exp", "edad_debut"],
     "Trayectoria de su valor": ["mom6", "mom1", "mom2", "mom3", "dd", "anios_max", "nval12", "meses_val"],
-    "Club y liga": ["comp", "club_x", "club_n", "rango", "cuota", "liga_med", "cambio_club", "d_liga", "estuvo", "fichado12", "log_fee", "fee_x"],
-    "Minutos y producción": ["min12", "pj12", "ga90", "g90", "min_eu", "min_prev", "min_sel", "cuota_min", "min_carrera", "min_eu_carrera", "ga_carrera"],
+    "Club y liga": ["comp", "club_x", "club_n", "rango", "cuota", "liga_med", "cambio_club", "d_liga", "estuvo", "fichado12", "log_fee", "fee_x",
+                    "club_ppg", "club_dg", "club_asist"],
+    "Minutos y producción": ["min12", "pj12", "ga90", "g90", "min_eu", "min_prev", "min_sel", "cuota_min", "min_carrera", "min_eu_carrera", "ga_carrera",
+                             "tit12", "cuota_tit", "cap12", "tit_sel12", "conv_sel12", "sale12", "entra12", "tarjetas12"],
     "Lesiones": ["les12", "les24"],
 }
 
@@ -37,7 +41,59 @@ def sin_deflactor(fotos):
     return fotos.groupby("anio").valor.apply(lambda s: 0.0)
 
 
-def construir(val, jug, les, apar, fich, corte, log_idx_de=sin_deflactor):
+def cargar_partidos(crudos):
+    """Alineaciones, eventos y resultados de la fuente A (desde 2013): titularidades, capitanías, cambios, equipo."""
+    leer = lambda t, **kw: pd.read_csv(crudos / f"{t}.csv.gz", low_memory=False, **kw)
+    juegos = leer("games", usecols=["game_id", "date", "competition_type", "home_club_id", "attendance"], parse_dates=["date"])
+    return {
+        "juegos": juegos,
+        "alineaciones": leer("game_lineups", usecols=["date", "game_id", "player_id", "type", "team_captain"], parse_dates=["date"]),
+        "eventos": leer("game_events", usecols=["date", "type", "player_id", "player_in_id"], parse_dates=["date"]),
+        "club_juegos": leer("club_games", usecols=["game_id", "club_id", "own_goals", "opponent_goals"]),
+    }
+
+
+def _foto(fecha):
+    """Año de la foto (1-jul) a la que pertenece un hecho: todo lo ocurrido hasta el 30-jun cuenta para ese año."""
+    return fecha.dt.year + (fecha.dt.month > 6)
+
+
+def rasgos_partidos(f, partidos):
+    """Agrega al panel los rasgos de alineaciones, eventos y resultados del club (12 meses previos a la foto)."""
+    nuevos = ["club_ppg", "club_dg", "club_asist", "tit12", "cuota_tit", "cap12", "tit_sel12", "conv_sel12", "sale12", "entra12", "tarjetas12"]
+    if partidos is None:
+        return f.assign(**{c: np.nan for c in nuevos})
+    J = partidos["juegos"]
+    sel = J.set_index("game_id").competition_type.eq("national_team_competition")
+    a = partidos["alineaciones"].assign(anio=lambda d: _foto(d.date))
+    a["es_sel"] = a.game_id.map(sel).fillna(False).astype(bool)
+    a["tit"] = a.type.eq("starting_lineup")
+    club = a[~a.es_sel].groupby(["player_id", "anio"]).agg(tit12=("tit", "sum"), conv12=("tit", "size"), cap12=("team_captain", "sum")).reset_index()
+    nac = a[a.es_sel].groupby(["player_id", "anio"]).agg(tit_sel12=("tit", "sum"), conv_sel12=("tit", "size")).reset_index()
+    e = partidos["eventos"].assign(anio=lambda d: _foto(d.date))
+    sale = e[e.type == "Substitutions"].groupby(["player_id", "anio"]).size().rename("sale12").reset_index()
+    entra = e[e.type == "Substitutions"].dropna(subset=["player_in_id"]).groupby(["player_in_id", "anio"]).size().rename("entra12").reset_index().rename(columns={"player_in_id": "player_id"})
+    tarj = e[e.type == "Cards"].groupby(["player_id", "anio"]).size().rename("tarjetas12").reset_index()
+    for t in (club, nac, sale, entra, tarj):
+        f = f.merge(t, on=["player_id", "anio"], how="left")
+    hay = f.anio >= 2014                                     # las alineaciones empiezan en jul-2013
+    en_liga = f.comp_t.notna() & hay
+    for c in ["tit12", "conv12", "cap12", "tit_sel12", "conv_sel12", "sale12", "entra12", "tarjetas12"]:
+        f[c] = np.where(en_liga, f[c].fillna(0), f[c].where(hay))
+    f["cuota_tit"] = np.where(f.conv12 > 0, f.tit12 / f.conv12, np.nan)
+    # resultados del club en liga doméstica
+    cj = partidos["club_juegos"].merge(J[["game_id", "date", "competition_type", "home_club_id", "attendance"]], on="game_id")
+    cj = cj[cj.competition_type == "domestic_league"].assign(anio=lambda d: _foto(d.date))
+    cj["pts"] = np.where(cj.own_goals > cj.opponent_goals, 3, np.where(cj.own_goals == cj.opponent_goals, 1, 0))
+    cj["dg"] = cj.own_goals - cj.opponent_goals
+    cj["asist_local"] = cj.attendance.where((cj.home_club_id == cj.club_id) & (cj.attendance > 0))
+    cg = cj.groupby(["club_id", "anio"]).agg(club_ppg=("pts", "mean"), club_dg=("dg", "mean"), club_asist=("asist_local", "mean"), n=("pts", "size")).reset_index()
+    cg = cg[cg.n >= 10].drop(columns="n").rename(columns={"club_id": "club_t"})
+    cg["club_asist"] = np.log(cg.club_asist)
+    return f.merge(cg, on=["club_t", "anio"], how="left")
+
+
+def construir(val, jug, les, apar, fich, corte, log_idx_de=sin_deflactor, partidos=None):
     """Panel jugador-año con rasgos. `log_idx_de(fotos)` devuelve el log-índice del mercado por año."""
     val = val.sort_values(["player_id", "date"]).copy()
     # La fuente B no trae club por fecha: se arrastra el último club conocido de A (hasta 400 días).
@@ -126,6 +182,8 @@ def construir(val, jug, les, apar, fich, corte, log_idx_de=sin_deflactor):
     f["min_eu_carrera"] = gj.min_eu.cumsum().where(hay)
     f["ga_carrera"] = (f.goles + f.asist).groupby(f.player_id).cumsum().where(hay)
     f["cuota_min"] = f.min12 / f.groupby(["club_t", "anio"]).min12.transform("max").where(f.club_t.notna())
+
+    f = rasgos_partidos(f, partidos)
 
     # fichajes en los 12 meses previos
     t = fich[fich.transfer_date.notna()].assign(anio=lambda d: d.transfer_date.dt.year + (d.transfer_date.dt.month > 6))
