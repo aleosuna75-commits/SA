@@ -230,3 +230,13 @@ en la base quedaron aceptadas.
 - 2026-11-18 07:45 UTC · Bajas de la Jornada 17 integradas (18 equipos; 9 de 9 partidos con bajas en su tarjeta) y V19 publicada. Cotejo de suspendidos: los 13 que deduce el sistema aparecen en alguna fuente; un agregador da además a Gorriarán (Tigres) por quinta amarilla, el sistema cuenta 4 (la amarilla de una doble amonestación no acumula) y nadie más lo confirma: quedó como duda.
 - 2026-11-19 07:25 UTC · Corrida diaria: sin partidos nuevos; V20 publicada, `vivo/actual` en versión 25. Programado el vivo del sábado (5 despertares). No se avanzó un pendiente de mejora: se guarda el presupuesto para el fin de semana de 9 partidos en vivo.
 - 2026-11-20 07:25 UTC · Corrida diaria (hoy arranca la Jornada 17): sin partidos nuevos; V21 publicada, `vivo/actual` en versión 26; 83 sellos. Programado el vivo del domingo (4 despertares): los tres bloques del fin de semana ya tienen sus despertares. Esta sesión también atiende las tareas de F1 de Las Vegas (20 a 22-nov), que se intercalan con el vivo.
+- 2026-11-21 07:05 UTC · **Viernes de la Jornada 17 en vivo** (Puebla 1-1 San Luis, Juárez 3-3 Atlas, Tijuana 1-0 Atlante):
+  26 eventos (10 a 35), todos escritos en `vivo/actual` (versiones 27 a 52) sin rechazos gracias a la copia estable;
+  primer **gol anulado** real (Juárez 2-1 → 1-1 al 45'+4') bien corregido; dos goles en la misma consulta (Atlas y
+  Tijuana, 04:48) salieron en un solo despertar. A la vez corrió el vivo de la qualy de F1 (28 relevos). **La sesión se
+  quedó sin límite de uso a las 05:07 UTC** (unas 80 respuestas en 4 h 50 min) y volvió a las 06:55: no se perdió nada
+  visible de la Liga MX (el último final se escribió a las 05:07), pero el cierre y el aviso de F1 salieron 1 h 45 tarde.
+  Para el sábado: `vivo_relevo.sh` (un despertar = una respuesta). Cierre: 4 sellos calificados; el modelo acertó 2 de 4
+  ganadores y 1 marcador exacto; combinadas completas: segura 1 de 4, equilibrada 2 de 4, atrevida 1 de 4. Modelo contra
+  mercado (3 partidos con momios sellados): log-loss 1.040 contra 1.075, diferencia −0.035 ± 0.008 a favor del modelo:
+  demasiado pocos para concluir. V22 publicada. Campeón: América 26.4%, Cruz Azul 26.1%, Toluca 19.8%, Chivas 19.1%.

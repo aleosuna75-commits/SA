@@ -16,3 +16,6 @@ salidas/vivo.json
 salidas/vivo_eventos.jsonl
 salidas/vivo_estado.json
 salidas/vivo_relevo.json
+salidas/vivo_ultimo_n.txt
+salidas/.vivo_esperar.tmp
+salidas/.vivo_relevo.tmp

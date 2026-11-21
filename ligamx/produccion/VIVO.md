@@ -202,6 +202,13 @@ Escribir una primera vez el documento (ver 6.4) para que la página muestre «pr
 
 ### 6.3 Bucle de la sesión (N = `ultimo_n`)
 
+**Forma corta (desde el 21-nov-2026, para gastar la mitad de respuestas):** `bash vivo_relevo.sh` en segundo plano hace un
+paso completo: espera el siguiente evento desde el último atendido (`salidas/vivo_ultimo_n.txt`), deja la copia estable
+(`salidas/vivo_relevo.json`), imprime la línea del evento y el estado de la copia, y sale con el código de `esperar`. Al
+despertar, UNA sola respuesta con dos llamadas a la vez: `ArtifactData set` de la copia (6.4, con la versión que devolvió
+la escritura anterior) y volver a lanzar `bash vivo_relevo.sh` en segundo plano. Al armar: `python3 vivo.py estado` y
+escribir `ultimo_n` en `salidas/vivo_ultimo_n.txt`. Lo de abajo es lo que el guion hace por dentro.
+
     python3 vivo.py esperar --desde N           # Bash en segundo plano; despierta sola (hasta 110 minutos)
 
 | sale con | qué pasó | qué hacer |
