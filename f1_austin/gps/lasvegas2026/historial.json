@@ -1,5 +1,5 @@
 {
- "actualizado": "2026-11-20T05:53:23Z",
+ "actualizado": "2026-11-21T02:04:32Z",
  "fases": [
   {
    "fase": "FP2",
@@ -40,6 +40,89 @@
    "cambios": {
     "qualy": [],
     "carrera": []
+   }
+  },
+  {
+   "fase": "FP3",
+   "actualizado": "2026-11-21T02:04:32Z",
+   "qualy": {
+    "top10": [
+     "RUS",
+     "LEC",
+     "ANT",
+     "NOR",
+     "VER",
+     "HAM",
+     "HAD",
+     "GAS",
+     "PIA",
+     "LAW"
+    ],
+    "pole": "RUS",
+    "modelo": "Random Forest"
+   },
+   "carrera": {
+    "top10": [
+     "RUS",
+     "LEC",
+     "ANT",
+     "NOR",
+     "VER",
+     "HAM",
+     "HAD",
+     "PIA",
+     "LAW",
+     "GAS"
+    ],
+    "ganador": "RUS",
+    "preliminar": true,
+    "parrilla_fuente": "pronóstico de qualy (FP3)"
+   },
+   "cambios": {
+    "qualy": [
+     {
+      "acr": "VER",
+      "de": 6,
+      "a": 5
+     },
+     {
+      "acr": "HAM",
+      "de": 5,
+      "a": 6
+     },
+     {
+      "acr": "GAS",
+      "de": 9,
+      "a": 8
+     },
+     {
+      "acr": "PIA",
+      "de": 8,
+      "a": 9
+     },
+     {
+      "acr": "LAW",
+      "de": 11,
+      "a": 10
+     },
+     {
+      "acr": "COL",
+      "de": 10,
+      "a": 11
+     }
+    ],
+    "carrera": [
+     {
+      "acr": "VER",
+      "de": 6,
+      "a": 5
+     },
+     {
+      "acr": "HAM",
+      "de": 5,
+      "a": 6
+     }
+    ]
    }
   }
  ]

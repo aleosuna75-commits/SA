@@ -35,6 +35,41 @@
     "carrera.json",
     "historial.json"
    ]
+  },
+  "fp3": {
+   "hecho": "2026-11-21T02:04:32Z",
+   "corte": "2026-11-21T04:00:00Z",
+   "fuente": "reconstruida del live timing (crudo_fp3_lasvegas2026.jsonl; OpenF1 401)",
+   "modelo": "Random Forest",
+   "top10": [
+    "RUS",
+    "LEC",
+    "ANT",
+    "NOR",
+    "VER",
+    "HAM",
+    "HAD",
+    "GAS",
+    "PIA",
+    "LAW"
+   ],
+   "top10_carrera": [
+    "RUS",
+    "LEC",
+    "ANT",
+    "NOR",
+    "VER",
+    "HAM",
+    "HAD",
+    "PIA",
+    "LAW",
+    "GAS"
+   ],
+   "archivos": [
+    "gp.json",
+    "carrera.json",
+    "historial.json"
+   ]
   }
  }
 }
