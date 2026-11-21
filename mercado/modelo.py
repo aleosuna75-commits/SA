@@ -12,6 +12,8 @@ import numpy as np
 import pandas as pd
 import lightgbm as lgb
 
+import fuentes as F
+
 H_MODELO = [1, 3, 5, 8]          # los validados en la prueba retrospectiva (1, 3, 5) más 8; el resto se interpola
 CUANTILES = [0.1, 0.5, 0.9]
 COMP_EUROPA = ["CL", "EL", "UCOL"]
@@ -25,6 +27,7 @@ RASGOS = [
     "min12", "pj12", "ga90", "g90", "min_eu", "min_prev", "min_sel", "cuota_min", "min_carrera", "min_eu_carrera", "ga_carrera",
     "fichado12", "log_fee", "fee_x",
 ]
+RASGOS += F.RASGOS_EXTRA
 CATEGORICAS = ["pi", "sub", "pie", "comp"]
 GRUPOS = {
     "Edad, posición y nivel de valor": ["edad_f", "pi", "sub", "altura", "pie", "x", "exp", "edad_debut"],
@@ -39,6 +42,9 @@ GRUPOS = {
 
 def sin_deflactor(fotos):
     return fotos.groupby("anio").valor.apply(lambda s: 0.0)
+
+
+GRUPOS.update(F.GRUPOS_EXTRA)
 
 
 def cargar_partidos(crudos):
@@ -93,7 +99,7 @@ def rasgos_partidos(f, partidos):
     return f.merge(cg, on=["club_t", "anio"], how="left")
 
 
-def construir(val, jug, les, apar, fich, corte, log_idx_de=sin_deflactor, partidos=None):
+def construir(val, jug, les, apar, fich, corte, log_idx_de=sin_deflactor, partidos=None, extra=None):
     """Panel jugador-año con rasgos. `log_idx_de(fotos)` devuelve el log-índice del mercado por año."""
     val = val.sort_values(["player_id", "date"]).copy()
     # La fuente B no trae club por fecha: se arrastra el último club conocido de A (hasta 400 días).
@@ -184,6 +190,10 @@ def construir(val, jug, les, apar, fich, corte, log_idx_de=sin_deflactor, partid
     f["cuota_min"] = f.min12 / f.groupby(["club_t", "anio"]).min12.transform("max").where(f.club_t.notna())
 
     f = rasgos_partidos(f, partidos)
+    if extra is not None:                                    # (carpeta de crudos, tabla unificada de traspasos)
+        f = F.agregar(f, extra[0], extra[1], corte)
+    else:
+        f = f.assign(**{c: np.nan for c in F.RASGOS_EXTRA})
 
     # fichajes en los 12 meses previos
     t = fich[fich.transfer_date.notna()].assign(anio=lambda d: d.transfer_date.dt.year + (d.transfer_date.dt.month > 6))

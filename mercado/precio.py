@@ -14,7 +14,9 @@ import lightgbm as lgb
 
 import modelo as M
 
-RASGOS_P = M.RASGOS + ["lv_t", "meses_foto", "nivel_de", "pais_de"]
+# Fuera los rasgos de "fichaje reciente": para un traspaso fechado el 1-jul contendrían la propia cuota a predecir.
+FUGA = ["fichado12", "log_fee", "fee_x"]
+RASGOS_P = [r for r in M.RASGOS if r not in FUGA] + ["lv_t", "meses_foto", "nivel_de", "pais_de"]
 CAT_P = M.CATEGORICAS + ["pais_de"]
 CUANTILES = [0.1, 0.5, 0.9]
 
@@ -28,10 +30,24 @@ def tabla_traspasos(crudos):
     a = pd.read_csv(crudos / "transfers.csv.gz", parse_dates=["transfer_date"])
     a = pd.DataFrame({"player_id": a.player_id, "fecha": a.transfer_date, "de_id": a.from_club_id, "a_id": a.to_club_id,
                       "de": a.from_club_name, "a": a.to_club_name, "tipo": "Transfer", "valor_t": a.market_value_in_eur, "pagado": a.transfer_fee})
-    t = pd.concat([b, a[a.pagado > 0]])                       # de A sólo interesan los que traen cuota
+    # Tercera fuente (Zenodo, CC BY 4.0; 50 ligas, 2005-2024): sólo traspasos definitivos con cuota y valor.
+    c = pd.read_csv(crudos / "extra" / "zenodo_cumetti_transfers" / "football_transfers_data.csv.gz", low_memory=False)
+    c = c[(c.fee_cleaned > 0) & (c.market_value > 0) & ~c.fee.astype(str).str.lower().str.contains("loan")]
+    c = pd.DataFrame({"player_id": c.player_id, "fecha": pd.to_datetime(c.year.astype(str) + np.where(c.transfer_period == "Summer", "-07-01", "-01-15")),
+                      "de_id": c.source_club_id, "a_id": c.target_club_id, "de": c.source_club, "a": c.target_club, "tipo": "Transfer",
+                      "valor_t": c.market_value * 1e6, "pagado": c.fee_cleaned * 1e6})
+    t = pd.concat([b.assign(orden=0), a[a.pagado > 0].assign(orden=1), c.assign(orden=2)])   # de A y C sólo los que traen cuota
     t = t[t.fecha.notna()]
-    t["mes"] = t.fecha.dt.strftime("%Y-%m")
-    return t.sort_values("pagado", ascending=False).drop_duplicates(["player_id", "mes", "a_id"]).drop(columns="mes")
+    t["ventana"] = t.fecha.dt.year + (t.fecha.dt.month >= 5)   # verano de Y y enero de Y+1 caen en ventanas distintas
+    t = t.sort_values(["orden", "pagado"], ascending=[True, False])
+    # el mismo traspaso en dos fuentes: se queda el de fecha exacta, pero con la cuota si la otra fuente la trae
+    con_cuota = t[t.pagado > 0].drop_duplicates(["player_id", "a_id", "ventana"]).set_index(["player_id", "a_id", "ventana"])[["pagado", "valor_t"]]
+    t = t.drop_duplicates(["player_id", "a_id", "ventana"]).set_index(["player_id", "a_id", "ventana"])
+    falta = (t.pagado <= 0) | t.pagado.isna()
+    t.loc[falta, "pagado"] = con_cuota.pagado.reindex(t.index)[falta].fillna(t.pagado[falta])
+    sin_valor = ~(t.valor_t > 0)
+    t.loc[sin_valor, "valor_t"] = con_cuota.valor_t.reindex(t.index)[sin_valor].fillna(t.valor_t[sin_valor])
+    return t.reset_index().drop(columns=["orden", "ventana"]).sort_values(["player_id", "fecha"])
 
 
 def _contexto(d, clubes, codigos):

@@ -17,6 +17,7 @@ Modelo, en tres capas (la 2 vive en modelo.py):
 Uso:  python3 mercado/pipeline.py [--sin-descarga]
 """
 import argparse
+import gzip
 import json
 import shutil
 import subprocess
@@ -58,6 +59,18 @@ def descargar():
     for t in TABLAS_A:
         print("bajando", t)
         with urllib.request.urlopen(URL_A.format(t), timeout=600) as r, open(CRUDOS / f"{t}.csv.gz", "wb") as f:
+            shutil.copyfileobj(r, f)
+    # Fuentes extra (ver fuentes.py y precio.py): dos tablas grandes del mismo repositorio B y los traspasos de Zenodo.
+    extra = {
+        "salimt_transfer_history/transfer_history.csv.gz": "https://media.githubusercontent.com/media/salimt/football-datasets/main/datalake/transfermarkt/transfer_history/transfer_history.csv",
+        "salimt_player_performances/player_performances.csv.gz": "https://media.githubusercontent.com/media/salimt/football-datasets/main/datalake/transfermarkt/player_performances/player_performances.csv",
+        "zenodo_cumetti_transfers/football_transfers_data.csv.gz": "https://zenodo.org/records/17921143/files/football_transfers_data.csv?download=1",
+    }
+    for destino, url in extra.items():
+        ruta = CRUDOS / "extra" / destino
+        ruta.parent.mkdir(parents=True, exist_ok=True)
+        print("bajando", destino)
+        with urllib.request.urlopen(url, timeout=900) as r, gzip.open(ruta, "wb") as f:
             shutil.copyfileobj(r, f)
     fd = CRUDOS / "fd"
     shutil.rmtree(fd, ignore_errors=True)
@@ -393,6 +406,7 @@ def exportar(jug, val, clubes, les, apar, traspasos, panel, act, pr, precios, lo
     for c in ["mom", "x"]:
         j[c] = j.player_id.map(f[c]).fillna(0)
     R, SV = pr["R"], pr["SV"]
+    ea_ovr, ea_pot, ea_sal, ea_cl, ea_val, ea_con, ea_anio = (act[c].to_numpy(float) for c in ["ea_ovr", "ea_pot", "ea_lsal", "ea_clausula", "ea_lval", "ea_contrato", "anio"])
     cubierta = act.comp_t.notna().to_numpy()
 
     def proyeccion(r):
@@ -465,6 +479,8 @@ def exportar(jug, val, clubes, les, apar, traspasos, panel, act, pr, precios, lo
         H = int(np.isfinite(R[i, :, 2]).sum())
         d = {"h": hist.get(pid, [[], []]), "q": [[round(float(x), 3) for x in R[i, h]] for h in range(H)],
              "s": [round(float(x), 2) for x in SV[i, :H]], "f": [round(float(x), 3) for x in pr["contrib"][i]]}
+        if np.isfinite(ea_ovr[i]):                           # estimaciones de EA Sports: media, potencial, salario semanal, cláusula, año de contrato
+            d["e"] = [n(ea_ovr[i]), n(ea_pot[i]), n(np.expm1(ea_sal[i])), n(np.exp(ea_cl[i] + ea_val[i])), n(ea_con[i] + ea_anio[i]), int(ea_anio[i])]
         for k, src in (("t", tras), ("l", lesiones), ("p", prec), ("a", agentes), ("c", cedidos)):
             if pid in src:
                 d[k] = src[pid]
@@ -516,14 +532,16 @@ def main():
     sim = simular(celdas, rng)
 
     # modelo de precisión
-    fm, li = M.construir(val, jug, les, apar, fich, corte, partidos=M.cargar_partidos(CRUDOS))   # euros corrientes
-    previo = SALIDA / "meta.json"
-    if args.sin_retro and previo.exists() and "retro" in json.loads(previo.read_text()):
-        retro = json.loads(previo.read_text())["retro"]
+    traspasos = PR.tabla_traspasos(CRUDOS)
+    fm, li = M.construir(val, jug, les, apar, fich, corte, partidos=M.cargar_partidos(CRUDOS), extra=(CRUDOS, traspasos))   # euros corrientes
+    previo = RAIZ / "datos_crudos" / "retro_cache.json"     # la prueba tarda ~15 min: se guarda en cuanto termina
+    if args.sin_retro and previo.exists():
+        retro = json.loads(previo.read_text())
     else:
         filas, picks, casos, zs = M.retro(fm, li, jug.set_index("player_id").nombre)
         k, cob, k95, cob95 = M.calibrar(zs)
         retro = resumen_retro(filas, picks, casos, cob, k, cob95, k95, li, corte)
+        previo.write_text(json.dumps(retro))
     global RECORD
     RECORD = float(val.market_value_in_eur.max())
     if len(retro.get("pico_c", [])) < 3:
@@ -534,7 +552,6 @@ def main():
     pr = proyectar(act, modelos, k, {int(h): v for h, v in retro["ensanche95"].items()}, sim, retro["pico_c"])
 
     # precio de traspaso pagado frente al valor de TM (precio.py)
-    traspasos = PR.tabla_traspasos(CRUDOS)
     muestra, codigos = PR.muestra(fm, traspasos, clubes, corte)
     if "precio" not in retro:
         filas_p, k_p, cob_p, k95_p, cob95_p = PR.retro(muestra)
@@ -542,6 +559,7 @@ def main():
                            "ensanche": round(k_p, 3), "cobertura": round(cob_p, 3), "ensanche95": round(k95_p, 3), "cobertura95": round(cob95_p, 3),
                            "n": int(len(muestra)),
                            "por_edad": PR.resumen_por_grupo(muestra)}
+    previo.write_text(json.dumps(retro))
     act["club_actual"] = act.player_id.map(jug.set_index("player_id").club_id)
     precios = PR.proyectar(muestra, codigos, act, clubes, retro["precio"]["ensanche"], retro["precio"]["ensanche95"])
 

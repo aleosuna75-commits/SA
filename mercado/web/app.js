@@ -433,7 +433,7 @@
         <p><b>Lo que sí hace bien es ordenar.</b> En cada año de prueba, sus 50 apuestas sub-23 multiplicaron su valor por ${mediaDe(P, "sel_mult").toFixed(1)} en tres años (mediana), contra ${mediaDe(P, "pob_mult").toFixed(1)} del grupo del que salieron; y ${p100(mediaDe(P, "al_cae"))} de sus 50 alertas de devaluación perdió al menos 40% de valor. Sirve para decidir dónde mirar y qué vender, no para fijar un precio.</p></div>
 
       <h3>Cómo funciona</h3>
-      <div class="tarjeta"><p><b>1. Modelo de precisión.</b> Árboles de decisión potenciados (gradient boosting) entrenados por cuantiles: uno para el escenario pesimista, otro para la mediana y otro para el optimista, a 1, 3, 5 y 8 años (los intermedios se interpolan). Cada jugador-año aporta ${meta.rasgos} variables: edad exacta, posición, valor y su trayectoria (6 meses, 1, 2 y 3 años, distancia a su máximo), club y liga en esa fecha (valor de la plantilla, su lugar dentro de ella, nivel de la liga), minutos, goles y asistencias de los 12 meses previos, minutos europeos y de selección, acumulados de carrera, fichajes recientes y días de lesión. Proyecta en euros corrientes: aprende el cambio típico de cada tipo de jugador, inflación incluida, y supone que el mercado seguirá comportándose como su promedio histórico.</p>
+      <div class="tarjeta"><p><b>1. Modelo de precisión.</b> Árboles de decisión potenciados (gradient boosting) entrenados por cuantiles: uno para el escenario pesimista, otro para la mediana y otro para el optimista, a 1, 3, 5 y 8 años (los intermedios se interpolan). Cada jugador-año aporta ${meta.rasgos} variables: edad exacta, posición, valor y su trayectoria (6 meses, 1, 2 y 3 años, distancia a su máximo), club y liga en esa fecha (valor de la plantilla, su lugar dentro de ella, nivel de la liga), minutos, goles y asistencias de los 12 meses previos, minutos europeos y de selección, acumulados de carrera, fichajes recientes, días de lesión, partidos y goles en todas las competiciones (también divisiones inferiores), historial de traspasos y cesiones, media y potencial de EA FC con años de contrato y cláusula, y puesto en liga y Elo del club. Proyecta en euros corrientes: aprende el cambio típico de cada tipo de jugador, inflación incluida, y supone que el mercado seguirá comportándose como su promedio histórico.</p>
         <p><b>2. Curva de largo plazo.</b> Más allá de 8 años no hay datos suficientes para un modelo individual; la proyección se prolonga con la forma típica por edad, posición y nivel de valor (factores de desarrollo edad a edad, como un triángulo actuarial).</p>
         <p><b>3. Rangos con confianza comprobada.</b> Cada proyección trae dos rangos, escalados con el error observado en las pruebas retrospectivas (calibración conforme: no supone ninguna distribución). Medido dejando fuera cada año evaluado, el rango de 95% contuvo el valor real ${Object.entries(RT.cobertura95).map(([h, c]) => `${p100(c)} de las veces a ${h} año${h > 1 ? "s" : ""}`).join(", ")}; el de 80%, ${Object.entries(RT.cobertura).map(([h, c]) => p100(c)).join(", ")}.</p>
         <p><b>4. Precedentes.</b> En cada ficha, los cinco jugadores históricos más parecidos y qué fue de ellos. No alimentan el número: sirven para juzgarlo.</p></div>
@@ -476,7 +476,7 @@
 
       <h3>Límites</h3>
       <div class="tarjeta"><ul>
-        <li><b>El techo de precisión lo ponen los datos, no el modelo.</b> Se probaron modelos más grandes, la identidad del club y la nacionalidad: ninguno mejoró. Para bajar más el error haría falta información que no es pública (datos de evento, salarios, cláusulas, informes de scouting).</li>
+        <li><b>El techo de precisión lo pone el fútbol, no la falta de datos.</b> Además de modelos más grandes, se rastrearon más de 60 conjuntos de datos abiertos y se integraron los más fuertes: partidos y goles en 1,643 competiciones, historial completo de traspasos y cesiones, media y potencial de EA FC con contrato y cláusula, tabla de liga y Elo del club. El error típico casi no cambió; mejoró el orden entre jugadores y la calidad de las apuestas. El valor de Transfermarkt ya incorpora casi todo lo que es público.</li>
         <li><b>Se proyecta la valuación de Transfermarkt</b>, una estimación de su comunidad, no precios de traspaso.</li>
         <li><b>${mil(sinCob)} jugadores están fuera de las ligas con datos completos.</b> Para ellos el modelo no ve club, minutos ni goles y sus proyecciones son menos finas; la ficha lo avisa.</li>
         <li><b>${mil(viejos)} valores tienen más de un año</b> (una fuente dejó de actualizar valuaciones en septiembre de 2025). Cada ficha muestra la fecha de su valor.</li>
@@ -486,7 +486,7 @@
         <li><b>No entran al modelo</b> duración del contrato (sólo se conoce la actual), salario ni exposición mediática.</li>
         <li><b>Por encima de €100M, por encima de 38 años y más allá de 8 años</b> hay pocos casos: ahí el modelo extrapola.</li>
         <li>Los perfiles (Estrella ≥ €60M, Élite ≥ €25M, Cumplidor ≥ €8M, Regular ≥ €2M, De rol) son cortes convencionales sobre el valor máximo esperado en los próximos 8 años o el ya alcanzado.</li></ul></div>
-      <p class="nota">Fuentes: dcaribou/transfermarkt-datasets (corte ${meta.corte}) y salimt/football-datasets (valuaciones a septiembre de 2025, lesiones a septiembre de 2026).</p></div>`;
+      <p class="nota">Fuentes: dcaribou/transfermarkt-datasets (corte ${meta.corte}); salimt/football-datasets (valuaciones, rendimiento y traspasos a septiembre de 2025, lesiones a septiembre de 2026); Football Transfers Dataset 2005–2024 (Zenodo, CC BY 4.0); ediciones FIFA 15 a FC 26 (datos de sofifa en espejos abiertos); ClubElo vía espejo abierto.</p></div>`;
     const el = d3.select("#indice"), W = el.node().clientWidth, H = 200, m = { t: 8, r: 10, b: 22, l: 36 }, I = meta.indice_mercado;
     el.attr("viewBox", `0 0 ${W} ${H}`).attr("height", H);
     const x = d3.scaleLinear(d3.extent(I.anios), [m.l, W - m.r]), y = d3.scaleLinear([0, d3.max(I.valor) * 1.05], [H - m.b, m.t]);
@@ -554,6 +554,12 @@
         <div class="tabla-caja"><table class="plana"><thead><tr><th class="izq">Jugador (año)</th><th>Valía entonces</th><th>3 años después</th><th>Máximo posterior</th></tr></thead>
         <tbody>${pr.c.map((x) => `<tr><td class="izq">${esc(x[0])} <span class="tenue">(${x[1]})</span></td><td>${eur(x[2] * 1e3)}</td><td>${x[3] == null ? '<span class="tenue">sin valor</span>' : eur(x[3] * 1e3)}</td><td>${eur(x[4] * 1e3)}</td></tr>`).join("")}</tbody></table></div>
         <p class="nota">Importes llevados a euros de hoy con el índice del mercado. Los cinco más cercanos por posición, edad, valor y tendencia.</p>` : ""}
+      ${d.e ? `<h3>Lo que estima EA Sports FC <span class="tenue">(edición vigente en ${d.e[5]})</span></h3>
+        <div class="kpis"><div class="kpi"><b>${d.e[0]} → ${d.e[1]}</b><span>media actual → potencial</span></div>
+          <div class="kpi"><b>${d.e[2] > 0 ? eur(d.e[2] * 52) : "—"}</b><span>salario anual estimado${d.e[2] > 0 ? ` (${eur(d.e[2])} por semana)` : ""}</span></div>
+          <div class="kpi"><b>${d.e[3] > 0 ? eur(d.e[3]) : "—"}</b><span>cláusula de rescisión estimada</span></div>
+          <div class="kpi"><b>${d.e[4] > 2000 ? d.e[4] : "—"}</b><span>contrato hasta (según EA)</span></div></div>
+        <p class="nota">Son estimaciones del videojuego, no cifras reales de contrato: sirven como referencia de ojeadores y de orden de magnitud salarial. El potencial y el contrato sí entran al modelo.</p>` : ""}
       <div class="dos"><div><h3>Contrato</h3>
         <p>${j.contrato ? `Vence en <b>${fechaYM(+j.contrato.replace("-", ""))}</b>${j.meses != null && j.meses <= 12 && j.meses >= 0 ? ` <span class="baja">(${j.meses} meses)</span>` : ""}` : "Sin fecha de vencimiento en la fuente"}</p>
         ${d.c ? `<p>Cedido por <b>${esc(d.c)}</b></p>` : ""}${d.a ? `<p class="tenue">Agente: ${esc(d.a)}</p>` : ""}</div>
