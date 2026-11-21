@@ -273,11 +273,11 @@ def simular(celdas, rng):
 RECORD = 200e6                                   # mayor valor de mercado registrado; se actualiza en main
 
 
-def proyectar(act, modelos, k, sim, c_pico):
+def proyectar(act, modelos, k, c_95, sim, c_pico):
     """Curvas por jugador a partir de los modelos por cuantiles.
 
     act: última foto de cada jugador vigente, con rasgos. Devuelve cocientes valor futuro/actual en euros corrientes:
-    R[n, HP, 3] (pesimista, mediana, optimista), SV[n, HP] (prob. de seguir valuado), pico y contribuciones.
+    R[n, HP, 5] (límite 95% bajo, 80% bajo, mediana, 80% alto, 95% alto), SV[n, HP] (prob. de seguir valuado), pico y contribuciones.
     Hasta 8 años manda el modelo; más allá se prolonga con la forma de la curva base por edad.
     """
     Q, S, _, _ = sim
@@ -285,21 +285,24 @@ def proyectar(act, modelos, k, sim, c_pico):
     lr = np.stack([np.stack([M.predecir(modelos, act, h, q) for q in M.CUANTILES], axis=1) for h in HM], axis=1)
     kk = np.interp(HM, sorted(k), [k[h] for h in sorted(k)])[None, :]          # ensanche calibrado de la banda
     med = lr[:, :, 1]
-    puntos = [med - kk * np.maximum(med - lr[:, :, 0], 0.02), med, med + kk * np.maximum(lr[:, :, 2] - med, 0.02),
+    k95 = np.interp(HM, sorted(k), [c_95[h] for h in sorted(k)])[None, :]
+    bajo, alto = np.maximum(med - lr[:, :, 0], 0.02), np.maximum(lr[:, :, 2] - med, 0.02)
+    puntos = [med - k95 * bajo, med - kk * bajo, med, med + kk * alto, med + k95 * alto,
               np.stack([M.predecir(modelos, act, h, "s") for h in HM], axis=1)]
     hs = np.arange(1, HM[-1] + 1)
     interp = lambda a: np.stack([np.interp(hs, HM, fila) for fila in a])        # (n, 8)
-    lo, md, hi, sv = (interp(a) for a in puntos)
+    lo95, lo, md, hi, hi95, sv = (interp(a) for a in puntos)
     sv = np.minimum.accumulate(np.clip(sv, 0, 1), axis=1)
-    R, SV = np.full((n, HP, 3), np.nan), np.full((n, HP), np.nan)
-    R[:, :8] = np.exp(np.stack([lo, md, hi], axis=2))
+    R, SV = np.full((n, HP, 5), np.nan), np.full((n, HP), np.nan)
+    R[:, :8] = np.exp(np.stack([lo95, lo, md, hi, hi95], axis=2))
     SV[:, :8] = sv
     pi = act.pi.to_numpy().astype(int)
     e = act.edad.to_numpy().clip(EDAD_MIN, EDAD_MAX - 1) - EDAD_MIN
     bb = bin_de(np.log(act.valor.to_numpy()))
     Qb, Sb = Q[pi, e, bb], S[pi, e, bb]                                         # (n, HMAX, 3), (n, HMAX)
     with np.errstate(all="ignore"):
-        R[:, 8:] = R[:, 7:8] * Qb[:, 8:HP] / Qb[:, 7:8]
+        cola = Qb[:, 8:HP] / Qb[:, 7:8]                                     # forma de largo plazo (bajo, mediana, alto)
+        R[:, 8:] = R[:, 7:8] * cola[:, :, [0, 0, 1, 2, 2]]
         SV[:, 8:] = SV[:, 7:8] * Sb[:, 8:HP] / Sb[:, 7:8]
     fuera = act.edad.to_numpy()[:, None] + np.arange(1, HP + 1)[None, :] > EDAD_MAX + 1
     R[fuera], SV[fuera] = np.nan, np.nan
@@ -311,16 +314,16 @@ def proyectar(act, modelos, k, sim, c_pico):
     R = np.minimum(R, np.maximum(1.0, 1.5 * RECORD / valor)[:, None, None])
     # coherencia: el máximo de una trayectoria nunca es menor que cualquiera de sus puntos
     with np.errstate(all="ignore"):
-        p50 = np.maximum(p50, np.nan_to_num(np.nanmax(R[:, :8, 1], axis=1), nan=1.0))
+        p50 = np.maximum(p50, np.nan_to_num(np.nanmax(R[:, :8, 2], axis=1), nan=1.0))
     p90 = np.maximum(p90, p50)
     with np.errstate(all="ignore"):
-        h_pico = np.nanargmax(np.where(np.isnan(R[:, :, 1]), -1, R[:, :, 1]), axis=1) + 1
+        h_pico = np.nanargmax(np.where(np.isnan(R[:, :, 2]), -1, R[:, :, 2]), axis=1) + 1
     c = modelos[(3, 0.5)].predict(act[M.RASGOS], pred_contrib=True)
     contrib = np.column_stack([c[:, -1]] + [c[:, [M.RASGOS.index(r) for r in rs]].sum(axis=1) for rs in M.GRUPOS.values()])
     return {"R": R, "SV": SV, "pico50": p50, "pico90": p90, "h_pico": h_pico, "contrib": contrib}
 
 
-def resumen_retro(filas, picks, casos, cob, k, li, corte):
+def resumen_retro(filas, picks, casos, cob, k, cob95, k95, li, corte):
     """Compacta la prueba retrospectiva para la página."""
     prom = lambda g, c: float(np.average(g[c], weights=g.n))
     agregada = [{"h": int(h), "grupo": gr, "n": int(g.n.sum()), **{c: round(prom(g, c), 3) for c in ["modelo", "ingenuo", "modelo_real", "ingenuo_real", "spearman"]}}
@@ -330,6 +333,7 @@ def resumen_retro(filas, picks, casos, cob, k, li, corte):
                    "spearman": round(r.spearman, 3)} for r in liga.itertuples()]
     return {"agregada": agregada, "por_origen": por_origen, "picks": picks.round(3).to_dict("records"), "casos": casos,
             "cobertura": {str(h): round(v, 3) for h, v in cob.items()}, "ensanche": {str(h): round(v, 3) for h, v in k.items()},
+            "cobertura95": {str(h): round(v, 3) for h, v in cob95.items()}, "ensanche95": {str(h): round(v, 3) for h, v in k95.items()},
             "origenes": [int(filas.origen.min()), int(filas.origen.max())],
             "inflacion_supuesta": round(float(np.exp(M.inflacion_supuesta(li, corte.year)) - 1), 4)}
 
@@ -394,12 +398,12 @@ def exportar(jug, val, clubes, les, apar, traspasos, panel, act, pr, precios, lo
     def proyeccion(r):
         """Columnas de proyección de la fila: medianas a 1,2,3,5,8 años, supervivencia, pico, techo."""
         i = fila_de[int(r.player_id)]
-        H = int(np.isfinite(R[i, :, 1]).sum())
-        v = [int(r.valor * R[i, h - 1, 1]) if h <= H else -1 for h in (1, 2, 3, 5, 8)]
+        H = int(np.isfinite(R[i, :, 2]).sum())
+        v = [int(r.valor * R[i, h - 1, 2]) if h <= H else -1 for h in (1, 2, 3, 5, 8)]
         h3 = min(3, H)
         s3 = int(round(100 * SV[i, h3 - 1])) if H else -1
         pico, techo = max(r.max_hist, r.valor * pr["pico50"][i]), max(r.max_hist, r.valor * pr["pico90"][i])
-        edad_pico = int(r.edad + pr["h_pico"][i]) if H and r.valor * pr["pico50"][i] > 1.03 * r.max_hist and R[i, pr["h_pico"][i] - 1, 1] > 1.03 else 0
+        edad_pico = int(r.edad + pr["h_pico"][i]) if H and r.valor * pr["pico50"][i] > 1.03 * r.max_hist and R[i, pr["h_pico"][i] - 1, 2] > 1.03 else 0
         return v + [s3, int(pico), int(techo), edad_pico, int(cubierta[i]), H]
 
     a = apar[apar.date > corte - pd.Timedelta(days=365)]
@@ -421,7 +425,7 @@ def exportar(jug, val, clubes, les, apar, traspasos, panel, act, pr, precios, lo
         r.contrato if isinstance(r.contrato, str) else "", int(r.fecha_valor.strftime("%Y%m")),
         pies.index(r.pie) if r.pie in pies else -1, int(r.altura) if r.altura and r.altura > 100 else 0,
         int(r.les24), 1 if r.cedido_de else 0, *proyeccion(r),
-        *[int(r.valor * x) for x in precios[fila_de[int(r.player_id)]]],          # precio de traspaso estimado: bajo, mediana, alto
+        *[int(r.valor * x) for x in precios[fila_de[int(r.player_id)]]],          # precio estimado: 95% bajo, 80% bajo, mediana, 80% alto, 95% alto
     ] for r in j.itertuples()]
 
     cl = clubes[clubes.index.isin(j.club_id)].copy()
@@ -458,7 +462,7 @@ def exportar(jug, val, clubes, les, apar, traspasos, panel, act, pr, precios, lo
     for pid in j.player_id:
         pid = int(pid)
         i = fila_de[pid]
-        H = int(np.isfinite(R[i, :, 1]).sum())
+        H = int(np.isfinite(R[i, :, 2]).sum())
         d = {"h": hist.get(pid, [[], []]), "q": [[round(float(x), 3) for x in R[i, h]] for h in range(H)],
              "s": [round(float(x), 2) for x in SV[i, :H]], "f": [round(float(x), 3) for x in pr["contrib"][i]]}
         for k, src in (("t", tras), ("l", lesiones), ("p", prec), ("a", agentes), ("c", cedidos)):
@@ -518,8 +522,8 @@ def main():
         retro = json.loads(previo.read_text())["retro"]
     else:
         filas, picks, casos, zs = M.retro(fm, li, jug.set_index("player_id").nombre)
-        k, cob = M.calibrar(zs)
-        retro = resumen_retro(filas, picks, casos, cob, k, li, corte)
+        k, cob, k95, cob95 = M.calibrar(zs)
+        retro = resumen_retro(filas, picks, casos, cob, k, cob95, k95, li, corte)
     global RECORD
     RECORD = float(val.market_value_in_eur.max())
     if len(retro.get("pico_c", [])) < 3:
@@ -527,28 +531,29 @@ def main():
     k = {int(h): v for h, v in retro["ensanche"].items()}
     modelos = M.entrenar(fm, corte.year, pico=True)
     act = fm.sort_values("anio").groupby("player_id").tail(1).reset_index(drop=True)
-    pr = proyectar(act, modelos, k, sim, retro["pico_c"])
+    pr = proyectar(act, modelos, k, {int(h): v for h, v in retro["ensanche95"].items()}, sim, retro["pico_c"])
 
     # precio de traspaso pagado frente al valor de TM (precio.py)
     traspasos = PR.tabla_traspasos(CRUDOS)
     muestra, codigos = PR.muestra(fm, traspasos, clubes, corte)
     if "precio" not in retro:
-        filas_p, k_p, cob_p = PR.retro(muestra)
+        filas_p, k_p, cob_p, k95_p, cob95_p = PR.retro(muestra)
         retro["precio"] = {"por_temporada": [{c: (round(v, 3) if isinstance(v, float) else v) for c, v in f_.items()} for f_ in filas_p],
-                           "ensanche": round(k_p, 3), "cobertura": round(cob_p, 3), "n": int(len(muestra)),
+                           "ensanche": round(k_p, 3), "cobertura": round(cob_p, 3), "ensanche95": round(k95_p, 3), "cobertura95": round(cob95_p, 3),
+                           "n": int(len(muestra)),
                            "por_edad": PR.resumen_por_grupo(muestra)}
     act["club_actual"] = act.player_id.map(jug.set_index("player_id").club_id)
-    precios = PR.proyectar(muestra, codigos, act, clubes, retro["precio"]["ensanche"])
+    precios = PR.proyectar(muestra, codigos, act, clubes, retro["precio"]["ensanche"], retro["precio"]["ensanche95"])
 
     stats = {"transiciones": n_trans, "salida_anual": round(p_salida, 3), "valuaciones": len(val), "jugadores_historia": int(val.player_id.nunique()),
              "filas_modelo": int((~fm.pre).sum()), "rasgos": len(M.RASGOS)}
     meta = exportar(jug, val, clubes, les, apar, traspasos, panel, act, pr, precios, log_idx, retro, corte, stats)
 
     print(f"corte {meta['corte']} | {meta['jugadores']} jugadores, {meta['clubes']} clubes, {meta['ligas']} ligas, {meta['paises_liga']} países")
-    print("cobertura fuera de muestra:", retro["cobertura"], "| ensanche:", retro["ensanche"], "| ajuste del pico:", retro["pico_c"])
+    print("cobertura 80%:", retro["cobertura"], "| cobertura 95%:", retro["cobertura95"], "| ensanche 95:", retro["ensanche95"], "| pico:", retro["pico_c"])
     print(pd.DataFrame(retro["agregada"]).to_string(index=False))
     print(pd.DataFrame(retro["picks"]).to_string(index=False))
-    print("precio pagado: cobertura", retro["precio"]["cobertura"]); print(pd.DataFrame(retro["precio"]["por_temporada"]).to_string(index=False))
+    print("precio pagado: cobertura 80/95", retro["precio"]["cobertura"], retro["precio"]["cobertura95"]); print(pd.DataFrame(retro["precio"]["por_temporada"]).to_string(index=False))
 
 
 if __name__ == "__main__":

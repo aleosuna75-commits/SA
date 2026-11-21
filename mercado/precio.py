@@ -76,12 +76,13 @@ def retro(p, anios=range(2018, 2026)):
                       "modelo_sub22": e((P[0.5] - pru.r)[joven]), "tm_sub22": e(-pru.r[joven]), "n_sub22": int(joven.sum()),
                       "orden": float(pd.Series(P[0.5]).corr(pru.r.reset_index(drop=True), method="spearman"))})
     zs = pd.concat(zs)
-    k = float(zs.z.quantile(0.8))
-    cob = float(np.mean([(g.z <= zs[zs["T"] != T].z.quantile(0.8)).mean() for T, g in zs.groupby("T")]))
-    return filas, k, cob
+    sal = []
+    for nivel in (0.8, 0.95):
+        sal += [float(zs.z.quantile(nivel)), float(np.mean([(g.z <= zs[zs["T"] != T].z.quantile(nivel)).mean() for T, g in zs.groupby("T")]))]
+    return (filas, *sal)                                      # filas, k80, cobertura80, k95, cobertura95
 
 
-def proyectar(p, codigos, act, clubes, k):
+def proyectar(p, codigos, act, clubes, k, k95):
     """Precio estimado hoy para cada jugador vigente: (pesimista, mediana, optimista) como múltiplos del valor de TM."""
     m = {q: _ajustar(p, q) for q in CUANTILES}
     d = act.copy()
@@ -90,9 +91,8 @@ def proyectar(p, codigos, act, clubes, k):
     d["de_id"] = d.club_actual
     d = _contexto(d, clubes, codigos)
     P = {q: m[q].predict(d[RASGOS_P]) for q in CUANTILES}
-    lo = P[0.5] - k * np.maximum(P[0.5] - P[0.1], 0.05)
-    hi = P[0.5] + k * np.maximum(P[0.9] - P[0.5], 0.05)
-    return np.exp(np.column_stack([lo, P[0.5], hi]))
+    bajo, alto = np.maximum(P[0.5] - P[0.1], 0.05), np.maximum(P[0.9] - P[0.5], 0.05)
+    return np.exp(np.column_stack([P[0.5] - k95 * bajo, P[0.5] - k * bajo, P[0.5], P[0.5] + k * alto, P[0.5] + k95 * alto]))
 
 
 def resumen_por_grupo(p):

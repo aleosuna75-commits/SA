@@ -327,17 +327,23 @@ def retro(f, li, nombres, origenes=range(2016, 2026), horizontes=(1, 3, 5)):
 
 
 def calibrar(zs):
-    """Factor por horizonte que ensancha la banda p10-p90 hasta cubrir 80% fuera de muestra.
+    """Factores por horizonte que escalan la banda p10-p90 hasta cubrir 80% y 95% fuera de muestra.
+
+    Cada desvío real se mide en unidades del ancho de la banda del propio jugador (z); el cuantil 80 o 95 de
+    z es el factor. Es una calibración conforme: no supone ninguna distribución.
 
     Devuelve (factores, cobertura dejando fuera cada origen): la cobertura que se reporta nunca usa
     el origen que evalúa.
     """
-    k = {int(h): float(g.z.quantile(0.8)) for h, g in zs.groupby("h")}
-    cob = {}
-    for h, g in zs.groupby("h"):
-        dentro = [float((g2.z <= g[g.origen != o].z.quantile(0.8)).mean()) for o, g2 in g.groupby("origen")]
-        cob[int(h)] = float(np.mean(dentro))
-    return k, cob
+    salida = []
+    for nivel in (0.8, 0.95):
+        k = {int(h): float(g.z.quantile(nivel)) for h, g in zs.groupby("h")}
+        cob = {}
+        for h, g in zs.groupby("h"):
+            dentro = [float((g2.z <= g[g.origen != o].z.quantile(nivel)).mean()) for o, g2 in g.groupby("origen")]
+            cob[int(h)] = float(np.mean(dentro))
+        salida += [k, cob]
+    return salida                                             # k80, cobertura80, k95, cobertura95
 
 
 def calibrar_pico(f, tope):

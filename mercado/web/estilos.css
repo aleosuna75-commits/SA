@@ -126,7 +126,8 @@ td .sub { display: block; font-size: 11px; color: var(--tenue); }
 .ficha-top { display: flex; justify-content: space-between; align-items: start; gap: 10px; }
 .cerrar { font-size: 18px; width: 34px; height: 34px; padding: 0; }
 .grafica { width: 100%; display: block; }
-.grafica .banda { fill: var(--acento); opacity: .16; }
+.grafica .banda { fill: var(--acento); opacity: .2; }
+.grafica .banda.b95 { opacity: .09; }
 .grafica .mediana { fill: none; stroke: var(--acento); stroke-width: 2; stroke-dasharray: 5 4; }
 .grafica .historia { fill: none; stroke: var(--texto); stroke-width: 2; }
 .grafica .hoy { stroke: var(--borde2); stroke-dasharray: 2 3; }

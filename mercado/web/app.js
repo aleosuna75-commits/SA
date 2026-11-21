@@ -73,7 +73,7 @@
   const jugadores = crudos.map((r) => {
     const j = { id: r[0], nombre: r[1], club: r[2], pos: r[3], subpos: r[4], edad: r[5], nac: r[6], valor: r[7], maxHist: r[8],
       pj: r[9], min: r[10], goles: r[11], asist: r[12], contrato: r[13], fecha: r[14], pie: r[15], altura: r[16], les24: r[17], cedido: r[18],
-      pLo: r[30], precio: r[31], pHi: r[32],
+      pLo95: r[30], pLo: r[31], precio: r[32], pHi: r[33], pHi95: r[34],
       V: [r[19], r[20], r[21], r[22], r[23]].map(nulo), s3: nulo(r[24]), pico: r[25], techo: r[26], edadPico: r[27] || null, cubierta: r[28], H: r[29] };
     const c = club.get(j.club);
     j.c = c; j.pais = c.pais; j.liga = c.liga; j.nivel = c.nivel;
@@ -203,9 +203,9 @@
   }
   function csv(id) {
     const t = tablas[id];
-    const cab = ["id", "jugador", "club", "liga", "pais_liga", "division", "posicion", "edad", "valor_tm", "fecha_valor", "precio_estimado", "precio_bajo", "precio_alto", "mediana_1a", "mediana_3a", "mediana_5a",
+    const cab = ["id", "jugador", "club", "liga", "pais_liga", "division", "posicion", "edad", "valor_tm", "fecha_valor", "precio_estimado", "precio_bajo_95", "precio_alto_95", "mediana_1a", "mediana_3a", "mediana_5a",
       "max_carrera", "techo_p90", "contrato", "minutos_12m"];
-    const fila = (j) => [j.id, j.nombre, j.c.nombre, j.liga, j.pais, j.nivel, POS[j.pos], j.edad, j.valor, j.fecha, j.precio, j.pLo, j.pHi, j.v1, j.v3, j.v5, j.pico, j.techo, j.contrato, j.min < 0 ? "" : j.min]
+    const fila = (j) => [j.id, j.nombre, j.c.nombre, j.liga, j.pais, j.nivel, POS[j.pos], j.edad, j.valor, j.fecha, j.precio, j.pLo95, j.pHi95, j.v1, j.v3, j.v5, j.pico, j.techo, j.contrato, j.min < 0 ? "" : j.min]
       .map((v) => (v == null ? "" : typeof v === "number" ? Math.round(v) : `"${String(v).replace(/"/g, '""')}"`)).join(",");
     const a = document.createElement("a");
     a.href = URL.createObjectURL(new Blob(["﻿" + cab.join(",") + "\n" + t.datos.map(fila).join("\n")], { type: "text/csv" }));
@@ -322,7 +322,7 @@
     { id: "alertas", t: "Alertas de devaluación", d: `27 años o más, desde €5M, en liga con datos completos: los de mayor caída esperada. En las pruebas, ${Math.round(100 * mediaDe(RT.picks, "al_cae"))}% de las 50 alertas de cada año perdió al menos 40% en tres años, contra ${Math.round(100 * mediaDe(RT.picks, "viej_cae"))}% del grupo.`,
       f: (j) => j.edad >= 27 && j.valor >= 5e6 && j.cubierta && j.r3 != null, k: (j) => j.r3, r: (j) => `${eur(j.valor)} → ${eur(j.v3)}<small class="baja">${pct(j.r3)} · ${eur(j.d3)}</small>`, o: "r3", asc: true, fl: { emin: 27, vmin: 5, nivel: 1 } },
     { id: "prima", t: "Se pagan por encima de su valor", d: "Desde €2M en liga con datos completos: mayor diferencia entre el precio de traspaso estimado y el valor de Transfermarkt.",
-      f: (j) => j.valor >= 2e6 && j.cubierta, k: (j) => -j.prima, r: (j) => `${eur(j.valor)} TM → ${eur(j.precio)}<small class="sube">${pct(j.prima)} · hasta ${eur(j.pHi)}</small>`, o: "precio", fl: { vmin: 2, nivel: 1 } },
+      f: (j) => j.valor >= 2e6 && j.cubierta, k: (j) => -j.prima, r: (j) => `${eur(j.valor)} TM → ${eur(j.precio)}<small class="sube">${pct(j.prima)} · hasta ${eur(j.pHi95)}</small>`, o: "precio", fl: { vmin: 2, nivel: 1 } },
     { id: "alza", t: "Mayor revalorización esperada", d: "Ganancia mediana esperada a 3 años.", f: (j) => j.d3 > 0, k: (j) => -j.d3, r: (j) => `${eur(j.valor)} → ${eur(j.v3)}<small class="sube">${eur(j.d3)} · ${pct(j.r3)}</small>`, o: "d3" },
     { id: "promesas", t: "Promesas sub-21 con mayor techo", d: "Valor máximo de carrera esperado (mediana) y escenario optimista.", f: (j) => j.edad <= 21, k: (j) => -j.pico, r: (j) => `${eur(j.valor)} → ${eur(j.pico)}<small>techo ${eur(j.techo)}</small>`, o: "pico", fl: { emax: 21 } },
     { id: "gangas", t: "Fuera de primera división, al alza", d: "Divisiones inferiores con mayor crecimiento porcentual esperado (valor ≥ €300k).", f: (j) => j.nivel >= 2 && j.nivel <= 8 && j.valor >= 3e5 && j.r3 > 0, k: (j) => -j.r3, r: (j) => `${eur(j.valor)} → ${eur(j.v3)}<small class="sube">${pct(j.r3)} · ${esc(j.liga)}</small>`, o: "r3" },
@@ -423,6 +423,11 @@
       <div class="kpis"><div class="kpi"><b>${mil(meta.jugadores)}</b><span>jugadores vigentes</span></div><div class="kpi"><b>${mil(meta.valuaciones)}</b><span>valuaciones históricas de ${mil(meta.jugadores_historia)} jugadores</span></div>
         <div class="kpi"><b>${mil(meta.filas_modelo)}</b><span>observaciones jugador-año para entrenar</span></div><div class="kpi"><b>${meta.rasgos}</b><span>variables por jugador</span></div></div>
 
+      <h3>Cómo leer los números: confianza no es lo mismo que precisión</h3>
+      <div class="tarjeta"><p><b>Confianza</b> es cuántas veces el valor real cae dentro del rango que da el modelo. Aquí es 95%, y está comprobado contra diez años de historia: no es una promesa, es una medición.</p>
+        <p><b>Precisión</b> es qué tan angosto es ese rango. «Error típico de ${p100(ag(3, "liga").modelo)} a tres años» no significa acertar ${Math.round(10 - 10 * ag(3, "liga").modelo)} de cada 10: significa que la cifra central se desvía típicamente esa proporción del valor real (una proyección de €10M suele terminar entre €${(10 / (1 + ag(3, "liga").modelo)).toFixed(0)}M y €${(10 * (1 + ag(3, "liga").modelo)).toFixed(1)}M). El rango de 95% es mucho más ancho, porque incluye también los casos raros.</p>
+        <p>Subir la confianza es cuestión de ensanchar el rango. Estrecharlo sin perder confianza sólo se logra con mejores datos.</p></div>
+
       <h3>La respuesta corta</h3>
       <div class="tarjeta"><p><b>Nadie puede proyectar el valor de un futbolista «al centavo», y este modelo tampoco.</b> A tres años, la proyección central se desvía típicamente ${p100(ag(3, "liga").modelo)} del valor real (contra ${p100(ag(3, "liga").ingenuo)} de suponer que el valor no cambia). En 2018 Haaland valía €300 mil y ningún dato disponible ese día apuntaba a €200 millones.</p>
         <p><b>Lo que sí hace bien es ordenar.</b> En cada año de prueba, sus 50 apuestas sub-23 multiplicaron su valor por ${mediaDe(P, "sel_mult").toFixed(1)} en tres años (mediana), contra ${mediaDe(P, "pob_mult").toFixed(1)} del grupo del que salieron; y ${p100(mediaDe(P, "al_cae"))} de sus 50 alertas de devaluación perdió al menos 40% de valor. Sirve para decidir dónde mirar y qué vender, no para fijar un precio.</p></div>
@@ -430,7 +435,7 @@
       <h3>Cómo funciona</h3>
       <div class="tarjeta"><p><b>1. Modelo de precisión.</b> Árboles de decisión potenciados (gradient boosting) entrenados por cuantiles: uno para el escenario pesimista, otro para la mediana y otro para el optimista, a 1, 3, 5 y 8 años (los intermedios se interpolan). Cada jugador-año aporta ${meta.rasgos} variables: edad exacta, posición, valor y su trayectoria (6 meses, 1, 2 y 3 años, distancia a su máximo), club y liga en esa fecha (valor de la plantilla, su lugar dentro de ella, nivel de la liga), minutos, goles y asistencias de los 12 meses previos, minutos europeos y de selección, acumulados de carrera, fichajes recientes y días de lesión. Proyecta en euros corrientes: aprende el cambio típico de cada tipo de jugador, inflación incluida, y supone que el mercado seguirá comportándose como su promedio histórico.</p>
         <p><b>2. Curva de largo plazo.</b> Más allá de 8 años no hay datos suficientes para un modelo individual; la proyección se prolonga con la forma típica por edad, posición y nivel de valor (factores de desarrollo edad a edad, como un triángulo actuarial).</p>
-        <p><b>3. Bandas calibradas.</b> Las bandas pesimista–optimista se ensanchan con el error observado en las pruebas retrospectivas hasta contener 8 de cada 10 resultados reales. Medido dejando fuera cada año evaluado, contienen ${Object.entries(RT.cobertura).map(([h, c]) => `${p100(c)} a ${h} año${h > 1 ? "s" : ""}`).join(", ")}.</p>
+        <p><b>3. Rangos con confianza comprobada.</b> Cada proyección trae dos rangos, escalados con el error observado en las pruebas retrospectivas (calibración conforme: no supone ninguna distribución). Medido dejando fuera cada año evaluado, el rango de 95% contuvo el valor real ${Object.entries(RT.cobertura95).map(([h, c]) => `${p100(c)} de las veces a ${h} año${h > 1 ? "s" : ""}`).join(", ")}; el de 80%, ${Object.entries(RT.cobertura).map(([h, c]) => p100(c)).join(", ")}.</p>
         <p><b>4. Precedentes.</b> En cada ficha, los cinco jugadores históricos más parecidos y qué fue de ellos. No alimentan el número: sirven para juzgarlo.</p></div>
 
       <h3>Precisión: prueba retrospectiva de origen móvil</h3>
@@ -447,7 +452,7 @@
       <p class="nota">Prueba retrospectiva: para cada temporada el modelo se entrenó sólo con traspasos anteriores y se comparó con las cuotas reales de esa temporada. «Pagar el valor de TM» es la referencia.</p>
       <div class="tabla-caja"><table class="plana"><thead><tr><th class="izq">Temporada</th><th>Traspasos</th><th>Error típico del modelo</th><th>Suponer cuota = valor TM</th><th>Menores de 22: modelo</th><th>Menores de 22: valor TM</th><th>Orden</th></tr></thead>
       <tbody>${RT.precio.por_temporada.map((r) => `<tr><td class="izq">${r.temporada}/${String(r.temporada + 1).slice(2)}</td><td>${mil(r.n)}</td><td><b>${p100(r.modelo)}</b></td><td>${p100(r.tm)}</td><td><b>${p100(r.modelo_sub22)}</b></td><td>${p100(r.tm_sub22)}</td><td>${r.orden.toFixed(2)}</td></tr>`).join("")}</tbody></table></div>
-      <p class="nota">La banda de precio contiene ${p100(RT.precio.cobertura)} de las cuotas reales fuera de muestra. <b>Límite importante:</b> sólo se observan traspasos con cuota divulgada; los libres, las cesiones y los jugadores que nadie compró no están. El precio estimado se lee como «si se vende con cuota, esto se paga por alguien así», no como el precio al que cualquiera lo conseguiría. No ve la duración del contrato ni cláusulas.</p>
+      <p class="nota">El rango de precio de 95% contuvo ${p100(RT.precio.cobertura95)} de las cuotas reales fuera de muestra (el de 80%, ${p100(RT.precio.cobertura)}). <b>Límite importante:</b> sólo se observan traspasos con cuota divulgada; los libres, las cesiones y los jugadores que nadie compró no están. El precio estimado se lee como «si se vende con cuota, esto se paga por alguien así», no como el precio al que cualquiera lo conseguiría. No ve la duración del contrato ni cláusulas.</p>
 
       <h3>¿Sirve para elegir?</h3>
       <p class="nota">Cada año, entre los sub-23 de €1–25M en ligas con datos completos, se tomaron las 50 mayores alzas previstas; y entre los de 27 años o más desde €5M, las 50 mayores caídas previstas. Resultado tres años después (sólo quienes seguían valuados).</p>
@@ -497,7 +502,6 @@
     if (!trozos.has(k)) trozos.set(k, fetch(`datos/det/${k}.json`).then((r) => r.json()));
     return trozos.get(k).then((t) => t[id] || { h: [[], []] });
   };
-  const inflacion = 0;                                      // el modelo ya proyecta en euros corrientes
   async function pintarFicha() {
     const el = $("#ficha"), j = ruta.j && porId.get(ruta.j);
     el.hidden = $("#velo").hidden = !j;
@@ -506,11 +510,12 @@
     const d = await detalle(j.id);
     if (ruta.j !== j.id) return;
     const c = j.c, Q = d.q || [], Sv = d.s || [];
-    const proy = (h, k = 1, infl = 0) => (Q[h - 1] ? j.valor * Q[h - 1][k] * Math.pow(1 + infl, h) : null);
+    const proy = (h, k = 2) => (Q[h - 1] ? j.valor * Q[h - 1][k] : null);     // k: 0-4 = 95% bajo, 80% bajo, mediana, 80% alto, 95% alto
     const viejo = j.fecha < corteYM - 100;
     const horizontes = [1, 2, 3, 5, 8, 10, 15].filter((h) => h <= Q.length);
-    const fila = (h) => `<tr><td class="izq">${h} año${h > 1 ? "s" : ""} · ${j.edad + h} de edad</td><td>${eur(proy(h, 0, inflacion))}</td><td><b>${eur(proy(h, 1, inflacion))}</b></td>
-      <td>${eur(proy(h, 2, inflacion))}</td><td class="${tono(proy(h) / j.valor - 1)}">${pct(proy(h, 1, inflacion) / j.valor - 1)}</td><td>${Sv[h - 1] == null ? "—" : Math.round(Sv[h - 1] * 100) + "%"}</td></tr>`;
+    const fila = (h) => `<tr><td class="izq">${h} año${h > 1 ? "s" : ""} · ${j.edad + h} de edad</td><td><b>${eur(proy(h))}</b></td>
+      <td class="${tono(proy(h) / j.valor - 1)}">${pct(proy(h) / j.valor - 1)}</td><td>${eur(proy(h, 0))} – ${eur(proy(h, 4))}</td><td>${eur(proy(h, 1))} – ${eur(proy(h, 3))}</td>
+      <td>${Sv[h - 1] == null ? "—" : Math.round(Sv[h - 1] * 100) + "%"}</td></tr>`;
     // contribución de cada grupo de factores a la mediana a 3 años (descomposición exacta del modelo)
     const hf = 3, F_ = d.f || [];
     const contrib = j.H >= 3 && F_.length ? [["Punto de partida: cambio típico de un jugador", F_[0]]].concat(meta.grupos.map((g, i) => [g, F_[i + 1]])) : [];
@@ -530,16 +535,16 @@
       </div>
       <div class="precio"><div><span class="rot">Precio de traspaso estimado hoy</span><b>${eur(j.precio)}</b>
           <span class="${tono(j.prima)}">${pct(j.prima)} respecto a su valor de Transfermarkt</span></div>
-        <div class="rango"><span>entre <b>${eur(j.pLo)}</b> y <b>${eur(j.pHi)}</b></span>
-          <span class="nota">8 de cada 10 traspasos con cuota de jugadores así. Lo que se paga, no lo que TM estima.</span></div>
+        <div class="rango"><span>con 95% de confianza, entre <b>${eur(j.pLo95)}</b> y <b>${eur(j.pHi95)}</b></span>
+          <span class="nota">Con 80%: ${eur(j.pLo)} – ${eur(j.pHi)}. Es lo que se paga en traspasos con cuota de jugadores así, no lo que Transfermarkt estima.</span></div>
       </div>
       ${viejo ? `<div class="aviso">El último valor disponible es de ${fechaYM(j.fecha)}. La proyección parte de ahí y puede estar desfasada.</div>` : ""}
       ${j.valor >= 1e8 ? `<div class="aviso">Por encima de €100M casi no hay precedentes: el modelo extrapola.</div>` : ""}
       ${j.edad >= 38 ? `<div class="aviso">A esta edad hay muy pocos casos históricos; se muestra la devaluación típica de quienes siguieron activos.</div>` : ""}
       <h3>Historia y proyección</h3>
       <svg class="grafica" id="g-jugador"></svg>
-      ${horizontes.length ? `<div class="tabla-caja"><table class="plana"><thead><tr><th class="izq">Horizonte</th><th>Pesimista</th><th>Mediana</th><th>Optimista</th><th>Cambio</th><th>Sigue valuado</th></tr></thead><tbody>${horizontes.map(fila).join("")}</tbody></table></div>
-        <p class="nota">Banda = 8 de cada 10 trayectorias históricas comparables. «Sigue valuado» = probabilidad de seguir con valor publicado; los importes son para ese caso.</p>` : `<p class="nota">Sin proyección disponible.</p>`}
+      ${horizontes.length ? `<div class="tabla-caja"><table class="plana"><thead><tr><th class="izq">Horizonte</th><th>Mediana</th><th>Cambio</th><th>Rango con 95% de confianza</th><th>Rango con 80%</th><th>Sigue valuado</th></tr></thead><tbody>${horizontes.map(fila).join("")}</tbody></table></div>
+        <p class="nota">El rango de 95% contiene el valor real 95 de cada 100 veces en las pruebas contra el pasado; el de 80%, 8 de cada 10. En la gráfica, la franja clara es el 95% y la oscura el 80%. «Sigue valuado» = probabilidad de seguir con valor publicado; los importes son para ese caso.</p>` : `<p class="nota">Sin proyección disponible.</p>`}
       ${!j.cubierta ? `<div class="aviso">Juega fuera de las ligas con datos completos: el modelo no ve su club, sus minutos ni sus goles, sólo su edad, posición, lesiones y la trayectoria de su valor. La proyección es menos fina.</div>` : ""}
       ${contrib.length ? `<h3>Por qué esta proyección (a ${hf} año${hf > 1 ? "s" : ""})</h3>${contrib.map(([t, x]) => `<div class="factor"><span>${t}</span>
         <span class="pista"><i style="${x >= 0 ? "left:50%" : "right:50%"};width:${Math.min(50, 50 * Math.abs(x) / mxc)}%;background:${x >= 0 ? "var(--acento)" : "var(--malo)"}"></i></span><b class="${tono(Math.exp(x) - 1)}">${pct(Math.exp(x) - 1)}</b></div>`).join("")}
@@ -567,13 +572,15 @@
     el.attr("viewBox", `0 0 ${W} ${H}`).attr("height", H);
     const hist = d.h[0].map((ym, i) => [anioDec(ym), d.h[1][i] * 1e3]);
     const Q = d.q || [], t0 = anioDec(j.fecha), n = Math.min(12, Q.length);
-    const fut = [{ t: t0, q: [j.valor, j.valor, j.valor] }].concat(d3.range(1, n + 1).map((h) => ({ t: t0 + h, q: Q[h - 1].map((x) => j.valor * x * Math.pow(1 + inflacion, h)) })));
+    const fut = [{ t: t0, q: [j.valor, j.valor, j.valor, j.valor, j.valor] }].concat(d3.range(1, n + 1).map((h) => ({ t: t0 + h, q: Q[h - 1].map((x) => j.valor * x) })));
     const x = d3.scaleLinear([hist.length ? Math.min(hist[0][0], t0 - 1) : t0 - 1, t0 + Math.max(n, 1)], [m.l, W - m.r]);
-    const y = d3.scaleLinear([0, Math.max(d3.max(hist, (p) => p[1]) || 0, d3.max(fut, (p) => p.q[2]) || 0, j.valor) * 1.06], [H - m.b, m.t]);
+    const y = d3.scaleLinear([0, Math.max(d3.max(hist, (p) => p[1]) || 0, d3.max(fut, (p) => p.q[3]) * 1.35 || 0, j.valor) * 1.06], [H - m.b, m.t]);
     el.append("g").attr("class", "eje").attr("transform", `translate(0,${H - m.b})`).call(d3.axisBottom(x).ticks(Math.min(10, W / 60)).tickFormat(d3.format("d")));
     el.append("g").attr("class", "eje").attr("transform", `translate(${m.l},0)`).call(d3.axisLeft(y).ticks(5).tickFormat(eur));
-    el.append("path").attr("class", "banda").attr("d", d3.area().x((p) => x(p.t)).y0((p) => y(p.q[0])).y1((p) => y(p.q[2]))(fut));
-    el.append("path").attr("class", "mediana").attr("d", d3.line().x((p) => x(p.t)).y((p) => y(p.q[1]))(fut));
+    const tope = y.domain()[1];                               // el 95% alto puede salirse de escala: se recorta a la vista
+    el.append("path").attr("class", "banda b95").attr("d", d3.area().x((p) => x(p.t)).y0((p) => y(p.q[0])).y1((p) => y(Math.min(p.q[4], tope)))(fut));
+    el.append("path").attr("class", "banda").attr("d", d3.area().x((p) => x(p.t)).y0((p) => y(p.q[1])).y1((p) => y(p.q[3]))(fut));
+    el.append("path").attr("class", "mediana").attr("d", d3.line().x((p) => x(p.t)).y((p) => y(p.q[2]))(fut));
     el.append("path").attr("class", "historia").attr("d", d3.line().x((p) => x(p[0])).y((p) => y(p[1]))(hist));
     el.append("line").attr("class", "hoy").attr("x1", x(t0)).attr("x2", x(t0)).attr("y1", m.t).attr("y2", H - m.b);
     el.append("circle").attr("cx", x(t0)).attr("cy", y(j.valor)).attr("r", 4).attr("fill", "#fff");
