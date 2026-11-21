@@ -1,6 +1,6 @@
 {
  "torneo": "Apertura 2026",
- "generado_utc": "2026-11-21T06:56:42Z",
+ "generado_utc": "2026-11-21T07:21:10Z",
  "fuente": "ESPN scoreboard mex.1",
  "partidos": [
   {
@@ -42,7 +42,7 @@
     "ml_e": 3.7,
     "ml_v": 2.65,
     "total_linea": 2.5,
-    "over": 1.571,
+    "over": 1.588,
     "under": 2.3,
     "proveedor": "DraftKings"
    }
@@ -65,7 +65,7 @@
     "ml_v": 2.6,
     "total_linea": 2.5,
     "over": 1.741,
-    "under": 2.05,
+    "under": 2.0,
     "proveedor": "DraftKings"
    }
   },

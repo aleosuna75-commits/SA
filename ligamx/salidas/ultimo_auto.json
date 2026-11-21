@@ -1,32 +1,32 @@
 {
- "corrida_utc": "2026-11-21T06:56:35Z",
+ "corrida_utc": "2026-11-21T07:21:04Z",
  "pasos": {
   "datos": {
    "ok": true,
    "codigo": 0,
-   "nuevos_jugados": 3,
+   "nuevos_jugados": 0,
    "reprogramados": 0,
    "nuevos_en_calendario": 0,
-   "momios_actualizados": 5,
+   "momios_actualizados": 0,
    "tabla_coincide_con_espn": true,
-   "segundos": 8.1
+   "segundos": 7.0
   },
   "variables": {
    "ok": true,
-   "segundos": 5.1
+   "segundos": 8.3
   },
   "mejora": {
    "ok": true,
-   "adoptado": null,
-   "segundos": 36.3
+   "omitido": "sin partidos nuevos",
+   "segundos": 0.0
   },
   "pronostico": {
    "ok": true,
    "salida": [
-    "/home/user/SA/ligamx/salidas/actual.json  201 KB  modelo=ensamble  pendientes=6  sellos nuevos=6  61.0 s",
+    "/home/user/SA/ligamx/salidas/actual.json  201 KB  modelo=ensamble  pendientes=6  sellos nuevos=2  62.1 s",
     "campeón: América 0.264, Cruz Azul 0.261, Toluca 0.198, Chivas 0.191, Monterrey 0.023"
    ],
-   "segundos": 63.1
+   "segundos": 64.6
   },
   "vivo": {
    "ok": true,
@@ -39,55 +39,18 @@
     "visitante": "Toluca"
    },
    "incrustado": true,
-   "segundos": 21.5
+   "segundos": 24.6
   },
   "pagina": {
    "ok": true,
    "salida": [
-    "listo en 0.12 s"
+    "listo en 0.03 s"
    ],
-   "segundos": 0.3
+   "segundos": 0.1
   }
  },
  "errores": [],
- "nuevos_jugados": [
-  {
-   "id": "401877054",
-   "fecha_local": "2026-11-20",
-   "torneo": "Apertura 2026",
-   "fase": "regular",
-   "local": "Puebla",
-   "visitante": "Atlético San Luis",
-   "gl": 1,
-   "gv": 1,
-   "tiene_stats": true,
-   "tiene_eventos": true
-  },
-  {
-   "id": "401877053",
-   "fecha_local": "2026-11-20",
-   "torneo": "Apertura 2026",
-   "fase": "regular",
-   "local": "Juárez",
-   "visitante": "Atlas",
-   "gl": 3,
-   "gv": 3,
-   "tiene_stats": true,
-   "tiene_eventos": true
-  },
-  {
-   "id": "401877052",
-   "fecha_local": "2026-11-20",
-   "torneo": "Apertura 2026",
-   "fase": "regular",
-   "local": "Tijuana",
-   "visitante": "Atlante",
-   "gl": 1,
-   "gv": 0,
-   "tiene_stats": true,
-   "tiene_eventos": true
-  }
- ],
+ "nuevos_jugados": [],
  "reprogramados": [],
  "nuevos_en_calendario": [],
  "proximo_partido": {
@@ -112,79 +75,6 @@
    "proveedor": "DraftKings"
   }
  },
- "mejora": {
-  "produccion": "ensamble",
-  "adoptado": null,
-  "tabla": [
-   {
-    "modelo": "ensamble",
-    "rol": "producción",
-    "n": 3465,
-    "logloss": 1.025,
-    "logv_marcador": -2.8834
-   },
-   {
-    "modelo": "ajuste",
-    "rol": "retador",
-    "n": 3465,
-    "logloss": 1.0231,
-    "logv_marcador": -2.8893,
-    "d_logloss_vs_produccion": -0.0018,
-    "ee": 0.001,
-    "z": -1.92,
-    "d_ultimos_bloques": 0.0151,
-    "cumple_regla": false
-   },
-   {
-    "modelo": "elo",
-    "rol": "retador",
-    "n": 3465,
-    "logloss": 1.0302,
-    "logv_marcador": -2.8921,
-    "d_logloss_vs_produccion": 0.0053,
-    "ee": 0.001,
-    "z": 5.44,
-    "d_ultimos_bloques": -0.0084,
-    "cumple_regla": false
-   },
-   {
-    "modelo": "dc2",
-    "rol": "retador",
-    "n": 3465,
-    "logloss": 1.0284,
-    "logv_marcador": -2.8936,
-    "d_logloss_vs_produccion": 0.0035,
-    "ee": 0.0011,
-    "z": 3.24,
-    "d_ultimos_bloques": 0.0037,
-    "cumple_regla": false
-   },
-   {
-    "modelo": "dc",
-    "rol": "retador",
-    "n": 3465,
-    "logloss": 1.0293,
-    "logv_marcador": -2.8942,
-    "d_logloss_vs_produccion": 0.0043,
-    "ee": 0.0009,
-    "z": 4.58,
-    "d_ultimos_bloques": 0.0066,
-    "cumple_regla": false
-   },
-   {
-    "modelo": "tiros",
-    "rol": "retador",
-    "n": 3465,
-    "logloss": 1.0312,
-    "logv_marcador": -2.8928,
-    "d_logloss_vs_produccion": 0.0062,
-    "ee": 0.0013,
-    "z": 4.69,
-    "d_ultimos_bloques": 0.0082,
-    "cumple_regla": false
-   }
-  ]
- },
  "vivo": {
   "estado": "terminado_hoy",
   "partidos": 3,
@@ -197,7 +87,7 @@
   "incrustado": true
  },
  "modelo": "ensamble",
- "corte_local": "2026-11-21 00:57",
+ "corte_local": "2026-11-21 01:21",
  "campeon_top": [
   [
    "América",
@@ -264,9 +154,9 @@
    }
   }
  },
- "huella": "a177b2fd324caecd551800d3e915263d",
+ "huella": "07cf60c55e6716268d62bedac92e085a",
  "publicar": false,
- "huella_publicada": "a177b2fd324caecd551800d3e915263d",
- "segundos": 134.3,
- "publicado_utc": "2026-11-21T06:59:46Z"
+ "huella_publicada": "07cf60c55e6716268d62bedac92e085a",
+ "segundos": 104.6,
+ "publicado_utc": "2026-11-21T07:23:05Z"
 }

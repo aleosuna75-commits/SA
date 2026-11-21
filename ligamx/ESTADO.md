@@ -240,3 +240,4 @@ en la base quedaron aceptadas.
   ganadores y 1 marcador exacto; combinadas completas: segura 1 de 4, equilibrada 2 de 4, atrevida 1 de 4. Modelo contra
   mercado (3 partidos con momios sellados): log-loss 1.040 contra 1.075, diferencia −0.035 ± 0.008 a favor del modelo:
   demasiado pocos para concluir. V22 publicada. Campeón: América 26.4%, Cruz Azul 26.1%, Toluca 19.8%, Chivas 19.1%.
+- 2026-11-21 07:25 UTC · Corrida diaria: sin partidos nuevos tras el cierre de las 07:00; momios actualizados; V23 publicada (`vivo/actual` sigue en versión 52: el documento no cambió de estado). Bloques del sábado y del domingo ya programados. Sin avanzar pendientes de mejora: el presupuesto de uso se guarda para el vivo del fin de semana.
