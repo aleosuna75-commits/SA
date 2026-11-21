@@ -70,6 +70,32 @@
     "carrera.json",
     "historial.json"
    ]
+  },
+  "post_qualy": {
+   "hecho": "2026-11-21T05:13:26Z",
+   "firma": "1ce1c0f6926d",
+   "fuente_qualy": "último snapshot del colector en vivo (estado terminada; provisional)",
+   "fuente_parrilla": "Qualy oficial (OpenF1)",
+   "oficial": false,
+   "corte": "2026-11-22T04:00:00Z",
+   "top10_carrera": [
+    "ANT",
+    "VER",
+    "RUS",
+    "NOR",
+    "HAD",
+    "PIA",
+    "LIN",
+    "LAW",
+    "LEC",
+    "HAM"
+   ],
+   "archivos": [
+    "post_qualy.json",
+    "carrera.json",
+    "historial.json",
+    "vueltas.json"
+   ]
   }
  }
 }

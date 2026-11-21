@@ -1,5 +1,5 @@
 {
- "actualizado": "2026-11-21T01:50:59Z",
+ "actualizado": "2026-11-21T05:11:08Z",
  "actual": "lasvegas2026",
  "gps": [
   {
@@ -213,7 +213,7 @@
      "fin_utc": "2026-11-21T05:00:00Z",
      "fecha_local": "Viernes 20 de noviembre",
      "hora_local": "8:00 PM",
-     "estado": "proximo"
+     "estado": "terminado"
     },
     {
      "clave": "r",
@@ -233,11 +233,15 @@
    "carrera_texto": "Sábado 21 de noviembre de 2026, 8:00 PM (hora local, UTC−8)",
    "pasos": {
     "pre_qualy": "2026-11-20T05:53:23Z",
-    "fp3": "2026-11-21T02:04:32Z"
+    "fp3": "2026-11-21T02:04:32Z",
+    "post_qualy": "2026-11-21T05:13:26Z"
    },
    "docs": {
     "gp": "gp/lasvegas2026",
+    "live": "live/lasvegas2026",
+    "postqualy": "postqualy/lasvegas2026",
     "carrera": "carrera/lasvegas2026",
+    "vueltas": "vueltas/lasvegas2026",
     "historial": "historial/lasvegas2026"
    }
   },

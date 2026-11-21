@@ -1,5 +1,5 @@
 {
- "actualizado": "2026-11-21T02:04:32Z",
+ "actualizado": "2026-11-21T05:13:06Z",
  "fases": [
   {
    "fase": "FP2",
@@ -121,6 +121,83 @@
       "acr": "HAM",
       "de": 5,
       "a": 6
+     }
+    ]
+   }
+  },
+  {
+   "fase": "Q",
+   "actualizado": "2026-11-21T05:13:06Z",
+   "qualy": null,
+   "carrera": {
+    "top10": [
+     "ANT",
+     "VER",
+     "RUS",
+     "NOR",
+     "HAD",
+     "PIA",
+     "LIN",
+     "LAW",
+     "LEC",
+     "HAM"
+    ],
+    "ganador": "ANT",
+    "preliminar": false,
+    "parrilla_fuente": "Qualy oficial (OpenF1)"
+   },
+   "cambios": {
+    "qualy": [],
+    "carrera": [
+     {
+      "acr": "ANT",
+      "de": 3,
+      "a": 1
+     },
+     {
+      "acr": "VER",
+      "de": 5,
+      "a": 2
+     },
+     {
+      "acr": "RUS",
+      "de": 1,
+      "a": 3
+     },
+     {
+      "acr": "HAD",
+      "de": 7,
+      "a": 5
+     },
+     {
+      "acr": "PIA",
+      "de": 8,
+      "a": 6
+     },
+     {
+      "acr": "LIN",
+      "de": 11,
+      "a": 7
+     },
+     {
+      "acr": "LAW",
+      "de": 9,
+      "a": 8
+     },
+     {
+      "acr": "LEC",
+      "de": 2,
+      "a": 9
+     },
+     {
+      "acr": "HAM",
+      "de": 6,
+      "a": 10
+     },
+     {
+      "acr": "GAS",
+      "de": 10,
+      "a": 11
      }
     ]
    }
