@@ -72,22 +72,22 @@
    ]
   },
   "post_qualy": {
-   "hecho": "2026-11-21T05:13:26Z",
-   "firma": "1ce1c0f6926d",
-   "fuente_qualy": "último snapshot del colector en vivo (estado terminada; provisional)",
-   "fuente_parrilla": "Qualy oficial (OpenF1)",
-   "oficial": false,
+   "hecho": "2026-11-22T01:03:32Z",
+   "firma": "3dbf254c3e52",
+   "fuente_qualy": "OpenF1 session_result (oficial)",
+   "fuente_parrilla": "Parrilla oficial (OpenF1 starting_grid) (cambios respecto a la qualy: ANT 1.º → 6.º, PIA 7.º → 17.º, SAI 14.º → 20.º)",
+   "oficial": true,
    "corte": "2026-11-22T04:00:00Z",
    "top10_carrera": [
-    "ANT",
     "VER",
     "RUS",
     "NOR",
+    "ANT",
     "HAD",
-    "PIA",
     "LIN",
     "LAW",
     "LEC",
+    "PIA",
     "HAM"
    ],
    "archivos": [
