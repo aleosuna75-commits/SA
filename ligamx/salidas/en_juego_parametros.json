@@ -140,8 +140,8 @@
   "con_mas": 1.5189
  },
  "meta": {
-  "generado_utc": "2026-11-22T05:19:58Z",
-  "firma": "goles.csv:1403485:b84d5d40e47aece7|tarjetas.csv:1340435:f00cf197cd75c1b8|partidos.csv:2895001:e4a864a8511ed02e|ensamble.parquet:397268:c1adfc6010cdb95d",
+  "generado_utc": "2026-11-22T07:22:38Z",
+  "firma": "goles.csv:1403485:b84d5d40e47aece7|tarjetas.csv:1340435:f00cf197cd75c1b8|partidos.csv:2895000:f8f34d748220d8ac|ensamble.parquet:397268:c1adfc6010cdb95d",
   "modelo_lambdas": "ensamble",
   "ventana_torneos": 8,
   "efectos": {

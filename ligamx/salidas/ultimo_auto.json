@@ -1,32 +1,32 @@
 {
- "corrida_utc": "2026-11-22T05:17:43Z",
+ "corrida_utc": "2026-11-22T07:20:58Z",
  "pasos": {
   "datos": {
    "ok": true,
    "codigo": 0,
-   "nuevos_jugados": 4,
+   "nuevos_jugados": 0,
    "reprogramados": 0,
    "nuevos_en_calendario": 0,
-   "momios_actualizados": 2,
+   "momios_actualizados": 1,
    "tabla_coincide_con_espn": true,
-   "segundos": 8.5
+   "segundos": 8.0
   },
   "variables": {
    "ok": true,
-   "segundos": 5.4
+   "segundos": 9.3
   },
   "mejora": {
    "ok": true,
-   "adoptado": null,
-   "segundos": 38.5
+   "omitido": "sin partidos nuevos",
+   "segundos": 0.0
   },
   "pronostico": {
    "ok": true,
    "salida": [
-    "/home/user/SA/ligamx/salidas/actual.json  124 KB  modelo=ensamble  pendientes=2  sellos nuevos=2  59.3 s",
+    "/home/user/SA/ligamx/salidas/actual.json  123 KB  modelo=ensamble  pendientes=2  sellos nuevos=2  55.8 s",
     "campeón: Cruz Azul 0.264, América 0.229, Chivas 0.194, Toluca 0.180, Pachuca 0.056"
    ],
-   "segundos": 61.1
+   "segundos": 58.4
   },
   "vivo": {
    "ok": true,
@@ -39,67 +39,18 @@
     "visitante": "Cruz Azul"
    },
    "incrustado": true,
-   "segundos": 22.0
+   "segundos": 25.7
   },
   "pagina": {
    "ok": true,
    "salida": [
-    "listo en 0.18 s"
+    "listo en 0.03 s"
    ],
-   "segundos": 0.4
+   "segundos": 0.1
   }
  },
  "errores": [],
- "nuevos_jugados": [
-  {
-   "id": "401877050",
-   "fecha_local": "2026-11-21",
-   "torneo": "Apertura 2026",
-   "fase": "regular",
-   "local": "Pachuca",
-   "visitante": "Toluca",
-   "gl": 2,
-   "gv": 0,
-   "tiene_stats": true,
-   "tiene_eventos": true
-  },
-  {
-   "id": "401877051",
-   "fecha_local": "2026-11-21",
-   "torneo": "Apertura 2026",
-   "fase": "regular",
-   "local": "Santos",
-   "visitante": "León",
-   "gl": 1,
-   "gv": 2,
-   "tiene_stats": true,
-   "tiene_eventos": true
-  },
-  {
-   "id": "401877049",
-   "fecha_local": "2026-11-21",
-   "torneo": "Apertura 2026",
-   "fase": "regular",
-   "local": "Pumas",
-   "visitante": "Monterrey",
-   "gl": 0,
-   "gv": 2,
-   "tiene_stats": true,
-   "tiene_eventos": true
-  },
-  {
-   "id": "401877048",
-   "fecha_local": "2026-11-21",
-   "torneo": "Apertura 2026",
-   "fase": "regular",
-   "local": "Tigres",
-   "visitante": "América",
-   "gl": 1,
-   "gv": 0,
-   "tiene_stats": true,
-   "tiene_eventos": true
-  }
- ],
+ "nuevos_jugados": [],
  "reprogramados": [],
  "nuevos_en_calendario": [],
  "proximo_partido": {
@@ -119,83 +70,10 @@
    "ml_e": 3.95,
    "ml_v": 2.9,
    "total_linea": 2.5,
-   "over": 1.606,
+   "over": 1.588,
    "under": 2.25,
    "proveedor": "DraftKings"
   }
- },
- "mejora": {
-  "produccion": "ensamble",
-  "adoptado": null,
-  "tabla": [
-   {
-    "modelo": "ensamble",
-    "rol": "producción",
-    "n": 3469,
-    "logloss": 1.025,
-    "logv_marcador": -2.8832
-   },
-   {
-    "modelo": "ajuste",
-    "rol": "retador",
-    "n": 3469,
-    "logloss": 1.0231,
-    "logv_marcador": -2.8891,
-    "d_logloss_vs_produccion": -0.0019,
-    "ee": 0.001,
-    "z": -1.97,
-    "d_ultimos_bloques": 0.0109,
-    "cumple_regla": false
-   },
-   {
-    "modelo": "elo",
-    "rol": "retador",
-    "n": 3469,
-    "logloss": 1.0303,
-    "logv_marcador": -2.8918,
-    "d_logloss_vs_produccion": 0.0053,
-    "ee": 0.001,
-    "z": 5.49,
-    "d_ultimos_bloques": -0.0041,
-    "cumple_regla": false
-   },
-   {
-    "modelo": "dc2",
-    "rol": "retador",
-    "n": 3469,
-    "logloss": 1.0285,
-    "logv_marcador": -2.8934,
-    "d_logloss_vs_produccion": 0.0035,
-    "ee": 0.0011,
-    "z": 3.24,
-    "d_ultimos_bloques": 0.0036,
-    "cumple_regla": false
-   },
-   {
-    "modelo": "dc",
-    "rol": "retador",
-    "n": 3469,
-    "logloss": 1.0293,
-    "logv_marcador": -2.894,
-    "d_logloss_vs_produccion": 0.0043,
-    "ee": 0.0009,
-    "z": 4.59,
-    "d_ultimos_bloques": 0.0067,
-    "cumple_regla": false
-   },
-   {
-    "modelo": "tiros",
-    "rol": "retador",
-    "n": 3469,
-    "logloss": 1.0312,
-    "logv_marcador": -2.8926,
-    "d_logloss_vs_produccion": 0.0062,
-    "ee": 0.0013,
-    "z": 4.68,
-    "d_ultimos_bloques": 0.0064,
-    "cumple_regla": false
-   }
-  ]
  },
  "vivo": {
   "estado": "terminado_hoy",
@@ -209,7 +87,7 @@
   "incrustado": true
  },
  "modelo": "ensamble",
- "corte_local": "2026-11-21 23:18",
+ "corte_local": "2026-11-22 01:21",
  "campeon_top": [
   [
    "Cruz Azul",
@@ -229,7 +107,7 @@
   ],
   [
    "Pachuca",
-   0.0563
+   0.0564
   ]
  ],
  "liguilla_en_curso": false,
@@ -276,9 +154,9 @@
    }
   }
  },
- "huella": "c8a7a0de8d99f7e41c517568e68955c5",
+ "huella": "377305376bb9623417a27c225b801f17",
  "publicar": false,
- "huella_publicada": "c8a7a0de8d99f7e41c517568e68955c5",
- "segundos": 135.9,
- "publicado_utc": "2026-11-22T05:20:25Z"
+ "huella_publicada": "377305376bb9623417a27c225b801f17",
+ "segundos": 101.4,
+ "publicado_utc": "2026-11-22T07:22:53Z"
 }
