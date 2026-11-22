@@ -1,96 +1,8 @@
 {
  "torneo": "Apertura 2026",
- "generado_utc": "2026-11-21T07:21:10Z",
+ "generado_utc": "2026-11-22T05:17:51Z",
  "fuente": "ESPN scoreboard mex.1",
  "partidos": [
-  {
-   "id": "401877050",
-   "fecha_utc": "2026-11-21T22:50Z",
-   "fecha_local": "2026-11-21",
-   "hora_local": "16:50",
-   "fase": "regular",
-   "pierna": "",
-   "estado": "programado",
-   "local": "Pachuca",
-   "visitante": "Toluca",
-   "estadio": "Estadio Hidalgo",
-   "ciudad": "Pachuca",
-   "momios": {
-    "ml_l": 2.6,
-    "ml_e": 3.95,
-    "ml_v": 2.4,
-    "total_linea": 3.5,
-    "over": 2.1,
-    "under": 1.69,
-    "proveedor": "DraftKings"
-   }
-  },
-  {
-   "id": "401877051",
-   "fecha_utc": "2026-11-21T23:00Z",
-   "fecha_local": "2026-11-21",
-   "hora_local": "17:00",
-   "fase": "regular",
-   "pierna": "",
-   "estado": "programado",
-   "local": "Santos",
-   "visitante": "León",
-   "estadio": "Estadio Corona",
-   "ciudad": "Torreón",
-   "momios": {
-    "ml_l": 2.4,
-    "ml_e": 3.7,
-    "ml_v": 2.65,
-    "total_linea": 2.5,
-    "over": 1.588,
-    "under": 2.3,
-    "proveedor": "DraftKings"
-   }
-  },
-  {
-   "id": "401877049",
-   "fecha_utc": "2026-11-22T01:00Z",
-   "fecha_local": "2026-11-21",
-   "hora_local": "19:00",
-   "fase": "regular",
-   "pierna": "",
-   "estado": "programado",
-   "local": "Pumas",
-   "visitante": "Monterrey",
-   "estadio": "Estadio Olímpico Universitario",
-   "ciudad": "Mexico City",
-   "momios": {
-    "ml_l": 2.6,
-    "ml_e": 3.5,
-    "ml_v": 2.6,
-    "total_linea": 2.5,
-    "over": 1.741,
-    "under": 2.0,
-    "proveedor": "DraftKings"
-   }
-  },
-  {
-   "id": "401877048",
-   "fecha_utc": "2026-11-22T03:00Z",
-   "fecha_local": "2026-11-21",
-   "hora_local": "21:00",
-   "fase": "regular",
-   "pierna": "",
-   "estado": "programado",
-   "local": "Tigres",
-   "visitante": "América",
-   "estadio": "Estadio Universitario",
-   "ciudad": "San Nicolás de los Garza",
-   "momios": {
-    "ml_l": 3.25,
-    "ml_e": 3.55,
-    "ml_v": 2.15,
-    "total_linea": 2.5,
-    "over": 1.645,
-    "under": 2.15,
-    "proveedor": "DraftKings"
-   }
-  },
   {
    "id": "401877047",
    "fecha_utc": "2026-11-22T23:07Z",
@@ -105,11 +17,11 @@
    "ciudad": "Guadalajara",
    "momios": {
     "ml_l": 2.2,
-    "ml_e": 4.0,
-    "ml_v": 2.75,
-    "total_linea": 3.5,
-    "over": 2.3,
-    "under": 1.556,
+    "ml_e": 3.95,
+    "ml_v": 2.9,
+    "total_linea": 2.5,
+    "over": 1.606,
+    "under": 2.25,
     "proveedor": "DraftKings"
    }
   },
@@ -127,10 +39,10 @@
    "ciudad": "Santiago de Querétaro",
    "momios": {
     "ml_l": 2.05,
-    "ml_e": 3.75,
+    "ml_e": 3.8,
     "ml_v": 3.2,
     "total_linea": 2.5,
-    "over": 1.571,
+    "over": 1.588,
     "under": 2.25,
     "proveedor": "DraftKings"
    }

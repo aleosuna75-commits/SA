@@ -74,13 +74,13 @@
    "error_calibracion": 0.017
   },
   "prueba_dia": {
-   "n": 484,
-   "logloss": 1.0223,
-   "ee_logloss": 0.0202,
-   "rps": 0.2109,
-   "brier": 0.6123,
-   "logv_marcador": -2.9875,
-   "acierto": 0.5
+   "n": 488,
+   "logloss": 1.0226,
+   "ee_logloss": 0.02,
+   "rps": 0.2116,
+   "brier": 0.6126,
+   "logv_marcador": -2.9852,
+   "acierto": 0.498
   }
  },
  "pareadas_campeon_menos_referencia": {
@@ -136,7 +136,7 @@
   },
   "prueba": {
    "dc": {
-    "n": 484,
+    "n": 488,
     "d_logloss": -0.004,
     "ee": 0.0033,
     "ic95": [
@@ -145,7 +145,7 @@
     ],
     "z": -1.2,
     "d_logv_marcador": 0.0157,
-    "ee_logv_marcador": 0.0045
+    "ee_logv_marcador": 0.0044
    },
    "poisson_simple": {
     "n": 480,
@@ -207,10 +207,10 @@
  "api": "modelo.pronostico.Pronosticador",
  "modelo_anterior": "ajuste",
  "ultimo_ciclo": {
-  "fecha": "2026-11-21",
+  "fecha": "2026-11-22",
   "produccion": "ensamble",
   "adoptado": null,
-  "partidos_fuera_de_muestra": 3465,
+  "partidos_fuera_de_muestra": 3469,
   "ultimo_bloque": "2026-11-20"
  }
 }

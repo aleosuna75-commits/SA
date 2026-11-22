@@ -150,3 +150,10 @@
 2026-11-21T06:57:23Z	accion=lectura_pareadas	quien=mejora.adoptar	modelo=ensamble	pid=3123	argv=pipeline.py auto
 2026-11-21T06:58:27Z	accion=leer	quien=desconocido	modelo=ensamble	granularidad=dia	pid=3163	argv=/home/user/SA/ligamx/produccion/exportar.py
 2026-11-21T07:22:23Z	accion=leer	quien=desconocido	modelo=ensamble	granularidad=dia	pid=175	argv=/home/user/SA/ligamx/produccion/exportar.py
+2026-11-22T05:18:02Z	accion=evaluar	quien=mejora.ciclo	modelo=ensamble	periodo=prueba	granularidad=dia	partidos=488	parcial=False	pid=5506	argv=pipeline.py auto
+2026-11-22T05:18:14Z	accion=evaluar	quien=mejora.ciclo	modelo=ajuste	periodo=prueba	granularidad=dia	partidos=488	parcial=False	pid=5506	argv=pipeline.py auto
+2026-11-22T05:18:26Z	accion=evaluar	quien=mejora.ciclo	modelo=elo	periodo=prueba	granularidad=dia	partidos=488	parcial=False	pid=5506	argv=pipeline.py auto
+2026-11-22T05:18:27Z	accion=evaluar	quien=mejora.ciclo	modelo=dc2	periodo=prueba	granularidad=dia	partidos=488	parcial=False	pid=5506	argv=pipeline.py auto
+2026-11-22T05:18:29Z	accion=evaluar	quien=mejora.ciclo	modelo=dc	periodo=prueba	granularidad=dia	partidos=488	parcial=False	pid=5506	argv=pipeline.py auto
+2026-11-22T05:18:31Z	accion=evaluar	quien=mejora.ciclo	modelo=tiros	periodo=prueba	granularidad=dia	partidos=488	parcial=False	pid=5506	argv=pipeline.py auto
+2026-11-22T05:18:35Z	accion=lectura_pareadas	quien=mejora.adoptar	modelo=ensamble	pid=5506	argv=pipeline.py auto

@@ -1,84 +1,84 @@
 {
- "generado_utc": "2026-11-21T07:21:35.370676+00:00",
- "n_sellos": 91,
+ "generado_utc": "2026-11-22T05:18:52.763347+00:00",
+ "n_sellos": 93,
  "n_partidos_sellados": 10,
- "n_calificados": 4,
+ "n_calificados": 8,
  "primer_sello_utc": "2026-11-10T09:57:18.747707+00:00",
  "acumulado": {
-  "n": 4,
-  "aciertos_1x2": 2,
-  "acierto_1x2": 0.5,
+  "n": 8,
+  "aciertos_1x2": 3,
+  "acierto_1x2": 0.375,
   "marcadores_exactos": 1,
-  "marcador_exacto": 0.25,
-  "logloss": 0.9917744043002377,
-  "ee_logloss": 0.20640870343863482,
-  "brier": 0.5804743115946491,
-  "rps": 0.14077065833772576,
-  "prob_media_del_pick": 0.4555984946126926,
+  "marcador_exacto": 0.125,
+  "logloss": 1.0251105433176575,
+  "ee_logloss": 0.09867043368608591,
+  "brier": 0.6136752831553246,
+  "rps": 0.2147472095914254,
+  "prob_media_del_pick": 0.42747424730634626,
   "logloss_referencia_tercios": 1.0986122886681098,
   "combinadas": {
    "segura": {
-    "n": 4,
-    "completas": 1,
+    "n": 8,
+    "completas": 2,
     "frecuencia": 0.25,
-    "prob_anunciada": 0.485615,
+    "prob_anunciada": 0.477405125,
     "picks_acertados_media": 3.25,
     "picks_por_combinada": 4
    },
    "equilibrada": {
-    "n": 4,
-    "completas": 2,
+    "n": 8,
+    "completas": 4,
     "frecuencia": 0.5,
-    "prob_anunciada": 0.337298,
-    "picks_acertados_media": 2.5,
+    "prob_anunciada": 0.32424949999999997,
+    "picks_acertados_media": 2.625,
     "picks_por_combinada": 4
    },
    "atrevida": {
-    "n": 4,
+    "n": 8,
     "completas": 1,
-    "frecuencia": 0.25,
-    "prob_anunciada": 0.22109900000000002,
-    "picks_acertados_media": 2.25,
+    "frecuencia": 0.125,
+    "prob_anunciada": 0.23187712500000002,
+    "picks_acertados_media": 1.625,
     "picks_por_combinada": 4
    }
   }
  },
  "por_modelo": {
   "ensamble": {
-   "n": 4,
-   "aciertos_1x2": 2,
-   "acierto_1x2": 0.5,
+   "n": 8,
+   "aciertos_1x2": 3,
+   "acierto_1x2": 0.375,
    "marcadores_exactos": 1,
-   "marcador_exacto": 0.25,
-   "logloss": 0.9917744043002377,
-   "ee_logloss": 0.20640870343863482,
-   "brier": 0.5804743115946491,
-   "rps": 0.14077065833772576,
-   "prob_media_del_pick": 0.4555984946126926,
+   "marcador_exacto": 0.125,
+   "logloss": 1.0251105433176575,
+   "ee_logloss": 0.09867043368608591,
+   "brier": 0.6136752831553246,
+   "rps": 0.2147472095914254,
+   "prob_media_del_pick": 0.42747424730634626,
    "logloss_referencia_tercios": 1.0986122886681098,
    "combinadas": {
     "segura": {
-     "n": 4,
-     "completas": 1,
+     "n": 8,
+     "completas": 2,
      "frecuencia": 0.25,
-     "prob_anunciada": 0.485615,
+     "prob_anunciada": 0.477405125,
      "picks_acertados_media": 3.25,
      "picks_por_combinada": 4
     },
     "equilibrada": {
-     "n": 4,
-     "completas": 2,
+     "n": 8,
+     "completas": 4,
      "frecuencia": 0.5,
-     "prob_anunciada": 0.337298,
-     "picks_acertados_media": 2.5,
+     "prob_anunciada": 0.32424949999999997,
+     "picks_acertados_media": 2.625,
      "picks_por_combinada": 4
     },
     "atrevida": {
-     "n": 4,
+     "n": 8,
      "completas": 1,
-     "frecuencia": 0.25,
-     "prob_anunciada": 0.22109900000000002,
-     "picks_acertados_media": 2.25,
+     "frecuencia": 0.125,
+     "prob_anunciada": 0.23187712500000002,
+     "picks_acertados_media": 1.625,
      "picks_por_combinada": 4
     }
    }
@@ -86,47 +86,47 @@
  },
  "por_torneo": {
   "Apertura 2026": {
-   "n": 4,
-   "aciertos_1x2": 2,
-   "acierto_1x2": 0.5,
+   "n": 8,
+   "aciertos_1x2": 3,
+   "acierto_1x2": 0.375,
    "marcadores_exactos": 1,
-   "marcador_exacto": 0.25,
-   "logloss": 0.9917744043002377,
-   "ee_logloss": 0.20640870343863482,
-   "brier": 0.5804743115946491,
-   "rps": 0.14077065833772576,
-   "prob_media_del_pick": 0.4555984946126926,
+   "marcador_exacto": 0.125,
+   "logloss": 1.0251105433176575,
+   "ee_logloss": 0.09867043368608591,
+   "brier": 0.6136752831553246,
+   "rps": 0.2147472095914254,
+   "prob_media_del_pick": 0.42747424730634626,
    "logloss_referencia_tercios": 1.0986122886681098,
    "combinadas": {
     "segura": {
-     "n": 4,
-     "completas": 1,
+     "n": 8,
+     "completas": 2,
      "frecuencia": 0.25,
-     "prob_anunciada": 0.485615,
+     "prob_anunciada": 0.477405125,
      "picks_acertados_media": 3.25,
      "picks_por_combinada": 4
     },
     "equilibrada": {
-     "n": 4,
-     "completas": 2,
+     "n": 8,
+     "completas": 4,
      "frecuencia": 0.5,
-     "prob_anunciada": 0.337298,
-     "picks_acertados_media": 2.5,
+     "prob_anunciada": 0.32424949999999997,
+     "picks_acertados_media": 2.625,
      "picks_por_combinada": 4
     },
     "atrevida": {
-     "n": 4,
+     "n": 8,
      "completas": 1,
-     "frecuencia": 0.25,
-     "prob_anunciada": 0.22109900000000002,
-     "picks_acertados_media": 2.25,
+     "frecuencia": 0.125,
+     "prob_anunciada": 0.23187712500000002,
+     "picks_acertados_media": 1.625,
      "picks_por_combinada": 4
     }
    }
   }
  },
  "contra_mercado": {
-  "n": 3,
+  "n": 7,
   "n_sin_mercado": 1,
   "n_sellados_con_mercado": 9,
   "primer_sello_con_mercado_utc": "2026-11-16T07:45:52.665105+00:00",
@@ -134,25 +134,25 @@
   "metodo": "shin",
   "n_minimo": 30,
   "mercado": {
-   "n": 3,
-   "logloss": 1.0751619691284515,
-   "ee_logloss": 0.2754604329652906,
-   "brier": 0.6400055295545959,
-   "rps": 0.12855330496751938,
+   "n": 7,
+   "logloss": 1.0725269983818795,
+   "ee_logloss": 0.1083454364446983,
+   "brier": 0.6499359186924802,
+   "rps": 0.22431959899456586,
    "aciertos_favorito": 1,
-   "acierto_favorito": 0.3333333333333333
+   "acierto_favorito": 0.14285714285714285
   },
   "modelo": {
-   "n": 3,
-   "logloss": 1.0399344744912307,
-   "ee_logloss": 0.28384911658984235,
-   "brier": 0.6104863594241988,
-   "rps": 0.11790339568863435,
-   "aciertos_1x2": 1,
-   "acierto_1x2": 0.3333333333333333
+   "n": 7,
+   "logloss": 1.0505128789734286,
+   "ee_logloss": 0.11009435848114903,
+   "brier": 0.631280585305228,
+   "rps": 0.21551503292091473,
+   "aciertos_1x2": 2,
+   "acierto_1x2": 0.2857142857142857
   },
-  "dif_logloss": -0.03522749463722082,
-  "ee_dif_logloss": 0.008411312363746407,
+  "dif_logloss": -0.022014119408450678,
+  "ee_dif_logloss": 0.040804571596592586,
   "lectura": "pocos_partidos",
   "nota": "Sólo partidos cuyo sello oficial guardó momios: los del momento de sellar, no los de cierre. Probabilidades del mercado sin margen (Shin). dif_logloss = modelo − mercado: positiva favorece al mercado. Con menos de 30 partidos no se puede concluir nada."
  },
@@ -731,6 +731,598 @@
     "brier": 0.2508233154751182,
     "rps": 0.0999459774689451,
     "dif_logloss": -0.05203467399397865
+   }
+  },
+  {
+   "id": 401877050,
+   "fecha_utc": "2026-11-21T22:50:00+00:00",
+   "torneo": "Apertura 2026",
+   "fase": "regular",
+   "local": "Pachuca",
+   "visitante": "Toluca",
+   "gl": 2,
+   "gv": 0,
+   "gl_ht": 0,
+   "gv_ht": 0,
+   "resultado": "L",
+   "modelo": "ensamble",
+   "sellado_utc": "2026-11-21T06:57:39.518370+00:00",
+   "lam_l": 1.48318,
+   "lam_v": 1.385808,
+   "p_l": 0.391391,
+   "p_e": 0.26089,
+   "p_v": 0.347719,
+   "pick": "L",
+   "prob_pick": 0.391391,
+   "acierto_1x2": 1,
+   "marcador_pronosticado": {
+    "gl": 1,
+    "gv": 1,
+    "prob": 0.122622
+   },
+   "marcador_exacto": 0,
+   "logloss": 0.9380482186636878,
+   "brier": 0.559377009942,
+   "rps": 0.245656708921,
+   "combinadas": {
+    "segura": {
+     "prob_conjunta": 0.480135,
+     "n_picks": 4,
+     "aciertos": 4,
+     "completa": true,
+     "picks": [
+      {
+       "clave": "H_L+1.5",
+       "etiqueta": "Pachuca gana, empata o pierde por un gol (hándicap +1.5)",
+       "prob": 0.838757,
+       "acerto": true
+      },
+      {
+       "clave": "G2T_SI",
+       "etiqueta": "Hay gol en el segundo tiempo",
+       "prob": 0.789684,
+       "acerto": true
+      },
+      {
+       "clave": "L_ANOTA",
+       "etiqueta": "Pachuca anota",
+       "prob": 0.773085,
+       "acerto": true
+      },
+      {
+       "clave": "D_1X",
+       "etiqueta": "Pachuca o empate al descanso",
+       "prob": 0.717133,
+       "acerto": true
+      }
+     ]
+    },
+    "equilibrada": {
+     "prob_conjunta": 0.297621,
+     "n_picks": 4,
+     "aciertos": 4,
+     "completa": true,
+     "picks": [
+      {
+       "clave": "D_1X",
+       "etiqueta": "Pachuca o empate al descanso",
+       "prob": 0.717133,
+       "acerto": true
+      },
+      {
+       "clave": "U15_1T",
+       "etiqueta": "Menos de 1.5 goles en el primer tiempo",
+       "prob": 0.625124,
+       "acerto": true
+      },
+      {
+       "clave": "V_U15",
+       "etiqueta": "Toluca anota menos de 1.5",
+       "prob": 0.596742,
+       "acerto": true
+      },
+      {
+       "clave": "U25",
+       "etiqueta": "Menos de 2.5 goles",
+       "prob": 0.453173,
+       "acerto": true
+      }
+     ]
+    },
+    "atrevida": {
+     "prob_conjunta": 0.245077,
+     "n_picks": 4,
+     "aciertos": 2,
+     "completa": false,
+     "picks": [
+      {
+       "clave": "D_12",
+       "etiqueta": "No hay empate al descanso",
+       "prob": 0.597588,
+       "acerto": false
+      },
+      {
+       "clave": "O25",
+       "etiqueta": "Más de 2.5 goles",
+       "prob": 0.546827,
+       "acerto": false
+      },
+      {
+       "clave": "GM_L",
+       "etiqueta": "Pachuca gana alguna mitad",
+       "prob": 0.541693,
+       "acerto": true
+      },
+      {
+       "clave": "L_2MAS",
+       "etiqueta": "Pachuca anota 2 o más",
+       "prob": 0.436529,
+       "acerto": true
+      }
+     ]
+    }
+   },
+   "mercado": {
+    "proveedor": "DraftKings",
+    "ml_l": 2.6,
+    "ml_e": 3.95,
+    "ml_v": 2.4,
+    "margen": 0.054447,
+    "metodo": "shin",
+    "p_l": 0.366011,
+    "p_e": 0.236351,
+    "p_v": 0.397638,
+    "pick": "V",
+    "acierto_1x2": 0,
+    "prob_resultado": 0.366011,
+    "logloss": 1.005091891387594,
+    "brier": 0.615919826366,
+    "rps": 0.28002901558250004,
+    "dif_logloss": -0.0670436727239061
+   }
+  },
+  {
+   "id": 401877051,
+   "fecha_utc": "2026-11-21T23:00:00+00:00",
+   "torneo": "Apertura 2026",
+   "fase": "regular",
+   "local": "Santos",
+   "visitante": "León",
+   "gl": 1,
+   "gv": 2,
+   "gl_ht": 0,
+   "gv_ht": 1,
+   "resultado": "V",
+   "modelo": "ensamble",
+   "sellado_utc": "2026-11-21T07:21:34.985978+00:00",
+   "lam_l": 1.489721,
+   "lam_v": 1.312092,
+   "p_l": 0.408359,
+   "p_e": 0.263717,
+   "p_v": 0.327924,
+   "pick": "L",
+   "prob_pick": 0.408359,
+   "acierto_1x2": 0,
+   "marcador_pronosticado": {
+    "gl": 1,
+    "gv": 1,
+    "prob": 0.124714
+   },
+   "marcador_exacto": 0,
+   "logloss": 1.1149734047633544,
+   "brier": 0.687989878746,
+   "rps": 0.3092216113285,
+   "combinadas": {
+    "segura": {
+     "prob_conjunta": 0.462052,
+     "n_picks": 4,
+     "aciertos": 3,
+     "completa": false,
+     "picks": [
+      {
+       "clave": "G2T_SI",
+       "etiqueta": "Hay gol en el segundo tiempo",
+       "prob": 0.781811,
+       "acerto": true
+      },
+      {
+       "clave": "O15",
+       "etiqueta": "Más de 1.5 goles",
+       "prob": 0.775297,
+       "acerto": true
+      },
+      {
+       "clave": "L_ANOTA",
+       "etiqueta": "Santos anota",
+       "prob": 0.774564,
+       "acerto": true
+      },
+      {
+       "clave": "D_1X",
+       "etiqueta": "Santos o empate al descanso",
+       "prob": 0.731146,
+       "acerto": false
+      }
+     ]
+    },
+    "equilibrada": {
+     "prob_conjunta": 0.295688,
+     "n_picks": 4,
+     "aciertos": 3,
+     "completa": false,
+     "picks": [
+      {
+       "clave": "D_X2",
+       "etiqueta": "León o empate al descanso",
+       "prob": 0.676498,
+       "acerto": true
+      },
+      {
+       "clave": "U15_1T",
+       "etiqueta": "Menos de 1.5 goles en el primer tiempo",
+       "prob": 0.635856,
+       "acerto": true
+      },
+      {
+       "clave": "L_U15",
+       "etiqueta": "Santos anota menos de 1.5",
+       "prob": 0.561272,
+       "acerto": true
+      },
+      {
+       "clave": "U25",
+       "etiqueta": "Menos de 2.5 goles",
+       "prob": 0.469022,
+       "acerto": false
+      }
+     ]
+    },
+    "atrevida": {
+     "prob_conjunta": 0.246034,
+     "n_picks": 4,
+     "aciertos": 2,
+     "completa": false,
+     "picks": [
+      {
+       "clave": "D_12",
+       "etiqueta": "No hay empate al descanso",
+       "prob": 0.592356,
+       "acerto": true
+      },
+      {
+       "clave": "GM_L",
+       "etiqueta": "Santos gana alguna mitad",
+       "prob": 0.554613,
+       "acerto": false
+      },
+      {
+       "clave": "O25",
+       "etiqueta": "Más de 2.5 goles",
+       "prob": 0.530978,
+       "acerto": true
+      },
+      {
+       "clave": "L_2MAS",
+       "etiqueta": "Santos anota 2 o más",
+       "prob": 0.438728,
+       "acerto": false
+      }
+     ]
+    }
+   },
+   "mercado": {
+    "proveedor": "DraftKings",
+    "ml_l": 2.4,
+    "ml_e": 3.7,
+    "ml_v": 2.65,
+    "margen": 0.064295,
+    "metodo": "shin",
+    "p_l": 0.3942533942533943,
+    "p_e": 0.2501892501892502,
+    "p_v": 0.35555735555735557,
+    "pick": "L",
+    "acierto_1x2": 0,
+    "prob_resultado": 0.35555735555735557,
+    "logloss": 1.0340687050382904,
+    "brier": 0.6333367217668102,
+    "rps": 0.2853710304282756,
+    "dif_logloss": 0.08090469972506398
+   }
+  },
+  {
+   "id": 401877049,
+   "fecha_utc": "2026-11-22T01:00:00+00:00",
+   "torneo": "Apertura 2026",
+   "fase": "regular",
+   "local": "Pumas",
+   "visitante": "Monterrey",
+   "gl": 0,
+   "gv": 2,
+   "gl_ht": 0,
+   "gv_ht": 0,
+   "resultado": "V",
+   "modelo": "ensamble",
+   "sellado_utc": "2026-11-21T07:21:34.985978+00:00",
+   "lam_l": 1.538447,
+   "lam_v": 1.312792,
+   "p_l": 0.420492,
+   "p_e": 0.260333,
+   "p_v": 0.319175,
+   "pick": "L",
+   "prob_pick": 0.420492,
+   "acierto_1x2": 0,
+   "marcador_pronosticado": {
+    "gl": 1,
+    "gv": 1,
+    "prob": 0.122648
+   },
+   "marcador_exacto": 0,
+   "logloss": 1.1420157372757225,
+   "brier": 0.708109473578,
+   "rps": 0.3201681013445,
+   "combinadas": {
+    "segura": {
+     "prob_conjunta": 0.47348,
+     "n_picks": 4,
+     "aciertos": 3,
+     "completa": false,
+     "picks": [
+      {
+       "clave": "G2T_SI",
+       "etiqueta": "Hay gol en el segundo tiempo",
+       "prob": 0.787581,
+       "acerto": true
+      },
+      {
+       "clave": "L_ANOTA",
+       "etiqueta": "Pumas anota",
+       "prob": 0.785286,
+       "acerto": false
+      },
+      {
+       "clave": "O15",
+       "etiqueta": "Más de 1.5 goles",
+       "prob": 0.78347,
+       "acerto": true
+      },
+      {
+       "clave": "D_1X",
+       "etiqueta": "Pumas o empate al descanso",
+       "prob": 0.735444,
+       "acerto": true
+      }
+     ]
+    },
+    "equilibrada": {
+     "prob_conjunta": 0.335796,
+     "n_picks": 4,
+     "aciertos": 0,
+     "completa": false,
+     "picks": [
+      {
+       "clave": "G1T_SI",
+       "etiqueta": "Hay gol en el primer tiempo",
+       "prob": 0.724496,
+       "acerto": false
+      },
+      {
+       "clave": "1X",
+       "etiqueta": "Pumas o empate",
+       "prob": 0.680825,
+       "acerto": false
+      },
+      {
+       "clave": "GM_L",
+       "etiqueta": "Pumas gana alguna mitad",
+       "prob": 0.566783,
+       "acerto": false
+      },
+      {
+       "clave": "L_2MAS",
+       "etiqueta": "Pumas anota 2 o más",
+       "prob": 0.454959,
+       "acerto": false
+      }
+     ]
+    },
+    "atrevida": {
+     "prob_conjunta": 0.257291,
+     "n_picks": 4,
+     "aciertos": 0,
+     "completa": false,
+     "picks": [
+      {
+       "clave": "D_12",
+       "etiqueta": "No hay empate al descanso",
+       "prob": 0.596958,
+       "acerto": false
+      },
+      {
+       "clave": "GM_L",
+       "etiqueta": "Pumas gana alguna mitad",
+       "prob": 0.566783,
+       "acerto": false
+      },
+      {
+       "clave": "O25",
+       "etiqueta": "Más de 2.5 goles",
+       "prob": 0.54267,
+       "acerto": false
+      },
+      {
+       "clave": "L_2MAS",
+       "etiqueta": "Pumas anota 2 o más",
+       "prob": 0.454959,
+       "acerto": false
+      }
+     ]
+    }
+   },
+   "mercado": {
+    "proveedor": "DraftKings",
+    "ml_l": 2.6,
+    "ml_e": 3.5,
+    "ml_v": 2.6,
+    "margen": 0.054945,
+    "metodo": "shin",
+    "p_l": 0.36585063414936586,
+    "p_e": 0.26829873170126833,
+    "p_v": 0.36585063414936586,
+    "pick": "L",
+    "acierto_1x2": 0,
+    "prob_resultado": 0.36585063414936586,
+    "logloss": 1.0055301322946668,
+    "brier": 0.6079763141487637,
+    "rps": 0.2679960523581273,
+    "dif_logloss": 0.13648560498105566
+   }
+  },
+  {
+   "id": 401877048,
+   "fecha_utc": "2026-11-22T03:00:00+00:00",
+   "torneo": "Apertura 2026",
+   "fase": "regular",
+   "local": "Tigres",
+   "visitante": "América",
+   "gl": 1,
+   "gv": 0,
+   "gl_ht": 0,
+   "gv_ht": 0,
+   "resultado": "L",
+   "modelo": "ensamble",
+   "sellado_utc": "2026-11-21T06:57:39.518370+00:00",
+   "lam_l": 1.338907,
+   "lam_v": 1.389618,
+   "p_l": 0.353897,
+   "p_e": 0.268945,
+   "p_v": 0.377158,
+   "pick": "V",
+   "prob_pick": 0.377158,
+   "acierto_1x2": 0,
+   "marcador_pronosticado": {
+    "gl": 1,
+    "gv": 1,
+    "prob": 0.127738
+   },
+   "marcador_exacto": 0,
+   "logloss": 1.0387493686375449,
+   "brier": 0.632028656598,
+   "rps": 0.2798486217865,
+   "combinadas": {
+    "segura": {
+     "prob_conjunta": 0.461114,
+     "n_picks": 4,
+     "aciertos": 3,
+     "completa": false,
+     "picks": [
+      {
+       "clave": "H_V+1.5",
+       "etiqueta": "América gana, empata o pierde por un gol (hándicap +1.5)",
+       "prob": 0.838222,
+       "acerto": true
+      },
+      {
+       "clave": "G2T_SI",
+       "etiqueta": "Hay gol en el segundo tiempo",
+       "prob": 0.773058,
+       "acerto": true
+      },
+      {
+       "clave": "V_ANOTA",
+       "etiqueta": "América anota",
+       "prob": 0.750829,
+       "acerto": false
+      },
+      {
+       "clave": "D_X2",
+       "etiqueta": "América o empate al descanso",
+       "prob": 0.712432,
+       "acerto": true
+      }
+     ]
+    },
+    "equilibrada": {
+     "prob_conjunta": 0.315699,
+     "n_picks": 4,
+     "aciertos": 4,
+     "completa": true,
+     "picks": [
+      {
+       "clave": "D_1X",
+       "etiqueta": "Tigres o empate al descanso",
+       "prob": 0.702422,
+       "acerto": true
+      },
+      {
+       "clave": "U15_1T",
+       "etiqueta": "Menos de 1.5 goles en el primer tiempo",
+       "prob": 0.64793,
+       "acerto": true
+      },
+      {
+       "clave": "V_U15",
+       "etiqueta": "América anota menos de 1.5",
+       "prob": 0.595422,
+       "acerto": true
+      },
+      {
+       "clave": "U25",
+       "etiqueta": "Menos de 2.5 goles",
+       "prob": 0.486663,
+       "acerto": true
+      }
+     ]
+    },
+    "atrevida": {
+     "prob_conjunta": 0.222219,
+     "n_picks": 4,
+     "aciertos": 0,
+     "completa": false,
+     "picks": [
+      {
+       "clave": "D_12",
+       "etiqueta": "No hay empate al descanso",
+       "prob": 0.585146,
+       "acerto": false
+      },
+      {
+       "clave": "GM_V",
+       "etiqueta": "América gana alguna mitad",
+       "prob": 0.524224,
+       "acerto": false
+      },
+      {
+       "clave": "O25",
+       "etiqueta": "Más de 2.5 goles",
+       "prob": 0.513337,
+       "acerto": false
+      },
+      {
+       "clave": "V_2MAS",
+       "etiqueta": "América anota 2 o más",
+       "prob": 0.404578,
+       "acerto": false
+      }
+     ]
+    }
+   },
+   "mercado": {
+    "proveedor": "DraftKings",
+    "ml_l": 3.25,
+    "ml_e": 3.55,
+    "ml_v": 2.15,
+    "margen": 0.054499,
+    "metodo": "shin",
+    "p_l": 0.290105,
+    "p_e": 0.264461,
+    "p_v": 0.445434,
+    "pick": "V",
+    "acierto_1x2": 0,
+    "prob_resultado": 0.290105,
+    "logloss": 1.2375123525672507,
+    "brier": 0.7723019799019999,
+    "rps": 0.35118117969049994,
+    "dif_logloss": -0.19876298392970582
    }
   }
  ]

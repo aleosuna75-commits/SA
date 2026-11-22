@@ -1,5 +1,5 @@
 {
- "actualizado": "2026-11-21",
+ "actualizado": "2026-11-22",
  "protocolo": {
   "metrica": "log-loss 1X2 a 90 minutos",
   "walk_forward": "por bloques (cortes lunes y viernes 00:00 CDMX)",
@@ -81,13 +81,13 @@
     "error_calibracion": 0.017
    },
    "prueba_dia": {
-    "n": 484,
-    "logloss": 1.0223,
-    "ee_logloss": 0.0202,
-    "rps": 0.2109,
-    "brier": 0.6123,
-    "logv_marcador": -2.9875,
-    "acierto": 0.5
+    "n": 488,
+    "logloss": 1.0226,
+    "ee_logloss": 0.02,
+    "rps": 0.2116,
+    "brier": 0.6126,
+    "logv_marcador": -2.9852,
+    "acierto": 0.498
    }
   }
  },
@@ -141,13 +141,13 @@
      "error_calibracion": 0.011
     },
     "prueba_dia": {
-     "n": 484,
+     "n": 488,
      "logloss": 1.0268,
-     "ee_logloss": 0.0214,
-     "rps": 0.212,
-     "brier": 0.6152,
-     "logv_marcador": -3.0035,
-     "acierto": 0.49
+     "ee_logloss": 0.0212,
+     "rps": 0.2125,
+     "brier": 0.6153,
+     "logv_marcador": -3.0012,
+     "acierto": 0.488
     }
    },
    "estado": "retador: fue el modelo de producción hasta 2026-11-10"
@@ -180,13 +180,13 @@
      "error_calibracion": 0.011
     },
     "prueba_dia": {
-     "n": 484,
-     "logloss": 1.022,
-     "ee_logloss": 0.0193,
-     "rps": 0.2111,
-     "brier": 0.612,
-     "logv_marcador": -2.9869,
-     "acierto": 0.508
+     "n": 488,
+     "logloss": 1.0227,
+     "ee_logloss": 0.0191,
+     "rps": 0.2118,
+     "brier": 0.6125,
+     "logv_marcador": -2.9846,
+     "acierto": 0.504
     }
    },
    "retador_menos_campeon": {
@@ -266,12 +266,12 @@
      "error_calibracion": 0.012
     },
     "prueba_dia": {
-     "n": 484,
-     "logloss": 1.0244,
-     "ee_logloss": 0.0179,
-     "rps": 0.2116,
-     "brier": 0.6136,
-     "logv_marcador": -3.0026,
+     "n": 488,
+     "logloss": 1.0247,
+     "ee_logloss": 0.0177,
+     "rps": 0.2123,
+     "brier": 0.6139,
+     "logv_marcador": -3.0004,
      "acierto": 0.488
     }
    },
@@ -352,13 +352,13 @@
      "error_calibracion": 0.014
     },
     "prueba_dia": {
-     "n": 484,
-     "logloss": 1.0263,
-     "ee_logloss": 0.0182,
-     "rps": 0.2124,
-     "brier": 0.6148,
-     "logv_marcador": -3.0032,
-     "acierto": 0.481
+     "n": 488,
+     "logloss": 1.0266,
+     "ee_logloss": 0.018,
+     "rps": 0.213,
+     "brier": 0.6151,
+     "logv_marcador": -3.0009,
+     "acierto": 0.48
     }
    },
    "retador_menos_campeon": {
@@ -438,13 +438,13 @@
      "error_calibracion": 0.017
     },
     "prueba_dia": {
-     "n": 484,
-     "logloss": 1.0267,
-     "ee_logloss": 0.0163,
-     "rps": 0.2125,
-     "brier": 0.6152,
-     "logv_marcador": -3.0002,
-     "acierto": 0.483
+     "n": 488,
+     "logloss": 1.0268,
+     "ee_logloss": 0.0162,
+     "rps": 0.2131,
+     "brier": 0.6154,
+     "logv_marcador": -2.9978,
+     "acierto": 0.482
     }
    },
    "retador_menos_campeon": {
@@ -810,79 +810,79 @@
   }
  ],
  "ultimo_ciclo": {
-  "fecha": "2026-11-21",
+  "fecha": "2026-11-22",
   "produccion": "ensamble",
   "adoptado": null,
   "tabla": [
    {
     "modelo": "ensamble",
     "rol": "producción",
-    "n": 3465,
+    "n": 3469,
     "logloss": 1.025,
-    "logv_marcador": -2.8834
+    "logv_marcador": -2.8832
    },
    {
     "modelo": "ajuste",
     "rol": "retador",
-    "n": 3465,
+    "n": 3469,
     "logloss": 1.0231,
-    "logv_marcador": -2.8893,
-    "d_logloss_vs_produccion": -0.0018,
+    "logv_marcador": -2.8891,
+    "d_logloss_vs_produccion": -0.0019,
     "ee": 0.001,
-    "z": -1.92,
-    "d_ultimos_bloques": 0.0151,
+    "z": -1.97,
+    "d_ultimos_bloques": 0.0109,
     "cumple_regla": false
    },
    {
     "modelo": "elo",
     "rol": "retador",
-    "n": 3465,
-    "logloss": 1.0302,
-    "logv_marcador": -2.8921,
+    "n": 3469,
+    "logloss": 1.0303,
+    "logv_marcador": -2.8918,
     "d_logloss_vs_produccion": 0.0053,
     "ee": 0.001,
-    "z": 5.44,
-    "d_ultimos_bloques": -0.0084,
+    "z": 5.49,
+    "d_ultimos_bloques": -0.0041,
     "cumple_regla": false
    },
    {
     "modelo": "dc2",
     "rol": "retador",
-    "n": 3465,
-    "logloss": 1.0284,
-    "logv_marcador": -2.8936,
+    "n": 3469,
+    "logloss": 1.0285,
+    "logv_marcador": -2.8934,
     "d_logloss_vs_produccion": 0.0035,
     "ee": 0.0011,
     "z": 3.24,
-    "d_ultimos_bloques": 0.0037,
+    "d_ultimos_bloques": 0.0036,
     "cumple_regla": false
    },
    {
     "modelo": "dc",
     "rol": "retador",
-    "n": 3465,
+    "n": 3469,
     "logloss": 1.0293,
-    "logv_marcador": -2.8942,
+    "logv_marcador": -2.894,
     "d_logloss_vs_produccion": 0.0043,
     "ee": 0.0009,
-    "z": 4.58,
-    "d_ultimos_bloques": 0.0066,
+    "z": 4.59,
+    "d_ultimos_bloques": 0.0067,
     "cumple_regla": false
    },
    {
     "modelo": "tiros",
     "rol": "retador",
-    "n": 3465,
+    "n": 3469,
     "logloss": 1.0312,
-    "logv_marcador": -2.8928,
+    "logv_marcador": -2.8926,
     "d_logloss_vs_produccion": 0.0062,
     "ee": 0.0013,
-    "z": 4.69,
-    "d_ultimos_bloques": 0.0082,
+    "z": 4.68,
+    "d_ultimos_bloques": 0.0064,
     "cumple_regla": false
    }
   ],
-  "partidos_fuera_de_muestra": 3465,
+  "partidos_fuera_de_muestra": 3469,
   "ultimo_bloque": "2026-11-20"
  }
 }

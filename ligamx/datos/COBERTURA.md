@@ -3,9 +3,9 @@
 Generado automáticamente por `espn_descarga.py` el 2026-11-21 (no editar a mano: se reescribe en cada `tablas` / `actualizar`; los veredictos de la conciliación viven en `conciliacion_veredictos.json`).
 
 - Fuente: API pública de ESPN, liga `mex.1` (scoreboard por año + summary por partido).
-- Partidos en `partidos.csv`: **8767** (8688 jugados) de 2001-07-21 a 2026-11-22; 51 torneos.
+- Partidos en `partidos.csv`: **8767** (8692 jugados) de 2001-07-21 a 2026-11-22; 51 torneos.
 - ESPN no tiene eventos de Liga MX anteriores al Invierno 2001 (probado 1996-2000: vacío).
-- Partidos jugados con algún bloque de detalle (stats, eventos o alineaciones): 8672 (100%).
+- Partidos jugados con algún bloque de detalle (stats, eventos o alineaciones): 8676 (100%).
 
 ## 1. Cobertura por torneo
 
@@ -63,7 +63,7 @@ Porcentajes sobre partidos **jugados**. `stats` = boxscore real; `eventos` = gol
 | Clausura 2025 | 170 | 170 | 153 | 17 | 98% | 100% | 96% | 100% | 100% | 100% | 98% | 100% | 100% |
 | Apertura 2025 | 170 | 170 | 153 | 17 | 100% | 100% | 99% | 100% | 98% | 100% | 100% | 99% | 100% |
 | Clausura 2026 | 167 | 167 | 153 | 14 | 100% | 100% | 99% | 100% | 100% | 100% | 100% | 92% | 100% |
-| Apertura 2026 | 153 | 147 | 147 | 0 | 100% | 100% | 100% | 100% | 100% | 100% | 100% | 1% | 59% |
+| Apertura 2026 | 153 | 151 | 151 | 0 | 100% | 100% | 100% | 100% | 100% | 100% | 100% | 1% | 57% |
 
 ## 2. Desde qué torneo es confiable cada bloque
 
@@ -71,13 +71,13 @@ Regla: primer torneo a partir del cual TODOS los torneos siguientes (con partido
 
 | Bloque | ≥ 95% desde | ≥ 80% desde | Cobertura en ese tramo (≥95%) |
 |---|---|---|---|
-| Estadísticas (tiros, córners, faltas, tarjetas...) | Clausura 2025 | Clausura 2020 | 651 de 654 (100%) |
-| Posesión | Clausura 2025 | Clausura 2020 | 650 de 654 (99%) |
-| Goles con minuto | Apertura 2001 | Apertura 2001 | 8663 de 8688 (100%) |
-| Marcador de medio tiempo | Apertura 2001 | Apertura 2001 | 8668 de 8688 (100%) |
-| Tarjetas con minuto | Clausura 2025 | Clausura 2020 | 646 de 654 (99%) |
-| Alineaciones (11 titulares) | Apertura 2012 | Apertura 2012 | 4784 de 4803 (100%) |
-| Momios 1X2 | Clausura 2025 | Clausura 2021 | 650 de 654 (99%) |
+| Estadísticas (tiros, córners, faltas, tarjetas...) | Clausura 2025 | Clausura 2020 | 655 de 658 (100%) |
+| Posesión | Clausura 2025 | Clausura 2020 | 654 de 658 (99%) |
+| Goles con minuto | Apertura 2001 | Apertura 2001 | 8667 de 8692 (100%) |
+| Marcador de medio tiempo | Apertura 2001 | Apertura 2001 | 8672 de 8692 (100%) |
+| Tarjetas con minuto | Clausura 2025 | Clausura 2020 | 650 de 658 (99%) |
+| Alineaciones (11 titulares) | Apertura 2012 | Apertura 2012 | 4788 de 4807 (100%) |
+| Momios 1X2 | Clausura 2025 | Clausura 2021 | 654 de 658 (99%) |
 | Asistencia | nunca | nunca |  |
 | Árbitro | nunca | nunca |  |
 
@@ -230,7 +230,7 @@ Las 3 diferencias de -3 días son las idas de liguilla mal fechadas en el histó
 | gl_ht <= gl y gv_ht <= gv | OK |  / excepciones documentadas (resultado de escritorio): 590969 2021-02-20 Atlas-América HT 0-1 FT 3-0 |
 | marcador tras tiempos extra >= marcador de 90 min | OK |  |
 | fecha_local = fecha_utc convertida a America/Mexico_City | OK | 5157 partidos nocturnos caen en el día UTC siguiente y quedan en su día local correcto |
-| fase regular completa por torneo (n equipos a una vuelta) | OK | 49 torneos completos; incompletos: Clausura 2020: 90 de 153 jugados (18 equipos; otros: {'cancelado': 63}); Apertura 2026: 147 de 153 jugados (18 equipos; otros: {'programado': 6}) |
+| fase regular completa por torneo (n equipos a una vuelta) | OK | 49 torneos completos; incompletos: Clausura 2020: 90 de 153 jugados (18 equipos; otros: {'cancelado': 63}); Apertura 2026: 151 de 153 jugados (18 equipos; otros: {'programado': 2}) |
 | liguilla: 8 partidos de cuartos, 4 de semifinal y 2 de final por torneo | OK |  |
 | goles.csv suma el marcador en los partidos con tiene_eventos=1 | OK |  |
 | todos los equipos tienen nombre canónico | OK |  |
