@@ -1,5 +1,5 @@
 {
- "actualizado": "2026-11-22T01:03:32Z",
+ "actualizado": "2026-11-22T06:16:06Z",
  "actual": "lasvegas2026",
  "gps": [
   {
@@ -173,7 +173,7 @@
    "circuito": "Circuito urbano de Las Vegas (Las Vegas Strip)",
    "ciudad": "Las Vegas, Nevada",
    "fecha_texto": "Sábado 21 de noviembre de 2026",
-   "estado": "en_curso",
+   "estado": "terminado",
    "fases": [
     {
      "clave": "fp1",
@@ -223,7 +223,7 @@
      "fin_utc": "2026-11-22T06:00:00Z",
      "fecha_local": "Sábado 21 de noviembre",
      "hora_local": "8:00 PM",
-     "estado": "proximo"
+     "estado": "terminado"
     }
    ],
    "meeting_key": 1300,
