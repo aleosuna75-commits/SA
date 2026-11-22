@@ -1,5 +1,5 @@
 {
- "actualizado": "2026-11-21T05:11:10Z",
+ "actualizado": "2026-11-22T01:01:04Z",
  "aciertos_top10": 8,
  "top10_pred": [
   "RUS",
@@ -235,5 +235,5 @@
    "dif": -5
   }
  ],
- "resumen": "Provisional (último dato del cronometraje en vivo; falta la clasificación oficial). El modelo (FP3) acertó 8 de los 10 que llegaron a la Q3 (se le escaparon Arvid Lindblad, Franco Colapinto). La pole fue para Kimi Antonelli, a quien el modelo veía P3 con 13% de probabilidad. La mayor sorpresa: Charles Leclerc (pronóstico P2, real P11). Error medio de 2.18 lugares y correlación de 0.875."
+ "resumen": "El modelo (FP3) acertó 8 de los 10 que llegaron a la Q3 (se le escaparon Arvid Lindblad, Franco Colapinto). La pole fue para Kimi Antonelli, a quien el modelo veía P3 con 13% de probabilidad. La mayor sorpresa: Charles Leclerc (pronóstico P2, real P11). Error medio de 2.18 lugares y correlación de 0.875."
 }

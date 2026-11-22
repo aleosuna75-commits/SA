@@ -2,6 +2,14 @@
  "sustituciones": {},
  "penalizaciones": {},
  "parrilla": {},
- "notas": [],
- "fuentes": []
+ "notas": [
+  "Las fuentes difieren en el lugar exacto de Sainz, Stroll y Bearman (20/21/22); se usa el de OpenF1."
+ ],
+ "fuentes": [
+  "Parrilla: OpenF1 starting_grid (session_key 11416), consultada el 22/11/2026 01:02 UTC; se usa tal cual.",
+  "Diferencias qualy -> parrilla (confirmadas en prensa): ANT P1 -> 6 (5 lugares por motor de combustión nuevo; Verstappen hereda la pole), PIA P7 -> 17 (10 lugares por quinto motor de combustión), SAI P14 -> 20 (10 lugares), STR 10 lugares (sale 21) y BEA 35 lugares (sale último). Cinco penalizaciones por unidad de potencia.",
+  "https://www.crash.net/f1/news/1110516/1/f1-2026-las-vegas-grand-prix-starting-grid-after-five-engine-penalties",
+  "https://www.planetf1.com/las-vegas-grand-prix/f1-starting-grid-2026-las-vegas-grand-prix",
+  "https://racingnews365.com/las-vegas-starting-grid-heavily-adjusted-after-five-driver-penalties"
+ ]
 }
