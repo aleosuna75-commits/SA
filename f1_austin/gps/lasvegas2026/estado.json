@@ -96,6 +96,15 @@
     "historial.json",
     "vueltas.json"
    ]
+  },
+  "post_carrera": {
+   "hecho": "2026-11-22T06:49:19Z",
+   "firma": "0027d8757756",
+   "aciertos_top10": 7,
+   "ganador_real": "VER",
+   "archivos": [
+    "post_carrera.json"
+   ]
   }
  }
 }

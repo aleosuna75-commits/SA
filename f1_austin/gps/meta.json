@@ -1,5 +1,5 @@
 {
- "actualizado": "2026-11-22T06:16:06Z",
+ "actualizado": "2026-11-22T06:49:05Z",
  "actual": "lasvegas2026",
  "gps": [
   {
@@ -234,7 +234,8 @@
    "pasos": {
     "pre_qualy": "2026-11-20T05:53:23Z",
     "fp3": "2026-11-21T02:04:32Z",
-    "post_qualy": "2026-11-22T01:03:32Z"
+    "post_qualy": "2026-11-22T01:03:32Z",
+    "post_carrera": "2026-11-22T06:49:19Z"
    },
    "docs": {
     "gp": "gp/lasvegas2026",
@@ -242,6 +243,7 @@
     "postqualy": "postqualy/lasvegas2026",
     "carrera": "carrera/lasvegas2026",
     "vueltas": "vueltas/lasvegas2026",
+    "postcarrera": "postcarrera/lasvegas2026",
     "historial": "historial/lasvegas2026"
    }
   },
