@@ -1,5 +1,5 @@
 {
- "actualizado": "2026-11-09T04:52:34Z",
+ "actualizado": "2026-11-22T08:08:58Z",
  "campeones": {
   "qualy_fp1": {
    "modelo": "selección automática (hoy elige Ridge)",
@@ -9,8 +9,8 @@
     "top10_hits": 8.0588,
     "top10_hits_reciente": 8.25,
     "pole": 0.353,
-    "mae": 2.999,
-    "spearman": 0.7566,
+    "mae": 3.0,
+    "spearman": 0.7564,
     "top3_hits": 1.676
    },
    "n_gp": 68
@@ -20,41 +20,41 @@
    "variante": "base",
    "desde": "2026-11-09T03:27:13Z",
    "metricas": {
-    "top10_hits": 8.2059,
-    "top10_hits_reciente": 8.375,
-    "pole": 0.338,
-    "mae": 2.844,
-    "spearman": 0.7777,
-    "top3_hits": 1.794
+    "top10_hits": 8.2029,
+    "top10_hits_reciente": 8.25,
+    "pole": 0.333,
+    "mae": 2.848,
+    "spearman": 0.7779,
+    "top3_hits": 1.797
    },
-   "n_gp": 68
+   "n_gp": 69
   },
   "qualy_fp3": {
    "modelo": "selección automática (hoy elige Random Forest)",
    "variante": "base",
    "desde": "2026-11-09T03:27:13Z",
    "metricas": {
-    "top10_hits": 8.1765,
-    "top10_hits_reciente": 8.5,
-    "pole": 0.368,
-    "mae": 2.791,
-    "spearman": 0.7862,
-    "top3_hits": 1.75
+    "top10_hits": 8.1739,
+    "top10_hits_reciente": 8.375,
+    "pole": 0.362,
+    "mae": 2.782,
+    "spearman": 0.7875,
+    "top3_hits": 1.754
    },
-   "n_gp": 68
+   "n_gp": 69
   },
   "carrera": {
    "modelo": "Simulador Monte Carlo de carrera (Simulador original: salida, ritmo de tanda larga, gap de qualy, forma de piloto/equipo con interacción por posición de salida, facilidad de rebase, ruido de 1.ª vuelta y abandonos)",
    "variante": "base",
    "desde": "2026-11-09T03:27:13Z",
    "metricas": {
-    "ndcg10": 0.8902,
-    "ndcg10_reciente": 0.9067,
-    "top10_hits": 8.0,
+    "ndcg10": 0.8895,
+    "ndcg10_reciente": 0.9007,
+    "top10_hits": 7.985,
     "ganador": 0.618,
     "podio": 2.074,
-    "mae_top10": 2.226,
-    "spearman": 0.7108
+    "mae_top10": 2.228,
+    "spearman": 0.7104
    },
    "n_gp": 68
   }
@@ -104,6 +104,21 @@
     "podio": 2,
     "mae": 3.0
    }
+  },
+  {
+   "slug": "lasvegas2026",
+   "gp": "Gran Premio de Las Vegas",
+   "qualy": {
+    "aciertos": 8,
+    "pole_ok": false,
+    "mae": 2.18
+   },
+   "carrera": {
+    "aciertos": 7,
+    "ganador_ok": true,
+    "podio": 2,
+    "mae": 4.05
+   }
   }
  ],
  "cambios": [],
@@ -119,7 +134,7 @@
     "valor": 8.0588,
     "reciente": 8.25,
     "n_gp": 68,
-    "fecha": "2026-11-09T04:52:25Z"
+    "fecha": "2026-11-22T08:08:45Z"
    }
   },
   {
@@ -133,7 +148,7 @@
     "valor": 8.1176,
     "reciente": 8.25,
     "n_gp": 68,
-    "fecha": "2026-11-09T04:52:25Z",
+    "fecha": "2026-11-22T08:08:45Z",
     "diferencia_vs_campeon": 0.0588,
     "ee": 0.0413,
     "diferencia_reciente": 0.0,
@@ -151,7 +166,7 @@
     "valor": 8.0441,
     "reciente": 8.125,
     "n_gp": 68,
-    "fecha": "2026-11-09T04:52:26Z",
+    "fecha": "2026-11-22T08:08:46Z",
     "diferencia_vs_campeon": -0.0147,
     "ee": 0.0611,
     "diferencia_reciente": -0.125,
@@ -169,7 +184,7 @@
     "valor": 8.1176,
     "reciente": 8.25,
     "n_gp": 68,
-    "fecha": "2026-11-09T04:52:26Z",
+    "fecha": "2026-11-22T08:08:46Z",
     "diferencia_vs_campeon": 0.0588,
     "ee": 0.0508,
     "diferencia_reciente": 0.0,
@@ -187,7 +202,7 @@
     "valor": 8.0735,
     "reciente": 8.125,
     "n_gp": 68,
-    "fecha": "2026-11-09T04:52:26Z",
+    "fecha": "2026-11-22T08:08:46Z",
     "diferencia_vs_campeon": 0.0147,
     "ee": 0.0574,
     "diferencia_reciente": -0.125,
@@ -205,7 +220,7 @@
     "valor": 8.0441,
     "reciente": 8.125,
     "n_gp": 68,
-    "fecha": "2026-11-09T04:52:26Z",
+    "fecha": "2026-11-22T08:08:46Z",
     "diferencia_vs_campeon": -0.0147,
     "ee": 0.0534,
     "diferencia_reciente": -0.125,
@@ -220,13 +235,13 @@
    "origen": "predefinido",
    "ultima_metrica": {
     "metrica": "top10_hits",
-    "valor": 8.0882,
-    "reciente": 8.125,
+    "valor": 8.0735,
+    "reciente": 8.0,
     "n_gp": 68,
-    "fecha": "2026-11-09T04:52:26Z",
-    "diferencia_vs_campeon": 0.0294,
-    "ee": 0.0467,
-    "diferencia_reciente": -0.125,
+    "fecha": "2026-11-22T08:08:46Z",
+    "diferencia_vs_campeon": 0.0147,
+    "ee": 0.0491,
+    "diferencia_reciente": -0.25,
     "pasa_regla": false
    }
   },
@@ -241,7 +256,7 @@
     "valor": 8.0882,
     "reciente": 8.25,
     "n_gp": 68,
-    "fecha": "2026-11-09T04:52:26Z",
+    "fecha": "2026-11-22T08:08:47Z",
     "diferencia_vs_campeon": 0.0294,
     "ee": 0.0512,
     "diferencia_reciente": 0.0,
@@ -256,13 +271,13 @@
    "origen": "predefinido",
    "ultima_metrica": {
     "metrica": "top10_hits",
-    "valor": 8.0882,
-    "reciente": 8.25,
+    "valor": 8.0735,
+    "reciente": 8.125,
     "n_gp": 68,
-    "fecha": "2026-11-09T04:52:27Z",
-    "diferencia_vs_campeon": 0.0294,
-    "ee": 0.0553,
-    "diferencia_reciente": 0.0,
+    "fecha": "2026-11-22T08:08:47Z",
+    "diferencia_vs_campeon": 0.0147,
+    "ee": 0.0574,
+    "diferencia_reciente": -0.125,
     "pasa_regla": false
    }
   },
@@ -274,13 +289,13 @@
    "origen": "predefinido",
    "ultima_metrica": {
     "metrica": "top10_hits",
-    "valor": 8.0735,
-    "reciente": 8.25,
+    "valor": 8.0588,
+    "reciente": 8.125,
     "n_gp": 68,
-    "fecha": "2026-11-09T04:52:27Z",
-    "diferencia_vs_campeon": 0.0147,
-    "ee": 0.0392,
-    "diferencia_reciente": 0.0,
+    "fecha": "2026-11-22T08:08:47Z",
+    "diferencia_vs_campeon": 0.0,
+    "ee": 0.0419,
+    "diferencia_reciente": -0.125,
     "pasa_regla": false
    }
   },
@@ -295,7 +310,7 @@
     "valor": 8.0882,
     "reciente": 8.25,
     "n_gp": 68,
-    "fecha": "2026-11-09T04:52:27Z",
+    "fecha": "2026-11-22T08:08:47Z",
     "diferencia_vs_campeon": 0.0294,
     "ee": 0.0512,
     "diferencia_reciente": 0.0,
@@ -310,10 +325,10 @@
    "origen": "predefinido",
    "ultima_metrica": {
     "metrica": "top10_hits",
-    "valor": 8.2059,
-    "reciente": 8.375,
-    "n_gp": 68,
-    "fecha": "2026-11-09T04:52:27Z"
+    "valor": 8.2029,
+    "reciente": 8.25,
+    "n_gp": 69,
+    "fecha": "2026-11-22T08:08:47Z"
    }
   },
   {
@@ -324,10 +339,10 @@
    "origen": "predefinido",
    "ultima_metrica": {
     "metrica": "top10_hits",
-    "valor": 8.2059,
-    "reciente": 8.375,
-    "n_gp": 68,
-    "fecha": "2026-11-09T04:52:27Z",
+    "valor": 8.2029,
+    "reciente": 8.25,
+    "n_gp": 69,
+    "fecha": "2026-11-22T08:08:48Z",
     "diferencia_vs_campeon": 0.0,
     "ee": 0.0,
     "diferencia_reciente": 0.0,
@@ -342,13 +357,13 @@
    "origen": "predefinido",
    "ultima_metrica": {
     "metrica": "top10_hits",
-    "valor": 8.1618,
+    "valor": 8.1594,
     "reciente": 8.25,
-    "n_gp": 68,
-    "fecha": "2026-11-09T04:52:27Z",
-    "diferencia_vs_campeon": -0.0441,
-    "ee": 0.0441,
-    "diferencia_reciente": -0.125,
+    "n_gp": 69,
+    "fecha": "2026-11-22T08:08:48Z",
+    "diferencia_vs_campeon": -0.0435,
+    "ee": 0.0435,
+    "diferencia_reciente": 0.0,
     "pasa_regla": false
    }
   },
@@ -360,12 +375,12 @@
    "origen": "predefinido",
    "ultima_metrica": {
     "metrica": "top10_hits",
-    "valor": 8.1765,
-    "reciente": 8.375,
-    "n_gp": 68,
-    "fecha": "2026-11-09T04:52:27Z",
-    "diferencia_vs_campeon": -0.0294,
-    "ee": 0.0417,
+    "valor": 8.1594,
+    "reciente": 8.25,
+    "n_gp": 69,
+    "fecha": "2026-11-22T08:08:48Z",
+    "diferencia_vs_campeon": -0.0435,
+    "ee": 0.0383,
     "diferencia_reciente": 0.0,
     "pasa_regla": false
    }
@@ -378,13 +393,13 @@
    "origen": "predefinido",
    "ultima_metrica": {
     "metrica": "top10_hits",
-    "valor": 8.2059,
+    "valor": 8.2029,
     "reciente": 8.375,
-    "n_gp": 68,
-    "fecha": "2026-11-09T04:52:28Z",
+    "n_gp": 69,
+    "fecha": "2026-11-22T08:08:49Z",
     "diferencia_vs_campeon": 0.0,
-    "ee": 0.0468,
-    "diferencia_reciente": 0.0,
+    "ee": 0.0462,
+    "diferencia_reciente": 0.125,
     "pasa_regla": false
    }
   },
@@ -396,13 +411,13 @@
    "origen": "predefinido",
    "ultima_metrica": {
     "metrica": "top10_hits",
-    "valor": 8.1765,
-    "reciente": 8.5,
-    "n_gp": 68,
-    "fecha": "2026-11-09T04:52:28Z",
-    "diferencia_vs_campeon": -0.0294,
-    "ee": 0.0361,
-    "diferencia_reciente": 0.125,
+    "valor": 8.1594,
+    "reciente": 8.25,
+    "n_gp": 69,
+    "fecha": "2026-11-22T08:08:49Z",
+    "diferencia_vs_campeon": -0.0435,
+    "ee": 0.0322,
+    "diferencia_reciente": 0.0,
     "pasa_regla": false
    }
   },
@@ -414,12 +429,12 @@
    "origen": "predefinido",
    "ultima_metrica": {
     "metrica": "top10_hits",
-    "valor": 8.1618,
-    "reciente": 8.25,
-    "n_gp": 68,
-    "fecha": "2026-11-09T04:52:28Z",
-    "diferencia_vs_campeon": -0.0441,
-    "ee": 0.0251,
+    "valor": 8.1594,
+    "reciente": 8.125,
+    "n_gp": 69,
+    "fecha": "2026-11-22T08:08:49Z",
+    "diferencia_vs_campeon": -0.0435,
+    "ee": 0.0247,
     "diferencia_reciente": -0.125,
     "pasa_regla": false
    }
@@ -432,12 +447,12 @@
    "origen": "predefinido",
    "ultima_metrica": {
     "metrica": "top10_hits",
-    "valor": 8.1618,
-    "reciente": 8.375,
-    "n_gp": 68,
-    "fecha": "2026-11-09T04:52:28Z",
-    "diferencia_vs_campeon": -0.0441,
-    "ee": 0.0388,
+    "valor": 8.1449,
+    "reciente": 8.25,
+    "n_gp": 69,
+    "fecha": "2026-11-22T08:08:49Z",
+    "diferencia_vs_campeon": -0.058,
+    "ee": 0.0351,
     "diferencia_reciente": 0.0,
     "pasa_regla": false
    }
@@ -450,13 +465,13 @@
    "origen": "predefinido",
    "ultima_metrica": {
     "metrica": "top10_hits",
-    "valor": 8.1765,
-    "reciente": 8.5,
-    "n_gp": 68,
-    "fecha": "2026-11-09T04:52:28Z",
-    "diferencia_vs_campeon": -0.0294,
-    "ee": 0.0417,
-    "diferencia_reciente": 0.125,
+    "valor": 8.1594,
+    "reciente": 8.25,
+    "n_gp": 69,
+    "fecha": "2026-11-22T08:08:50Z",
+    "diferencia_vs_campeon": -0.0435,
+    "ee": 0.0383,
+    "diferencia_reciente": 0.0,
     "pasa_regla": false
    }
   },
@@ -468,13 +483,13 @@
    "origen": "predefinido",
    "ultima_metrica": {
     "metrica": "top10_hits",
-    "valor": 8.1765,
+    "valor": 8.1739,
     "reciente": 8.25,
-    "n_gp": 68,
-    "fecha": "2026-11-09T04:52:28Z",
-    "diferencia_vs_campeon": -0.0294,
-    "ee": 0.0361,
-    "diferencia_reciente": -0.125,
+    "n_gp": 69,
+    "fecha": "2026-11-22T08:08:50Z",
+    "diferencia_vs_campeon": -0.029,
+    "ee": 0.0356,
+    "diferencia_reciente": 0.0,
     "pasa_regla": false
    }
   },
@@ -486,13 +501,13 @@
    "origen": "predefinido",
    "ultima_metrica": {
     "metrica": "top10_hits",
-    "valor": 8.1324,
+    "valor": 8.1304,
     "reciente": 8.25,
-    "n_gp": 68,
-    "fecha": "2026-11-09T04:52:29Z",
-    "diferencia_vs_campeon": -0.0735,
-    "ee": 0.0319,
-    "diferencia_reciente": -0.125,
+    "n_gp": 69,
+    "fecha": "2026-11-22T08:08:50Z",
+    "diferencia_vs_campeon": -0.0725,
+    "ee": 0.0314,
+    "diferencia_reciente": 0.0,
     "pasa_regla": false
    }
   },
@@ -504,10 +519,10 @@
    "origen": "predefinido",
    "ultima_metrica": {
     "metrica": "top10_hits",
-    "valor": 8.1765,
-    "reciente": 8.5,
-    "n_gp": 68,
-    "fecha": "2026-11-09T04:52:29Z"
+    "valor": 8.1739,
+    "reciente": 8.375,
+    "n_gp": 69,
+    "fecha": "2026-11-22T08:08:50Z"
    }
   },
   {
@@ -518,12 +533,12 @@
    "origen": "predefinido",
    "ultima_metrica": {
     "metrica": "top10_hits",
-    "valor": 8.2353,
-    "reciente": 8.5,
-    "n_gp": 68,
-    "fecha": "2026-11-09T04:52:29Z",
-    "diferencia_vs_campeon": 0.0588,
-    "ee": 0.0287,
+    "valor": 8.2319,
+    "reciente": 8.375,
+    "n_gp": 69,
+    "fecha": "2026-11-22T08:08:51Z",
+    "diferencia_vs_campeon": 0.058,
+    "ee": 0.0283,
     "diferencia_reciente": 0.0,
     "pasa_regla": false
    }
@@ -536,12 +551,12 @@
    "origen": "predefinido",
    "ultima_metrica": {
     "metrica": "top10_hits",
-    "valor": 8.2353,
-    "reciente": 8.5,
-    "n_gp": 68,
-    "fecha": "2026-11-09T04:52:29Z",
-    "diferencia_vs_campeon": 0.0588,
-    "ee": 0.0413,
+    "valor": 8.2319,
+    "reciente": 8.375,
+    "n_gp": 69,
+    "fecha": "2026-11-22T08:08:51Z",
+    "diferencia_vs_campeon": 0.058,
+    "ee": 0.0407,
     "diferencia_reciente": 0.0,
     "pasa_regla": false
    }
@@ -554,12 +569,12 @@
    "origen": "predefinido",
    "ultima_metrica": {
     "metrica": "top10_hits",
-    "valor": 8.2059,
-    "reciente": 8.5,
-    "n_gp": 68,
-    "fecha": "2026-11-09T04:52:29Z",
-    "diferencia_vs_campeon": 0.0294,
-    "ee": 0.0417,
+    "valor": 8.2029,
+    "reciente": 8.375,
+    "n_gp": 69,
+    "fecha": "2026-11-22T08:08:51Z",
+    "diferencia_vs_campeon": 0.029,
+    "ee": 0.0411,
     "diferencia_reciente": 0.0,
     "pasa_regla": false
    }
@@ -572,12 +587,12 @@
    "origen": "predefinido",
    "ultima_metrica": {
     "metrica": "top10_hits",
-    "valor": 8.1912,
-    "reciente": 8.5,
-    "n_gp": 68,
-    "fecha": "2026-11-09T04:52:29Z",
-    "diferencia_vs_campeon": 0.0147,
-    "ee": 0.0331,
+    "valor": 8.1884,
+    "reciente": 8.375,
+    "n_gp": 69,
+    "fecha": "2026-11-22T08:08:51Z",
+    "diferencia_vs_campeon": 0.0145,
+    "ee": 0.0326,
     "diferencia_reciente": 0.0,
     "pasa_regla": false
    }
@@ -590,12 +605,12 @@
    "origen": "predefinido",
    "ultima_metrica": {
     "metrica": "top10_hits",
-    "valor": 8.1765,
-    "reciente": 8.5,
-    "n_gp": 68,
-    "fecha": "2026-11-09T04:52:29Z",
+    "valor": 8.1739,
+    "reciente": 8.375,
+    "n_gp": 69,
+    "fecha": "2026-11-22T08:08:51Z",
     "diferencia_vs_campeon": 0.0,
-    "ee": 0.0468,
+    "ee": 0.0462,
     "diferencia_reciente": 0.0,
     "pasa_regla": false
    }
@@ -608,12 +623,12 @@
    "origen": "predefinido",
    "ultima_metrica": {
     "metrica": "top10_hits",
-    "valor": 8.1765,
-    "reciente": 8.5,
-    "n_gp": 68,
-    "fecha": "2026-11-09T04:52:30Z",
+    "valor": 8.1739,
+    "reciente": 8.375,
+    "n_gp": 69,
+    "fecha": "2026-11-22T08:08:52Z",
     "diferencia_vs_campeon": 0.0,
-    "ee": 0.0419,
+    "ee": 0.0413,
     "diferencia_reciente": 0.0,
     "pasa_regla": false
    }
@@ -626,12 +641,12 @@
    "origen": "predefinido",
    "ultima_metrica": {
     "metrica": "top10_hits",
-    "valor": 8.2059,
-    "reciente": 8.5,
-    "n_gp": 68,
-    "fecha": "2026-11-09T04:52:30Z",
-    "diferencia_vs_campeon": 0.0294,
-    "ee": 0.0361,
+    "valor": 8.2029,
+    "reciente": 8.375,
+    "n_gp": 69,
+    "fecha": "2026-11-22T08:08:52Z",
+    "diferencia_vs_campeon": 0.029,
+    "ee": 0.0356,
     "diferencia_reciente": 0.0,
     "pasa_regla": false
    }
@@ -644,13 +659,13 @@
    "origen": "predefinido",
    "ultima_metrica": {
     "metrica": "top10_hits",
-    "valor": 8.2059,
-    "reciente": 8.5,
-    "n_gp": 68,
-    "fecha": "2026-11-09T04:52:30Z",
-    "diferencia_vs_campeon": 0.0294,
-    "ee": 0.0467,
-    "diferencia_reciente": 0.0,
+    "valor": 8.1884,
+    "reciente": 8.25,
+    "n_gp": 69,
+    "fecha": "2026-11-22T08:08:52Z",
+    "diferencia_vs_campeon": 0.0145,
+    "ee": 0.0484,
+    "diferencia_reciente": -0.125,
     "pasa_regla": false
    }
   },
@@ -662,12 +677,12 @@
    "origen": "predefinido",
    "ultima_metrica": {
     "metrica": "top10_hits",
-    "valor": 8.2206,
-    "reciente": 8.5,
-    "n_gp": 68,
-    "fecha": "2026-11-09T04:52:30Z",
-    "diferencia_vs_campeon": 0.0441,
-    "ee": 0.0531,
+    "valor": 8.2174,
+    "reciente": 8.375,
+    "n_gp": 69,
+    "fecha": "2026-11-22T08:08:52Z",
+    "diferencia_vs_campeon": 0.0435,
+    "ee": 0.0524,
     "diferencia_reciente": 0.0,
     "pasa_regla": false
    }
@@ -680,12 +695,12 @@
    "origen": "predefinido",
    "ultima_metrica": {
     "metrica": "top10_hits",
-    "valor": 8.1618,
-    "reciente": 8.5,
-    "n_gp": 68,
-    "fecha": "2026-11-09T04:52:30Z",
-    "diferencia_vs_campeon": -0.0147,
-    "ee": 0.0444,
+    "valor": 8.1594,
+    "reciente": 8.375,
+    "n_gp": 69,
+    "fecha": "2026-11-22T08:08:53Z",
+    "diferencia_vs_campeon": -0.0145,
+    "ee": 0.0438,
     "diferencia_reciente": 0.0,
     "pasa_regla": false
    }
@@ -698,10 +713,10 @@
    "origen": "predefinido",
    "ultima_metrica": {
     "metrica": "ndcg10",
-    "valor": 0.8902,
-    "reciente": 0.9067,
+    "valor": 0.8895,
+    "reciente": 0.9007,
     "n_gp": 68,
-    "fecha": "2026-11-09T04:52:30Z"
+    "fecha": "2026-11-22T08:08:53Z"
    }
   },
   {
@@ -715,10 +730,10 @@
     "valor": 0.8846,
     "reciente": 0.8927,
     "n_gp": 68,
-    "fecha": "2026-11-09T04:52:31Z",
-    "diferencia_vs_campeon": -0.0055,
-    "ee": 0.0028,
-    "diferencia_reciente": -0.014,
+    "fecha": "2026-11-22T08:08:54Z",
+    "diferencia_vs_campeon": -0.0048,
+    "ee": 0.0026,
+    "diferencia_reciente": -0.008,
     "pasa_regla": false
    }
   },
@@ -733,10 +748,10 @@
     "valor": 0.89,
     "reciente": 0.9012,
     "n_gp": 68,
-    "fecha": "2026-11-09T04:52:31Z",
-    "diferencia_vs_campeon": -0.0002,
-    "ee": 0.0014,
-    "diferencia_reciente": -0.0055,
+    "fecha": "2026-11-22T08:08:54Z",
+    "diferencia_vs_campeon": 0.0005,
+    "ee": 0.001,
+    "diferencia_reciente": 0.0005,
     "pasa_regla": false
    }
   },
@@ -748,12 +763,12 @@
    "origen": "predefinido",
    "ultima_metrica": {
     "metrica": "ndcg10",
-    "valor": 0.8901,
-    "reciente": 0.9073,
+    "valor": 0.8894,
+    "reciente": 0.9012,
     "n_gp": 68,
-    "fecha": "2026-11-09T04:52:31Z",
+    "fecha": "2026-11-22T08:08:55Z",
     "diferencia_vs_campeon": -0.0001,
-    "ee": 0.001,
+    "ee": 0.0008,
     "diferencia_reciente": 0.0005,
     "pasa_regla": false
    }
@@ -769,10 +784,10 @@
     "valor": 0.8861,
     "reciente": 0.9076,
     "n_gp": 68,
-    "fecha": "2026-11-09T04:52:32Z",
-    "diferencia_vs_campeon": -0.0041,
-    "ee": 0.002,
-    "diferencia_reciente": 0.0008,
+    "fecha": "2026-11-22T08:08:55Z",
+    "diferencia_vs_campeon": -0.0034,
+    "ee": 0.0021,
+    "diferencia_reciente": 0.0069,
     "pasa_regla": false
    }
   },
@@ -787,10 +802,10 @@
     "valor": 0.8876,
     "reciente": 0.9063,
     "n_gp": 68,
-    "fecha": "2026-11-09T04:52:32Z",
-    "diferencia_vs_campeon": -0.0025,
-    "ee": 0.0014,
-    "diferencia_reciente": -0.0005,
+    "fecha": "2026-11-22T08:08:55Z",
+    "diferencia_vs_campeon": -0.0018,
+    "ee": 0.0013,
+    "diferencia_reciente": 0.0055,
     "pasa_regla": false
    }
   },
@@ -802,12 +817,12 @@
    "origen": "predefinido",
    "ultima_metrica": {
     "metrica": "ndcg10",
-    "valor": 0.8901,
-    "reciente": 0.9071,
+    "valor": 0.8894,
+    "reciente": 0.901,
     "n_gp": 68,
-    "fecha": "2026-11-09T04:52:32Z",
+    "fecha": "2026-11-22T08:08:55Z",
     "diferencia_vs_campeon": -0.0001,
-    "ee": 0.0023,
+    "ee": 0.0022,
     "diferencia_reciente": 0.0003,
     "pasa_regla": false
    }
@@ -823,10 +838,10 @@
     "valor": 0.8877,
     "reciente": 0.8935,
     "n_gp": 68,
-    "fecha": "2026-11-09T04:52:32Z",
-    "diferencia_vs_campeon": -0.0025,
-    "ee": 0.0024,
-    "diferencia_reciente": -0.0132,
+    "fecha": "2026-11-22T08:08:56Z",
+    "diferencia_vs_campeon": -0.0018,
+    "ee": 0.0022,
+    "diferencia_reciente": -0.0072,
     "pasa_regla": false
    }
   },
@@ -841,10 +856,10 @@
     "valor": 0.891,
     "reciente": 0.9067,
     "n_gp": 68,
-    "fecha": "2026-11-09T04:52:32Z",
-    "diferencia_vs_campeon": 0.0008,
-    "ee": 0.0019,
-    "diferencia_reciente": 0.0,
+    "fecha": "2026-11-22T08:08:56Z",
+    "diferencia_vs_campeon": 0.0015,
+    "ee": 0.0018,
+    "diferencia_reciente": 0.006,
     "pasa_regla": false
    }
   },
@@ -856,13 +871,13 @@
    "origen": "predefinido",
    "ultima_metrica": {
     "metrica": "ndcg10",
-    "valor": 0.8893,
-    "reciente": 0.901,
+    "valor": 0.8891,
+    "reciente": 0.8999,
     "n_gp": 68,
-    "fecha": "2026-11-09T04:52:33Z",
-    "diferencia_vs_campeon": -0.0009,
-    "ee": 0.0013,
-    "diferencia_reciente": -0.0057,
+    "fecha": "2026-11-22T08:08:56Z",
+    "diferencia_vs_campeon": -0.0003,
+    "ee": 0.0008,
+    "diferencia_reciente": -0.0008,
     "pasa_regla": false
    }
   },
@@ -877,10 +892,10 @@
     "valor": 0.8881,
     "reciente": 0.8989,
     "n_gp": 68,
-    "fecha": "2026-11-09T04:52:33Z",
-    "diferencia_vs_campeon": -0.0021,
-    "ee": 0.0017,
-    "diferencia_reciente": -0.0078,
+    "fecha": "2026-11-22T08:08:56Z",
+    "diferencia_vs_campeon": -0.0013,
+    "ee": 0.0014,
+    "diferencia_reciente": -0.0018,
     "pasa_regla": false
    }
   },
@@ -892,13 +907,13 @@
    "origen": "predefinido",
    "ultima_metrica": {
     "metrica": "ndcg10",
-    "valor": 0.8903,
-    "reciente": 0.908,
+    "valor": 0.8895,
+    "reciente": 0.9009,
     "n_gp": 68,
-    "fecha": "2026-11-09T04:52:33Z",
-    "diferencia_vs_campeon": 0.0002,
-    "ee": 0.001,
-    "diferencia_reciente": 0.0013,
+    "fecha": "2026-11-22T08:08:56Z",
+    "diferencia_vs_campeon": 0.0,
+    "ee": 0.0007,
+    "diferencia_reciente": 0.0002,
     "pasa_regla": false
    }
   },
@@ -913,10 +928,10 @@
     "valor": 0.889,
     "reciente": 0.8983,
     "n_gp": 68,
-    "fecha": "2026-11-09T04:52:33Z",
-    "diferencia_vs_campeon": -0.0012,
-    "ee": 0.0013,
-    "diferencia_reciente": -0.0085,
+    "fecha": "2026-11-22T08:08:57Z",
+    "diferencia_vs_campeon": -0.0005,
+    "ee": 0.0008,
+    "diferencia_reciente": -0.0024,
     "pasa_regla": false
    }
   },
@@ -928,12 +943,12 @@
    "origen": "predefinido",
    "ultima_metrica": {
     "metrica": "ndcg10",
-    "valor": 0.8902,
-    "reciente": 0.9065,
+    "valor": 0.8895,
+    "reciente": 0.9005,
     "n_gp": 68,
-    "fecha": "2026-11-09T04:52:33Z",
+    "fecha": "2026-11-22T08:08:57Z",
     "diferencia_vs_campeon": -0.0,
-    "ee": 0.001,
+    "ee": 0.0007,
     "diferencia_reciente": -0.0002,
     "pasa_regla": false
    }
@@ -946,12 +961,12 @@
    "origen": "predefinido",
    "ultima_metrica": {
     "metrica": "ndcg10",
-    "valor": 0.8902,
-    "reciente": 0.9071,
+    "valor": 0.8895,
+    "reciente": 0.901,
     "n_gp": 68,
-    "fecha": "2026-11-09T04:52:33Z",
+    "fecha": "2026-11-22T08:08:57Z",
     "diferencia_vs_campeon": -0.0,
-    "ee": 0.001,
+    "ee": 0.0007,
     "diferencia_reciente": 0.0003,
     "pasa_regla": false
    }
@@ -964,13 +979,13 @@
    "origen": "predefinido",
    "ultima_metrica": {
     "metrica": "ndcg10",
-    "valor": 0.8901,
-    "reciente": 0.9072,
+    "valor": 0.8893,
+    "reciente": 0.9009,
     "n_gp": 68,
-    "fecha": "2026-11-09T04:52:34Z",
+    "fecha": "2026-11-22T08:08:57Z",
     "diferencia_vs_campeon": -0.0001,
-    "ee": 0.001,
-    "diferencia_reciente": 0.0004,
+    "ee": 0.0007,
+    "diferencia_reciente": 0.0002,
     "pasa_regla": false
    }
   },
@@ -993,12 +1008,12 @@
    }
   }
  ],
- "proxima_revision": "2026-11-22T06:15:00Z",
+ "proxima_revision": "2026-11-29T18:15:00Z",
  "regla": "Se adopta un retador sólo si su mejora media por GP en la métrica principal (qualy: aciertos en el Top 10; carrera: NDCG@10) supera 2 errores estándar sobre todos los GP del walk-forward (más si se prueban muchos retadores a la vez: 2,3 con 10), no empeora en los últimos 8 GP y sigue ganando al repetir la evaluación con otras 2 semillas aleatorias. Así un retador que sólo tuvo suerte (p. ej. el mismo modelo con otra semilla) no se adopta.",
  "ultimo_ciclo": {
-  "inicio": "2026-11-09T04:49:43Z",
-  "fin": "2026-11-09T04:52:34Z",
-  "segundos": 171,
+  "inicio": "2026-11-22T08:01:19Z",
+  "fin": "2026-11-22T08:08:58Z",
+  "segundos": 459,
   "presupuesto_min": 40.0,
   "adoptados": {
    "qualy_fp1": null,
@@ -1010,7 +1025,7 @@
   "recalibracion": {
    "sim_vueltas_hist": "al día",
    "wf_sim_carrera_actual": "68 GP (variante base)",
-   "validacion_carrera": "oficial = base, NDCG@10 0.8902 (68 GP)"
+   "validacion_carrera": "oficial = base, NDCG@10 0.8895 (68 GP)"
   }
  }
 }

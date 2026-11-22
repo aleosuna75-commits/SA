@@ -1,5 +1,5 @@
 {
- "actualizado": "2026-11-22T06:49:05Z",
+ "actualizado": "2026-11-22T08:00:47Z",
  "actual": "lasvegas2026",
  "gps": [
   {
@@ -235,7 +235,8 @@
     "pre_qualy": "2026-11-20T05:53:23Z",
     "fp3": "2026-11-21T02:04:32Z",
     "post_qualy": "2026-11-22T01:03:32Z",
-    "post_carrera": "2026-11-22T06:49:19Z"
+    "post_carrera": "2026-11-22T08:00:52Z",
+    "mejora": "2026-11-22T08:08:59Z"
    },
    "docs": {
     "gp": "gp/lasvegas2026",
