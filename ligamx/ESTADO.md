@@ -69,7 +69,9 @@ V1-V3 verificación y F cierre; sus carpetas de trabajo están en el scratchpad 
 `Workflow({scriptPath: <ese guion>, resumeFromRunId: "wf_c407c924-72c"})`; si el contenedor se reinició (no hay
 diario), revisar `git status`/`git diff` de `ligamx/`, correr pytest y `web/pruebas/prueba.js` y terminar a mano lo
 que falte. Al terminar el workflow: `python3 -m produccion.exportar` (un millón) + `python3 web/construir.py`,
-pruebas, republicar con `url` y capabilities, `pipeline.py publicado`.
+pruebas, republicar con `url` y capabilities, `pipeline.py publicado`. La corrida diaria del 23-nov 07:21 UTC se
+pospuso para no pisar al agente F (sin partidos nuevos; `vivo-plan --horas 72` vacío): al terminar el workflow, correr
+`pipeline.py auto` en lugar del exportar suelto (incluye exportar con el millón y construir).
 4. Programar los despertares en vivo de cuartos cuando ESPN liste los partidos; republicar; bitácora; commit y push;
    desactivar la tarea de continuidad y dejar esta sección en «Nada pendiente».
 
