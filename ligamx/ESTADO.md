@@ -48,7 +48,20 @@
 - [x] 8. Automatización: `pipeline.py auto` + `modelo/mejora.py ciclo` + tarea programada diaria (runbook abajo).
 
 ## En curso
-Nada pendiente (18-nov-2026, 07:45 UTC). Tarea de continuidad desactivada.
+**Cierre de la fase regular y puesta a punto de la liguilla (23-nov-2026, desde 03:20 UTC).** Tarea de continuidad
+`trig_011daxVc81g1dWPVNtuVKMCi` ACTIVADA mientras dura. Hecho: `pipeline.py auto` tras Chivas 1-0 Cruz Azul, `vivo/actual`
+en versión 107 (terminado_hoy), página republicada (V26) con `liguilla.torneo` «definido» y `pipeline.py publicado`.
+Falta, en este orden (si la sesión se corta, retomar aquí):
+1. Página en el estado «sin partidos pendientes y cuadro definido»: la portada debe anunciar los cuartos, «Próximos
+   partidos» debe mostrar las 8 piernas de cuartos tomadas de `liguilla.torneo` (hoy sale vacío), las series de cuartos
+   deben decir «definida» y no «proyectada», y `web/pruebas/prueba.js` debe pasar con 0 pendientes (hoy fallan 3
+   revisiones y truena la de pestañas de la combinada).
+2. Ensayo de la liguilla con cortes retrospectivos del Clausura 2026 (antes de la ida, entre ida y vuelta, semifinal,
+   final): exportar + página + motor en vivo con serie a dos partidos.
+3. Regla de menores (confirmar que nadie perdió 3 puntos), horarios y sedes de cuartos (sede de Cruz Azul) y bajas de
+   los 8 clasificados en `config/actualidad.json`.
+4. Programar los despertares en vivo de cuartos cuando ESPN liste los partidos; republicar; bitácora; commit y push;
+   desactivar la tarea de continuidad y dejar esta sección en «Nada pendiente».
 
 ### Último cierre (11 a 15-nov)
 Nada pendiente (11-nov-2026, 04:15 UTC). Lo último cerrado: rediseño a punto (portada por favorito que cabe en la

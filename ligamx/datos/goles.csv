@@ -23670,3 +23670,8 @@ partido_id,minuto,anadido,periodo,equipo,jugador,tipo,subtipo,jugador_id,asisten
 401877049,74,0,2,Monterrey,Luca Orellano,gol,,276305,Orbelín Pineda
 401877049,90,1,2,Monterrey,Luca Orellano,gol,,276305,Óliver Torres
 401877048,90,1,2,Tigres,Juan Brunetta,gol,tiro_libre,245771,
+401877047,21,0,1,Chivas,Efrain Álvarez,gol,volea,260173,Richard Ledezma
+401877046,13,0,1,Querétaro,Ali Avila,gol,cabeza,297287,Mateo Coronel
+401877046,15,0,1,Necaxa,Miguel Rodríguez,gol,,342767,Diego Ochoa
+401877046,75,0,2,Querétaro,Enzo Giménez,gol,,252571,Carlo García
+401877046,89,0,2,Necaxa,Julián Carranza,penal,,262566,

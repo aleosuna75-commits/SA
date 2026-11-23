@@ -1,51 +1,6 @@
 {
  "torneo": "Apertura 2026",
- "generado_utc": "2026-11-22T07:21:05Z",
+ "generado_utc": "2026-11-23T03:17:23Z",
  "fuente": "ESPN scoreboard mex.1",
- "partidos": [
-  {
-   "id": "401877047",
-   "fecha_utc": "2026-11-22T23:07Z",
-   "fecha_local": "2026-11-22",
-   "hora_local": "17:07",
-   "fase": "regular",
-   "pierna": "",
-   "estado": "programado",
-   "local": "Chivas",
-   "visitante": "Cruz Azul",
-   "estadio": "Estadio Akron",
-   "ciudad": "Guadalajara",
-   "momios": {
-    "ml_l": 2.2,
-    "ml_e": 3.95,
-    "ml_v": 2.9,
-    "total_linea": 2.5,
-    "over": 1.588,
-    "under": 2.25,
-    "proveedor": "DraftKings"
-   }
-  },
-  {
-   "id": "401877046",
-   "fecha_utc": "2026-11-23T01:10Z",
-   "fecha_local": "2026-11-22",
-   "hora_local": "19:10",
-   "fase": "regular",
-   "pierna": "",
-   "estado": "programado",
-   "local": "Querétaro",
-   "visitante": "Necaxa",
-   "estadio": "Estadio Corregidora",
-   "ciudad": "Santiago de Querétaro",
-   "momios": {
-    "ml_l": 2.1,
-    "ml_e": 3.7,
-    "ml_v": 3.2,
-    "total_linea": 2.5,
-    "over": 1.588,
-    "under": 2.25,
-    "proveedor": "DraftKings"
-   }
-  }
- ]
+ "partidos": []
 }

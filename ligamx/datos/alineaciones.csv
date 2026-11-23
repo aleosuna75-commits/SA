@@ -305795,3 +305795,87 @@ partido_id,equipo,jugador_id,jugador,titular,posicion,minuto_entra,minuto_sale,f
 401877048,América,3102566,Ícaro ca Conceição,0,,,,4-2-3-1
 401877048,América,103729,Rodolfo Cota,0,,,,4-2-3-1
 401877048,América,265866,Alexis Gutierrez,0,,,,4-2-3-1
+401877047,Chivas,290899,Raúl Rangel,1,G,,,4-2-3-1
+401877047,Chivas,37249,José Castillo,1,CD-L,,59,4-2-3-1
+401877047,Chivas,290889,Diego Campillo,1,CD-R,,,4-2-3-1
+401877047,Chivas,297284,Bryan González,1,LB,,,4-2-3-1
+401877047,Chivas,133111,Daniel Aguirre,1,RB,,,4-2-3-1
+401877047,Chivas,194308,Roberto Alvarado,1,AM,,75,4-2-3-1
+401877047,Chivas,131697,Fernando Gonzalez,1,LM,,,4-2-3-1
+401877047,Chivas,190901,Omar Govea,1,RM,,,4-2-3-1
+401877047,Chivas,118717,Santiago Sandoval,1,F,,75,4-2-3-1
+401877047,Chivas,260173,Efrain Álvarez,1,AM-L,,67,4-2-3-1
+401877047,Chivas,271844,Richard Ledezma,1,AM-R,,75,4-2-3-1
+401877047,Chivas,387984,Hugo Camberos,0,,,,4-2-3-1
+401877047,Chivas,228352,Ricardo Marín,0,,67,,4-2-3-1
+401877047,Chivas,3313,Miguel Gómez,0,,75,,4-2-3-1
+401877047,Chivas,147715,Luis Gabriel Rey,0,,59,,4-2-3-1
+401877047,Chivas,96526,Jonathan Pérez,0,,,,4-2-3-1
+401877047,Chivas,303577,Brian Gutiérrez,0,,75,,4-2-3-1
+401877047,Chivas,276398,Kevin Castañeda,0,,,,4-2-3-1
+401877047,Chivas,194182,Óscar Whalley,0,,,,4-2-3-1
+401877047,Chivas,277191,Jordan Carillo,0,,,,4-2-3-1
+401877047,Chivas,151850,Ángel Sepúlveda,0,,75,,4-2-3-1
+401877047,Cruz Azul,224752,Andrés Gudiño,1,G,,,4-2-3-1
+401877047,Cruz Azul,192166,Gonzalo Piovi,1,CD-L,,,4-2-3-1
+401877047,Cruz Azul,270229,Willer Ditta,1,CD-R,,,4-2-3-1
+401877047,Cruz Azul,136124,Omar Campos,1,LB,,,4-2-3-1
+401877047,Cruz Azul,215785,Alan Mozo,1,RB,,67,4-2-3-1
+401877047,Cruz Azul,239990,Carlos Rodríguez,1,AM,,,4-2-3-1
+401877047,Cruz Azul,276942,Érik Lira,1,LM,,,4-2-3-1
+401877047,Cruz Azul,219001,Agustín Palavecino,1,RM,,79,4-2-3-1
+401877047,Cruz Azul,115447,Gabriel Fernandez,1,F,,59,4-2-3-1
+401877047,Cruz Azul,257640,Rodolfo Rotondi,1,AM-L,,59,4-2-3-1
+401877047,Cruz Azul,277270,José Paradela,1,AM-R,,59,4-2-3-1
+401877047,Cruz Azul,207549,Nicolás Ibáñez,0,,59,,4-2-3-1
+401877047,Cruz Azul,336641,Andres Montaño,0,,59,,4-2-3-1
+401877047,Cruz Azul,304424,Alán Montes,0,,,,4-2-3-1
+401877047,Cruz Azul,228300,Osinachi Ebere,0,,59,,4-2-3-1
+401877047,Cruz Azul,318342,Jesús Orozco,0,,,,4-2-3-1
+401877047,Cruz Azul,266587,Kevin Mier,0,,,,4-2-3-1
+401877047,Cruz Azul,346805,Ralph Orquin,0,,,,4-2-3-1
+401877047,Cruz Azul,285862,Ángel Márquez,0,,67,,4-2-3-1
+401877047,Cruz Azul,291186,Amaury García,0,,,,4-2-3-1
+401877047,Cruz Azul,303844,Luka Romero,0,,79,,4-2-3-1
+401877046,Querétaro,303680,José Hernández,1,G,,,4-4-2
+401877046,Querétaro,315939,Lucas Abascia,1,CD-L,,,4-4-2
+401877046,Querétaro,83869,Diego Reyes,1,CD-R,,,4-4-2
+401877046,Querétaro,116745,Paulo Victor,1,LB,,81,4-4-2
+401877046,Querétaro,252571,Enzo Giménez,1,RB,,,4-4-2
+401877046,Querétaro,407294,Jesús Arellano,1,CM-L,,45,4-4-2
+401877046,Querétaro,309109,Carlo García,1,CM-R,,,4-4-2
+401877046,Querétaro,333379,Iker Benito,1,LM,,62,4-4-2
+401877046,Querétaro,3106052,Denilson Muñoz,1,RM,,73,4-4-2
+401877046,Querétaro,263219,Mateo Coronel,1,CF-L,,,4-4-2
+401877046,Querétaro,297287,Ali Avila,1,CF-R,,81,4-4-2
+401877046,Querétaro,418519,Claudio Robles,0,,,,4-4-2
+401877046,Querétaro,5333352,Maximiliano Coronado Olascoaga,0,,,,4-4-2
+401877046,Querétaro,3145446,Joaquín Yael Cruz Sosa,0,,,,4-4-2
+401877046,Querétaro,372374,Bayron Duarte,0,,73,,4-4-2
+401877046,Querétaro,5334178,Edison David Gruezo Castillo,0,,81,,4-4-2
+401877046,Querétaro,362417,Bernardo Parra,0,,,,4-4-2
+401877046,Querétaro,309201,Santiago Homenchenko,0,,45,,4-4-2
+401877046,Querétaro,171317,Carlos Villanueva,0,,81,,4-4-2
+401877046,Querétaro,318505,Alejandro Alcala,0,,62,,4-4-2
+401877046,Querétaro,149407,Guillermo Allison,0,,,,4-4-2
+401877046,Necaxa,364768,Javier Orantes,1,G,,,4-1-4-1
+401877046,Necaxa,303329,Agustín Oliveros,1,CD-L,,,4-1-4-1
+401877046,Necaxa,332351,Kaiky Naves,1,CD-R,,,4-1-4-1
+401877046,Necaxa,372152,Diego Ochoa,1,DM,,79,4-1-4-1
+401877046,Necaxa,333586,Mauro Zaleta,1,LB,,90,4-1-4-1
+401877046,Necaxa,362604,Raúl Martínez,1,RB,,,4-1-4-1
+401877046,Necaxa,154517,Lorenzo Faravelli,1,CM-L,,72,4-1-4-1
+401877046,Necaxa,280765,Danny Leyva,1,CM-R,,90,4-1-4-1
+401877046,Necaxa,366699,Owen González,1,LM,,72,4-1-4-1
+401877046,Necaxa,342767,Miguel Rodríguez,1,RM,,,4-1-4-1
+401877046,Necaxa,262566,Julián Carranza,1,F,,,4-1-4-1
+401877046,Necaxa,74070,Carlos Vargas,0,,,,4-1-4-1
+401877046,Necaxa,5327652,Leroy Davis,0,,,,4-1-4-1
+401877046,Necaxa,224736,Alexis Peña,0,,,,4-1-4-1
+401877046,Necaxa,365552,Javier Ruiz,0,,79,,4-1-4-1
+401877046,Necaxa,5327653,Leonardo Arvizo Vargas,0,,90,,4-1-4-1
+401877046,Necaxa,3099595,Christopher Josué Andrade Martín,0,,,,4-1-4-1
+401877046,Necaxa,336916,Matías Espíndola,0,,72,,4-1-4-1
+401877046,Necaxa,3125541,Omar Eduardo Domínguez Loya,0,,90,,4-1-4-1
+401877046,Necaxa,406874,Juan Valencia,0,,72,,4-1-4-1
+401877046,Necaxa,387739,Joshua Palacios,0,,,,4-1-4-1
