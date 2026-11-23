@@ -60,10 +60,13 @@ Falta, en este orden (si la sesión se corta, retomar aquí):
    final): exportar + página + motor en vivo con serie a dos partidos.
 3. Regla de menores (confirmar que nadie perdió 3 puntos), horarios y sedes de cuartos (sede de Cruz Azul) y bajas de
    los 8 clasificados en `config/actualidad.json`.
-Los pasos 1 a 3 corren en el workflow `notas/workflows/10_liguilla_puesta_a_punto.js` (corrida `wf_7ca6f6c0-3d7`,
-lanzada 23-nov 03:55 UTC; agentes A página, B ensayo en worktree, C reglas y bajas, D motor en vivo; luego E arreglos,
+Los pasos 1 a 3 corren en el workflow `notas/workflows/10_liguilla_puesta_a_punto.js`. La primera corrida
+(`wf_7ca6f6c0-3d7`, 03:31 UTC) murió a los 18 min porque se agotó el límite del modelo Fable (vuelve el 26-nov 14:00
+UTC); el usuario cambió la sesión a Opus y se relanzó como **`wf_c407c924-72c` (23-nov 03:55 UTC)**, con notas de
+reanudación para A (página, que dejó cambios a medias, guardados en el commit 9882c91) y B (ensayo, que dejó los 7
+cortes y capturas en el scratchpad). Estructura: agentes A página, B ensayo en worktree, C reglas y bajas, D motor en vivo; luego E arreglos,
 V1-V3 verificación y F cierre; sus carpetas de trabajo están en el scratchpad `liguilla/`). Si se cortó: relanzar con
-`Workflow({scriptPath: <ese guion>, resumeFromRunId: "wf_7ca6f6c0-3d7"})`; si el contenedor se reinició (no hay
+`Workflow({scriptPath: <ese guion>, resumeFromRunId: "wf_c407c924-72c"})`; si el contenedor se reinició (no hay
 diario), revisar `git status`/`git diff` de `ligamx/`, correr pytest y `web/pruebas/prueba.js` y terminar a mano lo
 que falte. Al terminar el workflow: `python3 -m produccion.exportar` (un millón) + `python3 web/construir.py`,
 pruebas, republicar con `url` y capabilities, `pipeline.py publicado`.
