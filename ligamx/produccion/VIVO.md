@@ -2,7 +2,7 @@
 
 Qué hay: `vivo.py` (consulta ESPN, arma el documento en vivo y avisa de cada evento), `produccion/en_juego.py`
 (modelo en juego), el parámetro `en_juego` de `produccion/simulador.py`, el campo `vivo` de `salidas/actual.json`
-y las pruebas `produccion/pruebas/test_vivo.py` (26, sin red). Contrato del documento: `salidas/CONTRATO.md`
+y las pruebas `produccion/pruebas/test_vivo.py` (36, sin red; 10 de ellas de liguilla, desde el 23-nov-2026). Contrato del documento: `salidas/CONTRATO.md`
 («Documento en vivo»); ejemplo: `salidas/vivo_ejemplo.json`.
 
 ## 1. Cómo funciona
@@ -12,7 +12,7 @@ ESPN scoreboard (un día por consulta)
    └─ vivo.py: partidos de HOY ──► pronóstico al momento (en_juego.py)
                                  ├► tabla al momento (desempates oficiales del simulador)
                                  ├► proyección de clasificación y campeón (simulador con en_juego)
-                                 └► liguilla: global y P(avanza) de cada serie
+                                 └► liguilla: global, P(avanza) y cómo va cada serie (§2 y «Liguilla»)
         ──► salidas/vivo.json  (escritura atómica, < 40 KB)
         ──► salidas/vivo_eventos.jsonl  (una línea por evento, numerada)
 la sesión:  vivo.py esperar ──► copia vivo.json a la base del Artifact ("vivo/actual") ──► la página lo recibe con onSnapshot
@@ -77,9 +77,20 @@ pronóstico al momento es idéntico al previo y la corrección se desvanece con 
 
 **Liguilla.** `en_juego.prob_avanza` llama a `simulador.prob_serie` con la matriz de cada pierna tal como esté
 (marcador fijo si ya se jugó, matriz condicional si está en juego, matriz previa si no ha empezado): global
-empatado = mejor sembrado en cuartos y semifinales; en la final, tiempos extra (1/3 de los goles de 90 minutos)
-y penales a 50/50. Ya en tiempos extra: marcador del tiempo extra + Poisson de lo que queda de los 30 minutos
-(reparto lineal: sólo hay 12 goles de tiempo extra en la base, no alcanza para una curva).
+empatado = mejor sembrado en cuartos y semifinales (sin gol de visitante ni tiempos extra); en la final, tiempos
+extra (1/3 de los goles de 90 minutos) y penales a 50/50. Durante la ida la vuelta entra con su matriz previa
+(la serie nunca se da por decidida en la ida); durante la vuelta la ida entra con su marcador real. Ya en tiempos
+extra: marcador del tiempo extra + Poisson de lo que queda de los 30 minutos (reparto lineal: sólo hay 12 goles
+de tiempo extra en la base, no alcanza para una curva; el agregado del primer tiempo extra, «107'», se lee como
+105'+2' y en el agregado del segundo queda un piso de 1.5 minutos). `en_juego.situacion_serie` da, sin probabilidades,
+quién avanzaría si la serie terminara así y cuántos goles netos le faltan a cada uno (ver «Liguilla»).
+**Quién avanzó** lo decide el reglamento, no ESPN: global a 90 minutos; empatado, el mejor sembrado (cuartos y
+semifinales) o, en la final, los goles del tiempo extra y luego la tanda. En la vuelta el `winner` de ESPN marca
+a quien avanza según ESPN, no al que ganó el partido (en la base: Clausura 2009, Pachuca perdió 2-3 la vuelta y es
+`winner` por el global 4-3; Apertura 2008, Toluca perdió 0-2 y es `winner`, campeón en penales 7-6), pero ESPN
+aplica reglas viejas: en la vuelta Pumas 3-3 América del Clausura 2026 (global 6-6) no marcó a nadie y su nota dice
+«AME win on away goals», cuando ya no hay gol de visitante y avanzó Pumas. Por eso el `winner` sólo se usa en la
+final, tras un tiempo extra sin goles de diferencia y mientras ESPN no publique la tanda.
 
 ## 3. Validación sin fuga (`python3 -m produccion.en_juego validar`)
 
@@ -136,7 +147,12 @@ simula esos partidos como marcador actual + Poisson(lo que falta). Detalles que 
   medido el 11-nov-2026 entre 6 semillas: desviación del cambio 0.0012 con 100,000 simulaciones, 0.004 con 6,000).
 - Costo: armar la base (pronosticador + simulación) tarda ~10 s la primera vez del día y se guarda en
   `modelo/cache/vivo_base.pkl` (~15 s con 100,000); cada ciclo posterior tarda ~4 s.
-- Un partido que ya acabó pero todavía no está en `partidos.csv` entra con `lam_rest = 0` (marcador fijo).
+- Un partido que ya acabó pero todavía no está en `partidos.csv` entra con `lam_rest = 0` (marcador fijo). Una
+  vuelta de liguilla que ya acabó entra además con `avanza` = el ganador que calcula `_series` por el reglamento
+  (las series se arman antes que la proyección para eso).
+- En liguilla `clasifica` sale vacía y `campeon` trae a los que siguen vivos y a los recién eliminados (con `p` 0
+  y su `delta` negativo): en la vuelta Chivas 1-2 Cruz Azul (semifinal del Clausura 2026, repetida) Cruz Azul
+  pasó de 21.1% a 66.7% de ser campeón y Chivas de 41.6% a 0.
 
 ## 5. Comandos
 
@@ -146,7 +162,7 @@ simula esos partidos como marcador actual + Poisson(lo que falta). Detalles que 
 | `python3 vivo.py observar [--hasta AAAA-MM-DDTHH:MM]` | bucle: cada 20 s con partido en juego o a menos de 15 min de uno; cada 120 s si no. Anota los eventos. Termina solo 10 minutos después del último final, si hoy no hay partidos (confirmado en dos consultas seguidas), al cambiar el día (04:00) o al llegar `--hasta` (hora de México; con `Z`, UTC). Código 2 si ya hay otro corriendo |
 | `python3 vivo.py esperar --desde N [--max-seg 6600] [--agrupar 40]` | imprime en UNA línea el primer evento con número > N (más `pendientes`, `ultimo_n` y `tipos`) y sale con 0. Un gol, un gol anulado o una roja salen de inmediato; cualquier otro evento espera `--agrupar` segundos por si llega otro (un solo aviso). 3 si `observar` ya no corre y no hay más; 4 si se agotó el tiempo; **5 si `observar` tiene el candado pero lleva más de 7 minutos sin latido (colgado)** |
 | `python3 vivo.py repetir <id> [--velocidad 60] [--salida salidas/vivo_prueba.json]` | reproduce un partido ya jugado (goles y rojas de los CSV) con el contexto de ese día; documentos con `"prueba": true` |
-| `python3 vivo.py plan [--horas 48]` · `python3 pipeline.py vivo-plan` | próximos inicios en UTC y hora de México |
+| `python3 vivo.py plan [--horas 48]` · `python3 pipeline.py vivo-plan` | próximos inicios en UTC y hora de México, con `fase` y `etiqueta` («Cuartos de final, ida»; si actual.json todavía no tiene el partido, del slug y la pierna de ESPN) |
 | `python3 vivo.py estado` | ¿corre `observar`? (`observar_activo`), ¿está colgado? (`observar_colgado`), último latido, último evento (`ultimo_n`) y `vivo.vence_utc` |
 | `python3 -m produccion.en_juego ajustar` / `validar` / `curva` | parámetros, validación y curva del modelo en juego |
 
@@ -252,10 +268,7 @@ real (14-nov-2026). La copia no se versiona.
   la página (con `url` y las capabilities de `web/capacidades.json`) y `python3 pipeline.py publicado`;
   commit y push.
 
-En liguilla, además: `pipeline.py auto` debe haber corrido DESPUÉS de la ida (lo hace la tarea diaria) para que
-`liguilla.torneo` traiga la serie real con la ida ya jugada; el P(avanza) al momento parte de ahí. Si no corrió,
-el documento trata la ida como no jugada (global 0-0) sin avisar: comprobarlo en «armar» el día de la vuelta
-(`python3 pipeline.py auto` tarda menos de un minuto).
+En liguilla, además, ver la sección «Liguilla» (abajo).
 
 ### 6.6 Probar sin partido real
 
@@ -279,6 +292,47 @@ así que el real, que es más nuevo, lo reemplaza.
   actualizar» al pasar `vence_utc` y el siguiente despertar programado («vigilar» o «cierre») retoma en 6.5.
   El contenedor nuevo no tiene `vivo_eventos.jsonl` (no va al repositorio): N vuelve a empezar en 0.
 
+### 6.8 Liguilla (qué cambia el día de partido)
+
+El procedimiento es el mismo (6.1 a 6.7). Lo que cambia:
+
+- **Antes.** Cuando ESPN lista los partidos, `pipeline.py auto` los mete en `pendientes` con su sello y las series
+  pasan a `real` con el id de cada pierna. `vivo.py plan --horas 48` los da con `fase` y `etiqueta` («Cuartos de
+  final, ida») aunque actual.json todavía no los tenga. Dos partidos el mismo día (19:00 y 21:10) son un bloque y
+  `observar` no termina entre uno y otro; el día de partido cambia a las 04:00 de México. Si ESPN los lista y
+  `pipeline.py auto` aún no corre, el motor reconoce la pierna por sus equipos (serie `definida`) y toma el
+  pronóstico previo de `liguilla.torneo` (`previo.origen` = `"liguilla.torneo"`).
+- **Qué trae el documento.** Cada serie (y la `serie` de cada partido) trae, además del global y de `p_avanza_*`:
+  `momento` (`por_jugar`, `ida`, `entre`, `vuelta`, `tiempos_extra`, `penales`, `terminada`), `ida` (marcador de
+  la ida si ya se jugó), `avanza_ahora` y `motivo_ahora` (`global`, `mejor_sembrado`, `tiempos_extra`, `penales`)
+  si la serie terminara así (sólo desde la vuelta), `le_falta` (`{mejor, peor}`: goles netos para avanzar sin
+  depender de nada más) y `texto`, una línea lista para mostrar, p. ej. «Global 3-3: si termina así, avanza
+  Chivas por su mejor lugar en la tabla. A Tigres le falta un gol.». La `serie` del partido trae también `pierna`.
+  La `tabla` es la final de la fase regular (`tabla_nota` lo dice y `tabla_fija` = `true`: no se mueve con los marcadores).
+- **Ida.** La probabilidad de avanzar cuenta la vuelta entera; nada queda decidido. El evento final dice «Final de
+  la ida: …».
+- **Entre ida y vuelta.** La tarea diaria corre `pipeline.py auto`, que baja la ida a `partidos.csv` y a
+  `liguilla.torneo`. En «armar» del día de la vuelta comprobar que la ida ya está jugada:
+
+      python3 -c "import json; t=json.load(open('salidas/actual.json'))['liguilla']['torneo']; print([(s['llave'], [(p['pierna'], p['jugado'], p['gl'], p['gv']) for p in s['piernas']]) for r in t['rondas'] for s in r['series'] if s.get('real')])"
+
+  Si no, `python3 pipeline.py auto` (menos de un minuto). Si nadie lo corre, el motor completa la ida con
+  `partidos.csv` o con el global que ESPN da en la vuelta (`aggregateScore` menos el marcador) y lo dice en
+  `avisos`; si ninguno sirve también lo dice (nunca la trata como por jugar en silencio).
+- **Vuelta.** Goles, descanso y final avisan con el global en el orden del partido («Chivas 1-1 Tigres (global
+  2-4)») y el final dice quién avanzó y por qué («Final: Chivas 2-0 Tigres. Avanza Chivas: global 3-3, por su mejor
+  lugar en la tabla.»). El campeón al momento se recalcula en cada consulta con el marcador de la vuelta.
+- **Final.** Si el global queda empatado a los 90 minutos: evento `tiempos_extra` (con `STATUS_END_OF_REGULATION` o
+  al entrar al periodo 3), `momento` = `tiempos_extra`, luego `penales` (periodo 5) y el `final` dice «X es
+  campeón en tiempos extra…» o «… en penales (4-3) tras empatar 3-3 el global.». Mientras ESPN no publique la tanda
+  ni haya gol en el tiempo extra, la serie queda sin decidir (`p_avanza` 0.5 y «falta que ESPN confirme…»).
+- **Probar** (sin escribir en `salidas/`; `--salida` a una carpeta de trabajo):
+  `python3 vivo.py repetir 401870507 --velocidad 0 --salida /tmp/rep/vuelta.json` (vuelta Chivas 2-0 Tigres tras
+  perder 3-1 la ida: global 3-3, avanza Chivas por posición), `401870508` (Pumas 3-3 América, global 6-6),
+  `401872571` (semifinal Chivas 1-2 Cruz Azul) y `401873246` (vuelta de la final Pumas 1-2 Cruz Azul). Cada una
+  tarda ~2 minutos con 100,000 simulaciones. `repetir` sólo cubre los 90 minutos (los tiempos extra se prueban
+  en `test_vivo.py` con los estados de ESPN).
+
 ## 7. Límites honestos
 
 - El estado se congela: el multiplicador de ahora se aplica a todo lo que falta. Si el que pierde empata, su
@@ -291,6 +345,18 @@ así que el real, que es más nuevo, lo reemplaza.
   el manejo de los estados en vivo de ESPN está probado con partidos reales rebobinados; el primer partido
   real (Querétaro-Monterrey, 14-nov) es la prueba de fuego, sobre todo de cómo marca ESPN el descanso.
 - La tabla al momento suma las tarjetas de hoy al Fair Play de forma aproximada (amarilla 1, cualquier roja 3).
+- Liguilla real en vivo: nunca se ha visto. Los estados FINALES con tiempos extra sí están en la base
+  (`STATUS_FINAL_AET` en las vueltas de final del Clausura y del Apertura 2023, `STATUS_FINAL_PEN` en la del Apertura
+  2025, Toluca-Tigres 9-8 en penales; periodo 4 y 5, reloj «120'+4'» y «120'»; en el tiempo extra el reloj de las
+  jugadas sigue corriendo: 5433 s = 91'), y `test_finales_reales_con_tiempos_extra_y_penales` las cierra con el
+  motor. Los estados EN JUEGO de tiempos extra y penales (`STATUS_END_OF_REGULATION`, `…EXTRA_TIME`,
+  `STATUS_OVERTIME`, `STATUS_HALFTIME_ET`, `STATUS_END_OF_EXTRATIME`, `STATUS_SHOOTOUT`) no se han visto: se
+  reconocen por su nombre y se prueban con respuestas construidas. `aggregateScore` viene en las vueltas
+  terminadas con el global final (incluye los goles del tiempo extra); no está visto que se actualice a medio
+  partido.
+- Una expulsión antes del tiempo extra de la final no se lleva al tiempo extra hasta que empieza (el cálculo del
+  tiempo extra por jugar usa las lambdas previas). En la tanda, 50/50 aunque vaya 4-2: ESPN sólo da los goles de la
+  tanda, no cuántos tiros faltan.
 - En tiempos extra y penales el modelo es deliberadamente simple (reparto lineal y 50/50). El motor no avisa
   del descanso ni de la reanudación del tiempo extra (el reloj de la página se queda en «105+'» hasta el
   siguiente documento) y, si ESPN mueve el marcador antes de publicar la jugada, ese gol se cuenta como del

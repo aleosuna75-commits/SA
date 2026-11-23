@@ -1079,11 +1079,18 @@ de ida y vuelta y `series`), `campeon_ruta`, `campeon_decidido`, `p_campeon_ruta
 |---|---|
 | `llave` | `C1`..`C4`, `S1`, `S2`, `F` |
 | `fase`, `real`, `viene_de` | `real` = el cruce ya está en el calendario; `viene_de` = llaves de las que salen sus equipos (resiembra) |
+| `definida` | booleano: los dos equipos de la serie ya se conocen con certeza, estén o no sus partidos en el calendario (`real` implica `definida`). Cuartos: en cuanto termina la fase regular. Semifinal: cuando están decididos los CUATRO cuartos (por la resiembra el rival de cada uno depende de todas las llaves). Final: cuando están decididas las dos semifinales. Mientras sea `false` la serie es la ruta de los favoritos y la página la rotula «Proyectada»; con `true`, «Definida». Documentos anteriores al 23-nov-2026 no traen el campo: la página lo deduce (`real`, o cuartos con `estado` distinto de `proyectado`) |
 | `mejor`, `peor` | `{equipo, siembra}` |
 | `piernas` | ida y vuelta: `pierna`, `nombre`, `id`, `fecha_utc`, `fecha_local`, `hora_local`, `local`, `visitante`, `estadio` (`slug`, `nombre`), `jugado`, `gl`, `gv`; sin jugar: `lam_l`, `lam_v`, `p_local`, `p_empate`, `p_visitante`, `marcador` y `marcadores` (5) |
 | `global` | `probable` (`mejor`, `peor`, `prob`), `top` (5), `p_gana_mejor`, `p_empate`, `p_gana_peor` |
 | `p_avanza_mejor`, `p_avanza_peor`, `favorito`, `p_favorito` | probabilidad exacta de avanzar en ESA serie |
 | `decidida`, `ganador`, `regla_empate`, `alternativas` | `alternativas`: otros cruces posibles de esa llave (`mejor`, `peor`, `prob`, `p_avanza_mejor`) |
+
+Uso en la página: una pierna sin jugar de una serie `definida` y no `decidida` que todavía no viene en `pendientes`
+(la liga no le ha puesto día y hora; se compara por `id` y por la pareja `local`–`visitante`) sale en «Próximos
+partidos» como tarjeta compacta: fase y pierna, `llave`, `marcador`, 1X2, `estadio` y la fecha (`fecha_local` y
+`hora_local`, o la ventana de `rondas[].fechas` mientras no la haya). Sin `pendientes`, la banda bajo la portada
+anuncia la primera ronda con piernas así. Las probabilidades salen tal cual de aquí: la página no calcula nada.
 
 ## fuerzas (18 filas, de mayor a menor `rating`)
 

@@ -302,13 +302,71 @@ def prob_tiempos_extra(el: int, ev: int, lam_rest_l: float, lam_rest_v: float, p
     return float(p[0] + 0.5 * p[1])
 
 
+MINUTOS_PISO_EXTRA = 1.5             # con el balón rodando en el agregado del tiempo extra se supone que queda esto
+
+
 def fraccion_extra_restante(minuto: int | None, periodo: int) -> float:
-    """Parte de los 30 minutos de tiempo extra que falta (lineal: no hay datos para una curva propia)."""
+    """
+    Parte de los 30 minutos de tiempo extra que falta (lineal: no hay datos para una curva propia), por el
+    minuto (vivo.py ya pasa el agregado del primer tiempo extra, «107'», a 105'+2'). En el segundo tiempo
+    extra (periodo 4) queda a lo más la mitad y al menos MINUTOS_PISO_EXTRA minutos mientras ESPN diga que
+    se juega.
+    """
     if periodo >= 5:
         return 0.0
     if minuto is None:
         return 1.0 if periodo <= 3 else 0.5
-    return float(min(1.0, max(0.0, (120 - (int(minuto) - 0.5)) / 30.0)))
+    r = (120 - (int(minuto) - 0.5)) / 30.0
+    if periodo <= 3:
+        return float(min(1.0, max(0.0, r)))
+    return float(min(0.5, max(MINUTOS_PISO_EXTRA / 30.0, r)))
+
+
+# ==================================================================================================
+# Liguilla: cómo va la serie (lo que se le muestra a la gente; sin probabilidades)
+# ==================================================================================================
+MOMENTOS_SERIE = ("por_jugar", "ida", "entre", "vuelta", "tiempos_extra", "penales", "terminada")
+
+
+def situacion_serie(fase: str, global_mejor: int, global_peor: int, momento: str,
+                    tanda_mejor: int | None = None, tanda_peor: int | None = None) -> dict:
+    """
+    Quién avanzaría si la serie terminara con el global de este momento y cuántos goles le faltan a cada
+    uno (reglamento 2026-27, sin gol de visitante):
+      * cuartos y semifinales: con el global empatado avanza el mejor sembrado, no hay tiempos extra;
+      * final: con el global empatado a los 90 minutos de la vuelta hay tiempos extra (30 minutos) y, si
+        sigue empatado, penales.
+    `global_*` son los goles de la serie al momento (en tiempos extra, con sus goles). `momento` es uno de
+    MOMENTOS_SERIE. Sólo hay `avanza_ahora` y `le_falta` cuando la serie se puede acabar «así» (vuelta en
+    juego, tiempos extra, penales o terminada): durante la ida o entre partidos falta la vuelta entera.
+    Devuelve {"avanza_ahora": "mejor"|"peor"|None, "motivo_ahora": "global"|"mejor_sembrado"|
+    "tiempos_extra"|"penales"|None, "le_falta": {"mejor": n, "peor": n} | None}; `le_falta` son goles
+    NETOS (más que el rival de aquí al final) para avanzar sin depender de nada más: 0 = hoy avanza.
+    """
+    if momento not in MOMENTOS_SERIE:
+        raise ValueError(f"momento inválido: {momento}")
+    d = int(global_mejor) - int(global_peor)
+    out = {"avanza_ahora": None, "motivo_ahora": None, "le_falta": None}
+    if momento in ("por_jugar", "ida", "entre"):
+        return out
+    if fase != "final":
+        out["avanza_ahora"] = "mejor" if d >= 0 else "peor"
+        out["motivo_ahora"] = "global" if d != 0 else "mejor_sembrado"
+        if momento != "terminada":
+            out["le_falta"] = {"mejor": max(0, -d), "peor": max(0, d + 1)}
+        return out
+    if d != 0:
+        out["avanza_ahora"] = "mejor" if d > 0 else "peor"
+        out["motivo_ahora"] = "global"
+    elif momento == "penales" or (momento == "terminada" and tanda_mejor is not None and tanda_peor is not None):
+        out["motivo_ahora"] = "penales"
+        if tanda_mejor is not None and tanda_peor is not None and tanda_mejor != tanda_peor:
+            out["avanza_ahora"] = "mejor" if tanda_mejor > tanda_peor else "peor"
+    else:
+        out["motivo_ahora"] = "tiempos_extra" if momento == "vuelta" else "penales"
+    if momento in ("vuelta", "tiempos_extra"):
+        out["le_falta"] = {"mejor": max(0, 1 - d), "peor": max(0, d + 1)}
+    return out
 
 
 # ==================================================================================================

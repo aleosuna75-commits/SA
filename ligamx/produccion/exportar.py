@@ -337,6 +337,8 @@ def torneo_liguilla(pron, sim: dict, reglas: dict, clasificados: list[str] | Non
     sedes = _sedes_por_equipo()
     reales = {(r["fase"], frozenset((r["mejor"], r["peor"]))): r for r in sim.get("series_reales", [])}
     fechas = (reglas.get("liguilla") or {}).get("fechas") or {}
+    if (sim.get("meta") or {}).get("torneo") not in (None, reglas.get("torneo")):
+        fechas = {}     # corte retrospectivo de otro torneo: las ventanas de config/torneo.json no son las suyas
     filas = df.set_index("id") if "id" in df.columns else df
     alternativas = {c["llave"]: c["opciones"] for c in sim.get("cruces_cuartos", [])}
     posibles = sim.get("series_posibles", {})
@@ -350,7 +352,8 @@ def torneo_liguilla(pron, sim: dict, reglas: dict, clasificados: list[str] | Non
                  "jugado": bool(p["jugado"])}
             if p.get("id") is not None and p["id"] in filas.index:
                 f = filas.loc[p["id"]]
-                d["fecha_local"] = str(f.get("fecha_local")) if pd.notna(f.get("fecha_local")) else None
+                fl = f.get("fecha_local")         # 'AAAA-MM-DD', como en «pendientes» (la columna puede venir como fecha con hora 00:00)
+                d["fecha_local"] = pd.Timestamp(fl).strftime("%Y-%m-%d") if pd.notna(fl) else None
                 d["hora_local"] = str(f.get("hora_local")) if pd.notna(f.get("hora_local")) else None
             if p["jugado"]:
                 d.update({"gl": p["gl"], "gv": p["gv"]})

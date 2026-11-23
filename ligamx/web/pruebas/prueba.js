@@ -30,6 +30,13 @@
      gol nuevo con aviso, tabla al momento, documentos corruptos, límite de 10 s y página sin base de datos;
    - variantes: liguilla en curso (una ida jugada, una serie terminada), sin liguilla.torneo, datos
      opcionales en null, «vivo» incrustado, movimiento reducido;
+   - según el estado de los datos (revisaSegunDatos: los de hoy, la copia «definido» y sus variantes): bajo la portada
+     el próximo partido con cuenta regresiva o el anuncio de la ronda que sigue (cruces, ventana de fechas, botón al
+     cuadro); «Próximos partidos» con una tarjeta por pendiente y las piernas de liguilla sin día ni hora como
+     tarjetas compactas (contenido, orden, nombres sin partir, pie alineado, botón al detalle de la serie) o retirada
+     si no hay nada; combinada de la jornada o sección retirada; ninguna sección visible vacía; menú y numeración;
+     etiqueta de cada serie (Terminada / En curso / Definida / Proyectada); textos de la fase regular terminada;
+     conexión sin window.claude («vivo» incrustado de hoy o corte);
    - desempeño sellado, modelo contra mercado: con los datos de hoy (lo que diga desempeno.contra_mercado) y con
      variantes de 3, 1 y 40 partidos comparados, sin ningún sello con momios, documento viejo sin el campo y
      mercado con basura; tarjeta de cada resultado con y sin mercado en su sello.
@@ -322,7 +329,7 @@ async function revisaSegunDatos(ctx, url, etiqueta, movil, opciones, extra) {
   }
   if (extra.anuncio) revisa(sg.texto.includes(extra.anuncio), etq + 'el anuncio bajo la portada dice «' + extra.anuncio + '»', sg.texto);
   if (CAPTURAS && extra.foto) { await pg.evaluate(() => window.scrollTo(0, 0)); await pg.waitForTimeout(300); fs.mkdirSync(DIR_CAP, { recursive: true }); const pre = path.join(DIR_CAP, motor + '-' + (movil ? 'iphone' : 'escritorio') + '-' + extra.foto);
-    await pg.screenshot({ path: pre + '-portada.png' }); await pg.locator('#sigue').screenshot({ path: pre + '-sigue.png' }); }
+    await pg.screenshot({ path: pre + '-portada.png' }); await pg.locator('section.sigue').screenshot({ path: pre + '-sigue.png' }); }
 
   /* «Próximos partidos»: una tarjeta completa por partido pendiente y, si no tienen día ni hora, las piernas de liguilla como tarjetas compactas */
   const px = await pg.evaluate(() => {

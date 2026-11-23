@@ -12,8 +12,9 @@
 El documento que escribe (contrato en salidas/CONTRATO.md y ejemplo en salidas/vivo_ejemplo.json) trae los
 partidos de HOY con su marcador, minuto y eventos, el pronóstico previo sellado, el pronóstico al momento
 (produccion/en_juego.py), la tabla al momento, la proyección de clasificación y campeón recalculada con los
-marcadores del momento (produccion/simulador.py con `en_juego`) y, en liguilla, cada serie con su global y
-su probabilidad de avanzar. La sesión lo copia a la base de datos del Artifact ("vivo/actual") cada vez que
+marcadores del momento (produccion/simulador.py con `en_juego`) y, en liguilla, cada serie con su global, su
+probabilidad de avanzar y cómo va (quién avanzaría si terminara así, qué le falta a cada uno y quién avanzó, por
+el reglamento y no por el `winner` de ESPN). La sesión lo copia a la base de datos del Artifact ("vivo/actual") cada vez que
 `esperar` avisa de un evento. Cómo se opera un día de partido: produccion/VIVO.md.
 
 Sólo biblioteca estándar más los módulos del proyecto (que usan numpy y pandas y se cargan cuando hacen falta).
@@ -240,6 +241,7 @@ def normalizar_evento(e: dict) -> dict | None:
             tid = str(t.get("id") or c.get("id") or "")
             lados[c.get("homeAway")] = {"id": tid, "nombre": nombre_equipo(tid, t.get("displayName")),
                                         "goles": _ent(c.get("score")), "tanda": _ent(c.get("shootoutScore")),
+                                        "global": _ent(c.get("aggregateScore")),     # vuelta de liguilla: global de la serie
                                         "gana": c.get("winner"), "avanza": c.get("advance")}
         if "home" not in lados or "away" not in lados:
             return None
@@ -264,8 +266,16 @@ def normalizar_evento(e: dict) -> dict | None:
         if fase_espn == "in":                                      # por si ESPN no mueve `period` en tiempos extra o penales
             if "SHOOTOUT" in nombre:
                 periodo = 5
+            elif (nombre == "STATUS_END_OF_EXTRATIME" or ("SECOND_HALF" in nombre and ("EXTRA" in nombre or "OVERTIME" in nombre))) \
+                    and periodo < 4:
+                periodo = 4                                        # segundo tiempo extra o la pausa antes de los penales
             elif ("OVERTIME" in nombre or "EXTRA" in nombre or nombre == "STATUS_HALFTIME_ET") and periodo < 3:
                 periodo = 3
+        elif fase_espn == "post":                                  # final tras tiempos extra o penales: que el periodo lo diga
+            if nombre == "STATUS_FINAL_PEN" or "SHOOTOUT" in nombre:
+                periodo = 5
+            elif nombre in ("STATUS_FINAL_AET", "STATUS_FINAL_ET") and periodo < 4:
+                periodo = 4
         # medio tiempo: lo dice el nombre del estado o, si ESPN usa otro nombre, una pausa justo al minuto 45
         medio_tiempo = estado == "descanso" and periodo <= 2 and (
             "HALFTIME" in nombre or (minuto is not None and 44 <= minuto <= 46
@@ -307,6 +317,7 @@ def normalizar_evento(e: dict) -> dict | None:
         return {"id": int(e["id"]), "inicio": inicio, "local": lados["home"]["nombre"], "visitante": lados["away"]["nombre"],
                 "estado": estado, "estado_espn": nombre, "periodo": periodo, "minuto": minuto, "anadido": anadido,
                 "segundos": seg_reloj, "gl": gl, "gv": gv, "tanda_l": lados["home"]["tanda"], "tanda_v": lados["away"]["tanda"],
+                "global_l": lados["home"]["global"], "global_v": lados["away"]["global"],
                 "gana": gana, "pierna": _ent((comp.get("leg") or {}).get("value")), "medio_tiempo": medio_tiempo,
                 "slug": (e.get("season") or {}).get("slug"), "jugadas": jug}
     except Exception as ex:                                      # un evento raro no tumba el ciclo
@@ -383,7 +394,8 @@ def contexto_de_actual(actual: dict | None, sellos: dict[int, dict] | None = Non
     los próximos partidos. Sin actual.json devuelve un contexto vacío (el documento sale sin previos).
     """
     ctx = {"torneo": None, "regular_completa": False, "tabla": [], "p_clasifica": {}, "p_campeon": {},
-           "partidos": {}, "series": [], "futuros": [], "origen": "actual.json", "corte_utc": None, "n_sim": None}
+           "partidos": {}, "series": [], "futuros": [], "origen": "actual.json", "corte_utc": None, "n_sim": None,
+           "por_equipos": {}}                                      # piernas de liguilla sin id: (local, visitante) -> info
     if not actual:
         ctx["origen"] = "sin actual.json"
         return ctx
@@ -404,18 +416,35 @@ def contexto_de_actual(actual: dict | None, sellos: dict[int, dict] | None = Non
                                "visitante": p["visitante"]})
     for u in actual.get("ultimos_resultados") or []:
         ctx["partidos"].setdefault(int(u["id"]), {"fase": u.get("fase"), "etiqueta": u.get("etiqueta"), "pierna": None, "previo": None})
+    rho_modelo = next((float(p["rho"]) for p in actual.get("pendientes") or [] if p.get("rho") is not None), None)
+    if rho_modelo is None and sellos:                             # la misma rho del modelo que sella (el último sello)
+        ult = max(sellos.values(), key=lambda s: str(s.get("sellado_utc") or ""))
+        rho_modelo = float(ult.get("rho") or 0.0)
     tor = (actual.get("liguilla") or {}).get("torneo") or {}
     for ronda in tor.get("rondas") or []:
         for s in ronda.get("series") or []:
-            if not s.get("real"):
+            # una serie entra si ya está en el calendario (`real`) o si sus dos equipos ya son seguros (`definida`):
+            # así, si ESPN lista el partido antes de que corra pipeline.py auto, la pierna se reconoce por sus equipos
+            if not (s.get("real") or s.get("definida")):
                 continue
             ctx["series"].append(s)
             for pi in s.get("piernas") or []:
+                etiqueta = f"{NOMBRE_FASE.get(s.get('fase'), s.get('fase'))}, {'ida' if pi.get('pierna') == 1 else 'vuelta'}"
                 if pi.get("id") is not None:
                     d = ctx["partidos"].setdefault(int(pi["id"]), {"previo": None})
-                    d.setdefault("fase", s.get("fase"))
-                    d.setdefault("etiqueta", f"{NOMBRE_FASE.get(s.get('fase'), s.get('fase'))}, {'ida' if pi.get('pierna') == 1 else 'vuelta'}")
-                    d["pierna"] = pi.get("pierna")
+                else:
+                    d = ctx["por_equipos"].setdefault((pi.get("local"), pi.get("visitante")), {"previo": None})
+                d.setdefault("fase", s.get("fase"))
+                d.setdefault("etiqueta", etiqueta)
+                d["pierna"] = pi.get("pierna")
+                if d.get("previo") is None and not pi.get("jugado") and pi.get("lam_l") is not None and pi.get("p_local") is not None:
+                    # sin sello ni «pendientes»: el pronóstico de la pierna que ya publica la página (liguilla.torneo)
+                    d["previo"] = _previo(pi["p_local"], pi["p_empate"], pi["p_visitante"], pi["lam_l"], pi["lam_v"],
+                                          rho_modelo, pi.get("marcador"), "liguilla.torneo")
+                if (pi.get("id") is not None and not pi.get("jugado") and pi.get("fecha_utc")
+                        and all(f["id"] != int(pi["id"]) for f in ctx["futuros"])):
+                    ctx["futuros"].append({"id": int(pi["id"]), "inicio_utc": iso(de_iso(pi["fecha_utc"])),
+                                           "local": pi["local"], "visitante": pi["visitante"]})
     for pid, s in (sellos or {}).items():                         # el sello manda sobre lo que diga actual.json
         d = ctx["partidos"].setdefault(int(pid), {"fase": s.get("fase"), "etiqueta": None, "pierna": s.get("pierna")})
         try:
@@ -570,7 +599,7 @@ class Motor:
         ctx = {"torneo": torneo, "regular_completa": sim["regular_completa"], "origen": "reconstruido al corte",
                "corte_utc": iso(self.corte), "n_sim": sim["n_sim"], "tabla": [{k: f[k] for k in ("pos", "equipo", "PJ", "PTS", "DG", "GF")} for f in sim["tabla"]],
                "p_clasifica": {e: v[0] for e, v in sim["p"].items()}, "p_campeon": {e: v[1] for e, v in sim["p"].items()},
-               "partidos": {}, "series": [], "futuros": []}
+               "partidos": {}, "series": [], "futuros": [], "por_equipos": {}}
         df_t = df[(df["torneo"] == torneo) & (df["estado"] != "cancelado")]
         jornadas = EX.etiquetas_jornada(df_t[df_t["fase"] == "regular"], int(S.cargar_reglas().get("jornadas", 17)))
         dia = dia_de_juego(self.corte + dt.timedelta(minutes=5))
@@ -596,7 +625,10 @@ class Motor:
             try:
                 clasificados = [f["equipo"] for f in sim["tabla"][: sim["clasifican"]]]
                 tor = EX.redondear(EX.torneo_liguilla(pron, sim["completo"], S.cargar_reglas(), clasificados, df))
-                ctx["series"] = [s for r in tor["rondas"] for s in r["series"] if s.get("real")]
+                # partidos.csv ya trae las rondas siguientes (se jugaron después): ese día ESPN todavía no las listaba
+                orden = {"repechaje": 0, "cuartos": 1, "semifinal": 2, "final": 3}
+                tope = max((orden.get(i.get("fase"), 0) for i in ctx["partidos"].values()), default=3)
+                ctx["series"] = [s for r in tor["rondas"] for s in r["series"] if s.get("real") and orden.get(s["fase"], 0) <= tope]
             except Exception as e:
                 log(f"aviso: no se pudo armar la liguilla al corte: {type(e).__name__}: {e}")
         return ctx
@@ -633,20 +665,17 @@ class Motor:
             doc["prueba"] = True
         # tabla, proyección y series: cada bloque aislado (si uno falla, el documento sale con lo previo y un aviso)
         tocados = [p for p in partidos if p["estado"] in ("en_juego", "descanso", "final")]
+        # liguilla: la tabla ya no se mueve con los marcadores (la página puede titularla «Tabla final» y quitar las flechas)
+        doc["tabla_fija"] = bool(ctx.get("regular_completa"))
         try:
             doc["tabla"], doc["tabla_nota"] = self._tabla(ctx, partidos, tocados, t_juego)
         except Exception as e:
             avisos.append(f"tabla al momento no disponible ({type(e).__name__}: {e}); se muestra la previa")
             doc["tabla"] = [dict(f, cambio=0, en_juego=False) for f in ctx["tabla"]]
             doc["tabla_nota"] = "Tabla previa a los partidos de hoy."
+        # las series van antes que la proyección: el campeón al momento usa el ganador que dicta el reglamento
         try:
-            doc["proyeccion"] = self._proyeccion(ctx, tocados, t_juego)
-        except Exception as e:
-            traceback.print_exc()
-            avisos.append(f"proyección al momento no disponible ({type(e).__name__}: {e}); se muestra la previa")
-            doc["proyeccion"] = _proyeccion_previa(ctx, self.n_sim, "No se pudo recalcular: es la proyección previa.")
-        try:
-            doc["series"] = self._series(ctx, partidos)
+            doc["series"] = self._series(ctx, partidos, avisos)
         except Exception as e:
             traceback.print_exc()
             avisos.append(f"series al momento no disponibles ({type(e).__name__}: {e})")
@@ -656,12 +685,23 @@ class Motor:
             for pi in s["piernas"]:
                 if pi.get("id") is not None:
                     por_llave[pi["id"]] = s
+        ganadores = {pi["id"]: s["ganador"] for s in doc["series"] if s.get("decidida") and s.get("ganador")
+                     for pi in s["piernas"] if pi.get("id") is not None and pi.get("pierna") == 2 and pi.get("estado") == "final"}
+        try:
+            doc["proyeccion"] = self._proyeccion(ctx, tocados, t_juego, ganadores)
+        except Exception as e:
+            traceback.print_exc()
+            avisos.append(f"proyección al momento no disponible ({type(e).__name__}: {e}); se muestra la previa")
+            doc["proyeccion"] = _proyeccion_previa(ctx, self.n_sim, "No se pudo recalcular: es la proyección previa.")
         for p in partidos:
             s = por_llave.get(p["id"])
             p["serie"] = None if s is None else {
                 "llave": s["llave"], "mejor": s["mejor"]["equipo"], "peor": s["peor"]["equipo"], "global_mejor": s["global_mejor"],
                 "global_peor": s["global_peor"], "p_avanza_mejor": s["p_avanza_mejor"], "p_avanza_peor": s["p_avanza_peor"],
-                "fase": s["fase"], "decidida": s["decidida"], "ganador": s["ganador"]}
+                "fase": s["fase"], "decidida": s["decidida"], "ganador": s["ganador"],
+                "pierna": next((pi["pierna"] for pi in s["piernas"] if pi.get("id") == p["id"]), None),
+                "ida": s.get("ida"), "momento": s.get("momento"), "avanza_ahora": s.get("avanza_ahora"),
+                "motivo_ahora": s.get("motivo_ahora"), "le_falta": s.get("le_falta"), "texto": s.get("texto")}
             p.pop("_cruda", None)
         doc["ultimo_evento"] = ultimo_evento
         doc["siguiente"] = self._siguiente(ctx, partidos, t_juego)
@@ -670,7 +710,7 @@ class Motor:
         return doc
 
     def _partido(self, c: dict, ctx: dict, ahora: dt.datetime, avisos: list[str]) -> dict:
-        info = ctx["partidos"].get(c["id"]) or {}
+        info = ctx["partidos"].get(c["id"]) or (ctx.get("por_equipos") or {}).get((c["local"], c["visitante"])) or {}
         fase = info.get("fase")
         if not fase:
             _tablas_espn()
@@ -697,6 +737,11 @@ class Motor:
                 minuto = {1: 1, 2: 46, 3: 91, 4: 106}.get(periodo, 120)
             elif periodo == 2 and minuto <= 45:                    # ya es el segundo tiempo y el reloj sigue en «45'+3'»
                 minuto, anadido = 46, None
+            elif anadido is None:                                  # agregado escrito como «92'» y no «90'+2'»: mismo reloj
+                tope = {1: 45, 2: 90, 3: 105, 4: 120}.get(periodo)
+                # ventana corta en el primer tiempo extra: si ESPN no movió el periodo, «112'» es del segundo
+                if tope is not None and tope < minuto <= tope + {1: 15, 2: 30, 3: 5, 4: 30}[periodo]:
+                    minuto, anadido = tope, minuto - tope
             seg = c.get("segundos")
             dentro = (seg % 60.0) if (seg and seg > 0) else 30.0  # segundos ya corridos del minuto que marca el reloj
             reloj = iso(ahora - dt.timedelta(seconds=dentro))
@@ -711,7 +756,7 @@ class Motor:
         for j in c.get("jugadas") or []:
             if j["clase"] == "gol":
                 a, b = (a + 1, b) if j["lado"] == 0 else (a, b + 1)
-                if (j["min"] or 0) <= 90:
+                if (j["min"] or 0) <= 90:                         # el agregado viene como «90'+3'» (minuto 90)
                     g90[j["lado"]] += 1
             elif j["clase"] == "roja":
                 rl, rv = (rl + 1, rv) if j["lado"] == 0 else (rl, rv + 1)
@@ -787,14 +832,20 @@ class Motor:
         # lo que necesitan la tabla, la simulación y las series (no sale en el documento)
         p["_cruda"] = {"gl90": gl90, "gv90": gv90, "extra": extra, "rest": rest, "previo": previo, "pierna": pierna,
                        "fair": [sum(fair[0].values()), sum(fair[1].values())], "gana": c.get("gana"),
-                       "segundos": c.get("segundos"), "rojas": (rl, rv), "tanda": (c.get("tanda_l"), c.get("tanda_v"))}
+                       "segundos": c.get("segundos"), "rojas": (rl, rv), "tanda": (c.get("tanda_l"), c.get("tanda_v")),
+                       "global": (c.get("global_l"), c.get("global_v"))}
         return p
 
     def _tabla(self, ctx: dict, partidos: list[dict], tocados: list[dict], ahora: dt.datetime) -> tuple[list[dict], str]:
         """Tabla al momento: los marcadores en juego cuentan como finales (desempates oficiales del simulador)."""
         reg = [p for p in tocados if p["fase"] == "regular"]
         jugando = {e for p in partidos if p["estado"] in ESTADOS_ACTIVOS for e in (p["local"], p["visitante"])}
-        if not reg or ctx.get("regular_completa"):
+        if ctx.get("regular_completa") or (not reg and ctx.get("series")):
+            # liguilla: la tabla ya no se mueve (la liguilla no suma puntos); sólo decide quién es el mejor sembrado
+            return ([dict(f, cambio=0, en_juego=f["equipo"] in jugando) for f in ctx["tabla"]],
+                    "Tabla final de la fase regular: en la liguilla no se suman puntos; el lugar decide quién avanza "
+                    "con el global empatado en cuartos y semifinales.")
+        if not reg:
             return ([dict(f, cambio=0, en_juego=f["equipo"] in jugando) for f in ctx["tabla"]],
                     "Tabla general: hoy no hay partidos de fase regular en juego.")
         import numpy as np
@@ -844,8 +895,13 @@ class Motor:
                 if n_vivos else "Tabla con los resultados de hoy.")
         return filas, nota
 
-    def _en_juego_sim(self, tocados: list[dict]) -> dict:
-        """Entrada `en_juego` del simulador: marcador a 90' y goles que faltan de cada partido tocado hoy."""
+    def _en_juego_sim(self, tocados: list[dict], ganadores: dict | None = None) -> dict:
+        """
+        Entrada `en_juego` del simulador: marcador a 90' y goles que faltan de cada partido tocado hoy. Una
+        vuelta de liguilla que ya terminó lleva `avanza` = el ganador de la serie según el reglamento
+        (`ganadores`, calculado en `_series`; no el `winner` de ESPN, que es el del partido).
+        """
+        ganadores = ganadores or {}
         ej = {}
         for p in tocados:
             c = p["_cruda"]
@@ -857,8 +913,8 @@ class Motor:
             x = self._extra(p)
             if x is not None:
                 d["extra"] = x
-            if p["estado"] == "final" and p["fase"] == "final" and c.get("gana"):
-                d["avanza"] = p["local"] if c["gana"] == "local" else p["visitante"]
+            if p["estado"] == "final" and ganadores.get(p["id"]):
+                d["avanza"] = ganadores[p["id"]]
             ej[p["id"]] = d
         return ej
 
@@ -876,12 +932,12 @@ class Motor:
                 "lam_rest_l": c["previo"]["lam_l"] * EJ.FRACCION_EXTRA * fr * EJ.multiplicador(par.ef, dif, rl, rv),
                 "lam_rest_v": c["previo"]["lam_v"] * EJ.FRACCION_EXTRA * fr * EJ.multiplicador(par.ef, -dif, rv, rl)}
 
-    def _proyeccion(self, ctx: dict, tocados: list[dict], ahora: dt.datetime) -> dict:
+    def _proyeccion(self, ctx: dict, tocados: list[dict], ahora: dt.datetime, ganadores: dict | None = None) -> dict:
         """Clasificación y campeón al momento, con el cambio frente al último pronóstico previo."""
         if not tocados or not self.proyectar:
             return _proyeccion_previa(ctx, self.n_sim, None if not tocados else "Proyección previa (no se recalculó).")
         from produccion import simulador as S
-        ej = self._en_juego_sim(tocados)
+        ej = self._en_juego_sim(tocados, ganadores)
         for intento in (0, 1):
             b = self.base(ahora)
             try:
@@ -913,26 +969,44 @@ class Motor:
             out[llave].sort(key=lambda d: (-d["p"], d["equipo"]))
         return out
 
-    def _series(self, ctx: dict, partidos: list[dict]) -> list[dict]:
-        """Series reales de la liguilla con el global y la probabilidad de avanzar al momento."""
+    def _series(self, ctx: dict, partidos: list[dict], avisos: list[str] | None = None) -> list[dict]:
+        """
+        Series de la liguilla (las de `liguilla.torneo` que ya están en el calendario o cuyos dos equipos ya
+        son seguros) con el global y la probabilidad de avanzar al momento, y cómo va la serie: `momento`,
+        `ida`, `avanza_ahora` / `motivo_ahora` (si terminara así), `le_falta` (goles netos que le faltan a
+        cada uno) y `texto` (una línea lista para mostrar). Una pierna de hoy se reconoce por su id o, si
+        actual.json todavía no lo trae, por sus equipos. Si la vuelta se juega hoy y actual.json no tiene la
+        ida como jugada (no corrió pipeline.py auto), la ida sale de partidos.csv o del global que da ESPN, con
+        un aviso; nunca se trata como por jugar en silencio.
+        """
         if not ctx["series"]:
             return []
-        import numpy as np
+        avisos = avisos if avisos is not None else []
         from modelo import arnes
         from produccion import en_juego as EJ
         from produccion import simulador as S
         hoy = {p["id"]: p for p in partidos}
+        por_eq = {(p["local"], p["visitante"]): p for p in partidos}
         out = []
         for s in ctx["series"]:
             mejor, peor, fase = s["mejor"]["equipo"], s["peor"]["equipo"], s["fase"]
+            legs = [dict(pi) for pi in sorted(s.get("piernas") or [], key=lambda d: d["pierna"])]
+            de_hoy = {}
+            for pi in legs:
+                p = hoy.get(pi.get("id")) if pi.get("id") is not None else por_eq.get((pi["local"], pi["visitante"]))
+                if p is not None and (pi.get("id") is not None or p["fase"] == fase):
+                    de_hoy[pi["pierna"]] = p
+                    pi["id"] = p["id"]
+            self._ida_que_falta(legs, de_hoy, mejor, peor, avisos)
             piernas, Ms, gm, gp, tocada, lam2 = [], {}, 0, 0, False, None
-            fin_hoy = None
-            for pi in sorted(s["piernas"], key=lambda d: d["pierna"]):
+            fin_hoy, vuelta, estados = None, None, {}
+            for pi in legs:
                 num = pi["pierna"]
-                p = hoy.get(pi.get("id")) if pi.get("id") is not None else None
+                p = de_hoy.get(num)
                 d = {"pierna": num, "id": pi.get("id"), "local": pi["local"], "visitante": pi["visitante"],
                      "estado": "final" if pi.get("jugado") else "programado", "gl": pi.get("gl"), "gv": pi.get("gv")}
-                rho = float(((ctx["partidos"].get(pi.get("id")) or {}).get("previo") or {}).get("rho", 0.0))
+                info = ctx["partidos"].get(pi.get("id")) or (ctx.get("por_equipos") or {}).get((pi["local"], pi["visitante"])) or {}
+                rho = float((info.get("previo") or {}).get("rho", 0.0))
                 if num == 2 and not pi.get("jugado"):
                     lam2 = (pi.get("lam_l"), pi.get("lam_v"))
                 if pi.get("jugado"):
@@ -945,63 +1019,162 @@ class Motor:
                     a, b = p["gl"], p["gv"]                        # el global que se ve incluye el tiempo extra
                     rest = c["rest"] if c["rest"] is not None else (0.0, 0.0)
                     Ms[num] = EJ.matriz_final(c["gl90"], c["gv90"], rest[0], rest[1], rho if p["estado"] != "final" else 0.0)
-                    if p["estado"] == "final":
-                        fin_hoy = p if num == 2 else fin_hoy
+                    if num == 2:
+                        vuelta = p
+                        fin_hoy = p if p["estado"] == "final" else None
                 else:
                     Ms[num] = arnes.matriz_marcadores(pi["lam_l"], pi["lam_v"], rho)
                     a = b = None
                 if a is not None:
                     gm += a if pi["local"] == mejor else b
                     gp += b if pi["local"] == mejor else a
+                estados[num] = d["estado"]
                 piernas.append(d)
+            ida = next(({"local": d["local"], "visitante": d["visitante"], "gl": d["gl"], "gv": d["gv"]}
+                        for d in piernas if d["pierna"] == 1 and d["estado"] == "final"), None)
             base = {"llave": s["llave"], "fase": fase, "mejor": s["mejor"], "peor": s["peor"], "piernas": piernas,
-                    "global_mejor": gm, "global_peor": gp}
+                    "global_mejor": gm, "global_peor": gp, "ida": ida}
             if not tocada or len(Ms) < 2:                          # nada de hoy: lo que ya decía actual.json
-                pm = float(s["p_avanza_mejor"])
-                out.append({**base, "p_avanza_mejor": _r4(pm), "p_avanza_peor": _r4(1 - pm), "delta_avanza_mejor": 0.0,
-                            "favorito": s.get("favorito"), "p_favorito": _r4(s.get("p_favorito")),
-                            "decidida": bool(s.get("decidida")), "ganador": s.get("ganador"), "al_momento": False})
-                continue
-            l1 = next(d["local"] for d in piernas if d["pierna"] == 1) == mejor
-            l2 = next(d["local"] for d in piernas if d["pierna"] == 2) == mejor
-            vuelta = hoy.get(next((d["id"] for d in piernas if d["pierna"] == 2), None))
-            if lam2 is None or lam2[0] is None:
-                pv = (ctx["partidos"].get(vuelta["id"]) or {}).get("previo") if vuelta else None
-                lam2 = (pv["lam_l"], pv["lam_v"]) if pv else (1.3, 1.1)
-            r = EJ.prob_avanza(fase, Ms[1], Ms[2], l1, l2, lam2)
-            pm = r["p_avanza_mejor"]
-            decidida, ganador = False, None
-            x = self._extra(vuelta) if vuelta is not None else None
-            if x is not None:                                      # final en tiempo extra: el global a 90' quedó empatado
-                p_loc = EJ.prob_tiempos_extra(x["gl"], x["gv"], x["lam_rest_l"], x["lam_rest_v"], x["penales"])
-                pm = r["p_global_mejor"] + r["p_global_empate"] * (p_loc if l2 else 1.0 - p_loc)
-            if fin_hoy is not None:                                # la vuelta acabó hoy
-                decidida = True
-                c = fin_hoy["_cruda"]
-                g90m = sum((pi_["gl"] if pi_["local"] == mejor else pi_["gv"]) for pi_ in s["piernas"] if pi_.get("jugado"))
-                g90p = sum((pi_["gv"] if pi_["local"] == mejor else pi_["gl"]) for pi_ in s["piernas"] if pi_.get("jugado"))
-                g90m += c["gl90"] if fin_hoy["local"] == mejor else c["gv90"]
-                g90p += c["gv90"] if fin_hoy["local"] == mejor else c["gl90"]
-                if g90m != g90p:
-                    ganador = mejor if g90m > g90p else peor
-                elif fase != "final":
-                    ganador = mejor                                # global empatado: avanza el mejor sembrado
-                elif c.get("gana"):
-                    ganador = fin_hoy["local"] if c["gana"] == "local" else fin_hoy["visitante"]
-                elif gm != gp and sum(c.get("extra") or [0, 0]) > 0:
-                    ganador = mejor if gm > gp else peor           # lo decidió un gol del tiempo extra (el global ya lo incluye)
-                elif None not in (c.get("tanda") or (None, None)) and c["tanda"][0] != c["tanda"][1]:
-                    ganador = fin_hoy["local"] if c["tanda"][0] > c["tanda"][1] else fin_hoy["visitante"]
-                else:
-                    decidida = False                               # ESPN aún no dice quién ganó el tiempo extra o los penales
-                if ganador is not None:
-                    pm = 1.0 if ganador == mejor else 0.0
-            fav = ganador or (mejor if pm >= 0.5 else peor)
-            out.append({**base, "p_avanza_mejor": _r4(pm), "p_avanza_peor": _r4(1 - pm),
-                        "delta_avanza_mejor": _r4(pm - float(s["p_avanza_mejor"])), "favorito": fav,
+                pm = float(s.get("p_avanza_mejor", 0.5))
+                decidida, ganador = bool(s.get("decidida")), s.get("ganador")
+                fila = {**base, "p_avanza_mejor": _r4(pm), "p_avanza_peor": _r4(1 - pm), "delta_avanza_mejor": 0.0,
+                        "favorito": s.get("favorito"), "p_favorito": _r4(s.get("p_favorito")),
+                        "decidida": decidida, "ganador": ganador, "al_momento": False}
+            else:
+                l1 = next(d["local"] for d in piernas if d["pierna"] == 1) == mejor
+                l2 = next(d["local"] for d in piernas if d["pierna"] == 2) == mejor
+                if lam2 is None or lam2[0] is None:
+                    pv = (ctx["partidos"].get(vuelta["id"]) or {}).get("previo") if vuelta else None
+                    lam2 = (pv["lam_l"], pv["lam_v"]) if pv else (1.3, 1.1)
+                r = EJ.prob_avanza(fase, Ms[1], Ms[2], l1, l2, lam2)
+                pm = r["p_avanza_mejor"]
+                decidida, ganador = False, None
+                x = self._extra(vuelta) if vuelta is not None else None
+                if x is not None:                                  # final en tiempo extra: el global a 90' quedó empatado
+                    p_loc = EJ.prob_tiempos_extra(x["gl"], x["gv"], x["lam_rest_l"], x["lam_rest_v"], x["penales"])
+                    pm = r["p_global_mejor"] + r["p_global_empate"] * (p_loc if l2 else 1.0 - p_loc)
+                if fin_hoy is not None:                            # la vuelta acabó hoy: quién avanzó lo dice el reglamento
+                    lado = self._ganador_vuelta(fase, fin_hoy, legs, mejor)
+                    if lado is not None:
+                        decidida, ganador = True, (mejor if lado == "mejor" else peor)
+                        pm = 1.0 if ganador == mejor else 0.0
+                    elif fase == "final" and (fin_hoy["periodo"] or 0) >= 3:
+                        pm = 0.5                                   # hubo tiempos extra sin ganador: penales sin dato de ESPN
+                fav = ganador or (mejor if pm >= 0.5 else peor)
+                fila = {**base, "p_avanza_mejor": _r4(pm), "p_avanza_peor": _r4(1 - pm),
+                        "delta_avanza_mejor": _r4(pm - float(s.get("p_avanza_mejor", pm))), "favorito": fav,
                         "p_favorito": _r4(pm if fav == mejor else 1 - pm), "decidida": decidida, "ganador": ganador,
-                        "al_momento": True})
+                        "al_momento": True}
+            fila.update(self._como_va(fase, mejor, peor, piernas, estados, vuelta, fila["decidida"], fila["ganador"], gm, gp))
+            out.append(fila)
         return out
+
+    def _ida_que_falta(self, legs: list[dict], de_hoy: dict, mejor: str, peor: str, avisos: list[str]) -> None:
+        """
+        La vuelta se juega hoy y actual.json no tiene la ida como jugada (no corrió pipeline.py auto después de
+        la ida): se completa con partidos.csv o, si tampoco está ahí, con el global que da ESPN en la vuelta
+        (`aggregateScore` menos el marcador de la vuelta). Si ninguno sirve, se avisa. Si la ida sí está y el
+        global de ESPN no cuadra con ella, también se avisa (manda actual.json).
+        """
+        ida = next((pi for pi in legs if pi["pierna"] == 1), None)
+        v = de_hoy.get(2)
+        if ida is None or v is None or v["estado"] not in ("en_juego", "descanso", "final"):
+            return
+        gl_v, gv_v = v["_cruda"].get("global") or (None, None)
+        del_espn = None
+        if gl_v is not None and gv_v is not None and v["gl"] is not None:
+            # goles de la ida de cada equipo = global de la serie − goles de la vuelta (con su tiempo extra)
+            ida_de = {v["local"]: gl_v - v["gl"], v["visitante"]: gv_v - v["gv"]}
+            if set(ida_de) == {ida["local"], ida["visitante"]} and min(ida_de.values()) >= 0:
+                del_espn = (ida_de[ida["local"]], ida_de[ida["visitante"]])
+        if ida.get("jugado"):
+            if del_espn is not None and del_espn != (ida["gl"], ida["gv"]):
+                avisos.append(f"El global de ESPN no cuadra con la ida de actual.json ({ida['local']} {ida['gl']}-{ida['gv']} "
+                              f"{ida['visitante']}; según ESPN {del_espn[0]}-{del_espn[1]}): se usa actual.json.")
+            return
+        if de_hoy.get(1) is not None:                              # la ida también es hoy: no falta nada
+            return
+        fuente = None
+        if ida.get("id") is not None:
+            try:
+                df = self.df()
+                fila = df[df["id"] == int(ida["id"])]
+                if len(fila) and fila.iloc[0]["estado"] == "jugado":
+                    ida.update(jugado=True, gl=int(fila.iloc[0]["gl"]), gv=int(fila.iloc[0]["gv"]))
+                    fuente = "datos/partidos.csv"
+            except Exception as e:                                 # sin partidos.csv se intenta con ESPN
+                log(f"aviso: no se pudo leer la ida en partidos.csv: {type(e).__name__}: {e}")
+        if fuente is None and del_espn is not None:
+            ida.update(jugado=True, gl=del_espn[0], gv=del_espn[1])
+            fuente = "el global que da ESPN"
+        if fuente is not None:
+            avisos.append(f"La ida {ida['local']} {ida['gl']}-{ida['gv']} {ida['visitante']} no estaba jugada en actual.json: "
+                          f"se tomó de {fuente}. Correr python3 pipeline.py auto.")
+        else:
+            avisos.append(f"La ida {ida['local']}-{ida['visitante']} no aparece jugada ni en actual.json ni en partidos.csv y ESPN "
+                          "no da el global: la probabilidad de avanzar la trata como por jugar. Correr python3 pipeline.py auto.")
+
+    def _ganador_vuelta(self, fase: str, fin: dict, legs: list[dict], mejor: str) -> str | None:
+        """
+        Quién ganó la serie («mejor» o «peor») con la vuelta ya terminada, por el reglamento: global a 90
+        minutos; empatado en cuartos o semifinales, el mejor sembrado; en la final, los goles del tiempo extra
+        y luego la tanda. En la vuelta el `winner` de ESPN marca a quien avanza según ESPN (Clausura 2009:
+        Pachuca perdió 2-3 la vuelta y es `winner` por el global 4-3), pero ESPN aplica reglas viejas: en
+        Pumas 3-3 América (Clausura 2026, global 6-6) no marcó a nadie y su nota dio a América por gol de
+        visitante, regla que ya no existe. Por eso sólo se usa en la final, tras el tiempo extra sin goles de
+        diferencia y mientras ESPN no publique la tanda. None si todavía no se sabe.
+        """
+        c = fin["_cruda"]
+        if any(not pi.get("jugado") for pi in legs if pi["pierna"] != 2):
+            return None                                            # sin el marcador de la ida no se puede decidir (ya hay aviso)
+        lado_m = 0 if fin["local"] == mejor else 1
+        g90m = sum((pi["gl"] if pi["local"] == mejor else pi["gv"]) for pi in legs if pi.get("jugado") and pi["pierna"] != 2)
+        g90p = sum((pi["gv"] if pi["local"] == mejor else pi["gl"]) for pi in legs if pi.get("jugado") and pi["pierna"] != 2)
+        g90 = (c["gl90"], c["gv90"])
+        g90m, g90p = g90m + g90[lado_m], g90p + g90[1 - lado_m]
+        extra = list(c.get("extra") or (0, 0))
+        tanda = c.get("tanda") or (None, None)
+        if g90m != g90p:
+            return "mejor" if g90m > g90p else "peor"
+        if fase != "final":
+            return "mejor"                                         # global empatado: avanza el mejor sembrado
+        if extra[lado_m] != extra[1 - lado_m]:
+            return "mejor" if extra[lado_m] > extra[1 - lado_m] else "peor"
+        if None not in tanda and tanda[0] != tanda[1]:
+            gana_local = tanda[0] > tanda[1]
+            return "mejor" if gana_local == (lado_m == 0) else "peor"
+        if c.get("gana") in ("local", "visitante") and (fin["periodo"] or 0) >= 3:
+            return "mejor" if (c["gana"] == "local") == (lado_m == 0) else "peor"
+        return None
+
+    def _como_va(self, fase: str, mejor: str, peor: str, piernas: list[dict], estados: dict, vuelta: dict | None,
+                 decidida: bool, ganador: str | None, gm: int, gp: int) -> dict:
+        """`momento`, `avanza_ahora`, `motivo_ahora`, `le_falta` y `texto` de una serie (en_juego.situacion_serie)."""
+        from produccion import en_juego as EJ
+        e1, e2 = estados.get(1, "programado"), estados.get(2, "programado")
+        tanda = (None, None)
+        if decidida or e2 == "final":
+            momento = "terminada"
+        elif e2 in ESTADOS_ACTIVOS and vuelta is not None:
+            per = vuelta.get("periodo") or 0
+            pausa_90 = vuelta["estado"] == "descanso" and per == 2 and (vuelta.get("minuto") or 0) >= 90
+            momento = "penales" if per >= 5 else "tiempos_extra" if (per >= 3 or (pausa_90 and fase == "final")) else "vuelta"
+        elif e1 == "final":
+            momento = "entre"
+        elif e1 in ESTADOS_ACTIVOS:
+            momento = "ida"
+        else:
+            momento = "por_jugar"
+        if vuelta is not None and vuelta.get("penales"):
+            pen = vuelta["penales"]
+            tanda = (pen["l"], pen["v"]) if vuelta["local"] == mejor else (pen["v"], pen["l"])
+        sit = EJ.situacion_serie(fase, gm, gp, momento, tanda[0], tanda[1])
+        nombre = {"mejor": mejor, "peor": peor}
+        avanza = ganador if decidida else nombre.get(sit["avanza_ahora"])
+        if momento == "terminada" and not decidida:
+            avanza = None
+        return {"momento": momento, "avanza_ahora": avanza, "motivo_ahora": sit["motivo_ahora"], "le_falta": sit["le_falta"],
+                "texto": _texto_serie(fase, mejor, peor, momento, gm, gp, sit, avanza, piernas, tanda, vuelta)}
 
     def _siguiente(self, ctx: dict, partidos: list[dict], ahora: dt.datetime) -> dict | None:
         """El próximo partido que no ha empezado: de hoy si queda alguno; si no, del calendario previo."""
@@ -1021,6 +1194,73 @@ def _resumen_sim(sim: dict, completo: bool = True) -> dict:
     if completo and sim["meta"]["regular_completa"]:
         out["completo"] = sim                                      # para armar la liguilla al corte (`repetir`)
     return out
+
+
+def _goles(n: int) -> str:
+    return "un gol" if n == 1 else f"{n} goles"
+
+
+def _le_faltan(n: int) -> str:
+    return f"le {'falta' if n == 1 else 'faltan'} {_goles(n)}"
+
+
+def _may(s: str) -> str:
+    return s[:1].upper() + s[1:]
+
+
+def _global(mejor: str, peor: str, gm: int, gp: int) -> str:
+    """«global 3-3» o «global Tigres 4-3 Chivas» (primero el que va arriba)."""
+    if gm == gp:
+        return f"global {gm}-{gp}"
+    return f"global {mejor} {gm}-{gp} {peor}" if gm > gp else f"global {peor} {gp}-{gm} {mejor}"
+
+
+def _texto_serie(fase: str, mejor: str, peor: str, momento: str, gm: int, gp: int, sit: dict, avanza: str | None,
+                 piernas: list[dict], tanda: tuple, vuelta: dict | None) -> str:
+    """Una línea en español de cómo va la serie (la página la muestra tal cual; JavaScript no calcula nada)."""
+    final = fase == "final"
+    p1 = next((d for d in piernas if d["pierna"] == 1), None)
+    p2 = next((d for d in piernas if d["pierna"] == 2), None)
+    casa_vuelta = p2["local"] if p2 else mejor
+    regla = ("con el global empatado hay tiempos extra y, si sigue el empate, penales" if final
+             else f"con el global empatado avanza {mejor} por su mejor lugar en la tabla")
+    falta = sit.get("le_falta") or {}
+    if momento == "por_jugar":
+        return f"Serie por jugar: la ida es en casa de {p1['local'] if p1 else peor} y la vuelta en casa de {casa_vuelta}; {regla}."
+    if momento in ("ida", "entre"):
+        marc = f"{p1['local']} {p1['gl']}-{p1['gv']} {p1['visitante']}" if p1 and p1.get("gl") is not None else "por jugar"
+        return f"{'Ida en juego' if momento == 'ida' else 'Ida'}: {marc}. Falta la vuelta en casa de {casa_vuelta}; {regla}."
+    g = _global(mejor, peor, gm, gp)
+    otro = None if avanza is None else (peor if avanza == mejor else mejor)
+    n = abs(gm - gp)
+    if momento == "vuelta":
+        if not final:
+            if sit["motivo_ahora"] == "mejor_sembrado":
+                return f"{_may(g)}: si termina así, avanza {mejor} por su mejor lugar en la tabla. A {peor} le falta un gol."
+            k = falta.get("peor" if avanza == mejor else "mejor", n)
+            cola = " (con el empate global le alcanza, por su mejor lugar en la tabla)" if otro == mejor else ""
+            return f"{_may(g)}: si termina así, avanza {avanza}. A {otro} {_le_faltan(k)}{cola}."
+        if avanza is None:
+            return f"{_may(g)}: si termina así, habrá tiempos extra y, si sigue el empate, penales."
+        return f"{_may(g)}: si termina así, {avanza} es campeón. A {otro} {_le_faltan(n)} para empatar el global y llevar la final a tiempos extra."
+    if momento == "tiempos_extra":
+        if avanza is None:
+            return f"Tiempos extra, {g}: si termina así, se define en penales."
+        return f"Tiempos extra, {g}: si termina así, {avanza} es campeón. A {otro} {_le_faltan(n)} para llevarla a penales."
+    if momento == "penales":
+        t = ""
+        if vuelta is not None and vuelta.get("penales"):
+            t = f": {vuelta['local']} {vuelta['penales']['l']}-{vuelta['penales']['v']} {vuelta['visitante']} en la tanda"
+        return f"Se define en penales ({g}){t}."
+    if avanza is None:                                             # terminada, sin ganador confirmado
+        return f"Terminó la vuelta, {g}: falta que ESPN confirme quién ganó."
+    if not final:
+        return f"Avanza {avanza}: {g}, por su mejor lugar en la tabla." if gm == gp else f"Avanza {avanza}: {g}."
+    if gm == gp:
+        t = f" ({max(tanda)}-{min(tanda)})" if None not in tanda else ""
+        return f"{avanza} es campeón en penales{t} tras empatar {gm}-{gp} el global."
+    et = " en tiempos extra" if vuelta is not None and (vuelta.get("periodo") or 0) >= 3 else ""
+    return f"{avanza} es campeón{et}: {g}."
 
 
 def _proyeccion_previa(ctx: dict, n_sim: int, nota: str | None) -> dict:
@@ -1063,6 +1303,22 @@ def _min(e: dict) -> str:
     if e.get("min") is None:
         return ""
     return f" ({e['min']}'+{e['anadido']}')" if e.get("anadido") else f" ({e['min']}')"
+
+
+def _con_global(p: dict, gl=None, gv=None) -> str:
+    """« (global 2-4)» en el orden local-visitante del partido si es una vuelta con la ida ya jugada; si no, «»."""
+    s = p.get("serie") or {}
+    ida = s.get("ida")
+    if s.get("pierna") != 2 or not ida or ida.get("gl") is None:
+        return ""
+    gl = p["gl"] if gl is None else gl
+    gv = p["gv"] if gv is None else gv
+    if gl is None or gv is None:
+        return ""
+    de = {ida["local"]: ida["gl"], ida["visitante"]: ida["gv"]}
+    if p["local"] not in de or p["visitante"] not in de:
+        return ""
+    return f" (global {int(gl) + de[p['local']]}-{int(gv) + de[p['visitante']]})"
 
 
 def detectar_eventos(previos: dict, nuevos: list[dict]) -> list[dict]:
@@ -1109,9 +1365,10 @@ def detectar_eventos(previos: dict, nuevos: list[dict]) -> list[dict]:
                     como = " de penal" if e["tipo"] == "penal" else " (autogol)" if e["tipo"] == "autogol" else ""
                     quien = f": {e['jugador']}" if e.get("jugador") else ""
                     parcial = e["marcador"].split("-")
-                    texto = f"Gol de {eq}{como}{_min(e)}{quien}. {p['local']} {parcial[0]}-{parcial[1]} {p['visitante']}"
+                    texto = (f"Gol de {eq}{como}{_min(e)}{quien}. {p['local']} {parcial[0]}-{parcial[1]} {p['visitante']}"
+                             + _con_global(p, int(parcial[0]), int(parcial[1])))
                 else:                                               # ESPN ya movió el marcador pero aún no publica la jugada
-                    texto = f"Gol de {eq}. {_marcador(p)}"
+                    texto = f"Gol de {eq}. {_marcador(p)}{_con_global(p)}"
                 nuevas.append((orden, "gol", texto))
             antes = a["rojas_l"] if k == 0 else a["rojas_v"]
             ahora_ = p["rojas_l"] if k == 0 else p["rojas_v"]
@@ -1120,21 +1377,29 @@ def detectar_eventos(previos: dict, nuevos: list[dict]) -> list[dict]:
                 e = del_equipo_r[n - 1] if n <= len(del_equipo_r) else None
                 quien = f": {e['jugador']}" if (e and e.get("jugador")) else ""
                 orden = lugar(e) if e is not None else 10 ** 6 + 50 + n
-                nuevas.append((orden, "roja", f"Expulsión en {eq}{_min(e) if e else ''}{quien}. {_marcador(p)}"))
+                nuevas.append((orden, "roja", f"Expulsión en {eq}{_min(e) if e else ''}{quien}. {_marcador(p)}{_con_global(p)}"))
         for _, tipo, texto in sorted(nuevas, key=lambda t: t[0]):   # en el orden de la lista de jugadas del partido
             ev(tipo, p, texto)
         if eb != ea:
+            glob = _con_global(p)
+            serie = p.get("serie") or {}
             if eb == 2:
-                ev("descanso", p, f"Descanso: {_marcador(p)}")
+                ev("descanso", p, f"Descanso: {_marcador(p)}{glob}")
             elif eb == 3 and ea < 3:
-                ev("segundo_tiempo", p, f"Arranca el segundo tiempo: {_marcador(p)}")
+                ev("segundo_tiempo", p, f"Arranca el segundo tiempo: {_marcador(p)}{glob}")
             elif eb in (4, 5) and ea < 4 and (eb == 5 or p.get("fase") == "final"):
-                ev("tiempos_extra", p, f"Habrá tiempos extra: {_marcador(p)}")
+                ev("tiempos_extra", p, f"Habrá tiempos extra: {_marcador(p)}{glob}")
             elif eb == 6:
-                ev("penales", p, f"Se va a penales: {_marcador(p)}")
+                ev("penales", p, f"Se va a penales: {_marcador(p)}{glob}")
             elif eb == 7:
                 pen = f" (penales {p['penales']['l']}-{p['penales']['v']})" if p.get("penales") else ""
-                ev("final", p, f"Final: {_marcador(p)}{pen}")
+                if serie.get("pierna") == 1:
+                    texto = f"Final de la ida: {_marcador(p)}{pen}"
+                elif serie.get("pierna") == 2 and serie.get("decidida") and serie.get("texto"):
+                    texto = f"Final: {_marcador(p)}{pen}. {serie['texto']}"       # quién avanzó y por qué
+                else:
+                    texto = f"Final: {_marcador(p)}{pen}{glob}"
+                ev("final", p, texto)
     return evs
 
 
@@ -1222,6 +1487,16 @@ def validar_documento(doc: dict) -> list[str]:
         for e in p.get("eventos") or []:
             if e.get("tipo") not in ("gol", "penal", "autogol", "roja"):
                 err.append(f"partido {p.get('id')}: evento de tipo inválido")
+    for s in doc["series"]:
+        if s.get("momento") not in (None, "por_jugar", "ida", "entre", "vuelta", "tiempos_extra", "penales", "terminada"):
+            err.append(f"serie {s.get('llave')}: momento inválido")
+        equipos = {(s.get("mejor") or {}).get("equipo"), (s.get("peor") or {}).get("equipo")}
+        if s.get("avanza_ahora") is not None and s["avanza_ahora"] not in equipos:
+            err.append(f"serie {s.get('llave')}: avanza_ahora no es de la serie")
+        if s.get("decidida") and s.get("ganador") not in equipos:
+            err.append(f"serie {s.get('llave')}: decidida sin ganador de la serie")
+        if not (0.0 <= float(s.get("p_avanza_mejor", 0.0)) <= 1.0):
+            err.append(f"serie {s.get('llave')}: p_avanza_mejor fuera de rango")
     if doc["tabla"] and [f["pos"] for f in doc["tabla"]] != list(range(1, len(doc["tabla"]) + 1)):
         err.append("posiciones de la tabla no consecutivas")
     for llave in ("clasifica", "campeon"):
@@ -1624,7 +1899,8 @@ def plan(horas: float = 48.0, ahora: dt.datetime | None = None, pedir=None) -> d
             for c in leer_dia(dia, pedir):
                 crudas[c["id"]] = c
             dia += dt.timedelta(days=1)
-        lista = [{"id": c["id"], "inicio": c["inicio"], "local": c["local"], "visitante": c["visitante"], "estado": c["estado"]}
+        lista = [{"id": c["id"], "inicio": c["inicio"], "local": c["local"], "visitante": c["visitante"], "estado": c["estado"],
+                  "slug": c.get("slug"), "pierna": c.get("pierna")}
                  for c in crudas.values() if c["estado"] in ("programado", "en_juego", "descanso")]
     except ErrorRed as e:
         out["fuente"] = f"actual.json (ESPN no respondió: {e})"
@@ -1634,10 +1910,18 @@ def plan(horas: float = 48.0, ahora: dt.datetime | None = None, pedir=None) -> d
         if d["estado"] == "programado" and not (ahora <= d["inicio"] <= fin):
             continue
         loc = d["inicio"].astimezone(ZONA)
+        info = ctx["partidos"].get(d["id"]) or ctx["por_equipos"].get((d["local"], d["visitante"])) or {}
+        fase, etiqueta = info.get("fase"), info.get("etiqueta")
+        if not fase and d.get("slug"):                             # ESPN ya lo lista y actual.json todavía no: fase del slug
+            _tablas_espn()
+            fase = _FASE_SLUG(d["slug"]) if _FASE_SLUG else None
+        if not etiqueta and fase and fase != "regular":
+            etiqueta = NOMBRE_FASE.get(fase, str(fase).capitalize()) + (
+                f", {'ida' if d.get('pierna') == 1 else 'vuelta'}" if d.get("pierna") in (1, 2) else "")
         out["partidos"].append({"id": d["id"], "inicio_utc": iso(d["inicio"]), "inicio_mexico": loc.strftime("%Y-%m-%d %H:%M"),
                                 "observar_desde_utc": iso(d["inicio"] - dt.timedelta(minutes=MIN_ANTES)),
                                 "local": d["local"], "visitante": d["visitante"], "estado": d["estado"],
-                                "etiqueta": (ctx["partidos"].get(d["id"]) or {}).get("etiqueta")})
+                                "fase": fase, "etiqueta": etiqueta})
     fut = [f for f in ctx["futuros"] if f.get("inicio_utc") and de_iso(f["inicio_utc"]) > ahora]
     if fut:
         s = min(fut, key=lambda f: f["inicio_utc"])

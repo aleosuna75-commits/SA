@@ -439,7 +439,7 @@ def test_documento_cumple_el_contrato_y_pesa_poco(df, pron_7nov, par, tmp_path):
     assert ahora["Toluca"]["PTS"] == antes.loc["Toluca", "PTS"] + 3 and ahora["Monterrey"]["PTS"] == antes.loc["Monterrey", "PTS"]
     assert ahora["Pachuca"]["PTS"] == antes.loc["Pachuca", "PTS"] + 3 and ahora["Pumas"]["PJ"] == antes.loc["Pumas", "PJ"]
     assert sum(f_["cambio"] for f_ in doc["tabla"]) == 0
-    assert "en juego" in doc["tabla_nota"]
+    assert "en juego" in doc["tabla_nota"] and doc["tabla_fija"] is False
     # proyección al momento con los tres partidos tocados
     pr = doc["proyeccion"]
     assert sorted(pr["partidos_considerados"]) == sorted([ID_ATLAS_PACHUCA, ID_TOLUCA_MONTERREY, 401876906])
@@ -543,7 +543,10 @@ def test_series_de_liguilla_al_momento(par):
     assert p["fase"] == "cuartos" and p["etiqueta"] == "Cuartos de final, vuelta"
     assert p["serie"] == {"llave": "C1", "mejor": "Cruz Azul", "peor": "Tijuana", "global_mejor": 1, "global_peor": 1,
                           "p_avanza_mejor": s["p_avanza_mejor"], "p_avanza_peor": s["p_avanza_peor"],
-                          "fase": "cuartos", "decidida": False, "ganador": None}
+                          "fase": "cuartos", "decidida": False, "ganador": None, "pierna": 2,
+                          "ida": {"local": "Tijuana", "visitante": "Cruz Azul", "gl": 1, "gv": 0}, "momento": "vuelta",
+                          "avanza_ahora": "Cruz Azul", "motivo_ahora": "mejor_sembrado", "le_falta": {"mejor": 0, "peor": 1},
+                          "texto": "Global 1-1: si termina así, avanza Cruz Azul por su mejor lugar en la tabla. A Tijuana le falta un gol."}
     # el mismo estado en una final vale menos: hay tiempos extra y penales
     sf = motor("final").documento([_cruda(9002, "Cruz Azul", "Tijuana", "en_juego", 70, 1, 0)], ahora)["series"][0]
     assert sf["p_avanza_mejor"] < s["p_avanza_mejor"]
@@ -556,8 +559,18 @@ def test_series_de_liguilla_al_momento(par):
     # en la final un 1-1 global no se decide hasta que ESPN diga quién ganó el tiempo extra o los penales
     s4 = motor("final").documento([_cruda(9002, "Cruz Azul", "Tijuana", "final", 90, 1, 0)], ahora)["series"][0]
     assert s4["decidida"] is False and 0.3 < s4["p_avanza_mejor"] < 0.7
-    s5 = motor("final").documento([_cruda(9002, "Cruz Azul", "Tijuana", "final", 120, 1, 0, gana="visitante")], ahora)["series"][0]
+    # tras 120 minutos sin goles en el tiempo extra y sin la tanda publicada, en la final vale el `winner` de ESPN: en la
+    # vuelta marca a quien avanza (Apertura 2008: Toluca perdió 0-2 la vuelta y es `winner`, campeón en penales 7-6)
+    s5 = motor("final").documento([_cruda(9002, "Cruz Azul", "Tijuana", "final", 120, 1, 0, periodo=4, gana="visitante")], ahora)["series"][0]
     assert (s5["decidida"], s5["ganador"], s5["p_avanza_mejor"]) == (True, "Tijuana", 0.0)
+    assert s5["texto"] == "Tijuana es campeón en penales tras empatar 1-1 el global."
+    # sin `winner` ni tanda: penales sin dato, 50/50 y «falta que ESPN confirme»
+    s5b = motor("final").documento([_cruda(9002, "Cruz Azul", "Tijuana", "final", 120, 1, 0, periodo=4)], ahora)["series"][0]
+    assert (s5b["decidida"], s5b["ganador"], s5b["p_avanza_mejor"], s5b["momento"]) == (False, None, 0.5, "terminada")
+    assert s5b["texto"] == "Terminó la vuelta, global 1-1: falta que ESPN confirme quién ganó."
+    # en cuartos el `winner` de ESPN no cuenta nunca (Pumas 3-3 América, Clausura 2026: ESPN aplicó el gol de visitante)
+    s5c = motor("cuartos").documento([_cruda(9002, "Cruz Azul", "Tijuana", "final", 90, 1, 0, gana="visitante")], ahora)["series"][0]
+    assert (s5c["decidida"], s5c["ganador"]) == (True, "Cruz Azul")
     # sin partido de la serie hoy se repite lo que ya decía actual.json
     s6 = motor("cuartos").documento([], ahora)["series"][0]
     assert (s6["al_momento"], s6["p_avanza_mejor"], s6["delta_avanza_mejor"], s6["global_mejor"], s6["global_peor"]) == (False, 0.62, 0.0, 0, 1)
@@ -985,3 +998,408 @@ def test_exportar_incrusta_el_documento_en_vivo(tmp_path):
     ruta.unlink()
     assert ex.incrustar_vivo(actual, ruta) is True and json.loads(actual.read_text(encoding="utf-8"))["vivo"] is None
     assert not (tmp_path / "historial").exists()
+
+
+# ==================================================================================================
+# Liguilla: series a dos partidos con la forma real de ESPN (desde el Apertura 2026)
+# ==================================================================================================
+def test_situacion_serie_y_tiempo_extra_siguen_el_reglamento():
+    sit = EJ.situacion_serie
+    for m in ("por_jugar", "ida", "entre"):                      # con la vuelta por jugar no hay «si terminara así»
+        assert sit("cuartos", 1, 0, m) == {"avanza_ahora": None, "motivo_ahora": None, "le_falta": None}
+    # cuartos y semifinales: global empatado = mejor sembrado; sin gol de visitante ni tiempos extra
+    assert sit("cuartos", 3, 3, "vuelta") == {"avanza_ahora": "mejor", "motivo_ahora": "mejor_sembrado",
+                                              "le_falta": {"mejor": 0, "peor": 1}}
+    assert sit("semifinal", 2, 4, "vuelta") == {"avanza_ahora": "peor", "motivo_ahora": "global", "le_falta": {"mejor": 2, "peor": 0}}
+    assert sit("cuartos", 5, 3, "vuelta")["le_falta"] == {"mejor": 0, "peor": 3}
+    assert sit("cuartos", 6, 6, "terminada") == {"avanza_ahora": "mejor", "motivo_ahora": "mejor_sembrado", "le_falta": None}
+    # final: empate global a los 90' = tiempos extra; empate tras el tiempo extra = penales
+    assert sit("final", 1, 1, "vuelta") == {"avanza_ahora": None, "motivo_ahora": "tiempos_extra", "le_falta": {"mejor": 1, "peor": 1}}
+    assert sit("final", 1, 2, "vuelta") == {"avanza_ahora": "peor", "motivo_ahora": "global", "le_falta": {"mejor": 2, "peor": 0}}
+    assert sit("final", 2, 2, "tiempos_extra")["motivo_ahora"] == "penales" and sit("final", 3, 2, "tiempos_extra")["avanza_ahora"] == "mejor"
+    assert sit("final", 2, 2, "penales", 3, 4)["avanza_ahora"] == "peor"
+    assert sit("final", 2, 2, "terminada", 5, 4) == {"avanza_ahora": "mejor", "motivo_ahora": "penales", "le_falta": None}
+    with pytest.raises(ValueError):
+        sit("cuartos", 0, 0, "medio_tiempo")
+    # lineal por el minuto (vivo.py pasa «107'» del primer tiempo extra a 105'+2'); el segundo tiempo extra deja a lo más
+    # la mitad y un piso mientras ESPN diga que se juega
+    assert EJ.fraccion_extra_restante(91, 3) == pytest.approx(29.5 / 30) and EJ.fraccion_extra_restante(105, 3) == pytest.approx(15.5 / 30)
+    assert EJ.fraccion_extra_restante(112, 3) == pytest.approx(8.5 / 30)          # ESPN no movió el periodo: manda el minuto
+    assert EJ.fraccion_extra_restante(110, 4) == pytest.approx(10.5 / 30)
+    assert EJ.fraccion_extra_restante(122, 4) == pytest.approx(EJ.MINUTOS_PISO_EXTRA / 30)
+    assert (EJ.fraccion_extra_restante(None, 3), EJ.fraccion_extra_restante(None, 4), EJ.fraccion_extra_restante(120, 5)) == (1.0, 0.5, 0.0)
+
+
+def _estado_espn(ev: dict, nombre: str, fase_espn: str, periodo: int, reloj: str, clock: float = 0.0) -> dict:
+    e = copy.deepcopy(ev)
+    st = {"clock": clock, "displayClock": reloj, "period": periodo,
+          "type": {"name": nombre, "state": fase_espn, "completed": fase_espn == "post"}}
+    e["competitions"][0]["status"], e["status"] = st, st
+    return e
+
+
+def test_estados_de_espn_de_tiempos_extra_y_penales():
+    """Nombres de estado de ESPN para el fútbol con tiempos extra (los de la final): estado y periodo que entiende el motor."""
+    ev = evento("20261107", ID_PUMAS_AMERICA)
+    casos = [("STATUS_END_OF_REGULATION", "in", 2, "90'+5'", ("descanso", 2)),
+             ("STATUS_EXTRA_TIME", "in", 3, "95'", ("en_juego", 3)),
+             ("STATUS_EXTRA_TIME", "in", 2, "95'", ("en_juego", 3)),          # ESPN no movió el periodo
+             ("STATUS_FIRST_HALF_EXTRA_TIME", "in", 3, "101'", ("en_juego", 3)),
+             ("STATUS_OVERTIME", "in", 2, "98'", ("en_juego", 3)),
+             ("STATUS_HALFTIME_ET", "in", 3, "HT", ("descanso", 3)),
+             ("STATUS_SECOND_HALF_EXTRA_TIME", "in", 4, "112'", ("en_juego", 4)),
+             ("STATUS_SECOND_HALF_EXTRA_TIME", "in", 2, "112'", ("en_juego", 4)),    # ESPN no movió el periodo
+             ("STATUS_END_OF_EXTRATIME", "in", 4, "120'+2'", ("descanso", 4)),
+             ("STATUS_END_OF_EXTRATIME", "in", 2, "120'", ("descanso", 4)),
+             ("STATUS_SHOOTOUT", "in", 5, "120'", ("en_juego", 5)),
+             ("STATUS_SHOOTOUT", "in", 4, "120'", ("en_juego", 5)),
+             ("STATUS_FINAL_AET", "post", 2, "120'", ("final", 4)),
+             ("STATUS_FINAL_PEN", "post", 4, "120'", ("final", 5)),
+             ("STATUS_FULL_TIME", "post", 2, "90'+4'", ("final", 2))]
+    for nombre, fe, per, reloj, esperado in casos:
+        c = vivo.normalizar_evento(_estado_espn(ev, nombre, fe, per, reloj))
+        assert (c["estado"], c["periodo"]) == esperado, nombre
+        assert c["medio_tiempo"] is False, nombre                    # ninguna de estas pausas es el medio tiempo
+    assert vivo._minuto("105'+1'", None) == (105, 1) and vivo._minuto("120'", None) == (120, None)
+    # el global de la serie que ESPN da en la vuelta (aggregateScore) se lee por lado
+    e = copy.deepcopy(ev)
+    for x, g in zip(e["competitions"][0]["competitors"], ("6", "5")):
+        x["aggregateScore"] = g
+    c = vivo.normalizar_evento(e)
+    assert (c["global_l"], c["global_v"]) == (6, 5) and vivo.normalizar_evento(ev)["global_l"] is None
+
+
+def _serie_final_pumas_america(ida=(1, 1)):
+    """Final construida con el partido real Pumas 2-2 América (7-nov) como VUELTA: ida América-Pumas jugada."""
+    return {"llave": "F", "fase": "final", "real": True, "definida": True, "viene_de": ["S1", "S2"],
+            "mejor": {"equipo": "Pumas", "siembra": 1}, "peor": {"equipo": "América", "siembra": 3},
+            "piernas": [{"pierna": 1, "id": 9101, "local": "América", "visitante": "Pumas", "jugado": True, "gl": ida[0], "gv": ida[1]},
+                        {"pierna": 2, "id": ID_PUMAS_AMERICA, "local": "Pumas", "visitante": "América", "jugado": False,
+                         "gl": None, "gv": None, "lam_l": 1.5, "lam_v": 1.2, "p_local": 0.45, "p_empate": 0.27, "p_visitante": 0.28,
+                         "marcador": {"gl": 1, "gv": 1, "prob": 0.12}}],
+            "p_avanza_mejor": 0.55, "p_avanza_peor": 0.45, "favorito": "Pumas", "p_favorito": 0.55, "decidida": False, "ganador": None}
+
+
+def _actual_liguilla(series, pendientes=(), tabla=()):
+    return {"meta": {"torneo": TORNEO}, "tabla": list(tabla), "pendientes": list(pendientes),
+            "proyeccion": {"n_sim": 20000, "regular_completa": True, "tabla_final": [],
+                           "campeon": [{"equipo": "Pumas", "prob": 0.3}, {"equipo": "América", "prob": 0.25}]},
+            "liguilla": {"torneo": {"estado": "en_curso", "rondas": [{"fase": series[0]["fase"], "series": list(series)}]}}}
+
+
+def test_final_con_tiempos_extra_y_penales_de_principio_a_fin(par):
+    """La vuelta de una final con los estados de ESPN: fin de los 90', tiempo extra con gol, final tras tiempo extra o penales."""
+    ev = evento("20261107", ID_PUMAS_AMERICA)                    # Pumas 2-2 América a los 90'; ida América 1-1 Pumas: global 3-3
+    am = next(x["team"]["id"] for x in ev["competitions"][0]["competitors"] if x["homeAway"] == "away")
+    ahora = dt.datetime(2026, 11, 8, 5, 30, tzinfo=UTC)
+
+    def doc_de(e, motor):
+        return motor.documento([vivo.normalizar_evento(e)], ahora)
+
+    m = vivo.Motor(actual=_actual_liguilla([_serie_final_pumas_america()]), sellos={}, parametros=par, proyectar=False)
+    fin90 = doc_de(_estado_espn(ev, "STATUS_END_OF_REGULATION", "in", 2, "90'+6'", 5400.0), m)
+    s, p = fin90["series"][0], fin90["partidos"][0]
+    assert vivo.validar_documento(fin90) == [] and p["vivo"]["p_empate"] == 1.0          # el pronóstico era a 90'
+    assert (s["global_mejor"], s["global_peor"], s["momento"], s["avanza_ahora"], s["motivo_ahora"]) == (3, 3, "tiempos_extra", None, "penales")
+    exacto = EJ.prob_avanza("final", S.matriz_fija(1, 1), S.matriz_fija(2, 2), False, True, (1.5, 1.2))["p_avanza_mejor"]
+    assert s["p_avanza_mejor"] == pytest.approx(exacto, abs=1e-4) and 0.5 < s["p_avanza_mejor"] < 0.6   # tiempo extra en casa y penales
+    assert s["texto"] == "Tiempos extra, global 3-3: si termina así, se define en penales."
+    # en el tiempo extra América anota al 105' (reloj «107'» = 105'+2'): ESPN suma el gol al marcador
+    e = _estado_espn(ev, "STATUS_EXTRA_TIME", "in", 3, "107'", 6420.0)
+    comp = e["competitions"][0]
+    comp["details"].append({"type": {"id": "70", "text": "Goal"}, "clock": {"value": 6300.0, "displayValue": "105'"}, "team": {"id": am},
+                            "scoringPlay": True, "redCard": False, "yellowCard": False, "penaltyKick": False, "ownGoal": False,
+                            "shootout": False, "athletesInvolved": [{"id": "1", "displayName": "Henry Martín"}]})
+    next(x for x in comp["competitors"] if x["homeAway"] == "away")["score"] = "3"
+    te = doc_de(e, m)
+    s, p = te["series"][0], te["partidos"][0]
+    assert (p["periodo"], p["minuto"], p["anadido"], p["gl"], p["gv"], p["gl90"], p["gv90"]) == (3, 105, 2, 2, 3, 2, 2)
+    assert (s["global_mejor"], s["global_peor"], s["momento"], s["avanza_ahora"], s["motivo_ahora"]) == (3, 4, "tiempos_extra", "América", "global")
+    assert s["le_falta"] == {"mejor": 2, "peor": 0} and 0.0 < s["p_avanza_mejor"] < 0.2
+    assert s["texto"] == "Tiempos extra, global América 4-3 Pumas: si termina así, América es campeón. A Pumas le falta un gol para llevarla a penales."
+    evs = vivo.detectar_eventos({ID_PUMAS_AMERICA: fin90["partidos"][0]}, te["partidos"])
+    assert [x["tipo"] for x in evs] == ["gol"] and evs[0]["texto"] == "Gol de América (105'): Henry Martín. Pumas 2-3 América (global 3-4)"
+    # final tras el tiempo extra: campeón América por el gol del tiempo extra, aunque ESPN marque `winner` al revés
+    e2 = _estado_espn(e, "STATUS_FINAL_AET", "post", 2, "120'+3'", 7200.0)
+    for x in e2["competitions"][0]["competitors"]:
+        x["winner"] = x["homeAway"] == "home"                       # `winner` equivocado a propósito
+    fin = doc_de(e2, m)
+    s = fin["series"][0]
+    assert (fin["estado"], s["decidida"], s["ganador"], s["p_avanza_mejor"], s["momento"]) == ("terminado_hoy", True, "América", 0.0, "terminada")
+    assert s["texto"] == "América es campeón en tiempos extra: global América 4-3 Pumas."
+    evs = vivo.detectar_eventos({ID_PUMAS_AMERICA: te["partidos"][0]}, fin["partidos"])
+    assert evs[-1]["texto"] == "Final: Pumas 2-3 América. América es campeón en tiempos extra: global América 4-3 Pumas."
+    # o bien penales: 2-2 tras 120', tanda 4-3 para Pumas (y `winner` de ESPN equivocado): manda la tanda
+    m2 = vivo.Motor(actual=_actual_liguilla([_serie_final_pumas_america()]), sellos={}, parametros=par, proyectar=False)
+    pen = _estado_espn(ev, "STATUS_SHOOTOUT", "in", 5, "120'", 7200.0)
+    for x, t in zip(pen["competitions"][0]["competitors"], (2, 2)):
+        x["shootoutScore"] = t
+    d_pen = doc_de(pen, m2)
+    s = d_pen["series"][0]
+    assert (s["momento"], s["motivo_ahora"], s["p_avanza_mejor"]) == ("penales", "penales", 0.5)
+    assert s["texto"] == "Se define en penales (global 3-3): Pumas 2-2 América en la tanda."
+    fin_pen = _estado_espn(pen, "STATUS_FINAL_PEN", "post", 4, "120'", 7200.0)
+    for x in fin_pen["competitions"][0]["competitors"]:
+        x["shootoutScore"] = 4 if x["homeAway"] == "home" else 3
+        x["winner"] = x["homeAway"] == "away"
+    d_fin = doc_de(fin_pen, m2)
+    s, p = d_fin["series"][0], d_fin["partidos"][0]
+    assert (s["decidida"], s["ganador"], s["avanza_ahora"], p["penales"]) == (True, "Pumas", "Pumas", {"l": 4, "v": 3})
+    assert s["texto"] == "Pumas es campeón en penales (4-3) tras empatar 3-3 el global."
+    assert vivo.detectar_eventos({ID_PUMAS_AMERICA: d_pen["partidos"][0]}, d_fin["partidos"])[-1]["texto"] == \
+        "Final: Pumas 2-2 América (penales 4-3). Pumas es campeón en penales (4-3) tras empatar 3-3 el global."
+
+
+def test_el_winner_de_espn_no_decide_la_serie(par):
+    """Final: ida 2-0 Tijuana; vuelta 2-0 Cruz Azul a los 90' (global 2-2) y Tijuana anota en el tiempo extra (2-1).
+    Aunque ESPN marcara `winner` a Cruz Azul (ESPN ya se equivocó de regla en Pumas 3-3 América del Clausura 2026),
+    el campeón es Tijuana (global 2-3): manda el gol del tiempo extra."""
+    s = _serie("final")
+    s["piernas"][0].update(gl=2, gv=0)
+    actual = {"meta": {"torneo": TORNEO}, "tabla": [], "pendientes": [],
+              "proyeccion": {"n_sim": 20000, "regular_completa": True, "tabla_final": [], "campeon": [{"equipo": "Cruz Azul", "prob": 0.3}]},
+              "liguilla": {"torneo": {"rondas": [{"fase": "final", "series": [s]}]}}}
+    c = _cruda(9002, "Cruz Azul", "Tijuana", "final", 120, 2, 0, periodo=4, gana="local")
+    c["jugadas"].append({"clase": "gol", "tipo": "gol", "lado": 1, "min": 108, "anadido": None, "seg": 108 * 60.0, "jugador": "T", "jid": ""})
+    c["gv"] = 1
+    m = vivo.Motor(actual=actual, sellos={}, parametros=par, proyectar=False)
+    vistos = {}
+    m._proyeccion = lambda ctx, tocados, ahora, ganadores=None: vistos.update(ganadores or {}) or vivo._proyeccion_previa(ctx, 0, None)
+    doc = m.documento([c], dt.datetime(2026, 11, 29, 4, 0, tzinfo=UTC))
+    sx = doc["series"][0]
+    assert (sx["decidida"], sx["ganador"], sx["p_avanza_mejor"]) == (True, "Tijuana", 0.0)
+    assert vistos == {9002: "Tijuana"}                                # el campeón al momento usa el ganador del reglamento
+    ej = m._en_juego_sim([dict(doc["partidos"][0], _cruda={"gl90": 2, "gv90": 0, "rest": (0.0, 0.0), "previo": None, "extra": [0, 1]})],
+                         {9002: "Tijuana"})
+    assert ej[9002]["avanza"] == "Tijuana" and (ej[9002]["gl"], ej[9002]["gv"]) == (2, 0)
+
+
+def _serie_sin_ids(fase="cuartos"):
+    """Como hoy (23-nov): serie `definida` (equipos seguros) pero sin partidos en el calendario: piernas sin id ni fecha."""
+    s = _serie(fase, ida_jugada=False)
+    s.update(real=False, definida=True)
+    for pi, (pl, pe, pv) in zip(s["piernas"], ((0.38, 0.27, 0.35), (0.62, 0.22, 0.16))):
+        pi.update(id=None, fecha_utc=None, p_local=pl, p_empate=pe, p_visitante=pv, marcador={"gl": 1, "gv": 1, "prob": 0.12})
+    return s
+
+
+def test_ida_de_cuartos_reconocida_por_equipos_y_con_la_vuelta_por_jugar(par):
+    """ESPN ya lista la ida y actual.json todavía no la tiene (sin id): se reconoce por equipos, toma el previo de
+    liguilla.torneo y la probabilidad de avanzar cuenta la vuelta entera."""
+    m = vivo.Motor(actual=_actual_liguilla([_serie_sin_ids()]), sellos={}, parametros=par, proyectar=False)
+    ahora = dt.datetime(2026, 11, 26, 1, 40, tzinfo=UTC)
+    c = _cruda(777, "Tijuana", "Cruz Azul", "en_juego", 30, 1, 0, periodo=1, inicio="2026-11-26T01:00:00Z")
+    c.update(pierna=1, slug="apertura---quarterfinals")
+    doc = m.documento([c], ahora)
+    assert vivo.validar_documento(doc) == []
+    p, s = doc["partidos"][0], doc["series"][0]
+    assert (p["fase"], p["etiqueta"], p["previo"]["origen"]) == ("cuartos", "Cuartos de final, ida", "liguilla.torneo")
+    assert p["vivo"] is not None and p["vivo"]["p_local"] > p["previo"]["p_local"]          # va ganando el local
+    assert s["piernas"][0]["id"] == 777 and s["al_momento"] and (s["momento"], s["avanza_ahora"], s["le_falta"]) == ("ida", None, None)
+    assert p["serie"]["llave"] == "C1" and p["serie"]["pierna"] == 1 and p["serie"]["ida"] is None
+    r30 = EJ.pronostico(par, 1.4, 1.5, 1, 0, 30, 1, en_curso=True)
+    exacto = EJ.prob_avanza("cuartos", r30["M"], arnes.matriz_marcadores(2.0, 0.9, 0.0), False, True)["p_avanza_mejor"]
+    assert s["p_avanza_mejor"] == pytest.approx(exacto, abs=1e-4) and 0.4 < s["p_avanza_mejor"] < 0.9   # falta la vuelta: nada decidido
+    assert s["texto"] == ("Ida en juego: Tijuana 1-0 Cruz Azul. Falta la vuelta en casa de Cruz Azul; con el global empatado "
+                          "avanza Cruz Azul por su mejor lugar en la tabla.")
+    assert "liguilla no se suman puntos" in doc["tabla_nota"] and doc["tabla_fija"] is True
+    # la ida termina 3-0: Tijuana va arriba pero falta la vuelta (ni decidida ni con «si terminara así»)
+    c3 = _cruda(777, "Tijuana", "Cruz Azul", "final", 90, 3, 0, inicio="2026-11-26T01:00:00Z")
+    c3.update(pierna=1, slug="apertura---quarterfinals")
+    d3 = m.documento([c3], ahora + dt.timedelta(hours=1))
+    s3 = d3["series"][0]
+    assert (s3["momento"], s3["decidida"], s3["global_mejor"], s3["global_peor"]) == ("entre", False, 0, 3)
+    assert 0.0 < s3["p_avanza_mejor"] < 0.3 and d3["partidos"][0]["serie"]["ida"] == {"local": "Tijuana", "visitante": "Cruz Azul", "gl": 3, "gv": 0}
+    assert vivo.detectar_eventos({777: doc["partidos"][0]}, d3["partidos"])[-1]["texto"] == "Final de la ida: Tijuana 3-0 Cruz Azul"
+
+
+def test_vuelta_cuando_actual_json_no_trae_la_ida(par):
+    """Si no corrió pipeline.py auto tras la ida, la vuelta no la trata como por jugar en silencio."""
+    sello = {9002: {"id": 9002, "sellado_utc": "2026-11-28T07:20:00+00:00", "fecha_utc": "2026-11-29T01:00:00+00:00", "fase": "cuartos",
+                    "pierna": 2, "lam_l": 2.0, "lam_v": 0.9, "rho": 0.0, "p_l": 0.64, "p_e": 0.2, "p_v": 0.16, "marcador": {"gl": 2, "gv": 0, "prob": 0.1}}}
+    ahora = dt.datetime(2026, 11, 29, 2, 0, tzinfo=UTC)
+
+    def doc(df=None, global_=(None, None), ida_jugada=False, estado="en_juego"):
+        actual = _actual_liguilla([_serie("cuartos", ida_jugada=ida_jugada)])
+        m = vivo.Motor(actual=actual, sellos=sello, parametros=par, proyectar=False, df=df)
+        c = _cruda(9002, "Cruz Azul", "Tijuana", estado, 60 if estado == "en_juego" else 90, 1, 0)
+        c["global_l"], c["global_v"] = global_
+        return m.documento([c], ahora)
+
+    vacio = pd.DataFrame({"id": [1], "estado": ["jugado"], "gl": [0], "gv": [0]})
+    # 1) partidos.csv ya la tiene (2-0 Tijuana)
+    d = doc(df=pd.DataFrame({"id": [9001], "estado": ["jugado"], "gl": [2], "gv": [0]}))
+    s = d["series"][0]
+    assert (s["global_mejor"], s["global_peor"], s["piernas"][0]["estado"]) == (1, 2, "final") and "datos/partidos.csv" in d["avisos"][0]
+    assert s["texto"] == ("Global Tijuana 2-1 Cruz Azul: si termina así, avanza Tijuana. A Cruz Azul le falta un gol "
+                          "(con el empate global le alcanza, por su mejor lugar en la tabla).")
+    # 2) sólo ESPN: global 1-1 en la vuelta (Cruz Azul 1, Tijuana 1) => ida Tijuana 1-0
+    d = doc(df=vacio, global_=(1, 1))
+    s = d["series"][0]
+    assert (s["global_mejor"], s["global_peor"], s["ida"]) == (1, 1, {"local": "Tijuana", "visitante": "Cruz Azul", "gl": 1, "gv": 0})
+    assert "el global que da ESPN" in d["avisos"][0] and s["avanza_ahora"] == "Cruz Azul" and s["motivo_ahora"] == "mejor_sembrado"
+    # 3) nada: se avisa
+    d = doc(df=vacio)
+    assert "no aparece jugada" in d["avisos"][0] and d["series"][0]["ida"] is None
+    d = doc(df=vacio, estado="final")                              # sin la ida no se declara a nadie ganador
+    assert (d["series"][0]["decidida"], d["series"][0]["ganador"]) == (False, None) and "no aparece jugada" in d["avisos"][0]
+    # 4) la ida sí está (1-0) y el global de ESPN no cuadra: aviso, manda actual.json
+    d = doc(global_=(3, 1), ida_jugada=True)
+    assert "no cuadra" in d["avisos"][0] and (d["series"][0]["global_mejor"], d["series"][0]["global_peor"]) == (1, 1)
+    assert not doc(global_=(1, 1), ida_jugada=True).get("avisos")
+
+
+def test_goles_de_la_vuelta_avisan_con_el_global(par):
+    sello = {9002: {"id": 9002, "sellado_utc": "2026-11-28T07:20:00+00:00", "fecha_utc": "2026-11-29T01:00:00+00:00", "fase": "cuartos",
+                    "pierna": 2, "lam_l": 2.0, "lam_v": 0.9, "rho": 0.0, "p_l": 0.64, "p_e": 0.2, "p_v": 0.16, "marcador": {"gl": 2, "gv": 0, "prob": 0.1}}}
+    m = vivo.Motor(actual=_actual_liguilla([_serie("cuartos")]), sellos=sello, parametros=par, proyectar=False)
+    ahora = dt.datetime(2026, 11, 29, 2, 0, tzinfo=UTC)
+    d0 = m.documento([_cruda(9002, "Cruz Azul", "Tijuana", "en_juego", 10, 0, 0, periodo=1)], ahora)
+    d1 = m.documento([_cruda(9002, "Cruz Azul", "Tijuana", "en_juego", 40, 0, 1, periodo=1)], ahora)
+    evs = vivo.detectar_eventos({9002: d0["partidos"][0]}, d1["partidos"])
+    assert evs[0]["texto"] == "Gol de Tijuana (30'): V0. Cruz Azul 0-1 Tijuana (global 0-2)"
+    s = d1["series"][0]
+    assert (s["avanza_ahora"], s["le_falta"]) == ("Tijuana", {"mejor": 2, "peor": 0})
+    d2 = m.documento([_cruda(9002, "Cruz Azul", "Tijuana", "descanso", 45, 0, 1, periodo=1)], ahora)
+    assert vivo.detectar_eventos({9002: d1["partidos"][0]}, d2["partidos"])[0]["texto"] == "Descanso: Cruz Azul 0-1 Tijuana (global 0-2)"
+    # termina 3-1: global 3-2, avanza Cruz Azul
+    d3 = m.documento([_cruda(9002, "Cruz Azul", "Tijuana", "final", 90, 3, 1)], ahora)
+    assert vivo.detectar_eventos({9002: d2["partidos"][0]}, d3["partidos"])[-1]["texto"] == \
+        "Final: Cruz Azul 3-1 Tijuana. Avanza Cruz Azul: global Cruz Azul 3-2 Tijuana."
+    assert d3["estado"] == "terminado_hoy" and d3["partidos"][0]["serie"]["ganador"] == "Cruz Azul"
+    assert vivo.validar_documento(d3) == []
+
+
+def _evento_liguilla(base: dict, pid: int, fecha: str, pierna: int = 1) -> dict:
+    e = copy.deepcopy(base)
+    e["id"], e["date"] = str(pid), fecha
+    e["competitions"][0]["date"] = fecha
+    e["competitions"][0]["leg"] = {"value": pierna, "displayValue": f"{pierna}st Leg"}
+    e["season"] = {"year": 2026, "type": 14277, "slug": "apertura---quarterfinals"}
+    return e
+
+
+def test_plan_reconoce_la_liguilla_aunque_actual_json_no_la_traiga(tmp_path, monkeypatch):
+    """Dos idas de cuartos el mismo día (19:00 y 21:10 de México): fase, etiqueta y hora de vigilar de cada una."""
+    a = _evento_liguilla(rebobinar(evento("20261107", ID_PUMAS_AMERICA), estado="pre"), 501, "2026-11-26T01:00Z")
+    b = _evento_liguilla(rebobinar(evento("20261107", ID_TOLUCA_MONTERREY), estado="pre"), 502, "2026-11-26T03:10Z")
+    serie = {"llave": "C3", "fase": "cuartos", "real": False, "definida": True, "mejor": {"equipo": "América", "siembra": 3},
+             "peor": {"equipo": "Pumas", "siembra": 6}, "p_avanza_mejor": 0.6,
+             "piernas": [{"pierna": 1, "id": None, "local": "Pumas", "visitante": "América", "jugado": False},
+                         {"pierna": 2, "id": None, "local": "América", "visitante": "Pumas", "jugado": False}]}
+    ruta = tmp_path / "actual.json"
+    ruta.write_text(json.dumps(_actual_liguilla([serie])), encoding="utf-8")
+    monkeypatch.setattr(vivo, "RUTA_ACTUAL", ruta)
+    r = vivo.plan(48, ahora=dt.datetime(2026, 11, 25, 18, 0, tzinfo=UTC), pedir=servir({"20261125": {"events": [a, b]}}))
+    assert [(x["id"], x["inicio_mexico"], x["observar_desde_utc"], x["fase"], x["etiqueta"]) for x in r["partidos"]] == [
+        (501, "2026-11-25 19:00", "2026-11-26T00:45:00Z", "cuartos", "Cuartos de final, ida"),     # por equipos (liguilla.torneo)
+        (502, "2026-11-25 21:10", "2026-11-26T02:55:00Z", "cuartos", "Cuartos de final, ida")]     # por el slug de ESPN
+
+
+class GuionDia(Guion):
+    """Como Guion, pero cada paso trae la LISTA de eventos de ESPN del día `dia` (formato dates=AAAAMMDD)."""
+
+    def __init__(self, pasos, dia):
+        super().__init__(pasos)
+        self.dia = dia
+
+    def pedir(self, url):
+        self.pedidos += 1
+        r = self.pasos[min(self.i, len(self.pasos) - 1)][1]
+        return {"events": list(r)} if url.endswith(self.dia) else {"events": []}
+
+
+def test_observar_dos_partidos_de_liguilla_el_mismo_dia_y_el_corte_de_las_4(par, tmp_path):
+    """`observar` no termina entre un partido y otro del mismo día, termina 10 minutos después del último y se va al
+    cambiar el día de partido (04:00 de México), no a medianoche."""
+    pa, tm = evento("20261107", ID_PUMAS_AMERICA), evento("20261107", ID_TOLUCA_MONTERREY)
+    A = lambda e: _evento_liguilla(e, 501, "2026-11-26T01:00Z")          # noqa: E731
+    B = lambda e: _evento_liguilla(e, 502, "2026-11-26T03:10Z")          # noqa: E731
+    pasos = [("2026-11-26T00:40:00Z", [A(rebobinar(pa, estado="pre")), B(rebobinar(tm, estado="pre"))]),
+             ("2026-11-26T01:05:00Z", [A(rebobinar(pa, 3)), B(rebobinar(tm, estado="pre"))]),
+             ("2026-11-26T02:55:00Z", [A(pa), B(rebobinar(tm, estado="pre"))]),
+             ("2026-11-26T03:06:00Z", [A(pa), B(rebobinar(tm, estado="pre"))]),     # A lleva 11 min terminado: B aún no empieza
+             ("2026-11-26T03:15:00Z", [A(pa), B(rebobinar(tm, 2))]),
+             ("2026-11-26T05:10:00Z", [A(pa), B(tm)]),
+             ("2026-11-26T05:21:00Z", [A(pa), B(tm)])]
+    g = GuionDia(pasos, "20261125")
+    m = vivo.Motor(actual=_actual_liguilla([_serie_sin_ids()]), sellos={}, parametros=par, proyectar=False, pedir=g.pedir)
+    assert vivo.observar(None, m, tmp_path / "v.json", tmp_path / "e.jsonl", tmp_path / "c.lock", dormir=g.dormir, reloj=g.reloj,
+                         max_ciclos=30) == 0
+    assert g.i == len(pasos) - 1
+    evs = vivo.leer_eventos(tmp_path / "e.jsonl")
+    assert [(e["tipo"], e["partido_id"]) for e in evs if e["tipo"] in ("inicio", "final")] == [
+        ("inicio", 501), ("final", 501), ("inicio", 502), ("final", 502)]
+    doc = json.loads((tmp_path / "v.json").read_text(encoding="utf-8"))
+    assert doc["estado"] == "terminado_hoy" and doc["dia"] == "2026-11-25" and [p["fase"] for p in doc["partidos"]] == ["cuartos", "cuartos"]
+    # un partido que sigue pasada la medianoche no corta `observar`; las 04:00 de México sí
+    pasos2 = [("2026-11-26T05:50:00Z", [B(rebobinar(tm, 80))]), ("2026-11-26T06:10:00Z", [B(rebobinar(tm, 89))]),
+              ("2026-11-26T10:01:00Z", [B(rebobinar(tm, 89))])]
+    g2 = GuionDia(pasos2, "20261125")
+    m2 = vivo.Motor(actual=_actual_liguilla([_serie_sin_ids()]), sellos={}, parametros=par, proyectar=False, pedir=g2.pedir)
+    assert vivo.observar(None, m2, tmp_path / "v2.json", tmp_path / "e2.jsonl", tmp_path / "c2.lock", dormir=g2.dormir,
+                         reloj=g2.reloj, max_ciclos=10) == 0
+    assert g2.i == 2 and g2.pedidos == 4                              # dos ciclos (2 días de ESPN cada uno) y al tercero se va
+    assert json.loads((tmp_path / "v2.json").read_text(encoding="utf-8"))["dia"] == "2026-11-25"
+
+
+# Tres vueltas de final reales con tiempos extra, tal como las guardó ESPN (datos/cache/espn/scoreboard/2023 y 2025,
+# que no van al repositorio; aquí sólo lo que usa el motor). Ida: datos/partidos.csv.
+FINALES_REALES = {
+    # Clausura 2023: ida Tigres 0-0 Chivas; vuelta Chivas 2-2 Tigres a los 90', Pizarro al 110': campeón Tigres (global 2-3)
+    669279: {"fecha": "2023-05-29T01:35Z", "estado": "STATUS_FINAL_AET", "reloj": "120'+4'", "periodo": 4,
+             "local": ("219", 2, None, 2.0, False), "visitante": ("232", 3, None, 3.0, True), "ida": ("Tigres", "Chivas", 0, 0),
+             "goles": [(610.0, "11'", "219", "Roberto Alvarado", False), (1164.0, "20'", "219", "Víctor Guzmán", False),
+                       (3883.0, "65'", "232", "André-Pierre Gignac", True), (4254.0, "71'", "232", "Sebastián Córdova", False),
+                       (6541.0, "110'", "232", "Guido Pizarro", False)],
+             "esperado": ("Tigres", (2, 2), "Tigres es campeón en tiempos extra: global Tigres 3-2 Chivas.")},
+    # Apertura 2023: ida Tigres 1-1 América; vuelta América 0-0 Tigres a los 90' y 3-0 en el tiempo extra: campeón América
+    690858: {"fecha": "2023-12-18T01:30Z", "estado": "STATUS_FINAL_AET", "reloj": "120'+2'", "periodo": 4,
+             "local": ("227", 3, None, 4.0, True), "visitante": ("232", 0, None, 1.0, False), "ida": ("Tigres", "América", 1, 1),
+             "goles": [(5433.0, "91'", "227", "Julián Quiñones", False), (6181.0, "104'", "227", "Richard Sánchez", False),
+                       (7191.0, "120'", "227", "Jonathan Rodríguez", False)],
+             "esperado": ("América", (0, 0), "América es campeón en tiempos extra: global América 4-1 Tigres.")},
+    # Apertura 2025: ida Tigres 1-0 Toluca; vuelta Toluca 2-1 Tigres (global 2-2), 0-0 en el tiempo extra, penales 9-8 Toluca
+    762465: {"fecha": "2025-12-15T01:00Z", "estado": "STATUS_FINAL_PEN", "reloj": "120'", "periodo": 5,
+             "local": ("223", 2, 9, 2.0, True), "visitante": ("232", 1, 8, 2.0, False), "ida": ("Tigres", "Toluca", 1, 0),
+             "goles": [(787.0, "14'", "232", "Fernando Gorriarán", False), (2400.0, "40'", "223", "Helinho", False),
+                       (3095.0, "52'", "223", "Paulinho", False)],
+             "esperado": ("Toluca", (2, 1), "Toluca es campeón en penales (9-8) tras empatar 2-2 el global.")},
+}
+
+
+def _espn_de_cache(pid: int, d: dict) -> dict:
+    comp = []
+    for lado, (tid, goles, tanda, glob, gana) in (("home", d["local"]), ("away", d["visitante"])):
+        x = {"homeAway": lado, "team": {"id": tid}, "score": str(goles), "aggregateScore": glob, "winner": gana}
+        if tanda is not None:
+            x["shootoutScore"] = tanda
+        comp.append(x)
+    det = [{"clock": {"value": c, "displayValue": dv}, "team": {"id": tid}, "scoringPlay": True, "penaltyKick": pen, "ownGoal": False,
+            "redCard": False, "yellowCard": False, "shootout": False, "athletesInvolved": [{"displayName": j}]}
+           for c, dv, tid, j, pen in d["goles"]]
+    st = {"clock": 7200.0, "displayClock": d["reloj"], "period": d["periodo"], "type": {"name": d["estado"], "state": "post", "completed": True}}
+    return {"id": str(pid), "date": d["fecha"], "status": st,
+            "competitions": [{"competitors": comp, "details": det, "status": st, "leg": {"value": 2}}],
+            "season": {"slug": "apertura---finals"}}
+
+
+def test_finales_reales_con_tiempos_extra_y_penales(par):
+    """Cierre de la serie con tres finales reales: quién fue campeón lo dice el reglamento y cuadra con la historia."""
+    for pid, d in FINALES_REALES.items():
+        cr = vivo.normalizar_evento(_espn_de_cache(pid, d))
+        local, visitante = cr["local"], cr["visitante"]
+        il, iv, igl, igv = d["ida"]
+        serie = {"llave": "F", "fase": "final", "real": True, "mejor": {"equipo": local, "siembra": 1}, "peor": {"equipo": visitante, "siembra": 2},
+                 "piernas": [{"pierna": 1, "id": pid - 1, "local": il, "visitante": iv, "jugado": True, "gl": igl, "gv": igv},
+                             {"pierna": 2, "id": pid, "local": local, "visitante": visitante, "jugado": False, "gl": None, "gv": None,
+                              "lam_l": 1.5, "lam_v": 1.1}],
+                 "p_avanza_mejor": 0.6, "favorito": local, "p_favorito": 0.6, "decidida": False, "ganador": None}
+        m = vivo.Motor(actual=_actual_liguilla([serie]), sellos={}, parametros=par, proyectar=False)
+        doc = m.documento([cr], vivo.de_iso(d["fecha"]) + dt.timedelta(hours=3))
+        assert vivo.validar_documento(doc) == [], pid
+        s, p = doc["series"][0], doc["partidos"][0]
+        ganador, a90, texto = d["esperado"]
+        assert (s["decidida"], s["ganador"], s["momento"], s["texto"]) == (True, ganador, "terminada", texto), pid
+        assert (p["gl90"], p["gv90"]) == a90 and p["periodo"] == d["periodo"], pid      # el pronóstico se califica a 90'
+        assert (s["global_mejor"], s["global_peor"]) == (int(d["local"][3]), int(d["visitante"][3])), pid   # = aggregateScore

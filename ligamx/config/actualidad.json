@@ -1,46 +1,185 @@
 {
- "actualizado_utc": "2026-11-18T07:40:31Z",
- "alcance": "Jornada 17 del Apertura 2026 (20 a 22-nov-2026), los 18 equipos",
+ "actualizado_utc": "2026-11-23T04:34:38Z",
+ "alcance": "Ida de cuartos de final del Apertura 2026 (25 y 26-nov-2026): los 8 clasificados, con corte al 23-nov. Los 10 eliminados conservan, marcada como tal, la actualización del 18-nov para la Jornada 17.",
  "equipos": {
-  "Pachuca": {
-   "tecnico": "Benjamín Mora",
+  "Chivas": {
+   "tecnico": "Gabriel Milito",
    "lesionados": [
     {
-     "jugador": "Carlos Sánchez",
-     "motivo": "Lesión de menisco; regreso estimado a inicios de enero de 2027 (solo FotMob; sin nota de prensa reciente)",
-     "tipo": "lesion",
-     "fuente": "https://www.fotmob.com/matches/toluca-vs-pachuca/1qaynf",
-     "fecha_fuente": "2026-11-18"
-    },
-    {
-     "jugador": "Alexéi Domínguez",
-     "motivo": "Fractura de quinto metatarsiano (operado en agosto); FotMob lo marca como duda, sin fecha de regreso",
+     "jugador": "Luis Romo",
+     "motivo": "Sobrecarga muscular el viernes 20; no jugó ante Cruz Azul. Milito: «no tuvo una lesión» y espera que «en estos cuatro días pueda estar en condiciones de jugar o de ser opción para jugar»",
      "tipo": "duda",
-     "fuente": "https://www.fotmob.com/matches/toluca-vs-pachuca/1qaynf",
-     "fecha_fuente": "2026-11-18"
+     "fuente": "https://chivaspasion.bolavip.com/noticias/luis-romo-se-pierde-la-liguilla-gabriel-milito-destapo-el-estado-fisico-de-los-lesionados-antes-del-chivas-vs.-pachuca-a4oTp5P3S1ub",
+     "fecha_fuente": "2026-11-22"
     }
    ],
-   "nota": "Cobertura floja: no hallé nota de prensa de bajas para este partido; las dos bajas salen solo de la ficha de FotMob (consultada el 18-nov) y FutMercado (18-nov) no lista lesionados ni suspendidos de Pachuca. DT confirmado por Claro Sports del 5-nov, no por una nota posterior al 10-nov."
+   "nota": "1.º (33 pts). Cobertura buena y reciente: Milito (22-nov) aclaró que Romo sólo tiene sobrecarga y que José Castillo salió acalambrado y «va a estar disponible». Daniel Aguirre, Richard Ledezma y Fernando «Oso» González ya se recuperaron (Juanfutbol, 22-nov) y jugaron ante Cruz Azul (ESPN). Sin suspendidos. FutMercado (23-nov) aún lista a Campillo, Tapias, Bryan González, Miguel Gómez, Romo y Castillo con fecha 16-oct, pero Campillo, B. González y Gómez jugaron la J17: no se usó."
+  },
+  "Cruz Azul": {
+   "tecnico": "Joel Huiqui",
+   "lesionados": [
+    {
+     "jugador": "Amaury Morales",
+     "motivo": "Rotura de ligamento cruzado anterior, rodilla derecha (junio); regreso en los primeros meses de 2027",
+     "tipo": "lesion",
+     "fuente": "https://juanfutbol.com/liga-mx/milito-y-chivas-recuperan-piezas-mientras-cruz-azul-pierde-a-tres-las-bajas-del-duelo-por-el-liderato",
+     "fecha_fuente": "2026-11-22"
+    },
+    {
+     "jugador": "Cristian Jiménez",
+     "motivo": "Rotura de ligamento cruzado (agosto), operado; regreso en los primeros meses de 2027 (FutMercado: 1-mar-2027)",
+     "tipo": "lesion",
+     "fuente": "https://juanfutbol.com/liga-mx/milito-y-chivas-recuperan-piezas-mientras-cruz-azul-pierde-a-tres-las-bajas-del-duelo-por-el-liderato",
+     "fecha_fuente": "2026-11-22"
+    },
+    {
+     "jugador": "Mateo Levy",
+     "motivo": "Lesión de menisco en la rodilla derecha, operado en septiembre; su reincorporación se prevé para principios de diciembre, así que no llegaría a los cuartos",
+     "tipo": "lesion",
+     "fuente": "https://juanfutbol.com/liga-mx/milito-y-chivas-recuperan-piezas-mientras-cruz-azul-pierde-a-tres-las-bajas-del-duelo-por-el-liderato",
+     "fecha_fuente": "2026-11-22"
+    }
+   ],
+   "nota": "2.º (32 pts). Cobertura buena (Juanfutbol 22-nov; Récord y Vamos Azul 17-nov): las tres bajas son de larga duración. José Paradela, con 4 amarillas, no vio tarjeta ante Chivas y salió de cambio al 59' (ESPN); las amarillas se cancelan al empezar la liguilla. Sin suspendidos ni lesiones reportadas del partido ante Chivas. FutMercado (23-nov) marca a Paradela y Rotondi en duda con fecha 16-oct, pero ambos fueron titulares en la J17: no se usó."
+  },
+  "América": {
+   "tecnico": "Guillermo Almada",
+   "lesionados": [
+    {
+     "jugador": "Brian Rodríguez",
+     "motivo": "Lesión muscular en el bíceps femoral izquierdo; no jugó la J17. Almada: «Lo cuidamos para cuando empecemos la Liguilla, no quisimos tomar riesgos hoy». Sin alta confirmada para la ida",
+     "tipo": "duda",
+     "fuente": "https://www.elfutbolero.com.mx/ligamx/club-america/almada-guardo-a-brian-para-la-liguilla-pero-el-problema-del-america-es-su-casa-no-gana-en-el-banorte-desde-agosto-y-ahi-cierra-con-rayados-20261123.html",
+     "fecha_fuente": "2026-11-22"
+    },
+    {
+     "jugador": "Raphael Veiga",
+     "motivo": "Lesión de hombro izquierdo (cirugía anunciada el 23-oct); sigue fuera",
+     "tipo": "lesion",
+     "fuente": "https://www.elfutbolero.com.mx/ligamx/club-america/almada-guardo-a-brian-para-la-liguilla-pero-el-problema-del-america-es-su-casa-no-gana-en-el-banorte-desde-agosto-y-ahi-cierra-con-rayados-20261123.html",
+     "fecha_fuente": "2026-11-22"
+    },
+    {
+     "jugador": "Raúl Zúñiga",
+     "motivo": "Molestias en la rodilla; fuera de registro, sin fecha de regreso",
+     "tipo": "lesion",
+     "fuente": "https://www.si.com/es-us/lesionados-y-suspendidos-de-america-para-enfrentarse-a-tigres-uanl-21-11-2026",
+     "fecha_fuente": "2026-11-20"
+    },
+    {
+     "jugador": "Víctor Dávila",
+     "motivo": "Rotura de ligamento cruzado anterior de la rodilla derecha; fuera el resto del torneo",
+     "tipo": "lesion",
+     "fuente": "https://www.si.com/es-us/lesionados-y-suspendidos-de-america-para-enfrentarse-a-tigres-uanl-21-11-2026",
+     "fecha_fuente": "2026-11-20"
+    }
+   ],
+   "nota": "3.º (30 pts). Cobertura buena y reciente (El Futbolero 22-nov, SI 20-nov, FutMercado 23-nov). Regresa Érick Sánchez, que cumplió en la J17 su partido por quinta amarilla. Kevin Álvarez descansó en la J17 y llega sin suspensión; Israel Reyes y Cristián Borja ya jugaron la J17 (ESPN), así que no se listan. Sin suspendidos."
+  },
+  "Atlas": {
+   "tecnico": "Hernán Crespo",
+   "lesionados": [
+    {
+     "jugador": "Duk",
+     "motivo": "Rotura del tendón rotuliano (septiembre), operado; FotMob estima su regreso a finales de marzo de 2027",
+     "tipo": "lesion",
+     "fuente": "https://futmercado.com/lesiones/",
+     "fecha_fuente": "2026-11-23"
+    },
+    {
+     "jugador": "Paulo Ramírez",
+     "motivo": "Esguince de rodilla desde la J16 (parte del club del 7-nov); FutMercado lo mantiene lesionado sin fecha y no estuvo entre los convocados de la J17 (ESPN); sin nota de prensa reciente",
+     "tipo": "duda",
+     "fuente": "https://futmercado.com/lesiones/",
+     "fecha_fuente": "2026-11-23"
+    }
+   ],
+   "nota": "4.º (28 pts). Cobertura media: sin parte médico tras la J17. Adonis Frías ya cumplió en la J17 su partido de suspensión (Rotowire, 22-nov) y regresa. Édgar Zaldívar y Jorge Sánchez, bajas en la J16, jugaron ante Juárez (ESPN): ya no se listan. Manuel Capasso (4 amarillas antes de la J17) no vio tarjeta. Sin suspendidos."
   },
   "Toluca": {
    "tecnico": "Antonio Mohamed",
    "lesionados": [
     {
      "jugador": "Marcel Ruiz",
-     "motivo": "Rotura de ligamento cruzado; fuera el resto del torneo (FutMercado da regreso 31-dic-2026)",
+     "motivo": "Rotura de ligamento cruzado; fuera el resto del torneo (regreso estimado 31-dic-2026)",
      "tipo": "lesion",
      "fuente": "https://futmercado.com/lesiones/",
-     "fecha_fuente": "2026-11-18"
+     "fecha_fuente": "2026-11-23"
     },
     {
      "jugador": "Iván López",
-     "motivo": "Listado como lesionado/no disponible en FotMob, sin detalle de lesión ni fecha; sin confirmación de prensa",
-     "tipo": "lesion",
+     "motivo": "FotMob lo listaba no disponible antes de la J17, sin detalle ni fecha; no estuvo entre los convocados ante Pachuca (ESPN); sin nota de prensa",
+     "tipo": "duda",
      "fuente": "https://www.fotmob.com/matches/toluca-vs-pachuca/1qaynf",
      "fecha_fuente": "2026-11-18"
     }
    ],
-   "nota": "Cobertura parcial: sin nota de prensa de bajas para la J17; datos de agregadores (FutMercado actualizado 18-nov y FotMob). DT según Récord del 7-nov (previo a la J16). Récord del 7-nov mencionaba a 'Méndez' lesionado antes de la J16, sin confirmación posterior: no se incluye."
+   "nota": "5.º (27 pts). El portero Hugo González, expulsado al 88-89' ante Pachuca (el VAR cambió la amarilla por roja tras jalar a Mauricio Isaís en el área), se pierde la ida: lo deduce el sistema y lo confirman TV Azteca, Excélsior, El Futbolero y Récord (21-nov) y FutMercado (23-nov); la prensa espera a Luis García Palomera en la portería. Cuántos partidos recibe se sabrá con el reporte de la Disciplinaria. Helinho ya cumplió en la J17 su suspensión por quinta amarilla. Franco Romero (4 amarillas) no jugó la J17. Mohamed tiene 1 roja y 16 de 17 partidos dirigidos según ligamx.net: su sanción (9-oct, ante Tigres) ya se cumplió."
+  },
+  "Monterrey": {
+   "tecnico": "Matías Almeyda",
+   "lesionados": [
+    {
+     "jugador": "Uros Durdevic",
+     "motivo": "Molestia en el tobillo; sigue en recuperación (Consulta Monterrey, 17-nov), FutMercado lo mantiene lesionado sin fecha y no estuvo en la J17 (ESPN)",
+     "tipo": "lesion",
+     "fuente": "https://futmercado.com/lesiones/",
+     "fecha_fuente": "2026-11-23"
+    },
+    {
+     "jugador": "Stefan Medina",
+     "motivo": "Vuelve de molestias musculares; se perdió el pendiente ante Querétaro y la J17 (no convocado, ESPN); FutMercado lo lista en duda",
+     "tipo": "duda",
+     "fuente": "https://futmercado.com/lesiones/",
+     "fecha_fuente": "2026-11-23"
+    }
+   ],
+   "nota": "6.º (27 pts). Carlos Salcedo, expulsado por doble amarilla al 58' ante Pumas, se pierde la ida: lo deduce el sistema y lo confirman Excélsior y Récord (22-nov) y FutMercado (23-nov). Regresa Ricardo Chávez, que cumplió suspensión en la J17. Érick Aguirre salió de cambio al 38' ante Pumas sin explicación publicada (ver no_confirmado). Luca Orellano, que FutMercado marca en duda, entró al medio tiempo y anotó los dos goles: no se lista."
+  },
+  "León": {
+   "tecnico": "Javier Gandolfi",
+   "lesionados": [
+    {
+     "jugador": "Valentín Gauthier",
+     "motivo": "Cirugía de tobillo (agosto de 2026); fuera el resto del torneo, sin fecha de regreso",
+     "tipo": "lesion",
+     "fuente": "https://futmercado.com/lesiones/",
+     "fecha_fuente": "2026-11-23"
+    },
+    {
+     "jugador": "Ángel Estrada",
+     "motivo": "Fractura de pierna desde mediados de octubre según FutMercado, sin fecha de regreso (FotMob lo tenía en duda el 18-nov); no estuvo entre los convocados de la J17 (ESPN)",
+     "tipo": "duda",
+     "fuente": "https://futmercado.com/lesiones/",
+     "fecha_fuente": "2026-11-23"
+    }
+   ],
+   "nota": "7.º (26 pts). Cobertura floja tras la J17: sin parte médico ni nota de bajas para la serie. Regresan José Iván Rodríguez y Juan José Guevara, que cumplieron en la J17 su partido de suspensión (un partido cada uno, Noticieros en Línea 12-nov). Luis Valadez ya no va como duda: fue titular ante Santos y salió al medio tiempo tras ver amarilla (ESPN). Sebastián Vegas (4 amarillas antes de la J17) no vio tarjeta. Sin suspendidos."
+  },
+  "Pachuca": {
+   "tecnico": "Benjamín Mora",
+   "lesionados": [
+    {
+     "jugador": "Carlos Sánchez",
+     "motivo": "Lesión de menisco; FotMob estimaba su regreso a inicios de enero de 2027 y no estuvo entre los convocados de la J17 (ESPN); sin nota de prensa, y FutMercado no lo lista",
+     "tipo": "duda",
+     "fuente": "https://www.fotmob.com/matches/toluca-vs-pachuca/1qaynf",
+     "fecha_fuente": "2026-11-18"
+    },
+    {
+     "jugador": "Alexéi Domínguez",
+     "motivo": "Fractura del quinto metatarsiano operada en agosto; FotMob lo marcaba en duda y no estuvo entre los convocados de la J17 (ESPN)",
+     "tipo": "duda",
+     "fuente": "https://www.fotmob.com/matches/toluca-vs-pachuca/1qaynf",
+     "fecha_fuente": "2026-11-18"
+    }
+   ],
+   "nota": "8.º (25 pts). Cobertura floja: ninguna nota de bajas de Pachuca tras la J17 (El Universal Hidalgo, 22-nov, no menciona ninguna) y FutMercado (23-nov) no le lista lesionados. Sin suspendidos: nadie fue expulsado en la J17 y Oussama Idrissi (4 amarillas) no vio tarjeta. Rodolfo Pizarro salió al 90' ante Toluca; una transmisión en vivo habló de lesión, sin confirmar (ver no_confirmado)."
+  },
+  "Tijuana": {
+   "tecnico": "Sebastián Abreu",
+   "lesionados": [],
+   "nota": "ELIMINADO: 9.º de la fase regular del Apertura 2026, sin más partidos en el torneo. Sus bajas son las de la actualización del 18-nov para la Jornada 17 y ya no se actualizan. Sin bajas localizadas: FotMob (18-nov) indica que Tijuana no tiene jugadores no disponibles y la previa local del 17-nov no menciona ausencias; no encontré parte médico del club ni reporte de seleccionados que volvieran lesionados."
   },
   "Santos": {
    "tecnico": "Renato Paiva",
@@ -74,34 +213,7 @@
      "fecha_fuente": "2026-11-18"
     }
    ],
-   "nota": "Cobertura media: lesiones largas bien sustentadas (Amione, González); Orona y Di Yorio quedan como duda. El Siglo de Torreón bloqueó la lectura (403), así que su nota sobre Di Yorio solo se conoció por el resumen del buscador. Ninguna fuente reporta suspendidos de Santos (Aldo López y Felipe Sánchez están con 4 amarillas)."
-  },
-  "León": {
-   "tecnico": "Javier Gandolfi",
-   "lesionados": [
-    {
-     "jugador": "Valentín Gauthier",
-     "motivo": "Cirugía de tobillo (agosto de 2026); fuera el resto del torneo, sin fecha de regreso",
-     "tipo": "lesion",
-     "fuente": "https://futmercado.com/lesiones/",
-     "fecha_fuente": "2026-11-18"
-    },
-    {
-     "jugador": "Ángel Estrada",
-     "motivo": "Fractura de pierna (desde mediados de octubre), sin fecha de regreso; FotMob lo marca como duda",
-     "tipo": "lesion",
-     "fuente": "https://futmercado.com/lesiones/",
-     "fecha_fuente": "2026-11-18"
-    },
-    {
-     "jugador": "Luis Valadez",
-     "motivo": "Lesión en el pie (desde mediados de octubre), sin fecha de regreso; FotMob lo marca como duda",
-     "tipo": "duda",
-     "fuente": "https://www.fotmob.com/matches/leon-vs-santos-laguna/s06zo",
-     "fecha_fuente": "2026-11-18"
-    }
-   ],
-   "nota": "Suspendidos bien confirmados (medio local del 12-nov que cita a la Disciplinaria, más FutMercado y FotMob). Lesionados solo por agregadores (FutMercado 18-nov, FotMob), sin parte del club. DT según Claro Sports del 1-nov y nota de su renovación hasta 2027; sin confirmación posterior al 10-nov."
+   "nota": "ELIMINADO: 10.º de la fase regular del Apertura 2026, sin más partidos en el torneo. Sus bajas son las de la actualización del 18-nov para la Jornada 17 y ya no se actualizan. Cobertura media: lesiones largas bien sustentadas (Amione, González); Orona y Di Yorio quedan como duda. El Siglo de Torreón bloqueó la lectura (403), así que su nota sobre Di Yorio solo se conoció por el resumen del buscador. Ninguna fuente reporta suspendidos de Santos (Aldo López y Felipe Sánchez están con 4 amarillas)."
   },
   "Pumas": {
    "tecnico": "Esteban Solari",
@@ -135,27 +247,27 @@
      "fecha_fuente": "2026-11-15"
     }
    ],
-   "nota": "Cobertura buena y reciente (Récord 14-nov, El Futbolero 15-nov, FotMob y FutMercado 18-nov). Récord dice que, fuera de Vite, Pumas estaría completo; las tres dudas dependen del parte final. La nota de ABC Noticias del 16-nov sobre bajas de Pumas no se pudo leer (403)."
+   "nota": "ELIMINADO: 11.º de la fase regular del Apertura 2026, sin más partidos en el torneo. Sus bajas son las de la actualización del 18-nov para la Jornada 17 y ya no se actualizan. Cobertura buena y reciente (Récord 14-nov, El Futbolero 15-nov, FotMob y FutMercado 18-nov). Récord dice que, fuera de Vite, Pumas estaría completo; las tres dudas dependen del parte final. La nota de ABC Noticias del 16-nov sobre bajas de Pumas no se pudo leer (403)."
   },
-  "Monterrey": {
-   "tecnico": "Matías Almeyda",
+  "Querétaro": {
+   "tecnico": "Esteban González",
    "lesionados": [
     {
-     "jugador": "Uros Durdevic",
-     "motivo": "Lesión (molestia en tobillo según FutMercado); sigue en recuperación y el cuerpo médico lo evalúa; ABC Noticias lo perfila como ausencia",
-     "tipo": "lesion",
-     "fuente": "https://consultamonterrey.mx/deportes/monterrey-se-prepara-para-enfrentar-a-pumas/",
-     "fecha_fuente": "2026-11-17"
+     "jugador": "Erik Dueñas",
+     "motivo": "Lesión de rodilla; FotMob lo marca en duda; no fue convocado el 8 ni el 14 de noviembre",
+     "tipo": "duda",
+     "fuente": "https://www.fotmob.com/matches/necaxa-vs-queretaro-fc/49m1w",
+     "fecha_fuente": "2026-11-18"
     },
     {
-     "jugador": "Stefan Medina",
-     "motivo": "Molestias musculares; se perdió el partido pendiente ante Querétaro (14-nov) y sigue en evaluación; FutMercado lo lista 'en duda'",
+     "jugador": "Jean Unjanque",
+     "motivo": "Lesión de cadera; FotMob lo marca en duda; no fue convocado el 8 ni el 14 de noviembre",
      "tipo": "duda",
-     "fuente": "https://consultamonterrey.mx/deportes/monterrey-se-prepara-para-enfrentar-a-pumas/",
-     "fecha_fuente": "2026-11-17"
+     "fuente": "https://www.fotmob.com/matches/necaxa-vs-queretaro-fc/49m1w",
+     "fecha_fuente": "2026-11-18"
     }
    ],
-   "nota": "Cobertura buena y reciente (Récord 14-nov, medio local 17-nov, FutMercado y FotMob 18-nov). Oliver Torres y Carlos Salcedo ya cumplieron sanción; Cuypers, Corona y Fimbres regresan de selección sin reporte de lesión. Las notas de ABC Noticias y Telediario dieron 403 y solo se conocieron por el resumen del buscador."
+   "nota": "ELIMINADO: 12.º de la fase regular del Apertura 2026, sin más partidos en el torneo. Sus bajas son las de la actualización del 18-nov para la Jornada 17 y ya no se actualizan. Cobertura escasa: no hay previa de prensa con bajas. Los tres suspendidos que deduce el sistema quedan confirmados (FutMercado lista a los tres; FotMob a Allison y Pérez; Récord y Rotowire las rojas). Las dos dudas por lesión salen sólo de FotMob. No encontré dictamen de la Disciplinaria sobre si Allison recibe más de un partido por la agresión. Excélsior llama «Eduardo Reyes» al segundo expulsado; es Eduardo Pérez."
   },
   "Puebla": {
    "tecnico": "Gerardo Espinoza",
@@ -182,7 +294,7 @@
      "fecha_fuente": "2026-11-18"
     }
    ],
-   "nota": "Cobertura media: las tres bajas salen sólo de la ficha en vivo de FotMob (consultada el 18-nov) y de una previa de Betmaster del 17-nov que repite la misma lista; no encontré parte del club ni nota de prensa local, y ninguna fuente reporta suspendidos."
+   "nota": "ELIMINADO: 13.º de la fase regular del Apertura 2026, sin más partidos en el torneo. Sus bajas son las de la actualización del 18-nov para la Jornada 17 y ya no se actualizan. Cobertura media: las tres bajas salen sólo de la ficha en vivo de FotMob (consultada el 18-nov) y de una previa de Betmaster del 17-nov que repite la misma lista; no encontré parte del club ni nota de prensa local, y ninguna fuente reporta suspendidos."
   },
   "Atlético San Luis": {
    "tecnico": "Diego Mejía",
@@ -202,72 +314,7 @@
      "fecha_fuente": "2026-11-18"
     }
    ],
-   "nota": "Cobertura media: João Pedro es baja larga bien documentada y sigue fuera según FotMob (18-nov) y Betmaster (17-nov); lo de Medina sale sólo de esas dos fuentes. Sin suspendidos reportados y sin nota local de esta semana."
-  },
-  "Juárez": {
-   "tecnico": "Gustavo Lema",
-   "lesionados": [
-    {
-     "jugador": "Lucas Romero",
-     "motivo": "Lesión de ligamentos de la rodilla izquierda (operado en julio); FotMob estima su regreso para inicios de abril de 2027",
-     "tipo": "lesion",
-     "fuente": "https://www.fotmob.com/matches/atlas-vs-fc-juarez/2qui27oy",
-     "fecha_fuente": "2026-11-18"
-    },
-    {
-     "jugador": "Ettson Ayón",
-     "motivo": "Golpe; FotMob lo marca como dudoso (el club lo listó como lesionado en la J16)",
-     "tipo": "duda",
-     "fuente": "https://www.fotmob.com/matches/atlas-vs-fc-juarez/2qui27oy",
-     "fecha_fuente": "2026-11-18"
-    },
-    {
-     "jugador": "Bryan Romero",
-     "motivo": "Lesión de rodilla; FotMob lo marca como dudoso",
-     "tipo": "duda",
-     "fuente": "https://www.fotmob.com/matches/atlas-vs-fc-juarez/2qui27oy",
-     "fecha_fuente": "2026-11-18"
-    }
-   ],
-   "nota": "Cobertura media: bajas tomadas de FotMob (18-nov). La lista oficial de convocados de la J16 (6-nov) daba además como lesionados a Alejandro Mayorga, Haret Ortega y Said Godínez, sin confirmación posterior al 10-nov; la lista de la J17 aún no está publicada. Sin suspendidos reportados."
-  },
-  "Atlas": {
-   "tecnico": "Hernán Crespo",
-   "lesionados": [
-    {
-     "jugador": "Duk",
-     "motivo": "Rotura del tendón rotuliano sufrida en septiembre; FotMob estima su regreso para finales de marzo de 2027",
-     "tipo": "lesion",
-     "fuente": "https://www.fotmob.com/matches/atlas-vs-fc-juarez/2qui27oy",
-     "fecha_fuente": "2026-11-18"
-    },
-    {
-     "jugador": "Édgar Zaldívar",
-     "motivo": "Lesión ligamentaria en la rodilla izquierda (parte del club del 7-nov); FotMob lo marca como dudoso",
-     "tipo": "duda",
-     "fuente": "https://www.fotmob.com/matches/atlas-vs-fc-juarez/2qui27oy",
-     "fecha_fuente": "2026-11-18"
-    }
-   ],
-   "nota": "Cobertura aceptable: Frías confirmado por Azteca Jalisco (12-nov) y FotMob. Jorge Sánchez (aductor) y Paulo Ramírez (esguince de rodilla) fueron baja en la J16 según el club (7-nov), pero no hay fuente posterior al 10-nov y FotMob ya no los lista. FotMob marca también a Edyairth Ortega como suspendido, sin corroboración (ver no_confirmado)."
-  },
-  "Tijuana": {
-   "tecnico": "Sebastián Abreu",
-   "lesionados": [],
-   "nota": "Sin bajas localizadas: FotMob (18-nov) indica que Tijuana no tiene jugadores no disponibles y la previa local del 17-nov no menciona ausencias; no encontré parte médico del club ni reporte de seleccionados que volvieran lesionados."
-  },
-  "Atlante": {
-   "tecnico": "Miguel Herrera",
-   "lesionados": [
-    {
-     "jugador": "Hardy Meza",
-     "motivo": "Fractura de rótula; FotMob estima su regreso para mediados de marzo de 2027",
-     "tipo": "lesion",
-     "fuente": "https://www.fotmob.com/matches/atlante-vs-tijuana/67dtxoa",
-     "fecha_fuente": "2026-11-18"
-    }
-   ],
-   "nota": "Cobertura media: los dos suspendidos coinciden con lo que deduce el sistema, pero sólo FotMob (18-nov) los da como tales; la roja de Quirós está en crónicas del 6-nov. La lesión de Hardy Meza sale únicamente de FotMob, sin nota de prensa que la respalde."
+   "nota": "ELIMINADO: 14.º de la fase regular del Apertura 2026, sin más partidos en el torneo. Sus bajas son las de la actualización del 18-nov para la Jornada 17 y ya no se actualizan. Cobertura media: João Pedro es baja larga bien documentada y sigue fuera según FotMob (18-nov) y Betmaster (17-nov); lo de Medina sale sólo de esas dos fuentes. Sin suspendidos reportados y sin nota local de esta semana."
   },
   "Tigres": {
    "tecnico": "Víctor Manuel Vucetich (interino)",
@@ -322,129 +369,7 @@
      "fecha_fuente": "2026-11-18"
     }
    ],
-   "nota": "Cobertura media: Chicha Sánchez confirmado por prensa (13-nov); los de larga duración salen de FotMob/FutMercado (consulta 18-nov) y coinciden con la previa de SI del 6-nov. Rômulo recibió alta médica y Joaquim y Alan Franco ya se recuperaron según ABC Noticias (16-nov, leído sólo en resumen de búsqueda), por eso no van como baja aunque FotMob aún marca a Rômulo en duda. Gorriarán suspendido es dato a cotejar: sólo lo lista FutMercado."
-  },
-  "América": {
-   "tecnico": "Guillermo Almada",
-   "lesionados": [
-    {
-     "jugador": "Brian Rodríguez",
-     "motivo": "Lesión muscular en el bíceps femoral izquierdo; entrena por separado; prácticamente descartado, lo guardan para la Liguilla (no hay descarte oficial)",
-     "tipo": "lesion",
-     "fuente": "https://www.mediotiempo.com/futbol/liga-mx/brian-rodriguez-entreno-por-separado-con-america-es-duda-vs-tigres",
-     "fecha_fuente": "2026-11-17"
-    },
-    {
-     "jugador": "Raphael Veiga",
-     "motivo": "Lesión de hombro izquierdo (el club anunció cirugía el 23-oct); sigue fuera",
-     "tipo": "lesion",
-     "fuente": "https://www.fotmob.com/matches/cf-america-vs-tigres/1w7uw2",
-     "fecha_fuente": "2026-11-18"
-    },
-    {
-     "jugador": "Raúl Zúñiga",
-     "motivo": "Lesión de rodilla; fuera de registro; regreso estimado enero 2027",
-     "tipo": "lesion",
-     "fuente": "https://www.fotmob.com/matches/cf-america-vs-tigres/1w7uw2",
-     "fecha_fuente": "2026-11-18"
-    },
-    {
-     "jugador": "Víctor Dávila",
-     "motivo": "Rotura de ligamento cruzado (marzo); no está registrado en el Apertura 2026",
-     "tipo": "lesion",
-     "fuente": "https://www.fotmob.com/matches/cf-america-vs-tigres/1w7uw2",
-     "fecha_fuente": "2026-11-18"
-    },
-    {
-     "jugador": "Israel Reyes",
-     "motivo": "Desgaste por partidos y viajes con la Selección; se evaluará horas antes (Marca, citado por El Futbolero: baja casi segura)",
-     "tipo": "duda",
-     "fuente": "https://americamonumental.bolavip.com/ligamx/todas-las-bajas-que-america-apunta-a-tener-en-la-jornada-17-del-apertura-2026-ante-tigres",
-     "fecha_fuente": "2026-11-17"
-    },
-    {
-     "jugador": "Kevin Álvarez",
-     "motivo": "Apercibido (4 amarillas); reportan que el club lo reservaría para no perder la ida de cuartos. Especulación de prensa, no parte del club",
-     "tipo": "otro",
-     "fuente": "https://americamonumental.bolavip.com/ligamx/todas-las-bajas-que-america-apunta-a-tener-en-la-jornada-17-del-apertura-2026-ante-tigres",
-     "fecha_fuente": "2026-11-17"
-    }
-   ],
-   "nota": "Cobertura buena y reciente (notas del 17-nov de Mediotiempo, Excélsior, Tribuna, TV Azteca). Brian Rodríguez es la baja de peso; Israel Reyes y Kevin Álvarez son posibles rotaciones reportadas por un solo medio de afición. Henry Martín con cargas dosificadas (TV Azteca) pero disponible; Zendejas y Malagón ya jugaron la J16. Zúñiga y Dávila no están registrados, pesan poco."
-  },
-  "Chivas": {
-   "tecnico": "Gabriel Milito",
-   "lesionados": [
-    {
-     "jugador": "Daniel Aguirre",
-     "motivo": "Salió con molestias físicas ante León (J16); en observación médica el 11-12 nov; el club lo mostró después entrenando con normalidad",
-     "tipo": "duda",
-     "fuente": "https://www.elfutbolero.com.mx/ligamx/chivas/cruz-azul-elimino-dos-veces-a-la-chivas-de-milito-y-llega-al-akron-por-el-liderato-con-nueve-bajas-en-verde-valle-20261112.html",
-     "fecha_fuente": "2026-11-12"
-    },
-    {
-     "jugador": "Richard Ledezma",
-     "motivo": "Salió con molestias físicas ante León (J16); en observación médica el 11-12 nov; el club lo mostró después entrenando con normalidad",
-     "tipo": "duda",
-     "fuente": "https://www.elfutbolero.com.mx/ligamx/chivas/cruz-azul-elimino-dos-veces-a-la-chivas-de-milito-y-llega-al-akron-por-el-liderato-con-nueve-bajas-en-verde-valle-20261112.html",
-     "fecha_fuente": "2026-11-12"
-    },
-    {
-     "jugador": "Fernando \"Oso\" González",
-     "motivo": "Salió con molestias físicas ante León (J16); en observación; luego apareció entrenando con normalidad en videos del club",
-     "tipo": "duda",
-     "fuente": "https://chivaspasion.bolavip.com/noticias/noticias-de-chivas-hoy-13-de-noviembre-jonathan-perez-armando-gonzalez-hugo-camberos-roberto-alvarado-y-lesionados",
-     "fecha_fuente": "2026-11-13"
-    }
-   ],
-   "nota": "Cobertura media, sin parte médico oficial ni nota posterior al 17-nov: las tres dudas son molestias leves y lo más probable es que lleguen. El Futbolero escribe «Bryan el Oso González», pero el que salió de cambio ante León fue Fernando González (ESPN); Bryan jugó completo. Luis Romo sin lesión, sólo preocupación por recaída (Bolavip, 13-nov). Prensa del 13-nov dice que los lesionados previos ya se recuperaron. Ningún suspendido reportado."
-  },
-  "Cruz Azul": {
-   "tecnico": "Joel Huiqui",
-   "lesionados": [
-    {
-     "jugador": "Amaury Morales",
-     "motivo": "Rotura de ligamento cruzado anterior, rodilla derecha (junio); fuera el resto del torneo",
-     "tipo": "lesion",
-     "fuente": "https://futmercado.com/lesiones/",
-     "fecha_fuente": "2026-11-18"
-    },
-    {
-     "jugador": "Cristian Jiménez",
-     "motivo": "Rotura de ligamento cruzado (agosto), operado; regreso estimado marzo 2027",
-     "tipo": "lesion",
-     "fuente": "https://futmercado.com/lesiones/",
-     "fecha_fuente": "2026-11-18"
-    },
-    {
-     "jugador": "Mateo Levy",
-     "motivo": "Lesión de menisco en rodilla derecha, operado en septiembre; FutMercado aún lo lista sin fecha de regreso, sin confirmación de prensa reciente",
-     "tipo": "duda",
-     "fuente": "https://futmercado.com/lesiones/",
-     "fecha_fuente": "2026-11-18"
-    }
-   ],
-   "nota": "Cobertura buena y reciente: Récord y Vamos Azul (17-nov) reportan plantel completo y sin lesionados en el grupo que entrena; las tres bajas listadas son juveniles de larga duración. Lira, Orozco y Montaño volvían de la Selección el 18-nov y Huiqui evaluará su carga; los Sub-23 (Rogelio González, Emmanuel Ochoa, Ariel Castro) regresan el 19-nov de Corea. José Paradela apercibido con 4 amarillas. Ditta ya jugó la J16. Ningún suspendido."
-  },
-  "Querétaro": {
-   "tecnico": "Esteban González",
-   "lesionados": [
-    {
-     "jugador": "Erik Dueñas",
-     "motivo": "Lesión de rodilla; FotMob lo marca en duda; no fue convocado el 8 ni el 14 de noviembre",
-     "tipo": "duda",
-     "fuente": "https://www.fotmob.com/matches/necaxa-vs-queretaro-fc/49m1w",
-     "fecha_fuente": "2026-11-18"
-    },
-    {
-     "jugador": "Jean Unjanque",
-     "motivo": "Lesión de cadera; FotMob lo marca en duda; no fue convocado el 8 ni el 14 de noviembre",
-     "tipo": "duda",
-     "fuente": "https://www.fotmob.com/matches/necaxa-vs-queretaro-fc/49m1w",
-     "fecha_fuente": "2026-11-18"
-    }
-   ],
-   "nota": "Cobertura escasa: no hay previa de prensa con bajas. Los tres suspendidos que deduce el sistema quedan confirmados (FutMercado lista a los tres; FotMob a Allison y Pérez; Récord y Rotowire las rojas). Las dos dudas por lesión salen sólo de FotMob. No encontré dictamen de la Disciplinaria sobre si Allison recibe más de un partido por la agresión. Excélsior llama «Eduardo Reyes» al segundo expulsado; es Eduardo Pérez."
+   "nota": "ELIMINADO: 15.º de la fase regular del Apertura 2026, sin más partidos en el torneo. Sus bajas son las de la actualización del 18-nov para la Jornada 17 y ya no se actualizan. Cobertura media: Chicha Sánchez confirmado por prensa (13-nov); los de larga duración salen de FotMob/FutMercado (consulta 18-nov) y coinciden con la previa de SI del 6-nov. Rômulo recibió alta médica y Joaquim y Alan Franco ya se recuperaron según ABC Noticias (16-nov, leído sólo en resumen de búsqueda), por eso no van como baja aunque FotMob aún marca a Rômulo en duda. Gorriarán suspendido es dato a cotejar: sólo lo lista FutMercado."
   },
   "Necaxa": {
    "tecnico": "Juan Reynoso",
@@ -457,19 +382,169 @@
      "fecha_fuente": "2026-11-18"
     }
    ],
-   "nota": "Cobertura escasa: sin notas de prensa sobre bajas de Necaxa desde el 10-nov; la única duda sale de FotMob y el suspendido de FutMercado (coincide con el sistema). Alexis Peña, que venía lesionado, ya entró de cambio en la J16 y no se lista. Reynoso es técnico desde septiembre, tras la salida de Martín Varini."
+   "nota": "ELIMINADO: 16.º de la fase regular del Apertura 2026, sin más partidos en el torneo. Sus bajas son las de la actualización del 18-nov para la Jornada 17 y ya no se actualizan. Cobertura escasa: sin notas de prensa sobre bajas de Necaxa desde el 10-nov; la única duda sale de FotMob y el suspendido de FutMercado (coincide con el sistema). Alexis Peña, que venía lesionado, ya entró de cambio en la J16 y no se lista. Reynoso es técnico desde septiembre, tras la salida de Martín Varini."
+  },
+  "Atlante": {
+   "tecnico": "Miguel Herrera",
+   "lesionados": [
+    {
+     "jugador": "Hardy Meza",
+     "motivo": "Fractura de rótula; FotMob estima su regreso para mediados de marzo de 2027",
+     "tipo": "lesion",
+     "fuente": "https://www.fotmob.com/matches/atlante-vs-tijuana/67dtxoa",
+     "fecha_fuente": "2026-11-18"
+    }
+   ],
+   "nota": "ELIMINADO: 17.º de la fase regular del Apertura 2026, sin más partidos en el torneo. Sus bajas son las de la actualización del 18-nov para la Jornada 17 y ya no se actualizan. Cobertura media: los dos suspendidos coinciden con lo que deduce el sistema, pero sólo FotMob (18-nov) los da como tales; la roja de Quirós está en crónicas del 6-nov. La lesión de Hardy Meza sale únicamente de FotMob, sin nota de prensa que la respalde."
+  },
+  "Juárez": {
+   "tecnico": "Gustavo Lema",
+   "lesionados": [
+    {
+     "jugador": "Lucas Romero",
+     "motivo": "Lesión de ligamentos de la rodilla izquierda (operado en julio); FotMob estima su regreso para inicios de abril de 2027",
+     "tipo": "lesion",
+     "fuente": "https://www.fotmob.com/matches/atlas-vs-fc-juarez/2qui27oy",
+     "fecha_fuente": "2026-11-18"
+    },
+    {
+     "jugador": "Ettson Ayón",
+     "motivo": "Golpe; FotMob lo marca como dudoso (el club lo listó como lesionado en la J16)",
+     "tipo": "duda",
+     "fuente": "https://www.fotmob.com/matches/atlas-vs-fc-juarez/2qui27oy",
+     "fecha_fuente": "2026-11-18"
+    },
+    {
+     "jugador": "Bryan Romero",
+     "motivo": "Lesión de rodilla; FotMob lo marca como dudoso",
+     "tipo": "duda",
+     "fuente": "https://www.fotmob.com/matches/atlas-vs-fc-juarez/2qui27oy",
+     "fecha_fuente": "2026-11-18"
+    }
+   ],
+   "nota": "ELIMINADO: 18.º de la fase regular del Apertura 2026, sin más partidos en el torneo. Sus bajas son las de la actualización del 18-nov para la Jornada 17 y ya no se actualizan. Cobertura media: bajas tomadas de FotMob (18-nov). La lista oficial de convocados de la J16 (6-nov) daba además como lesionados a Alejandro Mayorga, Haret Ortega y Said Godínez, sin confirmación posterior al 10-nov; la lista de la J17 aún no está publicada. Sin suspendidos reportados."
   }
  },
  "cotejo_suspendidos": [
-  "Tigres: un agregador (FutMercado/Opta) da suspendido a Fernando Gorriarán por quinta amarilla; el sistema cuenta 4 (la de su doble amonestación no acumula) y ninguna nota de prensa lo confirma: queda como duda.",
-  "Los demás suspendidos que deduce el sistema (Frías, Quirós, Portales, Helinho, J. Rodríguez, Guevara, Vite, Chávez, É. Sánchez, Allison, E. Pérez, Parra, R. Martínez) aparecen en al menos una fuente publicada."
+  "Suspendidos para la ida de cuartos: Hugo González (Toluca, roja en la J17) y Carlos Salcedo (Monterrey, doble amarilla en la J17). Los dos los deduce el sistema de tarjetas.csv y los confirman la prensa (Toluca: TV Azteca, Excélsior, El Futbolero y Récord, 21-nov; Monterrey: Excélsior y Récord, 22-nov) y FutMercado (23-nov). No se agregan a mano en «lesionados» para no duplicarlos en la página.",
+  "Quinta amarilla en la J17: ninguno de los 8 clasificados. De los 12 jugadores con 4 amarillas antes de la J17 (Excélsior, 20-nov), los de equipos clasificados (Paradela, Kevin Álvarez, Franco Romero, Capasso, Sebastián Vegas, Idrissi) no vieron tarjeta según ESPN.",
+  "Cumplieron suspensión en la J17 y regresan para la ida: Érick Sánchez (América), Ricardo Chávez (Monterrey), José Iván Rodríguez y Juan José Guevara (León), Adonis Frías (Atlas) y Helinho (Toluca).",
+  "El sistema muestra todavía «a una amarilla de la suspensión» para la ida (Carlos Rodríguez, Paradela, Ángel Márquez, Kevin Álvarez, Capasso, Franco Romero, Óliver Torres, Vegas, Jesús Lara, Pizarro, Idrissi), pero el Reglamento de Sanciones (art. 15) cancela las amarillas al terminar la fase de calificación: en la ida nadie está apercibido."
  ],
  "no_confirmado": [
-  "1) No encontré el boletín oficial de la Comisión Disciplinaria ni una nota de prensa con la lista completa de suspendidos de la Jornada 17; los suspendidos salen de notas por club y de agregadores. Los cinco que deduce el sistema quedan confirmados por al menos una fuente publicada (Vite y Chávez por Récord; José Iván Rodríguez y Juan José Guevara por un medio local que cita a la Disciplinaria; Helinho solo por FutMercado, sin nota de prensa). Ninguna fuente reporta suspendidos adicionales en estos seis equipos. 2) Pachuca y Toluca: sin previa ni parte de bajas en prensa; sus lesionados salen solo de FotMob/FutMercado, y FutMercado no lista ningún lesionado de Pachuca (contradice a FotMob en Carlos Sánchez y Alexéi Domínguez). No se incluyeron Kenedy, Arroyo ni Berlanga (reporte médico del 29-sep, estado actual desconocido) ni 'Méndez' de Toluca (Récord 7-nov, sin seguimiento). 3) Técnicos de Pachuca (Mora, 5-nov), Toluca (Mohamed, 7-nov) y León (Gandolfi, 1-nov) confirmados con notas previas al 10-nov, sin noticia de cambio posterior. 4) Santos: no se sabe si Orona y Di Yorio entran en convocatoria; sobre Diego González las fuentes difieren en el diagnóstico (fractura vs. esguince grado 3), no en que está fuera. 5) Pumas: disponibilidad final de Navas, Macías y Calderón sin confirmar. 6) Monterrey: el tipo de lesión de Durdevic varía entre fuentes (tobillo vs. muscular). 7) Las fichas de FotMob no traen fecha de publicación: se fechan con el día de consulta (18-nov). 8) Sitios que bloquearon la lectura (403): ABC Noticias, Telediario, El Siglo de Torreón, Milenio, Squawka, Tribuna; lesionadosysuspendidos.mx está fuera de la red permitida de la sesión. 9) Un calendario de TV Azteca ubica Pachuca vs Toluca el viernes 20 a las 16:50; el resto de fuentes (FotMob, Telediario, NNC) lo da el sábado 21.",
-  "No encontré el dictamen de la Comisión Disciplinaria ni una lista de prensa con los suspendidos de la Jornada 17; los suspendidos salen de FotMob y, en el caso de Frías, de Azteca Jalisco. Casi todas las lesiones y dudas provienen de las fichas en vivo de FotMob consultadas el 18-nov (sin fecha de publicación propia); sólo Zaldívar, Duk, Lucas Romero, Ayón y João Pedro tienen respaldo adicional del club o de prensa.\n\nPuntos sin confirmar:\n- Atlas, Edyairth Ortega: FotMob lo marca «Suspended», pero ya aparecía así en la ficha de la J16, no figuraba entre los apercibidos y Wikipedia lo ubica cedido en Tepatitlán. Parece un registro arrastrado, por eso no lo incluí como suspendido.\n- Atlas, Jorge Sánchez y Paulo Ramírez: fueron baja en la J16 (parte del 7-nov) y no hay fuente posterior que diga si ya están disponibles. Azteca Jalisco (12-nov) habla de «otros jugadores» pendientes de evolución médica sin nombrarlos.\n- Juárez, Alejandro Mayorga, Haret Ortega y Said Godínez: lesionados en la lista oficial de la J16 (6-nov), sin confirmación posterior al 10-nov.\n- Juárez, técnico: Gustavo Lema figura en la lista oficial del 6-nov y no hallé noticia de su salida, pero NNC (17-nov) muestra «DT T. Campos» (Tomás Campos es auxiliar).\n- Apercibidos antes de la J16 (Bolavip): Capasso (Atlas); Denzell García, Guilherme Castilho y Jesús Murillo (Juárez); Adonis Preciado (Tijuana); Pizzuto y Carrera (Atlante). No verifiqué si alguno fue amonestado en la J16; FotMob no los lista como suspendidos. Portales no estaba entre los apercibidos, así que no confirmé el motivo de su suspensión.\n- Atlante, Hardy Meza: la fractura de rótula sólo aparece en FotMob.\n- Tijuana: ninguna fuente menciona bajas ni seleccionados que volvieran lesionados; es ausencia de reportes, no un parte médico.\n- Fuentes que no pude leer (error 403): Squawka, El Heraldo de Juárez, Heraldo de México, Milenio, Vox Populi y la API de ESPN. Los resúmenes de búsqueda de Squawka dicen que no hay bajas en ningún equipo, pero dan a Atlas «plantel completo» pese a la suspensión de Frías, así que no los usé.",
-  "1) No encontré el reporte oficial de la Comisión Disciplinaria para la J16 ni para el pendiente Querétaro-Monterrey del 14-nov: en fmf.mx el último reporte de Liga MX publicado es el de la J13 (23-oct). Los suspendidos salen de prensa, FotMob y FutMercado. 2) Fernando Gorriarán (Tigres) suspendido: sólo lo lista FutMercado (5.ª amarilla, datos Opta). Vio amarilla al 81' ante Cruz Azul en la J16, pero ESPN le cuenta 4 amarillas y 1 roja en el torneo y ninguna nota de prensa lo confirma; el sistema no lo deduce. Conviene cotejarlo antes de darlo por baja. 3) Brian Rodríguez (América) no está descartado oficialmente: Mediotiempo y Tribuna lo dan como duda, Excélsior y ClaroSports como baja; Almada decide al final de la semana. Las posibles ausencias de Israel Reyes y Kevin Álvarez son especulación de un medio de afición (Bolavip), no parte del club. 4) Chivas: sin parte médico oficial de Aguirre, Ledezma y Fernando González, y sin nota posterior al 17-nov sobre cómo regresaron los seleccionados. 5) Tigres: la nota de ABC Noticias del 16-nov (alta de Rômulo, recuperación de Joaquim y Alan Franco) no se pudo abrir (403); se conoce sólo por el resumen del buscador. 6) Querétaro y Necaxa: las dudas por lesión (Dueñas, Unjanque, Javier Ruiz) salen únicamente de FotMob, sin nota de prensa; no hay dictamen sobre si Allison recibe más de un partido. 7) FotMob y FutMercado no muestran fecha de publicación por jugador: la fecha anotada (18-nov) es la de consulta o última actualización. Los apartados «en duda» de FutMercado y sus lesionados de Chivas se ven desactualizados (varios ya jugaron) y no se usaron. 8) No se reportaron lesionados en el México-Jamaica del 17-nov, pero los clubes aún no informan el estado de sus seleccionados."
+  "No hay reporte de la Comisión Disciplinaria de la J17 (en fmf.mx el último de Liga MX es el de la J13, 23-oct; suele salir el martes): no se sabe si Hugo González o Carlos Salcedo reciben más de un partido. Salcedo ya había sido expulsado antes en el torneo (Récord, 22-nov).",
+  "Pachuca: Rodolfo Pizarro salió al 90' ante Toluca (ESPN: entró Cristóbal Hernández); una transmisión en vivo de Mediotiempo habló de lesión y ninguna otra fuente lo confirma. Tampoco hay nota de bajas de Pachuca tras la J17: Carlos Sánchez y Alexéi Domínguez salen sólo de FotMob (18-nov) y de su ausencia en la J17.",
+  "Monterrey: Érick Aguirre salió de cambio al 38' ante Pumas (entró Óliver Torres; ESPN y Claro Sports); ninguna fuente explica si fue lesión. No se incluye.",
+  "Chivas: Miguel Tapias no estuvo entre los convocados de la J17 y FutMercado lo da «en rehabilitación» con fecha 16-oct; Juanfutbol (22-nov) dice que Chivas recuperó a sus lesionados. No se incluye.",
+  "FutMercado (23-nov) arrastra entradas con fecha 16-oct de jugadores que sí estuvieron en la J17 según ESPN (Chivas: Campillo, Bryan González, Miguel Gómez; Cruz Azul: Orquin, Paradela, Rotondi; América: Cristián Borja; Monterrey: Orellano). Esas entradas no se usaron.",
+  "Las fichas de FotMob y FutMercado no traen fecha por jugador: se fechan con el día de consulta. Lo no confirmado de la Jornada 17 (equipos ya eliminados) queda en la versión del 18-nov del historial de git."
  ],
  "fuentes": [
+  {
+   "url": "https://www.ligamx.net/cancha/tablas/tablaDrctTcnc/sp/60e74c9a334e55",
+   "titulo": "LIGA MX: Tabla de Directores Técnicos, Apertura 2026 (técnicos de los 8 clasificados; rojas y partidos dirigidos)",
+   "fecha": "2026-11-23 (consulta)"
+  },
+  {
+   "url": "https://chivaspasion.bolavip.com/noticias/luis-romo-se-pierde-la-liguilla-gabriel-milito-destapo-el-estado-fisico-de-los-lesionados-antes-del-chivas-vs.-pachuca-a4oTp5P3S1ub",
+   "titulo": "Rebaño Pasión: Milito destapó el estado físico de los lesionados antes del Chivas vs. Pachuca (Romo, Castillo)",
+   "fecha": "2026-11-22"
+  },
+  {
+   "url": "https://juanfutbol.com/liga-mx/milito-y-chivas-recuperan-piezas-mientras-cruz-azul-pierde-a-tres-las-bajas-del-duelo-por-el-liderato",
+   "titulo": "Juanfutbol: Chivas recupera a tres y Cruz Azul llega con tres bajas al Akron",
+   "fecha": "2026-11-22"
+  },
+  {
+   "url": "https://www.elfutbolero.com.mx/ligamx/club-america/almada-guardo-a-brian-para-la-liguilla-pero-el-problema-del-america-es-su-casa-no-gana-en-el-banorte-desde-agosto-y-ahi-cierra-con-rayados-20261123.html",
+   "titulo": "El Futbolero: Almada guardó a Brian para la Liguilla; América cierra con Rayados en el Banorte",
+   "fecha": "2026-11-22"
+  },
+  {
+   "url": "https://www.si.com/es-us/lesionados-y-suspendidos-de-america-para-enfrentarse-a-tigres-uanl-21-11-2026",
+   "titulo": "SI: Lesionados y suspendidos de América para enfrentarse a Tigres (Dávila, Zúñiga, Brian, Érick Sánchez)",
+   "fecha": "2026-11-20"
+  },
+  {
+   "url": "https://www.excelsior.com.mx/deportes/liguilla-apertura-2026-liga-mx-cuartos-final",
+   "titulo": "Excélsior: Todo definido, así se jugará la Liguilla (Salcedo suspendido para la ida)",
+   "fecha": "2026-11-22"
+  },
+  {
+   "url": "https://www.record.com.mx/historia/la-racha-de-carlos-salcedo-que-enciende-las-alarmas-en-monterrey-rumbo-a-la-liguilla-2026112223103115274",
+   "titulo": "Récord: La racha de Carlos Salcedo que enciende las alarmas en Monterrey (jugaría la vuelta)",
+   "fecha": "2026-11-22"
+  },
+  {
+   "url": "https://www.tvazteca.com/aztecadeportes/ultimo-momento-toluca-tendra-durisima-baja-para-los-cuartos-de-final/",
+   "titulo": "TV Azteca: Toluca tendrá durísima baja para los cuartos de final (Hugo González)",
+   "fecha": "2026-11-21"
+  },
+  {
+   "url": "https://www.record.com.mx/historia/pachuca-a-un-paso-de-liguilla-los-tuzos-vencen-a-toluca-en-un-partido-para-locos-2026112201362326659",
+   "titulo": "Récord: Pachuca vence a Toluca (expulsión de Hugo González al 88 tras revisión del VAR)",
+   "fecha": "2026-11-21"
+  },
+  {
+   "url": "https://www.excelsior.com.mx/deportes/atlas-vs-toluca-confirmado-primer-partido-cuartos-final-apertura-2026",
+   "titulo": "Excélsior: Atlas vs. Toluca, confirmado el primer partido de cuartos (García Palomera por Hugo González)",
+   "fecha": "2026-11-21"
+  },
+  {
+   "url": "https://www.elfutbolero.com.mx/ligamx/la-ventaja-que-el-atlas-no-queria-cierra-en-el-jalisco-donde-gano-dos-de-nueve-y-abre-en-toluca-donde-le-metieron-cinco-20261122.html",
+   "titulo": "El Futbolero: Atlas cierra en el Jalisco y abre en Toluca (Hugo González, roja al 89)",
+   "fecha": "2026-11-21"
+  },
+  {
+   "url": "https://rotowire.com/soccer/headlines/adonis-frias-news-option-going-forward-548197",
+   "titulo": "Rotowire: Adonis Frías cumplió su partido de suspensión",
+   "fecha": "2026-11-22"
+  },
+  {
+   "url": "https://www.excelsior.com.mx/deportes/12-jugadores-que-perderan-inicio-liguilla-si-ven-tarjeta-amarilla",
+   "titulo": "Excélsior: Los 12 jugadores que se perderán el inicio de la Liguilla si ven una tarjeta amarilla",
+   "fecha": "2026-11-20"
+  },
+  {
+   "url": "https://www.clarosports.com/futbol/liga-mx/pumas-vs-monterrey-en-vivo-el-partido-de-la-jornada-17-de-la-liga-mx-resultado-y-goles-hoy-apertura-2026/",
+   "titulo": "Claro Sports: Pumas vs Monterrey, J17 (salida de Érick Aguirre al 38', expulsión de Salcedo)",
+   "fecha": "2026-11-21"
+  },
+  {
+   "url": "https://www.eluniversalhidalgo.com.mx/deportes/pachuca-enfrentara-al-lider-chivas-en-la-liguilla-del-apertura-2026/",
+   "titulo": "El Universal Hidalgo: Pachuca enfrentará al líder Chivas (sin bajas mencionadas)",
+   "fecha": "2026-11-22"
+  },
+  {
+   "url": "https://site.api.espn.com/apis/site/v2/sports/soccer/mex.1/summary?event=401877047",
+   "titulo": "ESPN: Chivas vs Cruz Azul J17, alineaciones, cambios y tarjetas (cotejo)",
+   "fecha": "2026-11-22"
+  },
+  {
+   "url": "https://site.api.espn.com/apis/site/v2/sports/soccer/mex.1/summary?event=401877048",
+   "titulo": "ESPN: Tigres vs América J17, alineaciones, cambios y tarjetas (cotejo)",
+   "fecha": "2026-11-21"
+  },
+  {
+   "url": "https://site.api.espn.com/apis/site/v2/sports/soccer/mex.1/summary?event=401877049",
+   "titulo": "ESPN: Pumas vs Monterrey J17, alineaciones, cambios y tarjetas (cotejo)",
+   "fecha": "2026-11-21"
+  },
+  {
+   "url": "https://site.api.espn.com/apis/site/v2/sports/soccer/mex.1/summary?event=401877050",
+   "titulo": "ESPN: Pachuca vs Toluca J17, alineaciones, cambios y tarjetas (cotejo)",
+   "fecha": "2026-11-21"
+  },
+  {
+   "url": "https://site.api.espn.com/apis/site/v2/sports/soccer/mex.1/summary?event=401877051",
+   "titulo": "ESPN: Santos vs León J17, alineaciones, cambios y tarjetas (cotejo)",
+   "fecha": "2026-11-21"
+  },
+  {
+   "url": "https://site.api.espn.com/apis/site/v2/sports/soccer/mex.1/summary?event=401877053",
+   "titulo": "ESPN: Juárez vs Atlas J17, alineaciones, cambios y tarjetas (cotejo)",
+   "fecha": "2026-11-20"
+  },
   {
    "url": "https://abcnoticias.mx/deportes/2026/11/16/tigres-recupera-jugadores-para-cerrar-el-apertura-2026-ante-america-295619.html",
    "titulo": "Tigres recupera jugadores para cerrar el Apertura 2026 ante América (sitio bloqueado; leído sólo en resumen de búsqueda)",
@@ -537,8 +612,8 @@
   },
   {
    "url": "https://futmercado.com/lesiones/",
-   "titulo": "FutMercado: Lesiones y suspensiones de la Liga MX (datos Opta vía SportMonks; última actualización 18-nov)",
-   "fecha": "2026-11-18"
+   "titulo": "FutMercado: Lesiones y suspensiones de la Liga MX (datos Opta vía SportMonks; consultada el 18 y el 23-nov)",
+   "fecha": "2026-11-23"
   },
   {
    "url": "https://juanfutbol.com/liga-mx/los-futbolistas-que-se-perderan-el-resto-del-torneo-apertura-2026-de-la-liga-mx",

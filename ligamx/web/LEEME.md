@@ -25,10 +25,14 @@ Opciones:
   escribe `web/documento.html` (es lo que usan las pruebas; sirve para abrirla con doble clic).
 - `--vivo RUTA` (de prueba): incrusta ese documento en vivo como `datos.vivo`.
 - `--portada EQUIPO` (de prueba): fuerza el equipo de la portada, para revisar las 16.
+- `--datos OTRO.json --solo-documento web/_variante_x.html` (de prueba): escribe ÚNICAMENTE ese documento
+  completo (dentro de `web/`, para que encuentre `img/` y `video/`); no toca `index.html`,
+  `archivos_publicados.json` ni `capacidades.json` y se niega a escribir sobre `index.html` o
+  `documento.html`. Es lo que usan las pruebas para armar la página con otro estado del torneo.
 
-Las dos opciones de prueba NO tocan `index.html` ni `archivos_publicados.json`: sólo escriben el
-documento (`web/documento.html` si no se da `--salida`). Sin ellas, `index.html` incrusta
-`actual.json → vivo` cuando existe.
+Las tres opciones de prueba NO tocan `index.html` ni `archivos_publicados.json`: sólo escriben el
+documento (`web/documento.html` si no se da `--salida`, o la ruta de `--solo-documento`). Sin ellas,
+`index.html` incrusta `actual.json → vivo` cuando existe.
 
 ## Qué se publica
 
@@ -150,6 +154,33 @@ algo (inicio, gol, expulsión, descanso, final). La página:
     la suma), los globales y los cruces alternativos («sale en 14.4% · CAZ avanza 79%»), y un botón
     «Volver al cuadro». Tablero dorado = pronóstico; tablero blanco = resultado real. Si falta
     `liguilla.torneo` sale un aviso.
+- **Sin partidos con día y hora** (`pendientes` vacío; pasa entre el fin de la fase regular y el momento en que la
+  liga programa la ronda, y entre rondas):
+  - bajo la portada, la banda «Lo que sigue» anuncia la primera ronda con partidos por jugar entre equipos ya
+    definidos («Liguilla definida · Cuartos de final · Del 25 al 29 de noviembre», ida y vuelta, «Día y hora de
+    cada partido: por confirmar»), un botón por cruce que lleva a su serie y «Ver el cuadro» (en celular, al estado
+    del cuadro con el mini-cuadro; en pantallas anchas, al cuadro). Con la liguilla terminada, el campeón. La
+    portada sigue cabiendo en la primera pantalla;
+  - «Próximos partidos» muestra esas piernas (`liguilla.torneo`, series `definida` sin decidir que no vienen en
+    `pendientes`) como tarjetas compactas: primero las idas y luego las vueltas, con fase y pierna, llave, escudos,
+    marcador más probable, barra 1X2 con %, sede (la habitual del local) y fecha o ventana («25 o 26 nov»), y un
+    botón «Serie C1» que abre el detalle de la serie. Una nota dice que la combinada de cada partido se publica
+    cuando la liga confirme día y hora. En celular van en una columna, desde 600 px de dos en dos y desde 1160 px de
+    cuatro en cuatro (ningún nombre se parte a media palabra; sede y botón alineados abajo). Si ya hay partidos
+    pendientes, las piernas que falten de programar salen después de sus tarjetas completas;
+  - sin nada por jugar, «Próximos partidos» se retira; sin combinada de la jornada, la sección «Combinada de la
+    jornada» también se retira (en vez de ocupar una pantalla con un aviso vacío) y «Próximos partidos» dice por
+    qué. El menú, la barra de escritorio y el número de cada sección (`numerar()`) siguen a las secciones que sí se
+    muestran.
+- **Estado de cada serie** en el cuadro: «Terminada», «En curso», «Definida» (campo `definida`: sus dos equipos ya
+  son seguros; los cuartos desde el fin de la fase regular, las semifinales cuando están decididos los cuatro
+  cuartos, la final cuando lo están las semifinales) o «Proyectada» (ruta de los favoritos). Con datos viejos sin el
+  campo se deduce de `real` y del `estado` del torneo. Una serie definida ya no muestra cruces alternativos.
+- **Fase regular terminada** (`proyeccion.regular_completa`): la tabla general se rotula «Así terminó» y desaparece
+  la tabla final proyectada; «Hasta dónde llega cada uno» queda con los ocho clasificados y sin la columna
+  «Liguilla»; «¿Quién será campeón?» nombra a los que no clasificaron (en el orden de la tabla) y a los eliminados
+  en la liguilla; en «Camino al título» los cuartos más probables dejan su lugar a las semifinales y finales más
+  probables. Todo depende de los datos, nunca de la fecha.
 - Completa en reposo: las animaciones parten de un estado visible; con `prefers-reduced-motion` no hay
   animaciones ni autoplay.
 - Navegación interna con `scrollIntoView` (no se usa `location.hash`, `history` ni `localStorage`).
@@ -157,13 +188,20 @@ algo (inicio, gol, expulsión, descanso, final). La página:
 
 ## Probar
 
-Chromium y WebKit, en iPhone 13 y en escritorio 1440x900 (abre `web/documento.html` con `file://`):
+Chromium y WebKit, en iPhone 13 y en escritorio 1440x900. Arma y abre con `file://` tres documentos:
+`web/documento.html` con los datos de hoy (se revisa lo que corresponda a SU estado: partidos pendientes o no,
+piernas de liguilla sin día ni hora, cuadro proyectado / definido / en curso / terminado, fase regular terminada o
+no, combinada o no), y dos copias fijas armadas con `--solo-documento`: `pruebas/datos/actual_20261120T0722Z.json`
+(9 partidos pendientes, cuadro proyectado; reloj del navegador en el 20-nov) para tarjetas de partido, pestañas de
+combinada, cuenta regresiva, cuadro, en vivo y variantes, y `pruebas/datos/actual_20261123T0353Z.json` (noche del
+22-nov: 0 pendientes, cuadro definido, cuartos sin día ni hora; corrida de 100,000 simulaciones) con sus variantes
+(datos viejos sin el campo `definida`, idas ya en el calendario, semifinales definidas, liguilla terminada):
 
     PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers node web/pruebas/prueba.js chromium
     PLAYWRIGHT_BROWSERS_PATH=<carpeta con webkit> node web/pruebas/prueba.js webkit
     # con --capturas guarda PNG en web/pruebas/capturas/ (ignoradas por git)
 
-Revisa (254 comprobaciones por motor): fragmento válido y contrato de la plataforma, sin colores
+Revisa (504 comprobaciones por motor): fragmento válido y contrato de la plataforma, sin colores
 literales, portada (foto, Ken Burns, trofeo, confeti, nada encimado; en celular, que quepa en la primera
 pantalla a 390x664, 360x700 y 375x620, con y sin franja en vivo; en escritorio, que quepa y que la copa
 no toque el título), el cuadro (4 + 2 + 1 series con ida y vuelta, sin «global probable»; en celular el
@@ -181,7 +219,10 @@ cuando «Al momento» crece, error del oyente con nueva suscripción, flujo cort
 movimiento reducido; y «Modelo contra mercado» en el desempeño sellado (lo que diga `desempeno.contra_mercado`
 con los datos de hoy, y variantes con 3, 1 y 40 partidos comparados, sin ningún sello con momios, documento
 viejo sin el campo y mercado con basura; en cada resultado, la barra del mercado sellado o la nota de que su
-sello no guardó momios). Sale con código 1 si algo falla. Tarda unos 2 minutos por motor. Si la máquina no
+sello no guardó momios); y, según el estado de los datos, el anuncio bajo la portada con su botón al cuadro, las
+tarjetas compactas de liguilla (contenido, orden, nombres sin partir, pie alineado, botón al detalle), que ninguna
+sección visible quede vacía, la etiqueta de cada serie, el cuadro en espejo en una pantalla y los textos de la fase
+regular terminada. Sale con código 1 si algo falla. Tarda de 2.5 a 3 minutos por motor. Si la máquina no
 tiene salida a internet las fuentes de Google no cargan y se prueba con la pila de respaldo.
 
 Para revisar la portada de otro favorito: `python3 web/construir.py --portada Toluca` (escribe sólo

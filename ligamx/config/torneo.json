@@ -23,7 +23,18 @@
   "ajustes_tabla": {
     "regla_menores": "Menos 3 puntos al club que no sume 1,170 minutos de menores en la fase regular (art. 49).",
     "minutos_por_cumplir_al_2026_11_10": {"Toluca": 41, "Puebla": 16, "Santos": 36, "Querétaro": 46, "León": 91, "Tigres": 102, "Monterrey": 108},
-    "nota": "A todos les alcanza con un partido (tope de 225 minutos por partido). Se vigila en la tabla oficial de menores de ligamx.net tras la Jornada 17."
+    "nota": "A todos les alcanzaba con un partido (tope de 225 minutos por partido). Resuelto tras la Jornada 17: ver «verificado».",
+    "verificado": {
+      "fecha": "2026-11-23",
+      "resultado": "Los 18 clubes cumplieron la regla de menores: nadie pierde 3 puntos. La Tabla General oficial quedó sin descuentos (17 partidos por club) y coincide con la de ESPN: Chivas 33, Cruz Azul 32, América 30, Atlas 28, Toluca 27, Monterrey 27, León 26, Pachuca 25.",
+      "minutos_al_reglamento_finales": {"Toluca": 1234, "Puebla": 1354, "Santos": 1402, "Querétaro": 1449, "León": 1172, "Tigres": 1197, "Monterrey": 1197},
+      "nota": "León cumplió por 2 minutos (1,172 de 1,170). La tabla oficial suma minutos abonados por convocatorias a selecciones menores (Santos 201, Puebla 85, Tigres 39).",
+      "fuentes": [
+        {"url": "https://www.ligamx.net/cancha/tablas/tablaMnrs/eyAicGllVGFibGEiOiI8ZGl2PjxzdHJvbmc+TWVub3JlcyBMSUdBIE1YPC9zdHJvbmc+PC9kaXY+UmVnbGFtZW50byBkZSBDb21wZXRlbmNpYSBMSUdBIE1YLCBUZW1wb3JhZGEgMjAyNi0yMDI3PC9icj5NaW51dG9zIG3tbmltb3MgcG9yIEFjdW11bGFyIGVuIGVsIFRvcm5lbzogMSwxNzA8L2JyPk3heGltbyBkZSBtaW51dG9zIGEgY29uc2lkZXJhciBwb3IgUGFydGlkbzogMjI1PC9icj48L2JyPjxkaXY+PHN0cm9uZz5DYXRlZ29y7WFzPC9zdHJvbmc+PC9kaXY+MS4gRWwgMTAwJSBkZSBsb3MgbWludXRvcyBqdWdhZG9zIGEgbG9zIEp1Z2Fkb3JlcyBuYWNpZG9zIGVuIDIwMDQgeSBwb3N0ZXJpb3JlcyJ9/60e74c9a334e55", "titulo": "LIGA MX: Tabla de Participación de Menores, Apertura 2026 (los 18 clubes con «Cumplió»)", "fecha": "2026-11-23 (consulta)"},
+        {"url": "https://www.ligamx.net/cancha/tablas/tablaGeneralClasificacion/sp/60e74c9a334e55", "titulo": "LIGA MX: Tabla General, Apertura 2026 (sin descuentos)", "fecha": "2026-11-23 (consulta)"},
+        {"url": "https://juanfutbol.com/liga-mx/todos-los-equipos-cumplieron-asi-quedo-la-tabla-de-regla-de-menores-del-apertura-2026-de-liga-mx", "titulo": "Juanfutbol: así quedó la tabla de regla de menores del Apertura 2026 (14 clubes ya cumplían antes de la J17; Monterrey cumplió en la J17; no reporta sanciones)", "fecha": "2026-11-22"}
+      ]
+    }
   },
   "liguilla": {
     "rondas": ["cuartos", "semifinal", "final"],
@@ -44,7 +55,21 @@
       "final_vuelta": ["2026-12-13"],
       "final_ida_opcion2": ["2026-12-24"],
       "final_vuelta_opcion2": ["2026-12-27"]
-    }
+    },
+    "fechas_verificadas": "2026-11-23: semifinales (idas 2 y 3 de diciembre, vueltas 5 y 6) y final (10 y 13 de diciembre, o 24 y 27) confirmadas de nuevo por Excélsior el 22-nov; coinciden con el calendario oficial del 9-jun.",
+    "horarios_cuartos": [],
+    "horarios_cuartos_estado": "Sin horarios oficiales al 23-nov-2026 04:30 UTC (noche del domingo 22 en México): la liga fija día y hora en la videoconferencia del lunes 23-nov (art. 29) y los publica en ligamx.net; ESPN todavía no lista los partidos (su calendario del 25 al 29-nov sale vacío). Cuando salgan, llenar «horarios_cuartos» con {llave, pierna, local, visitante, fecha_local, hora_local (centro de México), estadio, fuente}. Por reglamento (art. 30): dos idas el miércoles 25 y dos el jueves 26, a las 19:00 y 21:00; dos vueltas el sábado 28 y dos el domingo 29.",
+    "sedes_cuartos": [
+      {"llave": "C1", "pierna": 1, "local": "Pachuca", "visitante": "Chivas", "estadio": "Estadio Hidalgo", "fuente": "https://www.excelsior.com.mx/deportes/liguilla-apertura-2026-liga-mx-cuartos-final"},
+      {"llave": "C1", "pierna": 2, "local": "Chivas", "visitante": "Pachuca", "estadio": "Estadio Akron", "fuente": "https://www.excelsior.com.mx/deportes/liguilla-apertura-2026-liga-mx-cuartos-final"},
+      {"llave": "C2", "pierna": 1, "local": "León", "visitante": "Cruz Azul", "estadio": "Estadio León (Nou Camp)", "fuente": "https://www.am.com.mx/superdeportivo/2026/11/22/asi-sera-la-revancha-del-leon-contra-un-cruz-azul-herido-tras-caer-en-el-akron-1869483.html"},
+      {"llave": "C2", "pierna": 2, "local": "Cruz Azul", "visitante": "León", "estadio": "Estadio Banorte", "fuente": "https://www.excelsior.com.mx/deportes/liguilla-apertura-2026-liga-mx-cuartos-final"},
+      {"llave": "C3", "pierna": 1, "local": "Monterrey", "visitante": "América", "estadio": "Estadio BBVA", "fuente": "https://www.elfutbolero.com.mx/ligamx/club-america/almada-guardo-a-brian-para-la-liguilla-pero-el-problema-del-america-es-su-casa-no-gana-en-el-banorte-desde-agosto-y-ahi-cierra-con-rayados-20261123.html"},
+      {"llave": "C3", "pierna": 2, "local": "América", "visitante": "Monterrey", "estadio": "Estadio Banorte", "fuente": "https://www.excelsior.com.mx/deportes/liguilla-apertura-2026-liga-mx-cuartos-final"},
+      {"llave": "C4", "pierna": 1, "local": "Toluca", "visitante": "Atlas", "estadio": "Estadio Nemesio Diez", "fuente": "https://www.excelsior.com.mx/deportes/atlas-vs-toluca-confirmado-primer-partido-cuartos-final-apertura-2026"},
+      {"llave": "C4", "pierna": 2, "local": "Atlas", "visitante": "Toluca", "estadio": "Estadio Jalisco", "fuente": "https://www.excelsior.com.mx/deportes/atlas-vs-toluca-confirmado-primer-partido-cuartos-final-apertura-2026"}
+    ],
+    "sedes_cuartos_nota": "Sedes según la prensa del 21 y 22 de noviembre (Excélsior, AM, El Futbolero) y la práctica de que el mejor ubicado cierra en casa; coinciden con la sede donde cada club jugó todos sus partidos de local del torneo (ESPN) y con liguilla.torneo de salidas/actual.json. Ningún estadio cambia. Pasan a oficiales cuando la liga publique la programación."
   },
   "pendientes_fase_regular": {
     "jornada_17": ["2026-11-20", "2026-11-22"],
@@ -54,7 +79,8 @@
   "copa_intercontinental_toluca": {
     "partidos": ["2026-12-09", "2026-12-12", "2026-12-16"],
     "sede": "Qatar",
-    "nota": "Si Toluca avanza, la final de liga se recorre al 24 y 27 de diciembre (la liga no ha precisado la condición exacta)."
+    "rivales": "9-dic contra el campeón de la Libertadores (Palmeiras o Estudiantes de La Plata) en el Estadio Jassim Bin Hamad; 12-dic Copa Challenger contra Mamelodi Sundowns, mismo estadio, si gana el primero; 16-dic final contra el PSG en el Estadio Ahmad bin Ali, si gana los dos (Excélsior, 22-nov).",
+    "nota": "Condición para recorrer la final de liga al 24 y 27 de diciembre: la nota oficial del 9-jun la liga a que Toluca «avance hasta la instancia definitiva» de la Intercontinental; Excélsior (22-nov) escribe que «únicamente se aplicaría si Toluca alcanza la última instancia» (la final de liga). En la práctica Toluca juega en Doha el 9-dic, un día antes de la ida del 10, así que si es finalista la final no puede jugarse el 10 y 13; si no llega a la final, se juega el 10 y 13. La liga no lo ha precisado por escrito."
   },
   "sedes_compartidas": {"Estadio Banorte": ["América", "Cruz Azul", "Atlante"]},
   "reglas_nuevas": [
@@ -66,13 +92,17 @@
     {"url": "https://fmf.mx/docs/reglamentos/507.pdf", "titulo": "Reglamento de Competencia de la Liga BBVA MX, temporada 2026-2027", "fecha": "2026-07-15", "sustenta": "clasificados, desempates, liguilla, final, menores, extranjeros"},
     {"url": "https://fmf.mx/docs/reglamentos/509.pdf", "titulo": "Reglamento de Sanciones 2026-2027", "fecha": "2026-07-15", "sustenta": "tarjetas y suspensiones"},
     {"url": "https://www.ligamx.net/cancha/detallenoticia/47591/calendario-oficial-del-torneo-apertura-2026", "titulo": "Calendario oficial del Torneo Apertura 2026", "fecha": "2026-06-09", "sustenta": "fechas de cuartos, semifinales y final; fecha FIFA"},
-    {"url": "https://www.foxsports.com.mx/2026/10/22/toluca-jugara-la-copa-intercontinental-en-qatar-fifa-confirma-la-sede-para-los-partidos/", "titulo": "FIFA revela dónde jugará Toluca la Copa Intercontinental 2026", "fecha": "2026-10-22", "sustenta": "fechas de la Intercontinental"}
+    {"url": "https://www.foxsports.com.mx/2026/10/22/toluca-jugara-la-copa-intercontinental-en-qatar-fifa-confirma-la-sede-para-los-partidos/", "titulo": "FIFA revela dónde jugará Toluca la Copa Intercontinental 2026", "fecha": "2026-10-22", "sustenta": "fechas de la Intercontinental"},
+    {"url": "https://www.ligamx.net/cancha/tablas/tablaGeneralClasificacion/sp/60e74c9a334e55", "titulo": "LIGA MX: Tabla General, Apertura 2026", "fecha": "2026-11-23 (consulta)", "sustenta": "tabla final sin descuentos; ver ajustes_tabla.verificado"},
+    {"url": "https://www.excelsior.com.mx/deportes/liguilla-apertura-2026-liga-mx-cuartos-final", "titulo": "Excélsior: Todo definido, así se jugará la Liguilla del Apertura 2026", "fecha": "2026-11-22", "sustenta": "cruces y estadios de ida y vuelta de cuartos; horarios pendientes"},
+    {"url": "https://www.excelsior.com.mx/deportes/pavo-y-liga-mx-toluca-podria-jugar-final-apertura-2026-nochebuena", "titulo": "Excélsior: Toluca podría jugar la final del Apertura 2026 en Nochebuena", "fecha": "2026-11-22", "sustenta": "fechas de semifinales y final, condición de Toluca, rivales y estadios de la Intercontinental"},
+    {"url": "https://www.am.com.mx/superdeportivo/2026/11/22/asi-sera-la-revancha-del-leon-contra-un-cruz-azul-herido-tras-caer-en-el-akron-1869483.html", "titulo": "AM: Así será la revancha del León contra un Cruz Azul herido", "fecha": "2026-11-22", "sustenta": "ida en el Nou Camp y vuelta de Cruz Azul en el «estadio Azteca» (Banorte); días y horas se publican el lunes"},
+    {"url": "https://www.elfutbolero.com.mx/ligamx/club-america/almada-guardo-a-brian-para-la-liguilla-pero-el-problema-del-america-es-su-casa-no-gana-en-el-banorte-desde-agosto-y-ahi-cierra-con-rayados-20261123.html", "titulo": "El Futbolero: América cierra con Rayados en el Banorte", "fecha": "2026-11-22", "sustenta": "ida en el BBVA, vuelta en el Banorte, probablemente en sábado; horarios el lunes"}
   ],
   "dudas": [
-    "Fechas de la final: 10 y 13 de diciembre, o 24 y 27 si Toluca avanza en la Intercontinental; se resuelve tras las semifinales.",
-    "Día, hora y sede de cada partido de cuartos: se fijan el lunes 23 de noviembre.",
-    "Sede de Cruz Azul en liguilla: Banorte o Ciudad de los Deportes (en el Clausura 2026 jugó la ida de la final en Ciudad de los Deportes).",
-    "Momento exacto en que se aplicaría la resta de 3 puntos por menores.",
+    "Fechas de la final: 10 y 13 de diciembre, o 24 y 27. La nota oficial (9-jun) liga el cambio a que Toluca «avance hasta la instancia definitiva» de la Intercontinental; Excélsior (22-nov) dice que «únicamente se aplicaría si Toluca alcanza la última instancia» (la final de liga). Como Toluca juega en Doha el 9-dic, en la práctica la final se recorre si Toluca es finalista. Se resuelve tras las semifinales (6-dic).",
+    "Día y hora de cada partido de cuartos: no oficiales al 23-nov 04:30 UTC (ver liguilla.horarios_cuartos_estado). La prensa adelanta, sin confirmar: Atlas-Toluca ida miércoles 25 y vuelta sábado 28 (El Futbolero, 21-nov); Chivas pediría jueves 26 y domingo 29 (Rebaño Pasión, 22-nov); América cerraría en sábado (El Futbolero, 22-nov).",
+    "Sede de Cruz Azul: Excélsior (22-nov) da su vuelta ante León en el Estadio Banorte y AM (22-nov) en el «estadio Azteca» (el mismo inmueble), donde jugó sus 8 partidos de local del torneo; Ciudad de los Deportes ya no aparece. Falta la publicación oficial. América también cierra en el Banorte: por el art. 13.3 e) no pueden jugar el mismo día y hora.",
     "La nota de ESPN sobre quién avanza en series empatadas puede ser errónea (dijo gol de visitante en Pumas-América del Clausura 2026): quién avanza se deduce de la regla."
   ],
   "detalle": "notas/reglas_oficial.md y notas/reglas_medios.md"

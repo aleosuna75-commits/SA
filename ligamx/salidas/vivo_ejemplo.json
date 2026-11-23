@@ -377,6 +377,7 @@
   }
  ],
  "tabla_nota": "Tabla al momento: cuenta los marcadores de los partidos en juego como si terminaran así.",
+ "tabla_fija": false,
  "proyeccion": {
   "n_sim": 20000,
   "clasifica": [
