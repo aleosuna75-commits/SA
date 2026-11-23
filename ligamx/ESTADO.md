@@ -191,8 +191,8 @@ en la base quedaron aceptadas.
   byte por byte; `mejora.ciclo` ya regenera solo el DESARROLLO que falte; 3) WebKit para `web/pruebas/prueba.js`:
   `node /opt/node-tools/node_modules/playwright/cli.js install-deps webkit` y
   `PLAYWRIGHT_BROWSERS_PATH=/opt/pw-webkit node /opt/node-tools/node_modules/playwright/cli.js install webkit`; correr
-  con `PLAYWRIGHT_BROWSERS_PATH=/opt/pw-webkit node web/pruebas/prueba.js webkit`. El entorno «Mx» puede traer
-  esto en su guion de preparación (si el usuario lo aprueba).
+  con `PLAYWRIGHT_BROWSERS_PATH=/opt/pw-webkit node web/pruebas/prueba.js webkit`. Desde el 23-nov el entorno «Mx»
+  trae los pasos 1 y 3 en su guion de preparación (aprobado por el usuario; corre al crear un contenedor nuevo).
 - Esta máquina tiene 4 CPU: cada workflow corre 2 agentes a la vez; conviene lanzar 2–3 workflows en paralelo.
 - Hacer commit y push al cerrar cada fase (el contenedor es efímero).
 
