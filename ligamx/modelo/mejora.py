@@ -152,6 +152,9 @@ def ciclo(reevaluar: bool = True, adoptar_si_gana: bool = True) -> dict:
     reg = json.loads(RUTA_REGISTRO.read_text(encoding="utf-8"))
     campeon = reg["campeon"]["nombre"]
     nombres = [campeon] + [r["nombre"] for r in reg["retadores"]]
+    for n in nombres:                    # modelo/pred no va a git: tras reiniciar el contenedor falta el DESARROLLO
+        if _leer(n, "desarrollo") is None:  # y la comparación quedaría sólo con la PRUEBA (modelo/restaurar_pred.py)
+            arnes.evaluar(candidatos.finalistas()[n], registrar_variante=False, verbose=False)
     if reevaluar:
         from modelo import variables
         variables.actualizar("bloque"); variables.actualizar()
