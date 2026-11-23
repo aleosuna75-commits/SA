@@ -115,6 +115,12 @@ Para ver tu nuevo campo en los datos durante el desarrollo regenera con
 orquestador lo rehace con el millón) y «python3 web/construir.py». No cambies probabilidades ni cálculos del simulador.
 Reglas de la página (CLAUDE.md): fragmento sin doctype, un solo tema oscuro con tokens (ningún color literal fuera de
 :root), cada bloque aislado con seguro(), sin location.hash, JavaScript no calcula probabilidades.
+REANUDACIÓN: un agente anterior empezó este mismo encargo y se cortó por límite de uso a la mitad (48 pasos). Dejó
+cambios SIN commit en web/plantilla.html (+255 líneas), web/construir.py (opción nueva --solo-documento),
+web/pruebas/prueba.js, produccion/exportar.py (campo «definida» en torneo_liguilla, con su lógica de semifinales y
+final) y la copia web/pruebas/datos/actual_20261120T0722Z.json; y material en ${S}/A (base/ con el estado previo,
+v1/ capturas). Empieza con «git diff» de esos archivos: lo que esté bien, consérvalo; lo que esté mal o a medias,
+corrígelo o termínalo. No empieces de cero.
 Entrega: capturas finales a 390 px de portada, «Próximos partidos» y liguilla en ${S}/A/final/, y el resultado
 completo de prueba.js (número de revisiones por motor).`
 
@@ -152,6 +158,13 @@ En cada corte revisa, contra los resultados reales:
   anota todo lo que se vea mal, vacío, contradictorio o confuso: portada (cuenta regresiva, favorito; en el corte 7 debe
   celebrar al campeón), «Próximos partidos», combinada, cuadro (mini-cuadro en celular y espejo ≥1400 px), detalle de
   serie con piernas jugadas, «Camino al título», tabla, «Última jornada», errores de consola.
+REANUDACIÓN: un agente anterior empezó este mismo encargo y se cortó por límite de uso justo antes de mirar las
+capturas. En ${S}/B ya están las salidas de los 7 cortes (corte_1.json … corte_7.json, corte_7b.json con su guion
+corte_7b.py), los registros exportar_<n>.log, construir_sitios.sh/.log, capturas en cap_1 … cap_7b (con capturar.js
+y detalle.js) y ACCESOS_PRUEBA_modificado.log (exportar con --corte dentro del periodo PRUEBA anota el acceso en
+modelo/pred/ACCESOS_PRUEBA.log: es la bitácora de accesos prevista por la regla del proyecto, no un defecto, pero
+dilo en el informe). Reutilízalas tras comprobar que están completas (rehaz sólo lo que falte o esté mal) y dedica
+el esfuerzo a REVISAR los datos y a MIRAR las capturas.
 Clasifica cada hallazgo (bloqueante = dato falso o página rota durante la liguilla; importante = confunde o se ve mal;
 menor) con evidencia (ruta del JSON y clave, o ruta de la captura) y un arreglo sugerido con archivo y función. Di
 también qué SÍ funciona bien, en el resumen. No propongas cambiar el modelo ni las probabilidades salvo que haya un

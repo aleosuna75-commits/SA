@@ -5,8 +5,17 @@
      PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers node web/pruebas/prueba.js chromium [--capturas]
      PLAYWRIGHT_BROWSERS_PATH=<carpeta con webkit> node web/pruebas/prueba.js webkit [--capturas]
 
-   Reconstruye la página (construir.py --documento --salida web/), la abre con file:// desde web/ en
-   iPhone 13 y en escritorio 1440x900 y revisa:
+   Arma TRES documentos y los abre con file:// desde web/ en iPhone 13 y en escritorio 1440x900:
+   - el de HOY (construir.py --documento --salida web/ → documento.html, con salidas/actual.json): se revisa lo que
+     toque según SU estado (partidos pendientes o no, cuadro proyectado / definido / en curso / terminado, fase
+     regular terminada o no). Las expectativas salen de los datos incrustados, nunca de la fecha;
+   - uno FIJO con partidos pendientes (pruebas/datos/actual_20261120T0722Z.json: 9 pendientes, cuadro proyectado),
+     con el reloj del navegador fijo en el 20-nov: ahí corren SIEMPRE las revisiones de tarjetas de partido, pestañas
+     de combinada, cuenta regresiva, cuadro, en vivo y variantes;
+   - uno FIJO sin partidos pendientes y con el cuadro definido (pruebas/datos/actual_20261123_definido.json): anuncio
+     de la liguilla bajo la portada, tarjetas de las piernas de cuartos, series «Definida», sin secciones vacías; y
+     sus variantes (datos viejos sin el campo «definida», semifinales definidas, liguilla terminada).
+   Los dos fijos se arman con «construir.py --datos … --solo-documento», que no toca index.html. Revisa:
    - archivo: fragmento válido, tokens de color, sin scripts externos, capacidad "db" declarada y usada;
    - portada: foto del favorito con movimiento lento, trofeo con su escudo, confeti, nada encimado; en celular
      cabe completa en la primera pantalla (390x664, 360x700 y 375x620, con y sin la franja en vivo);
@@ -33,7 +42,13 @@ const WEB = path.resolve(__dirname, '..');
 const motor = (process.argv[2] || 'chromium').toLowerCase();
 const CAPTURAS = process.argv.includes('--capturas');
 const DIR_CAP = path.join(__dirname, 'capturas');
-const URL_DOC = 'file://' + path.join(WEB, 'documento.html');
+const DATOS = path.join(__dirname, 'datos');
+const SUF = '_' + process.pid;                                     /* dos corridas a la vez no se pisan los temporales */
+const DOC_REAL = path.join(WEB, 'documento.html');                 /* los datos de hoy (salidas/actual.json) */
+const DOC_FIJO = path.join(WEB, '_variante' + SUF + '_pendientes.html');  /* copia fija: 9 partidos pendientes, cuadro proyectado */
+const DOC_DEFINIDO = path.join(WEB, '_variante' + SUF + '_definido.html'); /* copia fija: 0 pendientes, cuadro definido */
+const URL_REAL = 'file://' + DOC_REAL, URL_DOC = 'file://' + DOC_FIJO, URL_DEFINIDO = 'file://' + DOC_DEFINIDO;
+const AHORA_FIJO = '2026-11-20T08:00:00Z';                        /* 37 min después del corte de los datos fijos: sus 9 partidos siguen por jugar */
 const EJEMPLO = JSON.parse(fs.readFileSync(path.join(WEB, '..', 'salidas', 'vivo_ejemplo.json'), 'utf8'));
 const AHORA_EJEMPLO = '2026-11-21T23:41:30Z'; /* 10 s después de «generado_utc» del ejemplo */
 const temporales = [];
@@ -47,13 +62,13 @@ function revisa(cond, nombre, detalle) {
 }
 const copia = x => JSON.parse(JSON.stringify(x));
 
-/* escribe una copia de documento.html con los datos incrustados cambiados por fn(d) */
-function variante(nombre, fn) {
-  const doc = fs.readFileSync(path.join(WEB, 'documento.html'), 'utf8');
+/* escribe una copia del documento base (por omisión, el fijo con partidos pendientes) con los datos incrustados cambiados por fn(d) */
+function variante(nombre, fn, base) {
+  const doc = fs.readFileSync(base || DOC_FIJO, 'utf8');
   const re = /(<script type="application\/json" id="datos">)([\s\S]*?)(<\/script>)/;
   const d = JSON.parse(re.exec(doc)[2]);
   fn(d);
-  const ruta = path.join(WEB, '_variante_' + nombre + '.html');
+  const ruta = path.join(WEB, '_variante' + SUF + '_' + nombre + '.html');
   fs.writeFileSync(ruta, doc.replace(re, (_, a, __, c) => a + JSON.stringify(d).replace(/<\//g, '<\\/') + c));
   temporales.push(ruta);
   return 'file://' + ruta;
@@ -89,7 +104,7 @@ function conLiguillaEnCurso(d) {
 }
 
 /* ---- modelo contra mercado sellado: la página sólo da formato a desempeno.contra_mercado y a pronostico.mercado ---- */
-function datosDocumento() { return JSON.parse(/<script type="application\/json" id="datos">([\s\S]*?)<\/script>/.exec(fs.readFileSync(path.join(WEB, 'documento.html'), 'utf8'))[1]); }
+function datosDocumento(ruta) { return JSON.parse(/<script type="application\/json" id="datos">([\s\S]*?)<\/script>/.exec(fs.readFileSync(ruta || DOC_FIJO, 'utf8'))[1]); }
 function fechaCortaEsperada(iso) { const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso); return +m[3] + ' ' + ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'][+m[2] - 1] + ' ' + m[1]; }
 const P_MODELO = { L: 0.5, E: 0.3, V: 0.2 }, P_MERCADO = { L: 0.4, E: 0.3, V: 0.3 };      /* pronósticos INVENTADOS para las variantes */
 const PRON_PRUEBA = res => ({ origen: 'sello', sellado_utc: '2026-11-16T08:00:00+00:00', modelo: 'de_prueba', p_local: P_MODELO.L, p_empate: P_MODELO.E, p_visitante: P_MODELO.V, pick: 'L',

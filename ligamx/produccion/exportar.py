@@ -319,6 +319,9 @@ def torneo_liguilla(pron, sim: dict, reglas: dict, clasificados: list[str] | Non
     global más probable y la probabilidad exacta de avanzar. Lo ya jugado es real; lo demás se pronostica con las
     lambdas de liguilla. Antes de que acabe la fase regular la siembra es la esperada (los 8 con más probabilidad
     de clasificar, por su lugar esperado). Las rondas siguientes siguen la ruta de los favoritos con resiembra.
+    Cada serie dice si es `definida` (sus dos equipos ya se conocen con certeza, estén o no sus partidos en el
+    calendario): los cuartos, en cuanto la fase regular termina; una semifinal, cuando los cuatro cuartos están
+    decididos (por la resiembra el rival depende de todos); la final, cuando lo están las dos semifinales.
     """
     eq = list(pron.equipos); ix = {e: i for i, e in enumerate(eq)}
     pe = {d["equipo"]: d for d in sim["por_equipo"]}
@@ -359,7 +362,7 @@ def torneo_liguilla(pron, sim: dict, reglas: dict, clasificados: list[str] | Non
             out.append(d)
         return out
 
-    def serie(llave: str, a: str, b: str, fase: str, viene_de=None) -> dict:
+    def serie(llave: str, a: str, b: str, fase: str, viene_de=None, definida: bool = False) -> dict:
         mejor, peor = (a, b) if pos[a] < pos[b] else (b, a)
         real = reales.get((fase, frozenset((mejor, peor))))
         det = real or simulador.detalle_serie({"a": ix[mejor], "b": ix[peor], "fase": fase, "piernas": {}},
@@ -373,7 +376,7 @@ def torneo_liguilla(pron, sim: dict, reglas: dict, clasificados: list[str] | Non
         else:
             alt = [{"mejor": o["mejor"], "peor": o["peor"], "prob": o["prob"], "p_avanza_mejor": o["p_avanza_mejor"]}
                    for o in posibles.get(fase, [])[:4]]
-        return {"llave": llave, "fase": fase, "real": bool(real), "viene_de": viene_de,
+        return {"llave": llave, "fase": fase, "real": bool(real), "definida": bool(real or definida), "viene_de": viene_de,
                 "mejor": {"equipo": mejor, "siembra": pos[mejor]}, "peor": {"equipo": peor, "siembra": pos[peor]},
                 "piernas": piernas(det),
                 "global": {"probable": glob[0] if glob else None, "top": glob, "p_gana_mejor": det.get("p_global_mejor"),
@@ -382,12 +385,17 @@ def torneo_liguilla(pron, sim: dict, reglas: dict, clasificados: list[str] | Non
                 "p_favorito": float(pm if fav == mejor else 1 - pm), "decidida": bool(det.get("decidida")),
                 "ganador": det.get("ganador"), "regla_empate": det.get("regla_empate"), "alternativas": alt}
 
-    cuartos = [serie(f"C{i + 1}", siembra[a - 1], siembra[b - 1], "cuartos") for i, (a, b) in enumerate(((1, 8), (2, 7), (3, 6), (4, 5)))]
+    # definida = los dos equipos ya son seguros: cuartos con la tabla final; semifinales con los cuatro cuartos decididos
+    # (hay resiembra: el rival de cada uno depende de quiénes avancen en TODAS las llaves); final con las dos semifinales
+    cuartos = [serie(f"C{i + 1}", siembra[a - 1], siembra[b - 1], "cuartos", definida=bool(clasificados))
+               for i, (a, b) in enumerate(((1, 8), (2, 7), (3, 6), (4, 5)))]
     de = {c["favorito"]: c["llave"] for c in cuartos}
     vivos = sorted(de, key=lambda e: pos[e])
-    semis = [serie("S1", vivos[0], vivos[3], "semifinal", [de[vivos[0]], de[vivos[3]]]),
-             serie("S2", vivos[1], vivos[2], "semifinal", [de[vivos[1]], de[vivos[2]]])]
-    final = serie("F", semis[0]["favorito"], semis[1]["favorito"], "final", ["S1", "S2"])
+    semis_definidas = all(c["decidida"] for c in cuartos)
+    semis = [serie("S1", vivos[0], vivos[3], "semifinal", [de[vivos[0]], de[vivos[3]]], definida=semis_definidas),
+             serie("S2", vivos[1], vivos[2], "semifinal", [de[vivos[1]], de[vivos[2]]], definida=semis_definidas)]
+    final = serie("F", semis[0]["favorito"], semis[1]["favorito"], "final", ["S1", "S2"],
+                  definida=all(s_["decidida"] for s_ in semis))
     todas = cuartos + semis + [final]
     if all(s_["decidida"] for s_ in todas):
         estado = "terminado"

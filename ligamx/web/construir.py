@@ -6,9 +6,12 @@
     python3 web/construir.py --documento --salida DIR
     python3 web/construir.py --vivo RUTA          # de prueba: incrusta ese documento en vivo (forma: salidas/vivo_ejemplo.json)
     python3 web/construir.py --portada EQUIPO     # de prueba: fuerza el equipo de la portada (para revisar las 16)
+    python3 web/construir.py --datos OTRO.json --solo-documento web/_variante_x.html
+                                                  # de prueba: sólo ese documento completo (para otro estado del torneo)
 
-Las dos opciones de prueba NO tocan index.html ni archivos_publicados.json: sólo escriben el documento completo
-(web/documento.html, o el sitio de --salida), para que un ensayo nunca llegue a publicarse por descuido.
+Las tres opciones de prueba NO tocan index.html ni archivos_publicados.json: sólo escriben el documento completo
+(web/documento.html, el sitio de --salida o la ruta de --solo-documento), para que un ensayo nunca llegue a
+publicarse por descuido.
 
 Lee salidas/actual.json (contrato en salidas/CONTRATO.md) y web/medios.json, los incrusta en
 plantilla.html dentro de <script type="application/json"> y escribe el resultado. Las imágenes y los
@@ -320,7 +323,13 @@ def main(argv=None):
                          "sin la opción se incrusta actual.json → vivo si existe")
     ap.add_argument("--portada", default=None, metavar="EQUIPO",
                     help="sólo para revisar: fuerza el equipo de la portada en lugar del favorito al título")
+    ap.add_argument("--solo-documento", type=Path, default=None, metavar="RUTA.html", dest="solo_documento",
+                    help="de prueba: escribe únicamente el documento completo en esa ruta (dentro de web/, para que "
+                         "encuentre img/ y video/) y no toca index.html, archivos_publicados.json ni capacidades.json. "
+                         "Sirve para armar la página con otros datos (--datos) sin riesgo de publicarlos")
     args = ap.parse_args(argv)
+    if args.solo_documento is not None and (args.documento or args.salida is not None):
+        ap.error("--solo-documento no se combina con --documento ni con --salida")
     t0 = time.time()
     try:
         for ruta in (args.datos, MEDIOS, PLANTILLA):
@@ -354,6 +363,18 @@ def main(argv=None):
         tmp.replace(ruta)  # nunca queda un archivo a medias
 
     publicados = sorted(set(usados))
+    if args.solo_documento is not None:
+        destino = args.solo_documento.resolve()
+        if destino.name in ("index.html", "documento.html") and destino.parent == AQUI:
+            print(f"ERROR: --solo-documento no puede escribir sobre {destino.name}.", file=sys.stderr)
+            return 1
+        destino.parent.mkdir(parents=True, exist_ok=True)
+        escribir(destino, como_documento(fragmento))
+        print(f"opción de prueba (--solo-documento): no se toca index.html; documento: {destino}")
+        for a in avisos:
+            print(f"aviso: {a}", file=sys.stderr)
+        print(f"listo en {time.time() - t0:.2f} s")
+        return 0
     de_prueba = args.vivo is not None or bool(args.portada)
     if de_prueba:
         args.documento = True
