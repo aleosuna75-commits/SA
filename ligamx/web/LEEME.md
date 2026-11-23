@@ -18,7 +18,9 @@ ausente) salen por stderr y la página los resuelve sola.
 
 Opciones:
 
-- `--datos RUTA`: otro JSON con el mismo contrato (por ejemplo una corrida de `salidas/historial/`).
+- `--datos RUTA`: otro JSON con el mismo contrato (por ejemplo una corrida de `salidas/historial/`). Si no es
+  `salidas/actual.json`, la corrida es de prueba (ver abajo): aunque se pida `--documento --salida DIR`, no
+  reescribe `index.html`, `archivos_publicados.json` ni `capacidades.json`.
 - `--documento`: además genera un documento completo (`<!doctype>`, `<head>`, `<body>`) en
   `web/sitio/` y copia ahí los `img/` y `video/` que la página usa.
 - `--documento --salida DIR`: lo mismo en otro directorio. Si `DIR` es la propia carpeta `web/`, sólo
@@ -30,9 +32,10 @@ Opciones:
   `archivos_publicados.json` ni `capacidades.json` y se niega a escribir sobre `index.html` o
   `documento.html`. Es lo que usan las pruebas para armar la página con otro estado del torneo.
 
-Las tres opciones de prueba NO tocan `index.html` ni `archivos_publicados.json`: sólo escriben el
-documento (`web/documento.html` si no se da `--salida`, o la ruta de `--solo-documento`). Sin ellas,
-`index.html` incrusta `actual.json → vivo` cuando existe.
+Las opciones de prueba (`--vivo`, `--portada`, `--solo-documento` y cualquier `--datos` distinto de
+`salidas/actual.json`) NO tocan `index.html`, `archivos_publicados.json` ni `capacidades.json`: sólo escriben el
+documento (`web/documento.html` si no se da `--salida`, el sitio de `--salida` o la ruta de `--solo-documento`).
+Sin ellas, `index.html` incrusta `actual.json → vivo` cuando existe.
 
 ## Qué se publica
 
@@ -163,7 +166,7 @@ algo (inicio, gol, expulsión, descanso, final). La página:
     portada sigue cabiendo en la primera pantalla;
   - «Próximos partidos» muestra esas piernas (`liguilla.torneo`, series `definida` sin decidir que no vienen en
     `pendientes`) como tarjetas compactas: primero las idas y luego las vueltas, con fase y pierna, llave, escudos,
-    marcador más probable, barra 1X2 con %, sede (la habitual del local) y fecha o ventana («25 o 26 nov»), y un
+    marcador más probable, barra 1X2 con %, sede (la de la prensa o la habitual del local: `estadio.origen`) y fecha o ventana («25 o 26 nov»), y un
     botón «Serie C1» que abre el detalle de la serie. Una nota dice que la combinada de cada partido se publica
     cuando la liga confirme día y hora. En celular van en una columna, desde 600 px de dos en dos y desde 1160 px de
     cuatro en cuatro (ningún nombre se parte a media palabra; sede y botón alineados abajo). Si ya hay partidos
@@ -180,7 +183,17 @@ algo (inicio, gol, expulsión, descanso, final). La página:
   la tabla final proyectada; «Hasta dónde llega cada uno» queda con los ocho clasificados y sin la columna
   «Liguilla»; «¿Quién será campeón?» nombra a los que no clasificaron (en el orden de la tabla) y a los eliminados
   en la liguilla; en «Camino al título» los cuartos más probables dejan su lugar a las semifinales y finales más
-  probables. Todo depende de los datos, nunca de la fecha.
+  probables. Todo depende de los datos, nunca de la fecha. En liguilla la combinada se llama «Combinada de la ronda»
+  (sólo las pestañas de boletos distintos: `igual_a`) y «Última jornada» pasa a «Resultados recientes», agrupados por
+  ronda para no mezclar fases en una cuenta.
+- **Partidos de liguilla** (`pendientes[].serie`, desde el 23-nov-2026): la tarjeta y la franja «Próximo partido» dicen
+  de qué serie es el partido, cómo va el global y qué necesita cada uno (texto armado en Python) con la probabilidad
+  exacta de avanzar; el 1X2, los mercados y la combinada del partido se rotulan a 90 minutos. En «Al momento» cada
+  partido trae su serie (texto, ida y quién avanza) y, con `vivo.tabla_fija`, la tabla es la final de la fase regular.
+- **Final y campeón**: en la final la portada nombra a los dos finalistas y la ida, con sólo sus dos probabilidades;
+  con el campeón decidido la portada, «Camino al título» y la llave F lo celebran (campeón y subcampeón, sin
+  porcentajes). El trofeo del cuadro dice «Si gana cada favorito» (la ruta serie por serie) y, si ese no es el
+  favorito al título de la simulación completa, también nombra a ese.
 - Completa en reposo: las animaciones parten de un estado visible; con `prefers-reduced-motion` no hay
   animaciones ni autoplay.
 - Navegación interna con `scrollIntoView` (no se usa `location.hash`, `history` ni `localStorage`).
@@ -195,13 +208,15 @@ no, combinada o no), y dos copias fijas armadas con `--solo-documento`: `pruebas
 (9 partidos pendientes, cuadro proyectado; reloj del navegador en el 20-nov) para tarjetas de partido, pestañas de
 combinada, cuenta regresiva, cuadro, en vivo y variantes, y `pruebas/datos/actual_20261123T0353Z.json` (noche del
 22-nov: 0 pendientes, cuadro definido, cuartos sin día ni hora; corrida de 100,000 simulaciones) con sus variantes
-(datos viejos sin el campo `definida`, idas ya en el calendario, semifinales definidas, liguilla terminada):
+(datos viejos sin el campo `definida`, idas ya en el calendario, semifinales definidas, final a medio jugar, liguilla
+terminada), más `pruebas/datos/vivo_vuelta_ejemplo.json` (documento en vivo de EJEMPLO de una vuelta de cuartos, idas
+inventadas) para «Al momento» en liguilla:
 
     PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers node web/pruebas/prueba.js chromium
     PLAYWRIGHT_BROWSERS_PATH=<carpeta con webkit> node web/pruebas/prueba.js webkit
     # con --capturas guarda PNG en web/pruebas/capturas/ (ignoradas por git)
 
-Revisa (504 comprobaciones por motor): fragmento válido y contrato de la plataforma, sin colores
+Revisa (625 comprobaciones por motor): fragmento válido y contrato de la plataforma, sin colores
 literales, portada (foto, Ken Burns, trofeo, confeti, nada encimado; en celular, que quepa en la primera
 pantalla a 390x664, 360x700 y 375x620, con y sin franja en vivo; en escritorio, que quepa y que la copa
 no toque el título), el cuadro (4 + 2 + 1 series con ida y vuelta, sin «global probable»; en celular el
@@ -222,7 +237,10 @@ viejo sin el campo y mercado con basura; en cada resultado, la barra del mercado
 sello no guardó momios); y, según el estado de los datos, el anuncio bajo la portada con su botón al cuadro, las
 tarjetas compactas de liguilla (contenido, orden, nombres sin partir, pie alineado, botón al detalle), que ninguna
 sección visible quede vacía, la etiqueta de cada serie, el cuadro en espejo en una pantalla y los textos de la fase
-regular terminada. Sale con código 1 si algo falla. Tarda de 2.5 a 3 minutos por motor. Si la máquina no
+regular terminada; y lo que encontró el ensayo de la liguilla (encargo E del workflow 10): títulos según la fase,
+resultados por ronda, portada y «Camino al título» con la final o el campeón, «Si gana cada favorito», pronósticos
+en cursiva en el mini-cuadro, pestañas sin boletos repetidos, la serie de cada partido de liguilla, la pastilla
+«Resultado» legible y «Al momento» de una vuelta. Sale con código 1 si algo falla. Tarda de 2.5 a 3 minutos por motor. Si la máquina no
 tiene salida a internet las fuentes de Google no cargan y se prueba con la pila de respaldo.
 
 Para revisar la portada de otro favorito: `python3 web/construir.py --portada Toluca` (escribe sólo

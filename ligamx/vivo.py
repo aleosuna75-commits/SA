@@ -440,7 +440,8 @@ def contexto_de_actual(actual: dict | None, sellos: dict[int, dict] | None = Non
                 if d.get("previo") is None and not pi.get("jugado") and pi.get("lam_l") is not None and pi.get("p_local") is not None:
                     # sin sello ni «pendientes»: el pronóstico de la pierna que ya publica la página (liguilla.torneo)
                     d["previo"] = _previo(pi["p_local"], pi["p_empate"], pi["p_visitante"], pi["lam_l"], pi["lam_v"],
-                                          rho_modelo, pi.get("marcador"), "liguilla.torneo")
+                                          pi["rho"] if pi.get("rho") is not None else rho_modelo, pi.get("marcador"),
+                                          "liguilla.torneo")
                 if (pi.get("id") is not None and not pi.get("jugado") and pi.get("fecha_utc")
                         and all(f["id"] != int(pi["id"]) for f in ctx["futuros"])):
                     ctx["futuros"].append({"id": int(pi["id"]), "inicio_utc": iso(de_iso(pi["fecha_utc"])),
@@ -466,7 +467,24 @@ class PronCongelado:
         return self._mallas[(int(n), fase, int(semilla))]
 
     def partidos(self, df) -> list[dict]:
-        return [dict(self._partidos[int(i)]) for i in df["id"]]
+        """
+        Pronósticos guardados. Un partido que no estaba pendiente al armar la base (una ida de ayer que
+        partidos.csv todavía no da por jugada porque no corrió pipeline.py auto) sale de la malla puntual
+        (k = 0) de su fase, en vez de tumbar la simulación con un KeyError.
+        """
+        out = []
+        ix = {e: i for i, e in enumerate(self.equipos)}
+        cols = {c: list(df[c]) for c in ("id", "local", "visitante", "fase") if c in df}
+        for k, i in enumerate(cols["id"]):
+            d = self._partidos.get(int(i))
+            if d is None:
+                loc, vis = cols["local"][k], cols["visitante"][k]
+                fase = "regular" if cols.get("fase", ["regular"] * len(cols["id"]))[k] == "regular" else "liguilla"
+                m = next(v for (n, f, _), v in self._mallas.items() if f == fase)
+                d = {"id": int(i), "local": loc, "visitante": vis, "lam_l": float(m["lam_l"][0][ix[loc]][ix[vis]]),
+                     "lam_v": float(m["lam_v"][0][ix[loc]][ix[vis]]), "rho": float(m.get("rho", 0.0))}
+            out.append(dict(d))
+        return out
 
 
 # ==================================================================================================
@@ -674,8 +692,9 @@ class Motor:
             doc["tabla"] = [dict(f, cambio=0, en_juego=False) for f in ctx["tabla"]]
             doc["tabla_nota"] = "Tabla previa a los partidos de hoy."
         # las series van antes que la proyección: el campeón al momento usa el ganador que dicta el reglamento
+        idas = {}                                                  # idas que actual.json no traía y se completaron
         try:
-            doc["series"] = self._series(ctx, partidos, avisos)
+            doc["series"] = self._series(ctx, partidos, avisos, idas)
         except Exception as e:
             traceback.print_exc()
             avisos.append(f"series al momento no disponibles ({type(e).__name__}: {e})")
@@ -688,7 +707,7 @@ class Motor:
         ganadores = {pi["id"]: s["ganador"] for s in doc["series"] if s.get("decidida") and s.get("ganador")
                      for pi in s["piernas"] if pi.get("id") is not None and pi.get("pierna") == 2 and pi.get("estado") == "final"}
         try:
-            doc["proyeccion"] = self._proyeccion(ctx, tocados, t_juego, ganadores)
+            doc["proyeccion"] = self._proyeccion(ctx, tocados, t_juego, ganadores, idas)
         except Exception as e:
             traceback.print_exc()
             avisos.append(f"proyección al momento no disponible ({type(e).__name__}: {e}); se muestra la previa")
@@ -932,12 +951,18 @@ class Motor:
                 "lam_rest_l": c["previo"]["lam_l"] * EJ.FRACCION_EXTRA * fr * EJ.multiplicador(par.ef, dif, rl, rv),
                 "lam_rest_v": c["previo"]["lam_v"] * EJ.FRACCION_EXTRA * fr * EJ.multiplicador(par.ef, -dif, rv, rl)}
 
-    def _proyeccion(self, ctx: dict, tocados: list[dict], ahora: dt.datetime, ganadores: dict | None = None) -> dict:
-        """Clasificación y campeón al momento, con el cambio frente al último pronóstico previo."""
+    def _proyeccion(self, ctx: dict, tocados: list[dict], ahora: dt.datetime, ganadores: dict | None = None,
+                    idas: dict | None = None) -> dict:
+        """
+        Clasificación y campeón al momento, con el cambio frente al último pronóstico previo. `idas` = {id:
+        (gl, gv)} de idas que partidos.csv aún no da por jugadas: entran con su marcador fijo.
+        """
         if not tocados or not self.proyectar:
             return _proyeccion_previa(ctx, self.n_sim, None if not tocados else "Proyección previa (no se recalculó).")
         from produccion import simulador as S
         ej = self._en_juego_sim(tocados, ganadores)
+        for pid, (gl, gv) in (idas or {}).items():
+            ej.setdefault(int(pid), {"gl": int(gl), "gv": int(gv), "lam_rest_l": 0.0, "lam_rest_v": 0.0})
         for intento in (0, 1):
             b = self.base(ahora)
             try:
@@ -969,7 +994,7 @@ class Motor:
             out[llave].sort(key=lambda d: (-d["p"], d["equipo"]))
         return out
 
-    def _series(self, ctx: dict, partidos: list[dict], avisos: list[str] | None = None) -> list[dict]:
+    def _series(self, ctx: dict, partidos: list[dict], avisos: list[str] | None = None, idas: dict | None = None) -> list[dict]:
         """
         Series de la liguilla (las de `liguilla.torneo` que ya están en el calendario o cuyos dos equipos ya
         son seguros) con el global y la probabilidad de avanzar al momento, y cómo va la serie: `momento`,
@@ -998,6 +1023,9 @@ class Motor:
                     de_hoy[pi["pierna"]] = p
                     pi["id"] = p["id"]
             self._ida_que_falta(legs, de_hoy, mejor, peor, avisos)
+            ida0 = legs[0] if legs and legs[0]["pierna"] == 1 else None
+            if idas is not None and ida0 is not None and ida0.get("supuesta") and ida0.get("id") is not None:
+                idas[int(ida0["id"])] = (ida0["gl"], ida0["gv"])
             piernas, Ms, gm, gp, tocada, lam2 = [], {}, 0, 0, False, None
             fin_hoy, vuelta, estados = None, None, {}
             for pi in legs:
@@ -1101,15 +1129,15 @@ class Motor:
                 fila = df[df["id"] == int(ida["id"])]
                 if len(fila) and fila.iloc[0]["estado"] == "jugado":
                     ida.update(jugado=True, gl=int(fila.iloc[0]["gl"]), gv=int(fila.iloc[0]["gv"]))
-                    fuente = "datos/partidos.csv"
+                    fuente = "de datos/partidos.csv"
             except Exception as e:                                 # sin partidos.csv se intenta con ESPN
                 log(f"aviso: no se pudo leer la ida en partidos.csv: {type(e).__name__}: {e}")
         if fuente is None and del_espn is not None:
-            ida.update(jugado=True, gl=del_espn[0], gv=del_espn[1])
-            fuente = "el global que da ESPN"
+            ida.update(jugado=True, gl=del_espn[0], gv=del_espn[1], supuesta=True)   # la simulación no la conoce
+            fuente = "del global que da ESPN"
         if fuente is not None:
             avisos.append(f"La ida {ida['local']} {ida['gl']}-{ida['gv']} {ida['visitante']} no estaba jugada en actual.json: "
-                          f"se tomó de {fuente}. Correr python3 pipeline.py auto.")
+                          f"se tomó {fuente}. Correr python3 pipeline.py auto.")
         else:
             avisos.append(f"La ida {ida['local']}-{ida['visitante']} no aparece jugada ni en actual.json ni en partidos.csv y ESPN "
                           "no da el global: la probabilidad de avanzar la trata como por jugar. Correr python3 pipeline.py auto.")

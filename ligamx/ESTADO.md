@@ -84,7 +84,8 @@ un duplicado, como pasó con https://claude.ai/artifact/9Pa1hLxwQxgokdJJUowHqF, 
 usuario lo pide). Workflows: `notas/workflows/05_vivo_y_rediseno.js` y `06_correcciones.js`; críticas en
 `notas/critica_visual_v4.md` y en el diario de la corrida `wf_0172a560-1c9`.
 Pruebas al cierre: 157 de pytest, 230 revisiones de página en Chromium y 230 en WebKit (desde el 16-nov: 110 de
-producción y 254 revisiones de página por motor).
+producción y 254 revisiones de página por motor; desde el 23-nov, tras el encargo E del workflow 10, `pytest modelo/pruebas
+produccion/pruebas` da 209 que pasan y 2 saltadas, y la página 625 revisiones por motor).
 **Simulaciones (pedido del usuario, 11-nov):** el pronóstico usa **1,000,000 de torneos** en 50,000 muestras de
 parámetros (`produccion/simulador.py`: `N_SIM`, `N_MUESTRAS`; ~55 s y ~4.4 GB; error de P(campeón) ±0.06 puntos, antes
 ±0.36). La proyección en vivo usa 100,000 en 10,000 muestras (`vivo.py`; ~7 s por actualización; con 1,000,000 cada gol

@@ -23,10 +23,19 @@ from produccion import combinada as cb  # noqa: E402
 from produccion import mercados as mk  # noqa: E402
 from produccion.contexto import Contexto  # noqa: E402
 from produccion.pronosticador_provisional import Pronosticador  # noqa: E402
+from produccion.pruebas.al_corte import pendientes_al_corte  # noqa: E402
 
 CASOS = [(1.83, 0.71, -0.08, 0.44, 0.45), (1.2, 1.5, 0.0, 0.456, 0.451), (3.0, 2.5, -0.05, 0.40, 0.48),
          (0.6, 0.5, 0.10, 0.45, 0.45), (1.35, 1.30, -0.12, 0.47, 0.43)]
 FECHA = "2026-11-10"
+TORNEO = "Apertura 2026"
+
+
+def _pendientes():
+    """Los partidos por jugar AL CORTE (FECHA), no los de hoy: así la prueba no depende de cómo va la temporada."""
+    p = pendientes_al_corte(FECHA, TORNEO)
+    assert len(p) >= 9
+    return p
 
 
 def _q(lam_l, lam_v, rho, pl, pv):
@@ -379,7 +388,7 @@ def test_contexto_contenido(ctx_real):
     assert len(t) == 18 and list(t["pos"]) == list(range(1, 19))
     assert (t["PJ"] == t["G"] + t["E"] + t["P"]).all() and (t["PTS"] == 3 * t["G"] + t["E"]).all()
     assert t["GF"].sum() == t["GC"].sum() and t["PTS"].is_monotonic_decreasing
-    pend = datos.pendientes()
+    pend = _pendientes()
     r = c.partido(pend.iloc[-1].to_dict())
     json.dumps(r, default=str)                            # serializable
     assert len(r["equipo_local"]["forma"]) == 5 and r["equipo_local"]["posicion"] in range(1, 19)
@@ -414,7 +423,7 @@ def pron():
 
 def test_contrato_pronosticador(pron):
     assert len(pron.equipos) == 18 and pron.equipos == sorted(pron.equipos)
-    pend = datos.pendientes()
+    pend = _pendientes()
     ps = pron.partidos(pend)
     assert [d["id"] for d in ps] == [int(i) for i in pend["id"]]
     ma = pron.malla(n=30, fase="regular", semilla=3)
@@ -458,7 +467,7 @@ def test_pronosticador_no_ve_el_futuro():
 
 
 def test_paquete_partidos_solo_con_el_contrato(pron):
-    pend = datos.pendientes()
+    pend = _pendientes()
     r = cb.paquete_partidos(pron, pend)
     json.dumps(r)                                          # serializable
     assert len(r["partidos"]) == len(pend) and 0.35 < r["p1_l"] < 0.55

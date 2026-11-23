@@ -25,6 +25,7 @@ from produccion import exportar as ex  # noqa: E402
 from produccion import sellos  # noqa: E402
 from produccion import simulador as S  # noqa: E402
 from produccion.pronosticador_provisional import Pronosticador  # noqa: E402
+from produccion.pruebas.al_corte import al_corte  # noqa: E402
 
 TORNEO = "Apertura 2026"
 CORTE = "2026-11-10T00:00"                       # hora de CDMX
@@ -32,6 +33,13 @@ CORTE = "2026-11-10T00:00"                       # hora de CDMX
 
 @pytest.fixture(scope="module")
 def df():
+    """Los datos como estaban al CORTE (Jornada 17 por jugar, sin liguilla real): las pruebas no dependen del día."""
+    return al_corte(datos.cargar(), CORTE, TORNEO)
+
+
+@pytest.fixture(scope="module")
+def df_hoy():
+    """Los datos del día, para las pruebas que comparan con la tabla oficial guardada (tabla_apertura2026.csv)."""
     return datos.cargar()
 
 
@@ -113,18 +121,19 @@ def test_goles_de_visitante_y_cociente(df):
 # ==================================================================================================
 # Tabla
 # ==================================================================================================
-def test_tabla_actual_coincide_con_csv(df):
+def test_tabla_actual_coincide_con_csv(df_hoy):
     csv = pd.read_csv(datos.DIR_DATOS / "tabla_apertura2026.csv")
-    tab = S.tabla_actual(S.estado_torneo(df, TORNEO, None))
+    tab = S.tabla_actual(S.estado_torneo(df_hoy, TORNEO, None))
     if int(csv["PJ"].sum()) != int(tab["PJ"].sum()):
         pytest.skip("tabla_apertura2026.csv no está al día con partidos.csv")
     cols = ["pos", "equipo", "PJ", "G", "E", "P", "GF", "GC", "DG", "PTS", "PJ_L", "PTS_L", "GF_L", "GC_L", "PJ_V", "PTS_V", "GF_V", "GC_V"]
     pd.testing.assert_frame_equal(tab[cols].reset_index(drop=True), csv[cols].reset_index(drop=True), check_dtype=False)
 
 
-def test_sin_pendientes_la_tabla_simulada_es_la_real(df, pron):
+def test_sin_pendientes_la_tabla_simulada_es_la_real(df_hoy, pron):
     """Con todos los partidos jugados (se quitan los pendientes) la tabla simulada es la del CSV."""
     csv = pd.read_csv(datos.DIR_DATOS / "tabla_apertura2026.csv")
+    df = df_hoy[~((df_hoy["torneo"] == TORNEO) & df_hoy["fase"].isin(S.FASES_LIGUILLA))]     # sólo la fase regular
     jugado = df[~((df["torneo"] == TORNEO) & (df["estado"] != "jugado"))]
     if int(csv["PJ"].sum()) != 2 * int(((jugado["torneo"] == TORNEO) & (jugado["fase"] == "regular")).sum()):
         pytest.skip("tabla_apertura2026.csv no está al día con partidos.csv")

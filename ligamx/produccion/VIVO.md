@@ -2,7 +2,7 @@
 
 Qué hay: `vivo.py` (consulta ESPN, arma el documento en vivo y avisa de cada evento), `produccion/en_juego.py`
 (modelo en juego), el parámetro `en_juego` de `produccion/simulador.py`, el campo `vivo` de `salidas/actual.json`
-y las pruebas `produccion/pruebas/test_vivo.py` (36, sin red; 10 de ellas de liguilla, desde el 23-nov-2026). Contrato del documento: `salidas/CONTRATO.md`
+y las pruebas `produccion/pruebas/test_vivo.py` (37, sin red; 11 de ellas de liguilla, desde el 23-nov-2026). Contrato del documento: `salidas/CONTRATO.md`
 («Documento en vivo»); ejemplo: `salidas/vivo_ejemplo.json`.
 
 ## 1. Cómo funciona
@@ -318,14 +318,17 @@ El procedimiento es el mismo (6.1 a 6.7). Lo que cambia:
 
   Si no, `python3 pipeline.py auto` (menos de un minuto). Si nadie lo corre, el motor completa la ida con
   `partidos.csv` o con el global que ESPN da en la vuelta (`aggregateScore` menos el marcador) y lo dice en
-  `avisos`; si ninguno sirve también lo dice (nunca la trata como por jugar en silencio).
+  `avisos`; si ninguno sirve también lo dice (nunca la trata como por jugar en silencio). La proyección de campeón
+  usa esa ida con su marcador fijo (antes la simulación tronaba con `KeyError` porque el pronosticador congelado no
+  conocía la ida, y salía la proyección previa con una nota).
 - **Vuelta.** Goles, descanso y final avisan con el global en el orden del partido («Chivas 1-1 Tigres (global
   2-4)») y el final dice quién avanzó y por qué («Final: Chivas 2-0 Tigres. Avanza Chivas: global 3-3, por su mejor
   lugar en la tabla.»). El campeón al momento se recalcula en cada consulta con el marcador de la vuelta.
 - **Final.** Si el global queda empatado a los 90 minutos: evento `tiempos_extra` (con `STATUS_END_OF_REGULATION` o
   al entrar al periodo 3), `momento` = `tiempos_extra`, luego `penales` (periodo 5) y el `final` dice «X es
-  campeón en tiempos extra…» o «… en penales (4-3) tras empatar 3-3 el global.». Mientras ESPN no publique la tanda
-  ni haya gol en el tiempo extra, la serie queda sin decidir (`p_avanza` 0.5 y «falta que ESPN confirme…»).
+  campeón en tiempos extra…» o «… en penales (4-3) tras empatar 3-3 el global.». Si el tiempo extra no tuvo goles
+  de diferencia y ESPN todavía no publica la tanda, decide su `winner`; sin ninguno de los dos la serie queda sin
+  decidir (`p_avanza` 0.5 y «falta que ESPN confirme…»).
 - **Probar** (sin escribir en `salidas/`; `--salida` a una carpeta de trabajo):
   `python3 vivo.py repetir 401870507 --velocidad 0 --salida /tmp/rep/vuelta.json` (vuelta Chivas 2-0 Tigres tras
   perder 3-1 la ida: global 3-3, avanza Chivas por posición), `401870508` (Pumas 3-3 América, global 6-6),

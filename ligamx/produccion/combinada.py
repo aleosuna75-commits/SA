@@ -214,6 +214,13 @@ def combinada_jornada(partidos: list[dict], banda: tuple[float, float] = BANDA_J
            "equilibrada": variante(n_eq)}
     for nombre, piso in PISOS_JORNADA.items():
         out[nombre] = variante(int((acum >= piso).sum()))
+    # con pocos partidos (liguilla: 2 a 4) las tres variantes pueden ser el mismo boleto; `igual_a` dice que una
+    # repite a otra menos arriesgada (segura < equilibrada < atrevida) para que la página no la muestre dos veces
+    vistos: dict[int, str] = {}
+    for nombre in ("segura", "equilibrada", "atrevida"):
+        n = out[nombre]["n"]
+        out[nombre]["igual_a"] = vistos.get(n) if n else None
+        vistos.setdefault(n, nombre)
     return out
 
 

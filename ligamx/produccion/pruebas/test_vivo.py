@@ -1164,7 +1164,7 @@ def test_el_winner_de_espn_no_decide_la_serie(par):
     c["gv"] = 1
     m = vivo.Motor(actual=actual, sellos={}, parametros=par, proyectar=False)
     vistos = {}
-    m._proyeccion = lambda ctx, tocados, ahora, ganadores=None: vistos.update(ganadores or {}) or vivo._proyeccion_previa(ctx, 0, None)
+    m._proyeccion = lambda ctx, tocados, ahora, ganadores=None, idas=None: vistos.update(ganadores or {}) or vivo._proyeccion_previa(ctx, 0, None)
     doc = m.documento([c], dt.datetime(2026, 11, 29, 4, 0, tzinfo=UTC))
     sx = doc["series"][0]
     assert (sx["decidida"], sx["ganador"], sx["p_avanza_mejor"]) == (True, "Tijuana", 0.0)
@@ -1403,3 +1403,27 @@ def test_finales_reales_con_tiempos_extra_y_penales(par):
         assert (s["decidida"], s["ganador"], s["momento"], s["texto"]) == (True, ganador, "terminada", texto), pid
         assert (p["gl90"], p["gv90"]) == a90 and p["periodo"] == d["periodo"], pid      # el pronóstico se califica a 90'
         assert (s["global_mejor"], s["global_peor"]) == (int(d["local"][3]), int(d["visitante"][3])), pid   # = aggregateScore
+
+
+def test_sin_pipeline_tras_la_ida_la_simulacion_no_truena(par):
+    """La ida que partidos.csv aún no da por jugada: el pronosticador congelado no truena (malla puntual) y, si la ida
+    se completó con el global de ESPN, entra a la simulación con su marcador fijo."""
+    eq = ["Cruz Azul", "Tijuana", "Chivas"]
+    malla = {"equipos": eq, "rho": -0.05, "lam_l": np.full((3, 3, 3), 1.4), "lam_v": np.full((3, 3, 3), 1.1)}
+    malla["lam_l"][0, 1, 0] = 1.7
+    cong = vivo.PronCongelado(eq, TORNEO, "prueba", None, {(3, "regular", 7): malla, (3, "liguilla", 7): malla},
+                              {9002: {"id": 9002, "local": "Cruz Azul", "visitante": "Tijuana", "lam_l": 2.0, "lam_v": 0.9, "rho": -0.05}})
+    d = cong.partidos(pd.DataFrame({"id": [9001, 9002], "local": ["Tijuana", "Cruz Azul"], "visitante": ["Cruz Azul", "Tijuana"],
+                                    "fase": ["cuartos", "cuartos"]}))
+    assert d[0] == {"id": 9001, "local": "Tijuana", "visitante": "Cruz Azul", "lam_l": 1.7, "lam_v": 1.1, "rho": -0.05}
+    assert d[1]["lam_l"] == 2.0
+    sello = {9002: {"id": 9002, "sellado_utc": "2026-11-28T07:20:00+00:00", "fecha_utc": "2026-11-29T01:00:00+00:00", "fase": "cuartos",
+                    "pierna": 2, "lam_l": 2.0, "lam_v": 0.9, "rho": 0.0, "p_l": 0.64, "p_e": 0.2, "p_v": 0.16, "marcador": {"gl": 2, "gv": 0, "prob": 0.1}}}
+    m = vivo.Motor(actual=_actual_liguilla([_serie("cuartos", ida_jugada=False)]), sellos=sello, parametros=par, proyectar=False,
+                   df=pd.DataFrame({"id": [1], "estado": ["jugado"], "gl": [0], "gv": [0]}))
+    vistos = {}
+    m._proyeccion = lambda ctx, tocados, ahora, ganadores=None, idas=None: vistos.update(idas or {}) or vivo._proyeccion_previa(ctx, 0, None)
+    c = _cruda(9002, "Cruz Azul", "Tijuana", "en_juego", 60, 1, 0)
+    c["global_l"], c["global_v"] = 1, 1
+    m.documento([c], dt.datetime(2026, 11, 29, 2, 0, tzinfo=UTC))
+    assert vistos == {9001: (1, 0)}

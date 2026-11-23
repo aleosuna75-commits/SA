@@ -206,8 +206,10 @@ Intercontinental. En caso de que los Diablos Rojos avancen hasta la instancia de
     en ligamx.net (10-nov-2026) dice "Estadio Banorte", ESPN ubica en el Banorte sus 8 partidos de local del Apertura 2026 y Crónica
     (M5) anticipó que "América, Cruz Azul y Atlante disputarán sus partidos como locales en el Estadio Azteca durante la fase regular".
     Para el modelo: la localía de Cruz Azul en este torneo es el Banorte.
-  - **[NO CONFIRMADO]** dónde jugaría Cruz Azul la liguilla. Antecedente: en el Clausura 2026 jugó cuartos y semifinal en el Banorte,
-    pero la ida de la Final en el "Estadio Cuidad de los Deportes" [sic] (F).
+  - **[SEGÚN PRENSA, 22-nov-2026; pendiente de la programación oficial]** Cruz Azul juega la vuelta de cuartos del Apertura 2026
+    en el Estadio Banorte (Excélsior, 22-nov; ver `config/torneo.json` → `liguilla.sedes_cuartos`). Antecedente: en el Clausura
+    2026 jugó cuartos y semifinal en el Banorte, pero la ida de la Final en el "Estadio Cuidad de los Deportes" [sic] (F). La
+    página toma la sede de cada pierna del calendario de ESPN en cuanto la lista; mientras tanto, la de la prensa.
   - Con tres inquilinos, dos no pueden jugar "en el mismo día y horario" en la misma sede (R, art. 13.3 e); en liguilla lo resuelve
     la elección de día y hora.
 - Nombres de estadio que cambian según la fuente (mismo inmueble): Alfonso Lastras (R) = "Estadio Libertad Financiera" (ESPN);

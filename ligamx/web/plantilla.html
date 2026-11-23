@@ -116,6 +116,17 @@ h1 span{display:block;color:var(--oro)}
 #b-portada,.portada__pie{grid-column:1/-1;min-width:0}
 .titular{font:700 clamp(1.5rem,5.6vw,2.5rem)/1.05 var(--f-cartel);text-transform:uppercase;letter-spacing:.03em;max-width:22ch}
 .titular b{color:var(--oro-2);font-weight:900}
+.marc__serie{margin-top:6px;font-size:var(--t-0);line-height:1.4;color:var(--cal-2)}
+.marc__serie span{color:var(--gris)}
+.marc__av b{color:var(--cal);font-variant-numeric:tabular-nums}
+.sigue__serie{margin-top:var(--e-2);font-size:var(--t-1);line-height:1.4;color:var(--cal-2);max-width:62ch}
+.sigue__serie b{color:var(--oro-2);font-weight:700;text-transform:uppercase;letter-spacing:.08em;font-size:var(--t-0);margin-right:4px}
+.serie-p{display:grid;gap:6px;padding:10px 12px;border-left:2px solid var(--oro);background:var(--noche-3)}
+.serie-p__t{font-size:var(--t-2);line-height:1.45;color:var(--cal)}
+.serie-p__av{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:var(--t-1);color:var(--cal-2)}
+.serie-p__av b{font:900 1.05rem/1 var(--f-cartel);color:var(--cal);font-variant-numeric:tabular-nums}
+.serie-p__l{flex-basis:100%}
+@media (min-width:900px){.serie-p__l{flex-basis:auto}}
 .palmares{display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 8px;margin-top:var(--e-3);padding-left:10px;border-left:2px solid var(--oro);font:500 var(--t-1)/1.4 var(--f-texto);color:var(--cal-2);max-width:60ch}
 .palmares span{font-weight:700;text-transform:uppercase;letter-spacing:.13em;font-size:var(--t-0);color:var(--oro)}
 .palmares b{color:var(--cal);font-weight:700}
@@ -126,6 +137,7 @@ h1 span{display:block;color:var(--oro)}
 .favoritos .esc{grid-row:1/3}
 .favoritos .fav__n{font:600 var(--t-1)/1.15 var(--f-texto);color:var(--cal-2);min-width:0;overflow-wrap:break-word}
 .favoritos .fav__p{font:900 1.75rem/1 var(--f-cartel);font-variant-numeric:tabular-nums;color:var(--cal)}
+.favoritos .fav__p--t{font:800 var(--t-1)/1.2 var(--f-texto);text-transform:uppercase;letter-spacing:.12em;color:var(--oro-2)}
 .favoritos li:first-child{background:linear-gradient(135deg,var(--oro-tenue),var(--velo-0) 70%),var(--noche-2)}
 .favoritos li:first-child .fav__p{color:var(--oro-2)}
 .portada__pie{display:grid;gap:4px;margin-top:var(--e-3);font-size:var(--t-0);line-height:1.4;color:var(--cal-2);max-width:72ch}
@@ -187,6 +199,9 @@ h1 span{display:block;color:var(--oro)}
 .grupo>h3{display:flex;align-items:center;gap:var(--e-3)}
 .grupo>h3::after{content:"";flex:1;border-top:1px solid var(--linea-2)}
 .grupo>h3 small{font:500 var(--t-0)/1 var(--f-texto);letter-spacing:.02em;text-transform:none;color:var(--gris);white-space:nowrap}
+.grupo[data-grupo-ultima]{margin-top:var(--e-5)}
+.grupo[data-grupo-ultima]>h3{flex-wrap:wrap;row-gap:4px}
+.grupo[data-grupo-ultima]>h3 small{white-space:normal;line-height:1.3}
 .partido{background:var(--noche-2);border:1px solid var(--linea);border-radius:var(--radio);overflow:hidden;scroll-margin-top:76px}
 /* piernas de liguilla que todavía no tienen día ni hora: tarjetas compactas de pronóstico */
 .plegs{display:grid;gap:var(--e-3)}
@@ -347,6 +362,11 @@ td.v{background:linear-gradient(90deg,var(--oro-tenue) calc(var(--v,0)*100%),var
   td .forma i{width:17px;height:20px;border-radius:3px;font-size:.66rem}
 }
 /* gráficas de barras e intervalos */
+.podio{display:grid;gap:1px;border:1px solid var(--linea-2);background:var(--linea-2);max-width:560px}
+.podio li{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:12px;align-items:center;padding:10px 14px;background:var(--noche-2)}
+.podio .nb{font:700 var(--t-3)/1.2 var(--f-texto);color:var(--cal);min-width:0;overflow-wrap:break-word}
+.podio__r{font:800 var(--t-0)/1.2 var(--f-texto);text-transform:uppercase;letter-spacing:.13em;color:var(--cal-2)}
+.podio__1 .podio__r{color:var(--oro-2)}
 .barras li{display:grid;grid-template-columns:auto minmax(0,5.6em) minmax(0,1fr) auto;gap:8px;align-items:center;padding:5px 0}
 .barras .nb{font-weight:600;font-size:var(--t-1);line-height:1.1;overflow-wrap:anywhere}
 .barras .pista{height:14px;background:var(--noche-3)}
@@ -380,6 +400,7 @@ tbody th{background:var(--noche-3);color:var(--oro);padding-top:11px}
 .leyenda-m span{display:inline-flex;align-items:center;gap:6px}
 .leyenda-m i{width:14px;height:14px;border-radius:3px;background:var(--noche-3);border:1px solid var(--oro)}
 .leyenda-m i.r{background:var(--noche-4);border-color:var(--cal)}
+.leyenda-m__mini{font-style:normal}
 /* mini-cuadro (celular y tableta): el torneo completo de un vistazo; cada nodo lleva a la tarjeta de su serie */
 .mini-cuadro{--u:14px;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));grid-template-rows:auto repeat(4,auto);column-gap:var(--u);width:100%;max-width:520px;margin:var(--e-2) auto 0}
 .mini-cuadro__rot{grid-row:1;padding-bottom:3px;font:800 .82rem/1 var(--f-cartel);text-transform:uppercase;letter-spacing:.1em;color:var(--oro);white-space:nowrap}
@@ -404,6 +425,7 @@ tbody th{background:var(--noche-3);color:var(--oro);padding-top:11px}
 .mc__leg em{flex:none;min-width:2em;font-style:normal;font-weight:700;letter-spacing:.05em;color:var(--gris-2)}
 .mc__leg b{font-weight:800;color:var(--oro-2)}
 .mc__leg.real{color:var(--cal-2)} .mc__leg.real b{color:var(--cal)}
+.mc__leg.pron b{font-style:italic;font-weight:600;opacity:.85}
 .mc__eq+.mc__leg{margin-top:2px;padding-top:4px;border-top:1px dashed var(--linea)}
 .mc__vivo{position:absolute;right:-3px;top:-3px;box-shadow:0 0 0 2px var(--noche)}
 .mc-eje{position:relative;width:100%}
@@ -413,6 +435,7 @@ tbody th{background:var(--noche-3);color:var(--oro);padding-top:11px}
 .mc-campeon .emblema::after,.campeon-ruta .emblema::after{display:none}
 .mc-campeon span{font:700 .56rem/1.15 var(--f-texto);text-transform:uppercase;letter-spacing:.1em;color:var(--oro)}
 .mc-campeon b{font:900 1.2rem/1 var(--f-cartel);text-transform:uppercase;letter-spacing:.03em;padding-bottom:3px}
+.mc-campeon small{font:600 .58rem/1.2 var(--f-texto);color:var(--cal-2);letter-spacing:.02em;padding-bottom:2px}
 /* botones de ronda: pegajosos bajo la barra (y bajo la franja en vivo) mientras se recorre la lista */
 .rondas-pega{position:-webkit-sticky;position:sticky;top:calc(60px + env(safe-area-inset-top, 0px));z-index:30;padding:6px var(--canal-d) 6px var(--canal-i);background:var(--noche);border-top:1px solid var(--linea);border-bottom:1px solid var(--linea)}
 .con-franja .rondas-pega{top:calc(110px + env(safe-area-inset-top, 0px))}
@@ -513,7 +536,7 @@ tbody th{background:var(--noche-3);color:var(--oro);padding-top:11px}
 .leg--real{border-color:var(--linea-2);background:var(--noche-3)}
 .leg__cab{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 10px}
 .leg__cab h4{color:var(--oro-2)}
-.leg__cab span{font-size:var(--t-1);color:var(--cal-2)}
+.leg__cab>span:not(.chip){font-size:var(--t-1);color:var(--cal-2)}
 .leg__cab .chip{margin-left:auto;align-self:center}
 .leg .duelo{margin-top:0}
 .leg .eq__n{font-size:1.1rem}
@@ -714,7 +737,7 @@ tr.enjuego td.eqc .pulso{margin-left:8px;vertical-align:middle}
   .franja__extra .sig{flex:none;color:var(--cal-2)}
   .franja__extra .sig b{color:var(--cal);font-weight:600}
   /* cuadro de tres columnas con líneas de cal, sin desplazamiento */
-  .mini-cuadro,.rondas-pega{display:none}
+  .mini-cuadro,.rondas-pega,.leyenda-m__mini{display:none}
   .cuadro{display:flex;gap:0;padding-top:4px}
   .ronda{flex:1 1 0;display:flex;flex-direction:column;gap:0;padding-right:var(--u)}
   .ronda:last-of-type{padding-right:0}
@@ -1148,8 +1171,11 @@ function boleto(c, dePartido) {
   return '<ol>' + filas + '</ol><div class="boleto__total"><p>' + (dePartido ? 'Pegan los cuatro' : 'Pegan los ' + picks.length) + '<b>' + pct(c.prob_conjunta) + '</b></p>' +
     '<p class="mom">Momio justo<b>' + n2(c.momio_justo) + '</b></p></div>' + (nota ? '<p class="nota">' + nota + '</p>' : '');
 }
+function variantes(combis) { /* las que tienen picks y no repiten un boleto menos arriesgado (igual_a, de Python) */
+  return ['segura', 'equilibrada', 'atrevida'].filter(function (k) { return combis && combis[k] && (combis[k].picks || []).length && !combis[k].igual_a; });
+}
 function pestanas(combis, dePartido) {
-  var vs = ['segura', 'equilibrada', 'atrevida'].filter(function (k) { return combis && combis[k] && (combis[k].picks || []).length; });
+  var vs = variantes(combis);
   if (!vs.length) return '';
   var pid = 'pt' + (++nPest), tabs = '', paneles = '';
   vs.forEach(function (k, i) {
@@ -1291,14 +1317,33 @@ function cambiarFoto(b) { /* galería de estadios: cambia la foto, su alt y su c
 function portada() {
   var m = D.meta, s = id('p-sello'), hh = (/(\d{2}:\d{2})/.exec(m.corte_local || '') || [])[1];
   if (s) s.innerHTML = '<b>' + E(m.torneo) + '</b><span>Actualizado ' + fechaCorta(m.corte_local) + (hh ? ', ' + hh + ' h' : '') + '</span>';
-  var c = D.proyeccion.campeon.filter(function (x) { return ok(x.prob); }).slice(0, 4), f = c[0];
-  var ep = (M.portada || {}).equipo || (f && f.equipo), em = id('emblema-esc');
+  /* sólo los que todavía pueden ser campeones (los eliminados con 0% no van en la cuadrícula) */
+  var c = D.proyeccion.campeon.filter(function (x) { return ok(x.prob) && x.prob > 0; }).slice(0, 4), f = c[0];
+  var t = torneo(), fin = t ? (arr((rondaDe('final') || {}).series).filter(obj)[0] || null) : null;
+  var camp = t && t.campeon_decidido && fin && fin.decidida && fin.ganador ? fin.ganador : null;
+  var ep = (M.portada || {}).equipo || camp || (f && f.equipo), em = id('emblema-esc');
   if (em) em.innerHTML = ep ? esc(ep, 96) : '';
   var pie = id('p-pie');
-  if (pie) pie.textContent = 'Probabilidad de ser campeón' + (ok(D.proyeccion.n_sim) ? ' en ' + miles(D.proyeccion.n_sim) + ' torneos simulados' : '') + '.' +
+  if (pie) pie.textContent = (camp ? 'Liguilla terminada: global de la final, ida y vuelta.' : 'Probabilidad de ser campeón' + (ok(D.proyeccion.n_sim) ? ' en ' + miles(D.proyeccion.n_sim) + ' torneos simulados' : '') + '.') +
     (m.modelo && m.modelo.provisional ? ' Modelo provisional.' : '') + (m.retrospectivo ? ' Corrida retrospectiva.' : '');
+  if (camp) { /* campeón decidido: se celebra, sin porcentajes (ya no hay nada que pronosticar) */
+    var g = globalReal(fin), sub = txt(t.subcampeon) || (camp === eqDe(fin.mejor) ? eqDe(fin.peor) : eqDe(fin.mejor));
+    var gc = camp === eqDe(fin.mejor) ? g.m + '-' + g.p : g.p + '-' + g.m;
+    return '<p class="titular"><b>' + E(camp) + '</b>, campeón' + (m.torneo ? ' del ' + E(m.torneo) : '') + '</p>' +
+      (g.n ? '<p class="palmares"><span>Final</span><b>' + E(gc) + ' en el global</b><i>ante ' + E(sub) + '</i></p>' : '') +
+      '<ol class="favoritos" aria-label="Campeón y subcampeón"><li>' + esc(camp, 38) + '<span class="fav__n">' + E(camp) + '</span><span class="fav__p fav__p--t">Campeón</span></li>' +
+      '<li>' + esc(sub, 38) + '<span class="fav__n">' + E(sub) + '</span><span class="fav__p fav__p--t">Subcampeón</span></li></ol>';
+  }
   if (!f) return '<p class="titular">Pronósticos de cada partido, la liguilla y el campeón.</p>';
   var h = '<p class="titular"><b>' + E(f.equipo) + '</b> es el favorito al título: <b class="tab">' + pct(f.prob) + '</b></p>';
+  if (fin && serieDefinida(fin) && !fin.decidida) { /* en la final: quiénes la juegan y cómo quedó la ida (en lugar del último título) */
+    var ida = arr(fin.piernas).filter(function (l) { return obj(l) && l.pierna === 1; })[0], cuandoIda = ida ? cuandoPierna(ida, rondaDe('final')) : '';
+    var idaTxt = ida && ida.jugado && ok(ida.gl) && ok(ida.gv) ? 'Ida: ' + ida.local + ' ' + ida.gl + '-' + ida.gv + ' ' + ida.visitante : 'Ida' + (cuandoIda ? ': ' + cuandoIda : ' por jugar');
+    return h + '<p class="palmares"><span>Final</span><b>' + E(eqDe(fin.mejor)) + ' contra ' + E(eqDe(fin.peor)) + '</b><i>' + E(idaTxt) + '</i></p>' +
+      '<ol class="favoritos" aria-label="Probabilidad de ser campeón de los dos finalistas">' + c.map(function (x) {
+        return '<li>' + esc(x.equipo, 38) + '<span class="fav__n">' + E(x.equipo) + '</span><span class="fav__p">' + pct(x.prob) + '</span></li>';
+      }).join('') + '</ol>';
+  }
   var u = obj((obj((D.proyeccion.titulos || {})[f.equipo]) || {}).ultimo);
   if (u && u.torneo) {
     var gm = /^(.+?) (\d+)-(\d+) (.+)$/.exec(txt(u.global)), fin = '';
@@ -1440,7 +1485,8 @@ function sigue(el) {
   var est = p.estadio || {};
   el.innerHTML = '<div class="sigue__caja"><div><p class="rotulo">' + (fut.length ? 'Próximo partido' : 'Último partido programado') + '</p>' +
     '<p class="sigue__duelo">' + eqn(p.local, 40) + '<small>VS</small>' + eqn(p.visitante, 40) + '</p>' +
-    '<p class="sigue__cuando">' + may(fecha(p.fecha_local)) + ' · ' + E(p.hora_local) + ' h, centro de México' + (est.nombre ? ' · ' + E(est.nombre) : '') + '</p></div>' +
+    '<p class="sigue__cuando">' + may(fecha(p.fecha_local)) + ' · ' + E(p.hora_local) + ' h, centro de México' + (est.nombre ? ' · ' + E(est.nombre) : '') + '</p>' +
+    parcial('serie del próximo partido', function () { var x = obj(p.serie); return x ? '<p class="sigue__serie"><b>' + E(FASE_C[x.fase] || '') + ' ' + E(x.llave) + ' · ' + (x.pierna === 2 ? 'Vuelta' : 'Ida') + '</b> ' + E(x.texto) + '</p>' : ''; }) + '</div>' +
     '<div class="reloj" id="reloj" role="timer" aria-label="Tiempo que falta para el partido"></div>' +
     '<button type="button" class="boton" data-ir="p-' + E(p.id) + '">Ver pronóstico</button></div>' +
     '<p class="conexion js-conexion" style="margin-top:var(--e-3)"></p>';
@@ -1572,7 +1618,8 @@ function mercados(p) {
   }).join('');
   return '<details class="ancho"><summary><span>Otros mercados<small>' + ms.length + ' pronósticos más de este partido, con su momio justo</small></span></summary><div class="det">' +
     '<div class="caja-tabla" tabindex="0" role="region" aria-label="Otros mercados"><table><thead><tr><th class="i">Pronóstico</th><th>Prob.</th><th>Momio justo</th></tr></thead><tbody>' + filas + '</tbody></table></div>' +
-    '<p class="nota">Momio justo = 1 ÷ probabilidad: lo mínimo que tendría que pagar para no perder a la larga. Los mercados de cantidad de goles discriminan poco.</p></div></details>';
+    '<p class="nota">Momio justo = 1 ÷ probabilidad: lo mínimo que tendría que pagar para no perder a la larga. Los mercados de cantidad de goles discriminan poco.' +
+    (FASE1[p.fase] ? ' En liguilla cuentan sólo los 90 minutos: sin tiempo extra ni penales.' : '') + '</p></div></details>';
 }
 function tarjeta(p, nSede) {
   var c = p.contexto || {}, est = p.estadio || {}, em = estadioDe(est.slug);
@@ -1581,7 +1628,8 @@ function tarjeta(p, nSede) {
   var h = '<article class="partido a" id="p-' + E(p.id) + '" aria-labelledby="pt-' + E(p.id) + '"><figure class="partido__foto">' + (foto ? img(foto) + cred(foto) : '') +
     '<div class="placa"><div><p class="placa__n">' + E(est.nombre || 'Sede por confirmar') + '</p>' + (est.ciudad ? '<p class="placa__c">' + E(est.ciudad) + '</p>' : '') + '</div>' +
     (ok(alt) ? '<div class="alt"><b>' + miles(alt) + ' m</b><span>altitud</span></div>' : '') + '</div></figure><div class="partido__cuerpo">' +
-    '<div class="pvivo ancho" data-pvivo="' + E(p.id) + '" hidden></div>';
+    '<div class="pvivo ancho" data-pvivo="' + E(p.id) + '" hidden></div>' + parcial('serie del partido', function () { return serieTarjeta(p); });
+  var lig = !!FASE1[p.fase];
   function equipo(eq, x, rol) {
     return '<div class="eq">' + esc(eq, 58) + '<span class="eq__n">' + E(eq) + '</span><span class="eq__r">' + rol + (x && ok(x.posicion) ? ' · ' + x.posicion + '.º' + (ok(x.puntos) ? ', ' + x.puntos + ' pts' : '') : '') + '</span></div>';
   }
@@ -1593,13 +1641,13 @@ function tarjeta(p, nSede) {
     equipo(p.visitante, c.equipo_visitante, 'Visita') + '</div></div>';
   var pk = p.pick || {};
   var top = (p.top5 || []).map(function (t) { return '<li><b>' + E(t.gl) + '-' + E(t.gv) + '</b>' + pct(t.prob) + '</li>'; }).join('');
-  h += '<div class="sub"><h5>Quién gana</h5>' + x12(p.p_local, p.p_empate, p.p_visitante) + ley(p) +
+  h += '<div class="sub"><h5>Quién gana' + (lig ? ' este partido (90 minutos)' : '') + '</h5>' + x12(p.p_local, p.p_empate, p.p_visitante) + ley(p) +
     '<p class="pick"><span>Pronóstico</span><b>' + (pk.resultado === 'E' ? 'Empate' : 'Gana ' + E(pk.equipo)) + '</b><span>' + pct(pk.prob) + ' de probabilidad</span></p></div>';
   h += '<div class="sub">' + (top ? '<h5>Los 5 marcadores más probables</h5><ul class="top5">' + top + '</ul>' : '') +
     (ok(p.lam_l) && ok(p.lam_v) ? '<div class="xg"><div><span>Goles esperados<br>de ' + E(abr(p.local)) + '</span><b>' + n2(p.lam_l) + '</b></div><div><span>Goles esperados<br>de ' + E(abr(p.visitante)) + '</span><b>' + n2(p.lam_v) + '</b></div></div>' : '') + '</div>';
   var pest = parcial('combinada del partido', function () { return pestanas(p.combinadas, true); });
   h += '</div><div class="col"><div class="sub"><h5>Combinada del partido</h5>' + (pest
-    ? '<p class="nota">Cuatro pronósticos de este mismo juego en un solo boleto. Elige cuánto riesgo quieres.</p>' + pest
+    ? '<p class="nota">Cuatro pronósticos de este mismo juego en un solo boleto. Elige cuánto riesgo quieres.' + (lig ? ' Cuentan sólo los 90 minutos: sin tiempo extra ni penales.' : '') + '</p>' + pest
     : '<p class="nota">No hay cuatro pronósticos compatibles para armar la combinada de este partido.</p>') + '</div></div>';
   var porque = [
     parcial('factores', function () { return factores(p); }),
@@ -1612,6 +1660,14 @@ function tarjeta(p, nSede) {
   if (porque) h += '<details class="ancho"><summary><span>Por qué<small>Factores del modelo, forma, historial, sede, descanso' + (p.momios ? ' y momios' : ' y suspendidos') + '</small></span></summary><div class="det">' + porque + '</div></details>';
   h += parcial('otros mercados', function () { return mercados(p); });
   return h + '</div></article>';
+}
+function serieTarjeta(p) { /* de qué serie es el partido, cómo va el global y qué necesita cada uno: todo viene redactado en p.serie */
+  var x = obj(p.serie); if (!x || !txt(x.texto)) return '';
+  var fin = x.fase === 'final';
+  return '<div class="ancho serie-p"><p class="cuando"><b>' + E(FASE1[x.fase] || '') + '</b><span>Llave ' + E(x.llave) + '</span><span>' + (x.pierna === 2 ? 'Vuelta' : 'Ida') + '</span></p>' +
+    '<p class="serie-p__t">' + E(x.texto) + '</p>' +
+    (ok(x.p_avanza_mejor) && ok(x.p_avanza_peor) ? '<p class="serie-p__av"><span class="serie-p__l">' + (fin ? 'Probabilidad de ser campeón' : 'Probabilidad de avanzar') + ':</span><span>' + E(x.mejor) + ' <b>' + pct(x.p_avanza_mejor, 0) + '</b></span><span>' + E(x.peor) + ' <b>' + pct(x.p_avanza_peor, 0) + '</b></span></p>' : '') +
+    '<p class="nota">Lo de abajo es el pronóstico de este partido a 90 minutos; quién avanza lo decide el global de la serie.</p></div>';
 }
 /* piernas de liguilla SIN JUGAR, entre equipos ya definidos, que todavía no vienen en «pendientes» (la liga no les ha puesto día y hora):
    por ronda, primero las idas y luego las vueltas. Todo sale de liguilla.torneo; aquí no se calcula nada */
@@ -1668,13 +1724,15 @@ function partidos() {
   }).join('');
   var sinJornada = !hayCombinadaJornada();
   if (sueltas.length) h += '<ul class="francos a" id="nota-sueltas"><li><b>Día y hora por confirmar</b><span>' + (sueltas.length === 1 ? 'Este partido todavía no tiene' : 'Estos ' + sueltas.length + ' partidos todavía no tienen') +
-    ' día ni hora en el calendario: la fecha es la ventana de la ronda y la sede, la habitual del local. La combinada de cuatro pronósticos de cada partido' + (sinJornada ? ' y la combinada de la jornada se publican' : ' se publica') +
+    ' día ni hora en el calendario: la fecha es la ventana de la ronda y la sede, la que da la prensa o, si no hay, la habitual del local. La combinada de cuatro pronósticos de cada partido' + (sinJornada ? ' y la combinada de la ronda se publican' : ' se publica') +
     ' cuando la liga confirme día y hora.</span></li></ul>' +
     gs.map(function (g) {
       var f = rangoFechas((obj(g.x.r.fechas) || {})[g.x.n === 2 ? 'vuelta' : 'ida']);
       return '<div class="grupo"><h3>' + E(g.et) + (f ? '<small>' + E(f) + '</small>' : '') + '</h3><div class="plegs">' + g.xs.map(function (x) { return parcial(x.l.local + ' vs ' + x.l.visitante, function () { return tarjetaPierna(x); }); }).join('') + '</div></div>';
     }).join('');
-  else if (sinJornada) h += '<p class="nota" id="nota-sin-combinada">Sin combinada de la jornada por ahora: se arma cuando hay al menos dos partidos con pronóstico.</p>';
+  else if (sinJornada) h += '<p class="nota" id="nota-sin-combinada">' + (ps.length && ps.every(function (p) { return p.fase === 'final'; })
+    ? 'En la final no hay combinada de la ronda: es un solo partido a la vez. Cada partido trae su combinada de cuatro pronósticos.'
+    : 'Sin combinada ' + (enLiguilla() ? 'de la ronda' : 'de la jornada') + ' por ahora: se arma cuando hay al menos dos partidos con pronóstico en la misma ronda.') + '</p>';
   return h;
 }
 
@@ -1687,8 +1745,24 @@ function combinadaJornada() {
   var cand = (cj.candidatos || []).map(function (c) {
     return '<li><span>' + E(c.etiqueta) + '<br><small class="nota">' + E(c.partido) + '</small></span><span>' + pct(c.prob) + '</span></li>';
   }).join('');
-  return '<div class="mitad"><div class="bloque a"><div class="bloque__cab"><h3>' + E(cj.etiqueta) + '</h3><p>Tres boletos con el pronóstico más firme de cada partido. La segura lleva menos partidos; la atrevida, casi todos.</p></div>' + pest + '</div>' +
+  var nv = variantes(cj).length, np = ok(cj.n_partidos) ? cj.n_partidos : null;
+  var bajada = nv >= 3 ? 'Tres boletos con el pronóstico más firme de cada partido. La segura lleva menos partidos; la atrevida, casi todos.'
+    : nv === 2 ? 'Dos boletos con el pronóstico más firme de cada partido' + (np ? ': con ' + np + ' partidos' : '') + ' la tercera variante saldría igual a una de estas, así que no se repite.'
+    : 'Un solo boleto con el pronóstico más firme de cada partido' + (np ? ': con ' + np + ' partidos' : '') + ' la segura, la equilibrada y la atrevida salen iguales.';
+  return '<div class="mitad"><div class="bloque a"><div class="bloque__cab"><h3>' + E(cj.etiqueta) + '</h3><p>' + bajada + '</p></div>' + pest + '</div>' +
     (cand ? '<div class="bloque a"><div class="bloque__cab"><h3>Los candidatos</h3><p>El mejor pronóstico de cada partido' + (ok(cj.n_partidos) ? ' (' + cj.n_partidos + ')' : '') + ', del más al menos probable. Los boletos toman los primeros de esta lista.</p></div><ul class="lista">' + cand + '</ul></div>' : '') + '</div>';
+}
+/* en liguilla ya no hay «jornada»: la combinada es de la ronda y la rendición de cuentas, de los resultados recientes */
+function enLiguilla() { return !!D.proyeccion.regular_completa; }
+function rotulosFase() {
+  if (!enLiguilla()) return;
+  function pon(sel, t) { $$(sel).forEach(function (b) { var i = $('i', b); b.textContent = t; if (i) b.insertBefore(i, b.firstChild); }); }
+  var tc = id('t-combinada'), tu = id('t-ultima');
+  if (tc) tc.textContent = 'Combinada de la ronda';
+  if (tu) tu.textContent = 'Resultados recientes';
+  pon('#menu [data-ir="combinada"]', 'Combinada de la ronda');
+  pon('#menu [data-ir="ultima"]', 'Resultados recientes');
+  pon('.barra__nav [data-ir="ultima"]', 'Resultados');
 }
 /* el menú, la barra y el número de cada sección siguen a las secciones que sí se muestran */
 function numerar() {
@@ -1719,6 +1793,19 @@ function campeon() {
   arr(D.tabla).filter(obj).forEach(function (r) { lugar[r.equipo] = ok(r.pos) ? r.pos : 99; });
   fuera.sort(function (a, b) { return (lugar[a.equipo] || 99) - (lugar[b.equipo] || 99); }); /* en el orden en que terminaron */
   function nombres(l) { return l.map(function (c) { return E(c.equipo); }).join(', '); }
+  var fin = t ? arr((rondaDe('final') || {}).series).filter(obj)[0] : null;
+  if (t && t.campeon_decidido && fin && fin.decidida && fin.ganador) { /* liguilla terminada: campeón y subcampeón, sin barras */
+    var g = globalReal(fin), cmp = fin.ganador, sub = txt(t.subcampeon) || (cmp === eqDe(fin.mejor) ? eqDe(fin.peor) : eqDe(fin.mejor));
+    var gc = cmp === eqDe(fin.mejor) ? g.m + '-' + g.p : g.p + '-' + g.m;
+    if (bj) bj.textContent = 'La liguilla terminó: así quedó.';
+    elim = elim.filter(function (c) { return c.equipo !== sub; });
+    return '<div class="bloque a"><div class="bloque__cab"><h3>' + E(cmp) + ', campeón' + (D.meta.torneo ? ' del ' + E(D.meta.torneo) : '') + '</h3>' +
+      '<p>' + (g.n ? 'Ganó la final ' + E(gc) + ' en el global ante ' + E(sub) + '.' : 'Ganó la final ante ' + E(sub) + '.') + '</p></div>' +
+      '<ol class="podio"><li class="podio__1">' + esc(cmp, 44) + '<span class="nb">' + E(cmp) + '</span><span class="podio__r">Campeón</span></li>' +
+      '<li>' + esc(sub, 32) + '<span class="nb">' + E(sub) + '</span><span class="podio__r">Subcampeón</span></li></ol>' +
+      (elim.length ? '<p class="nota">Eliminados en la liguilla: ' + nombres(elim) + '.</p>' : '') +
+      (fuera.length ? '<p class="nota">No clasificaron a la liguilla: ' + nombres(fuera) + '.</p>' : '') + '</div>';
+  }
   return '<div class="bloque a"><div class="bloque__cab"><h3>¿Quién será campeón?</h3><p>Probabilidad de levantar el trofeo. El ± es el error de la simulación, no toda la incertidumbre.</p></div>' +
     '<ol class="barras">' + con.map(function (c) {
       return '<li>' + esc(c.equipo, 32) + '<span class="nb">' + E(c.equipo) + '</span><span class="pista" aria-hidden="true"><i style="width:' + w(c.prob, tope) + '%"></i></span>' +
@@ -1735,7 +1822,7 @@ function embudo() {
   return '<div class="bloque a"><div class="bloque__cab"><h3>Hasta dónde llega cada uno</h3><p>' + (fin ? 'Probabilidad de que cada clasificado llegue a semifinales, a la final y al título.' : 'Probabilidad de clasificar a la liguilla (los primeros 8) y de llegar a cada ronda.') + '</p></div>' +
     '<div class="caja-tabla" tabindex="0" role="region" aria-label="Probabilidad de llegar a cada ronda"><table><thead><tr><th class="i">Equipo</th>' + (fin ? '' : '<th>Liguilla</th>') + '<th>Semis</th><th>Final</th><th>Campeón</th></tr></thead><tbody>' +
     t.map(function (r) { return '<tr><td class="i eqc">' + eqn(r.equipo, 26) + '</td>' + (fin ? '' : td(r.p_clasifica)) + td(r.p_semifinal) + td(r.p_final) + td(r.p_campeon) + '</tr>'; }).join('') +
-    '</tbody></table></div></div>';
+    '</tbody></table></div>' + (fin && torneo() && torneo().estado !== 'terminado' ? '<p class="nota">El porcentaje de semifinales puede diferir en un punto del que da el cuadro para la misma serie: el cuadro calcula cada serie con los goles esperados del modelo; esta tabla sale de la simulación, que además promedia la incertidumbre de esos goles esperados.</p>' : '') + '</div>';
 }
 function cruce(o, etiqueta) {
   return '<div class="cruce"><div class="cruce__eq">' + eqn(o.mejor, 28) + eqn(o.peor, 28) + '</div>' +
@@ -1805,7 +1892,7 @@ function marcPierna(l) { /* local a la izquierda: escudo, tablero, escudo */
 function ladoLlave(s, e, sem, p) {
   var gano = s.decidida && s.ganador === e, fuera = s.decidida && s.ganador && s.ganador !== e, fav = s.decidida ? gano : s.favorito === e;
   return '<div class="llave__eq' + (fav ? ' fav' : '') + (fuera ? ' fuera' : '') + '"><span class="sem">' + (sem == null ? '' : sem) + '</span>' + esc(e, 26) + '<span class="n">' + E(e) + '</span>' +
-    (s.decidida ? (gano ? '<span class="chip chip--oro">Avanza</span>' : '<span></span>') : '<b data-avz>' + pct(p, 0) + '</b>') + '</div>';
+    (s.decidida ? (gano ? '<span class="chip chip--oro">' + (s.fase === 'final' ? 'Campeón' : 'Avanza') + '</span>' : '<span></span>') : '<b data-avz>' + pct(p, 0) + '</b>') + '</div>';
 }
 function barraAvanza(s, grande) {
   var a = s.p_avanza_mejor, b = s.p_avanza_peor; if (!ok(a) || !ok(b) || s.decidida) return '';
@@ -1863,7 +1950,7 @@ function llaves() {
   var seDef = se.length > 0 && se.every(serieDefinida), fiDef = fi.length > 0 && fi.every(serieDefinida); /* qué rondas siguen siendo la ruta de los favoritos */
   var h = '<div class="cuadro-marco"><div class="interior cuadro-cab"><div class="cuadro-estado"><span class="chip chip--oro">' + e[0] + '</span><p>' + e[1] +
     (t.estado === 'terminado' || (seDef && fiDef) ? '' : seDef ? ' La final sigue la ruta de los favoritos.' : ' Semifinales y final siguen la ruta de los favoritos; en semifinales hay resiembra.') + '</p></div>' +
-    (hayReal ? '<p class="leyenda-m"><span><i class="r"></i>Resultado real</span><span><i></i>Pronóstico del modelo</span></p>' : '') +
+    (hayReal || cabal ? '<p class="leyenda-m"><span><i class="r"></i>Resultado real</span><span><i></i>Pronóstico del modelo' + (cabal ? '<em class="leyenda-m__mini">&nbsp;(en el cuadro de un vistazo, en cursiva)</em>' : '') + '</span></p>' : '') +
     (cabal ? parcial('el cuadro de un vistazo', function () { return miniCuadro(ord, se, fi, t); }) : '') + '</div>';
   h += '<div class="rondas-pega"><div class="rondas-nav" role="group" aria-label="Ir a una ronda del cuadro">' + R.map(function (x, i) {
     return '<button type="button" data-ronda="' + i + '"' + (i === 0 ? ' aria-current="true"' : '') + '>' + x[1] + '<small>' + E(vent(rondaDe(x[0]))) + '</small></button>';
@@ -1887,7 +1974,9 @@ function miniLeg(l, lv) { /* «IDA XOL 1-1 CAZ»: local–visitante. Resultado r
   if (lv && ok(lv.gl) && ok(lv.gv) && (EN_JUEGO[lv.estado] || lv.estado === 'final')) { real = true; gl = lv.gl; gv = lv.gv; }
   else if (l.jugado && ok(l.gl) && ok(l.gv)) { real = true; gl = l.gl; gv = l.gv; }
   else if (ok(m.gl) && ok(m.gv)) { gl = m.gl; gv = m.gv; }
-  return '<span class="mc__leg' + (real ? ' real' : '') + '"><em>' + (l.pierna === 2 ? 'VTA' : 'IDA') + '</em>' + E(abr(l.local)) + ' <b>' + (gl == null ? 'vs' : gl + '-' + gv) + '</b> ' + E(abr(l.visitante)) + '</span>';
+  /* el pronóstico va en cursiva y más tenue, con su nombre para el lector de pantalla: no se confunde con un resultado */
+  var que = real ? 'resultado' : gl == null ? 'por jugar' : 'pronóstico';
+  return '<span class="mc__leg' + (real ? ' real' : gl == null ? '' : ' pron') + '" aria-label="' + (l.pierna === 2 ? 'Vuelta' : 'Ida') + ', ' + que + ': ' + E(l.local) + (gl == null ? ' contra ' : ' ' + gl + '-' + gv + ' ') + E(l.visitante) + '"><em>' + (l.pierna === 2 ? 'VTA' : 'IDA') + '</em>' + E(abr(l.local)) + ' <b>' + (gl == null ? 'vs' : gl + '-' + gv) + '</b> ' + E(abr(l.visitante)) + '</span>';
 }
 function miniNodo(s, y) { /* y: la serie compacta del documento en vivo si se juega hoy; devuelve { c: clases, h: contenido } */
   var mj = eqDe(s.mejor), pr = eqDe(s.peor), g = globalReal(s), gano = s.decidida ? txt(s.ganador) : y && y.gano ? y.gano : '';
@@ -1911,17 +2000,24 @@ function miniCuadro(ord, se, fi, t) {
     var b = '<button type="button" class="' + m.c + '" data-ver-llave="' + k + '" aria-label="' + E(FASE1[s.fase] || '') + ' ' + k + ': ' + E(eqDe(s.mejor)) + ' contra ' + E(eqDe(s.peor)) + '. Ir a la serie">' + m.h + '</button>';
     return '<div class="mn" data-p="' + p + '">' + (extra ? '<div class="mc-eje">' + extra + b + '</div>' : b) + '</div>';
   }
+  var ft = favTitulo(), otro = !t.campeon_decidido && ft && ft.equipo !== camp;
   var cam = camp ? '<div class="mc-campeon"><div class="emblema" aria-hidden="true">' + trofeo() + '<span class="emblema__esc">' + esc(camp, 20) + '</span></div>' +
-    '<span>' + (t.campeon_decidido ? 'Campeón' : 'Campeón por esta ruta') + '</span><b>' + E(camp) + '</b></div>' : '';
+    '<span>' + (t.campeon_decidido ? 'Campeón' : 'Si gana cada favorito') + '</span><b>' + E(camp) + '</b>' +
+    (otro ? '<small>Favorito al título: ' + E(abr(ft.equipo)) + ' ' + pct(ft.prob, 0) + '</small>' : '') + '</div>' : '';
   return '<div class="mini-cuadro" id="mini-cuadro" role="group" aria-label="El cuadro de un vistazo. Toca una serie para ir a su tarjeta">' +
     ['Cuartos', 'Semifinales', 'Final'].map(function (x, i) { return '<p class="mini-cuadro__rot" style="grid-column:' + (i + 1) + '" aria-hidden="true">' + x + '</p>'; }).join('') +
     ord.map(function (s, i) { return nodo(s, pos[i]); }).join('') + nodo(se[0], 's1') + nodo(se[1], 's2') + nodo(fi[0], 'f', cam) + '</div>';
 }
-function campeonRuta(t) {
+function favTitulo() { /* el de mayor probabilidad de título (simulación completa): el mismo que nombra la portada */
+  return D.proyeccion.campeon.filter(function (x) { return ok(x.prob) && x.prob > 0; }).sort(function (a, b) { return b.prob - a.prob; })[0] || null;
+}
+function campeonRuta(t) { /* «si gana cada favorito» no es «el favorito al título»: cuando no coinciden se dicen los dos */
   var e = txt(t.campeon_ruta); if (!e) return '';
+  var f = favTitulo(), otro = !t.campeon_decidido && f && f.equipo !== e;
   return '<div class="campeon-ruta"><div class="emblema" aria-hidden="true">' + trofeo() + '<span class="emblema__esc">' + esc(e, 40) + '</span></div>' +
-    '<span>' + (t.campeon_decidido ? 'Campeón' : 'Campeón por esta ruta') + '</span><b>' + E(e) + '</b>' +
-    (t.campeon_decidido || !ok(t.p_campeon_ruta) ? '' : '<small>Con todos los caminos posibles, su probabilidad de título es ' + pct(t.p_campeon_ruta) + '</small>') + '</div>';
+    '<span>' + (t.campeon_decidido ? 'Campeón' : 'Si gana cada favorito') + '</span><b>' + E(e) + '</b>' +
+    (t.campeon_decidido || !ok(t.p_campeon_ruta) ? '' : '<small>Con todos los caminos posibles, su probabilidad de título es ' + pct(t.p_campeon_ruta) +
+      (otro ? '; el favorito al título es ' + E(f.equipo) + ' (' + pct(f.prob) + ')' : '') + '.</small>') + '</div>';
 }
 function legDetalle(l, r) {
   var jug = !!l.jugado, m = obj(l.marcador) || {}, gl = jug ? l.gl : m.gl, gv = jug ? l.gv : m.gv;
@@ -1953,9 +2049,10 @@ function detalleSerie() {
     (g.n ? tablero(g.m, g.p, false, 'tablero--real') : pb && ok(pb.mejor) && ok(pb.peor) ? '<b>' + E(pb.mejor) + '-' + E(pb.peor) + '</b>' : '<span class="mini">VS</span>') +
     (!g.n && pb && ok(pb.prob) ? '<span class="duelo__p">' + pct(pb.prob) + '</span>' : '') + '</div>' + eq(pr, semDe(s.peor)) + '</div>';
   h += '<div class="llave__vivo" data-vivo-serie="' + E(s.llave) + '" hidden></div>';
-  if (!s.decidida && pb && ok(pb.mejor) && ok(pb.peor)) h += '<p class="nota">El global más probable no es la suma de los dos marcadores: cada marcador es el más probable de su partido.</p>';
-  if (s.decidida) h += '<p class="pick"><span>Serie terminada</span><b>Avanzó ' + E(s.ganador || '') + '</b></p>';
-  else if (ok(s.p_avanza_mejor) && ok(s.p_avanza_peor)) h += '<div class="sub"><h5 data-avanza-t>Quién avanza</h5>' + barraAvanza(s, true) +
+  /* la nota explica el «Global más probable» del recuadro: sólo va cuando ese recuadro lo muestra (sin nada jugado) */
+  if (!s.decidida && !g.n && pb && ok(pb.mejor) && ok(pb.peor)) h += '<p class="nota">El global más probable no es la suma de los dos marcadores: cada marcador es el más probable de su partido.</p>';
+  if (s.decidida) h += '<p class="pick"><span>' + (s.fase === 'final' ? 'Final terminada' : 'Serie terminada') + '</span><b>' + (s.fase === 'final' ? 'Campeón: ' : 'Avanzó ') + E(s.ganador || '') + '</b></p>';
+  else if (ok(s.p_avanza_mejor) && ok(s.p_avanza_peor)) h += '<div class="sub"><h5 data-avanza-t>' + (s.fase === 'final' ? 'Quién es campeón' : 'Quién avanza') + '</h5>' + barraAvanza(s, true) +
     '<div class="cruce__eq"><span class="eqn">' + E(mj) + '</span><span class="eqn">' + E(pr) + '</span></div>' +
     (s.regla_empate ? '<p class="nota">Si el global queda empatado: ' + E(s.regla_empate) + '.</p>' : '') + '</div>';
   if (!serieDefinida(s) && de.length === 2) h += '<p class="viene">' + (s.fase === 'final'
@@ -2103,8 +2200,15 @@ function ultima() {
   var con = us.filter(function (u) { return u.pronostico; });
   var ac = con.filter(function (u) { return u.pronostico.acierto_1x2; }).length, ex = con.filter(function (u) { return u.pronostico.marcador_exacto; }).length;
   var noSellado = con.some(function (u) { return /no sellado/i.test(u.pronostico.origen || ''); });
-  return (con.length ? '<div class="resumen a"><div><b>' + ac + '<small> de ' + con.length + '</small></b><span>resultados acertados (gana, empata o pierde)</span></div><div><b>' + ex + '<small> de ' + con.length + '</small></b><span>marcadores exactos</span></div></div>' : '') +
-    '<div class="rej rej--3">' + us.map(function (u) { return parcial(u.local + ' vs ' + u.visitante, function () { return resultado(u); }); }).join('') + '</div>' +
+  var grupos = [], pos = {};                     /* por ronda o jornada, la más reciente primero: no se mezclan fases en una cuenta */
+  us.forEach(function (u) { var k = txt(u.etiqueta) || 'Resultados'; if (!(k in pos)) { pos[k] = grupos.length; grupos.push({ et: k, us: [] }); } grupos[pos[k]].us.push(u); });
+  function cuenta(l) { var c = l.filter(function (u) { return u.pronostico; }); return c.length ? c.filter(function (u) { return u.pronostico.acierto_1x2; }).length + ' de ' + c.length + ' acertados · ' + c.filter(function (u) { return u.pronostico.marcador_exacto; }).length + ' marcadores exactos' : ''; }
+  function tarjetas(l) { return '<div class="rej rej--3">' + l.map(function (u) { return parcial(u.local + ' vs ' + u.visitante, function () { return resultado(u); }); }).join('') + '</div>'; }
+  var cuerpo = grupos.length < 2 ? tarjetas(us) : grupos.map(function (g) {
+    return '<div class="grupo" data-grupo-ultima><h3>' + E(g.et) + (cuenta(g.us) ? '<small>' + E(cuenta(g.us)) + '</small>' : '') + '</h3>' + tarjetas(g.us) + '</div>';
+  }).join('');
+  return (con.length ? '<div class="resumen a"><div><b>' + ac + '<small> de ' + con.length + '</small></b><span>resultados acertados (gana, empata o pierde)' + (grupos.length > 1 ? ' en estos ' + us.length + ' partidos' : '') + '</span></div><div><b>' + ex + '<small> de ' + con.length + '</small></b><span>marcadores exactos</span></div></div>' : '') +
+    cuerpo +
     (noSellado ? '<p class="nota">Estos pronósticos salen de la validación histórica del modelo (hechos sólo con información anterior a cada partido), no de un sello en vivo. Los pronósticos sellados empiezan a contar con el próximo partido.</p>' : '');
 }
 var LECTURA_MERCADO = {
@@ -2307,7 +2411,7 @@ function normVivo(d) { /* devuelve sólo lo que tiene la forma esperada; un docu
   var v = {
     ejemplo: !!d.ejemplo, prueba: !!d.prueba, generado_utc: typeof d.generado_utc === 'string' ? d.generado_utc : '', estado: txt(d.estado),
     partidos: arr(d.partidos).filter(function (p) { return obj(p) && p.id != null && typeof p.local === 'string' && typeof p.visitante === 'string'; }),
-    tabla: arr(d.tabla).filter(function (r) { return obj(r) && typeof r.equipo === 'string'; }), tabla_nota: txt(d.tabla_nota),
+    tabla: arr(d.tabla).filter(function (r) { return obj(r) && typeof r.equipo === 'string'; }), tabla_nota: txt(d.tabla_nota), tabla_fija: d.tabla_fija === true,
     proyeccion: obj(d.proyeccion) || {}, series: arr(d.series).filter(function (x) { return obj(x) && x.llave; }),
     ultimo_evento: obj(d.ultimo_evento), siguiente: obj(d.siguiente)
   };
@@ -2417,7 +2521,7 @@ function bloqueVivo(p) { /* el bloque de la tarjeta del partido */
       return '<div style="--c:var(--' + c + ')"><b>' + pct(v) + '</b><span>' + E(nom) + '</span>' + (d == null ? '' : delta(d)) + '</div>';
     }
     var mf = obj(vv.marcador_final);
-    h += '<div class="compara"><div class="compara__f"><span>Probabilidad al momento</span>' + x12(vv.p_local, vv.p_empate, vv.p_visitante) +
+    h += '<div class="compara"><div class="compara__f"><span>' + (obj(p.serie) ? 'Este partido a 90 minutos, al momento' : 'Probabilidad al momento') + '</span>' + x12(vv.p_local, vv.p_empate, vv.p_visitante) +
       '<div class="ley">' + col('local', vv.p_local, pv.p_local, p.local) + col('empate', vv.p_empate, pv.p_empate, 'Empate') + col('visita', vv.p_visitante, pv.p_visitante, p.visitante) + '</div></div>' +
       (hayPrevio ? '<div class="compara__f antes"><span>Pronóstico antes del partido</span>' + x12(pv.p_local, pv.p_empate, pv.p_visitante, true) +
         '<small><span>' + pct(pv.p_local) + '</span><span>' + pct(pv.p_empate) + '</span><span>' + pct(pv.p_visitante) + '</span></small></div>' +
@@ -2431,8 +2535,9 @@ function bloqueVivo(p) { /* el bloque de la tarjeta del partido */
     if (pk) h += '<p class="nota">El modelo decía: <b>' + (pk.r === 'E' ? 'empate' : 'gana ' + E(pk.r === 'L' ? p.local : p.visitante)) + '</b>' + (ok(pk.p) ? ' (' + pct(pk.p) + ')' : '') + (pm && ok(pm.gl) && ok(pm.gv) ? ', marcador ' + pm.gl + '-' + pm.gv : '') + '.</p>' +
       '<div class="sellos"><span class="sello-r ' + (pk.r === res ? 'si">Resultado acertado' : 'no">Resultado fallado') + '</span>' + (pm && pm.gl === rl && pm.gv === rv ? '<span class="sello-r si">Marcador exacto</span>' : '') + '</div>';
   }
-  var ls = lineaSerie(serieVivo(p.serie));
+  var ls = lineaSerie(serieVivo(p.serie)), st = obj(p.serie) ? txt(p.serie.texto) : '';
   if (ls) h += '<div class="llave__vivo">' + ls + '</div>';
+  if (st) h += '<p class="nota">' + E(st) + '</p>';
   return h;
 }
 function vivoFranja() {
@@ -2478,20 +2583,28 @@ function vivoSeccion() {
       return parcial(p.local + ' vs ' + p.visitante, function () {
         var kid = String(p.id).replace(/[^\w-]/g, ''), vivo = EN_JUEGO[p.estado] && !V.atrasado, vv = obj(p.vivo), pv = obj(p.previo) || {}, jug = ok(p.gl) && ok(p.gv), extra = ok(p.periodo) && p.periodo >= 3, pe = obj(p.penales);
         var evs = arr(p.eventos).filter(obj).map(function (e) { return minEv(e) + ' ' + (e.tipo === 'roja' ? 'expulsado ' : '') + txt(e.jugador || EVENTO[e.tipo]) + (e.tipo === 'penal' ? ' (penal)' : e.tipo === 'autogol' ? ' (autogol)' : '') + ' (' + abr(e.equipo) + ')'; }).join(' · ');
-        var pr = extra ? null : vivo && vv && ok(vv.p_local) ? [vv.p_local, vv.p_empate, vv.p_visitante, 'Al momento'] : p.estado !== 'final' && ok(pv.p_local) ? [pv.p_local, pv.p_empate, pv.p_visitante, 'Pronóstico'] : null;
+        var sv = obj(p.serie), ida = sv ? obj(sv.ida) : null; /* en liguilla la barra es del PARTIDO a 90 minutos; quién avanza va aparte */
+        var pr = extra ? null : vivo && vv && ok(vv.p_local) ? [vv.p_local, vv.p_empate, vv.p_visitante, sv ? 'Partido (90 min), al momento' : 'Al momento'] : p.estado !== 'final' && ok(pv.p_local) ? [pv.p_local, pv.p_empate, pv.p_visitante, sv ? 'Pronóstico del partido (90 min)' : 'Pronóstico'] : null;
+        var serieH = sv ? (txt(sv.texto) ? '<p class="marc__serie">' + E(sv.texto) + (ida && ok(ida.gl) && ok(ida.gv) && !/\bIda\b/.test(txt(sv.texto)) ? ' <span>Ida: ' + E(ida.local) + ' ' + ida.gl + '-' + ida.gv + ' ' + E(ida.visitante) + '.</span>' : '') + '</p>' : '') +
+          (ok(sv.p_avanza_mejor) && ok(sv.p_avanza_peor) && !sv.decidida ? '<p class="marc__serie marc__av">' + (sv.fase === 'final' ? 'Campeón' : 'Avanza') + ': ' + E(abr(eqDe(sv.mejor))) + ' <b>' + pct(sv.p_avanza_mejor, 0) + '</b> · ' + E(abr(eqDe(sv.peor))) + ' <b>' + pct(sv.p_avanza_peor, 0) + '</b></p>' : '') : '';
         function fila(e, g, r) { return '<div class="marc__eq">' + esc(e, 28) + '<span>' + E(e) + rojas(r) + '</span><b>' + (jug ? E(g) : '') + '</b></div>'; }
         return '<article class="marc' + (vivo ? ' marc--vivo' : '') + '" id="vm-' + kid + '" aria-label="' + E(p.local) + ' contra ' + E(p.visitante) + '"><p class="marc__cab">' + chipVivo(p) + (p.etiqueta ? '<span>' + E(p.etiqueta) + '</span>' : '') +
           (p.estado === 'en_juego' || p.estado === 'programado' ? '<span class="min" data-reloj="' + E(p.id) + '">' + E(minutoVivo(p, false)) + '</span>' : '') + '</p>' +
           '<div data-marc-filas="' + E(p.id) + '">' + fila(p.local, p.gl, p.rojas_l) + fila(p.visitante, p.gv, p.rojas_v) + '</div>' +
           (evs ? '<p class="marc__ev">' + E(evs) + '</p>' : '') +
           (extra ? '<p class="marc__ev">' + (pe && ok(pe.l) && ok(pe.v) ? 'Penales: ' + pe.l + '-' + pe.v : p.estado === 'final' ? 'Con tiempos extra' : 'Tiempos extra') + '</p>' : '') +
-          (pr && ok(pr[1]) && ok(pr[2]) ? '<div class="pierna__x">' + x12(pr[0], pr[1], pr[2], true) + '<small><span>' + pr[3] + '</span><span>' + pct(pr[0], 0) + ' · ' + pct(pr[1], 0) + ' · ' + pct(pr[2], 0) + '</span></small></div>' : '') +
+          (pr && ok(pr[1]) && ok(pr[2]) ? '<div class="pierna__x">' + x12(pr[0], pr[1], pr[2], true) + '<small><span>' + pr[3] + '</span><span>' + pct(pr[0], 0) + ' · ' + pct(pr[1], 0) + ' · ' + pct(pr[2], 0) + '</span></small></div>' : '') + serieH +
           ($('#p-' + kid) ? '<button type="button" class="llave__ver" data-ir="p-' + kid + '">Ver el partido</button>' : '') + '</article>';
       });
     }).join('') + '</div>' + (V.partidos.some(function (p) { return p.estado === 'programado'; }) ? '<p class="nota">Horarios en hora del centro de México.</p>' : '');
   });
   bloque('tabla al momento', 'b-vivo-tabla', function () {
     if (!V.tabla.length) return '';
+    if (V.tabla_fija) return '<div class="bloque"><div class="bloque__cab"><h3>Tabla final de la fase regular</h3><p>' + E(V.tabla_nota || 'En liguilla la tabla ya no se mueve: sólo sirve para la siembra y el desempate de cada serie.') + '</p></div>' +
+      '<div class="caja-tabla" tabindex="0" role="region" aria-label="Tabla final de la fase regular"><table><thead><tr><th>#</th><th class="i">Equipo</th><th>PJ</th><th>DG</th><th class="c-x">GF</th><th>Pts</th></tr></thead><tbody>' +
+      V.tabla.map(function (r) {
+        return '<tr class="' + (r.pos === 8 ? 'corte' : '') + '"><td class="pos">' + c(r.pos) + '</td><td class="i eqc">' + eqn(r.equipo, 26) + '</td><td>' + c(r.PJ) + '</td><td>' + (ok(r.DG) ? sig(r.DG, 0) : '—') + '</td><td class="c-x">' + c(r.GF) + '</td><td class="pts">' + c(r.PTS) + '</td></tr>';
+      }).join('') + '</tbody></table></div><p class="nota">La línea blanca es el corte de la liguilla.</p></div>';
     return '<div class="bloque"><div class="bloque__cab"><h3>Tabla al momento</h3><p>' + E(V.tabla_nota || 'Con los marcadores de este momento.') + ' La flecha dice cuántos lugares gana o pierde cada equipo.</p></div>' +
       '<div class="caja-tabla" tabindex="0" role="region" aria-label="Tabla al momento"><table><thead><tr><th>#</th><th class="i"><span class="oculto">Cambio</span></th><th class="i">Equipo</th><th>PJ</th><th>DG</th><th class="c-x">GF</th><th>Pts</th></tr></thead><tbody>' +
       V.tabla.map(function (r) {
@@ -2539,7 +2652,7 @@ function vivoCuadro() { /* el global y la probabilidad de avanzar al momento, so
         '<span class="pierna__x"><span class="chip ' + (lv.estado === 'final' ? 'chip--real">Resultado' : lv.estado === 'descanso' ? 'chip--oro">Descanso' : 'chip--vivo">En juego') + '</span></span>');
     });
   });
-  var ta = $('[data-avanza-t]'); if (ta) { var tt = por[serieSel] ? 'Quién avanza · antes del partido' : 'Quién avanza'; if (ta.textContent !== tt) ta.textContent = tt; }
+  var ta = $('[data-avanza-t]'); if (ta) { var qa = SERIES[serieSel] && SERIES[serieSel].fase === 'final' ? 'Quién es campeón' : 'Quién avanza', tt = por[serieSel] ? qa + ' · antes del partido' : qa; if (ta.textContent !== tt) ta.textContent = tt; }
   $$('[data-ver-llave]').forEach(function (b) {
     var k = b.getAttribute('data-ver-llave'), s = SERIES[k]; if (!s) return;
     var m = miniNodo(s, por[k] || null);
@@ -2671,6 +2784,7 @@ seguro('confeti', null, confeti);
 seguro('próximo partido', 'b-sigue', sigue);
 seguro('próximos partidos', 'b-partidos', partidos);
 seguro('combinada de la jornada', 'b-combinada', combinadaJornada);
+seguro('rótulos según la fase', null, rotulosFase);
 seguro('menú y numeración de secciones', null, numerar);
 seguro('cuadro de la liguilla', 'b-llaves', llaves);
 seguro('cuadro: rondas y detalle', null, cuadroListo);

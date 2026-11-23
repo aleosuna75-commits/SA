@@ -193,7 +193,9 @@ def _partido_pendiente(fila, d: dict, ctx: Contexto, etiqueta: str, detalle: boo
         "pick": {"resultado": PICKS[k], "equipo": (fila["local"], "Empate", fila["visitante"])[k], "prob": float(p[k])},
         "marcador": {"gl": int(top[0][0]), "gv": int(top[0][1]), "prob": float(top[0][2])},
     }
-    if not detalle:
+    if not detalle:          # el estadio tal como lo da el calendario (sin slug: la ficha ligera no consulta el contexto)
+        basico["estadio"] = {"nombre": fila["estadio"] if isinstance(fila["estadio"], str) else None,
+                             "ciudad": fila["ciudad"] if isinstance(fila["ciudad"], str) else None, "slug": None, "altitud_m": None}
         return basico
     por_clave = {m["clave"]: m for m in d["mercados"]}
     mercados = [{kk: por_clave[c][kk] for kk in ("clave", "etiqueta", "familia", "prob", "momio_justo", "p_nula")}
@@ -312,7 +314,126 @@ def _sedes_por_equipo() -> dict:
     return {e: {"slug": est["slug"], "nombre": est["nombre"]} for est in m.get("estadios", []) for e in est.get("equipos", [])}
 
 
-def torneo_liguilla(pron, sim: dict, reglas: dict, clasificados: list[str] | None, df: pd.DataFrame) -> dict:
+def _medios_estadios() -> list[dict]:
+    try:
+        return json.loads((RAIZ_PROYECTO / "web" / "medios.json").read_text(encoding="utf-8")).get("estadios", [])
+    except Exception:
+        return []
+
+
+def _simple(t: str) -> str:
+    """Minúsculas sin acentos ni signos: para comparar nombres de estadio de fuentes distintas."""
+    import unicodedata
+    t = unicodedata.normalize("NFKD", str(t or "")).encode("ascii", "ignore").decode().lower()
+    return " ".join("".join(c if c.isalnum() else " " for c in t).split())
+
+
+def _slug_por_nombre(nombre: str | None, estadios: list[dict]) -> str | None:
+    """Slug de web/medios.json cuyo nombre (o nombre histórico) coincide con `nombre` o es su comienzo."""
+    n = _simple(nombre)
+    if not n:
+        return None
+    for e in estadios:
+        for c in (e.get("nombre"), e.get("nombre_historico"), e.get("apodo")):
+            c = _simple(c)
+            if c and (n == c or n.startswith(c + " ") or c.startswith(n + " ")):
+                return e.get("slug")
+    return None
+
+
+def _necesita(r: int) -> str:
+    """Lo mínimo que necesita un equipo en la vuelta, como margen r de goles (equipo menos rival)."""
+    if r >= 2:
+        return f"necesita ganar por {r} o más"
+    if r == 1:
+        return "necesita ganar"
+    if r == 0:
+        return "le basta el empate"
+    return f"avanza aun si pierde por {-r}"
+
+
+def _frase(equipo: str, r: int, final: bool = False) -> str:
+    if final:
+        if r >= 2:
+            return f"{equipo} necesita ganar por {r} o más para ser campeón en 90 minutos"
+        if r == 1:
+            return f"{equipo} necesita ganar para ser campeón"
+        if r == 0:
+            return f"a {equipo} le basta el empate para ser campeón"
+        return f"{equipo} es campeón aun si pierde por {-r}"
+    return f"a {equipo} le basta el empate" if r == 0 else f"{equipo} {_necesita(r)}"
+
+
+def serie_del_partido(p: dict, lt: dict | None) -> dict | None:
+    """
+    La serie de liguilla de un partido por jugar (por su id o por fase y equipos en liguilla.torneo): llave,
+    pierna, global antes del partido, la ida (en la vuelta), la probabilidad exacta de avanzar y qué necesita
+    cada uno, ya redactado. None si el partido no es de liguilla o la serie no está en liguilla.torneo.
+    """
+    if not lt or p.get("fase") not in simulador.FASES_LIGUILLA:
+        return None
+    s, yo = None, None
+    for r in lt.get("rondas") or []:
+        for x in r.get("series") or []:
+            for l in x.get("piernas") or []:
+                if l.get("id") is not None and int(l["id"]) == int(p["id"]):
+                    s, yo = x, l
+    if s is None:
+        for r in lt.get("rondas") or []:
+            for x in r.get("series") or []:
+                if x.get("fase") == p["fase"] and {x["mejor"]["equipo"], x["peor"]["equipo"]} == {p["local"], p["visitante"]}:
+                    s = x
+                    yo = next((l for l in x.get("piernas") or [] if l["local"] == p["local"]), None)
+    if s is None:
+        return None
+    mj, pr = s["mejor"]["equipo"], s["peor"]["equipo"]
+    pierna = int(p.get("pierna") or (yo or {}).get("pierna") or (2 if p["local"] == mj else 1))
+    final = s["fase"] == "final"
+    gm = gp = 0
+    ida = None
+    for l in s.get("piernas") or []:
+        if l is yo or not l.get("jugado") or l.get("gl") is None:
+            continue
+        gm += l["gl"] if l["local"] == mj else l["gv"]
+        gp += l["gv"] if l["local"] == mj else l["gl"]
+        if l.get("pierna") == 1:
+            ida = {"local": l["local"], "visitante": l["visitante"], "gl": int(l["gl"]), "gv": int(l["gv"])}
+    nec = {"mejor": None, "peor": None}
+    casa = next((l["local"] for l in s.get("piernas") or [] if l.get("pierna") == 2), mj)
+    empate = "hay tiempos extra y penales" if final else f"avanza {mj}, mejor sembrado"
+    ronda = {"cuartos": "los cuartos", "semifinal": "la semifinal", "final": "la final"}.get(s["fase"], "la serie")
+    if pierna == 1:
+        texto = f"Ida de {ronda} ({s['llave']}): la vuelta es en casa de {casa}. Si el global queda empatado, {empate}."
+    elif ida is None:          # la ida todavía no se juega (o no está en los datos): lo que necesita cada uno depende de ella
+        texto = (f"Vuelta de {ronda} ({s['llave']}), en casa de {casa}: lo que necesita cada uno depende de la ida, que "
+                 f"todavía no tiene resultado. Si el global queda empatado, {empate}.")
+    else:
+        d = gm - gp
+        ida_txt = f"ida: {ida['local']} {ida['gl']}-{ida['gv']} {ida['visitante']}"
+        if final:
+            nec = {"mejor": _frase(mj, 1 - d, True), "peor": _frase(pr, 1 + d, True)}
+            if d == 0:
+                texto = (f"Global empatado {gm}-{gp} ({ida_txt}): quien gane la vuelta es campeón; con empate hay "
+                         "tiempos extra y penales.")
+            else:
+                lid, sig, k = (mj, pr, d) if d > 0 else (pr, mj, -d)
+                texto = (f"Global {max(gm, gp)}-{min(gm, gp)} a favor de {lid} ({ida_txt}). "
+                         f"{_frase(lid, 1 - k, True)[0].upper()}{_frase(lid, 1 - k, True)[1:]}; "
+                         f"{_frase(sig, 1 + k, True)} (ganando por {k} hay tiempos extra y penales).")
+        else:
+            nec = {"mejor": _frase(mj, -d), "peor": _frase(pr, d + 1)}
+            cab = (f"Global empatado {gm}-{gp}" if d == 0 else
+                   f"Global {max(gm, gp)}-{min(gm, gp)} a favor de {mj if d > 0 else pr}")
+            texto = f"{cab} ({ida_txt}). {nec['mejor'][0].upper()}{nec['mejor'][1:]}; {nec['peor']}."
+    return {"llave": s["llave"], "fase": s["fase"], "pierna": pierna,
+            "mejor": mj, "peor": pr, "siembra_mejor": s["mejor"]["siembra"], "siembra_peor": s["peor"]["siembra"],
+            "global_antes": {"mejor": gm, "peor": gp}, "ida": ida,
+            "p_avanza_mejor": s["p_avanza_mejor"], "p_avanza_peor": s["p_avanza_peor"],
+            "regla_empate": s.get("regla_empate"), "necesita": nec, "texto": texto}
+
+
+def torneo_liguilla(pron, sim: dict, reglas: dict, clasificados: list[str] | None, df: pd.DataFrame,
+                    ctx: Contexto | None = None) -> dict:
     """
     La liguilla con estructura de torneo: siembra, y por ronda (cuartos, semifinal, final) cada serie con el
     pronóstico de su IDA y su VUELTA (goles esperados, 1X2, marcador más probable y los 5 primeros), el marcador
@@ -322,6 +443,9 @@ def torneo_liguilla(pron, sim: dict, reglas: dict, clasificados: list[str] | Non
     Cada serie dice si es `definida` (sus dos equipos ya se conocen con certeza, estén o no sus partidos en el
     calendario): los cuartos, en cuanto la fase regular termina; una semifinal, cuando los cuatro cuartos están
     decididos (por la resiembra el rival depende de todos); la final, cuando lo están las dos semifinales.
+    El estadio de cada pierna es el del calendario (la misma regla que «pendientes», con `ctx`); sin calendario,
+    el que da config/torneo.json → liguilla.sedes_<fase> (prensa) y, si no, la sede habitual del local.
+    Las fechas de cada ronda salen de sus piernas calendarizadas; config/torneo.json sólo cubre lo que falta.
     """
     eq = list(pron.equipos); ix = {e: i for i, e in enumerate(eq)}
     pe = {d["equipo"]: d for d in sim["por_equipo"]}
@@ -334,34 +458,66 @@ def torneo_liguilla(pron, sim: dict, reglas: dict, clasificados: list[str] | Non
     pos = {e: i + 1 for i, e in enumerate(siembra)}
     m = pron.malla(1, fase="liguilla")
     LL, LV, rho = np.asarray(m["lam_l"])[0], np.asarray(m["lam_v"])[0], float(m.get("rho", 0.0))
-    sedes = _sedes_por_equipo()
+    sedes, estadios = _sedes_por_equipo(), _medios_estadios()
     reales = {(r["fase"], frozenset((r["mejor"], r["peor"]))): r for r in sim.get("series_reales", [])}
     fechas = (reglas.get("liguilla") or {}).get("fechas") or {}
-    if (sim.get("meta") or {}).get("torneo") not in (None, reglas.get("torneo")):
+    mismo_torneo = (sim.get("meta") or {}).get("torneo") in (None, reglas.get("torneo"))
+    if not mismo_torneo:
         fechas = {}     # corte retrospectivo de otro torneo: las ventanas de config/torneo.json no son las suyas
+
+    def sede_prensa(fase: str, local: str, visitante: str) -> dict | None:
+        """Sede de una pierna sin calendario según config/torneo.json → liguilla.sedes_<fase> (sólo de este torneo)."""
+        if not mismo_torneo:
+            return None
+        for x in (reglas.get("liguilla") or {}).get(f"sedes_{fase}") or []:
+            if x.get("local") == local and x.get("visitante") == visitante and x.get("estadio"):
+                return {"slug": _slug_por_nombre(x["estadio"], estadios) or (sedes.get(local) or {}).get("slug"),
+                        "nombre": x["estadio"], "origen": "prensa"}
+        return None
+
+    def sede_calendario(f, local: str) -> dict | None:
+        """La sede de una pierna que ya está en partidos.csv, con la misma regla que «pendientes»."""
+        if ctx is not None:
+            try:
+                sd, imputada = ctx.sede_de({"id": int(f.name), "estadio_id": f.get("estadio_id"), "local": local,
+                                            "fecha_utc": f.get("fecha_utc")})
+                info = ctx.info_sede(sd) or {}
+            except Exception:
+                info, imputada = {}, True
+            nombre = info.get("nombre") or (f.get("estadio") if isinstance(f.get("estadio"), str) else None)
+            if nombre:
+                return {"slug": info.get("slug_medios"), "nombre": nombre, "origen": "habitual" if imputada else "calendario"}
+        if isinstance(f.get("estadio"), str):
+            return {"slug": _slug_por_nombre(f["estadio"], estadios), "nombre": f["estadio"], "origen": "calendario"}
+        return None
     filas = df.set_index("id") if "id" in df.columns else df
     alternativas = {c["llave"]: c["opciones"] for c in sim.get("cruces_cuartos", [])}
     posibles = sim.get("series_posibles", {})
 
-    def piernas(det: dict) -> list[dict]:
+    def piernas(det: dict, fase: str) -> list[dict]:
         out = []
         for p in det["piernas"]:
+            habitual = sedes.get(p["local"])
             d = {"pierna": p["pierna"], "nombre": "Ida" if p["pierna"] == 1 else "Vuelta", "id": p.get("id"),
                  "fecha_utc": p.get("fecha_utc"), "fecha_local": None, "hora_local": None,
-                 "local": p["local"], "visitante": p["visitante"], "estadio": sedes.get(p["local"]),
+                 "local": p["local"], "visitante": p["visitante"],
+                 "estadio": sede_prensa(fase, p["local"], p["visitante"]) or (dict(habitual, origen="habitual") if habitual else None),
                  "jugado": bool(p["jugado"])}
             if p.get("id") is not None and p["id"] in filas.index:
                 f = filas.loc[p["id"]]
                 fl = f.get("fecha_local")         # 'AAAA-MM-DD', como en «pendientes» (la columna puede venir como fecha con hora 00:00)
                 d["fecha_local"] = pd.Timestamp(fl).strftime("%Y-%m-%d") if pd.notna(fl) else None
                 d["hora_local"] = str(f.get("hora_local")) if pd.notna(f.get("hora_local")) else None
+                d["estadio"] = sede_calendario(f, p["local"]) or d["estadio"]
             if p["jugado"]:
                 d.update({"gl": p["gl"], "gv": p["gv"]})
             else:
                 mm = p.get("marcadores") or []
-                d.update({"gl": None, "gv": None, "lam_l": p["lam_l"], "lam_v": p["lam_v"], "p_local": p["p_local"],
-                          "p_empate": p["p_empate"], "p_visitante": p["p_visitante"],
+                d.update({"gl": None, "gv": None, "lam_l": p["lam_l"], "lam_v": p["lam_v"], "rho": p.get("rho", rho),
+                          "p_local": p["p_local"], "p_empate": p["p_empate"], "p_visitante": p["p_visitante"],
                           "marcador": mm[0] if mm else None, "marcadores": mm})
+                if p.get("en_juego"):
+                    d["en_juego"] = True
             out.append(d)
         return out
 
@@ -381,7 +537,7 @@ def torneo_liguilla(pron, sim: dict, reglas: dict, clasificados: list[str] | Non
                    for o in posibles.get(fase, [])[:4]]
         return {"llave": llave, "fase": fase, "real": bool(real), "definida": bool(real or definida), "viene_de": viene_de,
                 "mejor": {"equipo": mejor, "siembra": pos[mejor]}, "peor": {"equipo": peor, "siembra": pos[peor]},
-                "piernas": piernas(det),
+                "piernas": piernas(det, fase),
                 "global": {"probable": glob[0] if glob else None, "top": glob, "p_gana_mejor": det.get("p_global_mejor"),
                            "p_empate": det.get("p_global_empate"), "p_gana_peor": det.get("p_global_peor")},
                 "p_avanza_mejor": pm, "p_avanza_peor": float(det["p_avanza_peor"]), "favorito": fav,
@@ -400,23 +556,38 @@ def torneo_liguilla(pron, sim: dict, reglas: dict, clasificados: list[str] | Non
     final = serie("F", semis[0]["favorito"], semis[1]["favorito"], "final", ["S1", "S2"],
                   definida=all(s_["decidida"] for s_ in semis))
     todas = cuartos + semis + [final]
+    # «en curso» sólo cuando ya se jugó (o se juega) alguna pierna: que ESPN publique los cuartos no basta
+    jugada = any(l.get("jugado") or l.get("en_juego") for s_ in todas for l in s_["piernas"])
     if all(s_["decidida"] for s_ in todas):
         estado = "terminado"
-    elif sim.get("series_reales"):
+    elif jugada:
         estado = "en_curso"
     else:
         estado = "definido" if clasificados else "proyectado"
     camp = final["favorito"]
+
+    def fechas_ronda(series: list[dict], clave: str) -> dict:
+        """Fechas de ida y vuelta de una ronda: las de sus piernas calendarizadas; lo que falte, de la configuración."""
+        out = {}
+        for n, nombre in ((1, "ida"), (2, "vuelta")):
+            ls = [l for s_ in series for l in s_["piernas"] if l["pierna"] == n]
+            con = sorted({l["fecha_local"] for l in ls if l.get("fecha_local")})
+            cfg = list(fechas.get(f"{clave}_{nombre}") or [])
+            out[nombre] = con if con and all(l.get("fecha_local") for l in ls) else (sorted(set(con) | set(cfg)) or None)
+        return out
     return {"estado": estado, "origen_siembra": origen,
             "siembra": [{"pos": i + 1, "equipo": e, "p_clasifica": pe[e]["p_clasifica"], "p_semifinal": pe[e]["p_semifinal"],
                          "p_final": pe[e]["p_final"], "p_campeon": pe[e]["p_campeon"]} for i, e in enumerate(siembra)],
-            "rondas": [{"fase": "cuartos", "nombre": "Cuartos de final", "fechas": {"ida": fechas.get("cuartos_ida"), "vuelta": fechas.get("cuartos_vuelta")}, "series": cuartos},
-                       {"fase": "semifinal", "nombre": "Semifinales", "fechas": {"ida": fechas.get("semis_ida"), "vuelta": fechas.get("semis_vuelta")}, "series": semis},
-                       {"fase": "final", "nombre": "Final", "fechas": {"ida": fechas.get("final_ida"), "vuelta": fechas.get("final_vuelta")}, "series": [final]}],
+            "rondas": [{"fase": "cuartos", "nombre": "Cuartos de final", "fechas": fechas_ronda(cuartos, "cuartos"), "series": cuartos},
+                       {"fase": "semifinal", "nombre": "Semifinales", "fechas": fechas_ronda(semis, "semis"), "series": semis},
+                       {"fase": "final", "nombre": "Final", "fechas": fechas_ronda([final], "final"), "series": [final]}],
             "campeon_ruta": camp, "campeon_decidido": bool(final["decidida"]), "p_campeon_ruta": pe[camp]["p_campeon"],
-            "nota": "Ruta de los favoritos, serie por serie y con resiembra en semifinales. El porcentaje de cada serie es la "
-                    "probabilidad de avanzar en esa serie; la probabilidad de campeón de cada equipo (simulación completa) "
-                    "considera todos los caminos posibles."}
+            "subcampeon": (final["peor"]["equipo"] if final["ganador"] == final["mejor"]["equipo"] else final["mejor"]["equipo"])
+                          if final["decidida"] else None,
+            "nota": (f"Liguilla terminada: {camp} es campeón." if final["decidida"] else
+                     "Ruta de los favoritos, serie por serie y con resiembra en semifinales. El porcentaje de cada serie es la "
+                     "probabilidad de avanzar en esa serie; la probabilidad de campeón de cada equipo (simulación completa) "
+                     "considera todos los caminos posibles.")}
 
 
 def cuadro_proyectado(pron, sim: dict, liguilla_series: list[dict], clasificados: list[str] | None) -> dict:
@@ -519,15 +690,26 @@ def _avisos(meta_modelo: dict, des: dict, reglas: dict, sim: dict, pendientes: l
         "Simulación: " + f"{sim['meta']['n_sim']:,} torneos simulados repartidos en {sim['meta']['n_muestras']:,} muestras de los "
         "parámetros; cada probabilidad trae su error de Monte Carlo (ee_*). La incertidumbre del propio modelo "
         "(que la forma de los equipos cambie) no está en ese error.",
-        "Desempates de la tabla: los goles de visitante se cuentan sobre las primeras 8 visitas de cada equipo (aproximación "
-        "de la regla del mismo número de visitas); el Fair Play sale de tarjetas.csv (sin sanciones de escritorio ni cuerpo "
-        "técnico) y los partidos simulados no suman tarjetas; el sorteo es al azar.",
-        "No se simula la resta de 3 puntos por la regla de menores (art. 49): a los 7 clubes que les faltan minutos les "
-        "alcanza con un partido, según config/torneo.json.",
-        "Liguilla: tiempos extra de la final con un tercio de los goles esperados de 90 minutos y penales a 50/50. "
-        "La localía se toma de la sede habitual de cada club (la sede de Cruz Azul en liguilla no está confirmada). "
-        "Si Toluca avanza en la Copa Intercontinental la final se recorre al 24 y 27 de diciembre.",
     ]
+    regular_completa = bool(sim["meta"].get("regular_completa"))
+    aj = reglas.get("ajustes_tabla") or {}
+    if not regular_completa:                 # en liguilla la tabla ya no se mueve: estos dos avisos sobran
+        a.append("Desempates de la tabla: los goles de visitante se cuentan sobre las primeras 8 visitas de cada equipo "
+                 "(aproximación de la regla del mismo número de visitas); el Fair Play sale de las tarjetas registradas (sin "
+                 "sanciones de escritorio ni cuerpo técnico) y los partidos simulados no suman tarjetas; el sorteo es al azar.")
+        faltan = [k for k in aj if k.startswith("minutos_por_cumplir")]
+        n_faltan = len(aj[faltan[-1]]) if faltan and isinstance(aj[faltan[-1]], dict) else None
+        a.append("No se simula la resta de 3 puntos por la regla de menores (art. 49)" + (
+            f": a los {n_faltan} clubes que les faltan minutos les alcanza con un partido." if n_faltan else "."))
+    elif (aj.get("verificado") or {}).get("resultado") and sim["meta"].get("torneo") == reglas.get("torneo"):
+        v = aj["verificado"]
+        r0 = v["resultado"].split(". ")[0].rstrip(".")
+        a.append(f"Regla de menores (art. 49), verificada el {v.get('fecha')}: {r0[:1].lower()}{r0[1:]}.")
+    a.append("Liguilla: tiempos extra de la final con un tercio de los goles esperados de 90 minutos y penales a 50/50; los "
+             "mercados y combinadas de un partido de liguilla cuentan sólo los 90 minutos. La localía de cada pierna es la del "
+             "calendario de ESPN; mientras la liga no lo publica, la que da la prensa y, si no hay, la sede habitual del local.")
+    if sim["meta"].get("torneo") == reglas.get("torneo") and (reglas.get("liguilla") or {}).get("fechas", {}).get("final_ida_opcion2"):
+        a.append("Si Toluca avanza en la Copa Intercontinental la final se recorre al 24 y 27 de diciembre.")
     if cal:
         a.append(f"El cálculo de series, contrastado con {cal['n_series']} series de liguilla de 2016 a 2025, le gana con claridad al "
                  f"50/50 (Brier {cal['brier']['simulador']:.4f} contra 0.2500) pero NO de forma concluyente a la frecuencia histórica "
@@ -614,16 +796,17 @@ def construir(corte=None, n_sim: int = simulador.N_SIM, sellar: bool | None = No
     pendientes = [_partido_pendiente(fila, por_id[int(fila["id"])], ctx, etiqueta_partido(fila, jornadas), n < MAX_DETALLE)
                   for n, (_, fila) in enumerate(pend.iterrows())]
 
-    # combinada de jornada: un pick por partido del grupo más numeroso de los próximos partidos
+    # combinada de jornada: un pick por partido de la ronda más próxima (la etiqueta del primer pendiente; si esa
+    # ronda tiene un solo partido, la siguiente en orden de fecha). Antes era el grupo más numeroso, que saltaba a la
+    # ronda siguiente con una a medio jugar (las vueltas con dos idas por jugar) o a una jornada lejana.
     comb_jornada = None
-    if pendientes:
-        cuenta = pd.Series([p["etiqueta"] for p in pendientes]).value_counts()
-        etq = cuenta.index[0]
+    for etq in dict.fromkeys(p["etiqueta"] for p in pendientes):
         grupo = [{"id": p["id"], "local": p["local"], "visitante": p["visitante"], "lam_l": p["lam_l"], "lam_v": p["lam_v"],
                   "rho": p["rho"], "p1_l": paquete["p1_l"], "p1_v": paquete["p1_v"]} for p in pendientes if p["etiqueta"] == etq]
         if len(grupo) >= 2:
             cj = cb.combinada_jornada(grupo)
             comb_jornada = {"etiqueta": etq, "n_partidos": len(grupo), **cj}
+            break
 
     # ---- sellos y desempeño ----
     if sellar is None:
@@ -648,7 +831,8 @@ def construir(corte=None, n_sim: int = simulador.N_SIM, sellar: bool | None = No
     # ---- tabla con forma ----
     tabla = []
     for f in sim["tabla_actual"]:
-        forma = ctx.forma(f["equipo"], 5)
+        # con la fase regular terminada la tabla es la final de esa fase: su forma no mezcla partidos de liguilla
+        forma = ctx.forma(f["equipo"], 5, fase="regular" if sim["meta"]["regular_completa"] else None)
         tabla.append({**f, "zona": "liguilla" if f["pos"] <= sim["meta"]["clasifican"] else "fuera",
                       "forma": [x["resultado"] for x in forma], "forma_detalle": forma})
 
@@ -673,17 +857,23 @@ def construir(corte=None, n_sim: int = simulador.N_SIM, sellar: bool | None = No
                 "formato": {"cruces_cuartos": lig.get("cruces_cuartos"), "resiembra_semifinal": lig.get("resiembra_semifinal"),
                             "empate_global_cuartos_semis": lig.get("empate_global_cuartos_semis"),
                             "final_empate": lig.get("final_empate"), "cierra_en_casa": lig.get("cierra_en_casa"),
-                            "fechas": lig.get("fechas")}}
+                            "fechas": lig.get("fechas") if torneo == reglas.get("torneo") else None}}
     try:
         proyeccion["titulos"] = titulos(ctx, df)
     except Exception as e:
         print(f"aviso: titulos falló: {e}", file=sys.stderr)
         proyeccion["titulos"] = {}
     try:
-        liguilla["torneo"] = torneo_liguilla(pron, sim, reglas, clasificados, df)
+        liguilla["torneo"] = torneo_liguilla(pron, sim, reglas, clasificados, df, ctx)
     except Exception as e:
         print(f"aviso: torneo_liguilla falló: {type(e).__name__}: {e}", file=sys.stderr)
         liguilla["torneo"] = None
+    for p in pendientes:                                         # de qué serie es, cómo va el global y qué necesita cada uno
+        try:
+            p["serie"] = serie_del_partido(p, liguilla["torneo"])
+        except Exception as e:
+            print(f"aviso: serie de {p.get('id')} falló: {type(e).__name__}: {e}", file=sys.stderr)
+            p["serie"] = None
     try:
         liguilla["cuadro_proyectado"] = cuadro_proyectado(pron, sim, sim["series_reales"], clasificados)
     except Exception as e:                                       # no tumba la exportación

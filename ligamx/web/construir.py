@@ -9,9 +9,10 @@
     python3 web/construir.py --datos OTRO.json --solo-documento web/_variante_x.html
                                                   # de prueba: sólo ese documento completo (para otro estado del torneo)
 
-Las tres opciones de prueba NO tocan index.html ni archivos_publicados.json: sólo escriben el documento completo
-(web/documento.html, el sitio de --salida o la ruta de --solo-documento), para que un ensayo nunca llegue a
-publicarse por descuido.
+Las opciones de prueba NO tocan index.html, archivos_publicados.json ni capacidades.json: sólo escriben el
+documento completo (web/documento.html, el sitio de --salida o la ruta de --solo-documento), para que un ensayo
+nunca llegue a publicarse por descuido. Cuenta como de prueba cualquier corrida con --datos distinto de
+salidas/actual.json (por ejemplo, un corte retrospectivo con --documento --salida DIR).
 
 Lee salidas/actual.json (contrato en salidas/CONTRATO.md) y web/medios.json, los incrusta en
 plantilla.html dentro de <script type="application/json"> y escribe el resultado. Las imágenes y los
@@ -133,7 +134,11 @@ def validar(d):
             faltan.append("pendientes (debe ser una lista)")
         else:
             for i, p in enumerate(d["pendientes"]):
+                # la ficha ligera (detalle = false, más allá de los primeros 20) puede no traer el estadio
+                ligero = isinstance(p, dict) and p.get("detalle") is False
                 for ruta in OBLIGATORIOS_PARTIDO:
+                    if ligero and ruta == "estadio.nombre":
+                        continue
                     try:
                         if _buscar(p, ruta) is None:
                             raise KeyError(ruta)
@@ -212,6 +217,8 @@ def recortar_medios(medios, datos, forzar_portada=None):
 
     slugs = {e["slug"] for e in estadios}
     for p in datos["pendientes"]:
+        if p.get("detalle") is False:          # la ficha ligera no muestra foto: no hace falta avisar
+            continue
         slug = (p.get("estadio") or {}).get("slug")
         if slug not in slugs:
             avisos.append(f"{p['local']} vs {p['visitante']}: la sede «{slug}» no tiene fotos en medios.json.")
@@ -375,12 +382,16 @@ def main(argv=None):
             print(f"aviso: {a}", file=sys.stderr)
         print(f"listo en {time.time() - t0:.2f} s")
         return 0
-    de_prueba = args.vivo is not None or bool(args.portada)
+    # con otros datos (un corte retrospectivo, una variante) la corrida también es de prueba: si reescribiera
+    # index.html y archivos_publicados.json, la siguiente republicación publicaría esos datos
+    datos_ajenos = args.datos.resolve() != DATOS.resolve()
+    de_prueba = args.vivo is not None or bool(args.portada) or datos_ajenos
     if de_prueba:
         args.documento = True
         if args.salida is None:
             args.salida = AQUI
-        print("opción de prueba (--vivo o --portada): no se toca index.html; sólo se escribe el documento")
+        print("opción de prueba (--vivo, --portada o --datos distinto de salidas/actual.json): no se toca index.html, "
+              "archivos_publicados.json ni capacidades.json; sólo se escribe el documento")
     else:
         escribir(AQUI / "index.html", fragmento)
         escribir(AQUI / "archivos_publicados.json", json.dumps(publicados, ensure_ascii=False, indent=1) + "\n")

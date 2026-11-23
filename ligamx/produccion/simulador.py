@@ -746,6 +746,7 @@ def detalle_serie(s: dict, eq: list[str], pos: dict[str, int], LL0: np.ndarray, 
                           "lam_rest_l": float(v.get("lam_rest_l") or 0.0), "lam_rest_v": float(v.get("lam_rest_v") or 0.0)})
             else:
                 Ms[num] = arnes.matriz_marcadores(ll, lv, p.get("rho", rho))
+                d["rho"] = float(p.get("rho", rho))          # la rho con la que se armó esta matriz (la usa vivo)
             pr = arnes.p1x2(Ms[num])
             pr = np.asarray(pr, float).ravel()
             d.update({"lam_l": float(ll), "lam_v": float(lv), "p_local": float(pr[0]), "p_empate": float(pr[1]),

@@ -129,6 +129,18 @@ class Contexto:
             return None
         return s or None
 
+    def sede_de(self, fila) -> tuple[str | None, bool]:
+        """
+        (sede, imputada) de un partido: la del calendario (estadio_id con las correcciones conocidas de ESPN)
+        o, si no se sabe, la habitual del local (imputada = True). La usan partido() y la liguilla de exportar.
+        """
+        g = fila.get if isinstance(fila, dict) else (lambda k, d=None: getattr(fila, k, d))
+        loc = g("local")
+        sede = self._sede_de_id(g("id"), g("estadio_id"), loc, _a_utc(g("fecha_utc")))
+        if sede is None:
+            return self.sede_habitual(loc), True
+        return sede, False
+
     def sede_habitual(self, equipo: str) -> str | None:
         """La sede más frecuente en sus últimos 6 partidos de local del último año (empate: la más reciente)."""
         t = self.largo[(self.largo["equipo"] == equipo) & (self.largo["cond"] == "L") & self.largo["sede"].notna()
@@ -188,9 +200,12 @@ class Contexto:
         self._tablas[torneo] = r
         return r.copy()
 
-    def forma(self, equipo: str, n: int = 5) -> list[dict]:
-        """Últimos n partidos (del más reciente al más antiguo): resultado G/E/P, rival, condición y marcador."""
-        t = self.largo[self.largo["equipo"] == equipo].tail(n).iloc[::-1]
+    def forma(self, equipo: str, n: int = 5, fase: str | None = None) -> list[dict]:
+        """
+        Últimos n partidos (del más reciente al más antiguo): resultado G/E/P, rival, condición y marcador.
+        `fase` ("regular"): sólo partidos de esa fase (la tabla final de la fase regular no mezcla la liguilla).
+        """
+        t = self.largo[(self.largo["equipo"] == equipo) & ((self.largo["fase"] == fase) if fase else True)].tail(n).iloc[::-1]
         return [{"fecha": _dia(r.fecha_utc), "torneo": r.torneo, "fase": r.fase, "rival": r.rival,
                  "condicion": "local" if r.cond == "L" else "visita",
                  "resultado": "G" if r.gf > r.gc else ("E" if r.gf == r.gc else "P"),
@@ -404,13 +419,15 @@ class Contexto:
             self._tar = t
         return self._tar
 
-    def suspendidos(self, equipo: str, fecha_partido=None) -> dict:
+    def suspendidos(self, equipo: str, fecha_partido=None, fase: str | None = None) -> dict:
         """
         Suspendidos deducidos de las tarjetas del ÚLTIMO partido jugado del equipo: expulsados (roja
         directa o doble amarilla) y quienes llegaron ahí a un múltiplo de 5 amarillas en el torneo (la
         cuenta de liguilla es aparte). `apercibidos`: a una amarilla de la suspensión. Si el equipo tiene
         otro partido agendado antes de `fecha_partido`, la sanción se cumple ahí y lo de este partido aún
-        no se puede saber: conocido = False.
+        no se puede saber: conocido = False. `fase`: la del partido para el que se pregunta; si es de
+        liguilla y el último partido fue de fase regular, las amarillas de la fase regular ya se cancelaron
+        (Reglamento de Sanciones, art. 15): nadie llega apercibido, pero las suspensiones ganadas se cumplen.
         """
         f = _a_utc(fecha_partido) if fecha_partido is not None else None
         out = {"equipo": equipo, "conocido": True, "suspendidos": [], "apercibidos": [], "nota": None}
@@ -419,6 +436,7 @@ class Contexto:
             return out
         ult = mios.iloc[-1]
         out["ultimo_partido"] = f"{_dia(ult.fecha_utc)} vs {ult.rival}"
+        cancela = fase in LIGUILLA and ult.fase == "regular"
         if f is not None:
             a = self.agenda[((self.agenda["local"] == equipo) | (self.agenda["visitante"] == equipo)) &
                             (self.agenda["fecha_utc"] < f)]
@@ -453,8 +471,10 @@ class Contexto:
                     continue
                 if n % 5 == 0 and quien in hoy and quien not in dobles:
                     out["suspendidos"].append({"jugador": nombres[quien], "motivo": f"llegó a {n} amarillas en el torneo"})
-                elif n % 5 == 4:
+                elif n % 5 == 4 and not cancela:
                     out["apercibidos"].append({"jugador": nombres[quien], "amarillas": int(n)})
+        if cancela and out["nota"] is None:
+            out["nota"] = "las amarillas de la fase regular se cancelan al empezar la liguilla (Reglamento de Sanciones, art. 15)"
         return out
 
     @staticmethod
@@ -488,11 +508,9 @@ class Contexto:
         """
         g = fila.get if isinstance(fila, dict) else (lambda k, d=None: getattr(fila, k, d))
         loc, vis, f = g("local"), g("visitante"), _a_utc(g("fecha_utc"))
-        sede = self._sede_de_id(g("id"), g("estadio_id"), loc, f)
-        imputada = sede is None
-        if imputada:
-            sede = self.sede_habitual(loc)
+        sede, imputada = self.sede_de(fila)
         info = self.info_sede(sede)
+        fase = g("fase")
         return {
             "id": None if g("id") is None else int(g("id")), "fecha": _dia(f), "torneo": g("torneo", self.torneo),
             "fase": g("fase"), "local": loc, "visitante": vis, "a_la_fecha": self.fecha.isoformat(),
@@ -502,6 +520,6 @@ class Contexto:
                      "balance_local_3_anios": self.balance_local_en_sede(loc, sede, 3.0)},
             "descanso_local": self.descanso(loc, f), "descanso_visitante": self.descanso(vis, f),
             "viaje_visitante_km": self.viaje_km(vis, sede),
-            "suspendidos_local": self.suspendidos(loc, f), "suspendidos_visitante": self.suspendidos(vis, f),
+            "suspendidos_local": self.suspendidos(loc, f, fase), "suspendidos_visitante": self.suspendidos(vis, f, fase),
             "lesionados_local": self.lesionados(loc), "lesionados_visitante": self.lesionados(vis),
         }
