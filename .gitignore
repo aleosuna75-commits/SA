@@ -14,3 +14,6 @@ world.tar.gz
 
 # Credenciales locales de SIREC (nunca al repositorio)
 sirec_config.py
+
+# Copias de trabajo temporales de los agentes (worktrees)
+.claude/worktrees/
