@@ -7,14 +7,17 @@
 
    Arma TRES documentos y los abre con file:// desde web/ en iPhone 13 y en escritorio 1440x900:
    - el de HOY (construir.py --documento --salida web/ → documento.html, con salidas/actual.json): se revisa lo que
-     toque según SU estado (partidos pendientes o no, cuadro proyectado / definido / en curso / terminado, fase
-     regular terminada o no). Las expectativas salen de los datos incrustados, nunca de la fecha;
+     toque según SU estado (partidos pendientes o no, piernas de liguilla sin día ni hora, cuadro proyectado / definido
+     / en curso / terminado, fase regular terminada o no, combinada o no). Las expectativas salen de los datos
+     incrustados, nunca de la fecha;
    - uno FIJO con partidos pendientes (pruebas/datos/actual_20261120T0722Z.json: 9 pendientes, cuadro proyectado),
-     con el reloj del navegador fijo en el 20-nov: ahí corren SIEMPRE las revisiones de tarjetas de partido, pestañas
-     de combinada, cuenta regresiva, cuadro, en vivo y variantes;
-   - uno FIJO sin partidos pendientes y con el cuadro definido (pruebas/datos/actual_20261123_definido.json): anuncio
-     de la liguilla bajo la portada, tarjetas de las piernas de cuartos, series «Definida», sin secciones vacías; y
-     sus variantes (datos viejos sin el campo «definida», semifinales definidas, liguilla terminada).
+     con el reloj del navegador en el 20-nov (AHORA_FIJO): ahí corren SIEMPRE las revisiones de tarjetas de partido,
+     pestañas de combinada, cuenta regresiva, cuadro, en vivo y sus variantes;
+   - uno FIJO sin partidos pendientes y con el cuadro definido (pruebas/datos/actual_20261123T0353Z.json, la noche
+     del 22-nov: fase regular terminada, cuartos sin día ni hora), con el reloj en AHORA_DEFINIDO: anuncio de la
+     liguilla bajo la portada, las 8 piernas de cuartos como tarjetas compactas, series «Definida», sin secciones
+     vacías; y sus variantes (datos viejos sin el campo «definida», idas ya en el calendario, semifinales definidas,
+     liguilla terminada).
    Los dos fijos se arman con «construir.py --datos … --solo-documento», que no toca index.html. Revisa:
    - archivo: fragmento válido, tokens de color, sin scripts externos, capacidad "db" declarada y usada;
    - portada: foto del favorito con movimiento lento, trofeo con su escudo, confeti, nada encimado; en celular
@@ -47,8 +50,12 @@ const SUF = '_' + process.pid;                                     /* dos corrid
 const DOC_REAL = path.join(WEB, 'documento.html');                 /* los datos de hoy (salidas/actual.json) */
 const DOC_FIJO = path.join(WEB, '_variante' + SUF + '_pendientes.html');  /* copia fija: 9 partidos pendientes, cuadro proyectado */
 const DOC_DEFINIDO = path.join(WEB, '_variante' + SUF + '_definido.html'); /* copia fija: 0 pendientes, cuadro definido */
+const DATOS_FIJO = path.join(DATOS, 'actual_20261120T0722Z.json'), DATOS_DEFINIDO = path.join(DATOS, 'actual_20261123T0353Z.json');
 const URL_REAL = 'file://' + DOC_REAL, URL_DOC = 'file://' + DOC_FIJO, URL_DEFINIDO = 'file://' + DOC_DEFINIDO;
-const AHORA_FIJO = '2026-11-20T08:00:00Z';                        /* 37 min después del corte de los datos fijos: sus 9 partidos siguen por jugar */
+const AHORA_FIJO = '2026-11-20T08:00:00Z';                        /* 38 min después del corte de los datos fijos: sus 9 partidos siguen por jugar */
+const AHORA_DEFINIDO = '2026-11-23T04:00:00Z';                    /* 22:00 h del 22-nov en el centro de México: 7 min después del corte; su «vivo» (21:18 h) sigue vigente */
+const MES3 = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+const MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
 const EJEMPLO = JSON.parse(fs.readFileSync(path.join(WEB, '..', 'salidas', 'vivo_ejemplo.json'), 'utf8'));
 const AHORA_EJEMPLO = '2026-11-21T23:41:30Z'; /* 10 s después de «generado_utc» del ejemplo */
 const temporales = [];
@@ -215,12 +222,224 @@ function abrir(ctx, errores) {
   });
 }
 
+/* ---------- lo que la página debe mostrar según el estado de SUS datos (expectativas tomadas de los datos, nunca de la fecha) ---------- */
+const COMO_PRONOSTICO = ['lam_l', 'lam_v', 'p_local', 'p_empate', 'p_visitante', 'marcador', 'marcadores'];
+function torneoDe(d) { const t = d.liguilla && d.liguilla.torneo; return t && Array.isArray(t.rondas) && t.rondas.length ? t : null; }
+/* una serie ya tiene sus dos equipos seguros: el campo «definida»; con datos viejos sin el campo, serie en el calendario o cuartos con la fase regular terminada */
+function definidaEsperada(s, t) { return typeof s.definida === 'boolean' ? s.definida : !!s.real || (s.fase === 'cuartos' && ['definido', 'en_curso', 'terminado'].includes(t.estado)); }
+/* piernas de liguilla por jugar, entre equipos ya definidos, que no vienen en «pendientes» (la liga no les ha puesto día y hora):
+   por ronda, primero las idas y luego las vueltas. Son las tarjetas compactas que «Próximos partidos» debe mostrar */
+function piernasEsperadas(d) {
+  const t = torneoDe(d), out = []; if (!t) return out;
+  const ids = new Set(d.pendientes.map(p => String(p.id))), pares = new Set(d.pendientes.map(p => p.local + '|' + p.visitante));
+  for (const r of t.rondas) for (const n of [1, 2]) for (const s of r.series || []) {
+    if (!s || !s.llave || s.decidida || !definidaEsperada(s, t)) continue;
+    for (const l of s.piernas || []) if (l && (l.pierna === 2 ? 2 : 1) === n && !l.jugado && !(l.id != null && ids.has(String(l.id))) && !pares.has(l.local + '|' + l.visitante)) out.push({ s, l, r, n });
+  }
+  return out;
+}
+function chipEsperado(s, t) { /* la pastilla de estado de cada serie en el cuadro (null: no lleva, todo el cuadro es proyectado) */
+  if (s.decidida) return 'Terminada';
+  if ((s.piernas || []).some(l => l && l.jugado && Number.isFinite(l.gl) && Number.isFinite(l.gv))) return 'En curso';
+  const def = definidaEsperada(s, t);
+  return def ? 'Definida' : t.estado === 'proyectado' ? null : 'Proyectada';
+}
+const pctTxt = x => (x * 100).toFixed(1) + '%';
+function ventanaTxt(fechas) { /* ['2026-11-25','2026-11-26'] → '25 o 26 nov' (la ventana de una pierna sin fecha) */
+  const ps = (fechas || []).map(f => /^(\d{4})-(\d{2})-(\d{2})/.exec(f)).filter(Boolean); if (!ps.length) return '';
+  return ps.every(m => m[2] === ps[0][2]) ? ps.map(m => +m[3]).join(' o ') + ' ' + MES3[+ps[0][2] - 1] : ps.map(m => +m[3] + ' ' + MES3[+m[2] - 1]).join(' o ');
+}
+/* el menú, la barra de escritorio y el número de cada sección siguen a las secciones que sí se muestran */
+async function revisaMenu(pg, etq) {
+  const men = await pg.evaluate(() => {
+    const items = Array.from(document.querySelectorAll('#menu li')).filter(li => !li.hidden).map(li => { const b = li.querySelector('[data-ir]'); return { ir: b.getAttribute('data-ir'), num: (b.querySelector('i') || {}).textContent || '' }; });
+    const secciones = Array.from(document.querySelectorAll('main > section[id]')).filter(s => !s.hidden).map(s => s.id);
+    const rotulos = {}; document.querySelectorAll('main > section[id] .rotulo').forEach(r => { const m = /^(\d\d)/.exec(r.textContent.trim()); if (m && !r.closest('section').hidden) rotulos[r.closest('section').id] = m[1]; });
+    return { items, secciones, rotulos, barra: Array.from(document.querySelectorAll('.barra__nav li')).filter(li => !li.hidden).map(li => li.querySelector('[data-ir]').getAttribute('data-ir')) };
+  });
+  revisa(men.items.every(i => men.secciones.includes(i.ir)) && men.secciones.every(s => men.items.some(i => i.ir === s)), etq + 'el menú lista exactamente las secciones que existen', JSON.stringify([men.items.map(i => i.ir), men.secciones]));
+  const conNumero = men.items.filter(i => i.ir !== 'vivo');        /* «Al momento» va sin número (sólo aparece con partidos de hoy) */
+  revisa(conNumero.every((i, k) => i.num === ('0' + k).slice(-2)) && men.items.every(i => i.ir !== 'vivo' || i.num === '') && men.items.every(i => !men.rotulos[i.ir] || men.rotulos[i.ir] === i.num) && men.barra.every(b => men.secciones.includes(b)) &&
+    Object.keys(men.rotulos).every(k => men.items.some(i => i.ir === k && i.num === men.rotulos[k])), etq + 'numeración del menú igual a la de las secciones', JSON.stringify([men.items.map(i => i.ir + ':' + i.num), men.rotulos, men.barra]));
+  return men;
+}
+/* sin window.claude: la conexión dice la hora del «vivo» incrustado si tiene partidos de hoy y menos de 12 h (y entonces sale «Al momento»);
+   si no, la del corte; con su fecha si no es de hoy en el centro de México */
+async function revisaConexion(pg, etq) {
+  const c = await pg.evaluate(([MES3]) => {
+    const d = JSON.parse(document.getElementById('datos').textContent), v = d.vivo, t = v ? Date.parse(v.generado_utc) : NaN, mx = ms => new Date(ms - 6 * 3600000).toISOString();
+    const activo = !!v && Array.isArray(v.partidos) && v.partidos.length > 0 && Number.isFinite(t) && Math.abs(Date.now() - t) <= 12 * 3600000;
+    const dia = activo ? mx(t).slice(0, 10) : String(d.meta.corte_local).slice(0, 10), hora = activo ? mx(t).slice(11, 16) : (/(\d{2}:\d{2})/.exec(d.meta.corte_local) || [])[1];
+    const f = dia.split('-'), esperado = 'Sin conexión en vivo: datos ' + (dia !== mx(Date.now()).slice(0, 10) ? 'del ' + (+f[2]) + ' ' + MES3[+f[1] - 1] + ', ' + hora + ' h' : 'de las ' + hora + ' h') + ' (centro de México)';
+    return { textos: Array.from(document.querySelectorAll('.js-conexion')).map(e => e.textContent), esperado, activo, juego: activo && v.partidos.some(p => p && (p.estado === 'en_juego' || p.estado === 'descanso')),
+      seccion: !document.getElementById('vivo').hidden, franja: !document.getElementById('franja').hidden };
+  }, [MES3]);
+  revisa(c.textos.length > 0 && c.textos.every(x => x === c.esperado) && c.seccion === c.activo && (c.juego || !c.franja),
+    etq + 'sin window.claude: la página funciona y lo dice (' + c.esperado + (c.activo ? '; con el «vivo» incrustado de hoy sale «Al momento»' : '') + ')', JSON.stringify(c));
+}
+/* revisa la página tal como debe verse con SUS datos. extra: { pantalla: revisa la portada en la primera pantalla del celular, ahora: reloj del navegador, foto: nombre de captura } */
+async function revisaSegunDatos(ctx, url, etiqueta, movil, opciones, extra) {
+  extra = extra || {};
+  const etq = etiqueta + ': ', errores = [], pg = await abrir(ctx, errores);
+  if (extra.ahora) await pg.clock.install({ time: new Date(extra.ahora) });
+  await pg.goto(url, { waitUntil: 'load' });
+  await pg.waitForTimeout(700);
+  const d = await pg.evaluate(() => JSON.parse(document.getElementById('datos').textContent));
+  const t = torneoDe(d), pend = d.pendientes.length, sueltas = piernasEsperadas(d), fin = !!d.proyeccion.regular_completa, cj = d.combinada_jornada;
+  const hayComb = !!cj && ['segura', 'equilibrada', 'atrevida'].some(k => cj[k] && (cj[k].picks || []).length > 0);
+  console.log('  nota   ' + etiqueta + ': ' + pend + ' partidos pendientes, ' + sueltas.length + ' de liguilla sin día ni hora, cuadro ' + (t ? t.estado : 'ausente') + ', fase regular ' + (fin ? 'terminada' : 'en juego') + (hayComb ? ', con' : ', sin') + ' combinada de la jornada');
+  if (movil && extra.pantalla) await primeraPantalla(pg, opciones.viewport, etq + 'portada (celular');
+
+  /* bajo la portada: el próximo partido con su cuenta regresiva, o el anuncio de lo que sigue en la liguilla */
+  const sg = await pg.evaluate(() => { const b = document.getElementById('b-sigue'), a = b.querySelector('[data-anuncio]');
+    return { reloj: !!b.querySelector('#reloj'), anuncio: a ? a.getAttribute('data-anuncio') : null, texto: b.textContent.replace(/\s+/g, ' ').trim(), titulo: ((b.querySelector('.sigue__duelo') || {}).textContent || '').trim(),
+      rotulo: ((b.querySelector('.rotulo') || {}).textContent || '').trim(), cruces: Array.from(b.querySelectorAll('[data-ir-llave]')).map(x => x.getAttribute('data-ir-llave')), boton: !!b.querySelector('[data-ir-cuadro]') }; });
+  if (pend) revisa(sg.reloj && !sg.anuncio, etq + 'con partidos pendientes, bajo la portada va el próximo partido con su cuenta regresiva', sg.texto.slice(0, 160));
+  else if (t && t.estado !== 'proyectado') {
+    const rot = { definido: 'Liguilla definida', en_curso: 'Liguilla en curso', terminado: 'Liguilla terminada' }[t.estado];
+    if (sueltas.length) {
+      const r = sueltas[0].r, de = sueltas.filter(x => x.r === r), llaves = [...new Set(de.map(x => x.s.llave))], f = r.fechas || {}, fs0 = [].concat(f.ida || [], f.vuelta || []).sort(), m = /^(\d{4})-(\d{2})-(\d{2})/.exec(fs0[0] || '') || [];
+      const fechas = !m.length || (sg.texto.includes(' ' + (+m[3]) + ' ') && sg.texto.includes(MESES[+m[2] - 1]));
+      revisa(sg.anuncio === t.estado && sg.rotulo === rot && sg.titulo === r.nombre && JSON.stringify(sg.cruces) === JSON.stringify(llaves) && fechas && sg.boton && !sg.reloj &&
+        /por confirmar/.test(sg.texto) === de.some(x => !x.l.fecha_local) && !/No hay partidos pendientes/.test(sg.texto),
+        etq + 'sin partidos con día y hora, bajo la portada se anuncia lo que sigue («' + rot + ' · ' + r.nombre + '»: sus ' + llaves.length + ' cruces, la ventana de fechas y un botón al cuadro)', JSON.stringify([sg.anuncio, sg.rotulo, sg.titulo, sg.cruces, sg.texto.slice(0, 200)]));
+    } else if (t.estado === 'terminado' && t.campeon_decidido) {
+      revisa(sg.anuncio === 'terminado' && sg.rotulo === rot && sg.titulo.includes(t.campeon_ruta) && /campeón/i.test(sg.titulo) && sg.boton, etq + 'liguilla terminada: bajo la portada, el campeón y el botón al cuadro', sg.texto);
+    } else revisa(!!sg.anuncio && /Todavía no hay partidos con día y hora/.test(sg.texto) && sg.boton, etq + 'sin partidos por jugar definidos: lo dice bajo la portada y lleva al cuadro', sg.texto);
+  } else revisa(!sg.anuncio && /No hay partidos pendientes por ahora/.test(sg.texto), etq + 'sin partidos pendientes ni cuadro definido: lo dice bajo la portada', sg.texto);
+  if (sg.boton) {
+    await pg.click('#b-sigue [data-ir-cuadro]');
+    await pg.waitForTimeout(1500);
+    const v = await pg.evaluate(() => { const m = document.getElementById('mini-cuadro'), e = m && m.offsetParent ? document.getElementById('b-llaves') : document.getElementById('cuadro'), r = e.getBoundingClientRect(); return { top: Math.round(r.top), alto: window.innerHeight, hash: location.hash, foco: !!(document.activeElement && document.activeElement.closest('#liguilla')) }; });
+    revisa(v.top >= 0 && v.top < v.alto * 0.5 && v.hash === '' && v.foco, etq + '«Ver el cuadro» lleva al cuadro de la liguilla (sin location.hash)', JSON.stringify(v));
+  }
+  if (sg.cruces.length) {
+    await pg.evaluate(() => window.scrollTo(0, 0));
+    await pg.click('#b-sigue [data-ir-llave="' + sg.cruces[sg.cruces.length - 1] + '"]');
+    await pg.waitForTimeout(1500);
+    const v = await pg.evaluate(k => { const a = document.querySelector('.llave[data-llave="' + k + '"]').getBoundingClientRect(); return { top: Math.round(a.top), alto: window.innerHeight, hash: location.hash }; }, sg.cruces[sg.cruces.length - 1]);
+    revisa(v.top >= 0 && v.top < v.alto * 0.6 && v.hash === '', etq + 'cada cruce del anuncio lleva a su serie en el cuadro', JSON.stringify(v));
+  }
+  if (extra.anuncio) revisa(sg.texto.includes(extra.anuncio), etq + 'el anuncio bajo la portada dice «' + extra.anuncio + '»', sg.texto);
+  if (CAPTURAS && extra.foto) { await pg.evaluate(() => window.scrollTo(0, 0)); await pg.waitForTimeout(300); fs.mkdirSync(DIR_CAP, { recursive: true }); const pre = path.join(DIR_CAP, motor + '-' + (movil ? 'iphone' : 'escritorio') + '-' + extra.foto);
+    await pg.screenshot({ path: pre + '-portada.png' }); await pg.locator('#sigue').screenshot({ path: pre + '-sigue.png' }); }
+
+  /* «Próximos partidos»: una tarjeta completa por partido pendiente y, si no tienen día ni hora, las piernas de liguilla como tarjetas compactas */
+  const px = await pg.evaluate(() => {
+    const sec = document.getElementById('proximos'), T = e => (e ? e.textContent : '').replace(/\s+/g, ' ').trim();
+    return { oculto: sec.hidden, tarjetas: document.querySelectorAll('#b-partidos .partido').length, bajada: T(document.getElementById('proximos-bajada')), nota: T(document.getElementById('nota-sueltas')), notaComb: T(document.getElementById('nota-sin-combinada')),
+      grupos: Array.from(document.querySelectorAll('#b-partidos .grupo > h3')).map(h => T(h)), indice: document.querySelectorAll('#b-indice .indice button').length, vacios: document.querySelectorAll('#proximos .vacio, #combinada .vacio').length,
+      cards: Array.from(document.querySelectorAll('#b-partidos .pleg')).map(p => ({ cuando: T(p.querySelector('.cuando')), nombres: Array.from(p.querySelectorAll('.eq__n')).map(T), escudos: p.querySelectorAll('.duelo .esc').length,
+        tablero: Array.from(p.querySelectorAll('.duelo .tablero b')).map(T).join('-'), x12: !!p.querySelector('.x12'), pcts: Array.from(p.querySelectorAll('.ley b')).map(T), pie: T(p.querySelector('.pleg__pie span')), serie: (p.querySelector('[data-serie]') || { getAttribute: () => '' }).getAttribute('data-serie'),
+        cortados: Array.from(p.querySelectorAll('.eq__n')).filter(e => { const lh = parseFloat(getComputedStyle(e).lineHeight) || 16, renglones = Math.round(e.getBoundingClientRect().height / lh); return e.scrollWidth > e.clientWidth + 1 || renglones > e.textContent.trim().split(/\s+/).length; }).map(T),
+        caja: (() => { const r = p.getBoundingClientRect(), q = p.querySelector('.pleg__pie').getBoundingClientRect(); return [Math.round(r.top), Math.round(r.bottom), Math.round(q.bottom)]; })() })) };
+  });
+  revisa(px.tarjetas === pend, etq + 'una tarjeta completa por partido pendiente (' + pend + ')', String(px.tarjetas));
+  if (extra.plegs != null) revisa(sueltas.length === extra.plegs && px.cards.length === extra.plegs, etq + extra.plegs + ' tarjetas compactas de liguilla', sueltas.length + ' / ' + px.cards.length);
+  if (!pend && !sueltas.length) revisa(px.oculto, etq + 'sin nada por jugar, la sección «Próximos partidos» se retira (no queda una pantalla vacía)', JSON.stringify(px).slice(0, 200));
+  else revisa(!px.oculto && px.vacios === 0 && px.indice === pend + sueltas.length, etq + '«Próximos partidos» a la vista, con un botón en el índice por partido', JSON.stringify([px.oculto, px.vacios, px.indice]));
+  const malasP = [];
+  sueltas.forEach((x, i) => {
+    const c = px.cards[i], l = x.l, m = l.marcador || {}, fase = { cuartos: 'Cuartos', semifinal: 'Semifinal', final: 'Final' }[x.s.fase], cuando = l.fecha_local ? null : ventanaTxt((x.r.fechas || {})[x.n === 2 ? 'vuelta' : 'ida']);
+    const bien = !!c && c.cuando.startsWith(fase + ' · ' + (x.n === 2 ? 'Vuelta' : 'Ida')) && c.cuando.includes(x.s.llave) && (!cuando || c.cuando.endsWith(cuando)) && JSON.stringify(c.nombres) === JSON.stringify([l.local, l.visitante]) && c.escudos === 2 &&
+      (!Number.isFinite(m.gl) || c.tablero === m.gl + '-' + m.gv) && c.x12 && JSON.stringify(c.pcts) === JSON.stringify([pctTxt(l.p_local), pctTxt(l.p_empate), pctTxt(l.p_visitante)]) && c.pie === ((l.estadio || {}).nombre || 'Sede por confirmar') && c.serie === x.s.llave;
+    if (!bien) malasP.push(x.s.llave + '-' + x.n + ' ' + JSON.stringify(c));
+  });
+  if (sueltas.length) {
+    revisa(px.cards.length === sueltas.length && malasP.length === 0, etq + 'las ' + sueltas.length + ' piernas de liguilla sin día ni hora como tarjetas compactas en orden (idas y luego vueltas): fase y pierna, llave, ventana de fechas, escudos, marcador más probable, 1X2 con sus %, sede y botón a la serie', px.cards.length + ' ' + malasP.slice(0, 2).join(' | '));
+    revisa(/Día y hora por confirmar/i.test(px.nota) && /combinada de cuatro pronósticos de cada partido/.test(px.nota) && /cuando la liga confirme día y hora/.test(px.nota) && (pend || /^Lo que sigue: /.test(px.bajada)), etq + 'nota honesta: sin día ni hora, la combinada de cada partido se publica cuando la liga los confirme', px.nota + ' · ' + px.bajada);
+    revisa(px.cards.every(c => c.cortados.length === 0), etq + 'en las tarjetas compactas ningún nombre se parte a media palabra ni se sale', JSON.stringify(px.cards.map(c => c.cortados).filter(x => x.length)));
+    if (!movil) { /* en escritorio van de cuatro en cuatro: el pie (sede y botón) queda a la misma altura en cada renglón */
+      const filas = {}; px.cards.forEach(c => { (filas[c.caja[0]] = filas[c.caja[0]] || []).push(c.caja); });
+      revisa(Object.values(filas).every(f => f.every(k => Math.abs(k[1] - f[0][1]) <= 1 && Math.abs(k[2] - f[0][2]) <= 1)) && Object.values(filas).some(f => f.length >= 2), etq + 'tarjetas compactas en renglones parejos, con la sede y el botón alineados abajo', JSON.stringify(Object.values(filas).map(f => f.map(k => k.join('/')))));
+    }
+    /* el botón «Serie Cx» abre el detalle de esa serie en el cuadro */
+    const k0 = sueltas[0].s.llave;
+    await pg.click('#b-partidos .pleg [data-serie="' + k0 + '"]');
+    await pg.waitForTimeout(1500);
+    const dt = await pg.evaluate(() => { const d = document.getElementById('serie-det'), r = d.getBoundingClientRect(); return { sel: (document.querySelector('.llave--sel') || { getAttribute: () => '' }).getAttribute('data-llave'), legs: d.querySelectorAll('.leg').length, top: Math.round(r.top), alto: window.innerHeight, hash: location.hash }; });
+    revisa(dt.sel === k0 && dt.legs === 2 && dt.top >= 0 && dt.top < dt.alto * 0.6 && dt.hash === '', etq + 'el botón de la tarjeta compacta abre el detalle de su serie (' + k0 + ') en el cuadro', JSON.stringify(dt));
+  }
+  if (!hayComb && !px.oculto) revisa(/combinada de la jornada/.test(px.nota + ' ' + px.notaComb), etq + 'sin combinada de la jornada, «Próximos partidos» dice por qué', px.nota + ' · ' + px.notaComb);
+  const cb = await pg.evaluate(() => ({ oculto: document.getElementById('combinada').hidden, tabs: document.querySelectorAll('#combinada [role="tab"]').length }));
+  revisa(hayComb ? !cb.oculto && cb.tabs >= 3 : cb.oculto, etq + (hayComb ? 'la combinada de la jornada con sus pestañas' : 'sin combinada de la jornada la sección se retira (no queda una pantalla vacía)'), JSON.stringify(cb));
+  /* ninguna sección se queda en un estado vacío gigante */
+  const vac = await pg.evaluate(() => Array.from(document.querySelectorAll('main > section.banda[id]')).filter(s => !s.hidden).map(s => { const c = s.querySelector('.interior.cuerpo') || s; return { id: s.id, n: c.innerText.trim().length, vacio: !!s.querySelector('.vacio') }; }).filter(x => x.n < 60 || (x.vacio && /^(proximos|combinada|liguilla)$/.test(x.id))));
+  revisa(vac.length === 0, etq + 'ninguna sección visible se queda vacía', JSON.stringify(vac));
+  await revisaMenu(pg, etq);
+
+  /* el cuadro: cada serie con su estado (Definida si sus dos equipos ya son seguros; Proyectada si todavía es la ruta de los favoritos) */
+  if (t) {
+    const enPagina = await pg.evaluate(() => Array.from(document.querySelectorAll('#cuadro .llave')).map(l => [l.getAttribute('data-llave'), ((l.querySelector('.llave__id .chip') || {}).textContent || null)]));
+    const esp = [].concat(...t.rondas.map(r => (r.series || []).map(s => [s.llave, chipEsperado(s, t)]))), mapa = Object.fromEntries(enPagina), chips = esp.map(x => [x[0], x[0] in mapa ? mapa[x[0]] : 'falta']);
+    revisa(enPagina.length === esp.length && JSON.stringify(chips) === JSON.stringify(esp) && (!extra.chips || JSON.stringify(chips.map(x => x[1])) === JSON.stringify(extra.chips)), etq + 'cada serie del cuadro con su estado (' + esp.map(x => x[0] + ' ' + (x[1] || '—')).join(', ') + ')', JSON.stringify(chips));
+    if (extra.estadoCuadro) { const ec = await pg.evaluate(() => document.querySelector('.cuadro-estado p').textContent); revisa(extra.estadoCuadro.test(ec), etq + 'el estado del cuadro dice qué rondas siguen siendo la ruta de los favoritos', ec); }
+    if (!movil) {
+      await pg.setViewportSize({ width: 1440, height: 900 }); await pg.waitForTimeout(300);
+      const alto = await pg.evaluate(() => Math.round(document.getElementById('cuadro').getBoundingClientRect().height));
+      revisa(alto <= 900 - 60, etq + 'cuadro en espejo a 1440x900: cabe en una pantalla', String(alto));
+      await pg.setViewportSize(opciones.viewport); await pg.waitForTimeout(200);
+    }
+  }
+  /* terminada la fase regular nada habla en futuro de ella */
+  const rc = await pg.evaluate(() => { const T = e => (e ? e.textContent : '').replace(/\s+/g, ' ').trim();
+    return { final: document.getElementById('b-final').hidden, finalTxt: T(document.getElementById('b-final')), cols: Array.from(document.querySelectorAll('#b-embudo thead th')).map(T), filas: document.querySelectorAll('#b-embudo tbody tr').length,
+      notas: Array.from(document.querySelectorAll('#b-campeon .nota')).map(T), tabla: T(document.querySelector('#b-tabla h3')), bajada: T(document.getElementById('tabla-bajada')), cruces: T(document.getElementById('b-cruces')), camino: T(document.getElementById('camino-bajada')) }; });
+  const texto = await textoVisible(pg);
+  if (fin) {
+    const cl = (d.liguilla && d.liguilla.clasificados) || d.tabla.slice(0, 8).map(r => r.equipo), fuera = d.tabla.filter(r => !cl.includes(r.equipo)).map(r => r.equipo);
+    const viejo = /si la tabla termina como se espera|cerraría los cuartos|Así se espera que termine|Tabla final proyectada|Aún falta fase regular|Todavía falta fase regular|Los cuartos más probables|Lo que resta del torneo/i.exec(texto);
+    revisa(rc.final && !rc.cols.includes('Liguilla') && rc.filas === cl.length && rc.notas.includes('No clasificaron a la liguilla: ' + fuera.join(', ') + '.') && !rc.notas.some(n => /Sin título en ninguna simulación/.test(n) && fuera.some(e => n.includes(e))) &&
+      /Así terminó/.test(rc.tabla) && /Así terminó la fase regular/.test(rc.bajada) && /^La liguilla, jugada /.test(rc.camino) && !viejo,
+      etq + 'fase regular terminada: tabla final (sin la proyección), «Hasta dónde llega cada uno» sólo con los ' + cl.length + ' clasificados y sin columna «Liguilla», los ' + fuera.length + ' que no clasificaron por su nombre y nada en futuro', JSON.stringify(rc).slice(0, 400) + (viejo ? ' · «' + viejo[0] + '»' : ''));
+  } else revisa(!rc.final && /Así se espera que termine/.test(rc.finalTxt) && rc.cols.includes('Liguilla') && /Así va hoy/.test(rc.tabla), etq + 'fase regular en juego: tabla de hoy, tabla final proyectada y probabilidad de clasificar', JSON.stringify(rc).slice(0, 300));
+  await revisaConexion(pg, etq);
+  const desb = await desbordes(pg), mala = palabrasMalas(texto), resp = await pg.evaluate(() => document.querySelectorAll('.respaldo').length);
+  revisa(desb.sw <= desb.ancho + 1 && desb.malos.length === 0, etq + 'sin desplazamiento horizontal ni elementos fuera de la pantalla', desb.sw + ' ' + desb.malos.join(' | '));
+  revisa(!mala && resp === 0 && errores.length === 0, etq + 'sin "undefined"/"NaN"/"null", sin bloques de respaldo y sin errores de consola', (mala || '') + ' ' + resp + ' ' + errores.slice(0, 3).join(' || '));
+  if (CAPTURAS && extra.foto && px.cards.length) { await pg.evaluate(() => document.getElementById('proximos').scrollIntoView()); await pg.waitForTimeout(800); const b = await pg.locator('#proximos').boundingBox(), y = await pg.evaluate(() => window.pageYOffset); await pg.screenshot({ path: path.join(DIR_CAP, motor + '-' + (movil ? 'iphone' : 'escritorio') + '-' + extra.foto + '-proximos.png'), fullPage: true, clip: { x: 0, y: b.y + y, width: pg.viewportSize().width, height: Math.min(b.height, 3000) } }); }
+  await pg.close();
+  return { d, t, sueltas };
+}
+/* variantes de la copia fija «definido» (todas INVENTADAS a partir de ella): la serie la gana su favorito con marcadores a modo */
+function decidirSerie(s, base) {
+  const fav = s.favorito, mejorGana = fav === s.mejor.equipo;
+  s.real = true; s.definida = true; s.decidida = true; s.ganador = fav; s.alternativas = [];
+  s.p_avanza_mejor = mejorGana ? 1 : 0; s.p_avanza_peor = 1 - s.p_avanza_mejor; s.p_favorito = 1;
+  s.global = { probable: null, top: [], p_gana_mejor: null, p_empate: null, p_gana_peor: null };
+  s.piernas.forEach((l, j) => { /* ida en casa del peor sembrado, vuelta en la del mejor: gana el favorito en el global */
+    Object.assign(l, { id: base + j, fecha_utc: null, fecha_local: null, hora_local: null, jugado: true, gl: mejorGana ? (j ? 1 : 0) : (j ? 1 : 2), gv: mejorGana ? (j ? 0 : 1) : (j ? 1 : 0) });
+    COMO_PRONOSTICO.forEach(k => delete l[k]);
+  });
+}
+function conSemisDefinidas(d) { /* los cuatro cuartos jugados (ganan los favoritos): las dos semifinales ya tienen sus equipos; la final sigue proyectada */
+  const t = d.liguilla.torneo;
+  t.rondas[0].series.forEach((s, i) => decidirSerie(s, 990000100 + 10 * i));
+  t.rondas[1].series.forEach(s => { s.definida = true; s.alternativas = []; });
+  t.rondas[2].series[0].definida = false;
+  d.liguilla.en_curso = true; t.estado = 'en_curso';
+}
+function conLiguillaTerminada(d) {
+  conSemisDefinidas(d);
+  const t = d.liguilla.torneo;
+  t.rondas[1].series.forEach((s, i) => decidirSerie(s, 990000200 + 10 * i));
+  t.rondas[2].series[0].definida = true; decidirSerie(t.rondas[2].series[0], 990000300);
+  t.estado = 'terminado'; t.campeon_decidido = true; t.campeon_ruta = t.rondas[2].series[0].ganador; d.liguilla.en_curso = false;
+}
+function conIdasProgramadas(d, fijo) { /* ESPN ya lista las 4 idas (pronóstico completo, copiado de los partidos del documento fijo); las vueltas siguen sin día ni hora */
+  d.pendientes = d.liguilla.torneo.rondas[0].series.map((s, i) => {
+    const l = s.piernas[0], p = copia(fijo.pendientes[i]);
+    return Object.assign(p, { id: 990000400 + i, local: l.local, visitante: l.visitante, fase: 'cuartos', pierna: 1, etiqueta: 'Cuartos de final, ida', fecha_utc: (i < 2 ? '2026-11-26' : '2026-11-27') + 'T0' + (i % 2 ? 3 : 1) + ':00:00+00:00', fecha_local: i < 2 ? '2026-11-25' : '2026-11-26', hora_local: i % 2 ? '21:00' : '19:00' });
+  });
+}
+
 async function correr(navegador, nombre, opciones) {
   console.log('\n== ' + motor + ' · ' + nombre + ' ==');
   const movil = nombre === 'iphone';
   const ctx = await navegador.newContext(Object.assign({ ignoreHTTPSErrors: true, locale: 'es-MX' }, opciones));
   const errores = [];
   const page = await abrir(ctx, errores);
+  await page.clock.install({ time: new Date(AHORA_FIJO) });       /* sus 9 partidos siguen por jugar: cuenta regresiva y «Próximo partido» */
   let fuentes = true;
   page.on('requestfailed', r => { if (/fonts\.(googleapis|gstatic)\.com/.test(r.url())) fuentes = false; });
   await page.goto(URL_DOC, { waitUntil: 'load' });
@@ -282,7 +501,7 @@ async function correr(navegador, nombre, opciones) {
   revisa(n.respaldos === 0, 'ningún bloque en modo respaldo', String(n.respaldos));
   revisa(n.estadios === 16, 'galería con los 16 estadios', String(n.estadios));
   revisa(n.h1 === 1, 'un solo h1');
-  revisa(!n.franja && !n.vivo && n.conexion.some(t => /^Sin conexión en vivo: datos (de las|del \d+ \w+,) \d\d:\d\d h \(centro de México\)/.test(t)), 'sin window.claude: la página funciona y lo dice (hora con zona; con fecha si no es de hoy)', JSON.stringify(n.conexion));
+  await revisaConexion(page, '');
 
   /* ---------- cuadro de la liguilla ---------- */
   const cu = await page.evaluate(movil => {
@@ -420,14 +639,7 @@ async function correr(navegador, nombre, opciones) {
   revisa(pest.n === 3 && pest.vuelve && pest.vistos.every(v => v.sel === 'true' && !v.oculto && v.otroOculto && v.distinto), 'cada pestaña de la combinada cambia el contenido', JSON.stringify(pest));
 
   /* ---------- menú de tres barras ---------- */
-  const men = await page.evaluate(() => {
-    const items = Array.from(document.querySelectorAll('#menu li')).filter(li => !li.hidden).map(li => { const b = li.querySelector('[data-ir]'); return { ir: b.getAttribute('data-ir'), num: (b.querySelector('i') || {}).textContent || '' }; });
-    const secciones = Array.from(document.querySelectorAll('main > section[id]')).filter(s => !s.hidden).map(s => s.id);
-    const rotulos = {}; document.querySelectorAll('main > section[id] .rotulo').forEach(r => { const m = /^(\d\d)/.exec(r.textContent.trim()); if (m) rotulos[r.closest('section').id] = m[1]; });
-    return { items, secciones, rotulos, barra: Array.from(document.querySelectorAll('.barra__nav li')).filter(li => !li.hidden).map(li => li.querySelector('[data-ir]').getAttribute('data-ir')) };
-  });
-  revisa(men.items.every(i => men.secciones.includes(i.ir)) && men.secciones.every(s => men.items.some(i => i.ir === s)), 'el menú lista exactamente las secciones que existen', JSON.stringify([men.items.map(i => i.ir), men.secciones]));
-  revisa(men.items.every((i, k) => i.num === ('0' + k).slice(-2)) && men.items.every(i => !men.rotulos[i.ir] || men.rotulos[i.ir] === i.num) && men.barra.every(b => men.secciones.includes(b)), 'numeración del menú igual a la de las secciones', JSON.stringify([men.items.map(i => i.num), men.rotulos]));
+  await revisaMenu(page, '');
   await page.evaluate(() => window.scrollTo(0, 0));
   await page.click('#hamb');
   const abierto = await page.evaluate(() => ({ visible: !document.getElementById('menu').hidden, aria: document.getElementById('hamb').getAttribute('aria-expanded'), foco: document.activeElement && document.activeElement.closest('#menu') !== null }));
@@ -804,6 +1016,20 @@ async function correr(navegador, nombre, opciones) {
 
   /* ---------- desempeño: modelo contra mercado sellado ---------- */
   await mercadoSellado(ctx, capElDe);
+
+  /* ---------- la página según el estado de SUS datos: los de hoy, la copia fija «definido» y sus variantes ---------- */
+  await revisaSegunDatos(ctx, URL_REAL, 'datos de hoy', movil, opciones, { pantalla: true, foto: 'hoy' });
+  const DEF = ['Definida', 'Definida', 'Definida', 'Definida', 'Proyectada', 'Proyectada', 'Proyectada'];
+  const def = await revisaSegunDatos(ctx, URL_DEFINIDO, 'copia fija «definido»', movil, opciones,
+    { pantalla: true, ahora: AHORA_DEFINIDO, foto: 'definido', plegs: 8, chips: DEF, anuncio: 'Del 25 al 29 de noviembre', estadoCuadro: /Semifinales y final siguen la ruta de los favoritos/ });
+  const sd = def.t.rondas.map(r => r.series.map(x => x.definida));
+  revisa(def.t.estado === 'definido' && JSON.stringify(sd) === JSON.stringify([[true, true, true, true], [false, false], [false]]), 'copia fija «definido»: el exportador marca «definida» los cuartos (tabla final) y no las semifinales ni la final', JSON.stringify(sd));
+  const fijo = datosDocumento(DOC_FIJO);
+  await revisaSegunDatos(ctx, variante('sindefinida', d => { torneoDe(d).rondas.forEach(r => r.series.forEach(x => { delete x.definida; })); }, DOC_DEFINIDO), 'datos viejos sin el campo «definida»', movil, opciones, { ahora: AHORA_DEFINIDO, plegs: 8, chips: DEF });
+  await revisaSegunDatos(ctx, variante('idas', d => conIdasProgramadas(d, fijo), DOC_DEFINIDO), 'idas de cuartos ya en el calendario', movil, opciones, { ahora: AHORA_DEFINIDO, plegs: 4, chips: DEF, foto: 'idas' });
+  await revisaSegunDatos(ctx, variante('semis', conSemisDefinidas, DOC_DEFINIDO), 'cuartos jugados y semifinales definidas', movil, opciones,
+    { ahora: AHORA_DEFINIDO, foto: 'semis', plegs: 4, anuncio: 'Semifinales', chips: ['Terminada', 'Terminada', 'Terminada', 'Terminada', 'Definida', 'Definida', 'Proyectada'], estadoCuadro: /La final sigue la ruta de los favoritos\.$/ });
+  await revisaSegunDatos(ctx, variante('terminada', conLiguillaTerminada, DOC_DEFINIDO), 'liguilla terminada', movil, opciones, { ahora: AHORA_DEFINIDO, foto: 'terminada', plegs: 0, chips: ['Terminada', 'Terminada', 'Terminada', 'Terminada', 'Terminada', 'Terminada', 'Terminada'] });
   await ctx.close();
 
   /* ---------- movimiento reducido ---------- */
@@ -823,9 +1049,9 @@ async function correr(navegador, nombre, opciones) {
 async function mercadoSellado(ctx, capElDe) {
   const errM = [];
   const pb = await abrir(ctx, errM);
-  await pb.goto(URL_DOC, { waitUntil: 'load' });
+  await pb.goto(URL_REAL, { waitUntil: 'load' });                    /* lo exportado hoy */
   await pb.waitForTimeout(400);
-  const real = datosDocumento(), cmR = (real.desempeno || {}).contra_mercado || {}, mb = await leeMercado(pb);
+  const hoy = datosDocumento(DOC_REAL), real = datosDocumento(DOC_FIJO), cmR = (hoy.desempeno || {}).contra_mercado || {}, mb = await leeMercado(pb);
   const marcas = us => us.map(u => !u.pronostico ? '' : u.pronostico.mercado ? 'si' : u.pronostico.origen === 'sello' ? 'no' : '');
   revisa(typeof cmR.n === 'number' && mb.hay && mb.enDesempeno && mb.lectura === cmR.lectura && /Modelo contra mercado/.test(mb.texto) && mb.respaldos === 0, 'mercado sellado: el documento exportado trae desempeno.contra_mercado y la página lo muestra dentro del desempeño sellado', JSON.stringify([cmR.n, mb.hay, mb.lectura]));
   if (cmR.n > 0) {
@@ -837,10 +1063,10 @@ async function mercadoSellado(ctx, capElDe) {
     revisa(mb.datos.length === 0 && !/Log-loss del mercado/.test(mb.texto) && (desde ? mb.texto.includes('se guardan en su sello desde el ' + desde) && (cmR.n_sellados_con_mercado > 0) === mb.texto.includes(cmR.n_sellados_con_mercado === 1 ? 'los trae 1 partido pendiente' : 'los traen ' + cmR.n_sellados_con_mercado + ' partidos pendientes') : /ningún sello trae momios/.test(mb.texto)),
       'mercado sellado (datos de hoy): sin partidos comparados no hay cifras, sólo ' + (desde ? 'desde cuándo se guardan los momios (' + desde + ') y cuántos partidos pendientes los traen (' + cmR.n_sellados_con_mercado + ')' : 'el aviso de que ningún sello trae momios todavía'), mb.texto);
   }
-  revisa(JSON.stringify(mb.tarjetas.map(x => x.marca)) === JSON.stringify(marcas(real.ultimos_resultados)), 'mercado sellado (datos de hoy): cada resultado dice si su sello guardó momios; los que no vienen de un sello no dicen nada', JSON.stringify(mb.tarjetas.map(x => x.marca)));
+  revisa(JSON.stringify(mb.tarjetas.map(x => x.marca)) === JSON.stringify(marcas(hoy.ultimos_resultados)), 'mercado sellado (datos de hoy): cada resultado dice si su sello guardó momios; los que no vienen de un sello no dicen nada', JSON.stringify(mb.tarjetas.map(x => x.marca)));
   await pb.close();
 
-  /* tres partidos comparados (cifras INVENTADAS; son las del caso a mano de produccion/pruebas/test_sellos_mercado.py) */
+  /* tres partidos comparados (cifras INVENTADAS; son las del caso a mano de produccion/pruebas/test_sellos_mercado.py), sobre el documento fijo */
   const pm = await abrir(ctx, errM);
   await pm.goto(variante('mercado', d => conMercado(d, 3)), { waitUntil: 'load' });
   await pm.waitForTimeout(400);
@@ -905,6 +1131,14 @@ async function mercadoSellado(ctx, capElDe) {
   execFileSync('python3', [path.join(WEB, 'construir.py'), '--vivo', path.join(WEB, '..', 'salidas', 'vivo_ejemplo.json')], { stdio: 'pipe' });
   const conVivo = fs.readFileSync(path.join(WEB, 'documento.html'), 'utf8'), intacto = huella(indice) === antesIndice;
   execFileSync('python3', [path.join(WEB, 'construir.py'), '--documento', '--salida', WEB], { stdio: 'inherit' });
+  /* los dos documentos fijos (otro estado del torneo): --solo-documento no toca index.html, archivos_publicados.json ni capacidades.json */
+  const publicados = path.join(WEB, 'archivos_publicados.json'), huellas = () => [indice, publicados, path.join(WEB, 'capacidades.json')].map(huella).join();
+  const antesFijos = huellas();
+  for (const [datos, doc] of [[DATOS_FIJO, DOC_FIJO], [DATOS_DEFINIDO, DOC_DEFINIDO]]) {
+    temporales.push(doc);
+    execFileSync('python3', [path.join(WEB, 'construir.py'), '--datos', datos, '--solo-documento', doc], { stdio: 'pipe' });
+  }
+  const fijosBien = huellas() === antesFijos && [DOC_FIJO, DOC_DEFINIDO].every(f => fs.existsSync(f) && /^<!doctype html>/i.test(fs.readFileSync(f, 'utf8').slice(0, 40)));
   const frag = fs.readFileSync(indice, 'utf8');
   const antes = frag.split('<script type="application/json"')[0];
   const guion = frag.split('</script>').slice(-2)[0];
@@ -923,6 +1157,7 @@ async function mercadoSellado(ctx, capElDe) {
   const datosDe = h => JSON.parse(/<script type="application\/json" id="datos">([\s\S]*?)<\/script>/.exec(h)[1]);
   const vivoPrueba = datosDe(conVivo).vivo, vivoNormal = datosDe(frag).vivo, vivoActual = JSON.parse(fs.readFileSync(path.join(WEB, '..', 'salidas', 'actual.json'), 'utf8')).vivo;
   revisa(vivoPrueba && vivoPrueba.ejemplo === true && intacto, 'construir.py --vivo incrusta ese documento en documento.html y no toca index.html');
+  revisa(fijosBien, 'construir.py --datos … --solo-documento arma los dos documentos fijos de prueba y no toca index.html, archivos_publicados.json ni capacidades.json');
   revisa(JSON.stringify(vivoNormal) === JSON.stringify(vivoActual) && !(vivoNormal && vivoNormal.ejemplo), 'sin la opción, index.html incrusta actual.json → vivo sólo si existe (' + (vivoActual ? 'hoy existe: ' + vivoActual.estado : 'hoy no existe') + ')');
   const usados = JSON.parse(fs.readFileSync(path.join(WEB, 'archivos_publicados.json'), 'utf8'));
   const enPagina = Array.from(new Set((frag.match(/(?:img|video)\/[\w./-]+\.(?:jpg|jpeg|png|webp|svg|mp4)/g) || [])));

@@ -190,12 +190,12 @@ h1 span{display:block;color:var(--oro)}
 .partido{background:var(--noche-2);border:1px solid var(--linea);border-radius:var(--radio);overflow:hidden;scroll-margin-top:76px}
 /* piernas de liguilla que todavía no tienen día ni hora: tarjetas compactas de pronóstico */
 .plegs{display:grid;gap:var(--e-3)}
-.pleg{display:grid;gap:var(--e-3);align-content:start;padding:var(--e-4);min-width:0;scroll-margin-top:76px}
+.pleg{display:flex;flex-direction:column;gap:var(--e-3);padding:var(--e-4);min-width:0;scroll-margin-top:76px}
 .pleg>*{min-width:0}
 .pleg .cuando .chip{letter-spacing:.06em}
 .pleg .cuando span:last-child{margin-left:auto;color:var(--cal)}
 .pleg .duelo{margin-top:0}
-.pleg .eq__n{font-size:1.15rem}
+.pleg .eq__n{font-size:1.15rem;overflow-wrap:normal}   /* un nombre de una sola palabra nunca se parte («MONTERR-EY»); dos palabras sí van en dos renglones */
 .pleg__pie{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:auto;padding-top:var(--e-2);border-top:1px dashed var(--linea);font-size:var(--t-1);line-height:1.25;color:var(--cal-2)}
 .pleg__pie .llave__ver{min-height:44px;margin-left:0}
 .partido__foto{position:relative;aspect-ratio:16/9;background:var(--noche-3);overflow:hidden}
@@ -753,6 +753,8 @@ tr.enjuego td.eqc .pulso{margin-left:8px;vertical-align:middle}
   .marcs{grid-template-columns:repeat(auto-fit,minmax(250px,1fr))}
   .plegs{grid-template-columns:repeat(4,minmax(0,1fr))}
   .pleg{padding:var(--e-4) var(--e-3)}
+  .pleg .eq__n{font-size:1rem;letter-spacing:.01em}      /* cuatro por renglón: el nombre más largo de una palabra («Querétaro», «Monterrey») cabe entero */
+  .pleg .mini{letter-spacing:.05em}
 }
 @media (min-width:1160px) and (max-width:1319px){
   .barra__nav button{padding:14px 6px;letter-spacing:.06em}
@@ -1713,7 +1715,9 @@ function campeon() {
   /* los que ya no pueden ser campeones se dicen por su nombre: no clasificaron, o perdieron su serie (dato de liguilla.torneo) */
   if (t) arr(t.rondas).filter(obj).forEach(function (r) { arr(r.series).filter(obj).forEach(function (x) { if (x.decidida && x.ganador) caidos[eqDe(x.mejor) === x.ganador ? eqDe(x.peor) : eqDe(x.mejor)] = 1; }); });
   var fuera = P.regular_completa ? sin.filter(function (c) { return ok(c.p_clasifica) && c.p_clasifica <= 0; }) : [], elim = sin.filter(function (c) { return fuera.indexOf(c) < 0 && caidos[c.equipo]; });
-  var resto = sin.filter(function (c) { return fuera.indexOf(c) < 0 && elim.indexOf(c) < 0; });
+  var resto = sin.filter(function (c) { return fuera.indexOf(c) < 0 && elim.indexOf(c) < 0; }), lugar = {};
+  arr(D.tabla).filter(obj).forEach(function (r) { lugar[r.equipo] = ok(r.pos) ? r.pos : 99; });
+  fuera.sort(function (a, b) { return (lugar[a.equipo] || 99) - (lugar[b.equipo] || 99); }); /* en el orden en que terminaron */
   function nombres(l) { return l.map(function (c) { return E(c.equipo); }).join(', '); }
   return '<div class="bloque a"><div class="bloque__cab"><h3>¿Quién será campeón?</h3><p>Probabilidad de levantar el trofeo. El ± es el error de la simulación, no toda la incertidumbre.</p></div>' +
     '<ol class="barras">' + con.map(function (c) {
@@ -2495,7 +2499,7 @@ function vivoSeccion() {
         return '<tr class="' + (r.pos === 8 ? 'corte' : '') + (r.en_juego ? ' enjuego' : '') + '"><td class="pos">' + c(r.pos) + '</td><td class="i"><span class="mov' + (cm > 0 ? ' sube' : cm < 0 ? ' baja' : '') + '"' +
           (cm ? ' role="img" aria-label="' + (cm > 0 ? 'sube ' : 'baja ') + Math.abs(cm) + (Math.abs(cm) === 1 ? ' lugar' : ' lugares') + '">' + (cm > 0 ? '▲' : '▼') + Math.abs(cm) : ' aria-hidden="true">') + '</span></td>' +
           '<td class="i eqc">' + eqn(r.equipo, 26) + (r.en_juego ? '<i class="pulso" role="img" aria-label="en juego"></i>' : '') + '</td><td>' + c(r.PJ) + '</td><td>' + (ok(r.DG) ? sig(r.DG, 0) : '—') + '</td><td class="c-x">' + c(r.GF) + '</td><td class="pts">' + c(r.PTS) + '</td></tr>';
-      }).join('') + '</tbody></table></div><p class="nota">La línea blanca es el corte de la liguilla. El punto rojo marca a los equipos que están jugando.</p></div>';
+      }).join('') + '</tbody></table></div><p class="nota">La línea blanca es el corte de la liguilla.' + (V.tabla.some(function (r) { return r.en_juego; }) ? ' El punto rojo marca a los equipos que están jugando.' : '') + '</p></div>';
   });
   bloque('probabilidades al momento', 'b-vivo-proy', function () {
     var P = V.proyeccion;
