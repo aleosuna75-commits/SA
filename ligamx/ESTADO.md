@@ -178,19 +178,14 @@ en la base quedaron aceptadas.
 ## Tareas programadas
 - "Cerebro Liga MX diario" (`trig_0195ELWvAUmne2MKmr1ih8zi`): todos los días a la 01:20 (Ciudad de México), en esta
   sesión. Sigue el runbook de arriba (prompt actualizado el 11-nov con el paso «en vivo»).
-- "Continuar Cerebro Liga MX" (`trig_011daxVc81g1dWPVNtuVKMCi`, cada hora): **desactivada** el 11-nov-2026 04:15 UTC al
-  cerrar el rediseño. **Activarla antes de cada trabajo largo** (regla del usuario sobre los límites).
-- Vivo Jornada 17, bloque del viernes (UTC del 21-nov: Puebla–San Luis 01:00, Juárez–Atlas 03:00, Tijuana–Atlante 03:10):
-  «armar» 00:40 (`trig_01KNLxumakWo1kKD8wPqKi5d`), «vigilar» 02:00 (`trig_01HmozNf6ETpQcTjQ2RrMp37`) y 04:05
-  (`trig_01Hd1AJJcvj4fDPvpJz9fenf`), «cierre» 05:40 (`trig_01Hed1CuE5iUFPyC3CyQpx7A`).
-- Vivo Jornada 17, bloque del sábado (UTC: Pachuca–Toluca 22:50 y Santos–León 23:00 del 21-nov; Pumas–Monterrey 01:00 y
-  Tigres–América 03:00 del 22-nov): «armar» 22:30 (`trig_011n63HrTmpQVKFtZVDfaEVr`), «vigilar» 23:55
-  (`trig_013bHnMryjJuocPPUs5goXUQ`), 02:00 (`trig_01HcUY9WJgfE24dn12Tc26XE`) y 04:00 (`trig_01GxT4KPm1aWzXyWpkhXaFSy`),
-  «cierre» 05:30 (`trig_014JET1Wrb7v6JyHPHSZdWrM`).
-- Vivo Jornada 17, bloque del domingo (UTC: Chivas–Cruz Azul 23:07 del 22-nov y Querétaro–Necaxa 01:10 del 23-nov):
-  «armar» 22:47 (`trig_01AP7JNKs65oqAw1mWRHicRP`), «vigilar» 00:07 (`trig_0198eLmrnHmHFtrPeXAKtxcu`) y 02:10
-  (`trig_018H9mDfPPPnQfPM8S31UEpM`), «cierre» 03:40 (`trig_01CGwZtpXxFi73qvKfSYhPMz`; ese cierre avisa al usuario de
-  los clasificados y los cruces de cuartos).
+- "Continuar Cerebro Liga MX" (`trig_011daxVc81g1dWPVNtuVKMCi`, cada hora): **ACTIVA desde el 23-nov-2026 03:26 UTC**
+  (puesta a punto de la liguilla); se desactiva al dejar «En curso» en «Nada pendiente». **Activarla antes de cada
+  trabajo largo** (regla del usuario sobre los límites).
+- Los despertares en vivo de la Jornada 17 (viernes, sábado y domingo) ya se cumplieron; el «cierre» del domingo
+  (`trig_01CGwZtpXxFi73qvKfSYhPMz`) se borró el 23-nov 03:31 UTC porque el cierre se hizo a mano al terminar el partido.
+- «Liga MX: calendario de cuartos» (`trig_01TL9jTmiLVZi8GVJAQVWM9s`, una vez, lunes 23-nov 17:00 de México = 23:00 UTC):
+  corre `pipeline.py auto`; si ESPN ya lista los cuartos, republica, programa los despertares en vivo de cada día de
+  partido (VIVO.md §6.1) y avisa al usuario con horarios y pronósticos completos; si no, se reprograma 4 h después.
 
 ## Bitácora
 - 2026-11-10 02:50 UTC · Reconocimiento: ESPN da resultados y estadísticas por partido; 143/153 jugados.
@@ -263,3 +258,4 @@ en la base quedaron aceptadas.
 - 2026-11-21 07:25 UTC · Corrida diaria: sin partidos nuevos tras el cierre de las 07:00; momios actualizados; V23 publicada (`vivo/actual` sigue en versión 52: el documento no cambió de estado). Bloques del sábado y del domingo ya programados. Sin avanzar pendientes de mejora: el presupuesto de uso se guarda para el vivo del fin de semana.
 - 2026-11-22 05:25 UTC · **Sábado de la Jornada 17 en vivo** (Pachuca 2-0 Toluca, Santos 1-2 León, Pumas 0-2 Monterrey, Tigres 1-0 América): 35 eventos (36 a 70) escritos en `vivo/actual` (versiones 53 a 88) con `vivo_relevo.sh`, una respuesta por despertar; esta vez NO se acabó el límite de uso (a la vez se atendió la parrilla de F1). Segundo gol anulado real (Tigres, 65') bien corregido. Cierre: 8 sellos calificados, 3 ganadores y 1 marcador exacto; combinadas completas: segura 2 de 8, equilibrada 4 de 8, atrevida 1 de 8. Modelo contra mercado (7 partidos): 1.051 contra 1.073, diferencia −0.022 ± 0.041: sin conclusión. Ciclo de mejora sin cambio de modelo. **Los ocho clasificados ya están definidos** (Cruz Azul, América, Chivas, Atlas, Toluca, Monterrey, León, Pachuca; Pachuca entra con 25 puntos por desempate sobre Tijuana y Santos); falta el orden de los tres primeros (Chivas–Cruz Azul del domingo). Favorito nuevo: Cruz Azul 26.4%, América 22.9%, Chivas 19.4%, Toluca 18.0%, Pachuca 5.6%. V24 publicada.
 - 2026-11-22 07:25 UTC · Corrida diaria: sin partidos nuevos tras el cierre de las 05:25; V25 publicada (`vivo/actual` sigue en versión 88). Hoy se juega el bloque del domingo (Chivas–Cruz Azul 23:07 UTC, Querétaro–Necaxa 01:10 UTC), ya programado; su cierre avisa al usuario de los cruces. Mañana: bajas de los 8 clasificados para los cuartos (`config/actualidad.json` tiene 4 días).
+- 2026-11-23 03:30 UTC · **Domingo de la Jornada 17 en vivo y FIN DE LA FASE REGULAR** (Chivas 1-0 Cruz Azul, Querétaro 2-2 Necaxa): 18 eventos (71 a 88) escritos en `vivo/actual` (versiones 89 a 106) con `vivo_relevo.sh`, sin rechazos ni cortes por límite; el bucle salió con código 3 (`terminado_hoy`) a las 03:17 UTC. Cierre a mano en cuanto acabó el partido (sin esperar el despertar de las 03:40, que se borró): `pipeline.py auto` (ciclo de mejora sin cambio de modelo), `vivo/actual` en versión 107, **V26 publicada** con `liguilla.torneo` «definido». Tabla final (coincide con ESPN): Chivas 33, Cruz Azul 32, América 30, Atlas 28, Toluca 27, Monterrey 27, León 26, Pachuca 25 (fuera Tijuana y Santos con 25). Cuartos: Chivas–Pachuca (avanza Chivas 64%), Cruz Azul–León (82%), América–Monterrey (71%), Atlas–Toluca (Toluca 72%). Campeón: Cruz Azul 26.4%, Chivas 20.8%, América 20.8%, Toluca 18.3%, Pachuca 5.8%, Monterrey 4.8%, Atlas 1.8%, León 1.3% (que Cruz Azul siga en 26.36% tras perder es coincidencia comprobada: su fuerza bajó de 0.761 a 0.707 pero cambia a Pachuca por León en cuartos; p_semifinal pasó de 73.7% a 81.1%). **Jornada 17 completa (9 partidos): 3 ganadores acertados y 1 marcador exacto; combinadas completas: segura 3 de 9, equilibrada 3 de 9, atrevida 1 de 9. Modelo contra mercado (9 partidos con momios sellados): log-loss 1.059 contra 1.080 (−0.021 ± 0.032, a favor del modelo pero sin poder concluir; el favorito del mercado ganó 2 de 9).** Acumulado de sellos calificados (10): 4 ganadores, log-loss 1.038. Los medios confirman los cruces (El Heraldo, Telediario, Diario Puntual); ESPN todavía no lista los cuartos (la liga publica horarios el lunes 23). Con 0 pendientes la página deja dos secciones vacías y `web/pruebas/prueba.js` falla (3 revisiones + la de pestañas): se lanzó el workflow `10_liguilla_puesta_a_punto.js` (`wf_7ca6f6c0-3d7`) y se activó la tarea de continuidad.
