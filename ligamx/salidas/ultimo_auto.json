@@ -1,32 +1,32 @@
 {
- "corrida_utc": "2026-11-23T03:17:15Z",
+ "corrida_utc": "2026-11-23T07:46:32Z",
  "pasos": {
   "datos": {
    "ok": true,
    "codigo": 0,
-   "nuevos_jugados": 2,
+   "nuevos_jugados": 0,
    "reprogramados": 0,
    "nuevos_en_calendario": 0,
    "momios_actualizados": 0,
    "tabla_coincide_con_espn": true,
-   "segundos": 8.0
+   "segundos": 6.3
   },
   "variables": {
    "ok": true,
-   "segundos": 4.2
+   "segundos": 2.5
   },
   "mejora": {
    "ok": true,
-   "adoptado": null,
-   "segundos": 29.9
+   "omitido": "sin partidos nuevos",
+   "segundos": 0.0
   },
   "pronostico": {
    "ok": true,
    "salida": [
-    "/home/user/SA/ligamx/salidas/actual.json  89 KB  modelo=ensamble  pendientes=0  sellos nuevos=0  43.1 s",
-    "campeón: Cruz Azul 0.264, Chivas 0.208, América 0.208, Toluca 0.183, Pachuca 0.058"
+    "/home/user/SA/ligamx/salidas/actual.json  90 KB  modelo=ensamble  pendientes=0  sellos nuevos=0  45.3 s",
+    "campeón: Cruz Azul 0.264, Chivas 0.209, América 0.208, Toluca 0.182, Pachuca 0.059"
    ],
-   "segundos": 44.3
+   "segundos": 46.7
   },
   "vivo": {
    "ok": true,
@@ -34,119 +34,21 @@
    "partidos": 2,
    "siguiente": null,
    "incrustado": true,
-   "segundos": 15.4
+   "segundos": 19.5
   },
   "pagina": {
    "ok": true,
    "salida": [
-    "listo en 0.17 s"
+    "listo en 0.02 s"
    ],
-   "segundos": 0.4
+   "segundos": 0.1
   }
  },
  "errores": [],
- "nuevos_jugados": [
-  {
-   "id": "401877047",
-   "fecha_local": "2026-11-22",
-   "torneo": "Apertura 2026",
-   "fase": "regular",
-   "local": "Chivas",
-   "visitante": "Cruz Azul",
-   "gl": 1,
-   "gv": 0,
-   "tiene_stats": true,
-   "tiene_eventos": true
-  },
-  {
-   "id": "401877046",
-   "fecha_local": "2026-11-22",
-   "torneo": "Apertura 2026",
-   "fase": "regular",
-   "local": "Querétaro",
-   "visitante": "Necaxa",
-   "gl": 2,
-   "gv": 2,
-   "tiene_stats": true,
-   "tiene_eventos": true
-  }
- ],
+ "nuevos_jugados": [],
  "reprogramados": [],
  "nuevos_en_calendario": [],
  "proximo_partido": null,
- "mejora": {
-  "produccion": "ensamble",
-  "adoptado": null,
-  "tabla": [
-   {
-    "modelo": "ensamble",
-    "rol": "producción",
-    "n": 3471,
-    "logloss": 1.025,
-    "logv_marcador": -2.8831
-   },
-   {
-    "modelo": "ajuste",
-    "rol": "retador",
-    "n": 3471,
-    "logloss": 1.0231,
-    "logv_marcador": -2.8889,
-    "d_logloss_vs_produccion": -0.0019,
-    "ee": 0.001,
-    "z": -2.0,
-    "d_ultimos_bloques": 0.0082,
-    "cumple_regla": false
-   },
-   {
-    "modelo": "elo",
-    "rol": "retador",
-    "n": 3471,
-    "logloss": 1.0304,
-    "logv_marcador": -2.8917,
-    "d_logloss_vs_produccion": 0.0054,
-    "ee": 0.001,
-    "z": 5.52,
-    "d_ultimos_bloques": -0.0013,
-    "cumple_regla": false
-   },
-   {
-    "modelo": "dc2",
-    "rol": "retador",
-    "n": 3471,
-    "logloss": 1.0285,
-    "logv_marcador": -2.8933,
-    "d_logloss_vs_produccion": 0.0035,
-    "ee": 0.0011,
-    "z": 3.24,
-    "d_ultimos_bloques": 0.0031,
-    "cumple_regla": false
-   },
-   {
-    "modelo": "dc",
-    "rol": "retador",
-    "n": 3471,
-    "logloss": 1.0293,
-    "logv_marcador": -2.8939,
-    "d_logloss_vs_produccion": 0.0043,
-    "ee": 0.0009,
-    "z": 4.58,
-    "d_ultimos_bloques": 0.0059,
-    "cumple_regla": false
-   },
-   {
-    "modelo": "tiros",
-    "rol": "retador",
-    "n": 3471,
-    "logloss": 1.0312,
-    "logv_marcador": -2.8924,
-    "d_logloss_vs_produccion": 0.0062,
-    "ee": 0.0013,
-    "z": 4.68,
-    "d_ultimos_bloques": 0.0064,
-    "cumple_regla": false
-   }
-  ]
- },
  "vivo": {
   "estado": "terminado_hoy",
   "partidos": 2,
@@ -154,27 +56,27 @@
   "incrustado": true
  },
  "modelo": "ensamble",
- "corte_local": "2026-11-22 21:17",
+ "corte_local": "2026-11-23 01:46",
  "campeon_top": [
   [
    "Cruz Azul",
-   0.2636
+   0.2638
   ],
   [
    "Chivas",
-   0.2082
+   0.2092
   ],
   [
    "América",
-   0.2081
+   0.2082
   ],
   [
    "Toluca",
-   0.1829
+   0.1822
   ],
   [
    "Pachuca",
-   0.0584
+   0.0585
   ]
  ],
  "liguilla_en_curso": false,
@@ -221,9 +123,9 @@
    }
   }
  },
- "huella": "2dc467865955b1e12eab0450874c9f7d",
+ "huella": "177b7ed9669a351e6183811238daa7f9",
  "publicar": false,
- "huella_publicada": "2dc467865955b1e12eab0450874c9f7d",
- "segundos": 102.1,
- "publicado_utc": "2026-11-23T03:26:28Z"
+ "huella_publicada": "177b7ed9669a351e6183811238daa7f9",
+ "segundos": 75.1,
+ "publicado_utc": "2026-11-23T07:58:30Z"
 }

@@ -87,7 +87,16 @@ algo (inicio, gol, expulsión, descanso, final). La página:
   previo; al terminar, resultado final y si el pronóstico acertó;
 - sección «Al momento» (sólo aparece si el documento trae partidos de hoy): marcadores del día, tabla
   al momento con flechas (sólo si el equipo cambió de lugar) y equipos en juego, probabilidad de
-  clasificar y de campeón con su cambio;
+  clasificar y de campeón con su cambio. Desde el 23-nov-2026 (verificación del workflow 10):
+  - el rótulo dice «Hoy» sólo si `dia` del documento es la fecha de hoy en el centro de México; si no, «Ayer» o la
+    fecha, y ningún texto dice «de hoy». Si el documento es de otro día, nada está en juego y sus resultados ya
+    están en `ultimos_resultados` (corrió `pipeline.py auto`), la sección y su botón del menú se retiran;
+  - terminada la fase regular (`tabla_fija` o, con documentos viejos, `proyeccion.regular_completa`) la tabla es
+    «Tabla final de la fase regular», sin flechas, y sólo sale mientras se juega algo (sin nada en juego repetiría
+    «Tabla general · Así terminó»);
+  - la proyección no sale si el motor no la recalculó (`proyeccion.previa`, o un documento viejo con todos los
+    cambios en 0 y sin `partidos_considerados`) ni si, sin nada en juego, sus resultados ya están en la página: serían
+    las cifras de la portada (o unas más viejas) presentadas como «=»;
 - los cambios de probabilidad van con flecha y cifra («▲ 8.0», «▼ 15.8», «=») y una sola nota de
   «puntos porcentuales» por bloque (nunca «pts», que se confunde con los puntos de la tabla);
 - en liguilla, el cuadro, el mini-cuadro y el detalle de la serie muestran el global y la probabilidad
@@ -152,6 +161,9 @@ algo (inicio, gol, expulsión, descanso, final). La página:
     marcadores y confundía); sí lleva el global real cuando la serie ya tiene partidos jugados. En vivo,
     el tablero del global va junto a la pastilla «Al momento» y los % previos se atenúan con el rótulo
     «Antes del partido».
+  - Toda la tarjeta es el botón «Detalle» (`.llave .llave__ver::before` la cubre): en WebKit un toque fuera de un
+    botón no sintetiza el clic. Con la serie en juego, el detalle muestra el marcador real de la pierna que se juega
+    y rotula «antes del partido» el pronóstico de esa pierna y los globales.
   - Tocar una tarjeta abre su detalle debajo (al cargar, el detalle sólo invita a elegir serie): los 5
     marcadores de cada partido, el global más probable (en texto, con la frase que explica por qué no es
     la suma), los globales y los cruces alternativos («sale en 14.4% · CAZ avanza 79%»), y un botón
@@ -166,7 +178,9 @@ algo (inicio, gol, expulsión, descanso, final). La página:
     portada sigue cabiendo en la primera pantalla;
   - «Próximos partidos» muestra esas piernas (`liguilla.torneo`, series `definida` sin decidir que no vienen en
     `pendientes`) como tarjetas compactas: primero las idas y luego las vueltas, con fase y pierna, llave, escudos,
-    marcador más probable, barra 1X2 con %, sede (la de la prensa o la habitual del local: `estadio.origen`) y fecha o ventana («25 o 26 nov»), y un
+    marcador más probable, barra 1X2 con %, el pronóstico de la pierna («Gana Pachuca · 40.7%», del `pick` que trae; su % va
+    resaltado en la barra), sede (la de la prensa o la habitual del local: `estadio.origen`) y fecha o ventana («25 o 26 nov»;
+    desde 600 px en su propio renglón), y un
     botón «Serie C1» que abre el detalle de la serie. Una nota dice que la combinada de cada partido se publica
     cuando la liga confirme día y hora. En celular van en una columna, desde 600 px de dos en dos y desde 1160 px de
     cuatro en cuatro (ningún nombre se parte a media palabra; sede y botón alineados abajo). Si ya hay partidos

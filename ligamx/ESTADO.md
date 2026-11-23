@@ -48,32 +48,31 @@
 - [x] 8. Automatización: `pipeline.py auto` + `modelo/mejora.py ciclo` + tarea programada diaria (runbook abajo).
 
 ## En curso
-**Cierre de la fase regular y puesta a punto de la liguilla (23-nov-2026, desde 03:20 UTC).** Tarea de continuidad
-`trig_011daxVc81g1dWPVNtuVKMCi` ACTIVADA mientras dura. Hecho: `pipeline.py auto` tras Chivas 1-0 Cruz Azul, `vivo/actual`
-en versión 107 (terminado_hoy), página republicada (V26) con `liguilla.torneo` «definido» y `pipeline.py publicado`.
-Falta, en este orden (si la sesión se corta, retomar aquí):
-1. Página en el estado «sin partidos pendientes y cuadro definido»: la portada debe anunciar los cuartos, «Próximos
-   partidos» debe mostrar las 8 piernas de cuartos tomadas de `liguilla.torneo` (hoy sale vacío), las series de cuartos
-   deben decir «definida» y no «proyectada», y `web/pruebas/prueba.js` debe pasar con 0 pendientes (hoy fallan 3
-   revisiones y truena la de pestañas de la combinada).
-2. Ensayo de la liguilla con cortes retrospectivos del Clausura 2026 (antes de la ida, entre ida y vuelta, semifinal,
-   final): exportar + página + motor en vivo con serie a dos partidos.
-3. Regla de menores (confirmar que nadie perdió 3 puntos), horarios y sedes de cuartos (sede de Cruz Azul) y bajas de
-   los 8 clasificados en `config/actualidad.json`.
-Los pasos 1 a 3 corren en el workflow `notas/workflows/10_liguilla_puesta_a_punto.js`. La primera corrida
-(`wf_7ca6f6c0-3d7`, 03:31 UTC) murió a los 18 min porque se agotó el límite del modelo Fable (vuelve el 26-nov 14:00
-UTC); el usuario cambió la sesión a Opus y se relanzó como **`wf_c407c924-72c` (23-nov 03:55 UTC)**, con notas de
-reanudación para A (página, que dejó cambios a medias, guardados en el commit 9882c91) y B (ensayo, que dejó los 7
-cortes y capturas en el scratchpad). Estructura: agentes A página, B ensayo en worktree, C reglas y bajas, D motor en vivo; luego E arreglos,
-V1-V3 verificación y F cierre; sus carpetas de trabajo están en el scratchpad `liguilla/`). Si se cortó: relanzar con
-`Workflow({scriptPath: <ese guion>, resumeFromRunId: "wf_c407c924-72c"})`; si el contenedor se reinició (no hay
-diario), revisar `git status`/`git diff` de `ligamx/`, correr pytest y `web/pruebas/prueba.js` y terminar a mano lo
-que falte. Al terminar el workflow: `python3 -m produccion.exportar` (un millón) + `python3 web/construir.py`,
-pruebas, republicar con `url` y capabilities, `pipeline.py publicado`. La corrida diaria del 23-nov 07:21 UTC se
-pospuso para no pisar al agente F (sin partidos nuevos; `vivo-plan --horas 72` vacío): al terminar el workflow, correr
-`pipeline.py auto` en lugar del exportar suelto (incluye exportar con el millón y construir).
-4. Programar los despertares en vivo de cuartos cuando ESPN liste los partidos; republicar; bitácora; commit y push;
-   desactivar la tarea de continuidad y dejar esta sección en «Nada pendiente».
+Nada pendiente (23-nov-2026, 08:05 UTC). Tarea de continuidad desactivada.
+
+### Último cierre (23-nov): fase regular terminada y liguilla a punto
+Workflow `notas/workflows/10_liguilla_puesta_a_punto.js` (corrida `wf_c407c924-72c`, 9 agentes, 3.5 M de tokens, 3 h
+54 min; diario en `subagents/workflows/wf_c407c924-72c/journal.jsonl`). Después: `pipeline.py auto` con el millón,
+pytest 213 que pasan y 2 saltadas, página 651 revisiones en Chromium y 651 en WebKit, capturas a 390 px revisadas,
+**V27 publicada** con `url` y capabilities, `pipeline.py publicado` y `vivo/actual` en versión 108 (motor nuevo, con
+`tabla_fija` y `previa`). Lo que quedó:
+- Página con cuadro definido y 0 pendientes: la portada anuncia los cuartos; «Próximos partidos» muestra las 8 piernas
+  como tarjetas compactas (sin día ni hora todavía, con su pronóstico); las series dicen «Definida»; la combinada de la
+  jornada se retira hasta que haya horarios; «Al momento» se retira cuando el vivo es de otro día y sus resultados ya
+  están en la página. Toda la tarjeta de una serie abre su detalle (toque real en WebKit).
+- Ensayo con la liguilla del Clausura 2026 (12 cortes retrospectivos): siembra, cruces, resiembra, globales, desempate
+  por mejor sembrado y campeón coinciden con lo real; tras cada ida la probabilidad de avanzar coincide con un cálculo
+  Poisson independiente (máx. 0.75 puntos). Se arreglaron 13 hallazgos (el grave: el cuadro tomaba el estadio habitual
+  y no el del calendario).
+- Regla de menores: los 18 clubes «Cumplió» (ligamx.net, 23-nov): nadie pierde puntos. Sedes de cuartos en
+  `config/torneo.json` (prensa; Cruz Azul cierra en el Estadio Banorte); bajas de los 8 clasificados en
+  `config/actualidad.json` (eliminados marcados). En liguilla nadie aparece «a una amarilla» (las amarillas se limpian).
+- Motor en vivo para series: quién avanzaría si terminara así, qué le falta a cada uno, ida tomada de partidos.csv o
+  del global de ESPN si `auto` no corrió, ganador por reglamento, estados de tiempo extra y penales (37 pruebas).
+- Calendario de cuartos: la tarea «Liga MX: calendario de cuartos» (23:00 UTC de hoy, se reprograma cada 4 h) publica
+  horarios, programa los despertares en vivo y avisa al usuario. WebKit para `prueba.js`: instalado en el scratchpad
+  (`PLAYWRIGHT_BROWSERS_PATH=<scratchpad>/pw`; se pierde si el contenedor se reinicia: reinstalar con
+  `npx playwright install webkit` en esa carpeta).
 
 ### Último cierre (11 a 15-nov)
 Nada pendiente (11-nov-2026, 04:15 UTC). Lo último cerrado: rediseño a punto (portada por favorito que cabe en la
@@ -97,6 +96,13 @@ Falta que el usuario confirme que la página se movió sola en su teléfono: des
 en la base quedaron aceptadas.
 
 ## Pendientes de mejora
+- [ ] **Liguilla (del workflow 10, 23-nov):** (a) martes 24: reporte de la Comisión Disciplinaria de la J17 (fmf.mx):
+  si Hugo González (Toluca) o Salcedo (Monterrey) reciben más de un partido, agregarlos como `suspension` para la
+  vuelta; (b) antes de cada ida revisar las dudas de `config/actualidad.json` y repetir las bajas antes de semifinales
+  (sólo los 4 vivos); (c) escudo de Mazatlán en `web/medios.json` (sale con iniciales en la página del torneo
+  terminado); (d) un corte retrospectivo de una final decidida en tiempo extra o penales para ejercitar ese camino del
+  simulador; (e) en cortes retrospectivos ESPN ya lista las rondas siguientes con sus equipos reales (V2-9): quitarlas
+  para ensayos realistas; (f) la regla de doble amarilla en `config/torneo.json` es ambigua (V3-7, no cambia la tabla).
 - [ ] Fotos de campeón (`web/medios_parts/campeon.json`, unido a `web/medios.json`): sólo hay festejos libres de Toluca (Cl. 2025) y Pumas (Cl. 2011). Si aparecen fotos libres de otros equipos con el trofeo, agregarlas; la portada las toma sola cuando ese equipo es el favorito. (avanzar uno por corrida diaria si alcanza el presupuesto; marcar al cerrar)
 - [ ] Lesionados y técnicos (`config/actualidad.json`, formato en `produccion/MERCADOS.md` §7): antes de la Jornada
   17 (20-22 nov) y de cada ronda de liguilla. Guion: parte "Actualidad" de `notas/workflows/01_reglas_actualidad.js`.
@@ -184,9 +190,9 @@ en la base quedaron aceptadas.
 ## Tareas programadas
 - "Cerebro Liga MX diario" (`trig_0195ELWvAUmne2MKmr1ih8zi`): todos los días a la 01:20 (Ciudad de México), en esta
   sesión. Sigue el runbook de arriba (prompt actualizado el 11-nov con el paso «en vivo»).
-- "Continuar Cerebro Liga MX" (`trig_011daxVc81g1dWPVNtuVKMCi`, cada hora): **ACTIVA desde el 23-nov-2026 03:26 UTC**
-  (puesta a punto de la liguilla); se desactiva al dejar «En curso» en «Nada pendiente». **Activarla antes de cada
-  trabajo largo** (regla del usuario sobre los límites).
+- "Continuar Cerebro Liga MX" (`trig_011daxVc81g1dWPVNtuVKMCi`, cada hora): **desactivada el 23-nov-2026 08:05 UTC**
+  (se cerró la puesta a punto de la liguilla). **Activarla antes de cada trabajo largo** (regla del usuario sobre los
+  límites) y desactivarla al dejar «En curso» en «Nada pendiente».
 - Los despertares en vivo de la Jornada 17 (viernes, sábado y domingo) ya se cumplieron; el «cierre» del domingo
   (`trig_01CGwZtpXxFi73qvKfSYhPMz`) se borró el 23-nov 03:31 UTC porque el cierre se hizo a mano al terminar el partido.
 - «Liga MX: calendario de cuartos» (`trig_01TL9jTmiLVZi8GVJAQVWM9s`, una vez, lunes 23-nov 17:00 de México = 23:00 UTC):
@@ -265,3 +271,4 @@ en la base quedaron aceptadas.
 - 2026-11-22 05:25 UTC · **Sábado de la Jornada 17 en vivo** (Pachuca 2-0 Toluca, Santos 1-2 León, Pumas 0-2 Monterrey, Tigres 1-0 América): 35 eventos (36 a 70) escritos en `vivo/actual` (versiones 53 a 88) con `vivo_relevo.sh`, una respuesta por despertar; esta vez NO se acabó el límite de uso (a la vez se atendió la parrilla de F1). Segundo gol anulado real (Tigres, 65') bien corregido. Cierre: 8 sellos calificados, 3 ganadores y 1 marcador exacto; combinadas completas: segura 2 de 8, equilibrada 4 de 8, atrevida 1 de 8. Modelo contra mercado (7 partidos): 1.051 contra 1.073, diferencia −0.022 ± 0.041: sin conclusión. Ciclo de mejora sin cambio de modelo. **Los ocho clasificados ya están definidos** (Cruz Azul, América, Chivas, Atlas, Toluca, Monterrey, León, Pachuca; Pachuca entra con 25 puntos por desempate sobre Tijuana y Santos); falta el orden de los tres primeros (Chivas–Cruz Azul del domingo). Favorito nuevo: Cruz Azul 26.4%, América 22.9%, Chivas 19.4%, Toluca 18.0%, Pachuca 5.6%. V24 publicada.
 - 2026-11-22 07:25 UTC · Corrida diaria: sin partidos nuevos tras el cierre de las 05:25; V25 publicada (`vivo/actual` sigue en versión 88). Hoy se juega el bloque del domingo (Chivas–Cruz Azul 23:07 UTC, Querétaro–Necaxa 01:10 UTC), ya programado; su cierre avisa al usuario de los cruces. Mañana: bajas de los 8 clasificados para los cuartos (`config/actualidad.json` tiene 4 días).
 - 2026-11-23 03:30 UTC · **Domingo de la Jornada 17 en vivo y FIN DE LA FASE REGULAR** (Chivas 1-0 Cruz Azul, Querétaro 2-2 Necaxa): 18 eventos (71 a 88) escritos en `vivo/actual` (versiones 89 a 106) con `vivo_relevo.sh`, sin rechazos ni cortes por límite; el bucle salió con código 3 (`terminado_hoy`) a las 03:17 UTC. Cierre a mano en cuanto acabó el partido (sin esperar el despertar de las 03:40, que se borró): `pipeline.py auto` (ciclo de mejora sin cambio de modelo), `vivo/actual` en versión 107, **V26 publicada** con `liguilla.torneo` «definido». Tabla final (coincide con ESPN): Chivas 33, Cruz Azul 32, América 30, Atlas 28, Toluca 27, Monterrey 27, León 26, Pachuca 25 (fuera Tijuana y Santos con 25). Cuartos: Chivas–Pachuca (avanza Chivas 64%), Cruz Azul–León (82%), América–Monterrey (71%), Atlas–Toluca (Toluca 72%). Campeón: Cruz Azul 26.4%, Chivas 20.8%, América 20.8%, Toluca 18.3%, Pachuca 5.8%, Monterrey 4.8%, Atlas 1.8%, León 1.3% (que Cruz Azul siga en 26.36% tras perder es coincidencia comprobada: su fuerza bajó de 0.761 a 0.707 pero cambia a Pachuca por León en cuartos; p_semifinal pasó de 73.7% a 81.1%). **Jornada 17 completa (9 partidos): 3 ganadores acertados y 1 marcador exacto; combinadas completas: segura 3 de 9, equilibrada 3 de 9, atrevida 1 de 9. Modelo contra mercado (9 partidos con momios sellados): log-loss 1.059 contra 1.080 (−0.021 ± 0.032, a favor del modelo pero sin poder concluir; el favorito del mercado ganó 2 de 9).** Acumulado de sellos calificados (10): 4 ganadores, log-loss 1.038. Los medios confirman los cruces (El Heraldo, Telediario, Diario Puntual); ESPN todavía no lista los cuartos (la liga publica horarios el lunes 23). Con 0 pendientes la página deja dos secciones vacías y `web/pruebas/prueba.js` falla (3 revisiones + la de pestañas): se lanzó el workflow `10_liguilla_puesta_a_punto.js` (`wf_7ca6f6c0-3d7`) y se activó la tarea de continuidad.
+- 2026-11-23 08:05 UTC · **Liguilla a punto.** Terminó el workflow 10 (`wf_c407c924-72c`, relanzado en Opus tras agotarse el límite de Fable): página para el cuadro definido sin horarios, ensayo con la liguilla del Clausura 2026 (12 cortes; datos correctos, 13 hallazgos arreglados), menores (nadie pierde puntos), sedes y bajas de los 8, motor en vivo para series, y 9 hallazgos importantes de la verificación arreglados con su prueba. La corrida diaria de las 07:21 se pospuso hasta el cierre del agente F y se corrió después: `pipeline.py auto` (sin partidos nuevos; un millón de simulaciones), pytest 213 + 2 saltadas, página 651 revisiones por motor (Chromium y WebKit), **V27 publicada**, `vivo/actual` en versión 108. Campeón: Cruz Azul 26.4%, Chivas 20.9%, América 20.8%, Toluca 18.2%, Pachuca 5.9%. ESPN todavía no lista los cuartos (`vivo-plan --horas 72` vacío); la tarea de las 23:00 UTC los revisa. Tarea de continuidad desactivada.

@@ -142,7 +142,9 @@ simula esos partidos como marcador actual + Poisson(lo que falta). Detalles que 
 - vivo.py publica `p = último pronóstico previo (actual.json) + (simulación con en_juego − simulación base)`,
   las dos con 100,000 simulaciones, 10,000 muestras de parámetros y la misma semilla (el pronóstico previo usa
   1,000,000; al momento se usan menos porque se recalcula en cada consulta: con 1,000,000 cada gol llegaría ~40 s tarde). Sin nada en juego `p` es
-  exactamente el de `actual.json` y `delta` = 0.
+  exactamente el de `actual.json` y `delta` = 0, y la proyección lleva `previa: true`; si lo de hoy ya está en `partidos.csv`
+  (corrió `pipeline.py auto` tras los partidos) lleva además `incluye_hoy: true` y una `nota`: ese 0 NO es «sin cambio frente a
+  antes de los partidos» (V3-1 del workflow 10), y la página no muestra esa proyección.
 - Ruido: un `delta` de menos de ~0.3 puntos en un equipo que no juega puede ser ruido (`proyeccion.ruido` = 0.003;
   medido el 11-nov-2026 entre 6 semillas: desviación del cambio 0.0012 con 100,000 simulaciones, 0.004 con 6,000).
 - Costo: armar la base (pronosticador + simulación) tarda ~10 s la primera vez del día y se guarda en
