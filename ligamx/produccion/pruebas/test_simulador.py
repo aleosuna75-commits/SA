@@ -449,12 +449,20 @@ def test_exportar_valida_su_json(df, pron, tmp_path):
 
 
 def test_exportar_inicio_de_torneo_cabe_en_600_kb(df, tmp_path):
-    """Corte retrospectivo con 100 o más partidos por jugar: sólo los primeros llevan ficha completa."""
-    doc = ex.construir("2026-08-10T00:00", n_sim=2000, sellar=False, ruta_sellos=tmp_path / "s.jsonl",
-                       ruta_desempeno=tmp_path / "d.json", df=df, pron=Pronosticador(corte="2026-08-10T00:00", partidos=df))
+    """
+    Corte retrospectivo con más de 100 partidos por jugar en el torneo: «pendientes» sólo trae las dos próximas
+    jornadas y lo de los 6 días siguientes (V2-7 del workflow 10: con todo el torneo, «Próximos partidos» medía 143,548
+    px a 390 px); los primeros MAX_DETALLE llevan ficha completa.
+    """
+    corte = "2026-08-10T00:00"
+    doc = ex.construir(corte, n_sim=2000, sellar=False, ruta_sellos=tmp_path / "s.jsonl",
+                       ruta_desempeno=tmp_path / "d.json", df=df, pron=Pronosticador(corte=corte, partidos=df))
     assert ex.validar(doc) == []
-    assert doc["meta"]["retrospectivo"] and len(doc["pendientes"]) > 100
-    assert sum(p["detalle"] for p in doc["pendientes"]) == ex.MAX_DETALLE
+    por_jugar = df[(df["torneo"] == TORNEO) & (df["fecha_utc"] >= S.a_utc(corte)) & (df["estado"] != "cancelado")]
+    assert len(por_jugar) > 100 and doc["meta"]["retrospectivo"]
+    limpias = list(dict.fromkeys(p["etiqueta"] for p in doc["pendientes"] if "eprogramado" not in p["etiqueta"]))
+    assert 9 <= len(doc["pendientes"]) <= 27 and len(limpias) <= ex.RONDAS_PENDIENTES
+    assert sum(p["detalle"] for p in doc["pendientes"]) == min(ex.MAX_DETALLE, len(doc["pendientes"]))
     assert not (tmp_path / "s.jsonl").exists()                                    # una corrida retrospectiva no sella
 
 

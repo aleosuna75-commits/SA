@@ -158,6 +158,57 @@ def test_h2_vuelta_trae_la_serie_y_lo_que_necesita_cada_uno(doc_entre):
     assert all(p["serie"]["ida"] is None for p in vueltas if p["local"] in (s[2], s[3]))
     ida = [p for p in doc["pendientes"] if p["fase"] == "cuartos" and p["pierna"] == 1][0]["serie"]
     assert ida["pierna"] == 1 and "mejor sembrado" in ida["texto"]
+    # V1-3: `necesita` es null en la ida y en la vuelta cuya ida no tiene resultado (como dice el contrato)
+    assert ida["necesita"] is None
+    assert all(p["serie"]["necesita"] is None for p in vueltas if p["local"] in (s[2], s[3]))
+
+
+def test_v2_6_cada_pierna_sin_jugar_trae_su_pronostico(doc_publicado):
+    """La tarjeta compacta de una pierna sin día ni hora dice quién gana (antes sólo el tablero «1·1» y la barra)."""
+    _, _, doc = doc_publicado
+    sin_jugar = [l for x in _series(doc) for l in x["piernas"] if not l["jugado"]]
+    assert sin_jugar
+    for l in sin_jugar:
+        tres = {"L": l["p_local"], "E": l["p_empate"], "V": l["p_visitante"]}
+        pk = l["pick"]
+        assert pk["resultado"] == max(tres, key=tres.get) and pk["prob"] == pytest.approx(max(tres.values()), abs=1e-4)
+        assert pk["equipo"] == {"L": l["local"], "E": "Empate", "V": l["visitante"]}[pk["resultado"]]
+
+
+def test_v3_4_aviso_de_la_final_recorrida_sale_de_la_config():
+    from produccion import simulador
+    a = ex._aviso_final_recorrida(simulador.cargar_reglas())
+    assert "si Toluca llega a la final de liga" in a and "24 y 27 de diciembre" in a and "no lo ha precisado" in a
+    assert "avanza en la Copa Intercontinental" not in a
+    assert ex._dias_mes(["2026-11-30", "2026-12-03"]) == "30 de noviembre y 3 de diciembre"
+
+
+def test_v2_7_tras_la_final_sigue_el_torneo_terminado(tmp_path):
+    """
+    25-may-2026 (día siguiente a la final del Clausura 2026): partidos.csv ya trae el Apertura 2026 (empieza el 16-jul).
+    El documento sigue con el Clausura 2026 (campeón decidido, sin pendientes) hasta 7 días antes del torneo nuevo; ya
+    con el torneo nuevo, «pendientes» sólo trae sus dos primeras jornadas (antes, los 153 partidos).
+    """
+    d = datos.cargar()
+    corte = "2026-05-25T12:00"
+    d2, sig = ex.sin_torneo_siguiente(d, corte)
+    assert sig == "Apertura 2026" and not (d2["torneo"] == "Apertura 2026").any()
+    doc = ex.construir(corte, n_sim=2000, sellar=False, ruta_sellos=tmp_path / "s.jsonl", ruta_desempeno=tmp_path / "d.json",
+                       df=d, pron=Pronosticador(corte=corte, partidos=d2))
+    assert ex.validar(doc) == []
+    t = doc["liguilla"]["torneo"]
+    assert doc["meta"]["torneo"] == "Clausura 2026" and doc["pendientes"] == []
+    assert t["estado"] == "terminado" and t["campeon_decidido"] and doc["ultimos_resultados"][0]["etiqueta"] == "Final, vuelta"
+    assert "sigue con el Clausura 2026" in doc["avisos"][-1]
+    assert ex.sin_torneo_siguiente(d, "2026-05-22T12:00")[1] is None             # entre la ida y la vuelta de la final, no
+    primero = d.loc[d["torneo"] == "Apertura 2026", "fecha_utc"].min()
+    pegado = (primero - pd.Timedelta(days=5)).tz_convert("America/Mexico_City").strftime("%Y-%m-%dT%H:%M")
+    assert ex.sin_torneo_siguiente(d, pegado)[1] is None                          # a 5 días del torneo nuevo, ya es ése
+    doc = ex.construir(pegado, n_sim=2000, sellar=False, ruta_sellos=tmp_path / "s2.jsonl", ruta_desempeno=tmp_path / "d2.json",
+                       df=d, pron=Pronosticador(corte=pegado, partidos=d))
+    limpias = list(dict.fromkeys(p["etiqueta"] for p in doc["pendientes"] if "eprogramado" not in p["etiqueta"]))
+    assert doc["meta"]["torneo"] == "Apertura 2026" and limpias == ["Jornada 1", "Jornada 2"]
+    assert sum(p["etiqueta"] == "Jornada 2" for p in doc["pendientes"]) >= 7 and len(doc["pendientes"]) <= 22
 
 
 def test_h2_frases_de_la_final():
@@ -221,7 +272,9 @@ def test_a6_formato_sin_fechas_de_otro_torneo(df, tmp_path):
 
 
 def test_c5_en_liguilla_nadie_llega_apercibido():
-    c = Contexto("2026-11-23")
+    # datos AL CORTE (V1-1 del workflow 10): con los datos del día, en cuanto partidos.csv trae la ida de cuartos
+    # de Monterrey (agendada antes del 26-nov 21:00, o ya jugada) suspendidos() da conocido=False y la prueba fallaba
+    c = Contexto("2026-11-23", partidos=al_corte(datos.cargar(), "2026-11-23T00:00", TORNEO))
     reg = c.suspendidos("Monterrey", "2026-11-26 21:00", "regular")
     lig = c.suspendidos("Monterrey", "2026-11-26 21:00", "cuartos")
     assert reg["apercibidos"] and lig["apercibidos"] == []

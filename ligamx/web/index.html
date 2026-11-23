@@ -208,7 +208,9 @@ h1 span{display:block;color:var(--oro)}
 .pleg{display:flex;flex-direction:column;gap:var(--e-3);padding:var(--e-4);min-width:0;scroll-margin-top:76px}
 .pleg>*{min-width:0}
 .pleg .cuando .chip{letter-spacing:.06em}
-.pleg .cuando span:last-child{margin-left:auto;color:var(--cal)}
+.pleg .cuando .pleg__f{margin-left:auto;color:var(--cal)}
+.pick--ch{padding:8px 10px}
+.pick--ch b{font-size:var(--t-3)}
 .pleg .duelo{margin-top:0}
 .pleg .eq__n{font-size:1.15rem;overflow-wrap:normal}   /* un nombre de una sola palabra nunca se parte («MONTERR-EY»); dos palabras sí van en dos renglones */
 .pleg__pie{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:auto;padding-top:var(--e-2);border-top:1px dashed var(--linea);font-size:var(--t-1);line-height:1.25;color:var(--cal-2)}
@@ -397,7 +399,8 @@ tbody th{background:var(--noche-3);color:var(--oro);padding-top:11px}
 .cuadro-estado{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px}
 .cuadro-estado p{flex:1 1 30ch;color:var(--cal-2);font-size:var(--t-2);max-width:66ch}
 .leyenda-m{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:var(--t-0);color:var(--gris)}
-.leyenda-m span{display:inline-flex;align-items:center;gap:6px}
+.leyenda-m span{display:inline-flex;flex-wrap:wrap;align-items:center;gap:0 6px}
+@media (max-width:379px){.leyenda-m__mini{flex:1 0 100%;padding-left:20px}}
 .leyenda-m i{width:14px;height:14px;border-radius:3px;background:var(--noche-3);border:1px solid var(--oro)}
 .leyenda-m i.r{background:var(--noche-4);border-color:var(--cal)}
 .leyenda-m__mini{font-style:normal}
@@ -487,7 +490,7 @@ tbody th{background:var(--noche-3);color:var(--oro);padding-top:11px}
 .avanza i.f{background:linear-gradient(90deg,var(--oro),var(--oro-2))}
 .avanza--g{height:22px}
 .avanza--g i{display:grid;place-items:center;min-width:2.8em;font:800 var(--t-0)/1 var(--f-texto);font-style:normal;font-variant-numeric:tabular-nums;color:var(--tinta)}
-.piernas{flex:1 0 auto;display:grid;gap:7px;align-content:space-around;padding-top:8px;border-top:1px dashed var(--linea)}
+.piernas{flex:none;display:grid;gap:7px;align-content:start;padding-top:8px;border-top:1px dashed var(--linea)}
 .pierna{display:grid;grid-template-columns:auto minmax(0,1fr);gap:3px 10px;align-items:center}
 .pierna__n{grid-column:1/-1;display:flex;align-items:baseline;gap:8px;min-width:0;font:500 var(--t-0)/1.25 var(--f-texto);color:var(--gris)}
 .pierna__n b{flex:none;font-weight:700;text-transform:uppercase;letter-spacing:.13em;font-size:.66rem;color:var(--oro)}
@@ -504,6 +507,7 @@ tbody th{background:var(--noche-3);color:var(--oro);padding-top:11px}
 .llave__vivo .lv__t b{font:900 1.15rem/1 var(--f-cartel);font-variant-numeric:tabular-nums;color:var(--oro-2)}
 .llave__ver{flex:none;margin-left:auto;display:inline-flex;align-items:center;gap:6px;min-height:28px;font:700 .66rem/1 var(--f-texto);text-transform:uppercase;letter-spacing:.14em;color:var(--oro-2)}
 .llave__ver::after{content:"";width:6px;height:6px;border-top:2px solid currentColor;border-right:2px solid currentColor;transform:rotate(45deg)}
+.llave .llave__ver::before{content:"";position:absolute;inset:0;border-radius:var(--radio)} /* toda la tarjeta es el botón «Detalle»: en WebKit (iPhone) tocar fuera de un botón no abría el detalle */
 .final-eje{position:relative;display:flex;flex-direction:column-reverse;width:100%}
 .campeon-ruta{position:relative;display:grid;justify-items:center;gap:3px;padding-top:30px;text-align:center}
 .campeon-ruta::after{content:"";position:absolute;left:50%;top:0;height:22px;margin-left:-1px;border-left:var(--cal-l)}
@@ -538,6 +542,7 @@ tbody th{background:var(--noche-3);color:var(--oro);padding-top:11px}
 .leg__cab h4{color:var(--oro-2)}
 .leg__cab>span:not(.chip){font-size:var(--t-1);color:var(--cal-2)}
 .leg__cab .chip{margin-left:auto;align-self:center}
+.leg__vivo{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;padding:7px 8px;border:1px solid var(--rojo-brillo);border-radius:6px;background:var(--rojo-tenue)}
 .leg .duelo{margin-top:0}
 .leg .eq__n{font-size:1.1rem}
 .viene{padding-left:12px;border-left:2px solid var(--linea-2);font-size:var(--t-1);color:var(--cal-2);max-width:66ch}
@@ -704,6 +709,7 @@ tr.enjuego td.eqc .pulso{margin-left:8px;vertical-align:middle}
   .sigue__caja--lig{grid-template-columns:minmax(0,1fr) auto}
   .sigue__caja--lig .cruces-lig{grid-column:1/-1;grid-row:2;grid-template-columns:repeat(4,minmax(0,1fr))}
   .plegs{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .pleg .cuando .pleg__f{flex-basis:100%;margin-left:0}   /* con 2 o 4 por fila la fecha no cabía junto a la fase y bajaba sola a la derecha */
   .rej{grid-template-columns:repeat(2,minmax(0,1fr))}
   .dos{grid-template-columns:repeat(2,minmax(0,1fr))}
   .resumen{grid-template-columns:repeat(4,minmax(0,1fr))}
@@ -779,6 +785,7 @@ tr.enjuego td.eqc .pulso{margin-left:8px;vertical-align:middle}
   .pleg .eq__n{font-size:1rem;letter-spacing:.01em}      /* cuatro por renglón: el nombre más largo de una palabra («Querétaro», «Monterrey») cabe entero */
   .pleg .mini{letter-spacing:.05em}
 }
+@media (min-width:600px) and (max-width:1159px){.pleg .eq__n{min-height:2em}}
 @media (min-width:1160px) and (max-width:1319px){
   .barra__nav button{padding:14px 6px;letter-spacing:.06em}
 }
@@ -1346,10 +1353,10 @@ function portada() {
   }
   var u = obj((obj((D.proyeccion.titulos || {})[f.equipo]) || {}).ultimo);
   if (u && u.torneo) {
-    var gm = /^(.+?) (\d+)-(\d+) (.+)$/.exec(txt(u.global)), fin = '';
-    if (gm && u.rival && (gm[1] === f.equipo || gm[4] === f.equipo)) fin = 'ante ' + u.rival + ', ' + (gm[1] === f.equipo ? gm[2] + '-' + gm[3] : gm[3] + '-' + gm[2]);
-    else if (u.global) fin = 'final ' + u.global;
-    h += '<p class="palmares"><span>Último título</span><b>' + E(u.torneo) + '</b>' + (fin ? '<i>' + E(fin) + (gm ? '<em> en el global' + (u.estadio ? ' · ' + E(txt(u.estadio)) : '') + '</em>' : '') + '</i>' : '') + '</p>';
+    var gm = /^(.+?) (\d+)-(\d+) (.+)$/.exec(txt(u.global)), cola = ''; /* «cola», no «fin»: arriba «fin» es la serie final */
+    if (gm && u.rival && (gm[1] === f.equipo || gm[4] === f.equipo)) cola = 'ante ' + u.rival + ', ' + (gm[1] === f.equipo ? gm[2] + '-' + gm[3] : gm[3] + '-' + gm[2]);
+    else if (u.global) cola = 'final ' + u.global;
+    h += '<p class="palmares"><span>Último título</span><b>' + E(u.torneo) + '</b>' + (cola ? '<i>' + E(cola) + (gm ? '<em> en el global' + (u.estadio ? ' · ' + E(txt(u.estadio)) : '') + '</em>' : '') + '</i>' : '') + '</p>';
   }
   h += '<ol class="favoritos" aria-label="Los cuatro con más probabilidad de ser campeón">' + c.map(function (x) {
     return '<li>' + esc(x.equipo, 38) + '<span class="fav__n">' + E(x.equipo) + '</span><span class="fav__p">' + pct(x.prob) + '</span></li>';
@@ -1631,7 +1638,8 @@ function tarjeta(p, nSede) {
     '<div class="pvivo ancho" data-pvivo="' + E(p.id) + '" hidden></div>' + parcial('serie del partido', function () { return serieTarjeta(p); });
   var lig = !!FASE1[p.fase];
   function equipo(eq, x, rol) {
-    return '<div class="eq">' + esc(eq, 58) + '<span class="eq__n">' + E(eq) + '</span><span class="eq__r">' + rol + (x && ok(x.posicion) ? ' · ' + x.posicion + '.º' + (ok(x.puntos) ? ', ' + x.puntos + ' pts' : '') : '') + '</span></div>';
+    var pj = (D.tabla.filter(function (r) { return r.equipo === eq; })[0] || {}).PJ; /* antes de la Jornada 1 no hay lugar que decir («10.º, 0 pts») */
+    return '<div class="eq">' + esc(eq, 58) + '<span class="eq__n">' + E(eq) + '</span><span class="eq__r">' + rol + (x && ok(x.posicion) && pj !== 0 ? ' · ' + x.posicion + '.º' + (ok(x.puntos) ? ', ' + x.puntos + ' pts' : '') : '') + '</span></div>';
   }
   var mc = p.marcador || {};
   h += '<div class="col"><div><h4 class="oculto" id="pt-' + E(p.id) + '">' + E(p.local) + ' contra ' + E(p.visitante) + '</h4>' +
@@ -1641,14 +1649,15 @@ function tarjeta(p, nSede) {
     equipo(p.visitante, c.equipo_visitante, 'Visita') + '</div></div>';
   var pk = p.pick || {};
   var top = (p.top5 || []).map(function (t) { return '<li><b>' + E(t.gl) + '-' + E(t.gv) + '</b>' + pct(t.prob) + '</li>'; }).join('');
-  h += '<div class="sub"><h5>Quién gana' + (lig ? ' este partido (90 minutos)' : '') + '</h5>' + x12(p.p_local, p.p_empate, p.p_visitante) + ley(p) +
+  h += '<div class="sub"><h5>Quién gana' + (lig ? ' (90 minutos)' : '') + '</h5>' + x12(p.p_local, p.p_empate, p.p_visitante) + ley(p) +
     '<p class="pick"><span>Pronóstico</span><b>' + (pk.resultado === 'E' ? 'Empate' : 'Gana ' + E(pk.equipo)) + '</b><span>' + pct(pk.prob) + ' de probabilidad</span></p></div>';
   h += '<div class="sub">' + (top ? '<h5>Los 5 marcadores más probables</h5><ul class="top5">' + top + '</ul>' : '') +
     (ok(p.lam_l) && ok(p.lam_v) ? '<div class="xg"><div><span>Goles esperados<br>de ' + E(abr(p.local)) + '</span><b>' + n2(p.lam_l) + '</b></div><div><span>Goles esperados<br>de ' + E(abr(p.visitante)) + '</span><b>' + n2(p.lam_v) + '</b></div></div>' : '') + '</div>';
   var pest = parcial('combinada del partido', function () { return pestanas(p.combinadas, true); });
   h += '</div><div class="col"><div class="sub"><h5>Combinada del partido</h5>' + (pest
     ? '<p class="nota">Cuatro pronósticos de este mismo juego en un solo boleto. Elige cuánto riesgo quieres.' + (lig ? ' Cuentan sólo los 90 minutos: sin tiempo extra ni penales.' : '') + '</p>' + pest
-    : '<p class="nota">No hay cuatro pronósticos compatibles para armar la combinada de este partido.</p>') + '</div></div>';
+    : '<p class="nota">' + (p.detalle === false ? 'La combinada de este partido se publica más cerca de la fecha: la ficha completa sale para los próximos partidos.'
+      : 'No hay cuatro pronósticos compatibles para armar la combinada de este partido.') + '</p>') + '</div></div>';
   var porque = [
     parcial('factores', function () { return factores(p); }),
     parcial('forma', function () { var a = formaEquipo(c.equipo_local), b = formaEquipo(c.equipo_visitante); return a || b ? '<div class="dos">' + a + b + '</div>' : ''; }),
@@ -1693,10 +1702,12 @@ function tarjetaPierna(x) { /* tarjeta compacta: fase y pierna, llave, fecha (o 
   function eq(e, rol) { var sem = e === mj ? semDe(s.mejor) : semDe(s.peor); return '<div class="eq">' + esc(e, 46) + '<span class="eq__n">' + E(e) + '</span><span class="eq__r">' + rol + (sem != null ? ' · ' + sem + '.º' : '') + '</span></div>'; }
   return '<article class="pleg corner a" id="pl-' + x.pid + '" data-pleg="' + x.pid + '" aria-labelledby="plt-' + x.pid + '">' +
     '<h4 class="oculto" id="plt-' + x.pid + '">' + E(FASE1[s.fase] || 'Liguilla') + ', ' + (x.n === 2 ? 'vuelta' : 'ida') + ': ' + E(l.local) + ' contra ' + E(l.visitante) + '</h4>' +
-    '<p class="cuando"><b>' + E(FASE_C[s.fase] || 'Liguilla') + ' · ' + (x.n === 2 ? 'Vuelta' : 'Ida') + '</b><span class="chip">' + k + '</span>' + (cuando ? '<span>' + E(cuando) + '</span>' : '') + '</p>' +
+    '<p class="cuando"><b>' + E(FASE_C[s.fase] || 'Liguilla') + ' · ' + (x.n === 2 ? 'Vuelta' : 'Ida') + '</b><span class="chip">' + k + '</span>' + (cuando ? '<span class="pleg__f">' + E(cuando) + '</span>' : '') + '</p>' +
     '<div class="duelo">' + eq(l.local, 'Local') + '<div class="duelo__c"><span class="mini">Marcador<br>más probable</span>' +
     (ok(m.gl) && ok(m.gv) ? tablero(m.gl, m.gv, true) : '<span class="mini">Por definir</span>') + (ok(m.prob) ? '<span class="duelo__p">' + pct(m.prob) + '</span>' : '') + '</div>' + eq(l.visitante, 'Visita') + '</div>' +
     (ok(l.p_local) && ok(l.p_empate) && ok(l.p_visitante) ? '<div>' + x12(l.p_local, l.p_empate, l.p_visitante) + ley(l) + '</div>' : '') +
+    /* quién gana: el pick que trae la pierna (Python); sin él, el tablero «1·1» se leía como «empate» aunque hubiera favorito */
+    (obj(l.pick) && /^[LEV]$/.test(l.pick.resultado) && ok(l.pick.prob) ? '<p class="pick pick--ch"><span>Pronóstico</span><b>' + (l.pick.resultado === 'E' ? 'Empate' : 'Gana ' + E(l.pick.equipo)) + '</b><span>' + pct(l.pick.prob) + '</span></p>' : '') +
     '<p class="pleg__pie"><span>' + E(est || 'Sede por confirmar') + '</span><button type="button" class="llave__ver" data-serie="' + k + '" aria-label="Ver el detalle de la serie ' + E(mj) + ' contra ' + E(eqDe(s.peor)) + ' en el cuadro">Serie ' + k + '</button></p></article>';
 }
 function hayCombinadaJornada() { var cj = obj(D.combinada_jornada); return !!cj && ['segura', 'equilibrada', 'atrevida'].some(function (k) { return obj(cj[k]) && arr(cj[k].picks).length > 0; }); }
@@ -1809,7 +1820,7 @@ function campeon() {
   return '<div class="bloque a"><div class="bloque__cab"><h3>¿Quién será campeón?</h3><p>Probabilidad de levantar el trofeo. El ± es el error de la simulación, no toda la incertidumbre.</p></div>' +
     '<ol class="barras">' + con.map(function (c) {
       return '<li>' + esc(c.equipo, 32) + '<span class="nb">' + E(c.equipo) + '</span><span class="pista" aria-hidden="true"><i style="width:' + w(c.prob, tope) + '%"></i></span>' +
-        '<span class="val">' + pct(c.prob) + (ok(c.ee) ? '<small>± ' + (c.ee > 0 && c.ee < 0.0005 ? '<0.1' : (c.ee * 100).toFixed(1)) + '</small>' : '') + '</span></li>';
+        '<span class="val">' + pct(c.prob) + (ok(c.ee) ? '<small>± ' + (c.ee > 0 && c.ee < 0.0005 ? '&lt;0.1' : (c.ee * 100).toFixed(1)) + '</small>' : '') + '</span></li>';
     }).join('') + '</ol>' +
     (elim.length ? '<p class="nota">Eliminados en la liguilla: ' + nombres(elim) + '.</p>' : '') +
     (fuera.length ? '<p class="nota">No clasificaron a la liguilla: ' + nombres(fuera) + '.</p>' : '') +
@@ -2023,7 +2034,8 @@ function legDetalle(l, r) {
   var jug = !!l.jugado, m = obj(l.marcador) || {}, gl = jug ? l.gl : m.gl, gv = jug ? l.gv : m.gv;
   var meta = [txt((obj(l.estadio) || {}).nombre), cuandoPierna(l, r)].filter(Boolean).join(' · ');
   function eq(e, rol) { return '<div class="eq">' + esc(e, 46) + '<span class="eq__n">' + E(e) + '</span><span class="eq__r">' + rol + '</span></div>'; }
-  var h = '<div class="leg' + (jug ? ' leg--real' : '') + '"><div class="leg__cab"><h4>' + (l.pierna === 2 ? 'Vuelta' : 'Ida') + '</h4><span>' + E(meta) + '</span><span class="chip' + (jug ? ' chip--real">Resultado' : '">Pronóstico') + '</span></div>' +
+  var h = '<div class="leg' + (jug ? ' leg--real' : '') + '" data-leg="' + (l.pierna === 2 ? 2 : 1) + '"><div class="leg__cab"><h4>' + (l.pierna === 2 ? 'Vuelta' : 'Ida') + '</h4><span>' + E(meta) + '</span><span class="chip' + (jug ? ' chip--real">Resultado' : '" data-antes>Pronóstico') + '</span></div>' +
+    (jug ? '' : '<p class="leg__vivo" data-leg-vivo hidden></p>') +
     '<div class="duelo">' + eq(l.local, 'Local') + '<div class="duelo__c"><span class="mini">' + (jug ? 'Marcador<br>final' : 'Marcador<br>más probable') + '</span>' +
     (ok(gl) && ok(gv) ? tablero(gl, gv, true, jug ? 'tablero--real' : '') : '<span class="mini">Por definir</span>') + (!jug && ok(m.prob) ? '<span class="duelo__p">' + pct(m.prob) + '</span>' : '') + '</div>' + eq(l.visitante, 'Visita') + '</div>';
   if (jug) return h + '</div>';
@@ -2061,7 +2073,7 @@ function detalleSerie() {
   var legs = arr(s.piernas).filter(obj).map(function (l) { return parcial('partido de ' + (l.pierna === 2 ? 'vuelta' : 'ida'), function () { return legDetalle(l, r); }); }).join('');
   if (legs) h += '<div class="legs">' + legs + '</div>';
   var top = arr(G.top).filter(obj).slice(0, 5).map(function (x) { return '<li><b>' + E(x.mejor) + '-' + E(x.peor) + '</b>' + pct(x.prob) + '</li>'; }).join('');
-  if (top && !s.decidida) h += '<div class="sub"><h5>' + (g.n ? 'Cómo puede terminar el global' : 'Los 5 marcadores globales más probables') + '</h5><p class="nota">Primero los goles de ' + E(mj) + '.</p><ul class="top5">' + top + '</ul>' +
+  if (top && !s.decidida) h += '<div class="sub"><h5 data-antes>' + (g.n ? 'Cómo puede terminar el global' : 'Los 5 marcadores globales más probables') + '</h5><p class="nota">Primero los goles de ' + E(mj) + '.</p><ul class="top5">' + top + '</ul>' +
     (ok(G.p_gana_mejor) && ok(G.p_empate) && ok(G.p_gana_peor) ? '<ul class="chips"><li>Gana el global ' + E(mj) + ' <b>' + pct(G.p_gana_mejor, 0) + '</b></li><li>Global empatado <b>' + pct(G.p_empate, 0) + '</b></li><li>Gana el global ' + E(pr) + ' <b>' + pct(G.p_gana_peor, 0) + '</b></li></ul>' : '') + '</div>';
   var alt = serieDefinida(s) ? [] : arr(s.alternativas).filter(obj); /* un cruce definido ya no tiene alternativas */
   if (alt.length) h += '<div class="sub"><h5>' + (s.fase === 'cuartos' ? 'Los cruces más probables de esta llave' : s.fase === 'final' ? 'Las finales más probables' : 'Las semifinales más probables') + '</h5>' +
@@ -2410,6 +2422,7 @@ function normVivo(d) { /* devuelve sólo lo que tiene la forma esperada; un docu
   d = obj(d); if (!d) return null;
   var v = {
     ejemplo: !!d.ejemplo, prueba: !!d.prueba, generado_utc: typeof d.generado_utc === 'string' ? d.generado_utc : '', estado: txt(d.estado),
+    dia: typeof d.dia === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(d.dia) ? d.dia : '',
     partidos: arr(d.partidos).filter(function (p) { return obj(p) && p.id != null && typeof p.local === 'string' && typeof p.visitante === 'string'; }),
     tabla: arr(d.tabla).filter(function (r) { return obj(r) && typeof r.equipo === 'string'; }), tabla_nota: txt(d.tabla_nota), tabla_fija: d.tabla_fija === true,
     proyeccion: obj(d.proyeccion) || {}, series: arr(d.series).filter(function (x) { return obj(x) && x.llave; }),
@@ -2427,6 +2440,23 @@ function normVivo(d) { /* devuelve sólo lo que tiene la forma esperada; un docu
   return v;
 }
 function vencido(v) { return !!v && v.hayJuego && Date.now() > v.vence; }
+function diaMX(ms) { return new Date(ms - 6 * 3600000).toISOString().slice(0, 10); } /* fecha del centro de México (UTC-6, sin horario de verano) */
+function cuandoVivo() { /* ¿los datos en vivo son de HOY (fecha del centro de México)? Si no, «ayer» o su fecha: pasada la medianoche ya no son «de hoy» */
+  var hoy = diaMX(Date.now()), t = Date.parse(V ? V.generado_utc : ''), dia = V && V.dia ? V.dia : ok(t) ? diaMX(t) : hoy;
+  if (dia >= hoy) return { hoy: true, rot: 'Hoy', de: 'de hoy' };
+  if (dia === diaMX(Date.now() - 864e5)) return { hoy: false, rot: 'Ayer', de: 'de ayer' };
+  return { hoy: false, rot: fechaCorta(dia), de: 'del ' + fechaCorta(dia) };
+}
+function vivoYaEnLaPagina() { /* todo lo del documento ya terminó y sus resultados ya están en la página (corrió pipeline.py auto): la proyección y la tabla de abajo ya los incluyen */
+  if (!V || !V.partidos.length) return false;
+  var ids = {}; arr(D.ultimos_resultados).forEach(function (r) { if (obj(r) && r.id != null) ids[String(r.id)] = 1; });
+  return V.partidos.every(function (p) { return p.estado === 'final' ? !!ids[String(p.id)] : p.estado === 'pospuesto'; });
+}
+function proyeccionPrevia(P) { /* el motor no recalculó: es el pronóstico de actual.json (o uno que ya incluye los resultados de hoy); no hay cambio que mostrar */
+  if (P.previa === true) return true;
+  var fs = arr(P.campeon).concat(arr(P.clasifica)).filter(obj);   /* documentos anteriores al campo «previa»: todo en 0 y sin partidos considerados */
+  return !arr(P.partidos_considerados).length && fs.length > 0 && fs.every(function (x) { return x.delta === 0; });
+}
 function rotVivo() { return V && V.prueba ? 'Prueba' : V && V.ejemplo ? 'Ejemplo' : 'En vivo'; }
 function pon(el, h) { if (el && el.__h !== h) { el.innerHTML = h; el.__h = h; } } /* no toca el DOM si el contenido no cambió */
 function edadVivo() { var t = V ? Date.parse(V.generado_utc) : NaN; return ok(t) ? Date.now() - t : null; }
@@ -2566,9 +2596,11 @@ function vivoTarjetas() {
 }
 function vivoSeccion() {
   var sec = id('vivo'); if (!sec) return;
-  var hay = !!V && V.activo, rot = $('.rotulo', sec);
+  var cu = V ? cuandoVivo() : null, ya = !!V && !V.hayJuego && vivoYaEnLaPagina();
+  /* de otro día, sin nada en juego y con los resultados ya en la página: la sección sobra («Resultados recientes» los trae) */
+  var hay = !!V && V.activo && !(cu && !cu.hoy && ya), rot = $('.rotulo', sec);
   sec.hidden = !hay;
-  if (rot) rot.textContent = hay && V.hayJuego && !V.atrasado ? rotVivo() : 'Hoy';
+  if (rot) { var rt = hay && V.hayJuego && !V.atrasado ? rotVivo() : cu ? cu.rot : 'Hoy'; if (rot.textContent !== rt) rot.textContent = rt; }
   $$('.js-nav-vivo').forEach(function (li) { li.hidden = !hay; });
   $$('.js-ir-vivo').forEach(function (el) { el.hidden = !(hay && V.hayJuego); });
   if (!hay) { ['b-vivo-partidos', 'b-vivo-tabla', 'b-vivo-proy'].forEach(function (k) { var e = id(k); if (e) { e.innerHTML = ''; e.__h = ''; } }); return; }
@@ -2600,12 +2632,19 @@ function vivoSeccion() {
   });
   bloque('tabla al momento', 'b-vivo-tabla', function () {
     if (!V.tabla.length) return '';
-    if (V.tabla_fija) return '<div class="bloque"><div class="bloque__cab"><h3>Tabla final de la fase regular</h3><p>' + E(V.tabla_nota || 'En liguilla la tabla ya no se mueve: sólo sirve para la siembra y el desempate de cada serie.') + '</p></div>' +
+    /* terminada la fase regular la tabla ya no se mueve (aunque el documento sea de un motor anterior al campo tabla_fija);
+       sin nada en juego repetiría la de «Tabla general · Así terminó», así que sólo sale mientras se juega una serie */
+    var fija = V.tabla_fija || enLiguilla();
+    if (fija && !V.hayJuego) return '';
+    var nf = V.tabla_fija ? V.tabla_nota.replace(/^Tabla final de la fase regular:\s*/i, '') : '';
+    if (fija) return '<div class="bloque"><div class="bloque__cab"><h3>Tabla final de la fase regular</h3><p>' + E(nf ? nf.charAt(0).toUpperCase() + nf.slice(1) : 'En la liguilla la tabla ya no se mueve: el lugar decide quién avanza con el global empatado en cuartos y semifinales.') + '</p></div>' +
       '<div class="caja-tabla" tabindex="0" role="region" aria-label="Tabla final de la fase regular"><table><thead><tr><th>#</th><th class="i">Equipo</th><th>PJ</th><th>DG</th><th class="c-x">GF</th><th>Pts</th></tr></thead><tbody>' +
       V.tabla.map(function (r) {
         return '<tr class="' + (r.pos === 8 ? 'corte' : '') + '"><td class="pos">' + c(r.pos) + '</td><td class="i eqc">' + eqn(r.equipo, 26) + '</td><td>' + c(r.PJ) + '</td><td>' + (ok(r.DG) ? sig(r.DG, 0) : '—') + '</td><td class="c-x">' + c(r.GF) + '</td><td class="pts">' + c(r.PTS) + '</td></tr>';
       }).join('') + '</tbody></table></div><p class="nota">La línea blanca es el corte de la liguilla.</p></div>';
-    return '<div class="bloque"><div class="bloque__cab"><h3>Tabla al momento</h3><p>' + E(V.tabla_nota || 'Con los marcadores de este momento.') + ' La flecha dice cuántos lugares gana o pierde cada equipo.</p></div>' +
+    var mueve = V.tabla.some(function (r) { return r.en_juego || (ok(r.cambio) && r.cambio !== 0); }), cu = cuandoVivo();
+    var nt = !cu.hoy ? 'Tabla con los resultados ' + cu.de + '.' : V.tabla_nota || 'Con los marcadores de este momento.'; /* el texto del motor dice «hoy» */
+    return '<div class="bloque"><div class="bloque__cab"><h3>' + (cu.hoy ? 'Tabla al momento' : 'Tabla general') + '</h3><p>' + E(nt) + (mueve ? ' La flecha dice cuántos lugares gana o pierde cada equipo.' : '') + '</p></div>' +
       '<div class="caja-tabla" tabindex="0" role="region" aria-label="Tabla al momento"><table><thead><tr><th>#</th><th class="i"><span class="oculto">Cambio</span></th><th class="i">Equipo</th><th>PJ</th><th>DG</th><th class="c-x">GF</th><th>Pts</th></tr></thead><tbody>' +
       V.tabla.map(function (r) {
         var cm = ok(r.cambio) ? r.cambio : 0;
@@ -2616,6 +2655,9 @@ function vivoSeccion() {
   });
   bloque('probabilidades al momento', 'b-vivo-proy', function () {
     var P = V.proyeccion;
+    /* sin recalcular (o con los resultados ya en la página) serían las mismas cifras de la portada y de «¿Quién será campeón?», o unas
+       más viejas: no se repiten ni se presentan como un cambio */
+    if (proyeccionPrevia(P) || (!V.hayJuego && vivoYaEnLaPagina())) return '';
     function lista(titulo, bajada, filas, tope) {
       filas = arr(filas).filter(function (x) { return obj(x) && typeof x.equipo === 'string' && ok(x.p); }).sort(function (a, b) { return b.p - a.p; }).slice(0, tope);
       if (!filas.length) return '';
@@ -2627,7 +2669,7 @@ function vivoSeccion() {
       }).join('') + '</ol></div>';
     }
     var h = lista('Clasificar a la liguilla, al momento', 'Los que todavía se juegan el boleto.', P.clasifica, 10) +
-      lista('Campeón, al momento', V.hayJuego ? 'Recalculado con los marcadores de ahora.' : 'Con los resultados de hoy.', P.campeon, 6);
+      lista('Campeón, al momento', V.hayJuego ? 'Recalculado con los marcadores de ahora.' : 'Con los resultados ' + cuandoVivo().de + '.', P.campeon, 6);
     return h ? '<div class="cuerpo">' + h + '<p class="nota">▲ ▼ Cambio en puntos porcentuales frente al pronóstico de antes de estos partidos.' + (ok(P.n_sim) ? ' ' + miles(P.n_sim) + ' torneos simulados con los marcadores al momento.' : '') + '</p></div>' : '';
   });
 }
@@ -2651,6 +2693,16 @@ function vivoCuadro() { /* el global y la probabilidad de avanzar al momento, so
         esc(lv.local, 22) + tablero(lv.gl, lv.gv, 'mini', 'tablero--real' + (EN_JUEGO[lv.estado] ? ' tablero--vivo' : '')) + esc(lv.visitante, 22) + '</span>' +
         '<span class="pierna__x"><span class="chip ' + (lv.estado === 'final' ? 'chip--real">Resultado' : lv.estado === 'descanso' ? 'chip--oro">Descanso' : 'chip--vivo">En juego') + '</span></span>');
     });
+  });
+  var y0 = por[serieSel] || null; /* detalle de la serie elegida: la pierna que se juega con su marcador real; lo demás es de antes del partido */
+  $$('#serie-det [data-antes]').forEach(function (e) { if (e.__t0 == null) e.__t0 = e.textContent; var t = y0 ? e.__t0 + ' · antes del partido' : e.__t0; if (e.textContent !== t) e.textContent = t; });
+  $$('#serie-det .leg[data-leg]').forEach(function (lg) {
+    var el = $('[data-leg-vivo]', lg); if (!el) return;
+    var n = +lg.getAttribute('data-leg'), lv = y0 ? y0.piernas.filter(function (q) { return q.pierna === n; })[0] : null;
+    var real = lv && ok(lv.gl) && ok(lv.gv) && (EN_JUEGO[lv.estado] || lv.estado === 'final') && typeof lv.local === 'string' && typeof lv.visitante === 'string';
+    el.hidden = !real;
+    pon(el, real ? '<span class="chip ' + (lv.estado === 'final' ? 'chip--real">Resultado' : lv.estado === 'descanso' ? 'chip--oro">Descanso' : 'chip--vivo">En juego') + '</span><span class="pm" role="img" aria-label="' +
+      E(lv.local) + ' ' + lv.gl + ', ' + E(lv.visitante) + ' ' + lv.gv + '">' + esc(lv.local, 22) + tablero(lv.gl, lv.gv, 'mini', 'tablero--real' + (EN_JUEGO[lv.estado] ? ' tablero--vivo' : '')) + esc(lv.visitante, 22) + '</span>' : '');
   });
   var ta = $('[data-avanza-t]'); if (ta) { var qa = SERIES[serieSel] && SERIES[serieSel].fase === 'final' ? 'Quién es campeón' : 'Quién avanza', tt = por[serieSel] ? qa + ' · antes del partido' : qa; if (ta.textContent !== tt) ta.textContent = tt; }
   $$('[data-ver-llave]').forEach(function (b) {

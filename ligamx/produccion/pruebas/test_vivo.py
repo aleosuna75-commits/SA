@@ -1203,6 +1203,7 @@ def test_ida_de_cuartos_reconocida_por_equipos_y_con_la_vuelta_por_jugar(par):
     assert s["texto"] == ("Ida en juego: Tijuana 1-0 Cruz Azul. Falta la vuelta en casa de Cruz Azul; con el global empatado "
                           "avanza Cruz Azul por su mejor lugar en la tabla.")
     assert "liguilla no se suman puntos" in doc["tabla_nota"] and doc["tabla_fija"] is True
+    assert not doc["tabla_nota"].lower().startswith("tabla final")            # la página ya lo pone de título (V2-14)
     # la ida termina 3-0: Tijuana va arriba pero falta la vuelta (ni decidida ni con «si terminara así»)
     c3 = _cruda(777, "Tijuana", "Cruz Azul", "final", 90, 3, 0, inicio="2026-11-26T01:00:00Z")
     c3.update(pierna=1, slug="apertura---quarterfinals")
@@ -1238,15 +1239,49 @@ def test_vuelta_cuando_actual_json_no_trae_la_ida(par):
     s = d["series"][0]
     assert (s["global_mejor"], s["global_peor"], s["ida"]) == (1, 1, {"local": "Tijuana", "visitante": "Cruz Azul", "gl": 1, "gv": 0})
     assert "el global que da ESPN" in d["avisos"][0] and s["avanza_ahora"] == "Cruz Azul" and s["motivo_ahora"] == "mejor_sembrado"
-    # 3) nada: se avisa
+    # 3) nada: se avisa, y sin la ida no se afirma un global ni quién avanzaría (V1-2 del workflow 10)
     d = doc(df=vacio)
-    assert "no aparece jugada" in d["avisos"][0] and d["series"][0]["ida"] is None
+    s = d["series"][0]
+    assert "no aparece jugada" in d["avisos"][0] and s["ida"] is None
+    assert (s["momento"], s["avanza_ahora"], s["motivo_ahora"], s["le_falta"]) == ("vuelta", None, None, None)
+    assert s["texto"] == "Vuelta en juego (Cruz Azul 1-0 Tijuana): falta el marcador de la ida, así que no se puede decir quién avanza."
+    assert d["partidos"][0]["serie"]["avanza_ahora"] is None and "global" not in s["texto"]
     d = doc(df=vacio, estado="final")                              # sin la ida no se declara a nadie ganador
-    assert (d["series"][0]["decidida"], d["series"][0]["ganador"]) == (False, None) and "no aparece jugada" in d["avisos"][0]
+    s = d["series"][0]
+    assert (s["decidida"], s["ganador"], s["avanza_ahora"], s["le_falta"]) == (False, None, None, None) and "no aparece jugada" in d["avisos"][0]
+    assert s["texto"] == "Terminó la vuelta (Cruz Azul 1-0 Tijuana): falta el marcador de la ida para saber quién avanza."
+    assert vivo.validar_documento(d) == []
     # 4) la ida sí está (1-0) y el global de ESPN no cuadra: aviso, manda actual.json
     d = doc(global_=(3, 1), ida_jugada=True)
     assert "no cuadra" in d["avisos"][0] and (d["series"][0]["global_mejor"], d["series"][0]["global_peor"]) == (1, 1)
     assert not doc(global_=(1, 1), ida_jugada=True).get("avisos")
+
+
+def test_proyeccion_previa_se_marca_y_no_se_vende_como_cambio(par, monkeypatch):
+    """
+    V3-1 del workflow 10: tras pipeline.py auto, partidos.csv ya trae los resultados de hoy y la simulación no
+    aplica ningún marcador del momento; la proyección es la de actual.json (delta 0) y ya los incluye. Debe
+    llevar previa = True e incluye_hoy = True para que la página no diga «cambio frente a antes de los partidos».
+    """
+    actual = _actual_liguilla([_serie("cuartos")])
+    m = vivo.Motor(actual=actual, sellos={}, parametros=par, proyectar=True)
+    ahora = dt.datetime(2026, 11, 29, 6, 0, tzinfo=UTC)
+    ctx = m.contexto(ahora)
+    m.base = lambda ahora: {"pron": None, "sim": {"torneo": TORNEO, "p": {}}}
+    falsa = {"por_equipo": [{"equipo": "Cruz Azul", "p_clasifica": 1.0, "p_campeon": 0.3}],
+             "meta": {"n_sim": 10, "torneo": TORNEO, "regular_completa": True, "clasifican": 8, "en_juego": []}, "tabla_actual": []}
+    monkeypatch.setattr(S, "simular", lambda *a, **k: falsa)
+    tocado = {"id": 9002, "estado": "final", "_cruda": {"rest": None}}
+    pr = m._proyeccion(ctx, [tocado], ahora)
+    assert pr["previa"] is True and pr["incluye_hoy"] is True and pr["partidos_considerados"] == [] and "Ya incluye" in pr["nota"]
+    assert all(d["delta"] == 0.0 for d in pr["campeon"])
+    # sin nada tocado hoy: también es la previa, pero todavía no incluye nada de hoy
+    pr0 = m._proyeccion(ctx, [], ahora)
+    assert pr0["previa"] is True and pr0["incluye_hoy"] is False and "nota" not in pr0
+    # una proyección calculada al momento no lleva la marca
+    falsa["meta"]["en_juego"] = [9002]
+    m.base = lambda ahora: {"pron": None, "sim": {"torneo": TORNEO, "p": {"Cruz Azul": (1.0, 0.25)}}}
+    assert "previa" not in m._proyeccion(ctx, [tocado], ahora)
 
 
 def test_goles_de_la_vuelta_avisan_con_el_global(par):

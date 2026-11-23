@@ -30,8 +30,8 @@ Campos de primer nivel: `meta`, `tabla`, `pendientes`, `combinada_jornada`, `ult
 | `version_contrato` | versión de este contrato |
 | `generado_utc` | cuándo se escribió el archivo |
 | `corte_utc`, `corte_local` | instante hasta el que se usó información (todo lo jugado antes) |
-| `retrospectivo` | `true` si se pidió `--corte` |
-| `torneo` | torneo en curso |
+| `retrospectivo` | `true` si se pidió `--corte`. Ojo en los ensayos: un corte retrospectivo toma el calendario FINAL de `partidos.csv`, así que en liguilla `pendientes` puede traer partidos de una ronda cuyos equipos no se conocían al corte (p. ej. la semifinal con sus rivales reales, mientras el cuadro la proyecta con otros). Para un estado realista hay que quitar esas filas antes de exportar (lo hizo el guion `corte_sin_listar.py` del ensayo B del workflow 10) |
+| `torneo` | torneo en curso. Con la vuelta de la final ya jugada y el calendario del torneo siguiente cargado, sigue siendo el que acaba de terminar (campeón decidido, sin pendientes) hasta 7 días antes del primer partido del siguiente (`exportar.sin_torneo_siguiente`); ese caso trae un aviso en `avisos` |
 | `modelo.origen` | `"campeon"` (existe `modelo/campeon.json`) o `"provisional"` |
 | `modelo.nombre`, `modelo.descripcion` | nombre y descripción llana del modelo |
 | `modelo.metricas` | métricas de validación (las de `campeon.json`: `desarrollo_bloque` y `prueba_dia`; con el provisional, las líneas base de `modelo/ARNES.md`) |
@@ -180,10 +180,12 @@ los describe.
 
 ## pendientes (partidos por jugar, en orden cronológico)
 
-Los primeros 20 llevan ficha completa (`detalle: true`); los demás sólo los campos básicos (hasta
-`marcador`) y el `estadio` tal como lo da el calendario (`nombre` y `ciudad`; `slug` y `altitud_m` en `null`),
-para que el archivo no crezca sin límite al principio del torneo. `web/construir.py` sólo exige
-`estadio.nombre` en las fichas completas.
+No es el torneo entero (desde el 23-nov-2026, `exportar.acotar_pendientes`): todo lo que se juega hasta el último
+partido de las 2 primeras etiquetas sin «reprogramado» (dos jornadas, o la ida y la vuelta de una ronda de
+liguilla) y, como mínimo, los 6 días siguientes al primer pendiente; los reprogramados entran si caen antes de ese
+tope. Los primeros 20 llevan ficha completa (`detalle: true`); los demás sólo los campos básicos (hasta
+`marcador`) y el `estadio` tal como lo da el calendario (`nombre` y `ciudad`; `slug` y `altitud_m` en `null`).
+`web/construir.py` sólo exige `estadio.nombre` en las fichas completas.
 
 | campo | significado |
 |---|---|
@@ -203,7 +205,7 @@ para que el archivo no crezca sin límite al principio del torneo. `web/construi
 | `explica` | factores del modelo: `factor`, `detalle`, `efecto_l` y `efecto_v` (multiplicador sobre la lambda; 1 = neutro). Empieza por ataque, defensa y ventaja de local |
 | `contexto` | ficha descriptiva (NO entra al pronóstico salvo lo que diga `explica`): `equipo_local` / `equipo_visitante` (posición, balances, forma, rachas), `historial` (total, últimos, en la sede, liguilla, finales, series), `sede` (con `balance_local_3_anios`), `descanso_*`, `viaje_visitante_km`, `suspendidos_*` (suspendidos y apercibidos), `lesionados_*` (`null` si no hay `config/actualidad.json`) |
 | `momios` | momios de ESPN si existen (`null` si no): `proveedor`, `ml_local`, `ml_empate`, `ml_visitante` (decimales), `margen`, probabilidades implícitas sin margen (`p_*`, reparto proporcional), `total_linea`, `over`, `under` |
-| `serie` | (desde el 23-nov-2026) `null` en fase regular o si la serie no está en `liguilla.torneo`. En liguilla: `llave`, `fase`, `pierna` (1 o 2), `mejor`, `peor`, `siembra_mejor`, `siembra_peor`, `global_antes` (`{mejor, peor}`: goles de las piernas ya jugadas, sin contar este partido), `ida` (`{local, visitante, gl, gv}` en la vuelta si la ida ya se jugó; si no, `null`), `p_avanza_mejor`, `p_avanza_peor` (los exactos de la serie en `liguilla.torneo`; en la final, de ser campeón), `regla_empate`, `necesita` (`{mejor, peor}`: qué le falta a cada uno en la vuelta, ya redactado; `null` en la ida) y `texto` (una o dos oraciones listas para mostrar: en la ida, dónde se cierra y qué pasa con empate global; en la vuelta, el global y lo que necesita cada uno). Lo arma `exportar.serie_del_partido`: la página no deduce nada. Los mercados y combinadas del partido cuentan sólo los 90 minutos |
+| `serie` | (desde el 23-nov-2026) `null` en fase regular o si la serie no está en `liguilla.torneo`. En liguilla: `llave`, `fase`, `pierna` (1 o 2), `mejor`, `peor`, `siembra_mejor`, `siembra_peor`, `global_antes` (`{mejor, peor}`: goles de las piernas ya jugadas, sin contar este partido), `ida` (`{local, visitante, gl, gv}` en la vuelta si la ida ya se jugó; si no, `null`), `p_avanza_mejor`, `p_avanza_peor` (los exactos de la serie en `liguilla.torneo`; en la final, de ser campeón), `regla_empate`, `necesita` (`{mejor, peor}`: qué le falta a cada uno en la vuelta, ya redactado; `null` en la ida y en la vuelta cuya ida todavía no tiene resultado) y `texto` (una o dos oraciones listas para mostrar: en la ida, dónde se cierra y qué pasa con empate global; en la vuelta, el global y lo que necesita cada uno). Lo arma `exportar.serie_del_partido`: la página no deduce nada. Los mercados y combinadas del partido cuentan sólo los 90 minutos |
 
 ```json
 {
@@ -925,7 +927,8 @@ los ejemplos de abajo son de cuando eran 20,000).
 
 `en_curso`: `true` cuando partidos.csv ya trae partidos de liguilla del torneo. `clasificados`: los ocho
 en orden de siembra cuando la fase regular terminó (`null` antes). `formato`: reglas y fechas de
-`config/torneo.json`. `series`: una entrada por serie REAL (vacío mientras no existan):
+`config/torneo.json` (`formato.fechas` es `null` si el corte es de otro torneo que el de esa configuración, p. ej.
+un corte retrospectivo del Clausura 2026). `series`: una entrada por serie REAL (vacío mientras no existan):
 
 | campo | significado |
 |---|---|
@@ -1092,10 +1095,10 @@ sólo quién fue campeón). Cada SERIE:
 | `fase`, `real`, `viene_de` | `real` = el cruce ya está en el calendario; `viene_de` = llaves de las que salen sus equipos (resiembra) |
 | `definida` | booleano: los dos equipos de la serie ya se conocen con certeza, estén o no sus partidos en el calendario (`real` implica `definida`). Cuartos: en cuanto termina la fase regular. Semifinal: cuando están decididos los CUATRO cuartos (por la resiembra el rival de cada uno depende de todas las llaves). Final: cuando están decididas las dos semifinales. Mientras sea `false` la serie es la ruta de los favoritos y la página la rotula «Proyectada»; con `true`, «Definida». Documentos anteriores al 23-nov-2026 no traen el campo: la página lo deduce (`real`, o cuartos con `estado` distinto de `proyectado`) |
 | `mejor`, `peor` | `{equipo, siembra}` |
-| `piernas` | ida y vuelta: `pierna`, `nombre`, `id`, `fecha_utc`, `fecha_local` (`AAAA-MM-DD`), `hora_local`, `local`, `visitante`, `estadio` (`slug`, `nombre`, `origen`), `jugado`, `gl`, `gv`; sin jugar: `lam_l`, `lam_v`, `rho`, `p_local`, `p_empate`, `p_visitante`, `marcador` y `marcadores` (5). `estadio.origen`: `calendario` (la pierna ya está en partidos.csv: la sede de ESPN con la misma regla que `pendientes`, aunque no sea la habitual del local), `prensa` (sin calendario: `config/torneo.json` → `liguilla.sedes_<fase>`, sólo del torneo de esa configuración) o `habitual` (la sede habitual del local según `web/medios.json`) |
+| `piernas` | ida y vuelta: `pierna`, `nombre`, `id`, `fecha_utc`, `fecha_local` (`AAAA-MM-DD`), `hora_local`, `local`, `visitante`, `estadio` (`slug`, `nombre`, `origen`), `jugado`, `gl`, `gv`; sin jugar: `lam_l`, `lam_v`, `rho`, `p_local`, `p_empate`, `p_visitante`, `pick` (`{resultado: L/E/V, equipo, prob}`: el resultado con más probabilidad, como el `pick` de `pendientes`), `marcador` y `marcadores` (5); `en_juego: true` (sólo si aplica) en la pierna que se está jugando al momento del corte. `estadio.origen`: `calendario` (la pierna ya está en partidos.csv: la sede de ESPN con la misma regla que `pendientes`, aunque no sea la habitual del local), `prensa` (sin calendario: `config/torneo.json` → `liguilla.sedes_<fase>`, sólo del torneo de esa configuración) o `habitual` (la sede habitual del local según `web/medios.json`) |
 | `global` | `probable` (`mejor`, `peor`, `prob`), `top` (5), `p_gana_mejor`, `p_empate`, `p_gana_peor` |
 | `p_avanza_mejor`, `p_avanza_peor`, `favorito`, `p_favorito` | probabilidad exacta de avanzar en ESA serie |
-| `decidida`, `ganador`, `regla_empate`, `alternativas` | `alternativas`: otros cruces posibles de esa llave (`mejor`, `peor`, `prob`, `p_avanza_mejor`) |
+| `decidida`, `ganador`, `regla_empate`, `alternativas` | `alternativas` (`mejor`, `peor`, `prob`, `p_avanza_mejor`): en cuartos, otros cruces posibles de esa llave; en semifinales y final, los 4 cruces más probables de TODA la ronda (iguales en S1 y S2, pueden incluir el propio cruce y cruces que por la resiembra no caben en esa llave). La página los rotula «Las semifinales más probables». Vacía en una serie definida |
 
 Uso en la página: una pierna sin jugar de una serie `definida` y no `decidida` que todavía no viene en `pendientes`
 (la liga no le ha puesto día y hora; se compara por `id` y por la pareja `local`–`visitante`) sale en «Próximos
@@ -1332,13 +1335,13 @@ atómica, menos de 40 KB (un día de 4 partidos pesa unos 6 KB). Ejemplo con la 
 | `estado` | `sin_partidos` · `previo` (hay partidos hoy y ninguno en juego: falta alguno por empezar) · `en_juego` · `descanso` (los que se juegan están todos en pausa) · `terminado_hoy` |
 | `partidos` | los de HOY, por hora de inicio (abajo) |
 | `tabla`, `tabla_nota` | tabla general AL MOMENTO (18 filas): `pos`, `equipo`, `PJ`, `PTS`, `DG`, `GF`, `cambio` (lugares ganados, positivo, o perdidos frente a la tabla sin los partidos en juego) y `en_juego`. Los marcadores en juego cuentan como finales; desempates oficiales del simulador (las tarjetas de hoy suman al Fair Play de forma aproximada: amarilla 1, roja 3). En liguilla es la tabla final de la fase regular |
-| `proyeccion` | `n_sim`, `clasifica` y `campeon`: listas `{equipo, p, delta}` ordenadas por `p`. `delta` = cambio frente al último pronóstico previo (el de `actual.json`). `clasifica` sólo trae a los equipos sin decidir (vacía en liguilla). `ruido` (0.01): un `delta` menor puede ser ruido de simulación. `partidos_considerados`: ids cuyos marcadores del momento entraron en la simulación. `nota` si no se pudo recalcular |
+| `proyeccion` | `n_sim`, `clasifica` y `campeon`: listas `{equipo, p, delta}` ordenadas por `p`. `delta` = cambio frente al último pronóstico previo (el de `actual.json`). `clasifica` sólo trae a los equipos sin decidir (vacía en liguilla). `ruido` (0.01): un `delta` menor puede ser ruido de simulación. `partidos_considerados`: ids cuyos marcadores del momento entraron en la simulación. `nota` si no se pudo recalcular o si ya incluye los resultados de hoy. `previa: true` (desde el 23-nov-2026) cuando NO se recalculó: es el pronóstico de `actual.json` con `delta` 0 (sin nada tocado hoy, sin poder simular o porque `partidos.csv` ya trae los resultados de hoy, y entonces `incluye_hoy: true`); la página no la presenta como cambio y no repite esas cifras |
 | `series` | liguilla: una entrada por serie REAL de `liguilla.torneo` (abajo); `[]` en fase regular |
 | `ultimo_evento` | `{utc, tipo, partido_id, texto, n}` del último evento notificable del día, o `null` |
 | `siguiente` | `{id, inicio_utc, local, visitante}` del próximo partido que no ha empezado (de hoy si queda alguno) |
 | `avisos` | (opcional) textos: algo no se pudo calcular o ESPN no respondió para un día |
 | `prueba` | (opcional) `true` en los documentos de `vivo.py repetir`; la página lo rotula «Prueba» (franja, sección, tarjeta y conexión) |
-| `tabla_fija` | `true` cuando la fase regular ya terminó (liguilla): la tabla no se mueve y la página la rotula «Tabla final de la fase regular», sin flechas |
+| `tabla_fija` | `true` cuando la fase regular ya terminó (liguilla): la tabla no se mueve y la página la rotula «Tabla final de la fase regular», sin flechas (sólo mientras se juega una serie; sin nada en juego no la repite). `tabla_nota` no repite ese título. La página también la trata como fija si `actual.json` dice `proyeccion.regular_completa` (documentos de un motor anterior al campo) |
 
 Cada elemento de `partidos`:
 

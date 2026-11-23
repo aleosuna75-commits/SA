@@ -49,6 +49,11 @@ MERCADOS_PRINCIPALES = ["1", "X", "2", "1X", "X2", "12", "SE_1", "SE_2", "H_L-1.
                         "G1T_SI", "O15_1T", "GM_L", "GM_V"]
 N_MATRIZ = 7                                   # la matriz de marcadores se exporta de 0 a 6 goles por lado
 MAX_DETALLE = 20                               # partidos pendientes con ficha completa; el resto va en versión ligera
+RONDAS_PENDIENTES = 2                          # «pendientes»: las 2 primeras etiquetas por fecha (dos jornadas, o la ida y la vuelta de una ronda)
+DIAS_PENDIENTES = 6                            # ... y lo que se juegue en los 6 días siguientes al primer pendiente
+DIAS_ANTES_DEL_SIGUIENTE = 7                   # tras la final, el torneo terminado se sigue mostrando hasta 7 días antes del siguiente
+MESES = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre",
+         "diciembre"]
 SIN_REDONDEO = {"lat", "lon"}
 DESCRIPCION_PROVISIONAL = (
     "Modelo provisional (Poisson simple): cada equipo tiene una fuerza de ataque y una de defensa, y hay una "
@@ -235,7 +240,7 @@ def _pred_guardada(ids: list[int], nombre: str | None) -> dict[int, dict]:
         try:
             if not arnes.ruta_pred(nombre, periodo, gran).exists():
                 continue
-            t = arnes.leer_pred(nombre, periodo, gran)
+            t = arnes.leer_pred(nombre, periodo, gran, quien="exportar.ultimos_resultados")   # en el registro: quién leyó la PRUEBA
         except Exception:
             continue
         for r in t[t["id"].isin(ids)].itertuples(index=False):
@@ -398,7 +403,7 @@ def serie_del_partido(p: dict, lt: dict | None) -> dict | None:
         gp += l["gv"] if l["local"] == mj else l["gl"]
         if l.get("pierna") == 1:
             ida = {"local": l["local"], "visitante": l["visitante"], "gl": int(l["gl"]), "gv": int(l["gv"])}
-    nec = {"mejor": None, "peor": None}
+    nec = None                                    # en la ida, o en la vuelta sin la ida jugada, no aplica (CONTRATO: null)
     casa = next((l["local"] for l in s.get("piernas") or [] if l.get("pierna") == 2), mj)
     empate = "hay tiempos extra y penales" if final else f"avanza {mj}, mejor sembrado"
     ronda = {"cuartos": "los cuartos", "semifinal": "la semifinal", "final": "la final"}.get(s["fase"], "la serie")
@@ -513,8 +518,11 @@ def torneo_liguilla(pron, sim: dict, reglas: dict, clasificados: list[str] | Non
                 d.update({"gl": p["gl"], "gv": p["gv"]})
             else:
                 mm = p.get("marcadores") or []
+                pr3 = (float(p["p_local"]), float(p["p_empate"]), float(p["p_visitante"]))
+                k = int(np.argmax(np.round(pr3, 10)))
                 d.update({"gl": None, "gv": None, "lam_l": p["lam_l"], "lam_v": p["lam_v"], "rho": p.get("rho", rho),
                           "p_local": p["p_local"], "p_empate": p["p_empate"], "p_visitante": p["p_visitante"],
+                          "pick": {"resultado": PICKS[k], "equipo": (p["local"], "Empate", p["visitante"])[k], "prob": pr3[k]},
                           "marcador": mm[0] if mm else None, "marcadores": mm})
                 if p.get("en_juego"):
                     d["en_juego"] = True
@@ -666,6 +674,34 @@ def titulos(ctx: Contexto, df: pd.DataFrame) -> dict:
     return out
 
 
+def _dias_mes(fechas: list[str]) -> str:
+    """['2026-12-10', '2026-12-13'] → «10 y 13 de diciembre» (mismo mes) o «30 de noviembre y 3 de diciembre»."""
+    ts = [pd.Timestamp(f) for f in fechas if f]
+    if not ts:
+        return ""
+    if len({t.month for t in ts}) == 1:
+        return " y ".join(str(t.day) for t in ts) + f" de {MESES[ts[0].month - 1]}"
+    return " y ".join(f"{t.day} de {MESES[t.month - 1]}" for t in ts)
+
+
+def _aviso_final_recorrida(reglas: dict) -> str:
+    """
+    Las fechas alternas de la final, redactadas desde config/torneo.json (V3-4 del workflow 10): en la práctica la final
+    se recorre si Toluca es FINALISTA de liga (juega la Copa Intercontinental en Doha la víspera de la ida); la liga no
+    lo ha precisado por escrito.
+    """
+    fe = (reglas.get("liguilla") or {}).get("fechas") or {}
+    normal = _dias_mes(list(fe.get("final_ida") or []) + list(fe.get("final_vuelta") or []))
+    alterna = _dias_mes(list(fe.get("final_ida_opcion2") or []) + list(fe.get("final_vuelta_opcion2") or []))
+    doha = ((reglas.get("copa_intercontinental_toluca") or {}).get("partidos") or [None])[0]
+    cuando = ""
+    if doha and fe.get("final_ida"):
+        dif = (pd.Timestamp(fe["final_ida"][0]) - pd.Timestamp(doha)).days
+        cuando = f" (Toluca juega la Copa Intercontinental en Doha el {_dias_mes([doha])}" + (", víspera de la ida)" if dif == 1 else ")")
+    return (f"Fechas de la final: {normal or 'por confirmar'}; si Toluca llega a la final de liga, se recorrería al {alterna}{cuando}. "
+            "La liga no lo ha precisado por escrito.")
+
+
 def _avisos(meta_modelo: dict, des: dict, reglas: dict, sim: dict, pendientes: list[dict], cal: dict | None) -> list[str]:
     """Límites honestos: lo que el sistema NO modela o no sabe."""
     a = [f"Modelo «{meta_modelo.get('nombre')}»: {x}" for x in (meta_modelo.get("avisos") or [])]
@@ -677,7 +713,8 @@ def _avisos(meta_modelo: dict, des: dict, reglas: dict, sim: dict, pendientes: l
         if rep_cfg.get("nota") and p["local"] in rep_cfg.get("partido", "") and p["visitante"] in rep_cfg.get("partido", ""):
             a.append(f"{p['local']} vs {p['visitante']} ({p['fecha_local']}): {rep_cfg['nota']} El pronóstico no lo descuenta.")
     a += [
-        "Lesiones, convocatorias y alineaciones del día no se modelan (sólo se muestran si existen en config/actualidad.json).",
+        "Lesiones, convocatorias y alineaciones del día no se modelan. Las bajas reportadas (config/actualidad.json) se muestran "
+        "en la ficha de cada partido cuando ese partido ya tiene día y hora en el calendario.",
         "Los momios de ESPN son de referencia. En la historia el mercado de cierre ha sido mejor que cualquier modelo propio; "
         "una diferencia entre el modelo y el momio NO es por sí misma una apuesta con valor.",
         "«Ambos anotan» y «anota / no anota» salen por debajo de lo que ocurre: 2 puntos en 2016-2025 (0.524 pronosticado "
@@ -709,7 +746,7 @@ def _avisos(meta_modelo: dict, des: dict, reglas: dict, sim: dict, pendientes: l
              "mercados y combinadas de un partido de liguilla cuentan sólo los 90 minutos. La localía de cada pierna es la del "
              "calendario de ESPN; mientras la liga no lo publica, la que da la prensa y, si no hay, la sede habitual del local.")
     if sim["meta"].get("torneo") == reglas.get("torneo") and (reglas.get("liguilla") or {}).get("fechas", {}).get("final_ida_opcion2"):
-        a.append("Si Toluca avanza en la Copa Intercontinental la final se recorre al 24 y 27 de diciembre.")
+        a.append(_aviso_final_recorrida(reglas))
     if cal:
         a.append(f"El cálculo de series, contrastado con {cal['n_series']} series de liguilla de 2016 a 2025, le gana con claridad al "
                  f"50/50 (Brier {cal['brier']['simulador']:.4f} contra 0.2500) pero NO de forma concluyente a la frecuencia histórica "
@@ -759,6 +796,55 @@ def incrustar_vivo(ruta_actual: str | Path | None = None, ruta_vivo: str | Path 
 # ==================================================================================================
 # Documento completo
 # ==================================================================================================
+def sin_torneo_siguiente(df: pd.DataFrame, corte) -> tuple[pd.DataFrame, str | None]:
+    """
+    Con la vuelta de la final ya jugada, ESPN puede listar enseguida el calendario del torneo siguiente y el
+    pronosticador lo toma como «en curso» (el del primer partido después del corte): la página dejaba de festejar al
+    campeón de la víspera y llenaba «Próximos partidos» con el torneo nuevo entero (V2-7 del workflow 10). Mientras
+    ese torneo no empiece (ningún partido jugado antes del corte y el primero a más de DIAS_ANTES_DEL_SIGUIENTE días)
+    se quitan sus filas (y las de torneos posteriores): el documento sigue siendo el del torneo recién terminado.
+    Devuelve (df, nombre del torneo quitado o None si no se quitó nada).
+    """
+    c = simulador.a_utc(corte)
+    if "orden_torneo" not in df.columns:
+        return df, None
+    jug = df[(df["estado"] == "jugado") & (df["fecha_utc"] < c)]
+    if jug.empty:
+        return df, None
+    ultimo = jug.sort_values(["fecha_utc", "id"]).iloc[-1]
+    t0, o0 = ultimo["torneo"], int(ultimo["orden_torneo"])
+    vuelta_final = ((df["torneo"] == t0) & (df["fase"] == "final") & (df["pierna"] == 2) & (df["estado"] == "jugado")
+                    & (df["fecha_utc"] < c))
+    sig = df[(df["orden_torneo"] > o0) & (df["estado"] != "cancelado")]
+    if not vuelta_final.any() or sig.empty:
+        return df, None
+    primero = sig["fecha_utc"].min()
+    if pd.isna(primero) or primero - c <= pd.Timedelta(days=DIAS_ANTES_DEL_SIGUIENTE):
+        return df, None
+    nombre = str(sig.sort_values(["fecha_utc", "id"])["torneo"].iloc[0])
+    return df[df["orden_torneo"] <= o0], nombre
+
+
+def acotar_pendientes(pend: pd.DataFrame, etiquetas: list[str]) -> pd.DataFrame:
+    """
+    «Próximos partidos» no es el torneo entero (al inicio de un torneo eran 153 partidos y 143,548 px de página a
+    390 px; V2-7 del workflow 10): todo lo que se juega hasta el último partido de las RONDAS_PENDIENTES primeras
+    etiquetas limpias (dos jornadas, o la ida y la vuelta de una ronda de liguilla), y como mínimo los DIAS_PENDIENTES
+    días siguientes al primer pendiente. Los reprogramados no cuentan como ronda (un «Jornada 2 (reprogramado)» o un
+    «Reprogramado» lejano no se come el lugar de la jornada que sigue), pero entran si caen antes de ese tope.
+    `pend` viene ordenado por fecha y `etiquetas` es la etiqueta de cada fila.
+    """
+    if pend.empty:
+        return pend
+    limpias = [e for e in etiquetas if "eprogramado" not in e]
+    primeras = list(dict.fromkeys(limpias))[:RONDAS_PENDIENTES]
+    tope = pend["fecha_utc"].iloc[0] + pd.Timedelta(days=DIAS_PENDIENTES)
+    en = np.array([e in primeras for e in etiquetas], dtype=bool)
+    if en.any():
+        tope = max(tope, pend["fecha_utc"][en].max())
+    return pend[(pend["fecha_utc"] <= tope).to_numpy()]
+
+
 def construir(corte=None, n_sim: int = simulador.N_SIM, sellar: bool | None = None, ruta_sellos=None,
               ruta_desempeno=None, df: pd.DataFrame | None = None, pron=None) -> dict:
     """
@@ -770,8 +856,9 @@ def construir(corte=None, n_sim: int = simulador.N_SIM, sellar: bool | None = No
     df = datos.cargar() if df is None else df
     retro = corte is not None
     corte_utc = simulador.a_utc(corte)
+    df, siguiente = sin_torneo_siguiente(df, corte_utc)        # tras la final: el torneo recién terminado, no el que viene
     if pron is None:
-        pron = obtener_pronosticador(corte_utc)
+        pron = obtener_pronosticador(corte_utc, df=df if siguiente else None)
     reglas = simulador.cargar_reglas()
     torneo = getattr(pron, "torneo", None) or reglas["torneo"]
     df_t = df[(df["torneo"] == torneo) & (df["estado"] != "cancelado")]
@@ -786,6 +873,7 @@ def construir(corte=None, n_sim: int = simulador.N_SIM, sellar: bool | None = No
     else:
         pend = df_t[df_t["estado"].isin(["programado", "en_juego"]) & (df_t["fecha_utc"] >= corte_utc - pd.Timedelta(hours=3))]
     pend = pend.sort_values(["fecha_utc", "id"])
+    pend = acotar_pendientes(pend, [etiqueta_partido(f, jornadas) for _, f in pend.iterrows()])
     # mercados y combinadas sólo para los partidos con ficha completa (los próximos MAX_DETALLE)
     con_ficha, sin_ficha = pend.iloc[:MAX_DETALLE], pend.iloc[MAX_DETALLE:]
     paquete = (cb.paquete_partidos(pron, con_ficha, con_jornada=False) if len(con_ficha)
@@ -915,7 +1003,9 @@ def construir(corte=None, n_sim: int = simulador.N_SIM, sellar: bool | None = No
         "desempeno": desempeno,
         "calibracion_series": cal,
         # primero los avisos de datos del propio Pronosticador (p. ej. caché de variables desactualizada)
-        "avisos": [f"DATOS: {x}" for x in getattr(pron, "avisos", [])] + _avisos(meta_modelo, des, reglas, sim, pendientes, cal),
+        "avisos": [f"DATOS: {x}" for x in getattr(pron, "avisos", [])] + _avisos(meta_modelo, des, reglas, sim, pendientes, cal) + (
+            [f"El {siguiente} ya tiene calendario, pero empieza en más de {DIAS_ANTES_DEL_SIGUIENTE} días: la página sigue con el "
+             f"{torneo}, que acaba de terminar."] if siguiente else []),
         # último documento en vivo (vivo.py); en una corrida retrospectiva no aplica
         "vivo": None if retro else leer_vivo(),
     }

@@ -292,10 +292,10 @@ def ruta_pred(nombre: str, periodo: str = "desarrollo", granularidad: str = "blo
 
 
 def leer_pred(nombre: str, periodo: str = "desarrollo", granularidad: str = "bloque",
-              parcial: bool = False, dir_pred: str | Path | None = None) -> pd.DataFrame:
-    """Lee las predicciones guardadas de un modelo (leer las de PRUEBA también queda en el registro de accesos)."""
+              parcial: bool = False, dir_pred: str | Path | None = None, quien: str | None = None) -> pd.DataFrame:
+    """Lee las predicciones guardadas de un modelo (leer las de PRUEBA también queda en el registro de accesos, con `quien`)."""
     if periodo == "prueba":
-        _acceso_prueba(dir_pred, "leer", nombre, granularidad=granularidad)
+        _acceso_prueba(dir_pred, "leer", nombre, quien, granularidad=granularidad)
     return pd.read_parquet(ruta_pred(nombre, periodo, granularidad, parcial, dir_pred))
 
 

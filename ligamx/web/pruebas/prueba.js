@@ -290,11 +290,16 @@ async function revisaConexion(pg, etq) {
     const activo = !!v && Array.isArray(v.partidos) && v.partidos.length > 0 && Number.isFinite(t) && Math.abs(Date.now() - t) <= 12 * 3600000;
     const dia = activo ? mx(t).slice(0, 10) : String(d.meta.corte_local).slice(0, 10), hora = activo ? mx(t).slice(11, 16) : (/(\d{2}:\d{2})/.exec(d.meta.corte_local) || [])[1];
     const f = dia.split('-'), esperado = 'Sin conexión en vivo: datos ' + (dia !== mx(Date.now()).slice(0, 10) ? 'del ' + (+f[2]) + ' ' + MES3[+f[1] - 1] + ', ' + hora + ' h' : 'de las ' + hora + ' h') + ' (centro de México)';
-    return { textos: Array.from(document.querySelectorAll('.js-conexion')).map(e => e.textContent), esperado, activo, juego: activo && v.partidos.some(p => p && (p.estado === 'en_juego' || p.estado === 'descanso')),
+    const juego = activo && v.partidos.some(p => p && (p.estado === 'en_juego' || p.estado === 'descanso'));
+    /* «Al momento» se retira si el documento es de otro día (fecha del centro de México), nada está en juego y sus resultados ya están en la página */
+    const ids = new Set((d.ultimos_resultados || []).map(r => String(r.id))), diaV = activo ? (/^\d{4}-\d{2}-\d{2}$/.test(v.dia || '') ? v.dia : mx(t).slice(0, 10)) : '';
+    const yaEn = activo && !juego && v.partidos.every(p => p.estado === 'final' ? ids.has(String(p.id)) : p.estado === 'pospuesto');
+    const visible = activo && !(diaV < mx(Date.now()).slice(0, 10) && yaEn);
+    return { textos: Array.from(document.querySelectorAll('.js-conexion')).map(e => e.textContent), esperado, activo, visible, juego,
       seccion: !document.getElementById('vivo').hidden, franja: !document.getElementById('franja').hidden };
   }, [MES3]);
-  revisa(c.textos.length > 0 && c.textos.every(x => x === c.esperado) && c.seccion === c.activo && (c.juego || !c.franja),
-    etq + 'sin window.claude: la página funciona y lo dice (' + c.esperado + (c.activo ? '; con el «vivo» incrustado de hoy sale «Al momento»' : '') + ')', JSON.stringify(c));
+  revisa(c.textos.length > 0 && c.textos.every(x => x === c.esperado) && c.seccion === c.visible && (c.juego || !c.franja),
+    etq + 'sin window.claude: la página funciona y lo dice (' + c.esperado + (c.visible ? '; con el «vivo» incrustado vigente sale «Al momento»' : c.activo ? '; el «vivo» incrustado es de otro día y sus resultados ya están en la página: «Al momento» se retira' : '') + ')', JSON.stringify(c));
 }
 /* revisa la página tal como debe verse con SUS datos. extra: { pantalla: revisa la portada en la primera pantalla del celular, ahora: reloj del navegador, foto: nombre de captura } */
 async function revisaSegunDatos(ctx, url, etiqueta, movil, opciones, extra) {
@@ -351,6 +356,8 @@ async function revisaSegunDatos(ctx, url, etiqueta, movil, opciones, extra) {
       grupos: Array.from(document.querySelectorAll('#b-partidos .grupo > h3')).map(h => T(h)), indice: document.querySelectorAll('#b-indice .indice button').length, vacios: document.querySelectorAll('#proximos .vacio, #combinada .vacio').length,
       cards: Array.from(document.querySelectorAll('#b-partidos .pleg')).map(p => ({ cuando: T(p.querySelector('.cuando')), nombres: Array.from(p.querySelectorAll('.eq__n')).map(T), escudos: p.querySelectorAll('.duelo .esc').length,
         tablero: Array.from(p.querySelectorAll('.duelo .tablero b')).map(T).join('-'), x12: !!p.querySelector('.x12'), pcts: Array.from(p.querySelectorAll('.ley b')).map(T), pie: T(p.querySelector('.pleg__pie span')), serie: (p.querySelector('[data-serie]') || { getAttribute: () => '' }).getAttribute('data-serie'),
+        pick: T(p.querySelector('.pick')), gan: T(p.querySelector('.ley .gan b')),
+        fecha: (() => { const f = p.querySelector('.pleg__f'), q = p.querySelector('.cuando'); if (!f) return null; const a = f.getBoundingClientRect(), b = q.getBoundingClientRect(); return [Math.round(a.left - b.left), Math.round(a.top - b.top)]; })(),
         cortados: Array.from(p.querySelectorAll('.eq__n')).filter(e => { const lh = parseFloat(getComputedStyle(e).lineHeight) || 16, renglones = Math.round(e.getBoundingClientRect().height / lh); return e.scrollWidth > e.clientWidth + 1 || renglones > e.textContent.trim().split(/\s+/).length; }).map(T),
         caja: (() => { const r = p.getBoundingClientRect(), q = p.querySelector('.pleg__pie').getBoundingClientRect(); return [Math.round(r.top), Math.round(r.bottom), Math.round(q.bottom)]; })() })) };
   });
@@ -365,6 +372,13 @@ async function revisaSegunDatos(ctx, url, etiqueta, movil, opciones, extra) {
       (!Number.isFinite(m.gl) || c.tablero === m.gl + '-' + m.gv) && c.x12 && JSON.stringify(c.pcts) === JSON.stringify([pctTxt(l.p_local), pctTxt(l.p_empate), pctTxt(l.p_visitante)]) && c.pie === ((l.estadio || {}).nombre || 'Sede por confirmar') && c.serie === x.s.llave;
     if (!bien) malasP.push(x.s.llave + '-' + x.n + ' ' + JSON.stringify(c));
   });
+  /* V2-6 (workflow 10): con el pick de la pierna, la tarjeta dice quién gana y resalta su porcentaje (el tablero «1·1» se leía como «empate») */
+  const conPick = sueltas.map((x, i) => [x.l.pick, px.cards[i]]).filter(z => z[0] && z[1]);
+  const malPick = conPick.filter(([pk, c]) => !(c.pick.startsWith('Pronóstico') && c.pick.includes(pk.resultado === 'E' ? 'Empate' : 'Gana ' + pk.equipo) && c.pick.includes(pctTxt(pk.prob)) && c.gan === pctTxt(pk.prob)));
+  if (conPick.length) revisa(malPick.length === 0, etq + 'cada tarjeta compacta dice el pronóstico de la pierna («Gana …» o «Empate» con su %) y resalta ese % en el 1X2', JSON.stringify(malPick.slice(0, 2)));
+  /* V2-11: con dos o cuatro tarjetas por renglón la fecha va en su propio renglón, a la izquierda (no sola a la derecha) */
+  const conFecha = px.cards.filter(c => c.fecha);
+  if (!movil && conFecha.length) revisa(conFecha.every(c => c.fecha[0] <= 1 && c.fecha[1] > 4), etq + 'tarjetas compactas en escritorio: la fecha en su propio renglón, alineada a la izquierda', JSON.stringify(conFecha.map(c => c.fecha)));
   if (sueltas.length) {
     revisa(px.cards.length === sueltas.length && malasP.length === 0, etq + 'las ' + sueltas.length + ' piernas de liguilla sin día ni hora como tarjetas compactas en orden (idas y luego vueltas): fase y pierna, llave, ventana de fechas, escudos, marcador más probable, 1X2 con sus %, sede y botón a la serie', px.cards.length + ' ' + malasP.slice(0, 2).join(' | '));
     revisa(/Día y hora por confirmar/i.test(px.nota) && /combinada de cuatro pronósticos de cada partido/.test(px.nota) && /cuando la liga confirme día y hora/.test(px.nota) && (pend || /^Lo que sigue: /.test(px.bajada)), etq + 'nota honesta: sin día ni hora, la combinada de cada partido se publica cuando la liga los confirme', px.nota + ' · ' + px.bajada);
@@ -698,12 +712,17 @@ async function correr(navegador, nombre, opciones) {
   const inv = await page.evaluate(() => { const d = document.getElementById('serie-det'); return d ? { invita: d.classList.contains('serie-det--invita'), chips: d.querySelectorAll('.serie-sel button').length, legs: d.querySelectorAll('.leg').length, marcadas: document.querySelectorAll('.llave--sel').length,
     caben: Array.from(d.querySelectorAll('.serie-sel button')).every(b => { const r = b.getBoundingClientRect(); return r.left >= 0 && r.right <= window.innerWidth && r.width >= 36; }), alto: Math.round(d.getBoundingClientRect().height) } : null; });
   revisa(inv && inv.invita && inv.chips === 7 && inv.caben && inv.legs === 0 && inv.marcadas === 0 && inv.alto < 330, 'detalle de la serie: al abrir invita a elegir (los 7 botones caben) y ninguna tarjeta queda marcada', JSON.stringify(inv));
-  await page.click('.llave[data-llave="C1"] .llave__id b');
+  /* V2-4 (workflow 10): en WebKit un toque fuera de un botón no sintetiza el clic, así que el botón «Detalle» cubre toda la
+     tarjeta; un toque en el nombre de un equipo cae en ese botón (en celular, con toque de verdad: page.tap) */
+  const cubre = await page.evaluate(() => { const n = document.querySelector('.llave[data-llave="C1"] .llave__eq .n'); n.scrollIntoView({ block: 'center' }); const r = n.getBoundingClientRect(), e = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2); return e ? (e.matches('.llave__ver[data-serie="C1"]') ? 'boton' : e.className || e.tagName) : null; });
+  revisa(cubre === 'boton', 'cuadro: el botón «Detalle» cubre toda la tarjeta (un toque en el nombre de un equipo cae en un botón)', String(cubre));
+  if (movil) await page.tap('.llave[data-llave="C1"] .llave__eq .n', { force: true });
+  else await page.click('.llave[data-llave="C1"] .llave__id b', { force: true });
   await page.waitForTimeout(1300);
-  const det0 = await page.evaluate(() => { const d = document.getElementById('serie-det'); return d ? { frase: /no es la suma de los dos marcadores/.test(d.textContent), led: !!d.querySelector('.serie-duelo .tablero'), global: (d.querySelector('.serie-duelo .vs > b') || {}).textContent || '', sale: Array.from(d.querySelectorAll('.lista li')).every(li => /sale en [\d.<]+%/.test(li.textContent)), volver: !!d.querySelector('[data-volver]'), titulo: d.querySelector('h3').textContent, legs: d.querySelectorAll('.leg').length, top: Array.from(d.querySelectorAll('.leg')).map(l => l.querySelectorAll('.top5 li').length), x12: d.querySelectorAll('.leg .x12').length, chips: d.querySelectorAll('.serie-sel button').length, alt: d.querySelectorAll('.lista li').length, sel: (document.querySelector('.llave--sel') || { getAttribute: () => null }).getAttribute('data-llave') } : null; });
+  const det0 =await page.evaluate(() => { const d = document.getElementById('serie-det'); return d ? { frase: /no es la suma de los dos marcadores/.test(d.textContent), led: !!d.querySelector('.serie-duelo .tablero'), global: (d.querySelector('.serie-duelo .vs > b') || {}).textContent || '', sale: Array.from(d.querySelectorAll('.lista li')).every(li => /sale en [\d.<]+%/.test(li.textContent)), volver: !!d.querySelector('[data-volver]'), titulo: d.querySelector('h3').textContent, legs: d.querySelectorAll('.leg').length, top: Array.from(d.querySelectorAll('.leg')).map(l => l.querySelectorAll('.top5 li').length), x12: d.querySelectorAll('.leg .x12').length, chips: d.querySelectorAll('.serie-sel button').length, alt: d.querySelectorAll('.lista li').length, sel: (document.querySelector('.llave--sel') || { getAttribute: () => null }).getAttribute('data-llave') } : null; });
   revisa(det0 && det0.legs === 2 && det0.top.every(x => x === 5) && det0.x12 === 2 && det0.chips === 7 && det0.alt >= 1 && det0.sel === 'C1' && det0.sale, 'detalle de la serie: ida y vuelta con los 5 marcadores más probables y los cruces alternativos («sale en…»)', JSON.stringify(det0));
   revisa(det0 && det0.frase && !det0.led && /^\d+-\d+$/.test(det0.global) && det0.volver, 'detalle de la serie: el global más probable va sin tablero, con la frase que lo explica, y hay botón para volver al cuadro', JSON.stringify(det0));
-  await page.click('.llave[data-llave="S1"] .llave__id b');
+  await page.click('.llave[data-llave="S1"] .llave__id b', { force: true });     /* cae en el botón «Detalle», que cubre la tarjeta */
   await page.waitForTimeout(1300);
   const det1 = await page.evaluate(() => { const d = document.getElementById('serie-det'), r = d.getBoundingClientRect(); return { titulo: d.querySelector('h3').textContent, sel: document.querySelector('.llave--sel').getAttribute('data-llave'), viene: (d.querySelector('.viene') || {}).textContent || '', top: Math.round(r.top), alto: window.innerHeight, hash: location.hash }; });
   revisa(det1.sel === 'S1' && det1.titulo !== det0.titulo && /resiembra/.test(det1.viene) && det1.top >= 0 && det1.top < det1.alto * 0.6 && det1.hash === '', 'tocar una serie del cuadro abre su detalle (dice de qué llaves viene y que hay resiembra)', JSON.stringify(det1));
@@ -1126,6 +1145,7 @@ async function correr(navegador, nombre, opciones) {
   await revisaSegunDatos(ctx, variante('terminada', conLiguillaTerminada, DOC_DEFINIDO), 'liguilla terminada', movil, opciones, { ahora: AHORA_DEFINIDO, foto: 'terminada', plegs: 0, chips: ['Terminada', 'Terminada', 'Terminada', 'Terminada', 'Terminada', 'Terminada', 'Terminada'] });
   await revisaSegunDatos(ctx, variante('final', conFinalEnCurso, DOC_DEFINIDO), 'final a medio jugar (ida jugada)', movil, opciones, { ahora: AHORA_DEFINIDO, foto: 'final', chips: ['Terminada', 'Terminada', 'Terminada', 'Terminada', 'Terminada', 'Terminada', 'En curso'] });
   await alMomentoVuelta(ctx, movil);
+  await alMomentoTrasLaFase(ctx, movil);
   await ctx.close();
 
   /* ---------- movimiento reducido ---------- */
@@ -1155,9 +1175,67 @@ async function alMomentoVuelta(ctx, movil) {
     if (!m || !m.serie.includes(p.serie.texto) || (ida && !m.serie.includes('Ida: ' + ida.local + ' ' + ida.gl + '-' + ida.gv + ' ' + ida.visitante)) || (m.barra && !/90 min/.test(m.barra)) || (!p.serie.decidida && !/(Avanza|Campeón): /.test(m.serie))) mal.push(p.id + ' ' + JSON.stringify(m)); });
   revisa(conSerie.length > 0 && mal.length === 0, '«Al momento» en una vuelta: cada partido dice su serie (global, ida y quién avanza) y la barra es del partido a 90 minutos', mal.join(' | ').slice(0, 300));
   revisa(r.tabla === 'Tabla final de la fase regular' && r.flechas === 0 && !/flecha/i.test(r.tablaTxt), '«Al momento» en liguilla: la tabla fija se rotula «Tabla final de la fase regular», sin flechas', JSON.stringify([r.tabla, r.flechas]));
+  /* V2-5 (workflow 10): la tarjeta en juego crece con «Al momento»; las demás de su renglón no abren un hueco entre IDA y VUELTA */
+  const huecos = await pg.evaluate(() => Array.from(document.querySelectorAll('#cuadro .llave')).map(l => { const ps = l.querySelectorAll('.pierna'); return ps.length < 2 ? 0 : Math.round(ps[1].getBoundingClientRect().top - ps[0].getBoundingClientRect().bottom); }));
+  revisa(huecos.length > 0 && Math.max(...huecos) <= 12, '«Al momento» en una vuelta: en el cuadro ninguna tarjeta deja un hueco entre la ida y la vuelta', JSON.stringify(huecos));
+  /* V2-8: el detalle de la serie en juego muestra el marcador real de la vuelta y rotula «antes del partido» el pronóstico */
+  const enJ = VUELTA.series.filter(x => x.al_momento !== false && x.piernas.some(q => q.estado === 'en_juego'));
+  for (const x of enJ) {
+    await pg.evaluate(k => document.querySelector('.serie-sel [data-serie="' + k + '"]').click(), x.llave);
+    await pg.waitForTimeout(400);
+    const q = x.piernas.find(z => z.estado === 'en_juego');
+    const dv = await pg.evaluate(n => { const d = document.getElementById('serie-det'), b = d.querySelector('.leg[data-leg="' + n + '"] [data-leg-vivo]');
+      return { box: b && !b.hidden ? b.textContent.replace(/\s+/g, ' ').trim() : null, marc: b && !b.hidden ? Array.from(b.querySelectorAll('.tablero b')).map(e => e.textContent).join('-') : '', antes: Array.from(d.querySelectorAll('[data-antes]')).map(e => e.textContent) }; }, q.pierna);
+    revisa(dv.box && /En juego/.test(dv.box) && dv.marc === q.gl + '-' + q.gv && dv.antes.length > 0 && dv.antes.every(t => /antes del partido$/.test(t)),
+      '«Al momento» en una vuelta: el detalle de ' + x.llave + ' muestra el marcador real de la pierna en juego y rotula «antes del partido» lo previo', JSON.stringify(dv));
+  }
   revisa(errores.length === 0 && r.respaldos === 0, '«Al momento» en una vuelta: sin errores ni bloques de respaldo', errores.slice(0, 2).join(' || '));
   if (CAPTURAS) { fs.mkdirSync(DIR_CAP, { recursive: true }); await pg.locator('#vivo').screenshot({ path: path.join(DIR_CAP, motor + '-' + (movil ? 'iphone' : 'escritorio') + '-al-momento-vuelta.png') }); }
   await pg.close();
+}
+/* «Al momento» con la fase regular terminada (lo que encontró la verificación del workflow 10: V2-1, V2-2, V2-3, V3-1 y V3-8).
+   Base: la copia fija «definido», cuyo «vivo» incrustado (21:18 h del 22-nov) es de un motor anterior a tabla_fija y previa:
+   «Tabla general: hoy no hay partidos…», proyección con todos los cambios en 0 y los dos resultados ya en «Resultados recientes». */
+async function alMomentoTrasLaFase(ctx, movil) {
+  const errores = [];
+  async function ver(url, ahora) {
+    const pg = await abrir(ctx, errores);
+    await pg.clock.install({ time: new Date(ahora) });
+    await pg.goto(url, { waitUntil: 'load' });
+    await pg.waitForTimeout(700);
+    const r = await pg.evaluate(() => { const T = e => (e ? e.textContent : '').replace(/\s+/g, ' ').trim(), s = document.getElementById('vivo');
+      return { visible: !s.hidden, nav: Array.from(document.querySelectorAll('.js-nav-vivo')).every(li => li.hidden === s.hidden), rot: T(s.querySelector('.rotulo')), texto: T(s),
+        marcs: document.querySelectorAll('#b-vivo-partidos .marc').length, tabla: T(document.getElementById('b-vivo-tabla')), th: T(document.querySelector('#b-vivo-tabla h3')), flechas: document.querySelectorAll('#b-vivo-tabla .mov').length,
+        proy: T(document.getElementById('b-vivo-proy')), deltas: document.querySelectorAll('#b-vivo-proy .dl').length, respaldos: document.querySelectorAll('.respaldo').length }; });
+    if (CAPTURAS && r.visible) { fs.mkdirSync(DIR_CAP, { recursive: true }); await pg.locator('#vivo').screenshot({ path: path.join(DIR_CAP, motor + '-' + (movil ? 'iphone' : 'escritorio') + '-al-momento-' + ahora.slice(0, 13).replace(/\W/g, '') + '.png') }); }
+    await pg.close();
+    return r;
+  }
+  /* domingo 22:00 h: el mismo día, sin nada en juego: sólo los marcadores; ni la tabla (repetiría «Así terminó») ni la proyección (repetiría la portada con «=») */
+  const a = await ver(URL_DEFINIDO, AHORA_DEFINIDO);
+  revisa(a.visible && a.rot === 'Hoy' && a.marcs === 2 && a.tabla === '' && a.proy === '' && !/Tabla al momento|La flecha|Campeón, al momento|no hay partidos de fase regular/.test(a.texto),
+    '«Al momento» tras la fase regular (mismo día, nada en juego): sólo los marcadores del día, sin «Tabla al momento» ni «Campeón, al momento» repetidos', JSON.stringify(a).slice(0, 300));
+  /* lunes 01:00 h (el «vivo» de las 21:18 h sigue dentro de sus 12 h): ya no es «hoy» y sus resultados ya están en la página: la sección se retira */
+  const b = await ver(URL_DEFINIDO, '2026-11-23T07:00:00Z');
+  revisa(!b.visible && b.nav, '«Al momento» pasada la medianoche, con los resultados ya en la página: la sección y su botón del menú se retiran', JSON.stringify(b).slice(0, 200));
+  /* lo mismo, pero sin pipeline.py auto después de los partidos (sus resultados NO están en la página): sale, rotulada «Ayer», sin decir «hoy» */
+  const sinAuto = variante('vivoayer', d => { const ids = new Set(d.vivo.partidos.map(p => String(p.id))); d.ultimos_resultados = d.ultimos_resultados.filter(u => !ids.has(String(u.id))); }, DOC_DEFINIDO);
+  const c = await ver(sinAuto, '2026-11-23T07:00:00Z');
+  revisa(c.visible && c.rot === 'Ayer' && c.marcs === 2 && !/\bhoy\b/i.test(c.texto.replace(/datos (del|de las)[^)]*\)/, '')),
+    '«Al momento» pasada la medianoche, sin los resultados en la página: se rotula «Ayer» y no dice «hoy»', JSON.stringify(c).slice(0, 300));
+  /* una vuelta en juego con un «vivo» de un motor anterior a tabla_fija: con proyeccion.regular_completa la tabla es la final, sin flechas ni el texto viejo */
+  const enJuego = variante('vivoviejojuego', d => {
+    const v = d.vivo, p = v.partidos[0];
+    Object.assign(p, { estado: 'en_juego', periodo: 2, minuto: 60, anadido: null, reloj_utc: '2026-11-23T03:59:00Z' });
+    v.generado_utc = '2026-11-23T03:59:00Z'; v.vence_utc = '2026-11-23T04:36:00Z'; v.estado = 'en_juego';
+    delete v.tabla_fija; v.tabla_nota = 'Tabla general: hoy no hay partidos de fase regular en juego.';
+    v.proyeccion.previa = true;                                   /* el motor nuevo marca así la que no recalculó */
+  }, DOC_DEFINIDO);
+  const e = await ver(enJuego, AHORA_DEFINIDO);
+  revisa(e.visible && e.th === 'Tabla final de la fase regular' && e.flechas === 0 && !/flecha|hoy no hay partidos/i.test(e.tabla),
+    '«Al momento» con un partido en juego y un «vivo» sin tabla_fija: la tabla es la final de la fase regular, sin flechas ni el texto viejo', JSON.stringify([e.th, e.flechas, e.tabla.slice(0, 120)]));
+  revisa(e.proy === '' && e.deltas === 0, '«Al momento»: una proyección que el motor no recalculó (previa) no se presenta como cambio ni repite las cifras de la portada', JSON.stringify([e.proy.slice(0, 120), e.deltas]));
+  revisa(errores.length === 0 && [a, c, e].every(x => x.respaldos === 0), '«Al momento» tras la fase regular: sin errores ni bloques de respaldo', errores.slice(0, 2).join(' || '));
 }
 /* Desempeño sellado, modelo contra mercado: datos de hoy y variantes (ver conMercado). Todo lo que se revisa es formato:
    las cifras esperadas son las que trae el documento, nunca algo que la página tenga que calcular. */

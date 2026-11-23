@@ -861,9 +861,10 @@ class Motor:
         jugando = {e for p in partidos if p["estado"] in ESTADOS_ACTIVOS for e in (p["local"], p["visitante"])}
         if ctx.get("regular_completa") or (not reg and ctx.get("series")):
             # liguilla: la tabla ya no se mueve (la liguilla no suma puntos); sólo decide quién es el mejor sembrado
+            # la nota no repite el título que pone la página («Tabla final de la fase regular»; V2-14 del workflow 10)
             return ([dict(f, cambio=0, en_juego=f["equipo"] in jugando) for f in ctx["tabla"]],
-                    "Tabla final de la fase regular: en la liguilla no se suman puntos; el lugar decide quién avanza "
-                    "con el global empatado en cuartos y semifinales.")
+                    "En la liguilla no se suman puntos; el lugar decide quién avanza con el global empatado en cuartos y "
+                    "semifinales.")
         if not reg:
             return ([dict(f, cambio=0, en_juego=f["equipo"] in jugando) for f in ctx["tabla"]],
                     "Tabla general: hoy no hay partidos de fase regular en juego.")
@@ -976,7 +977,10 @@ class Motor:
                 RUTA_BASE.unlink(missing_ok=True)
         aplicados = set(sim["en_juego"])
         if not aplicados:                                          # todo lo de hoy ya está en partidos.csv
-            return _proyeccion_previa(ctx, self.n_sim, None)
+            # el pronóstico vigente (actual.json) ya incluye los resultados de hoy: delta 0 NO es «sin cambio frente
+            # a antes de los partidos» (V3-1 del workflow 10), así que se marca para que la página no lo diga
+            return _proyeccion_previa(ctx, self.n_sim, "Ya incluye los resultados de hoy: es el pronóstico vigente; el cambio "
+                                      "frente al de antes de los partidos no se mide aquí.", incluye_hoy=True)
         out = {"n_sim": sim["n_sim"], "clasifica": [], "campeon": [], "ruido": RUIDO_DELTA,
                "partidos_considerados": sorted(aplicados)}
         for k, llave, previa in ((0, "clasifica", ctx["p_clasifica"]), (1, "campeon", ctx["p_campeon"])):
@@ -1196,6 +1200,14 @@ class Motor:
         if vuelta is not None and vuelta.get("penales"):
             pen = vuelta["penales"]
             tanda = (pen["l"], pen["v"]) if vuelta["local"] == mejor else (pen["v"], pen["l"])
+        if momento in ("vuelta", "tiempos_extra", "penales", "terminada") and not decidida and e1 != "final":
+            # la vuelta se juega (o acabó) y no se sabe el marcador de la ida (ya hay aviso): el global sólo tendría
+            # los goles de la vuelta, así que no se dice quién avanzaría ni cuántos goles le faltan (nada inventado)
+            p2 = next((d for d in piernas if d["pierna"] == 2), None)
+            marc = f"{p2['local']} {p2['gl']}-{p2['gv']} {p2['visitante']}" if p2 and p2.get("gl") is not None else "sin marcador"
+            texto = (f"Terminó la vuelta ({marc}): falta el marcador de la ida para saber quién avanza." if momento == "terminada"
+                     else f"Vuelta en juego ({marc}): falta el marcador de la ida, así que no se puede decir quién avanza.")
+            return {"momento": momento, "avanza_ahora": None, "motivo_ahora": None, "le_falta": None, "texto": texto}
         sit = EJ.situacion_serie(fase, gm, gp, momento, tanda[0], tanda[1])
         nombre = {"mejor": mejor, "peor": peor}
         avanza = ganador if decidida else nombre.get(sit["avanza_ahora"])
@@ -1291,12 +1303,17 @@ def _texto_serie(fase: str, mejor: str, peor: str, momento: str, gm: int, gp: in
     return f"{avanza} es campeón{et}: {g}."
 
 
-def _proyeccion_previa(ctx: dict, n_sim: int, nota: str | None) -> dict:
-    """Proyección sin cambios: la del último pronóstico previo, con delta 0."""
+def _proyeccion_previa(ctx: dict, n_sim: int, nota: str | None, incluye_hoy: bool = False) -> dict:
+    """
+    Proyección sin recalcular: la del último pronóstico previo (actual.json), con delta 0 frente a él. `previa`
+    = True dice que no es un cálculo al momento (la página no la presenta como cambio); `incluye_hoy` = True
+    cuando ese pronóstico ya contiene los resultados de hoy (corrió pipeline.py auto tras los partidos).
+    """
     cl = [{"equipo": e, "p": _r4(p), "delta": 0.0} for e, p in ctx["p_clasifica"].items() if 0.0005 < p < 0.9995]
     ca = [{"equipo": e, "p": _r4(p), "delta": 0.0} for e, p in ctx["p_campeon"].items() if p >= 0.0005]
     out = {"n_sim": ctx.get("n_sim"), "clasifica": sorted(cl, key=lambda d: (-d["p"], d["equipo"])),
-           "campeon": sorted(ca, key=lambda d: (-d["p"], d["equipo"])), "ruido": RUIDO_DELTA, "partidos_considerados": []}
+           "campeon": sorted(ca, key=lambda d: (-d["p"], d["equipo"])), "ruido": RUIDO_DELTA, "partidos_considerados": [],
+           "previa": True, "incluye_hoy": bool(incluye_hoy)}
     if nota:
         out["nota"] = nota
     return out

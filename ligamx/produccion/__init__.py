@@ -19,9 +19,10 @@ def origen_pronosticador() -> str:
     return "campeon" if RUTA_CAMPEON.exists() else "provisional"
 
 
-def obtener_pronosticador(corte=None):
+def obtener_pronosticador(corte=None, df=None):
     """
-    Pronosticador ajustado con lo jugado antes de `corte` (por omisión: ahora).
+    Pronosticador ajustado con lo jugado antes de `corte` (por omisión: ahora). `df`: otros datos en lugar de
+    datos.cargar() (exportar lo usa para quitar el torneo siguiente mientras se festeja al campeón).
 
     Si existe modelo/campeon.json devuelve modelo.pronostico.Pronosticador (el modelo campeón; un
     error al importarlo o ajustarlo NO se oculta: producción no debe caer en silencio a un modelo
@@ -29,6 +30,6 @@ def obtener_pronosticador(corte=None):
     """
     if RUTA_CAMPEON.exists():
         from modelo.pronostico import Pronosticador
-    else:
-        from .pronosticador_provisional import Pronosticador
-    return Pronosticador(corte=corte)
+        return Pronosticador(corte=corte, df=df)
+    from .pronosticador_provisional import Pronosticador
+    return Pronosticador(corte=corte, partidos=df)
