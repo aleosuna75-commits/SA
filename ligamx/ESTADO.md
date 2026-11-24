@@ -220,13 +220,17 @@ en la base quedaron aceptadas.
 - «Liga MX: calendario de cuartos» (`trig_01TL9jTmiLVZi8GVJAQVWM9s`, una vez, lunes 23-nov 17:00 de México = 23:00 UTC):
   corre `pipeline.py auto`; si ESPN ya lista los cuartos, republica, programa los despertares en vivo de cada día de
   partido (VIVO.md §6.1) y avisa al usuario con horarios y pronósticos completos; si no, se reprograma 4 h después.
-  Ya corrió (23:00 y 03:04 UTC: ESPN sin cuartos). Lo sigue «Liga MX: ¿ya lista ESPN los cuartos?»
-  (`trig_01DVGgM7gAVDu4TiuzXczCGs`, 24-nov 11:30 UTC, se reprograma cada 4 h hasta que ESPN los liste).
+  Ya corrió (23:00 y 03:04 UTC: ESPN sin cuartos). ESPN los listó antes de la corrida diaria del 24-nov 07:20 UTC
+  (mismas horas que la prensa), así que se borró el reintento de las 11:30 (`trig_01DVGgM7gAVDu4TiuzXczCGs`).
 - Vivo de las idas de cuartos (programado el 24-nov con los horarios oficiales): mié 25 armar `trig_01JBWQ8rB3KL6HQJcDsxrmXG`
   (26-nov 00:40 UTC), vigilar `trig_01CoiiwvKD96CbeqH5KW32od` (02:00) y `trig_015Gpk7GmX7DcfAz2KBuJ9fz` (04:10), cierre
   `trig_01NfBMSgWVeQXUEVnzcGedgf` (05:40); jue 26 armar `trig_018kyeoeC9496h1u9TW5uch3` (27-nov 00:40), vigilar
   `trig_01WTDyiwXNHiAsvyZCtGLpJg` (02:00) y `trig_01H8sB7HK8xSu8fG3eWsgEWP` (04:10), cierre `trig_018r5jTArgqHcpZaDVKXVtAn`
-  (05:40). Las vueltas (sáb 28 y dom 29) las programa la corrida diaria.
+  (05:40). Vueltas (programadas el 24-nov 07:24 UTC con el calendario de ESPN): sáb 28 armar `trig_015tjguoBr8C8fo3TaeuxQnm`
+  (29-nov 00:40 UTC), vigilar `trig_01A76UwSL2ShqYY6f1RZZor4` (02:00) y `trig_014NUDkv8KeCJNKqgkqdPHbU` (04:10), cierre
+  `trig_01PYC4an7ag1jqxAG1KZ8zVC` (05:40); dom 29 armar `trig_01XDYr57xpZqXuoQMyMDuNJG` (30-nov 00:47), vigilar
+  `trig_012nduTVucw7M4fSUBdyH8wt` (02:07) y `trig_01WTdsPsLDzkjiQPBT5LGmjA` (04:00), cierre `trig_01QDPVn8SjDjykn4iYmSU5VD`
+  (05:30; avisa los cruces de semifinales y deja la revisión del calendario de semis).
 
 ## Bitácora
 - 2026-11-10 02:50 UTC · Reconocimiento: ESPN da resultados y estadísticas por partido; 143/153 jugados.

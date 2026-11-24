@@ -1,6 +1,135 @@
 {
  "torneo": "Apertura 2026",
- "generado_utc": "2026-11-23T03:17:23Z",
+ "generado_utc": "2026-11-24T07:21:29Z",
  "fuente": "ESPN scoreboard mex.1",
- "partidos": []
+ "partidos": [
+  {
+   "id": "401931986",
+   "fecha_utc": "2026-11-26T01:00Z",
+   "fecha_local": "2026-11-25",
+   "hora_local": "19:00",
+   "fase": "cuartos",
+   "pierna": "1",
+   "estado": "programado",
+   "local": "Toluca",
+   "visitante": "Atlas",
+   "estadio": "Estadio Nemesio Díez Riega",
+   "ciudad": "Toluca",
+   "momios": null
+  },
+  {
+   "id": "401931998",
+   "fecha_utc": "2026-11-26T03:10Z",
+   "fecha_local": "2026-11-25",
+   "hora_local": "21:10",
+   "fase": "cuartos",
+   "pierna": "1",
+   "estado": "programado",
+   "local": "Monterrey",
+   "visitante": "América",
+   "estadio": "Estadio BBVA",
+   "ciudad": "Guadalupe",
+   "momios": {
+    "ml_l": 2.35,
+    "ml_e": 3.3,
+    "ml_v": 2.9,
+    "total_linea": 2.5,
+    "over": 1.833,
+    "under": 1.87,
+    "proveedor": "DraftKings"
+   }
+  },
+  {
+   "id": "401931982",
+   "fecha_utc": "2026-11-27T01:00Z",
+   "fecha_local": "2026-11-26",
+   "hora_local": "19:00",
+   "fase": "cuartos",
+   "pierna": "1",
+   "estado": "programado",
+   "local": "Pachuca",
+   "visitante": "Chivas",
+   "estadio": "Estadio Hidalgo",
+   "ciudad": "Pachuca",
+   "momios": null
+  },
+  {
+   "id": "401931995",
+   "fecha_utc": "2026-11-27T03:10Z",
+   "fecha_local": "2026-11-26",
+   "hora_local": "21:10",
+   "fase": "cuartos",
+   "pierna": "1",
+   "estado": "programado",
+   "local": "León",
+   "visitante": "Cruz Azul",
+   "estadio": "Estadio León",
+   "ciudad": "León de los Aldamas",
+   "momios": {
+    "ml_l": 3.1,
+    "ml_e": 3.45,
+    "ml_v": 2.2,
+    "total_linea": 2.5,
+    "over": 1.69,
+    "under": 2.05,
+    "proveedor": "DraftKings"
+   }
+  },
+  {
+   "id": "401931997",
+   "fecha_utc": "2026-11-29T01:00Z",
+   "fecha_local": "2026-11-28",
+   "hora_local": "19:00",
+   "fase": "cuartos",
+   "pierna": "2",
+   "estado": "programado",
+   "local": "Atlas",
+   "visitante": "Toluca",
+   "estadio": "Estadio Jalisco",
+   "ciudad": "Guadalajara",
+   "momios": null
+  },
+  {
+   "id": "401931996",
+   "fecha_utc": "2026-11-29T03:10Z",
+   "fecha_local": "2026-11-28",
+   "hora_local": "21:10",
+   "fase": "cuartos",
+   "pierna": "2",
+   "estado": "programado",
+   "local": "América",
+   "visitante": "Monterrey",
+   "estadio": "Estadio Banorte",
+   "ciudad": "Mexico City",
+   "momios": null
+  },
+  {
+   "id": "401931983",
+   "fecha_utc": "2026-11-30T01:07Z",
+   "fecha_local": "2026-11-29",
+   "hora_local": "19:07",
+   "fase": "cuartos",
+   "pierna": "2",
+   "estado": "programado",
+   "local": "Chivas",
+   "visitante": "Pachuca",
+   "estadio": "Estadio Akron",
+   "ciudad": "Guadalajara",
+   "momios": null
+  },
+  {
+   "id": "401932000",
+   "fecha_utc": "2026-11-30T03:00Z",
+   "fecha_local": "2026-11-29",
+   "hora_local": "21:00",
+   "fase": "cuartos",
+   "pierna": "2",
+   "estado": "programado",
+   "local": "Cruz Azul",
+   "visitante": "León",
+   "estadio": "Estadio Banorte",
+   "ciudad": "Mexico City",
+   "momios": null
+  }
+ ]
 }

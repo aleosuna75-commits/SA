@@ -1,19 +1,19 @@
 {
- "corrida_utc": "2026-11-24T04:36:57Z",
+ "corrida_utc": "2026-11-24T07:21:22Z",
  "pasos": {
   "datos": {
    "ok": true,
    "codigo": 0,
    "nuevos_jugados": 0,
    "reprogramados": 0,
-   "nuevos_en_calendario": 0,
+   "nuevos_en_calendario": 8,
    "momios_actualizados": 0,
    "tabla_coincide_con_espn": true,
-   "segundos": 4.9
+   "segundos": 7.8
   },
   "variables": {
    "ok": true,
-   "segundos": 2.1
+   "segundos": 6.6
   },
   "mejora": {
    "ok": true,
@@ -23,40 +23,144 @@
   "pronostico": {
    "ok": true,
    "salida": [
-    "/home/user/SA/ligamx/salidas/actual.json  93 KB  modelo=ensamble  pendientes=0  sellos nuevos=0  47.6 s",
+    "/home/user/SA/ligamx/salidas/actual.json  231 KB  modelo=ensamble  pendientes=8  sellos nuevos=8  50.7 s",
     "campeón: Cruz Azul 0.264, Chivas 0.209, América 0.208, Toluca 0.182, Pachuca 0.059"
    ],
-   "segundos": 49.0
+   "segundos": 52.7
   },
   "vivo": {
    "ok": true,
    "estado": "sin_partidos",
    "partidos": 0,
-   "siguiente": null,
+   "siguiente": {
+    "id": 401931986,
+    "inicio_utc": "2026-11-26T01:00:00Z",
+    "local": "Toluca",
+    "visitante": "Atlas"
+   },
    "incrustado": true,
-   "segundos": 1.6
+   "segundos": 3.1
   },
   "pagina": {
    "ok": true,
    "salida": [
-    "listo en 0.01 s"
+    "listo en 0.34 s"
    ],
-   "segundos": 0.1
+   "segundos": 0.5
   }
  },
  "errores": [],
  "nuevos_jugados": [],
  "reprogramados": [],
- "nuevos_en_calendario": [],
- "proximo_partido": null,
+ "nuevos_en_calendario": [
+  {
+   "id": "401931986",
+   "fecha_local": "2026-11-25",
+   "torneo": "Apertura 2026",
+   "fase": "cuartos",
+   "local": "Toluca",
+   "visitante": "Atlas",
+   "estado": "programado",
+   "fecha_utc": "2026-11-26T01:00Z"
+  },
+  {
+   "id": "401931998",
+   "fecha_local": "2026-11-25",
+   "torneo": "Apertura 2026",
+   "fase": "cuartos",
+   "local": "Monterrey",
+   "visitante": "América",
+   "estado": "programado",
+   "fecha_utc": "2026-11-26T03:10Z"
+  },
+  {
+   "id": "401931982",
+   "fecha_local": "2026-11-26",
+   "torneo": "Apertura 2026",
+   "fase": "cuartos",
+   "local": "Pachuca",
+   "visitante": "Chivas",
+   "estado": "programado",
+   "fecha_utc": "2026-11-27T01:00Z"
+  },
+  {
+   "id": "401931995",
+   "fecha_local": "2026-11-26",
+   "torneo": "Apertura 2026",
+   "fase": "cuartos",
+   "local": "León",
+   "visitante": "Cruz Azul",
+   "estado": "programado",
+   "fecha_utc": "2026-11-27T03:10Z"
+  },
+  {
+   "id": "401931997",
+   "fecha_local": "2026-11-28",
+   "torneo": "Apertura 2026",
+   "fase": "cuartos",
+   "local": "Atlas",
+   "visitante": "Toluca",
+   "estado": "programado",
+   "fecha_utc": "2026-11-29T01:00Z"
+  },
+  {
+   "id": "401931996",
+   "fecha_local": "2026-11-28",
+   "torneo": "Apertura 2026",
+   "fase": "cuartos",
+   "local": "América",
+   "visitante": "Monterrey",
+   "estado": "programado",
+   "fecha_utc": "2026-11-29T03:10Z"
+  },
+  {
+   "id": "401931983",
+   "fecha_local": "2026-11-29",
+   "torneo": "Apertura 2026",
+   "fase": "cuartos",
+   "local": "Chivas",
+   "visitante": "Pachuca",
+   "estado": "programado",
+   "fecha_utc": "2026-11-30T01:07Z"
+  },
+  {
+   "id": "401932000",
+   "fecha_local": "2026-11-29",
+   "torneo": "Apertura 2026",
+   "fase": "cuartos",
+   "local": "Cruz Azul",
+   "visitante": "León",
+   "estado": "programado",
+   "fecha_utc": "2026-11-30T03:00Z"
+  }
+ ],
+ "proximo_partido": {
+  "id": "401931986",
+  "fecha_utc": "2026-11-26T01:00Z",
+  "fecha_local": "2026-11-25",
+  "hora_local": "19:00",
+  "fase": "cuartos",
+  "pierna": "1",
+  "estado": "programado",
+  "local": "Toluca",
+  "visitante": "Atlas",
+  "estadio": "Estadio Nemesio Díez Riega",
+  "ciudad": "Toluca",
+  "momios": null
+ },
  "vivo": {
   "estado": "sin_partidos",
   "partidos": 0,
-  "siguiente": null,
+  "siguiente": {
+   "id": 401931986,
+   "inicio_utc": "2026-11-26T01:00:00Z",
+   "local": "Toluca",
+   "visitante": "Atlas"
+  },
   "incrustado": true
  },
  "modelo": "ensamble",
- "corte_local": "2026-11-23 22:37",
+ "corte_local": "2026-11-24 01:21",
  "campeon_top": [
   [
    "Cruz Azul",
@@ -79,8 +183,8 @@
    0.0585
   ]
  ],
- "liguilla_en_curso": false,
- "pendientes": 0,
+ "liguilla_en_curso": true,
+ "pendientes": 8,
  "desempeno": {
   "n_calificados": 10,
   "acumulado": {
@@ -123,9 +227,8 @@
    }
   }
  },
- "huella": "d6bf34c6733d742e16829a6b2e0eaa16",
- "publicar": false,
+ "huella": "7bf34ce22fd5254ec5053a482e395d1c",
+ "publicar": true,
  "huella_publicada": "d6bf34c6733d742e16829a6b2e0eaa16",
- "segundos": 57.7,
- "publicado_utc": "2026-11-24T04:52:41Z"
+ "segundos": 70.6
 }

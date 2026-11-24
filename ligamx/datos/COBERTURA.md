@@ -1,9 +1,9 @@
 # Cobertura de la base histórica de Liga MX (ESPN)
 
-Generado automáticamente por `espn_descarga.py` el 2026-11-23 (no editar a mano: se reescribe en cada `tablas` / `actualizar`; los veredictos de la conciliación viven en `conciliacion_veredictos.json`).
+Generado automáticamente por `espn_descarga.py` el 2026-11-24 (no editar a mano: se reescribe en cada `tablas` / `actualizar`; los veredictos de la conciliación viven en `conciliacion_veredictos.json`).
 
 - Fuente: API pública de ESPN, liga `mex.1` (scoreboard por año + summary por partido).
-- Partidos en `partidos.csv`: **8767** (8694 jugados) de 2001-07-21 a 2026-11-22; 51 torneos.
+- Partidos en `partidos.csv`: **8775** (8694 jugados) de 2001-07-21 a 2026-11-29; 51 torneos.
 - ESPN no tiene eventos de Liga MX anteriores al Invierno 2001 (probado 1996-2000: vacío).
 - Partidos jugados con algún bloque de detalle (stats, eventos o alineaciones): 8678 (100%).
 
@@ -63,7 +63,7 @@ Porcentajes sobre partidos **jugados**. `stats` = boxscore real; `eventos` = gol
 | Clausura 2025 | 170 | 170 | 153 | 17 | 98% | 100% | 96% | 100% | 100% | 100% | 98% | 100% | 100% |
 | Apertura 2025 | 170 | 170 | 153 | 17 | 100% | 100% | 99% | 100% | 98% | 100% | 100% | 99% | 100% |
 | Clausura 2026 | 167 | 167 | 153 | 14 | 100% | 100% | 99% | 100% | 100% | 100% | 100% | 92% | 100% |
-| Apertura 2026 | 153 | 153 | 153 | 0 | 100% | 100% | 100% | 100% | 100% | 100% | 100% | 1% | 56% |
+| Apertura 2026 | 161 | 153 | 153 | 0 | 100% | 100% | 100% | 100% | 100% | 100% | 100% | 1% | 56% |
 
 ## 2. Desde qué torneo es confiable cada bloque
 
@@ -224,12 +224,12 @@ Las 3 diferencias de -3 días son las idas de liguilla mal fechadas en el histó
 
 | Prueba | Resultado | Detalle |
 |---|---|---|
-| ids únicos | OK | 8767 filas, 8767 ids |
+| ids únicos | OK | 8775 filas, 8775 ids |
 | sin partidos jugados duplicados (torneo, fase, pierna, local, visitante) | OK |  |
 | todo partido jugado tiene marcador | OK |  |
 | gl_ht <= gl y gv_ht <= gv | OK |  / excepciones documentadas (resultado de escritorio): 590969 2021-02-20 Atlas-América HT 0-1 FT 3-0 |
 | marcador tras tiempos extra >= marcador de 90 min | OK |  |
-| fecha_local = fecha_utc convertida a America/Mexico_City | OK | 5157 partidos nocturnos caen en el día UTC siguiente y quedan en su día local correcto |
+| fecha_local = fecha_utc convertida a America/Mexico_City | OK | 5165 partidos nocturnos caen en el día UTC siguiente y quedan en su día local correcto |
 | fase regular completa por torneo (n equipos a una vuelta) | OK | 50 torneos completos; incompletos: Clausura 2020: 90 de 153 jugados (18 equipos; otros: {'cancelado': 63}) |
 | liguilla: 8 partidos de cuartos, 4 de semifinal y 2 de final por torneo | OK |  |
 | goles.csv suma el marcador en los partidos con tiene_eventos=1 | OK |  |
