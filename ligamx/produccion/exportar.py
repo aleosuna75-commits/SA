@@ -16,11 +16,13 @@ existe y tiene menos de 36 horas; `incrustar_vivo()` actualiza sólo ese campo s
 from __future__ import annotations
 
 import argparse
+import datetime as dt
 import json
 import math
 import sys
 import time
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 import numpy as np
 import pandas as pd
@@ -55,6 +57,7 @@ DIAS_ANTES_DEL_SIGUIENTE = 7                   # tras la final, el torneo termin
 MESES = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre",
          "diciembre"]
 SIN_REDONDEO = {"lat", "lon"}
+ZONA_MX = ZoneInfo(datos.ZONA)                 # America/Mexico_City: horas de la prensa → UTC
 DESCRIPCION_PROVISIONAL = (
     "Modelo provisional (Poisson simple): cada equipo tiene una fuerza de ataque y una de defensa, y hay una "
     "ventaja de local igual para todos; se estiman con los partidos de los últimos años dando más peso a los "
@@ -449,8 +452,12 @@ def torneo_liguilla(pron, sim: dict, reglas: dict, clasificados: list[str] | Non
     calendario): los cuartos, en cuanto la fase regular termina; una semifinal, cuando los cuatro cuartos están
     decididos (por la resiembra el rival depende de todos); la final, cuando lo están las dos semifinales.
     El estadio de cada pierna es el del calendario (la misma regla que «pendientes», con `ctx`); sin calendario,
-    el que da config/torneo.json → liguilla.sedes_<fase> (prensa) y, si no, la sede habitual del local.
-    Las fechas de cada ronda salen de sus piernas calendarizadas; config/torneo.json sólo cubre lo que falta.
+    el que da config/torneo.json → liguilla.sedes_<fase> (o, si ahí no está, horarios_<fase>; prensa) y, si no, la
+    sede habitual del local. Día y hora: los del calendario de ESPN; una pierna que ESPN todavía no lista los toma de
+    config/torneo.json → liguilla.horarios_<fase> (lo que anunció la liga, leído en la prensa), emparejando local y
+    visitante y sólo si el corte es del torneo de esa configuración; `horario_origen` dice de dónde salieron
+    («calendario», «prensa» o None si no hay). Las fechas de cada ronda salen de las piernas con día (del calendario
+    o de la prensa); las ventanas de config/torneo.json sólo cubren lo que falta.
     """
     eq = list(pron.equipos); ix = {e: i for i, e in enumerate(eq)}
     pe = {d["equipo"]: d for d in sim["por_equipo"]}
@@ -471,13 +478,37 @@ def torneo_liguilla(pron, sim: dict, reglas: dict, clasificados: list[str] | Non
         fechas = {}     # corte retrospectivo de otro torneo: las ventanas de config/torneo.json no son las suyas
 
     def sede_prensa(fase: str, local: str, visitante: str) -> dict | None:
-        """Sede de una pierna sin calendario según config/torneo.json → liguilla.sedes_<fase> (sólo de este torneo)."""
+        """
+        Sede de una pierna sin calendario según config/torneo.json → liguilla.sedes_<fase> o, si ahí no está, el
+        `estadio` de liguilla.horarios_<fase> (sólo de este torneo).
+        """
         if not mismo_torneo:
             return None
-        for x in (reglas.get("liguilla") or {}).get(f"sedes_{fase}") or []:
+        lig = reglas.get("liguilla") or {}
+        for x in list(lig.get(f"sedes_{fase}") or []) + list(lig.get(f"horarios_{fase}") or []):
             if x.get("local") == local and x.get("visitante") == visitante and x.get("estadio"):
                 return {"slug": _slug_por_nombre(x["estadio"], estadios) or (sedes.get(local) or {}).get("slug"),
                         "nombre": x["estadio"], "origen": "prensa"}
+        return None
+
+    def horario_prensa(fase: str, local: str, visitante: str) -> dict | None:
+        """
+        Día y hora de una pierna que ESPN todavía no lista, según config/torneo.json → liguilla.horarios_<fase>
+        (`fecha_local` 'AAAA-MM-DD' y `hora_local` 'HH:MM' del centro de México), sólo de este torneo. La hora UTC
+        sale de la zona America/Mexico_City (zoneinfo), no de sumar un desfase fijo.
+        """
+        if not mismo_torneo:
+            return None
+        for x in (reglas.get("liguilla") or {}).get(f"horarios_{fase}") or []:
+            if x.get("local") != local or x.get("visitante") != visitante:
+                continue
+            try:
+                ini = dt.datetime.strptime(f"{x.get('fecha_local')} {x.get('hora_local')}", "%Y-%m-%d %H:%M")
+            except (TypeError, ValueError):
+                continue                          # sin día u hora completos (o mal escritos): no se inventa nada
+            ini = ini.replace(tzinfo=ZONA_MX)
+            return {"fecha_utc": ini.astimezone(dt.timezone.utc).isoformat(), "fecha_local": ini.strftime("%Y-%m-%d"),
+                    "hora_local": ini.strftime("%H:%M")}
         return None
 
     def sede_calendario(f, local: str) -> dict | None:
@@ -504,7 +535,7 @@ def torneo_liguilla(pron, sim: dict, reglas: dict, clasificados: list[str] | Non
         for p in det["piernas"]:
             habitual = sedes.get(p["local"])
             d = {"pierna": p["pierna"], "nombre": "Ida" if p["pierna"] == 1 else "Vuelta", "id": p.get("id"),
-                 "fecha_utc": p.get("fecha_utc"), "fecha_local": None, "hora_local": None,
+                 "fecha_utc": p.get("fecha_utc"), "fecha_local": None, "hora_local": None, "horario_origen": None,
                  "local": p["local"], "visitante": p["visitante"],
                  "estadio": sede_prensa(fase, p["local"], p["visitante"]) or (dict(habitual, origen="habitual") if habitual else None),
                  "jugado": bool(p["jugado"])}
@@ -514,6 +545,13 @@ def torneo_liguilla(pron, sim: dict, reglas: dict, clasificados: list[str] | Non
                 d["fecha_local"] = pd.Timestamp(fl).strftime("%Y-%m-%d") if pd.notna(fl) else None
                 d["hora_local"] = str(f.get("hora_local")) if pd.notna(f.get("hora_local")) else None
                 d["estadio"] = sede_calendario(f, p["local"]) or d["estadio"]
+                if d["fecha_utc"] is None and pd.notna(f.get("fecha_utc")):
+                    d["fecha_utc"] = pd.Timestamp(f["fecha_utc"]).isoformat()
+                d["horario_origen"] = "calendario" if d["fecha_local"] else None     # ESPN manda sobre la configuración
+            else:                                 # ESPN todavía no la lista: el día y la hora que anunció la liga (prensa)
+                hp = horario_prensa(fase, p["local"], p["visitante"])
+                if hp:
+                    d.update(hp, horario_origen="prensa")
             if p["jugado"]:
                 d.update({"gl": p["gl"], "gv": p["gv"]})
             else:
@@ -575,7 +613,7 @@ def torneo_liguilla(pron, sim: dict, reglas: dict, clasificados: list[str] | Non
     camp = final["favorito"]
 
     def fechas_ronda(series: list[dict], clave: str) -> dict:
-        """Fechas de ida y vuelta de una ronda: las de sus piernas calendarizadas; lo que falte, de la configuración."""
+        """Fechas de ida y vuelta de una ronda: las de sus piernas con día (calendario o prensa); lo que falte, las ventanas."""
         out = {}
         for n, nombre in ((1, "ida"), (2, "vuelta")):
             ls = [l for s_ in series for l in s_["piernas"] if l["pierna"] == n]
@@ -714,7 +752,7 @@ def _avisos(meta_modelo: dict, des: dict, reglas: dict, sim: dict, pendientes: l
             a.append(f"{p['local']} vs {p['visitante']} ({p['fecha_local']}): {rep_cfg['nota']} El pronóstico no lo descuenta.")
     a += [
         "Lesiones, convocatorias y alineaciones del día no se modelan. Las bajas reportadas (config/actualidad.json) se muestran "
-        "en la ficha de cada partido cuando ese partido ya tiene día y hora en el calendario.",
+        "en la ficha completa de cada partido, que sale cuando ESPN ya publica ese partido.",
         "Los momios de ESPN son de referencia. En la historia el mercado de cierre ha sido mejor que cualquier modelo propio; "
         "una diferencia entre el modelo y el momio NO es por sí misma una apuesta con valor.",
         "«Ambos anotan» y «anota / no anota» salen por debajo de lo que ocurre: 2 puntos en 2016-2025 (0.524 pronosticado "
@@ -743,8 +781,9 @@ def _avisos(meta_modelo: dict, des: dict, reglas: dict, sim: dict, pendientes: l
         r0 = v["resultado"].split(". ")[0].rstrip(".")
         a.append(f"Regla de menores (art. 49), verificada el {v.get('fecha')}: {r0[:1].lower()}{r0[1:]}.")
     a.append("Liguilla: tiempos extra de la final con un tercio de los goles esperados de 90 minutos y penales a 50/50; los "
-             "mercados y combinadas de un partido de liguilla cuentan sólo los 90 minutos. La localía de cada pierna es la del "
-             "calendario de ESPN; mientras la liga no lo publica, la que da la prensa y, si no hay, la sede habitual del local.")
+             "mercados y combinadas de un partido de liguilla cuentan sólo los 90 minutos. El día, la hora y la sede de cada pierna "
+             "son los del calendario de ESPN; mientras ESPN no publica el partido, los que anunció la liga según la prensa y, si "
+             "no hay sede anunciada, la habitual del local.")
     if sim["meta"].get("torneo") == reglas.get("torneo") and (reglas.get("liguilla") or {}).get("fechas", {}).get("final_ida_opcion2"):
         a.append(_aviso_final_recorrida(reglas))
     if cal:

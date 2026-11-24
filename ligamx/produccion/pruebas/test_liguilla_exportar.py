@@ -312,3 +312,120 @@ def test_h10_otros_datos_no_reescriben_index(tmp_path):
     assert c.main(["--datos", str(otro), "--documento", "--salida", str(tmp_path / "sitio")]) == 0
     assert (tmp_path / "sitio" / "index.html").exists()
     assert huella == {n: hashlib.md5((web / n).read_bytes()).hexdigest() for n in huella}
+
+
+# ==================================================================================================
+# Horarios de la prensa (24-nov-2026): la liga anunció día y hora de los cuartos, pero ESPN todavía no los lista.
+# exportar los toma de config/torneo.json → liguilla.horarios_<fase> (horario_origen = "prensa"); ESPN manda en cuanto
+# lista la pierna ("calendario"); un corte de otro torneo no los toma. Equipos y horarios CONSTRUIDOS sobre la siembra
+# del escenario (no son los reales).
+# ==================================================================================================
+def _reglas_con_horarios(s, **cambios) -> dict:
+    """config/torneo.json con horarios de prensa para tres piernas de cuartos (ida en casa del peor sembrado)."""
+    import copy
+    from produccion import simulador
+    r = copy.deepcopy(simulador.cargar_reglas())
+    r["torneo"] = TORNEO
+    lig = r.setdefault("liguilla", {})
+    lig["sedes_cuartos"] = []
+    lig["horarios_cuartos"] = [
+        {"llave": "C4", "pierna": 1, "local": s[4], "visitante": s[3], "fecha_local": "2026-11-25", "hora_local": "19:00",
+         "estadio": "Estadio de Prueba", "fuente": "prueba"},
+        {"llave": "C1", "pierna": 2, "local": s[0], "visitante": s[7], "fecha_local": "2026-11-29", "hora_local": "19:07",
+         "fuente": "prueba"},
+        {"llave": "C2", "pierna": 1, "local": s[6], "visitante": s[1], "fecha_local": "2026-11-26", "hora_local": None,
+         "fuente": "prueba: sin hora todavía, no se inventa"},
+    ]
+    r.update(cambios)
+    return r
+
+
+def _piernas(lt) -> dict:
+    return {(x["llave"], l["pierna"]): l for r in lt["rondas"] for x in r["series"] for l in x["piernas"]}
+
+
+@pytest.fixture(scope="module")
+def sin_calendario(df, pron):
+    """Lunes 23-nov por la noche: fase regular terminada y ESPN sin ningún partido de liguilla."""
+    from produccion import simulador
+    s, d = _siembra(df), _con_liguilla(df, [])
+    reglas = _reglas_con_horarios(s)
+    sim = simulador.simular(pron, "2026-11-23T21:15", d, n_sim=2000, reglas=reglas, torneo=TORNEO)
+    return s, d, sim, reglas
+
+
+def test_horario_de_prensa_llena_dia_hora_y_utc(sin_calendario, pron):
+    s, d, sim, reglas = sin_calendario
+    lt = ex.torneo_liguilla(pron, sim, reglas, s, d)
+    p = _piernas(lt)
+    ida = p[("C4", 1)]
+    assert (ida["local"], ida["visitante"]) == (s[4], s[3]) and ida["id"] is None
+    assert (ida["fecha_local"], ida["hora_local"]) == ("2026-11-25", "19:00")
+    assert ida["fecha_utc"] == "2026-11-26T01:00:00+00:00"                    # 19:00 del centro de México = 01:00 UTC
+    assert ida["horario_origen"] == "prensa"
+    assert ida["estadio"] == {"slug": ida["estadio"]["slug"], "nombre": "Estadio de Prueba", "origen": "prensa"}  # sede de horarios_<fase>
+    vu = p[("C1", 2)]
+    assert (vu["fecha_local"], vu["hora_local"], vu["fecha_utc"], vu["horario_origen"]) == \
+        ("2026-11-29", "19:07", "2026-11-30T01:07:00+00:00", "prensa")
+    # sin hora completa (C2 ida) o sin horario (las demás) no se inventa nada
+    for k, l in p.items():
+        if k not in (("C4", 1), ("C1", 2)):
+            assert (l["fecha_local"], l["hora_local"], l["fecha_utc"], l["horario_origen"]) == (None, None, None, None), k
+    # la ronda: con piernas sin día, las fechas siguen completándose con las ventanas de la configuración
+    assert lt["rondas"][0]["fechas"] == {"ida": ["2026-11-25", "2026-11-26"], "vuelta": ["2026-11-28", "2026-11-29"]}
+
+
+def test_horario_de_prensa_en_el_documento_completo(sin_calendario, pron, tmp_path, monkeypatch):
+    """construir() de punta a punta: el documento valida, la ronda toma los días de sus piernas y los avisos no dicen «sin día»."""
+    s, d, _, reglas = sin_calendario
+    todos = []
+    for (m, q), (fi, hi), (fv, hv) in zip(((0, 7), (1, 6), (2, 5), (3, 4)),
+                                          (("2026-11-26", "19:00"), ("2026-11-26", "21:10"), ("2026-11-25", "21:10"), ("2026-11-25", "19:00")),
+                                          (("2026-11-29", "19:07"), ("2026-11-29", "21:00"), ("2026-11-28", "21:10"), ("2026-11-28", "19:00"))):
+        todos += [{"pierna": 1, "local": s[q], "visitante": s[m], "fecha_local": fi, "hora_local": hi},
+                  {"pierna": 2, "local": s[m], "visitante": s[q], "fecha_local": fv, "hora_local": hv}]
+    reglas = dict(reglas, liguilla=dict(reglas["liguilla"], horarios_cuartos=todos))
+    monkeypatch.setattr(ex.simulador, "cargar_reglas", lambda *a, **k: reglas)
+    doc = _doc(d, "2026-11-23T21:15", tmp_path, pron)
+    assert ex.validar(doc) == [] and doc["pendientes"] == []
+    cu = doc["liguilla"]["torneo"]["rondas"][0]
+    assert all(l["horario_origen"] == "prensa" and l["id"] is None for x in cu["series"] for l in x["piernas"])
+    assert cu["fechas"] == {"ida": ["2026-11-25", "2026-11-26"], "vuelta": ["2026-11-28", "2026-11-29"]}
+    primera = min((l for x in cu["series"] for l in x["piernas"]), key=lambda l: l["fecha_utc"])
+    assert (primera["local"], primera["fecha_utc"]) == (s[4], "2026-11-26T01:00:00+00:00")
+    semis = [l for r in doc["liguilla"]["torneo"]["rondas"][1:] for x in r["series"] for l in x["piernas"]]
+    assert all(l["horario_origen"] is None and l["fecha_local"] is None for l in semis)
+    assert not any("ya tiene día y hora en el calendario" in a or "mientras la liga no lo publica" in a for a in doc["avisos"])
+
+
+def test_espn_gana_sobre_la_prensa(df, pron):
+    """ESPN lista las cuatro idas (C4 a otra hora que la prensa): su dato manda; la vuelta de C1, sin ESPN, sale de la prensa."""
+    from produccion import simulador
+    s = _siembra(df)
+    idas = ["2026-11-26T01:00", "2026-11-26T03:00", "2026-11-27T01:00", "2026-11-27T03:00"]
+    d = _con_liguilla(df, [("cuartos", 1, s[q], s[m], None, None, None, None, idas[k])
+                           for k, (m, q) in enumerate(((0, 7), (1, 6), (2, 5), (3, 4)))])
+    reglas = _reglas_con_horarios(s)
+    sim = simulador.simular(pron, "2026-11-24T12:00", d, n_sim=2000, reglas=reglas, torneo=TORNEO)
+    p = _piernas(ex.torneo_liguilla(pron, sim, reglas, s, d))
+    ida = p[("C4", 1)]                                   # ESPN: 27-nov 03:00 UTC = jueves 26, 21:00 (la prensa decía mié 25, 19:00)
+    fila = d[d["id"] == ida["id"]].iloc[0]
+    assert ida["id"] is not None and ida["horario_origen"] == "calendario"
+    assert (ida["fecha_local"], ida["hora_local"]) == ("2026-11-26", "21:00") and str(fila["hora_local"]) == "21:00"
+    assert pd.Timestamp(ida["fecha_utc"]) == pd.Timestamp("2026-11-27T03:00", tz="UTC")
+    assert ida["estadio"]["origen"] in ("calendario", "habitual")                       # la sede también es la de ESPN
+    assert p[("C2", 1)]["horario_origen"] == "calendario"                                # en ESPN aunque la prensa no tenga hora
+    vu = p[("C1", 2)]
+    assert vu["id"] is None and (vu["fecha_local"], vu["hora_local"], vu["horario_origen"]) == ("2026-11-29", "19:07", "prensa")
+    assert all(l["horario_origen"] is None for k, l in p.items() if k[1] == 2 and k[0] != "C1")
+
+
+def test_corte_de_otro_torneo_no_toma_los_horarios(sin_calendario, pron):
+    """Un corte retrospectivo de otro torneo (config/torneo.json es de otro): ni horarios ni sedes ni ventanas de la prensa."""
+    s, d, sim, reglas = sin_calendario
+    otro = dict(reglas, torneo="Clausura 2027")
+    lt = ex.torneo_liguilla(pron, sim, otro, s, d)
+    for l in _piernas(lt).values():
+        assert (l["fecha_local"], l["hora_local"], l["fecha_utc"], l["horario_origen"]) == (None, None, None, None)
+        assert l["estadio"] is None or l["estadio"]["origen"] == "habitual"
+    assert all(r["fechas"] == {"ida": None, "vuelta": None} for r in lt["rondas"])
