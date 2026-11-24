@@ -48,7 +48,20 @@
 - [x] 8. Automatización: `pipeline.py auto` + `modelo/mejora.py ciclo` + tarea programada diaria (runbook abajo).
 
 ## En curso
-Nada pendiente (23-nov-2026, 08:05 UTC). Tarea de continuidad desactivada.
+**Horarios de cuartos sin ESPN (24-nov-2026, desde 03:15 UTC).** La liga publicó el lunes 23 los días y horas de los
+8 partidos (Excélsior y Bolavip coinciden), pero ESPN todavía no los lista y la página decía «día y hora por confirmar».
+Hecho: horarios en `config/torneo.json` → `liguilla.horarios_cuartos`; despertares en vivo de las dos noches de ida
+programados (mié 25: armar 00:40 UTC del 26, vigilar 02:00 y 04:10, cierre 05:40; jue 26: lo mismo el 27); tarea de
+continuidad ACTIVADA. Falta, en este orden (si la sesión se corta, retomar aquí):
+1. Workflow `notas/workflows/11_horarios_cuartos_prensa.js` (corrida `wf_3c93cecd-d99`): A implementa el respaldo
+   (exportar toma día y hora de la configuración mientras ESPN no lista la pierna, con `horario_origen`; página con
+   día y hora; `vivo.py plan` con las piernas de prensa; contrato y pruebas); V1 datos y código, V2 revisión visual;
+   E arreglos. Si se cortó: `Workflow({scriptPath: "notas/workflows/11_horarios_cuartos_prensa.js" copiado al
+   directorio de guiones, resumeFromRunId: "wf_3c93cecd-d99"})` o terminar a mano revisando `git diff`.
+2. Al terminar: `pipeline.py auto` (millón), pytest, `prueba.js` en Chromium y WebKit (`PLAYWRIGHT_BROWSERS_PATH=/opt/pw-webkit`),
+   capturas a 390 px, republicar con `url` y capabilities, `pipeline.py publicado`, `vivo/actual`.
+3. Avisar al usuario: los cuartos con día y hora, el pronóstico de cada partido y quién avanza. Bitácora, commit y
+   push; desactivar la continuidad y dejar esta sección en «Nada pendiente».
 
 ### Último cierre (23-nov): fase regular terminada y liguilla a punto
 Workflow `notas/workflows/10_liguilla_puesta_a_punto.js` (corrida `wf_c407c924-72c`, 9 agentes, 3.5 M de tokens, 3 h
@@ -199,14 +212,21 @@ en la base quedaron aceptadas.
 ## Tareas programadas
 - "Cerebro Liga MX diario" (`trig_0195ELWvAUmne2MKmr1ih8zi`): todos los días a la 01:20 (Ciudad de México), en esta
   sesión. Sigue el runbook de arriba (prompt actualizado el 11-nov con el paso «en vivo»).
-- "Continuar Cerebro Liga MX" (`trig_011daxVc81g1dWPVNtuVKMCi`, cada hora): **desactivada el 23-nov-2026 08:05 UTC**
-  (se cerró la puesta a punto de la liguilla). **Activarla antes de cada trabajo largo** (regla del usuario sobre los
+- "Continuar Cerebro Liga MX" (`trig_011daxVc81g1dWPVNtuVKMCi`, cada hora): **ACTIVA desde el 24-nov-2026 03:10 UTC**
+  (horarios de cuartos sin ESPN). **Activarla antes de cada trabajo largo** (regla del usuario sobre los
   límites) y desactivarla al dejar «En curso» en «Nada pendiente».
 - Los despertares en vivo de la Jornada 17 (viernes, sábado y domingo) ya se cumplieron; el «cierre» del domingo
   (`trig_01CGwZtpXxFi73qvKfSYhPMz`) se borró el 23-nov 03:31 UTC porque el cierre se hizo a mano al terminar el partido.
 - «Liga MX: calendario de cuartos» (`trig_01TL9jTmiLVZi8GVJAQVWM9s`, una vez, lunes 23-nov 17:00 de México = 23:00 UTC):
   corre `pipeline.py auto`; si ESPN ya lista los cuartos, republica, programa los despertares en vivo de cada día de
   partido (VIVO.md §6.1) y avisa al usuario con horarios y pronósticos completos; si no, se reprograma 4 h después.
+  Ya corrió (23:00 y 03:04 UTC: ESPN sin cuartos). Lo sigue «Liga MX: ¿ya lista ESPN los cuartos?»
+  (`trig_01DVGgM7gAVDu4TiuzXczCGs`, 24-nov 11:30 UTC, se reprograma cada 4 h hasta que ESPN los liste).
+- Vivo de las idas de cuartos (programado el 24-nov con los horarios oficiales): mié 25 armar `trig_01JBWQ8rB3KL6HQJcDsxrmXG`
+  (26-nov 00:40 UTC), vigilar `trig_01CoiiwvKD96CbeqH5KW32od` (02:00) y `trig_015Gpk7GmX7DcfAz2KBuJ9fz` (04:10), cierre
+  `trig_01NfBMSgWVeQXUEVnzcGedgf` (05:40); jue 26 armar `trig_018kyeoeC9496h1u9TW5uch3` (27-nov 00:40), vigilar
+  `trig_01WTDyiwXNHiAsvyZCtGLpJg` (02:00) y `trig_01H8sB7HK8xSu8fG3eWsgEWP` (04:10), cierre `trig_018r5jTArgqHcpZaDVKXVtAn`
+  (05:40). Las vueltas (sáb 28 y dom 29) las programa la corrida diaria.
 
 ## Bitácora
 - 2026-11-10 02:50 UTC · Reconocimiento: ESPN da resultados y estadísticas por partido; 143/153 jugados.
