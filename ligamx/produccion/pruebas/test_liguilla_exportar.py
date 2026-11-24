@@ -405,6 +405,9 @@ def test_espn_gana_sobre_la_prensa(df, pron):
     idas = ["2026-11-26T01:00", "2026-11-26T03:00", "2026-11-27T01:00", "2026-11-27T03:00"]
     d = _con_liguilla(df, [("cuartos", 1, s[q], s[m], None, None, None, None, idas[k])
                            for k, (m, q) in enumerate(((0, 7), (1, 6), (2, 5), (3, 4)))])
+    cu = d["fase"] == "cuartos"                          # como en partidos.csv: día y hora del centro de México
+    loc = d.loc[cu, "fecha_utc"].dt.tz_convert(datos.ZONA)
+    d.loc[cu, "fecha_local"], d.loc[cu, "hora_local"] = loc.dt.tz_localize(None).dt.normalize(), loc.dt.strftime("%H:%M")
     reglas = _reglas_con_horarios(s)
     sim = simulador.simular(pron, "2026-11-24T12:00", d, n_sim=2000, reglas=reglas, torneo=TORNEO)
     p = _piernas(ex.torneo_liguilla(pron, sim, reglas, s, d))
