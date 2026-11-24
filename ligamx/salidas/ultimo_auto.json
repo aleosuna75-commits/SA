@@ -1,5 +1,5 @@
 {
- "corrida_utc": "2026-11-24T03:05:34Z",
+ "corrida_utc": "2026-11-24T04:36:57Z",
  "pasos": {
   "datos": {
    "ok": true,
@@ -9,11 +9,11 @@
    "nuevos_en_calendario": 0,
    "momios_actualizados": 0,
    "tabla_coincide_con_espn": true,
-   "segundos": 7.6
+   "segundos": 4.9
   },
   "variables": {
    "ok": true,
-   "segundos": 3.7
+   "segundos": 2.1
   },
   "mejora": {
    "ok": true,
@@ -23,10 +23,10 @@
   "pronostico": {
    "ok": true,
    "salida": [
-    "/home/user/SA/ligamx/salidas/actual.json  92 KB  modelo=ensamble  pendientes=0  sellos nuevos=0  45.9 s",
+    "/home/user/SA/ligamx/salidas/actual.json  93 KB  modelo=ensamble  pendientes=0  sellos nuevos=0  47.6 s",
     "campeón: Cruz Azul 0.264, Chivas 0.209, América 0.208, Toluca 0.182, Pachuca 0.059"
    ],
-   "segundos": 47.7
+   "segundos": 49.0
   },
   "vivo": {
    "ok": true,
@@ -34,7 +34,7 @@
    "partidos": 0,
    "siguiente": null,
    "incrustado": true,
-   "segundos": 1.7
+   "segundos": 1.6
   },
   "pagina": {
    "ok": true,
@@ -56,11 +56,11 @@
   "incrustado": true
  },
  "modelo": "ensamble",
- "corte_local": "2026-11-23 21:05",
+ "corte_local": "2026-11-23 22:37",
  "campeon_top": [
   [
    "Cruz Azul",
-   0.2636
+   0.2635
   ],
   [
    "Chivas",
@@ -68,7 +68,7 @@
   ],
   [
    "América",
-   0.2081
+   0.2083
   ],
   [
    "Toluca",
@@ -123,8 +123,8 @@
    }
   }
  },
- "huella": "3365a3a44c98b55e71a31af811f2ab38",
+ "huella": "d6bf34c6733d742e16829a6b2e0eaa16",
  "publicar": true,
  "huella_publicada": "725d32b4994821688a8c44b9606942c4",
- "segundos": 60.8
+ "segundos": 57.7
 }

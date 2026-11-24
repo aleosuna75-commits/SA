@@ -178,11 +178,17 @@ algo (inicio, gol, expulsión, descanso, final). La página:
     campeón. La portada sigue cabiendo en la primera pantalla;
   - **horarios de prensa** (`horario_origen` = `prensa`, desde el 24-nov-2026: la liga anunció día y hora y ESPN todavía
     no lista los partidos): si todas las idas de la ronda tienen día y hora, el anuncio dice cuándo empieza («Empieza el
-    miércoles 25 a las 19:00 h con Toluca–Atlas.»; si esa ya empezó, «Sigue el …») con una cuenta regresiva hasta esa
-    pierna (sólo formato: `fecha_utc` contra el reloj); las tarjetas compactas, el índice, el cuadro, el mini-cuadro
+    miércoles 25 a las 19:00 h (centro de México) con Toluca–Atlas.»; «hoy» o «mañana» según la fecha del centro de
+    México, y se vuelve a armar a la medianoche si la página sigue abierta; si ya se jugó o ya pasó la hora de alguna
+    pierna de la ronda, «Sigue …») con una cuenta regresiva hasta esa pierna (sólo formato: `fecha_utc` contra el reloj);
+    al llegar la hora pasa a la pierna que sigue y, con `estado` «definido», el rótulo a «Liguilla en curso». Los botones
+    de los cruces van en el orden del cuadro (C1 a C4). Las tarjetas compactas, el índice (en celular se desliza; desde
+    600 px va en renglones y ninguna pastilla queda cortada), el cuadro, el mini-cuadro
     (un renglón «Mié 25 · 19:00» bajo cada pierna) y el detalle de la serie muestran el día y la hora («Mié 25 nov ·
-    19:00 h»); las tarjetas van por día y hora dentro de cada grupo (ida o vuelta), y la nota de «Próximos partidos» dice
-    «Día y hora anunciados por la liga»: ESPN todavía no publica esos partidos y el pronóstico completo de cada uno
+    19:00 h», con espacios duros: no se parte en dos renglones); una tarjeta cuya hora ya pasó y que ESPN todavía no
+    publica dice «· ya empezó» y su pronóstico se rotula «Pronóstico previo». Las tarjetas van por día y hora dentro de
+    cada grupo (ida o vuelta), y la nota de «Próximos partidos» dice «Día y hora anunciados por la liga · Horas del
+    centro de México»: ESPN todavía no publica esos partidos y el pronóstico completo de cada uno
     (mercados y combinada), la combinada de la ronda y el seguimiento en vivo llegan cuando ESPN los publique. Ningún
     texto dice «por confirmar» cuando todo tiene horario; en cuanto ESPN lista una pierna, su día y hora mandan
     (`calendario`) y pasa a `pendientes` con su tarjeta completa;
@@ -241,7 +247,7 @@ inventadas) para «Al momento» en liguilla:
     PLAYWRIGHT_BROWSERS_PATH=<carpeta con webkit> node web/pruebas/prueba.js webkit
     # con --capturas guarda PNG en web/pruebas/capturas/ (ignoradas por git)
 
-Revisa (743 comprobaciones por motor desde el 24-nov-2026): fragmento válido y contrato de la plataforma, sin colores
+Revisa (unas 770 comprobaciones por motor desde el 24-nov-2026): fragmento válido y contrato de la plataforma, sin colores
 literales, portada (foto, Ken Burns, trofeo, confeti, nada encimado; en celular, que quepa en la primera
 pantalla a 390x664, 360x700 y 375x620, con y sin franja en vivo; en escritorio, que quepa y que la copa
 no toque el título), el cuadro (4 + 2 + 1 series con ida y vuelta, sin «global probable»; en celular el
@@ -267,7 +273,11 @@ resultados por ronda, portada y «Camino al título» con la final o el campeón
 en cursiva en el mini-cuadro, pestañas sin boletos repetidos, la serie de cada partido de liguilla, la pastilla
 «Resultado» legible y «Al momento» de una vuelta; y, con día y hora en las piernas que ESPN no publica (prensa), el anuncio con cuándo empieza
 y su cuenta regresiva, el día y la hora en las tarjetas compactas (por día y hora), el índice, el cuadro, el mini-cuadro
-y el detalle, la nota «Día y hora anunciados por la liga» y que no quede ningún «por confirmar». Sale con código 1 si algo falla. Tarda de 2.5 a 3 minutos por motor. Si la máquina no
+y el detalle, la nota «Día y hora anunciados por la liga» con la zona y que no quede ningún «por confirmar»; y el anuncio
+según el reloj (workflow 11, encargo E): «mañana» y «hoy», el paso a la pierna que sigue al empezar una, el cambio de
+«mañana» a «hoy» a la medianoche con la página abierta, «Sigue …» con las idas jugadas y las vueltas de la prensa, la
+tarjeta de una pierna cuya hora ya pasó, los cruces en el orden del cuadro y, en escritorio, el índice sin pastillas
+cortadas. Sale con código 1 si algo falla. Tarda de 2.5 a 3 minutos por motor. Si la máquina no
 tiene salida a internet las fuentes de Google no cargan y se prueba con la pila de respaldo.
 
 Para revisar la portada de otro favorito: `python3 web/construir.py --portada Toluca` (escribe sólo

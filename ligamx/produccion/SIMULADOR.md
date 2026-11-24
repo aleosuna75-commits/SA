@@ -53,7 +53,9 @@ enumeración directa de los cuatro marcadores.
 **Series reales.** Cuando la fase regular ya terminó y `partidos.csv` trae partidos de cuartos, semifinal
 o final del torneo, se respeta lo jugado antes del corte: las piernas jugadas quedan fijas, las pendientes
 se sortean con las lambdas de `Pronosticador.partidos()` (la localía real del calendario manda sobre la
-regla) y una serie terminada fija a su ganador (en la final, con `gl_et`/`gv_et` y `pen_l`/`pen_v`). Cada
+regla; si el calendario trae sólo una pierna, la otra se completa invirtiendo su localía —desde el 24-nov-2026,
+igual en `detalle_serie` y en la simulación—, así que si la liga pone la ida en casa del mejor sembrado la vuelta
+es en la del peor) y una serie terminada fija a su ganador (en la final, con `gl_et`/`gv_et` y `pen_l`/`pen_v`). Cada
 serie real sale con el pronóstico de sus piernas pendientes, la distribución del marcador global y
 P(avanza) condicionada a la ida (`liguilla.series` en el JSON). Probado con escenarios construidos: ida
 4-0 en contra del líder (su probabilidad de avanzar cae de más de 0.5 a menos de 0.2 y coincide con el

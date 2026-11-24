@@ -670,7 +670,11 @@ async function anuncioSegunReloj(ctx, movil) {
   }
   function esperado(d, ms) { const su = piernasEsperadas(d), r = su[0].r; return Object.assign(anuncioEsperado(r, su.filter(x => x.r === r), ms), { rot: rotuloEsperado(torneoDe(d), ms) }); }
   function bien(a, e) { return a.texto.includes(e.frase) && a.rotulo === e.rot && a.celdas >= 3 && Date.parse(a.inicio) === inicioEsp(e.sigE.l) && a.respaldos === 0; }
-  const url = variante('prensareloj', conHorariosPrensa, DOC_DEFINIDO), d = datosDocumento(url.slice(7));
+  /* la copia fija es anterior al campo «pick» de las piernas: se le pone como lo deja exportar (el resultado con más probabilidad) */
+  const conPick = d => d.liguilla.torneo.rondas.forEach(r => r.series.forEach(s => s.piernas.forEach(l => {
+    if (l.pick || !Number.isFinite(l.p_local)) return; const pr = [l.p_local, l.p_empate, l.p_visitante], k = pr.indexOf(Math.max(...pr));
+    l.pick = { resultado: 'LEV'[k], equipo: [l.local, 'Empate', l.visitante][k], prob: pr[k] }; })));
+  const url = variante('prensareloj', d => { conHorariosPrensa(d); conPick(d); }, DOC_DEFINIDO), d = datosDocumento(url.slice(7));
   const orden = torneoDe(d).rondas[0].series.map(s => s.llave);
   /* martes 24 a mediodía (México): «mañana»; los cruces en el orden del cuadro; «a las 19:00 h» sin cortes */
   let ms = Date.parse('2026-11-24T18:00:00Z'), e = esperado(d, ms), [a] = await ver(url, '2026-11-24T18:00:00Z');
@@ -790,7 +794,7 @@ async function correr(navegador, nombre, opciones) {
     const sin = todas.filter(l => { const ps = l.querySelectorAll('.pierna'); return ps.length !== 2 || Array.from(ps).some(p => !p.querySelector('.tablero') || !p.querySelector('.x12') || !/Ida|Vuelta/.test(p.textContent)) || !l.querySelector('.avanza') || l.querySelectorAll('.llave__eq .esc').length !== 2; }).map(l => l.getAttribute('data-llave'));
     const c = document.getElementById('cuadro'), cs = getComputedStyle(c), nodo = document.querySelector(movil ? '.mn[data-p="a"]' : '.nodo[data-pos="a"]');
     const series = [].concat(...t.rondas.map(r => r.series));
-    const sedes = series.every(s => { const l = document.querySelector('.llave[data-llave="' + s.llave + '"]'), sp = Array.from(l.querySelectorAll('.pierna__n span')).map(x => x.textContent); return s.piernas.every((p, i) => sp[i] && sp[i].startsWith(p.estadio.nombre.replace(/^Estadio\s+/i, '') + ' · ')); });
+    const sedes = series.every(s => { const l = document.querySelector('.llave[data-llave="' + s.llave + '"]'), sp = Array.from(l.querySelectorAll('.pierna__n span')).map(x => x.textContent.replace(/\s+/g, ' '));   /* «sede · día y hora» lleva espacios duros */ return s.piernas.every((p, i) => sp[i] && sp[i].startsWith(p.estadio.nombre.replace(/^Estadio\s+/i, '') + ' · ')); });
     const sinGlobal = todas.every(l => !/Global (más )?probable|Cierre probable/i.test(l.textContent) && !l.querySelector('.llave__global'));
     return { cuartos: por('cuartos').length, semis: por('semifinal').length, final: por('final').length, sin, sedes, sinGlobal, estado: t.estado,
       texto: document.querySelector('.cuadro-estado').textContent, campeon: (document.querySelector('.campeon-ruta b') || {}).textContent, campeonDato: t.campeon_ruta,
@@ -1267,7 +1271,7 @@ async function correr(navegador, nombre, opciones) {
     const piernas = Array.from(c1.querySelectorAll('.pierna'));
     return { llaves: document.querySelectorAll('#cuadro .llave').length, tarjetas: document.querySelectorAll('.partido').length, pendientes: JSON.parse(document.getElementById('datos').textContent).pendientes.length, respaldos: document.querySelectorAll('.respaldo').length,
       idaReal: !!piernas[0].querySelector('.tablero--real') && /Resultado/.test(piernas[0].textContent) && Array.from(piernas[0].querySelectorAll('.tablero b')).map(b => b.textContent).join('-') === '1-0',
-      vueltaPron: !piernas[1].querySelector('.tablero--real') && !!piernas[1].querySelector('.x12') && /28 nov/.test(piernas[1].textContent),
+      vueltaPron: !piernas[1].querySelector('.tablero--real') && !!piernas[1].querySelector('.x12') && /28\s+nov/.test(piernas[1].textContent),
       chips: [c1, c2, c3, s1].map(l => (l.querySelector('.llave__id .chip') || {}).textContent), globalIda: /Global hasta hoy/.test(c1.textContent) && !!c1.querySelector('.llave__global .tablero--real') && !/Cierre probable|Global probable/.test(c1.textContent) && !c3.querySelector('.llave__global'), leyenda: !!q('.leyenda-m'),
       mini: (() => { const n1 = q('.mc[data-ver-llave="C1"]'), n2 = q('.mc[data-ver-llave="C2"]'); return [n1.querySelectorAll('.mc__leg.real').length, /%/.test(n1.textContent), n2.querySelectorAll('.mc__leg.real').length, !!n2.querySelector('.mc__eq.fuera'), /%/.test(n2.textContent), Array.from(n2.querySelectorAll('.mc__eq i')).map(x => x.textContent).join('-')]; })(),
       avanza: /Avanza/.test(c2.textContent) && !!c2.querySelector('.llave__eq.fuera') && /Global final/.test(c2.textContent), estado: q('.cuadro-estado').textContent,
