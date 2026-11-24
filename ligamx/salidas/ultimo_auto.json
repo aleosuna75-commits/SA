@@ -228,7 +228,8 @@
   }
  },
  "huella": "7bf34ce22fd5254ec5053a482e395d1c",
- "publicar": true,
- "huella_publicada": "d6bf34c6733d742e16829a6b2e0eaa16",
- "segundos": 70.6
+ "publicar": false,
+ "huella_publicada": "7bf34ce22fd5254ec5053a482e395d1c",
+ "segundos": 70.6,
+ "publicado_utc": "2026-11-24T07:39:55Z"
 }

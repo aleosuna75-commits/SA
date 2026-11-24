@@ -309,10 +309,17 @@ def test_los_pendientes_tienen_variables(completa, insumos):
     reg = pend[pend["fase"] == "regular"]
     liguilla = ["pierna", "global_gf_l", "global_gc_l", "global_dif_l", "sembrado_l", "sembrado_v", "sembrado_dif",
                 "ventaja_serie_l", "h2h_lig_pts_l", "h2h_lig_dg_l", "h2h_final_dg_l", "asistencia5_l"]
-    faltan = reg.loc[al_dia.reindex(reg.index), [c for c in disp if c not in liguilla]].isna().mean()
-    assert (faltan == 0).all(), faltan[faltan > 0].to_dict()
-    resto = reg[[c for c in disp if c not in liguilla and c not in por_suspension]].isna().mean()
-    assert (resto == 0).all(), resto[resto > 0].to_dict()
+    if len(reg):                         # en liguilla no hay pendientes de fase regular: mean() de 0 filas es NaN
+        faltan = reg.loc[al_dia.reindex(reg.index), [c for c in disp if c not in liguilla]].isna().mean()
+        assert (faltan == 0).all(), faltan[faltan > 0].to_dict()
+        resto = reg[[c for c in disp if c not in liguilla and c not in por_suspension]].isna().mean()
+        assert (resto == 0).all(), resto[resto > 0].to_dict()
+    # pendientes de liguilla al día: sólo puede faltar lo propio de la serie (global en la ida, historial de
+    # liguilla entre los dos, asistencia) y la jornada
+    lig = pend[(pend["fase"] != "regular") & al_dia]
+    if len(lig):
+        f = lig[[c for c in disp if c not in liguilla + ["jornada_est"]]].isna().mean()
+        assert (f == 0).all(), f[f > 0].to_dict()
     # sin alineación publicada no hay variables _real
     con_once = set(insumos["al"]["partido_id"])
     sin = pend[~pend["id"].astype(str).isin(con_once)]
