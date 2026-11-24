@@ -169,20 +169,30 @@ algo (inicio, gol, expulsión, descanso, final). La página:
     la suma), los globales y los cruces alternativos («sale en 14.4% · CAZ avanza 79%»), y un botón
     «Volver al cuadro». Tablero dorado = pronóstico; tablero blanco = resultado real. Si falta
     `liguilla.torneo` sale un aviso.
-- **Sin partidos con día y hora** (`pendientes` vacío; pasa entre el fin de la fase regular y el momento en que la
-  liga programa la ronda, y entre rondas):
+- **Sin partidos en `pendientes`** (pasa entre el fin de la fase regular y el momento en que ESPN publica la ronda, y
+  entre rondas):
   - bajo la portada, la banda «Lo que sigue» anuncia la primera ronda con partidos por jugar entre equipos ya
-    definidos («Liguilla definida · Cuartos de final · Del 25 al 29 de noviembre», ida y vuelta, «Día y hora de
-    cada partido: por confirmar»), un botón por cruce que lleva a su serie y «Ver el cuadro» (en celular, al estado
-    del cuadro con el mini-cuadro; en pantallas anchas, al cuadro). Con la liguilla terminada, el campeón. La
-    portada sigue cabiendo en la primera pantalla;
+    definidos («Liguilla definida · Cuartos de final · Del 25 al 29 de noviembre», ida y vuelta, y «Día y hora de
+    cada partido: por confirmar» mientras no los haya), un botón por cruce que lleva a su serie y «Ver el cuadro» (en
+    celular, al estado del cuadro con el mini-cuadro; en pantallas anchas, al cuadro). Con la liguilla terminada, el
+    campeón. La portada sigue cabiendo en la primera pantalla;
+  - **horarios de prensa** (`horario_origen` = `prensa`, desde el 24-nov-2026: la liga anunció día y hora y ESPN todavía
+    no lista los partidos): si todas las idas de la ronda tienen día y hora, el anuncio dice cuándo empieza («Empieza el
+    miércoles 25 a las 19:00 h con Toluca–Atlas.»; si esa ya empezó, «Sigue el …») con una cuenta regresiva hasta esa
+    pierna (sólo formato: `fecha_utc` contra el reloj); las tarjetas compactas, el índice, el cuadro, el mini-cuadro
+    (un renglón «Mié 25 · 19:00» bajo cada pierna) y el detalle de la serie muestran el día y la hora («Mié 25 nov ·
+    19:00 h»); las tarjetas van por día y hora dentro de cada grupo (ida o vuelta), y la nota de «Próximos partidos» dice
+    «Día y hora anunciados por la liga»: ESPN todavía no publica esos partidos y el pronóstico completo de cada uno
+    (mercados y combinada), la combinada de la ronda y el seguimiento en vivo llegan cuando ESPN los publique. Ningún
+    texto dice «por confirmar» cuando todo tiene horario; en cuanto ESPN lista una pierna, su día y hora mandan
+    (`calendario`) y pasa a `pendientes` con su tarjeta completa;
   - «Próximos partidos» muestra esas piernas (`liguilla.torneo`, series `definida` sin decidir que no vienen en
     `pendientes`) como tarjetas compactas: primero las idas y luego las vueltas, con fase y pierna, llave, escudos,
     marcador más probable, barra 1X2 con %, el pronóstico de la pierna («Gana Pachuca · 40.7%», del `pick` que trae; su % va
     resaltado en la barra), sede (la de la prensa o la habitual del local: `estadio.origen`) y fecha o ventana («25 o 26 nov»;
-    desde 600 px en su propio renglón), y un
-    botón «Serie C1» que abre el detalle de la serie. Una nota dice que la combinada de cada partido se publica
-    cuando la liga confirme día y hora. En celular van en una columna, desde 600 px de dos en dos y desde 1160 px de
+    desde 600 px en su propio renglón; con día y hora, «Mié 25 nov · 19:00 h» en su propio renglón también en celular), y un
+    botón «Serie C1» que abre el detalle de la serie. Sin día ni hora, una nota dice que la combinada de cada partido se
+    publica cuando la liga confirme día y hora. En celular van en una columna, desde 600 px de dos en dos y desde 1160 px de
     cuatro en cuatro (ningún nombre se parte a media palabra; sede y botón alineados abajo). Si ya hay partidos
     pendientes, las piernas que falten de programar salen después de sus tarjetas completas;
   - sin nada por jugar, «Próximos partidos» se retira; sin combinada de la jornada, la sección «Combinada de la
@@ -217,20 +227,21 @@ algo (inicio, gol, expulsión, descanso, final). La página:
 
 Chromium y WebKit, en iPhone 13 y en escritorio 1440x900. Arma y abre con `file://` tres documentos:
 `web/documento.html` con los datos de hoy (se revisa lo que corresponda a SU estado: partidos pendientes o no,
-piernas de liguilla sin día ni hora, cuadro proyectado / definido / en curso / terminado, fase regular terminada o
-no, combinada o no), y dos copias fijas armadas con `--solo-documento`: `pruebas/datos/actual_20261120T0722Z.json`
+piernas de liguilla sin día ni hora o con los de la prensa, cuadro proyectado / definido / en curso / terminado, fase
+regular terminada o no, combinada o no), y dos copias fijas armadas con `--solo-documento`: `pruebas/datos/actual_20261120T0722Z.json`
 (9 partidos pendientes, cuadro proyectado; reloj del navegador en el 20-nov) para tarjetas de partido, pestañas de
 combinada, cuenta regresiva, cuadro, en vivo y variantes, y `pruebas/datos/actual_20261123T0353Z.json` (noche del
 22-nov: 0 pendientes, cuadro definido, cuartos sin día ni hora; corrida de 100,000 simulaciones) con sus variantes
-(datos viejos sin el campo `definida`, idas ya en el calendario, semifinales definidas, final a medio jugar, liguilla
-terminada), más `pruebas/datos/vivo_vuelta_ejemplo.json` (documento en vivo de EJEMPLO de una vuelta de cuartos, idas
+(datos viejos sin el campo `definida`, horarios de prensa —las 8 piernas con el día y la hora de
+`config/torneo.json` → `liguilla.horarios_cuartos` y `horario_origen` «prensa», como las deja exportar—, idas ya en el
+calendario, semifinales definidas, final a medio jugar, liguilla terminada), más `pruebas/datos/vivo_vuelta_ejemplo.json` (documento en vivo de EJEMPLO de una vuelta de cuartos, idas
 inventadas) para «Al momento» en liguilla:
 
     PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers node web/pruebas/prueba.js chromium
     PLAYWRIGHT_BROWSERS_PATH=<carpeta con webkit> node web/pruebas/prueba.js webkit
     # con --capturas guarda PNG en web/pruebas/capturas/ (ignoradas por git)
 
-Revisa (625 comprobaciones por motor): fragmento válido y contrato de la plataforma, sin colores
+Revisa (743 comprobaciones por motor desde el 24-nov-2026): fragmento válido y contrato de la plataforma, sin colores
 literales, portada (foto, Ken Burns, trofeo, confeti, nada encimado; en celular, que quepa en la primera
 pantalla a 390x664, 360x700 y 375x620, con y sin franja en vivo; en escritorio, que quepa y que la copa
 no toque el título), el cuadro (4 + 2 + 1 series con ida y vuelta, sin «global probable»; en celular el
@@ -254,7 +265,9 @@ sección visible quede vacía, la etiqueta de cada serie, el cuadro en espejo en
 regular terminada; y lo que encontró el ensayo de la liguilla (encargo E del workflow 10): títulos según la fase,
 resultados por ronda, portada y «Camino al título» con la final o el campeón, «Si gana cada favorito», pronósticos
 en cursiva en el mini-cuadro, pestañas sin boletos repetidos, la serie de cada partido de liguilla, la pastilla
-«Resultado» legible y «Al momento» de una vuelta. Sale con código 1 si algo falla. Tarda de 2.5 a 3 minutos por motor. Si la máquina no
+«Resultado» legible y «Al momento» de una vuelta; y, con día y hora en las piernas que ESPN no publica (prensa), el anuncio con cuándo empieza
+y su cuenta regresiva, el día y la hora en las tarjetas compactas (por día y hora), el índice, el cuadro, el mini-cuadro
+y el detalle, la nota «Día y hora anunciados por la liga» y que no quede ningún «por confirmar». Sale con código 1 si algo falla. Tarda de 2.5 a 3 minutos por motor. Si la máquina no
 tiene salida a internet las fuentes de Google no cargan y se prueba con la pila de respaldo.
 
 Para revisar la portada de otro favorito: `python3 web/construir.py --portada Toluca` (escribe sólo

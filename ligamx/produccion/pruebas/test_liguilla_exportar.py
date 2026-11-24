@@ -432,3 +432,65 @@ def test_corte_de_otro_torneo_no_toma_los_horarios(sin_calendario, pron):
         assert (l["fecha_local"], l["hora_local"], l["fecha_utc"], l["horario_origen"]) == (None, None, None, None)
         assert l["estadio"] is None or l["estadio"]["origen"] == "habitual"
     assert all(r["fechas"] == {"ida": None, "vuelta": None} for r in lt["rondas"])
+
+
+def test_v1_1_con_la_localia_invertida_la_vuelta_no_toma_el_dia_de_la_ida(df, pron):
+    """
+    Workflow 11, V1-1: la liga pone la ida de C4 en casa del MEJOR sembrado y ESPN lista sólo esa ida. La vuelta que
+    completa el simulador invierte la localía de la ida y toma de la prensa su propio día (pierna 2); nunca el de la
+    ida (antes salía con el mismo local, visitante, día y hora que la ida, y la ronda decía que había vuelta el 25).
+    """
+    from produccion import simulador
+    s = _siembra(df)
+    d = _con_liguilla(df, [("cuartos", 1, s[3], s[4], None, None, None, None, "2026-11-26T01:00")])
+    cu = d["fase"] == "cuartos"
+    loc = d.loc[cu, "fecha_utc"].dt.tz_convert(datos.ZONA)
+    d.loc[cu, "fecha_local"], d.loc[cu, "hora_local"] = loc.dt.tz_localize(None).dt.normalize(), loc.dt.strftime("%H:%M")
+    reglas = _reglas_con_horarios(s)
+    reglas["liguilla"]["horarios_cuartos"] = [
+        {"llave": "C4", "pierna": 1, "local": s[3], "visitante": s[4], "fecha_local": "2026-11-25", "hora_local": "19:00"},
+        {"llave": "C4", "pierna": 2, "local": s[4], "visitante": s[3], "fecha_local": "2026-11-28", "hora_local": "19:00"}]
+    sim = simulador.simular(pron, "2026-11-24T12:00", d, n_sim=2000, reglas=reglas, torneo=TORNEO)
+    lt = ex.torneo_liguilla(pron, sim, reglas, s, d)
+    p = _piernas(lt)
+    ida, vu = p[("C4", 1)], p[("C4", 2)]
+    assert (ida["local"], ida["horario_origen"], ida["fecha_local"]) == (s[3], "calendario", "2026-11-25")
+    assert (vu["local"], vu["visitante"], vu["id"]) == (s[4], s[3], None)
+    assert (vu["fecha_local"], vu["hora_local"], vu["fecha_utc"], vu["horario_origen"]) == \
+        ("2026-11-28", "19:00", "2026-11-29T01:00:00+00:00", "prensa")
+    assert "2026-11-25" not in lt["rondas"][0]["fechas"]["vuelta"]
+
+
+def test_v1_1_la_prensa_se_empareja_tambien_por_pierna(sin_calendario, pron):
+    """
+    Workflow 11, V1-1: una entrada de horarios_<fase> (o sedes_<fase>) con `pierna` sólo vale para esa pierna. Aquí la
+    prensa trae la ida de C1 en casa del mejor sembrado y ESPN no lista nada: la vuelta proyectada (mismo local y
+    visitante, pierna 2) no toma ni el día ni la sede de esa ida; queda sin día (no se inventa nada).
+    """
+    s, d, sim, reglas = sin_calendario
+    r = dict(reglas, liguilla=dict(reglas["liguilla"], horarios_cuartos=[
+        {"llave": "C1", "pierna": 1, "local": s[0], "visitante": s[7], "fecha_local": "2026-11-26", "hora_local": "19:00",
+         "estadio": "Estadio de la Ida"}],
+        sedes_cuartos=[{"llave": "C1", "pierna": 1, "local": s[0], "visitante": s[7], "estadio": "Estadio de la Ida"}]))
+    vu = _piernas(ex.torneo_liguilla(pron, sim, r, s, d))[("C1", 2)]
+    assert (vu["local"], vu["visitante"]) == (s[0], s[7])
+    assert (vu["fecha_local"], vu["hora_local"], vu["fecha_utc"], vu["horario_origen"]) == (None, None, None, None)
+    assert vu["estadio"] is None or vu["estadio"]["origen"] == "habitual"
+    # sin `pierna` en la entrada (configuraciones viejas) se sigue emparejando por local y visitante
+    r2 = dict(r, liguilla=dict(r["liguilla"], horarios_cuartos=[{k: v for k, v in r["liguilla"]["horarios_cuartos"][0].items() if k != "pierna"}]))
+    assert _piernas(ex.torneo_liguilla(pron, sim, r2, s, d))[("C1", 2)]["horario_origen"] == "prensa"
+
+
+def test_v1_6_entrada_de_prensa_ilegible_avisa_en_stderr(sin_calendario, pron, capsys):
+    """Workflow 11, V1-6: una entrada de esta pierna con la hora mal escrita no se usa, pero se avisa (una vez) en stderr."""
+    s, d, sim, reglas = sin_calendario
+    r = dict(reglas, liguilla=dict(reglas["liguilla"], horarios_cuartos=list(reglas["liguilla"]["horarios_cuartos"]) + [
+        {"llave": "C3", "pierna": 2, "local": s[2], "visitante": s[5], "fecha_local": "2026-11-28", "hora_local": "7:00 pm"}]))
+    capsys.readouterr()
+    p = _piernas(ex.torneo_liguilla(pron, sim, r, s, d))
+    err = capsys.readouterr().err
+    assert p[("C3", 2)]["horario_origen"] is None and p[("C3", 2)]["fecha_utc"] is None
+    assert err.count(f"aviso: config/torneo.json → liguilla.horarios_cuartos: {s[2]}–{s[5]} (vuelta) no tiene día y hora legibles") == 1
+    assert "'7:00 pm'" in err
+    assert err.count(f"{s[6]}–{s[1]} (ida) no tiene día y hora legibles") == 1      # la de C2 sin hora (del escenario base)
+    assert err.count("aviso:") == 2                                                 # las legibles no avisan

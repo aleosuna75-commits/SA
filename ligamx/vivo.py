@@ -1932,8 +1932,28 @@ def repetir(pid: int, velocidad: float = 60.0, salida: Path | None = None, ruta_
             "segundos": round(time.monotonic() - t0, 1), "ultimo": doc}
 
 
+def _misma_pierna(c: dict, d: dict) -> bool:
+    """
+    ¿El partido `c` (de ESPN o del calendario de actual.json) es la pierna de la prensa `d`? Los mismos dos equipos, en
+    cualquier orden local–visitante (ESPN puede listarlo al revés), y la misma pierna si los dos la dicen; si no, a
+    menos de 36 horas (la ida y la vuelta de una serie van con unos tres días de diferencia).
+    """
+    if {c.get("local"), c.get("visitante")} != {d.get("local"), d.get("visitante")}:
+        return False
+    if c.get("pierna") in (1, 2) and d.get("pierna") in (1, 2):
+        return c["pierna"] == d["pierna"]
+    return c.get("inicio") is not None and abs((c["inicio"] - d["inicio"]).total_seconds()) < 36 * 3600
+
+
 def plan(horas: float = 48.0, ahora: dt.datetime | None = None, pedir=None) -> dict:
-    """Próximos inicios en las siguientes `horas` (ESPN; si no responde, el calendario de actual.json)."""
+    """
+    Próximos inicios en las siguientes `horas` (ESPN; si no responde, el calendario de actual.json). Las piernas de
+    liguilla que ESPN todavía no lista pero que en actual.json ya traen día y hora de la prensa (liguilla.torneo, sin
+    id, `horario_origen` «prensa») también entran, con `id` None y `fuente` «actual.json (prensa)», para poder
+    programar los despertares. En cuanto ESPN lista el partido manda ESPN, aunque lo liste otro día (se consultan
+    también el día de cada pierna de la prensa y el siguiente) o con local y visitante al revés (ver _misma_pierna);
+    si ese partido de ESPN queda fuera de la ventana, puede ser el `siguiente`.
+    """
     ahora = ahora or ahora_utc()
     fin = ahora + dt.timedelta(hours=horas)
     ctx = contexto_de_actual(leer_json(RUTA_ACTUAL))
@@ -1951,6 +1971,38 @@ def plan(horas: float = 48.0, ahora: dt.datetime | None = None, pedir=None) -> d
         out["fuente"] = f"actual.json (ESPN no respondió: {e})"
         lista = [{"id": f["id"], "inicio": de_iso(f["inicio_utc"]), "local": f["local"], "visitante": f["visitante"], "estado": "programado"}
                  for f in ctx["futuros"] if f.get("inicio_utc")]
+    # piernas con día y hora de la prensa (actual.json → liguilla.torneo, sin id) que ESPN no lista
+    cand = []
+    for se in ctx["series"]:
+        for pi in se.get("piernas") or []:
+            ini = de_iso(pi.get("fecha_utc")) if pi.get("id") is None and not pi.get("jugado") else None
+            if ini is None or pi.get("horario_origen", "prensa") != "prensa":
+                continue
+            cand.append({"id": None, "inicio": ini, "local": pi["local"], "visitante": pi["visitante"], "fase": se.get("fase"),
+                         "pierna": pi.get("pierna"),
+                         "etiqueta": f"{NOMBRE_FASE.get(se.get('fase'), se.get('fase'))}, {'ida' if pi.get('pierna') == 1 else 'vuelta'}"})
+    # ESPN manda si lista la pierna en CUALQUIER día y en cualquier orden local–visitante: además de los días de la
+    # ventana se consultan el día de cada pierna futura de la prensa y el siguiente (hora del Este); si esas consultas
+    # fallan, la pierna de la prensa se queda (a lo más, un despertar de más)
+    otras: dict = {}
+    if out["fuente"] == "ESPN":
+        consultados = {c_dia for c_dia in (ahora.astimezone(ZONA_ESPN).date() + dt.timedelta(days=k)
+                                           for k in range((fin.astimezone(ZONA_ESPN).date() - ahora.astimezone(ZONA_ESPN).date()).days + 1))}
+        for dia_x in sorted({d["inicio"].astimezone(ZONA_ESPN).date() + dt.timedelta(days=k) for d in cand if d["inicio"] > ahora
+                             for k in (0, 1)} - consultados):
+            try:
+                for c in leer_dia(dia_x, pedir):
+                    otras.setdefault(c["id"], c)
+            except ErrorRed:
+                pass
+    listados = list(crudas.values()) + list(otras.values()) if out["fuente"] == "ESPN" else list(lista)
+    prensa, remplazos = [], {}
+    for d in cand:
+        c = next((c for c in listados if _misma_pierna(c, d)), None)
+        if c is None:
+            prensa.append(d)
+        elif c.get("id") is not None and c.get("estado", "programado") == "programado" and c["inicio"] > ahora:
+            remplazos[c["id"]] = {"id": c["id"], "inicio_utc": iso(c["inicio"]), "local": c["local"], "visitante": c["visitante"]}
     for d in sorted(lista, key=lambda d: (d["inicio"], d["id"])):
         if d["estado"] == "programado" and not (ahora <= d["inicio"] <= fin):
             continue
@@ -1967,7 +2019,18 @@ def plan(horas: float = 48.0, ahora: dt.datetime | None = None, pedir=None) -> d
                                 "observar_desde_utc": iso(d["inicio"] - dt.timedelta(minutes=MIN_ANTES)),
                                 "local": d["local"], "visitante": d["visitante"], "estado": d["estado"],
                                 "fase": fase, "etiqueta": etiqueta})
+    for d in prensa:
+        if ahora <= d["inicio"] <= fin:
+            out["partidos"].append({"id": None, "inicio_utc": iso(d["inicio"]), "inicio_mexico": d["inicio"].astimezone(ZONA).strftime("%Y-%m-%d %H:%M"),
+                                    "observar_desde_utc": iso(d["inicio"] - dt.timedelta(minutes=MIN_ANTES)),
+                                    "local": d["local"], "visitante": d["visitante"], "estado": "programado",
+                                    "fase": d["fase"], "etiqueta": d["etiqueta"], "fuente": "actual.json (prensa)"})
+    out["partidos"].sort(key=lambda x: (x["inicio_utc"], x["id"] is None, x["id"] or 0))
     fut = [f for f in ctx["futuros"] if f.get("inicio_utc") and de_iso(f["inicio_utc"]) > ahora]
+    fut += [{"id": None, "inicio_utc": iso(d["inicio"]), "local": d["local"], "visitante": d["visitante"], "fuente": "actual.json (prensa)"}
+            for d in prensa if d["inicio"] > ahora]
+    vistos = {f["id"] for f in fut if f.get("id") is not None}
+    fut += [r for r in remplazos.values() if r["id"] not in vistos]     # la pierna que ESPN ya lista en lugar de la de la prensa
     if fut:
         s = min(fut, key=lambda f: f["inicio_utc"])
         out["siguiente"] = {**s, "inicio_mexico": de_iso(s["inicio_utc"]).astimezone(ZONA).strftime("%Y-%m-%d %H:%M")}

@@ -153,6 +153,8 @@ h1 span{display:block;color:var(--oro)}
 .reloj div{display:grid;justify-items:center;gap:4px}
 .reloj b{min-width:2.1ch;padding:6px 8px;text-align:center;font:900 2.1rem/1 var(--f-cartel);font-variant-numeric:tabular-nums;color:var(--oro-2);background:radial-gradient(var(--led) 1px,var(--velo-0) 1.3px) 0 0/4px 4px,var(--noche);border:1px solid var(--linea);border-radius:5px;text-shadow:0 0 14px var(--oro-brillo)}
 .reloj span{font:600 var(--t-0)/1 var(--f-texto);text-transform:uppercase;letter-spacing:.12em;color:var(--gris)}
+.reloj--lig{margin-top:var(--e-3)}
+.reloj--lig b{font-size:1.6rem;padding:5px 7px}
 .boton{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:46px;padding:0 20px;border:1px solid var(--oro);border-radius:999px;font:700 var(--t-1)/1 var(--f-texto);text-transform:uppercase;letter-spacing:.14em;color:var(--oro-2)}
 .boton:hover{background:var(--oro);color:var(--tinta)}
 /* sin partidos con día y hora: la banda anuncia la ronda de liguilla que sigue, con sus cruces */
@@ -195,6 +197,7 @@ h1 span{display:block;color:var(--oro)}
 .indice button{flex:none;display:flex;align-items:center;gap:6px;padding:6px 12px 6px 6px;border:1px solid var(--linea-2);border-radius:999px;background:var(--noche-2);font:600 var(--t-1)/1.15 var(--f-texto);text-align:left}
 .indice button small{display:block;color:var(--gris);font-size:var(--t-0);font-weight:500}
 .indice .esc+.esc{margin-left:-12px}
+@media (min-width:600px){.indice{flex-wrap:wrap;overflow-x:visible}}   /* en tableta y escritorio, varios renglones: la última pastilla ya no queda cortada sin aviso */
 .grupo{display:grid;gap:var(--e-5)}
 .grupo>h3{display:flex;align-items:center;gap:var(--e-3)}
 .grupo>h3::after{content:"";flex:1;border-top:1px solid var(--linea-2)}
@@ -203,12 +206,13 @@ h1 span{display:block;color:var(--oro)}
 .grupo[data-grupo-ultima]>h3{flex-wrap:wrap;row-gap:4px}
 .grupo[data-grupo-ultima]>h3 small{white-space:normal;line-height:1.3}
 .partido{background:var(--noche-2);border:1px solid var(--linea);border-radius:var(--radio);overflow:hidden;scroll-margin-top:76px}
-/* piernas de liguilla que todavía no tienen día ni hora: tarjetas compactas de pronóstico */
+/* piernas de liguilla que ESPN todavía no publica (sin día ni hora, o con los anunciados por la liga): tarjetas compactas de pronóstico */
 .plegs{display:grid;gap:var(--e-3)}
 .pleg{display:flex;flex-direction:column;gap:var(--e-3);padding:var(--e-4);min-width:0;scroll-margin-top:76px}
 .pleg>*{min-width:0}
 .pleg .cuando .chip{letter-spacing:.06em}
-.pleg .cuando .pleg__f{margin-left:auto;color:var(--cal)}
+.pleg .cuando .pleg__f{margin-left:auto;color:var(--cal);white-space:nowrap}
+.pleg .cuando .pleg__f--dh{flex-basis:100%;margin-left:0}   /* día y hora en su renglón: junto a la fase no siempre cabía y bajaba sola a la derecha */
 .pick--ch{padding:8px 10px}
 .pick--ch b{font-size:var(--t-3)}
 .pleg .duelo{margin-top:0}
@@ -430,6 +434,7 @@ tbody th{background:var(--noche-3);color:var(--oro);padding-top:11px}
 .mc__leg.real{color:var(--cal-2)} .mc__leg.real b{color:var(--cal)}
 .mc__leg.pron b{font-style:italic;font-weight:600;opacity:.85}
 .mc__eq+.mc__leg{margin-top:2px;padding-top:4px;border-top:1px dashed var(--linea)}
+.mc__cuando{display:block;margin-top:-2px;padding-left:22px;overflow:hidden;white-space:nowrap;font:500 .55rem/1.15 var(--f-texto);color:var(--gris);font-variant-numeric:tabular-nums}
 .mc__vivo{position:absolute;right:-3px;top:-3px;box-shadow:0 0 0 2px var(--noche)}
 .mc-eje{position:relative;width:100%}
 .mc-campeon{position:absolute;left:0;right:0;bottom:calc(100% + 14px);display:grid;justify-items:center;gap:2px;text-align:center}
@@ -515,7 +520,7 @@ tbody th{background:var(--noche-3);color:var(--oro);padding-top:11px}
 .campeon-ruta b{font:900 var(--t-5)/1 var(--f-cartel);text-transform:uppercase;letter-spacing:.03em}
 .campeon-ruta span{font:700 .66rem/1.2 var(--f-texto);text-transform:uppercase;letter-spacing:.14em;color:var(--oro)}
 .campeon-ruta small{font-size:var(--t-0);line-height:1.3;color:var(--cal-2);max-width:26ch;padding-bottom:4px}
-@media (max-width:359px){.mini-cuadro{--u:10px}.mc{padding:4px 3px 5px}.mc__leg{font-size:.55rem;gap:2px}.mc__eq{gap:3px}}
+@media (max-width:359px){.mini-cuadro{--u:10px}.mc{padding:4px 3px 5px}.mc__leg{font-size:.55rem;gap:2px}.mc__eq{gap:3px}.mc__cuando{padding-left:19px;font-size:.52rem}}
 /* detalle de la serie elegida */
 .serie-det{display:grid;gap:var(--e-5);padding:var(--e-4);scroll-margin-top:76px}
 .serie-det--invita{gap:var(--e-3)}
@@ -1063,6 +1068,7 @@ function parcial(nombre, fn) {
 var MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
 var MES3 = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
 var DIAS = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
+var DIA3 = ['dom', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb'];
 var ENT = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
 function ok(x) { return typeof x === 'number' && isFinite(x); }
 function arr(x) { return Array.isArray(x) ? x : []; }
@@ -1091,6 +1097,17 @@ function fecha(iso) { /* 'AAAA-MM-DD' → 'sábado 14 de noviembre' */
   return DIAS[new Date(Date.UTC(p.a, p.m - 1, p.d)).getUTCDay()] + ' ' + p.d + ' de ' + MESES[p.m - 1];
 }
 function fechaCorta(iso, conAnio) { var p = partes(iso); return p ? p.d + ' ' + MES3[p.m - 1] + (conAnio ? ' ' + p.a : '') : ''; }
+function diaSem(iso, corto) { /* 'AAAA-MM-DD' → 'miércoles' (corto: 'mié') */
+  var p = partes(iso); if (!p) return '';
+  var k = new Date(Date.UTC(p.a, p.m - 1, p.d)).getUTCDay();
+  return corto ? DIA3[k] : DIAS[k];
+}
+function conHora(l) { return !!l && !!partes(l.fecha_local) && /^\d{1,2}:\d{2}$/.test(String(l.hora_local || '')); } /* pierna con día y hora (del calendario o de la prensa) */
+function inicioPierna(l) { /* instante de inicio de una pierna (para ordenar): fecha_utc; sin ella, día y hora del centro de México (UTC−6) */
+  var t = Date.parse((l && l.fecha_utc) || '');
+  if (!ok(t) && conHora(l)) t = Date.parse(l.fecha_local + 'T' + ('0' + l.hora_local).slice(-5) + ':00-06:00');
+  return ok(t) ? t : Infinity;
+}
 function rangoFechas(lista, sep) { /* ['2026-11-25','2026-11-26'] → '25 y 26 nov' */
   var ps = arr(lista).map(partes).filter(Boolean); if (!ps.length) return '';
   sep = sep || ' y ';
@@ -1460,16 +1477,36 @@ function confeti() {
   if ('IntersectionObserver' in window) new IntersectionObserver(function (es) { visible = es[es.length - 1].isIntersecting; ajusta(); }, { threshold: 0.02 }).observe(sec);
   ajusta();
 }
-function anuncioLiguilla() { /* sin partidos con día y hora: anuncia lo que sigue según liguilla.torneo (sólo le da formato) */
+function empezo(l, ahora) { return obj(l) && (!!l.jugado || !!l.en_juego || inicioPierna(l) <= ahora); } /* pierna jugada, en juego o cuya hora de inicio ya pasó (sólo el reloj contra fecha_utc) */
+function rondaEmpezada(r, ahora) { return arr((obj(r) || {}).series).some(function (s) { return arr((obj(s) || {}).piernas).some(function (l) { return empezo(l, ahora); }); }); }
+function proximaSuelta(de, r) { /* la próxima pierna de la ronda con día y hora (calendario o prensa), si todas sus idas sueltas ya los tienen; primera: ninguna pierna de la ronda se ha jugado ni ha empezado */
+  if (de.some(function (x) { return x.n === 1 && !conHora(x.l); })) return null;
+  var con = de.filter(function (x) { return conHora(x.l) && inicioPierna(x.l) < Infinity; }).sort(function (a, b) { return inicioPierna(a.l) - inicioPierna(b.l); }), ahora = Date.now();
+  for (var i = 0; i < con.length; i++) { var t = inicioPierna(con[i].l); if (t > ahora) return { x: con[i], t: t, primera: !rondaEmpezada(r, ahora) }; }
+  return null;
+}
+function cuandoSuelta(l) { /* «hoy», «mañana» o «el miércoles 25» según la fecha del centro de México de hoy (sólo formato) */
+  var ms = Date.now();
+  return l.fecha_local === diaMX(ms) ? 'hoy' : l.fecha_local === diaMX(ms + 864e5) ? 'mañana' : 'el ' + diaSem(l.fecha_local) + ' ' + partes(l.fecha_local).d;
+}
+function anuncioLiguilla() { /* sin partidos en «pendientes»: anuncia lo que sigue según liguilla.torneo (sólo le da formato) */
   var t = torneo(); if (!t || !ESTADOS_T.hasOwnProperty(t.estado) || t.estado === 'proyectado') return '';
-  var sueltas = piernasSueltas(), r = sueltas.length ? sueltas[0].r : null, camp = txt(t.campeon_ruta), h;
-  var rot = '<p class="rotulo">' + (t.estado === 'definido' ? 'Liguilla definida' : t.estado === 'terminado' ? 'Liguilla terminada' : 'Liguilla en curso') + '</p>';
+  var sueltas = piernasSueltas(), r = sueltas.length ? sueltas[0].r : null, camp = txt(t.campeon_ruta), h, ahora = Date.now();
+  /* «definido» con la hora de inicio de alguna pierna ya pasada (ESPN todavía no la publica): la liguilla ya está en curso */
+  var enCurso = t.estado === 'en_curso' || (t.estado === 'definido' && arr(t.rondas).some(function (x) { return rondaEmpezada(x, ahora); }));
+  var rot = '<p class="rotulo">' + (t.estado === 'terminado' ? 'Liguilla terminada' : enCurso ? 'Liguilla en curso' : 'Liguilla definida') + '</p>';
   if (r) { /* la primera ronda con partidos por jugar entre equipos ya definidos */
-    var f = obj(r.fechas) || {}, cuando = fechasLargas(arr(f.ida).concat(arr(f.vuelta))), ida = rangoFechas(f.ida), vu = rangoFechas(f.vuelta), vistas = {};
-    var de = sueltas.filter(function (x) { return x.r === r; }), falta = de.some(function (x) { return !x.l.fecha_local; }), nom = txt(r.nombre) || FASES[r.fase] || 'Lo que sigue';
-    var series = de.map(function (x) { return x.s; }).filter(function (x) { if (vistas[x.llave]) return false; vistas[x.llave] = 1; return true; });
+    var f = obj(r.fechas) || {}, cuando = fechasLargas(arr(f.ida).concat(arr(f.vuelta))), ida = rangoFechas(f.ida), vu = rangoFechas(f.vuelta);
+    var de = sueltas.filter(function (x) { return x.r === r; }), nom = txt(r.nombre) || FASES[r.fase] || 'Lo que sigue';
+    var falta = de.filter(function (x) { return !x.l.fecha_local; }).length, sig = proximaSuelta(de, r);
+    /* los cruces, en el orden de la ronda (C1 a C4, como el cuadro), aunque las tarjetas vayan por día y hora */
+    var series = arr(r.series).filter(function (s) { return de.some(function (x) { return x.s === s; }); });
     h = '<div>' + rot + '<p class="sigue__duelo">' + E(nom) + '</p><p class="sigue__cuando">' +
-      (cuando ? '<b>' + may(cuando) + '</b>' + (ida && vu ? ' · ida ' + ida + ', vuelta ' + vu : '') + '. ' : '') + (falta ? 'Día y hora de cada partido: por confirmar.' : '') + '</p></div>' +
+      (cuando ? '<b>' + may(cuando) + '</b>' + (ida && vu ? ' · ida ' + ida + ', vuelta ' + vu : '') + '. ' : '') +
+      /* la hora es la del centro de México (como la del «Próximo partido»); «a las 19:00 h» no se parte */
+      (sig ? (sig.primera ? 'Empieza ' : 'Sigue ') + cuandoSuelta(sig.x.l) + ' a las ' + E(sig.x.l.hora_local) + ' h (centro de México) con ' + E(sig.x.l.local) + '–' + E(sig.x.l.visitante) + '. ' : '') +
+      (falta ? (falta === de.length ? 'Día y hora de cada partido: por confirmar.' : 'Día y hora de algunos partidos: por confirmar.') : '') + '</p>' +
+      (sig ? '<div class="reloj reloj--lig" id="reloj" role="timer" data-inicio="' + E(new Date(sig.t).toISOString()) + '" aria-label="Tiempo que falta para ' + E(sig.x.l.local) + ' contra ' + E(sig.x.l.visitante) + '"></div>' : '') + '</div>' +
       '<div class="cruces-lig" role="group" aria-label="' + E(nom) + ': los cruces">' + series.map(function (x) {
         var mj = eqDe(x.mejor), pr = eqDe(x.peor), sm = semDe(x.mejor), sp = semDe(x.peor);
         return '<button type="button" data-ir-llave="' + E(x.llave) + '" aria-label="' + E(FASE1[x.fase] || '') + ' ' + E(x.llave) + ': ' + E(mj) + ' contra ' + E(pr) + '. Ir a la serie">' + esc(mj, 30) + esc(pr, 30) +
@@ -1480,12 +1517,40 @@ function anuncioLiguilla() { /* sin partidos con día y hora: anuncia lo que sig
   } else h = '<div>' + rot + '<p class="sigue__cuando">Todavía no hay partidos con día y hora. La página se actualiza cuando se programe el siguiente.</p></div>';
   return '<div class="sigue__caja sigue__caja--lig" data-anuncio="' + E(t.estado) + '">' + h + '<button type="button" class="boton" data-ir-cuadro>Ver el cuadro</button></div>';
 }
+function cuentaRegresiva(reloj, t, alTerminar) { /* días, horas, minutos y segundos que faltan para t (sólo formato) */
+  var tm = null, celdas = null, fin = false;
+  function tic() {
+    if (fin) return;
+    if (!reloj.isConnected) { fin = true; if (tm) clearInterval(tm); return; }   /* el bloque se volvió a armar: este reloj ya no está en la página */
+    var s = Math.floor((t - Date.now()) / 1000);
+    if (!ok(s) || s <= 0) { fin = true; if (tm) clearInterval(tm); alTerminar(); return; }
+    var v = [Math.floor(s / 86400), Math.floor(s % 86400 / 3600), Math.floor(s % 3600 / 60), s % 60];
+    if (!celdas) {
+      reloj.innerHTML = ['días', 'horas', 'min', 'seg'].slice(0, REDUCE ? 3 : 4).map(function (n) { return '<div><b>00</b><span>' + n + '</span></div>'; }).join('');
+      celdas = $$('b', reloj);
+    }
+    celdas.forEach(function (c, i) { var txt = (v[i] < 10 ? '0' : '') + v[i]; if (c.textContent !== txt) c.textContent = txt; });
+  }
+  tic();
+  if (!fin) tm = setInterval(tic, REDUCE ? 30000 : 1000);
+}
 function sigue(el) {
   var ps = D.pendientes;
   if (!ps.length) {
     var an = parcial('anuncio de la liguilla', anuncioLiguilla);
     if (an && el && el.parentNode) el.parentNode.setAttribute('aria-label', 'Lo que sigue en la liguilla');
-    return (an || '<p class="nota">No hay partidos pendientes por ahora. La página se actualiza cuando se programe el siguiente.</p>') + '<p class="conexion js-conexion" style="margin-top:var(--e-3)"></p>';
+    el.innerHTML = (an || '<p class="nota">No hay partidos pendientes por ahora. La página se actualiza cuando se programe el siguiente.</p>') + '<p class="conexion js-conexion" style="margin-top:var(--e-3)"></p>';
+    var rl = id('reloj'), t0 = rl ? Date.parse(rl.getAttribute('data-inicio') || '') : NaN;
+    if (rl && ok(t0)) {
+      cuentaRegresiva(rl, t0, function () { /* al empezar, el anuncio pasa a la pierna que sigue */
+        rl.innerHTML = '<p class="nota">Ya empezó.</p>';
+        setTimeout(function () { seguro('próximo partido', 'b-sigue', sigue); }, 2000);
+      });
+      /* a la medianoche del centro de México «mañana» pasa a ser «hoy»: el anuncio se vuelve a armar */
+      var ms = Date.now(), media = Date.parse(diaMX(ms + 864e5) + 'T06:00:00Z');
+      if (ok(media) && media < t0) setTimeout(function () { if (rl.isConnected) seguro('próximo partido', 'b-sigue', sigue); }, media - ms + 1000);
+    }
+    return;
   }
   var ahora = Date.now();
   var fut = ps.filter(function (x) { return Date.parse(x.fecha_utc) > ahora; }), p = fut[0] || ps[ps.length - 1], hayFuturo = fut.length > 1;
@@ -1497,24 +1562,11 @@ function sigue(el) {
     '<div class="reloj" id="reloj" role="timer" aria-label="Tiempo que falta para el partido"></div>' +
     '<button type="button" class="boton" data-ir="p-' + E(p.id) + '">Ver pronóstico</button></div>' +
     '<p class="conexion js-conexion" style="margin-top:var(--e-3)"></p>';
-  var reloj = id('reloj'), t = Date.parse(p.fecha_utc), tm = null, celdas = null;
-  function tic() {
-    var s = Math.floor((t - Date.now()) / 1000);
-    if (!ok(s) || s <= 0) {
-      reloj.innerHTML = '<p class="nota">Ya empezó o ya se jugó.<br>El pronóstico queda sellado.</p>';
-      if (tm) clearInterval(tm);
-      if (hayFuturo) setTimeout(function () { seguro('próximo partido', 'b-sigue', sigue); }, 2000); /* pasa al siguiente */
-      return;
-    }
-    var v = [Math.floor(s / 86400), Math.floor(s % 86400 / 3600), Math.floor(s % 3600 / 60), s % 60];
-    if (!celdas) {
-      reloj.innerHTML = ['días', 'horas', 'min', 'seg'].slice(0, REDUCE ? 3 : 4).map(function (n) { return '<div><b>00</b><span>' + n + '</span></div>'; }).join('');
-      celdas = $$('b', reloj);
-    }
-    celdas.forEach(function (c, i) { var txt = (v[i] < 10 ? '0' : '') + v[i]; if (c.textContent !== txt) c.textContent = txt; });
-  }
-  tic();
-  tm = setInterval(tic, REDUCE ? 30000 : 1000);
+  var reloj = id('reloj');
+  cuentaRegresiva(reloj, Date.parse(p.fecha_utc), function () {
+    reloj.innerHTML = '<p class="nota">Ya empezó o ya se jugó.<br>El pronóstico queda sellado.</p>';
+    if (hayFuturo) setTimeout(function () { seguro('próximo partido', 'b-sigue', sigue); }, 2000); /* pasa al siguiente */
+  });
 }
 
 /* ---------- 1. próximos partidos ---------- */
@@ -1690,25 +1742,41 @@ function piernasSueltas() {
         arr(s.piernas).filter(obj).forEach(function (l) {
           if ((l.pierna === 2 ? 2 : 1) !== n || l.jugado || typeof l.local !== 'string' || typeof l.visitante !== 'string') return;
           if ((l.id != null && ids[String(l.id)]) || pares[l.local + '|' + l.visitante]) return;
-          out.push({ s: s, l: l, r: r, n: n, pid: String(s.llave).replace(/[^\w-]/g, '') + '-' + n });
+          out.push({ s: s, l: l, r: r, n: n, pid: String(s.llave).replace(/[^\w-]/g, '') + '-' + n, i: out.length });
         });
       });
     });
   });
-  return out;
+  /* dentro de cada ronda y pierna, por día y hora (las que ya los tienen, del calendario o de la prensa, primero); si no, en orden de llave */
+  var rs = arr(t.rondas);
+  return out.sort(function (a, b) {
+    var ta = inicioPierna(a.l), tb = inicioPierna(b.l);
+    return rs.indexOf(a.r) - rs.indexOf(b.r) || a.n - b.n || (ta === tb ? 0 : ta < tb ? -1 : 1) || a.i - b.i;
+  });
 }
-function tarjetaPierna(x) { /* tarjeta compacta: fase y pierna, llave, fecha (o ventana), marcador más probable, 1X2, sede y el paso al detalle de la serie */
+function tarjetaPierna(x) { /* tarjeta compacta: fase y pierna, llave, día y hora (o la ventana), marcador más probable, 1X2, sede y el paso al detalle de la serie */
   var s = x.s, l = x.l, m = obj(l.marcador) || {}, mj = eqDe(s.mejor), k = E(s.llave), est = txt((obj(l.estadio) || {}).nombre), cuando = cuandoPierna(l, x.r);
+  /* ya pasó su hora de inicio y ESPN todavía no la publica: se dice, y el pronóstico queda como el de antes del partido */
+  if (cuando && conHora(l) && empezo(l, Date.now())) cuando += ' · ya empezó';
   function eq(e, rol) { var sem = e === mj ? semDe(s.mejor) : semDe(s.peor); return '<div class="eq">' + esc(e, 46) + '<span class="eq__n">' + E(e) + '</span><span class="eq__r">' + rol + (sem != null ? ' · ' + sem + '.º' : '') + '</span></div>'; }
   return '<article class="pleg corner a" id="pl-' + x.pid + '" data-pleg="' + x.pid + '" aria-labelledby="plt-' + x.pid + '">' +
     '<h4 class="oculto" id="plt-' + x.pid + '">' + E(FASE1[s.fase] || 'Liguilla') + ', ' + (x.n === 2 ? 'vuelta' : 'ida') + ': ' + E(l.local) + ' contra ' + E(l.visitante) + '</h4>' +
-    '<p class="cuando"><b>' + E(FASE_C[s.fase] || 'Liguilla') + ' · ' + (x.n === 2 ? 'Vuelta' : 'Ida') + '</b><span class="chip">' + k + '</span>' + (cuando ? '<span class="pleg__f">' + E(cuando) + '</span>' : '') + '</p>' +
+    '<p class="cuando"><b>' + E(FASE_C[s.fase] || 'Liguilla') + ' · ' + (x.n === 2 ? 'Vuelta' : 'Ida') + '</b><span class="chip">' + k + '</span>' + (cuando ? '<span class="pleg__f' + (conHora(l) ? ' pleg__f--dh' : '') + '">' + E(cuando) + '</span>' : '') + '</p>' +
     '<div class="duelo">' + eq(l.local, 'Local') + '<div class="duelo__c"><span class="mini">Marcador<br>más probable</span>' +
     (ok(m.gl) && ok(m.gv) ? tablero(m.gl, m.gv, true) : '<span class="mini">Por definir</span>') + (ok(m.prob) ? '<span class="duelo__p">' + pct(m.prob) + '</span>' : '') + '</div>' + eq(l.visitante, 'Visita') + '</div>' +
     (ok(l.p_local) && ok(l.p_empate) && ok(l.p_visitante) ? '<div>' + x12(l.p_local, l.p_empate, l.p_visitante) + ley(l) + '</div>' : '') +
     /* quién gana: el pick que trae la pierna (Python); sin él, el tablero «1·1» se leía como «empate» aunque hubiera favorito */
-    (obj(l.pick) && /^[LEV]$/.test(l.pick.resultado) && ok(l.pick.prob) ? '<p class="pick pick--ch"><span>Pronóstico</span><b>' + (l.pick.resultado === 'E' ? 'Empate' : 'Gana ' + E(l.pick.equipo)) + '</b><span>' + pct(l.pick.prob) + '</span></p>' : '') +
+    (obj(l.pick) && /^[LEV]$/.test(l.pick.resultado) && ok(l.pick.prob) ? '<p class="pick pick--ch"><span>Pronóstico' + (conHora(l) && empezo(l, Date.now()) ? ' previo' : '') + '</span><b>' + (l.pick.resultado === 'E' ? 'Empate' : 'Gana ' + E(l.pick.equipo)) + '</b><span>' + pct(l.pick.prob) + '</span></p>' : '') +
     '<p class="pleg__pie"><span>' + E(est || 'Sede por confirmar') + '</span><button type="button" class="llave__ver" data-serie="' + k + '" aria-label="Ver el detalle de la serie ' + E(mj) + ' contra ' + E(eqDe(s.peor)) + ' en el cuadro">Serie ' + k + '</button></p></article>';
+}
+function notaSueltas(sueltas, sinJornada) { /* qué falta de las piernas que ESPN todavía no publica (sólo formato) */
+  var n = sueltas.length, ch = sueltas.filter(function (x) { return conHora(x.l); }).length, uno = n === 1;
+  var luego = 'El pronóstico completo de cada partido (mercados y combinada)' + (sinJornada ? ', la combinada de la ronda' : '') + ' y el seguimiento en vivo llegan cuando ESPN ' + (uno ? 'lo publique.' : 'los publique.');
+  if (ch === n) return '<b>Día y hora anunciados por la liga</b><span>Horas del centro de México. ' + (uno ? 'ESPN todavía no publica este partido. ' : 'ESPN todavía no publica estos ' + n + ' partidos. ') + luego + '</span>';
+  if (ch) return '<b>Día y hora: ' + (n - ch === 1 ? 'uno por confirmar' : (n - ch) + ' por confirmar') + '</b><span>Los que ya los tienen son los anunciados por la liga (horas del centro de México); los demás muestran la ventana de la ronda. ESPN todavía no publica estos ' + n + ' partidos. ' + luego + '</span>';
+  return '<b>Día y hora por confirmar</b><span>' + (uno ? 'Este partido todavía no tiene' : 'Estos ' + n + ' partidos todavía no tienen') +
+    ' día ni hora en el calendario: la fecha es la ventana de la ronda y la sede, la que da la prensa o, si no hay, la habitual del local. La combinada de cuatro pronósticos de cada partido' + (sinJornada ? ' y la combinada de la ronda se publican' : ' se publica') +
+    ' cuando la liga confirme día y hora.</span>';
 }
 function hayCombinadaJornada() { var cj = obj(D.combinada_jornada); return !!cj && ['segura', 'equilibrada', 'atrevida'].some(function (k) { return obj(cj[k]) && arr(cj[k].picks).length > 0; }); }
 function partidos() {
@@ -1721,9 +1789,10 @@ function partidos() {
   ind.innerHTML = '<nav class="indice" aria-label="Ir a un partido">' + ps.map(function (p) {
     return '<button type="button" data-ir="p-' + E(p.id) + '">' + esc(p.local, 30) + esc(p.visitante, 30) + '<span>' + E(abr(p.local)) + '–' + E(abr(p.visitante)) + '<small>' + fechaCorta(p.fecha_local) + ' · ' + E(p.hora_local) + '</small></span></button>';
   }).join('') + sueltas.map(function (x) {
-    return '<button type="button" data-ir="pl-' + x.pid + '">' + esc(x.l.local, 30) + esc(x.l.visitante, 30) + '<span>' + E(abr(x.l.local)) + '–' + E(abr(x.l.visitante)) + '<small>' + (x.n === 2 ? 'Vuelta' : 'Ida') + ' · ' + E(cuandoPierna(x.l, x.r)) + '</small></span></button>';
+    return '<button type="button" data-ir="pl-' + x.pid + '">' + esc(x.l.local, 30) + esc(x.l.visitante, 30) + '<span>' + E(abr(x.l.local)) + '–' + E(abr(x.l.visitante)) + '<small>' +
+      (conHora(x.l) ? fechaCorta(x.l.fecha_local) + ' · ' + E(x.l.hora_local) : (x.n === 2 ? 'Vuelta' : 'Ida') + ' · ' + E(cuandoPierna(x.l, x.r))) + '</small></span></button>';
   }).join('') + '</nav>';
-  if (bj && !ps.length) { /* sólo hay partidos de liguilla sin día ni hora: la bajada no promete la combinada */
+  if (bj && !ps.length) { /* sólo hay partidos de liguilla que ESPN todavía no publica: la bajada no promete la combinada */
     var fases = sueltas.map(function (x) { return x.s.fase; }).filter(function (f, i, a) { return a.indexOf(f) === i; });
     bj.textContent = 'Lo que sigue: ' + (fases.length === 1 && { cuartos: 'los cuartos de final', semifinal: 'las semifinales', final: 'la final' }[fases[0]] || 'la liguilla') + '. Quién gana y el marcador más probable de cada partido.';
   }
@@ -1734,9 +1803,7 @@ function partidos() {
     }).join('') + '</div>';
   }).join('');
   var sinJornada = !hayCombinadaJornada();
-  if (sueltas.length) h += '<ul class="francos a" id="nota-sueltas"><li><b>Día y hora por confirmar</b><span>' + (sueltas.length === 1 ? 'Este partido todavía no tiene' : 'Estos ' + sueltas.length + ' partidos todavía no tienen') +
-    ' día ni hora en el calendario: la fecha es la ventana de la ronda y la sede, la que da la prensa o, si no hay, la habitual del local. La combinada de cuatro pronósticos de cada partido' + (sinJornada ? ' y la combinada de la ronda se publican' : ' se publica') +
-    ' cuando la liga confirme día y hora.</span></li></ul>' +
+  if (sueltas.length) h += '<ul class="francos a" id="nota-sueltas"><li>' + notaSueltas(sueltas, sinJornada) + '</li></ul>' +
     gs.map(function (g) {
       var f = rangoFechas((obj(g.x.r.fechas) || {})[g.x.n === 2 ? 'vuelta' : 'ida']);
       return '<div class="grupo"><h3>' + E(g.et) + (f ? '<small>' + E(f) + '</small>' : '') + '</h3><div class="plegs">' + g.xs.map(function (x) { return parcial(x.l.local + ' vs ' + x.l.visitante, function () { return tarjetaPierna(x); }); }).join('') + '</div></div>';
@@ -1890,8 +1957,8 @@ function estadoSerie(s) {
   if (jugadas(s).length) return [' chip--real', 'En curso'];
   return serieDefinida(s) ? [' chip--oro', 'Definida'] : ['', 'Proyectada'];
 }
-function cuandoPierna(l, r) { /* la fecha si ya existe; si no, la ventana de la ronda */
-  if (l.fecha_local) return fechaCorta(l.fecha_local) + (l.hora_local ? ', ' + l.hora_local + ' h' : '');
+function cuandoPierna(l, r) { /* con día (del calendario o el anunciado por la liga): «Mié 25 nov · 19:00 h», sin cortes de renglón por dentro; si no, la ventana de la ronda («25 o 26 nov») */
+  if (partes(l.fecha_local)) return (may(diaSem(l.fecha_local, true)) + ' ' + fechaCorta(l.fecha_local) + (conHora(l) ? ' · ' + l.hora_local + ' h' : '')).replace(/ /g, '\u00a0');
   return rangoFechas((obj(r.fechas) || {})[l.pierna === 2 ? 'vuelta' : 'ida'], ' o ');
 }
 function marcPierna(l) { /* local a la izquierda: escudo, tablero, escudo */
@@ -1923,7 +1990,7 @@ function nodoLlave(s, pos, extra, o) {
     : (!def && de.length === 2 ? 'De ' + de[0] + ' y ' + de[1] : FASE1[s.fase] || '');
   var mixto = (torneo() || {}).estado !== 'proyectado' || def; /* la etiqueta por serie sólo cuando no todo el cuadro es proyectado */
   var legs = arr(s.piernas).filter(obj).map(function (l) {
-    var meta = [sede(l), cuandoPierna(l, r)].filter(Boolean).join(' · ');
+    var meta = [sede(l), cuandoPierna(l, r)].filter(Boolean).join('\u00a0· ');
     return '<li class="pierna" data-pierna="' + (l.pierna === 2 ? 2 : 1) + '"><p class="pierna__n"><b>' + (l.pierna === 2 ? 'Vuelta' : 'Ida') + '</b><span>' + E(meta) + '</span></p>' + marcPierna(l) +
       (l.jugado ? '<span class="pierna__x"><span class="chip chip--real">Resultado</span></span>'
         : ok(l.p_local) && ok(l.p_empate) && ok(l.p_visitante) ? '<span class="pierna__x">' + x12(l.p_local, l.p_empate, l.p_visitante, true) + '<small aria-hidden="true"><span>' + pct(l.p_local, 0) + '</span><span>' + pct(l.p_empate, 0) + '</span><span>' + pct(l.p_visitante, 0) + '</span></small></span>' : '<span></span>') + '</li>';
@@ -1986,8 +2053,11 @@ function miniLeg(l, lv) { /* «IDA XOL 1-1 CAZ»: local–visitante. Resultado r
   else if (l.jugado && ok(l.gl) && ok(l.gv)) { real = true; gl = l.gl; gv = l.gv; }
   else if (ok(m.gl) && ok(m.gv)) { gl = m.gl; gv = m.gv; }
   /* el pronóstico va en cursiva y más tenue, con su nombre para el lector de pantalla: no se confunde con un resultado */
-  var que = real ? 'resultado' : gl == null ? 'por jugar' : 'pronóstico';
-  return '<span class="mc__leg' + (real ? ' real' : gl == null ? '' : ' pron') + '" aria-label="' + (l.pierna === 2 ? 'Vuelta' : 'Ida') + ', ' + que + ': ' + E(l.local) + (gl == null ? ' contra ' : ' ' + gl + '-' + gv + ' ') + E(l.visitante) + '"><em>' + (l.pierna === 2 ? 'VTA' : 'IDA') + '</em>' + E(abr(l.local)) + ' <b>' + (gl == null ? 'vs' : gl + '-' + gv) + '</b> ' + E(abr(l.visitante)) + '</span>';
+  var que = real ? 'resultado' : gl == null ? 'por jugar' : 'pronóstico', dh = !real && !(lv && EN_JUEGO[lv.estado]) && conHora(l);
+  return '<span class="mc__leg' + (real ? ' real' : gl == null ? '' : ' pron') + '" aria-label="' + (l.pierna === 2 ? 'Vuelta' : 'Ida') + ', ' + que + ': ' + E(l.local) + (gl == null ? ' contra ' : ' ' + gl + '-' + gv + ' ') + E(l.visitante) +
+    (dh ? ', ' + E(diaSem(l.fecha_local)) + ' ' + E(fechaCorta(l.fecha_local)) + ' a las ' + E(l.hora_local) + ' h' : '') + '"><em>' + (l.pierna === 2 ? 'VTA' : 'IDA') + '</em>' + E(abr(l.local)) + ' <b>' + (gl == null ? 'vs' : gl + '-' + gv) + '</b> ' + E(abr(l.visitante)) + '</span>' +
+    /* el día y la hora (del calendario o los anunciados por la liga) van en su renglón, bajo la pierna: el texto de la pierna no cambia */
+    (dh ? '<span class="mc__cuando" aria-hidden="true">' + E(may(diaSem(l.fecha_local, true))) + ' ' + partes(l.fecha_local).d + ' · ' + E(l.hora_local) + '</span>' : '');
 }
 function miniNodo(s, y) { /* y: la serie compacta del documento en vivo si se juega hoy; devuelve { c: clases, h: contenido } */
   var mj = eqDe(s.mejor), pr = eqDe(s.peor), g = globalReal(s), gano = s.decidida ? txt(s.ganador) : y && y.gano ? y.gano : '';
@@ -2032,7 +2102,7 @@ function campeonRuta(t) { /* «si gana cada favorito» no es «el favorito al t�
 }
 function legDetalle(l, r) {
   var jug = !!l.jugado, m = obj(l.marcador) || {}, gl = jug ? l.gl : m.gl, gv = jug ? l.gv : m.gv;
-  var meta = [txt((obj(l.estadio) || {}).nombre), cuandoPierna(l, r)].filter(Boolean).join(' · ');
+  var meta = [txt((obj(l.estadio) || {}).nombre), cuandoPierna(l, r)].filter(Boolean).join('\u00a0· ');
   function eq(e, rol) { return '<div class="eq">' + esc(e, 46) + '<span class="eq__n">' + E(e) + '</span><span class="eq__r">' + rol + '</span></div>'; }
   var h = '<div class="leg' + (jug ? ' leg--real' : '') + '" data-leg="' + (l.pierna === 2 ? 2 : 1) + '"><div class="leg__cab"><h4>' + (l.pierna === 2 ? 'Vuelta' : 'Ida') + '</h4><span>' + E(meta) + '</span><span class="chip' + (jug ? ' chip--real">Resultado' : '" data-antes>Pronóstico') + '</span></div>' +
     (jug ? '' : '<p class="leg__vivo" data-leg-vivo hidden></p>') +

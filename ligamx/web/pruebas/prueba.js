@@ -16,8 +16,9 @@
    - uno FIJO sin partidos pendientes y con el cuadro definido (pruebas/datos/actual_20261123T0353Z.json, la noche
      del 22-nov: fase regular terminada, cuartos sin día ni hora), con el reloj en AHORA_DEFINIDO: anuncio de la
      liguilla bajo la portada, las 8 piernas de cuartos como tarjetas compactas, series «Definida», sin secciones
-     vacías; y sus variantes (datos viejos sin el campo «definida», idas ya en el calendario, semifinales definidas,
-     liguilla terminada).
+     vacías; y sus variantes (datos viejos sin el campo «definida», horarios de prensa —día y hora anunciados por la
+     liga que ESPN todavía no lista, como los deja exportar con horario_origen «prensa»—, idas ya en el calendario,
+     semifinales definidas, liguilla terminada).
    Los dos fijos se arman con «construir.py --datos … --solo-documento», que no toca index.html. Revisa:
    - archivo: fragmento válido, tokens de color, sin scripts externos, capacidad "db" declarada y usada;
    - portada: foto del favorito con movimiento lento, trofeo con su escudo, confeti, nada encimado; en celular
@@ -246,15 +247,21 @@ const COMO_PRONOSTICO = ['lam_l', 'lam_v', 'p_local', 'p_empate', 'p_visitante',
 function torneoDe(d) { const t = d.liguilla && d.liguilla.torneo; return t && Array.isArray(t.rondas) && t.rondas.length ? t : null; }
 /* una serie ya tiene sus dos equipos seguros: el campo «definida»; con datos viejos sin el campo, serie en el calendario o cuartos con la fase regular terminada */
 function definidaEsperada(s, t) { return typeof s.definida === 'boolean' ? s.definida : !!s.real || (s.fase === 'cuartos' && ['definido', 'en_curso', 'terminado'].includes(t.estado)); }
-/* piernas de liguilla por jugar, entre equipos ya definidos, que no vienen en «pendientes» (la liga no les ha puesto día y hora):
-   por ronda, primero las idas y luego las vueltas. Son las tarjetas compactas que «Próximos partidos» debe mostrar */
+/* piernas de liguilla por jugar, entre equipos ya definidos, que no vienen en «pendientes» (ESPN todavía no las publica: sin día
+   ni hora, o con los que anunció la liga): por ronda, primero las idas y luego las vueltas y, dentro, por día y hora (las que
+   no los tienen, después y en orden de llave). Son las tarjetas compactas que «Próximos partidos» debe mostrar */
 function piernasEsperadas(d) {
   const t = torneoDe(d), out = []; if (!t) return out;
   const ids = new Set(d.pendientes.map(p => String(p.id))), pares = new Set(d.pendientes.map(p => p.local + '|' + p.visitante));
-  for (const r of t.rondas) for (const n of [1, 2]) for (const s of r.series || []) {
-    if (!s || !s.llave || s.decidida || !definidaEsperada(s, t)) continue;
-    for (const l of s.piernas || []) if (l && (l.pierna === 2 ? 2 : 1) === n && !l.jugado && !(l.id != null && ids.has(String(l.id))) && !pares.has(l.local + '|' + l.visitante)) out.push({ s, l, r, n });
-  }
+  t.rondas.forEach((r, ri) => { for (const n of [1, 2]) {
+    const grupo = [];
+    for (const s of r.series || []) {
+      if (!s || !s.llave || s.decidida || !definidaEsperada(s, t)) continue;
+      for (const l of s.piernas || []) if (l && (l.pierna === 2 ? 2 : 1) === n && !l.jugado && !(l.id != null && ids.has(String(l.id))) && !pares.has(l.local + '|' + l.visitante)) grupo.push({ s, l, r, n, i: grupo.length });
+    }
+    grupo.sort((a, b) => { const ta = inicioEsp(a.l), tb = inicioEsp(b.l); return ta === tb ? a.i - b.i : ta < tb ? -1 : 1; });
+    out.push(...grupo);
+  } });
   return out;
 }
 function chipEsperado(s, t) { /* la pastilla de estado de cada serie en el cuadro (null: no lleva, todo el cuadro es proyectado) */
@@ -264,6 +271,31 @@ function chipEsperado(s, t) { /* la pastilla de estado de cada serie en el cuadr
   return def ? 'Definida' : t.estado === 'proyectado' ? null : 'Proyectada';
 }
 const pctTxt = x => (x * 100).toFixed(1) + '%';
+/* día y hora de una pierna (del calendario o anunciados por la liga, horario_origen «prensa»): lo que la página debe mostrar */
+const DIA3 = ['dom', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb'], DIAS_L = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
+function conHoraEsp(l) { return !!l && /^\d{4}-\d{2}-\d{2}$/.test(l.fecha_local || '') && /^\d{1,2}:\d{2}$/.test(l.hora_local || ''); }
+function diaDe(iso) { const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso); return { k: new Date(Date.UTC(+m[1], +m[2] - 1, +m[3])).getUTCDay(), d: +m[3], m: +m[2] }; }
+function cuandoEsp(l) { const x = diaDe(l.fecha_local), d3 = DIA3[x.k]; return d3[0].toUpperCase() + d3.slice(1) + ' ' + x.d + ' ' + MES3[x.m - 1] + ' · ' + l.hora_local + ' h'; }   /* «Mié 25 nov · 19:00 h» */
+function miniCuandoEsp(l) { const x = diaDe(l.fecha_local), d3 = DIA3[x.k]; return d3[0].toUpperCase() + d3.slice(1) + ' ' + x.d + ' · ' + l.hora_local; }                         /* «Mié 25 · 19:00» */
+function inicioEsp(l) { const t = Date.parse((l && l.fecha_utc) || ''); return Number.isFinite(t) ? t : conHoraEsp(l) ? Date.parse(l.fecha_local + 'T' + ('0' + l.hora_local).slice(-5) + ':00-06:00') : Infinity; }
+const diaMXEsp = ms => new Date(ms - 6 * 3600000).toISOString().slice(0, 10);            /* fecha del centro de México (UTC−6) */
+/* una pierna ya empezó: jugada, en juego o su hora de inicio ya pasó */
+const empezoEsp = (l, ms) => !!l && (!!l.jugado || !!l.en_juego || inicioEsp(l) <= ms);
+/* rótulo del anuncio: «definido» con alguna pierna ya empezada por la hora (ESPN aún no la publica) es «en curso» */
+function rotuloEsperado(t, ms) {
+  const empezada = t.rondas.some(r => (r.series || []).some(s => (s.piernas || []).some(l => empezoEsp(l, ms))));
+  return t.estado === 'terminado' ? 'Liguilla terminada' : t.estado === 'en_curso' || (t.estado === 'definido' && empezada) ? 'Liguilla en curso' : 'Liguilla definida';
+}
+/* la frase del anuncio con día y hora: «Empieza …» si ninguna pierna de la ronda se ha jugado ni ha empezado; si no, «Sigue …»;
+   «hoy» / «mañana» por la fecha del centro de México; la hora con su zona (centro de México) */
+function anuncioEsperado(r, de, ms) {
+  const con = de.some(x => x.n === 1 && !conHoraEsp(x.l)) ? [] : de.filter(x => conHoraEsp(x.l) && inicioEsp(x.l) < Infinity).sort((a, b) => inicioEsp(a.l) - inicioEsp(b.l));
+  const sigE = con.find(x => inicioEsp(x.l) > ms + 5000) || null;
+  if (!sigE) return { sigE, frase: '' };
+  const empezada = (r.series || []).some(s => (s.piernas || []).some(l => empezoEsp(l, ms))), f = sigE.l.fecha_local;
+  const dia = f === diaMXEsp(ms) ? 'hoy' : f === diaMXEsp(ms + 864e5) ? 'mañana' : 'el ' + DIAS_L[diaDe(f).k] + ' ' + diaDe(f).d;
+  return { sigE, frase: (empezada ? 'Sigue ' : 'Empieza ') + dia + ' a las ' + sigE.l.hora_local + ' h (centro de México) con ' + sigE.l.local + '–' + sigE.l.visitante + '.' };
+}
 function ventanaTxt(fechas) { /* ['2026-11-25','2026-11-26'] → '25 o 26 nov' (la ventana de una pierna sin fecha) */
   const ps = (fechas || []).map(f => /^(\d{4})-(\d{2})-(\d{2})/.exec(f)).filter(Boolean); if (!ps.length) return '';
   return ps.every(m => m[2] === ps[0][2]) ? ps.map(m => +m[3]).join(' o ') + ' ' + MES3[+ps[0][2] - 1] : ps.map(m => +m[3] + ' ' + MES3[+m[2] - 1]).join(' o ');
@@ -312,22 +344,26 @@ async function revisaSegunDatos(ctx, url, etiqueta, movil, opciones, extra) {
   const t = torneoDe(d), pend = d.pendientes.length, sueltas = piernasEsperadas(d), fin = !!d.proyeccion.regular_completa, cj = d.combinada_jornada;
   const hayComb = !!cj && ['segura', 'equilibrada', 'atrevida'].some(k => cj[k] && (cj[k].picks || []).length > 0);
   const tabsEsp = hayComb ? ['segura', 'equilibrada', 'atrevida'].filter(k => cj[k] && (cj[k].picks || []).length > 0 && !cj[k].igual_a).length : 0;
-  console.log('  nota   ' + etiqueta + ': ' + pend + ' partidos pendientes, ' + sueltas.length + ' de liguilla sin día ni hora, cuadro ' + (t ? t.estado : 'ausente') + ', fase regular ' + (fin ? 'terminada' : 'en juego') + (hayComb ? ', con' : ', sin') + ' combinada de la jornada');
+  console.log('  nota   ' + etiqueta + ': ' + pend + ' partidos pendientes, ' + sueltas.length + ' de liguilla que ESPN no publica (' + sueltas.filter(x => conHoraEsp(x.l)).length + ' con día y hora de la prensa), cuadro ' + (t ? t.estado : 'ausente') + ', fase regular ' + (fin ? 'terminada' : 'en juego') + (hayComb ? ', con' : ', sin') + ' combinada de la jornada');
   if (movil && extra.pantalla) await primeraPantalla(pg, opciones.viewport, etq + 'portada (celular');
 
   /* bajo la portada: el próximo partido con su cuenta regresiva, o el anuncio de lo que sigue en la liguilla */
   const sg = await pg.evaluate(() => { const b = document.getElementById('b-sigue'), a = b.querySelector('[data-anuncio]');
-    return { reloj: !!b.querySelector('#reloj'), anuncio: a ? a.getAttribute('data-anuncio') : null, texto: b.textContent.replace(/\s+/g, ' ').trim(), titulo: ((b.querySelector('.sigue__duelo') || {}).textContent || '').trim(),
+    return { crudo: b.textContent, reloj: !!b.querySelector('#reloj'), celdas: b.querySelectorAll('#reloj b').length, inicio: (b.querySelector('#reloj') || { getAttribute: () => null }).getAttribute('data-inicio'), anuncio: a ? a.getAttribute('data-anuncio') : null, texto: b.textContent.replace(/\s+/g, ' ').trim(), titulo: ((b.querySelector('.sigue__duelo') || {}).textContent || '').trim(),
       rotulo: ((b.querySelector('.rotulo') || {}).textContent || '').trim(), cruces: Array.from(b.querySelectorAll('[data-ir-llave]')).map(x => x.getAttribute('data-ir-llave')), boton: !!b.querySelector('[data-ir-cuadro]') }; });
   if (pend) revisa(sg.reloj && !sg.anuncio, etq + 'con partidos pendientes, bajo la portada va el próximo partido con su cuenta regresiva', sg.texto.slice(0, 160));
   else if (t && t.estado !== 'proyectado') {
-    const rot = { definido: 'Liguilla definida', en_curso: 'Liguilla en curso', terminado: 'Liguilla terminada' }[t.estado];
+    const ahoraMs = extra.ahora ? Date.parse(extra.ahora) : Date.now(), rot = rotuloEsperado(t, ahoraMs);
     if (sueltas.length) {
-      const r = sueltas[0].r, de = sueltas.filter(x => x.r === r), llaves = [...new Set(de.map(x => x.s.llave))], f = r.fechas || {}, fs0 = [].concat(f.ida || [], f.vuelta || []).sort(), m = /^(\d{4})-(\d{2})-(\d{2})/.exec(fs0[0] || '') || [];
+      const r = sueltas[0].r, de = sueltas.filter(x => x.r === r), llaves = (r.series || []).filter(s => de.some(x => x.s === s)).map(s => s.llave), f = r.fechas || {}, fs0 = [].concat(f.ida || [], f.vuelta || []).sort(), m = /^(\d{4})-(\d{2})-(\d{2})/.exec(fs0[0] || '') || [];
       const fechas = !m.length || (sg.texto.includes(' ' + (+m[3]) + ' ') && sg.texto.includes(MESES[+m[2] - 1]));
-      revisa(sg.anuncio === t.estado && sg.rotulo === rot && sg.titulo === r.nombre && JSON.stringify(sg.cruces) === JSON.stringify(llaves) && fechas && sg.boton && !sg.reloj &&
+      /* con día y hora en todas las idas (calendario o prensa): cuándo empieza (o la que sigue) y la cuenta regresiva hasta ese partido */
+      const { sigE, frase } = anuncioEsperado(r, de, ahoraMs);
+      revisa(sg.anuncio === t.estado && sg.rotulo === rot && sg.titulo === r.nombre && JSON.stringify(sg.cruces) === JSON.stringify(llaves) && fechas && sg.boton &&
         /por confirmar/.test(sg.texto) === de.some(x => !x.l.fecha_local) && !/No hay partidos pendientes/.test(sg.texto),
-        etq + 'sin partidos con día y hora, bajo la portada se anuncia lo que sigue («' + rot + ' · ' + r.nombre + '»: sus ' + llaves.length + ' cruces, la ventana de fechas y un botón al cuadro)', JSON.stringify([sg.anuncio, sg.rotulo, sg.titulo, sg.cruces, sg.texto.slice(0, 200)]));
+        etq + 'sin partidos en «pendientes», bajo la portada se anuncia lo que sigue («' + rot + ' · ' + r.nombre + '»: sus ' + llaves.length + ' cruces, la ventana de fechas y un botón al cuadro)', JSON.stringify([sg.anuncio, sg.rotulo, sg.titulo, sg.cruces, sg.texto.slice(0, 200)]));
+      revisa(sigE ? sg.reloj && sg.celdas >= 3 && Date.parse(sg.inicio) === inicioEsp(sigE.l) && sg.texto.includes(frase) && sg.crudo.includes('a las\u00a0' + sigE.l.hora_local + '\u00a0h') : !sg.reloj && !/Empieza |Sigue /.test(sg.texto),
+        etq + (sigE ? 'el anuncio dice cuándo empieza («' + frase + '») con su cuenta regresiva' : 'sin día y hora de las idas, el anuncio no lleva cuenta regresiva'), JSON.stringify([sg.reloj, sg.celdas, sg.inicio, sg.texto.slice(0, 260)]));
     } else if (t.estado === 'terminado' && t.campeon_decidido) {
       revisa(sg.anuncio === 'terminado' && sg.rotulo === rot && sg.titulo.includes(t.campeon_ruta) && /campeón/i.test(sg.titulo) && sg.boton, etq + 'liguilla terminada: bajo la portada, el campeón y el botón al cuadro', sg.texto);
     } else revisa(!!sg.anuncio && /Todavía no hay partidos con día y hora/.test(sg.texto) && sg.boton, etq + 'sin partidos por jugar definidos: lo dice bajo la portada y lleva al cuadro', sg.texto);
@@ -353,7 +389,8 @@ async function revisaSegunDatos(ctx, url, etiqueta, movil, opciones, extra) {
   const px = await pg.evaluate(() => {
     const sec = document.getElementById('proximos'), T = e => (e ? e.textContent : '').replace(/\s+/g, ' ').trim();
     return { oculto: sec.hidden, tarjetas: document.querySelectorAll('#b-partidos .partido').length, bajada: T(document.getElementById('proximos-bajada')), nota: T(document.getElementById('nota-sueltas')), notaComb: T(document.getElementById('nota-sin-combinada')),
-      grupos: Array.from(document.querySelectorAll('#b-partidos .grupo > h3')).map(h => T(h)), indice: document.querySelectorAll('#b-indice .indice button').length, vacios: document.querySelectorAll('#proximos .vacio, #combinada .vacio').length,
+      grupos: Array.from(document.querySelectorAll('#b-partidos .grupo > h3')).map(h => T(h)), indice: document.querySelectorAll('#b-indice .indice button').length,
+      indiceAncho: (() => { const n = document.querySelector('#b-indice .indice'); return n && n.offsetParent ? [n.scrollWidth, n.clientWidth] : null; })(), vacios: document.querySelectorAll('#proximos .vacio, #combinada .vacio').length,
       cards: Array.from(document.querySelectorAll('#b-partidos .pleg')).map(p => ({ cuando: T(p.querySelector('.cuando')), nombres: Array.from(p.querySelectorAll('.eq__n')).map(T), escudos: p.querySelectorAll('.duelo .esc').length,
         tablero: Array.from(p.querySelectorAll('.duelo .tablero b')).map(T).join('-'), x12: !!p.querySelector('.x12'), pcts: Array.from(p.querySelectorAll('.ley b')).map(T), pie: T(p.querySelector('.pleg__pie span')), serie: (p.querySelector('[data-serie]') || { getAttribute: () => '' }).getAttribute('data-serie'),
         pick: T(p.querySelector('.pick')), gan: T(p.querySelector('.ley .gan b')),
@@ -365,9 +402,10 @@ async function revisaSegunDatos(ctx, url, etiqueta, movil, opciones, extra) {
   if (extra.plegs != null) revisa(sueltas.length === extra.plegs && px.cards.length === extra.plegs, etq + extra.plegs + ' tarjetas compactas de liguilla', sueltas.length + ' / ' + px.cards.length);
   if (!pend && !sueltas.length) revisa(px.oculto, etq + 'sin nada por jugar, la sección «Próximos partidos» se retira (no queda una pantalla vacía)', JSON.stringify(px).slice(0, 200));
   else revisa(!px.oculto && px.vacios === 0 && px.indice === pend + sueltas.length, etq + '«Próximos partidos» a la vista, con un botón en el índice por partido', JSON.stringify([px.oculto, px.vacios, px.indice]));
+  if (!movil && px.indiceAncho) revisa(px.indiceAncho[0] <= px.indiceAncho[1] + 1, etq + 'en escritorio el índice de «Próximos partidos» va en renglones: ninguna pastilla queda cortada en el borde', JSON.stringify(px.indiceAncho));
   const malasP = [];
   sueltas.forEach((x, i) => {
-    const c = px.cards[i], l = x.l, m = l.marcador || {}, fase = { cuartos: 'Cuartos', semifinal: 'Semifinal', final: 'Final' }[x.s.fase], cuando = l.fecha_local ? null : ventanaTxt((x.r.fechas || {})[x.n === 2 ? 'vuelta' : 'ida']);
+    const c = px.cards[i], l = x.l, m = l.marcador || {}, fase = { cuartos: 'Cuartos', semifinal: 'Semifinal', final: 'Final' }[x.s.fase], cuando = conHoraEsp(l) ? cuandoEsp(l) + (empezoEsp(l, extra.ahora ? Date.parse(extra.ahora) : Date.now()) ? ' · ya empezó' : '') : l.fecha_local ? null : ventanaTxt((x.r.fechas || {})[x.n === 2 ? 'vuelta' : 'ida']);
     const bien = !!c && c.cuando.startsWith(fase + ' · ' + (x.n === 2 ? 'Vuelta' : 'Ida')) && c.cuando.includes(x.s.llave) && (!cuando || c.cuando.endsWith(cuando)) && JSON.stringify(c.nombres) === JSON.stringify([l.local, l.visitante]) && c.escudos === 2 &&
       (!Number.isFinite(m.gl) || c.tablero === m.gl + '-' + m.gv) && c.x12 && JSON.stringify(c.pcts) === JSON.stringify([pctTxt(l.p_local), pctTxt(l.p_empate), pctTxt(l.p_visitante)]) && c.pie === ((l.estadio || {}).nombre || 'Sede por confirmar') && c.serie === x.s.llave;
     if (!bien) malasP.push(x.s.llave + '-' + x.n + ' ' + JSON.stringify(c));
@@ -380,8 +418,12 @@ async function revisaSegunDatos(ctx, url, etiqueta, movil, opciones, extra) {
   const conFecha = px.cards.filter(c => c.fecha);
   if (!movil && conFecha.length) revisa(conFecha.every(c => c.fecha[0] <= 1 && c.fecha[1] > 4), etq + 'tarjetas compactas en escritorio: la fecha en su propio renglón, alineada a la izquierda', JSON.stringify(conFecha.map(c => c.fecha)));
   if (sueltas.length) {
-    revisa(px.cards.length === sueltas.length && malasP.length === 0, etq + 'las ' + sueltas.length + ' piernas de liguilla sin día ni hora como tarjetas compactas en orden (idas y luego vueltas): fase y pierna, llave, ventana de fechas, escudos, marcador más probable, 1X2 con sus %, sede y botón a la serie', px.cards.length + ' ' + malasP.slice(0, 2).join(' | '));
-    revisa(/Día y hora por confirmar/i.test(px.nota) && /combinada de cuatro pronósticos de cada partido/.test(px.nota) && /cuando la liga confirme día y hora/.test(px.nota) && (pend || /^Lo que sigue: /.test(px.bajada)), etq + 'nota honesta: sin día ni hora, la combinada de cada partido se publica cuando la liga los confirme', px.nota + ' · ' + px.bajada);
+    const nDH = sueltas.filter(x => conHoraEsp(x.l)).length;
+    revisa(px.cards.length === sueltas.length && malasP.length === 0, etq + 'las ' + sueltas.length + ' piernas de liguilla que ESPN no publica como tarjetas compactas en orden (idas y luego vueltas, cada una por día y hora): fase y pierna, llave, ' + (nDH ? 'día y hora («' + cuandoEsp(sueltas.find(x => conHoraEsp(x.l)).l) + '»)' : 'ventana de fechas') + ', escudos, marcador más probable, 1X2 con sus %, sede y botón a la serie', px.cards.length + ' ' + malasP.slice(0, 2).join(' | '));
+    if (nDH === sueltas.length) revisa(/^Día y hora anunciados por la liga ?Horas del centro de México\./.test(px.nota) && /ESPN todavía no publica (este partido|estos \d+ partidos)\./.test(px.nota) && /pronóstico completo de cada partido \(mercados y combinada\)/.test(px.nota) && /seguimiento en vivo llegan cuando ESPN los? publique/.test(px.nota) && !/por confirmar|todavía no tienen/.test(px.nota) && (pend || /^Lo que sigue: /.test(px.bajada)),
+      etq + 'nota honesta: el día y la hora son los anunciados por la liga, en hora del centro de México; el pronóstico completo y el seguimiento en vivo llegan cuando ESPN publique los partidos', px.nota + ' · ' + px.bajada);
+    else if (nDH === 0) revisa(/Día y hora por confirmar/i.test(px.nota) && /combinada de cuatro pronósticos de cada partido/.test(px.nota) && /cuando la liga confirme día y hora/.test(px.nota) && (pend || /^Lo que sigue: /.test(px.bajada)), etq + 'nota honesta: sin día ni hora, la combinada de cada partido se publica cuando la liga los confirme', px.nota + ' · ' + px.bajada);
+    else revisa(/por confirmar/.test(px.nota) && /anunciados por la liga/.test(px.nota) && /cuando ESPN los publique/.test(px.nota), etq + 'nota honesta: unos con el día y la hora que anunció la liga y otros por confirmar', px.nota);
     revisa(px.cards.every(c => c.cortados.length === 0), etq + 'en las tarjetas compactas ningún nombre se parte a media palabra ni se sale', JSON.stringify(px.cards.map(c => c.cortados).filter(x => x.length)));
     if (!movil && px.cards.length >= 2) { /* en escritorio van de cuatro en cuatro: el pie (sede y botón) queda a la misma altura en cada renglón */
       const filas = {}; px.cards.forEach(c => { (filas[c.caja[0]] = filas[c.caja[0]] || []).push(c.caja); });
@@ -429,12 +471,65 @@ async function revisaSegunDatos(ctx, url, etiqueta, movil, opciones, extra) {
   } else revisa(!rc.final && /Así se espera que termine/.test(rc.finalTxt) && rc.cols.includes('Liguilla') && /Así va hoy/.test(rc.tabla), etq + 'fase regular en juego: tabla de hoy, tabla final proyectada y probabilidad de clasificar', JSON.stringify(rc).slice(0, 300));
   await revisaConexion(pg, etq);
   await revisaLiguillaE(pg, d, t, etq, fin);
+  await revisaHorarios(pg, d, t, sueltas, etq, movil, texto);
   const desb = await desbordes(pg), mala = palabrasMalas(texto), resp = await pg.evaluate(() => document.querySelectorAll('.respaldo').length);
   revisa(desb.sw <= desb.ancho + 1 && desb.malos.length === 0, etq + 'sin desplazamiento horizontal ni elementos fuera de la pantalla', desb.sw + ' ' + desb.malos.join(' | '));
   revisa(!mala && resp === 0 && errores.length === 0, etq + 'sin "undefined"/"NaN"/"null", sin bloques de respaldo y sin errores de consola', (mala || '') + ' ' + resp + ' ' + errores.slice(0, 3).join(' || '));
   if (CAPTURAS && extra.foto && px.cards.length) { await pg.evaluate(() => document.getElementById('proximos').scrollIntoView()); await pg.waitForTimeout(800); const b = await pg.locator('#proximos').boundingBox(), y = await pg.evaluate(() => window.pageYOffset); await pg.screenshot({ path: path.join(DIR_CAP, motor + '-' + (movil ? 'iphone' : 'escritorio') + '-' + extra.foto + '-proximos.png'), fullPage: true, clip: { x: 0, y: b.y + y, width: pg.viewportSize().width, height: Math.min(b.height, 3000) } }); }
   await pg.close();
   return { d, t, sueltas };
+}
+/* Día y hora de las piernas de liguilla que ESPN todavía no lista (horario_origen «prensa», 24-nov-2026) o que ya están en el
+   calendario: la página los muestra tal cual en el cuadro, el mini-cuadro de celular, el detalle de la serie, las tarjetas
+   compactas y el índice de «Próximos partidos»; las tarjetas van por día y hora y ningún texto dice «por confirmar» cuando
+   todo tiene horario. Las expectativas salen de los datos incrustados. */
+async function revisaHorarios(pg, d, t, sueltas, etq, movil, texto) {
+  if (!t) return;
+  const conDH = [].concat(...t.rondas.map(r => (r.series || []).map(s => (s.piernas || []).filter(l => l && !l.jugado && conHoraEsp(l)).map(l => ({ s, l }))))).flat();
+  if (!conDH.length) return;
+  const prensa = conDH.filter(x => x.l.horario_origen === 'prensa').length;
+  const pagina = await pg.evaluate(() => {
+    const T = e => (e ? e.textContent : '').replace(/\s+/g, ' ').trim();
+    const cuadro = {}; document.querySelectorAll('#cuadro .llave').forEach(a => { cuadro[a.getAttribute('data-llave')] = Array.from(a.querySelectorAll('.pierna')).map(li => [+li.getAttribute('data-pierna'), T(li.querySelector('.pierna__n span'))]); });
+    const mini = {}; document.querySelectorAll('#mini-cuadro .mc[data-ver-llave]').forEach(n => { mini[n.getAttribute('data-ver-llave')] = { txt: Array.from(n.querySelectorAll('.mc__cuando')).map(T), cortado: Array.from(n.querySelectorAll('.mc__cuando, .mc__leg')).some(e => e.scrollWidth > e.clientWidth + 1) }; });
+    const m = document.getElementById('mini-cuadro'), mb = m && m.offsetParent ? m.getBoundingClientRect() : null;
+    const indice = {}; document.querySelectorAll('#b-indice [data-ir^="pl-"]').forEach(b => { indice[b.getAttribute('data-ir').slice(3)] = T(b.querySelector('small')); });
+    const grupos = Array.from(document.querySelectorAll('#b-partidos .plegs')).map(g => Array.from(g.querySelectorAll('.pleg')).map(p => p.getAttribute('data-pleg')));
+    return { cuadro, mini, mb: mb ? [Math.round(mb.width), Math.round(mb.height), window.innerWidth] : null, indice, grupos };
+  });
+  const malC = conDH.filter(x => { const f = (pagina.cuadro[x.s.llave] || []).find(z => z[0] === (x.l.pierna === 2 ? 2 : 1)); return !f || !f[1].includes(cuandoEsp(x.l)); }).map(x => x.s.llave + '-' + x.l.pierna);
+  revisa(malC.length === 0, etq + 'cuadro: cada pierna con día y hora (' + conDH.length + (prensa ? ', ' + prensa + ' de la prensa' : '') + ') los muestra junto a su sede («' + cuandoEsp(conDH[0].l) + '»)', malC.join(', '));
+  if (movil && pagina.mb) {
+    const malM = [];
+    [].concat(...t.rondas.map(r => r.series || [])).forEach(s => {
+      const esp = (s.piernas || []).slice(0, 2).filter(l => l && !l.jugado && conHoraEsp(l)).map(miniCuandoEsp), en = pagina.mini[s.llave] || { txt: [], cortado: true };
+      if (JSON.stringify(en.txt) !== JSON.stringify(esp) || en.cortado) malM.push(s.llave + ' ' + JSON.stringify(en));
+    });
+    revisa(malM.length === 0 && pagina.mb[0] <= 358 && pagina.mb[0] <= pagina.mb[2] - 32 && pagina.mb[1] <= 540, etq + 'mini-cuadro (celular): día y hora bajo cada pierna que los tiene («' + miniCuandoEsp(conDH[0].l) + '»), sin cortes, y sigue cabiendo a lo ancho', malM.slice(0, 2).join(' | ') + ' ' + JSON.stringify(pagina.mb));
+  }
+  /* las tarjetas compactas van por día y hora dentro de cada grupo (ida o vuelta) y el índice dice el día y la hora */
+  const porPid = {}; sueltas.forEach(x => { porPid[String(x.s.llave).replace(/[^\w-]/g, '') + '-' + x.n] = x; });
+  const desorden = pagina.grupos.filter(g => g.some((pid, i) => i && porPid[pid] && porPid[g[i - 1]] && inicioEsp(porPid[pid].l) < inicioEsp(porPid[g[i - 1]].l)));
+  const dhS = sueltas.filter(x => conHoraEsp(x.l));
+  if (dhS.length) {
+    revisa(desorden.length === 0 && pagina.grupos.length > 0, etq + 'tarjetas compactas ordenadas por día y hora en cada grupo (' + pagina.grupos.map(g => g.join(' ')).join(' / ') + ')', JSON.stringify(desorden));
+    const malI = dhS.filter(x => { const pid = String(x.s.llave).replace(/[^\w-]/g, '') + '-' + x.n, m = /^(\d{4})-(\d{2})-(\d{2})/.exec(x.l.fecha_local); return pagina.indice[pid] !== +m[3] + ' ' + MES3[+m[2] - 1] + ' · ' + x.l.hora_local; });
+    revisa(malI.length === 0, etq + 'el índice de «Próximos partidos» dice el día y la hora de cada pierna («25 nov · 19:00»)', JSON.stringify(malI.slice(0, 2).map(x => [x.s.llave, pagina.indice[String(x.s.llave) + '-' + x.n]])));
+  }
+  /* el detalle de la serie de la primera pierna con día y hora */
+  const k = conDH[0].s.llave;
+  await pg.evaluate(() => window.scrollTo(0, 0));
+  await pg.click('.llave[data-llave="' + k + '"] .llave__ver');
+  await pg.waitForTimeout(900);
+  const det = await pg.evaluate(() => Array.from(document.querySelectorAll('#serie-det .leg[data-leg]')).map(g => [+g.getAttribute('data-leg'), (g.querySelector('.leg__cab > span:not(.chip)') || {}).textContent || '']));
+  const espD = (conDH[0].s.piernas || []).filter(l => l && !l.jugado && conHoraEsp(l));
+  revisa(espD.every(l => { const z = (det.find(z => z[0] === (l.pierna === 2 ? 2 : 1)) || [0, ''])[1]; return z.replace(/\s+/g, ' ').includes(cuandoEsp(l)) && z.includes(cuandoEsp(l).replace(/ /g, '\u00a0')) && !/ ·/.test(z); }),
+    etq + 'el detalle de la serie ' + k + ' dice el día y la hora de cada partido, sin cortes de renglón dentro de «' + cuandoEsp(espD[0] || conDH[0].l) + '» ni un «·» al empezar renglón', JSON.stringify(det));
+  /* con día y hora en todo lo que ESPN no publica, ningún texto dice «por confirmar» ni «sin día ni hora» */
+  if (sueltas.length && dhS.length === sueltas.length && sueltas.every(x => x.l.estadio && x.l.estadio.nombre)) {
+    const malo = /por confirmar|sin día ni hora|todavía no tienen? día|día ni hora en el calendario/i.exec(texto);
+    revisa(!malo, etq + 'con día y hora en todas las piernas, ninguna sección dice «por confirmar» ni «sin día ni hora»', malo ? texto.slice(Math.max(0, malo.index - 80), malo.index + 60) : '');
+  }
 }
 /* Lo que encontró el ensayo de la liguilla con el Clausura 2026 (workflow 10, encargo E). Las expectativas salen de los datos
    incrustados; la página sólo da formato. */
@@ -527,6 +622,82 @@ function conLiguillaTerminada(d) {
   t.rondas[1].series.forEach((s, i) => decidirSerie(s, 990000200 + 10 * i));
   t.rondas[2].series[0].definida = true; decidirSerie(t.rondas[2].series[0], 990000300);
   t.estado = 'terminado'; t.campeon_decidido = true; t.campeon_ruta = t.rondas[2].series[0].ganador; d.liguilla.en_curso = false;
+}
+/* horarios de prensa (24-nov-2026): la liga anunció día y hora de los cuartos y ESPN todavía no los lista. Las piernas quedan
+   como las deja exportar (fecha_local, hora_local, fecha_utc y horario_origen «prensa», sin id), tomadas de config/torneo.json */
+const HORARIOS_CUARTOS = (JSON.parse(fs.readFileSync(path.join(WEB, '..', 'config', 'torneo.json'), 'utf8')).liguilla || {}).horarios_cuartos || [];
+function conHorariosPrensa(d) {
+  const cu = d.liguilla.torneo.rondas[0];
+  let n = 0;
+  cu.series.forEach(s => s.piernas.forEach(l => {
+    const h = HORARIOS_CUARTOS.find(x => x.local === l.local && x.visitante === l.visitante);
+    if (!h) return;
+    n++;
+    Object.assign(l, { id: null, fecha_local: h.fecha_local, hora_local: h.hora_local, fecha_utc: new Date(h.fecha_local + 'T' + h.hora_local + ':00-06:00').toISOString().replace('.000Z', '+00:00'), horario_origen: 'prensa' });
+  }));
+  if (n !== 8) throw new Error('horarios de prensa: sólo ' + n + ' de 8 piernas de cuartos coinciden con config/torneo.json');
+  cu.fechas = { ida: [...new Set(cu.series.map(s => s.piernas[0].fecha_local))].sort(), vuelta: [...new Set(cu.series.map(s => s.piernas[1].fecha_local))].sort() };
+}
+/* idas de cuartos ya jugadas (marcadores INVENTADOS) y las vueltas todavía con el día y la hora de la prensa, sin pendientes */
+function conIdasJugadasPrensa(d) {
+  conHorariosPrensa(d);
+  const t = d.liguilla.torneo;
+  t.rondas[0].series.forEach((s, i) => { const l = s.piernas[0]; s.real = true;
+    Object.assign(l, { id: 990000500 + i, horario_origen: 'calendario', jugado: true, gl: i % 3, gv: 1 }); COMO_PRONOSTICO.concat(['pick']).forEach(k => delete l[k]); });
+  t.estado = 'en_curso'; d.liguilla.en_curso = true;
+}
+/* El anuncio de la liguilla según el reloj (workflow 11: V1-3, V2-2, V2-3 y V2-4): «hoy» y «mañana» por la fecha del centro de
+   México (también al pasar la medianoche con la página abierta), el paso a la pierna que sigue al empezar una, «Sigue» si ya
+   se jugó alguna pierna de la ronda, los cruces en el orden del cuadro y las tarjetas de las piernas cuya hora ya pasó. Las
+   expectativas salen de los datos (anuncioEsperado, rotuloEsperado); la página sólo da formato. */
+async function anuncioSegunReloj(ctx, movil) {
+  const errores = [], etq = 'reloj · ';
+  const leer = pg => pg.evaluate(() => { const b = document.getElementById('b-sigue'), p = document.querySelector('#b-partidos .pleg');
+    return { texto: b.textContent.replace(/\s+/g, ' ').trim(), crudo: b.textContent, rotulo: ((b.querySelector('.rotulo') || {}).textContent || '').trim(),
+      inicio: (b.querySelector('#reloj') || { getAttribute: () => null }).getAttribute('data-inicio'), celdas: b.querySelectorAll('#reloj b').length,
+      cruces: Array.from(b.querySelectorAll('[data-ir-llave]')).map(x => x.getAttribute('data-ir-llave')),
+      tarjeta: p ? { cuando: p.querySelector('.cuando').textContent.replace(/\s+/g, ' ').trim(), pick: ((p.querySelector('.pick span') || {}).textContent || '').trim() } : null,
+      respaldos: document.querySelectorAll('.respaldo').length }; });
+  async function ver(url, ahora, pasos) {
+    const pg = await abrir(ctx, errores);
+    await pg.clock.install({ time: new Date(ahora) });
+    await pg.goto(url, { waitUntil: 'load' });
+    await pg.waitForTimeout(500);
+    const out = [await leer(pg)];
+    for (const ms of pasos || []) { await pg.clock.fastForward(ms); await pg.clock.fastForward(2500); await pg.waitForTimeout(300); out.push(await leer(pg)); }
+    await pg.close();
+    return out;
+  }
+  function esperado(d, ms) { const su = piernasEsperadas(d), r = su[0].r; return Object.assign(anuncioEsperado(r, su.filter(x => x.r === r), ms), { rot: rotuloEsperado(torneoDe(d), ms) }); }
+  function bien(a, e) { return a.texto.includes(e.frase) && a.rotulo === e.rot && a.celdas >= 3 && Date.parse(a.inicio) === inicioEsp(e.sigE.l) && a.respaldos === 0; }
+  const url = variante('prensareloj', conHorariosPrensa, DOC_DEFINIDO), d = datosDocumento(url.slice(7));
+  const orden = torneoDe(d).rondas[0].series.map(s => s.llave);
+  /* martes 24 a mediodía (México): «mañana»; los cruces en el orden del cuadro; «a las 19:00 h» sin cortes */
+  let ms = Date.parse('2026-11-24T18:00:00Z'), e = esperado(d, ms), [a] = await ver(url, '2026-11-24T18:00:00Z');
+  revisa(e.frase === 'Empieza mañana a las 19:00 h (centro de México) con Toluca–Atlas.' && bien(a, e) && JSON.stringify(a.cruces) === JSON.stringify(orden) && a.crudo.includes('a las 19:00 h'),
+    etq + 'la víspera dice «' + e.frase + '», con la zona y los cruces en el orden del cuadro (' + orden.join(' ') + ')', JSON.stringify([a.texto.slice(0, 240), a.rotulo, a.cruces]));
+  /* miércoles 25, 18:59:50 (México): «hoy»; al empezar, «Ya empezó» y luego la pierna que sigue, con «Liguilla en curso» */
+  ms = Date.parse('2026-11-26T00:59:50Z'); e = esperado(d, ms);
+  const [b0, b1] = await ver(url, '2026-11-26T00:59:50Z', [15000]), e1 = esperado(d, ms + 17500);
+  revisa(e.frase === 'Empieza hoy a las 19:00 h (centro de México) con Toluca–Atlas.' && bien(b0, e) && b0.rotulo === 'Liguilla definida',
+    etq + 'el mismo día dice «' + e.frase + '»', JSON.stringify([b0.texto.slice(0, 240), b0.rotulo]));
+  revisa(e1.frase === 'Sigue hoy a las 21:10 h (centro de México) con Monterrey–América.' && bien(b1, e1) && b1.rotulo === 'Liguilla en curso',
+    etq + 'al empezar la primera pierna, el anuncio pasa a «' + e1.frase + '» y el rótulo a «Liguilla en curso»', JSON.stringify([b1.texto.slice(0, 240), b1.rotulo]));
+  /* miércoles 25, 23:59:50 (México): las dos primeras idas ya empezaron (ESPN no las publica): su tarjeta lo dice; a la medianoche «mañana» pasa a «hoy» */
+  ms = Date.parse('2026-11-26T05:59:50Z'); e = esperado(d, ms);
+  const [c0, c1] = await ver(url, '2026-11-26T05:59:50Z', [12000]), e2 = esperado(d, ms + 14500);
+  revisa(e.frase === 'Sigue mañana a las 19:00 h (centro de México) con Pachuca–Chivas.' && bien(c0, e) && e2.frase === 'Sigue hoy a las 19:00 h (centro de México) con Pachuca–Chivas.' && bien(c1, e2),
+    etq + 'con la página abierta a la medianoche del centro de México, «' + e.frase + '» pasa a «' + e2.frase + '»', JSON.stringify([c0.texto.slice(0, 200), c1.texto.slice(0, 200)]));
+  revisa(!!c0.tarjeta && /· ya empezó$/.test(c0.tarjeta.cuando) && c0.tarjeta.pick === 'Pronóstico previo',
+    etq + 'la tarjeta compacta de una pierna cuya hora ya pasó (ESPN aún no la publica) dice «ya empezó» y su pronóstico es «previo»', JSON.stringify(c0.tarjeta));
+  /* idas jugadas y vueltas de la prensa (sin pendientes): «Sigue …», no «Empieza …» */
+  const urlJ = variante('idasjugadasprensa', conIdasJugadasPrensa, DOC_DEFINIDO), dJ = datosDocumento(urlJ.slice(7));
+  ms = Date.parse('2026-11-27T12:00:00Z'); e = esperado(dJ, ms);
+  const [j0] = await ver(urlJ, '2026-11-27T12:00:00Z');
+  revisa(e.frase === 'Sigue mañana a las 19:00 h (centro de México) con Atlas–Toluca.' && bien(j0, e) && !/Empieza/.test(j0.texto) && j0.rotulo === 'Liguilla en curso',
+    etq + 'con las idas jugadas y las vueltas de la prensa, «' + e.frase + '» (no «Empieza»)', JSON.stringify([j0.texto.slice(0, 240), j0.rotulo]));
+  revisa(errores.length === 0, etq + 'sin errores de consola', errores.slice(0, 3).join(' || '));
+  void movil;
 }
 function conIdasProgramadas(d, fijo) { /* ESPN ya lista las 4 idas (pronóstico completo, copiado de los partidos del documento fijo); las vueltas siguen sin día ni hora */
   /* la combinada de la ronda con pocos partidos: la equilibrada sale igual a la segura (igual_a) y la página no la repite */
@@ -1139,6 +1310,9 @@ async function correr(navegador, nombre, opciones) {
   revisa(def.t.estado === 'definido' && JSON.stringify(sd) === JSON.stringify([[true, true, true, true], [false, false], [false]]), 'copia fija «definido»: el exportador marca «definida» los cuartos (tabla final) y no las semifinales ni la final', JSON.stringify(sd));
   const fijo = datosDocumento(DOC_FIJO);
   await revisaSegunDatos(ctx, variante('sindefinida', d => { torneoDe(d).rondas.forEach(r => r.series.forEach(x => { delete x.definida; })); }, DOC_DEFINIDO), 'datos viejos sin el campo «definida»', movil, opciones, { ahora: AHORA_DEFINIDO, plegs: 8, chips: DEF });
+  await revisaSegunDatos(ctx, variante('prensa', conHorariosPrensa, DOC_DEFINIDO), 'horarios de prensa (ESPN todavía no lista los cuartos)', movil, opciones,
+    { pantalla: true, ahora: AHORA_DEFINIDO, foto: 'prensa', plegs: 8, chips: DEF, anuncio: 'Empieza el miércoles 25 a las 19:00 h (centro de México) con Toluca–Atlas.' });
+  await anuncioSegunReloj(ctx, movil);
   await revisaSegunDatos(ctx, variante('idas', d => conIdasProgramadas(d, fijo), DOC_DEFINIDO), 'idas de cuartos ya en el calendario', movil, opciones, { ahora: AHORA_DEFINIDO, plegs: 4, chips: DEF, foto: 'idas' });
   await revisaSegunDatos(ctx, variante('semis', conSemisDefinidas, DOC_DEFINIDO), 'cuartos jugados y semifinales definidas', movil, opciones,
     { ahora: AHORA_DEFINIDO, foto: 'semis', plegs: 4, anuncio: 'Semifinales', chips: ['Terminada', 'Terminada', 'Terminada', 'Terminada', 'Definida', 'Definida', 'Proyectada'], estadoCuadro: /La final sigue la ruta de los favoritos\.$/ });

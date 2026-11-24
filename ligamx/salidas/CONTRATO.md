@@ -1084,8 +1084,8 @@ Hoy:
 `en_curso` desde que se juega la primera pierna —que ESPN publique los partidos no basta—, `terminado`),
 `origen_siembra`, `siembra` (8 filas: `pos`, `equipo`, `p_clasifica`, `p_semifinal`, `p_final`, `p_campeon`),
 `rondas` (cuartos, semifinal, final: `fase`, `nombre`, `fechas` de ida y vuelta y `series`; las `fechas` son las
-`fecha_local` de las piernas calendarizadas y, mientras falte alguna, se completan con las ventanas de
-`config/torneo.json`, sólo si el corte es del torneo de esa configuración), `campeon_ruta`, `campeon_decidido`,
+`fecha_local` de las piernas que ya tienen día —del calendario o de la prensa, ver `horario_origen`— y, mientras falte
+alguna, se completan con las ventanas de `config/torneo.json`, sólo si el corte es del torneo de esa configuración), `campeon_ruta`, `campeon_decidido`,
 `subcampeon` (con el campeón decidido; si no, `null`), `p_campeon_ruta` y `nota` (con el campeón decidido dice
 sólo quién fue campeón). Cada SERIE:
 
@@ -1095,16 +1095,22 @@ sólo quién fue campeón). Cada SERIE:
 | `fase`, `real`, `viene_de` | `real` = el cruce ya está en el calendario; `viene_de` = llaves de las que salen sus equipos (resiembra) |
 | `definida` | booleano: los dos equipos de la serie ya se conocen con certeza, estén o no sus partidos en el calendario (`real` implica `definida`). Cuartos: en cuanto termina la fase regular. Semifinal: cuando están decididos los CUATRO cuartos (por la resiembra el rival de cada uno depende de todas las llaves). Final: cuando están decididas las dos semifinales. Mientras sea `false` la serie es la ruta de los favoritos y la página la rotula «Proyectada»; con `true`, «Definida». Documentos anteriores al 23-nov-2026 no traen el campo: la página lo deduce (`real`, o cuartos con `estado` distinto de `proyectado`) |
 | `mejor`, `peor` | `{equipo, siembra}` |
-| `piernas` | ida y vuelta: `pierna`, `nombre`, `id`, `fecha_utc`, `fecha_local` (`AAAA-MM-DD`), `hora_local`, `local`, `visitante`, `estadio` (`slug`, `nombre`, `origen`), `jugado`, `gl`, `gv`; sin jugar: `lam_l`, `lam_v`, `rho`, `p_local`, `p_empate`, `p_visitante`, `pick` (`{resultado: L/E/V, equipo, prob}`: el resultado con más probabilidad, como el `pick` de `pendientes`), `marcador` y `marcadores` (5); `en_juego: true` (sólo si aplica) en la pierna que se está jugando al momento del corte. `estadio.origen`: `calendario` (la pierna ya está en partidos.csv: la sede de ESPN con la misma regla que `pendientes`, aunque no sea la habitual del local), `prensa` (sin calendario: `config/torneo.json` → `liguilla.sedes_<fase>`, sólo del torneo de esa configuración) o `habitual` (la sede habitual del local según `web/medios.json`) |
+| `piernas` | ida y vuelta: `pierna`, `nombre`, `id`, `fecha_utc`, `fecha_local` (`AAAA-MM-DD`), `hora_local` (`HH:MM`, centro de México), `horario_origen`, `local`, `visitante`, `estadio` (`slug`, `nombre`, `origen`), `jugado`, `gl`, `gv`; sin jugar: `lam_l`, `lam_v`, `rho`, `p_local`, `p_empate`, `p_visitante`, `pick` (`{resultado: L/E/V, equipo, prob}`: el resultado con más probabilidad, como el `pick` de `pendientes`), `marcador` y `marcadores` (5); `en_juego: true` (sólo si aplica) en la pierna que se está jugando al momento del corte. `estadio.origen`: `calendario` (la pierna ya está en partidos.csv: la sede de ESPN con la misma regla que `pendientes`, aunque no sea la habitual del local), `prensa` (sin calendario: `config/torneo.json` → `liguilla.sedes_<fase>`, sólo del torneo de esa configuración) o `habitual` (la sede habitual del local según `web/medios.json`). `horario_origen` (desde el 24-nov-2026) dice de dónde salen `fecha_local`, `hora_local` y `fecha_utc`: `calendario` (la pierna ya está en partidos.csv: el día y la hora de ESPN, que siempre mandan), `prensa` (ESPN todavía no la lista: `config/torneo.json` → `liguilla.horarios_<fase>`, el día y la hora que anunció la liga según la prensa, emparejando `local` y `visitante`; sólo si el corte es del torneo de esa configuración —un corte retrospectivo de otro torneo nunca los toma—; `fecha_utc` se convierte desde America/Mexico_City con zoneinfo; `id` sigue en `null`) o `null` (sin día ni hora: los tres campos en `null`). Con `prensa` la pierna NO está en `pendientes` (no tiene ficha, mercados, combinada ni sello) |
 | `global` | `probable` (`mejor`, `peor`, `prob`), `top` (5), `p_gana_mejor`, `p_empate`, `p_gana_peor` |
 | `p_avanza_mejor`, `p_avanza_peor`, `favorito`, `p_favorito` | probabilidad exacta de avanzar en ESA serie |
 | `decidida`, `ganador`, `regla_empate`, `alternativas` | `alternativas` (`mejor`, `peor`, `prob`, `p_avanza_mejor`): en cuartos, otros cruces posibles de esa llave; en semifinales y final, los 4 cruces más probables de TODA la ronda (iguales en S1 y S2, pueden incluir el propio cruce y cruces que por la resiembra no caben en esa llave). La página los rotula «Las semifinales más probables». Vacía en una serie definida |
 
 Uso en la página: una pierna sin jugar de una serie `definida` y no `decidida` que todavía no viene en `pendientes`
-(la liga no le ha puesto día y hora; se compara por `id` y por la pareja `local`–`visitante`) sale en «Próximos
-partidos» como tarjeta compacta: fase y pierna, `llave`, `marcador`, 1X2, `estadio` y la fecha (`fecha_local` y
-`hora_local`, o la ventana de `rondas[].fechas` mientras no la haya). Sin `pendientes`, la banda bajo la portada
-anuncia la primera ronda con piernas así. Las probabilidades salen tal cual de aquí: la página no calcula nada.
+(ESPN no la publica; se compara por `id` y por la pareja `local`–`visitante`) sale en «Próximos partidos» como tarjeta
+compacta: fase y pierna, `llave`, `marcador`, 1X2, `estadio` y el día y la hora («Mié 25 nov · 19:00 h», de `fecha_local`
+y `hora_local`, también con `horario_origen` = `prensa`) o, sin ellos, la ventana de `rondas[].fechas`. Dentro de cada
+ronda van primero las idas y luego las vueltas, cada grupo por `fecha_utc`. El mismo día y hora salen en el cuadro, el
+mini-cuadro de celular y el detalle de la serie. Sin `pendientes`, la banda bajo la portada anuncia la primera ronda con
+piernas así y, si todas sus idas tienen día y hora, cuándo empieza (la primera pierna futura por `fecha_utc`) con su
+cuenta regresiva. Con `prensa`, la nota de «Próximos partidos» dice que el día y la hora son los anunciados por la liga y
+que el pronóstico completo (mercados y combinada) y el seguimiento en vivo llegan cuando ESPN publique el partido.
+`vivo.py plan` también da estas piernas (`id` null, `fuente` «actual.json (prensa)») para programar los despertares
+mientras ESPN no las lista. Las probabilidades salen tal cual de aquí: la página no calcula nada.
 
 ## fuerzas (18 filas, de mayor a menor `rating`)
 

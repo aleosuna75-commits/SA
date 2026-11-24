@@ -374,11 +374,26 @@ def series_reales(df: pd.DataFrame, torneo: str, corte, equipos: list[str], pos:
     return out
 
 
+def _localia_faltante(piernas: dict, mejor, peor) -> dict:
+    """
+    Local y visitante de las piernas (1 y 2) que todavía no están en `piernas` de una serie real: la inversa de la que
+    sí está (si la liga invirtió la localía de la ida, la vuelta es en casa del otro); sin ninguna, la regla (ida en
+    casa del peor sembrado, vuelta en la del mejor). Devuelve {pierna: (local, visitante)}.
+    """
+    out = {}
+    for num in (1, 2):
+        if num in piernas:
+            continue
+        otra = piernas.get(3 - num)
+        out[num] = (otra["visitante"], otra["local"]) if otra is not None else ((peor, mejor) if num == 1 else (mejor, peor))
+    return out
+
+
 def _jugar_serie(rng, mejor, peor, k, LL, LV, rho, fase: str, reales: dict, rng_vivo=None):
     """
     Simula una serie por simulación (vectores de índices `mejor`, `peor` y de muestra de parámetros
     `k`). Ida en casa del peor sembrado y vuelta en casa del mejor, salvo que una serie real diga otra
-    cosa; lo ya jugado se respeta. Una pierna real con `vivo` (partido en juego: gl, gv, lam_rest_l,
+    cosa (si el calendario trae sólo una pierna, la otra invierte su localía); lo ya jugado se respeta. Una pierna real con `vivo` (partido en juego: gl, gv, lam_rest_l,
     lam_rest_v y, en la vuelta de la final, `extra` con lo mismo para el tiempo extra) se simula como
     marcador actual + Poisson(resto) con `rng_vivo` (flujo aparte para no desplazar los demás sorteos;
     ver `acoplar_en_juego`).
@@ -400,6 +415,8 @@ def _jugar_serie(rng, mejor, peor, k, LL, LV, rho, fase: str, reales: dict, rng_
         m = ((mejor == s["a"]) & (peor == s["b"])) | ((mejor == s["b"]) & (peor == s["a"]))
         if not m.any():
             continue
+        for num, (l_, v_) in _localia_faltante(s["piernas"], s["a"], s["b"]).items():   # la pierna que el calendario aún no trae
+            loc[num - 1][m], vis[num - 1][m] = l_, v_
         for num, p in s["piernas"].items():
             if num not in (1, 2):
                 continue
@@ -718,15 +735,15 @@ def detalle_serie(s: dict, eq: list[str], pos: dict[str, int], LL0: np.ndarray, 
     """
     Ficha de una serie real: piernas (resultado o pronóstico con 1X2 y marcadores), distribución del
     marcador global y P(avanza) de cada equipo CONDICIONADA a lo ya jugado (cálculo exacto con las
-    lambdas puntuales; `mejor` es el mejor sembrado). Una serie que aún no tiene su vuelta en el
-    calendario la completa con la localía de la regla (cierra en casa el mejor sembrado).
+    lambdas puntuales; `mejor` es el mejor sembrado). Una serie que aún no tiene una de sus piernas en el
+    calendario la completa invirtiendo la localía de la que sí está (si la liga puso la ida en casa del mejor
+    sembrado, la vuelta es en la del peor); sin ninguna, con la regla (cierra en casa el mejor sembrado).
     """
     a, b, fase = s["a"], s["b"], s["fase"]
     piernas = dict(s["piernas"])
-    for num, (loc, vis) in ((1, (b, a)), (2, (a, b))):
-        if num not in piernas:
-            piernas[num] = {"id": None, "fecha_utc": None, "local": loc, "visitante": vis, "jugado": False,
-                            "gl": None, "gv": None, "mult_l": 1.0, "mult_v": 1.0}
+    for num, (loc, vis) in _localia_faltante(piernas, a, b).items():
+        piernas[num] = {"id": None, "fecha_utc": None, "local": loc, "visitante": vis, "jugado": False,
+                        "gl": None, "gv": None, "mult_l": 1.0, "mult_v": 1.0}
     Ms, legs = {}, []
     for num in (1, 2):
         p = piernas[num]

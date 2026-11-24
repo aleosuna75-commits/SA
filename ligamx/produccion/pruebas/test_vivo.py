@@ -1331,6 +1331,107 @@ def test_plan_reconoce_la_liguilla_aunque_actual_json_no_la_traiga(tmp_path, mon
         (502, "2026-11-25 21:10", "2026-11-26T02:55:00Z", "cuartos", "Cuartos de final, ida")]     # por el slug de ESPN
 
 
+def test_plan_da_las_piernas_con_horario_de_prensa_si_espn_no_las_lista(tmp_path, monkeypatch):
+    """
+    24-nov-2026: la liga anunció día y hora de los cuartos, ESPN todavía no los lista y actual.json los trae de la prensa
+    (liguilla.torneo, sin id, horario_origen «prensa»). El plan los da para programar los despertares; si ESPN ya lista una
+    pierna (mismo local y visitante), manda ESPN; fuera de la ventana de horas no entran.
+    """
+    def pierna(n, loc, vis, utc, origen="prensa"):
+        return {"pierna": n, "id": None, "local": loc, "visitante": vis, "jugado": False, "fecha_utc": utc, "horario_origen": origen}
+    c4 = {"llave": "C4", "fase": "cuartos", "real": False, "definida": True, "mejor": {"equipo": "Toluca", "siembra": 4},
+          "peor": {"equipo": "Atlas", "siembra": 5}, "p_avanza_mejor": 0.6,
+          "piernas": [pierna(1, "Atlas", "Toluca", "2026-11-26T01:00:00+00:00"), pierna(2, "Toluca", "Atlas", "2026-11-29T01:00:00+00:00")]}
+    c3 = {"llave": "C3", "fase": "cuartos", "real": False, "definida": True, "mejor": {"equipo": "América", "siembra": 3},
+          "peor": {"equipo": "Pumas", "siembra": 6}, "p_avanza_mejor": 0.6,
+          "piernas": [pierna(1, "Pumas", "América", "2026-11-26T03:10:00+00:00"), pierna(2, "América", "Pumas", None, None)]}
+    proy = {"llave": "S1", "fase": "semifinal", "real": False, "definida": False, "mejor": {"equipo": "Toluca", "siembra": 4},
+            "peor": {"equipo": "Pumas", "siembra": 6}, "piernas": [pierna(1, "Pumas", "Toluca", "2026-11-27T01:00:00+00:00")]}
+    ruta = tmp_path / "actual.json"
+    ruta.write_text(json.dumps(_actual_liguilla([c4, c3, proy])), encoding="utf-8")
+    monkeypatch.setattr(vivo, "RUTA_ACTUAL", ruta)
+    ahora = dt.datetime(2026, 11, 24, 3, 15, tzinfo=UTC)
+    r = vivo.plan(48, ahora=ahora, pedir=servir({}))                         # ESPN responde, pero no lista nada
+    assert r["fuente"] == "ESPN"
+    assert [(x["id"], x["local"], x["inicio_utc"], x["inicio_mexico"], x["observar_desde_utc"], x["etiqueta"], x["fuente"]) for x in r["partidos"]] == [
+        (None, "Atlas", "2026-11-26T01:00:00Z", "2026-11-25 19:00", "2026-11-26T00:45:00Z", "Cuartos de final, ida", "actual.json (prensa)"),
+        (None, "Pumas", "2026-11-26T03:10:00Z", "2026-11-25 21:10", "2026-11-26T02:55:00Z", "Cuartos de final, ida", "actual.json (prensa)")]
+    assert r["siguiente"]["local"] == "Atlas" and r["siguiente"]["id"] is None and r["siguiente"]["inicio_mexico"] == "2026-11-25 19:00"
+    # con 120 horas entra la vuelta de C4; la semifinal proyectada, nunca
+    assert [x["local"] for x in vivo.plan(120, ahora=ahora, pedir=servir({}))["partidos"]] == ["Atlas", "Pumas", "Toluca"]
+    # ESPN ya lista Pumas–América (id 502, a otra hora): ESPN manda y esa pierna de la prensa ya no se repite
+    b = _evento_liguilla(rebobinar(evento("20261107", ID_PUMAS_AMERICA), estado="pre"), 502, "2026-11-26T03:00Z")
+    r = vivo.plan(48, ahora=ahora, pedir=servir({"20261125": {"events": [b]}}))
+    assert [(x["id"], x["local"], x["inicio_mexico"], x.get("fuente")) for x in r["partidos"]] == [
+        (None, "Atlas", "2026-11-25 19:00", "actual.json (prensa)"), (502, "Pumas", "2026-11-25 21:00", None)]
+    # sin respuesta de ESPN, las de la prensa siguen saliendo
+    r = vivo.plan(48, ahora=ahora, pedir=servir({"20261125": vivo.ErrorRed("sin red")}))
+    assert r["fuente"].startswith("actual.json") and [x["local"] for x in r["partidos"]] == ["Atlas", "Pumas"]
+
+
+def test_v1_2_plan_espn_manda_aunque_liste_la_pierna_otro_dia_o_al_reves(tmp_path, monkeypatch):
+    """
+    Workflow 11, V1-2: la regla «si ESPN lista la pierna, manda ESPN» antes sólo veía los días de la ventana y el mismo
+    orden local–visitante. Ahora se consultan también el día de cada pierna de la prensa y el siguiente, y se compara la
+    pareja sin orden más la pierna (o, sin pierna, la cercanía): una pierna movida a otro día o listada al revés ya no
+    sale dos veces; la vuelta de la prensa no se confunde con la ida de ESPN.
+    """
+    def pierna(n, loc, vis, utc):
+        return {"pierna": n, "id": None, "local": loc, "visitante": vis, "jugado": False, "fecha_utc": utc, "horario_origen": "prensa"}
+    c3 = {"llave": "C3", "fase": "cuartos", "real": False, "definida": True, "mejor": {"equipo": "América", "siembra": 3},
+          "peor": {"equipo": "Pumas", "siembra": 6}, "p_avanza_mejor": 0.6,
+          "piernas": [pierna(1, "Pumas", "América", "2026-11-26T03:10:00+00:00"), pierna(2, "América", "Pumas", "2026-11-29T03:10:00+00:00")]}
+    c4 = {"llave": "C4", "fase": "cuartos", "real": False, "definida": True, "mejor": {"equipo": "Toluca", "siembra": 4},
+          "peor": {"equipo": "Atlas", "siembra": 5}, "p_avanza_mejor": 0.6,
+          "piernas": [pierna(1, "Atlas", "Toluca", "2026-11-26T01:00:00+00:00"), pierna(2, "Toluca", "Atlas", "2026-11-29T01:00:00+00:00")]}
+    ruta = tmp_path / "actual.json"
+    ruta.write_text(json.dumps(_actual_liguilla([c3, c4])), encoding="utf-8")
+    monkeypatch.setattr(vivo, "RUTA_ACTUAL", ruta)
+    ahora = dt.datetime(2026, 11, 24, 3, 15, tzinfo=UTC)
+    base = rebobinar(evento("20261107", ID_PUMAS_AMERICA), estado="pre")             # Pumas local, América visitante
+
+    def al_reves(e):
+        e = copy.deepcopy(e)
+        for x in e["competitions"][0]["competitors"]:
+            x["homeAway"] = "away" if x["homeAway"] == "home" else "home"
+        return e
+
+    def ver(r):
+        return [(x["id"], x["local"], x["inicio_mexico"], x.get("fuente")) for x in r["partidos"]]
+    # (a) ESPN movió la ida de C3 al jueves 26 a las 21:00 (fuera de las 48 h): la de la prensa (miércoles) ya no sale
+    pedidas = []
+    movida = _evento_liguilla(base, 502, "2026-11-27T03:00Z")
+
+    def pedir(url):
+        pedidas.append(url.rsplit("dates=", 1)[-1])
+        return servir({"20261126": {"events": [movida]}})(url)
+    r = vivo.plan(48, ahora=ahora, pedir=pedir)
+    assert "20261126" in pedidas and "20261125" in pedidas                       # el día de la pierna de la prensa y el siguiente
+    assert ver(r) == [(None, "Atlas", "2026-11-25 19:00", "actual.json (prensa)")]
+    assert (r["siguiente"]["local"], r["siguiente"]["id"]) == ("Atlas", None)
+    # sólo con C3: la ventana queda vacía y el siguiente es la ida que ESPN movió al jueves (no la de la prensa ni la vuelta)
+    ruta.write_text(json.dumps(_actual_liguilla([c3])), encoding="utf-8")
+    r = vivo.plan(48, ahora=ahora, pedir=servir({"20261126": {"events": [movida]}}))
+    assert r["partidos"] == [] and (r["siguiente"]["id"], r["siguiente"]["inicio_mexico"]) == (502, "2026-11-26 21:00")
+    ruta.write_text(json.dumps(_actual_liguilla([c3, c4])), encoding="utf-8")
+    # (b) ESPN lista la ida de C3 al revés (América–Pumas) a la hora de la prensa: sale sólo la de ESPN
+    reves = _evento_liguilla(al_reves(base), 504, "2026-11-26T03:10Z")
+    r = vivo.plan(48, ahora=ahora, pedir=servir({"20261125": {"events": [reves]}}))
+    assert ver(r) == [(None, "Atlas", "2026-11-25 19:00", "actual.json (prensa)"), (504, "América", "2026-11-25 21:10", None)]
+    # (c) la ida de ESPN no tapa la vuelta de la prensa (misma pareja, otra pierna)
+    ida = _evento_liguilla(base, 505, "2026-11-26T03:10Z", pierna=1)
+    r = vivo.plan(132, ahora=ahora, pedir=servir({"20261125": {"events": [ida]}}))
+    assert [(x["id"], x["local"]) for x in r["partidos"]] == [(None, "Atlas"), (505, "Pumas"), (None, "Toluca"), (None, "América")]
+    # sin `leg` en ESPN se decide por cercanía: la vuelta (tres días después) tampoco se tapa
+    sin_leg = copy.deepcopy(ida)
+    del sin_leg["competitions"][0]["leg"]
+    r = vivo.plan(132, ahora=ahora, pedir=servir({"20261125": {"events": [sin_leg]}}))
+    assert [(x["id"], x["local"]) for x in r["partidos"]] == [(None, "Atlas"), (505, "Pumas"), (None, "Toluca"), (None, "América")]
+    # (d) si falla la consulta de un día fuera de la ventana, la pierna de la prensa se queda
+    r = vivo.plan(48, ahora=ahora, pedir=servir({"20261126": vivo.ErrorRed("sin red")}))
+    assert r["fuente"] == "ESPN" and [x["local"] for x in r["partidos"]] == ["Atlas", "Pumas"]
+
+
 class GuionDia(Guion):
     """Como Guion, pero cada paso trae la LISTA de eventos de ESPN del día `dia` (formato dates=AAAAMMDD)."""
 

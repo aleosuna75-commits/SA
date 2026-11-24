@@ -488,3 +488,38 @@ def test_ultimos_resultados_usan_el_sello_oficial(df, pron, tmp_path):
     torneo = d.loc[m, "torneo"].iloc[0]
     quedan = int(((d["torneo"] == torneo) & (d["fase"] == "regular") & d["estado"].isin(S.ESTADOS_PENDIENTES)).sum())
     assert doc["proyeccion"]["partidos_pendientes_regular"] == quedan
+
+
+def test_v1_1_serie_con_una_sola_pierna_invierte_la_localia_de_la_otra():
+    """
+    Workflow 11, V1-1: si el calendario trae sólo una pierna de una serie real, la otra se completa invirtiendo su
+    localía (antes se aplicaba la regla, local = mejor sembrado, y con la ida en casa del mejor sembrado los dos partidos
+    quedaban en su casa). detalle_serie (cálculo exacto) y _jugar_serie (simulación) completan igual.
+    """
+    assert S._localia_faltante({}, 0, 1) == {1: (1, 0), 2: (0, 1)}                          # sin piernas: la regla
+    assert S._localia_faltante({1: {"local": 1, "visitante": 0}}, 0, 1) == {2: (0, 1)}      # ida normal: igual que la regla
+    assert S._localia_faltante({1: {"local": 0, "visitante": 1}}, 0, 1) == {2: (1, 0)}      # ida invertida: vuelta en casa del peor
+    assert S._localia_faltante({2: {"local": 1, "visitante": 0}}, 0, 1) == {1: (0, 1)}      # sólo la vuelta (invertida)
+    assert S._localia_faltante({1: {}, 2: {}}, 0, 1) == {}
+
+    def pieza(loc, vis):
+        return {"id": 7, "fecha_utc": None, "local": loc, "visitante": vis, "jugado": False, "gl": None, "gv": None,
+                "mult_l": 1.0, "mult_v": 1.0}
+    n_k, E = 4, 2                                         # localía marcada: el equipo 0 en casa es mucho más fuerte
+    LL, LV = np.full((n_k, E, E), 1.0), np.full((n_k, E, E), 1.0)
+    LL[:, 0, 1], LV[:, 0, 1] = 2.2, 0.4
+    una = {"cuartos": [{"fase": "cuartos", "a": 0, "b": 1, "piernas": {1: pieza(0, 1)}, "ganador": None}]}
+    dos = {"cuartos": [{"fase": "cuartos", "a": 0, "b": 1, "piernas": {1: pieza(0, 1), 2: pieza(1, 0)}, "ganador": None}]}
+    regla = {"cuartos": [{"fase": "cuartos", "a": 0, "b": 1, "piernas": {1: pieza(0, 1), 2: pieza(0, 1)}, "ganador": None}]}
+    n = 6000
+    mejor, peor, k = np.zeros(n, dtype=int), np.ones(n, dtype=int), np.arange(n) % n_k
+
+    def jugar(reales):
+        return S._jugar_serie(np.random.default_rng(11), mejor, peor, k, LL, LV, 0.0, "cuartos", reales)
+    assert (jugar(una) == jugar(dos)).all()                # la vuelta que falta va en casa del peor sembrado
+    assert jugar(una).mean() < jugar(regla).mean() - 0.05   # no como si el mejor sembrado jugara los dos en casa
+    eq = ["Uno", "Dos"]
+    d1 = S.detalle_serie(una["cuartos"][0], eq, {"Uno": 4, "Dos": 5}, LL[0], LV[0])
+    d2 = S.detalle_serie(dos["cuartos"][0], eq, {"Uno": 4, "Dos": 5}, LL[0], LV[0])
+    assert [(l["local"], l["visitante"]) for l in d1["piernas"]] == [("Uno", "Dos"), ("Dos", "Uno")]
+    assert d1["p_avanza_mejor"] == pytest.approx(d2["p_avanza_mejor"], abs=1e-12)
