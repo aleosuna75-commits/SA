@@ -48,20 +48,20 @@
 - [x] 8. Automatización: `pipeline.py auto` + `modelo/mejora.py ciclo` + tarea programada diaria (runbook abajo).
 
 ## En curso
-**Horarios de cuartos sin ESPN (24-nov-2026, desde 03:15 UTC).** La liga publicó el lunes 23 los días y horas de los
-8 partidos (Excélsior y Bolavip coinciden), pero ESPN todavía no los lista y la página decía «día y hora por confirmar».
-Hecho: horarios en `config/torneo.json` → `liguilla.horarios_cuartos`; despertares en vivo de las dos noches de ida
-programados (mié 25: armar 00:40 UTC del 26, vigilar 02:00 y 04:10, cierre 05:40; jue 26: lo mismo el 27); tarea de
-continuidad ACTIVADA. Falta, en este orden (si la sesión se corta, retomar aquí):
-1. Workflow `notas/workflows/11_horarios_cuartos_prensa.js` (corrida `wf_3c93cecd-d99`): A implementa el respaldo
-   (exportar toma día y hora de la configuración mientras ESPN no lista la pierna, con `horario_origen`; página con
-   día y hora; `vivo.py plan` con las piernas de prensa; contrato y pruebas); V1 datos y código, V2 revisión visual;
-   E arreglos. Si se cortó: `Workflow({scriptPath: "notas/workflows/11_horarios_cuartos_prensa.js" copiado al
-   directorio de guiones, resumeFromRunId: "wf_3c93cecd-d99"})` o terminar a mano revisando `git diff`.
-2. Al terminar: `pipeline.py auto` (millón), pytest, `prueba.js` en Chromium y WebKit (`PLAYWRIGHT_BROWSERS_PATH=/opt/pw-webkit`),
-   capturas a 390 px, republicar con `url` y capabilities, `pipeline.py publicado`, `vivo/actual`.
-3. Avisar al usuario: los cuartos con día y hora, el pronóstico de cada partido y quién avanza. Bitácora, commit y
-   push; desactivar la continuidad y dejar esta sección en «Nada pendiente».
+Nada pendiente (24-nov-2026, 05:00 UTC). Tarea de continuidad desactivada.
+
+### Último cierre (24-nov): horarios de cuartos sin ESPN
+Workflow `notas/workflows/11_horarios_cuartos_prensa.js` (corrida `wf_3c93cecd-d99`, 4 agentes, 1.2 M de tokens). Mientras
+ESPN no lista una pierna de liguilla, `exportar` toma día y hora de `config/torneo.json` → `liguilla.horarios_<fase>`
+(empareja por local, visitante y pierna; sólo en cortes del mismo torneo; convierte con zoneinfo) y marca
+`horario_origen` = `"prensa"`; en cuanto ESPN la lista manda ESPN (`"calendario"`). La página muestra día y hora en
+tarjetas, índice, cuadro, mini-cuadro y detalle, el anuncio dice cuándo empieza (con cuenta regresiva y «centro de
+México») y la nota explica que el pronóstico completo, la combinada y el vivo llegan cuando ESPN publique el partido.
+`vivo.py plan` da las piernas de prensa (fuente «actual.json (prensa)»). V1 y V2 no hallaron nada bloqueante ni
+importante; E arregló 12 de 13 menores (queda V1-7: un corte retrospectivo del mismo torneo anterior al anuncio sí
+tomaría los horarios; haría falta un `publicado_utc` en la configuración). Simulador intacto (con y sin horarios sólo
+cambian los 32 campos de horario). Después: `pipeline.py auto` con el millón (campeón sin cambio: Cruz Azul 26.4%),
+pytest 223 + 2 saltadas, página 764 revisiones en Chromium y 764 en WebKit, **V29 publicada**, `vivo/actual` en versión 110.
 
 ### Último cierre (23-nov): fase regular terminada y liguilla a punto
 Workflow `notas/workflows/10_liguilla_puesta_a_punto.js` (corrida `wf_c407c924-72c`, 9 agentes, 3.5 M de tokens, 3 h
@@ -212,8 +212,8 @@ en la base quedaron aceptadas.
 ## Tareas programadas
 - "Cerebro Liga MX diario" (`trig_0195ELWvAUmne2MKmr1ih8zi`): todos los días a la 01:20 (Ciudad de México), en esta
   sesión. Sigue el runbook de arriba (prompt actualizado el 11-nov con el paso «en vivo»).
-- "Continuar Cerebro Liga MX" (`trig_011daxVc81g1dWPVNtuVKMCi`, cada hora): **ACTIVA desde el 24-nov-2026 03:10 UTC**
-  (horarios de cuartos sin ESPN). **Activarla antes de cada trabajo largo** (regla del usuario sobre los
+- "Continuar Cerebro Liga MX" (`trig_011daxVc81g1dWPVNtuVKMCi`, cada hora): **desactivada el 24-nov-2026 05:00 UTC**
+  (se cerraron los horarios de cuartos sin ESPN). **Activarla antes de cada trabajo largo** (regla del usuario sobre los
   límites) y desactivarla al dejar «En curso» en «Nada pendiente».
 - Los despertares en vivo de la Jornada 17 (viernes, sábado y domingo) ya se cumplieron; el «cierre» del domingo
   (`trig_01CGwZtpXxFi73qvKfSYhPMz`) se borró el 23-nov 03:31 UTC porque el cierre se hizo a mano al terminar el partido.
@@ -302,3 +302,4 @@ en la base quedaron aceptadas.
 - 2026-11-23 03:30 UTC · **Domingo de la Jornada 17 en vivo y FIN DE LA FASE REGULAR** (Chivas 1-0 Cruz Azul, Querétaro 2-2 Necaxa): 18 eventos (71 a 88) escritos en `vivo/actual` (versiones 89 a 106) con `vivo_relevo.sh`, sin rechazos ni cortes por límite; el bucle salió con código 3 (`terminado_hoy`) a las 03:17 UTC. Cierre a mano en cuanto acabó el partido (sin esperar el despertar de las 03:40, que se borró): `pipeline.py auto` (ciclo de mejora sin cambio de modelo), `vivo/actual` en versión 107, **V26 publicada** con `liguilla.torneo` «definido». Tabla final (coincide con ESPN): Chivas 33, Cruz Azul 32, América 30, Atlas 28, Toluca 27, Monterrey 27, León 26, Pachuca 25 (fuera Tijuana y Santos con 25). Cuartos: Chivas–Pachuca (avanza Chivas 64%), Cruz Azul–León (82%), América–Monterrey (71%), Atlas–Toluca (Toluca 72%). Campeón: Cruz Azul 26.4%, Chivas 20.8%, América 20.8%, Toluca 18.3%, Pachuca 5.8%, Monterrey 4.8%, Atlas 1.8%, León 1.3% (que Cruz Azul siga en 26.36% tras perder es coincidencia comprobada: su fuerza bajó de 0.761 a 0.707 pero cambia a Pachuca por León en cuartos; p_semifinal pasó de 73.7% a 81.1%). **Jornada 17 completa (9 partidos): 3 ganadores acertados y 1 marcador exacto; combinadas completas: segura 3 de 9, equilibrada 3 de 9, atrevida 1 de 9. Modelo contra mercado (9 partidos con momios sellados): log-loss 1.059 contra 1.080 (−0.021 ± 0.032, a favor del modelo pero sin poder concluir; el favorito del mercado ganó 2 de 9).** Acumulado de sellos calificados (10): 4 ganadores, log-loss 1.038. Los medios confirman los cruces (El Heraldo, Telediario, Diario Puntual); ESPN todavía no lista los cuartos (la liga publica horarios el lunes 23). Con 0 pendientes la página deja dos secciones vacías y `web/pruebas/prueba.js` falla (3 revisiones + la de pestañas): se lanzó el workflow `10_liguilla_puesta_a_punto.js` (`wf_7ca6f6c0-3d7`) y se activó la tarea de continuidad.
 - 2026-11-23 08:05 UTC · **Liguilla a punto.** Terminó el workflow 10 (`wf_c407c924-72c`, relanzado en Opus tras agotarse el límite de Fable): página para el cuadro definido sin horarios, ensayo con la liguilla del Clausura 2026 (12 cortes; datos correctos, 13 hallazgos arreglados), menores (nadie pierde puntos), sedes y bajas de los 8, motor en vivo para series, y 9 hallazgos importantes de la verificación arreglados con su prueba. La corrida diaria de las 07:21 se pospuso hasta el cierre del agente F y se corrió después: `pipeline.py auto` (sin partidos nuevos; un millón de simulaciones), pytest 213 + 2 saltadas, página 651 revisiones por motor (Chromium y WebKit), **V27 publicada**, `vivo/actual` en versión 108. Campeón: Cruz Azul 26.4%, Chivas 20.9%, América 20.8%, Toluca 18.2%, Pachuca 5.9%. ESPN todavía no lista los cuartos (`vivo-plan --horas 72` vacío); la tarea de las 23:00 UTC los revisa. Tarea de continuidad desactivada.
 - 2026-11-23 23:20 UTC · Revisión del calendario de cuartos (17:00 de México): **ESPN todavía no lista los cuartos**; se reprogramó la revisión para las 03:04 UTC (`trig_01S7b84Hb1QZfhXAShdyukJS`) y la corrida diaria de las 07:20 UTC también lo revisa. **El contenedor se había reiniciado:** faltaban scipy, pyarrow y scikit-learn (la primera corrida de `auto` falló), las predicciones de `modelo/pred/` y WebKit. Se reinstalaron; las predicciones se regeneraron con el nuevo `modelo/restaurar_pred.py` y reproducen al dígito `registro.json` (`ensamble.parquet` idéntico byte por byte); `mejora.ciclo` ahora regenera solo el DESARROLLO que falte. Pruebas: pytest 213 + 2 saltadas, página 651 revisiones en Chromium y 651 en WebKit. V28 publicada (sin cambios de pronóstico), `vivo/actual` en versión 109 (`sin_partidos`).
+- 2026-11-24 05:00 UTC · **Horarios de cuartos en la página sin esperar a ESPN.** La liga publicó el lunes 23 los días y horas (Excélsior y Bolavip coinciden; ESPN sigue sin listarlos a las 04:50 UTC). Se guardaron en `config/torneo.json` → `liguilla.horarios_cuartos` y el workflow 11 hizo que exportar, la página y `vivo.py plan` los usen mientras ESPN no publique cada pierna. Ida: mié 25 Toluca–Atlas 19:00 y Monterrey–América 21:10; jue 26 Pachuca–Chivas 19:00 y León–Cruz Azul 21:10. Vuelta: sáb 28 Atlas–Toluca 19:00 y América–Monterrey 21:10; dom 29 Chivas–Pachuca 19:07 y Cruz Azul–León 21:00. Avanzan (P): Cruz Azul 82%, Toluca 72%, América 71%, Chivas 64%. V29 publicada; `vivo/actual` en versión 110. Vivo de las dos noches de ida ya programado; «¿ya lista ESPN los cuartos?» a las 11:30 UTC.
