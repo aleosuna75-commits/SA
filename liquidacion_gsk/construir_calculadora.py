@@ -616,7 +616,7 @@ etiqueta(r, "Días de vacaciones tomados por adelantado (opcional)"); captura(r,
 dv_dias.add(f"D{r}")
 ayuda(r, "Sólo si ya usó todo su saldo y tomó días del año en curso que aún no ganaba. Se restan del concepto 3.")
 r += 1
-etiqueta(r, "Días de aguinaldo de este año que ya se le pagaron (opcional)")
+etiqueta(r, "Días de aguinaldo de este año ya pagados (opcional)")
 captura(r, "AguinaldoPagadoDias", EJEMPLO["AguinaldoPagadoDias"], "0.##", obligatorio=False)
 dv_dias.add(f"D{r}")
 ayuda(r, "Ej. si sale en diciembre y ya cobró su aguinaldo, o si recibió un anticipo. Si no, déjalo en 0.")
