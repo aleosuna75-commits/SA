@@ -48,7 +48,15 @@
 - [x] 8. Automatización: `pipeline.py auto` + `modelo/mejora.py ciclo` + tarea programada diaria (runbook abajo).
 
 ## En curso
-Nada pendiente (24-nov-2026, 05:00 UTC). Tarea de continuidad desactivada.
+**Bajas para las idas de cuartos (25-nov-2026, desde 07:25 UTC).** Corrida diaria hecha (V31, `vivo/actual` 112).
+Tarea de continuidad ACTIVADA. Falta (si la sesión se corta, retomar aquí):
+1. Workflow `notas/workflows/12_bajas_cuartos_ida.js` (corrida `wf_5e46607d-0c6`, args con lo que había el 23-nov):
+   dos investigadores (idas del miércoles y del jueves) y un verificador por grupo que relee cada fuente.
+2. Unir el resultado en `config/actualidad.json` (formato de `equipos.<equipo>.lesionados`; suspendidos con tipo
+   `suspension`; quitar a los de `ya_no_son_baja`; anotar la Disciplinaria en la nota del equipo), `python3 -m
+   produccion.exportar` (millón) + `python3 web/construir.py`, pruebas, republicar, `pipeline.py publicado`.
+   Debe quedar ANTES del «armar» de las 00:40 UTC del 26-nov.
+3. Bitácora, commit y push; desactivar la continuidad y dejar esta sección en «Nada pendiente».
 
 ### Último cierre (24-nov): horarios de cuartos sin ESPN
 Workflow `notas/workflows/11_horarios_cuartos_prensa.js` (corrida `wf_3c93cecd-d99`, 4 agentes, 1.2 M de tokens). Mientras
