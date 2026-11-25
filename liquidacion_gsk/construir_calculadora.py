@@ -66,7 +66,7 @@ FMT_MONEDA = '"$"#,##0.00;-"$"#,##0.00;"–"'
 FMT_MONEDA_SIMPLE = '"$"#,##0.00'
 FMT_DIAS = '#,##0.00;-#,##0.00;"–"'
 FMT_ENTERO = '#,##0'
-FMT_FECHA = 'dd/mmm/yyyy'
+FMT_FECHA = '[$-80A]dd/mmm/yyyy'   # mes abreviado siempre en español
 FMT_PCT = '0%'
 FMT_PCT2 = '0.00%'
 FMT_FACTOR = '0.0000'
@@ -132,7 +132,7 @@ SUBSIDIO_FUENTE = "Decreto del subsidio para el empleo, DOF 31/12/2025 (vigente 
 # Vacaciones LFT art. 76 (reforma DOF 27/12/2022, vigente desde 01/01/2023)
 VACACIONES = [(1, 1, 12), (2, 2, 14), (3, 3, 16), (4, 4, 18), (5, 5, 20)]
 _d = 22
-for desde in range(6, 61, 5):
+for desde in range(6, 101, 5):
     VACACIONES.append((desde, desde + 4, _d))
     _d += 2
 
@@ -158,12 +158,12 @@ EJEMPLO = {
     "ZonaSM": LISTA_ZONA[0],
     "DiasAguinaldo": 15,
     "PctPrimaVac": 0.25,
-    "DiasSueldoPend": 5,
-    "DiasVacPend": 2,
+    "DiasSueldoPend": 0,
+    "DiasVacPend": 0,
     "DiasVacTomados": 0,
     "AguinaldoPagadoDias": 0,
     "OtrasPrestInteg": 0,
-    "Bono": 20000,
+    "Bono": 0,
     "OtrasDeducciones": 0,
 }
 
@@ -184,6 +184,25 @@ def num_txt(expr):
     return f'IF(ROUND({expr},2)=INT({expr}),FIXED({expr},0),FIXED({expr},2))'
 
 
+def seguro_txt(x):
+    """Envuelve un texto-fórmula en IFERROR para que nunca muestre #¡VALOR!."""
+    if isinstance(x, str) and x.startswith("=") and not x.startswith("=IFERROR("):
+        return f'=IFERROR({x[1:]},"")'
+    return x
+
+
+SIN_GUARDA = {"DatosOK", "ListasOK", "TextoOK", "NegOK", "PoliticaOK", "AplicaIndem", "AplicaPrimaAnt"}
+
+
+def guardar(formula, nombre, fmt):
+    """Si faltan datos, los cálculos de apoyo dan 0 (y nunca un error)."""
+    if not (isinstance(formula, str) and formula.startswith("=")) or nombre in SIN_GUARDA:
+        return formula
+    if fmt is None:
+        return f'=IFERROR({formula[1:]},"No")'
+    return f'=IF(DatosOK="Sí",{formula[1:]},0)'
+
+
 def pesos(expr):
     return f'"$"&FIXED({expr},2)'
 
@@ -200,7 +219,7 @@ def isr_tarifa(x):
 wsT = wb.active
 wsT.title = "Tablas"
 wsT.sheet_view.showGridLines = False
-wsT.sheet_properties.tabColor = "9E9E9E"
+wsT.sheet_properties.tabColor = GRIS_BORDE
 for col, ancho in {"A": 2, "B": 16, "C": 16, "D": 20, "E": 22, "F": 40, "G": 3, "H": 44}.items():
     wsT.column_dimensions[col].width = ancho
 
@@ -436,7 +455,7 @@ def captura(fila, nombre, valor, fmt=None, obligatorio=True, alinear="center", a
     c.font = f(11 if obligatorio else 10, True, "000000")
     c.fill = relleno(DURAZNO if obligatorio else CREMA)
     c.border = BORDE_CAPTURA
-    c.alignment = Alignment(horizontal=alinear, vertical="center")
+    c.alignment = Alignment(horizontal=alinear, vertical="center", shrink_to_fit=(alinear == "left"))
     c.protection = Protection(locked=False)
     if fmt:
         c.number_format = fmt
@@ -449,6 +468,20 @@ def captura(fila, nombre, valor, fmt=None, obligatorio=True, alinear="center", a
     nombrar(nombre, HOJA, abs_ref("D", fila))
     ws.row_dimensions[fila].height = 20
     return c
+
+
+MESES = ('"enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"')
+
+
+def fecha_txt(x):
+    return f'DAY({x})&" de "&CHOOSE(MONTH({x}),{MESES})&" de "&YEAR({x})'
+
+
+def confirmacion(fila, formula):
+    c = ws[f"E{fila}"]
+    c.value = formula
+    c.font = f(9, True, VERDE_OK_TXT)
+    c.alignment = Alignment(horizontal="left", vertical="center", indent=1, shrink_to_fit=True)
 
 
 def calculo(fila, nombre, formula, fmt=None, col="D", negrita=False):
@@ -478,8 +511,10 @@ def validacion(tipo, operador=None, f1=None, f2=None, titulo="", error="", promp
     return dv
 
 
-dv_fecha = validacion("date", "between", "18264", "73415", "Fecha", "Escribe una fecha como 15/03/2019 (día/mes/año).",
-                      "Escríbela como día/mes/año, por ejemplo 15/03/2019.")
+dv_fecha = validacion("date", "between", "18264", "73415", "Fecha",
+                      "Escribe la fecha como 15/03/2019 (día/mes/año). Si tu computadora está en inglés y no la acepta, "
+                      "escríbela como 2019-03-15 (año-mes-día).",
+                      "Día/mes/año, por ejemplo 15/03/2019. A la derecha verás cómo la leyó Excel.")
 dv_dinero = validacion("decimal", "greaterThanOrEqual", "0", None, "Monto no válido",
                        "Escribe sólo el número, sin signo de pesos ni letras. Ej. 45000")
 dv_dias = validacion("decimal", "between", "0", "400", "Número de días no válido",
@@ -489,7 +524,7 @@ dv_pos = validacion("decimal", "between", "0", "1000", "Valor no válido", "Escr
 
 
 def lista(nombre_lista, titulo):
-    return validacion("list", None, f"={nombre_lista}", None, titulo,
+    return validacion("list", None, nombre_lista, None, titulo,
                       "Elige una opción de la lista (flechita a la derecha de la celda).",
                       "Elige una opción de la lista.", blanco=False)
 
@@ -502,8 +537,8 @@ ws["B1"].fill = relleno(NARANJA)
 ws["B1"].alignment = Alignment(vertical="center", indent=1)
 ws.row_dimensions[1].height = 42
 ws.merge_cells("B2:G2")
-ws["B2"] = ("Llena sólo las celdas color durazno. Todo lo gris se calcula solo. "
-            "¿Dudas? Abre la pestaña «Instrucciones».")
+ws["B2"] = ("Llena las celdas DURAZNO. Las de color CLARO ya traen un valor: cámbialas sólo si es distinto. "
+            "Lo GRIS se calcula solo. ¿Dudas? Pestaña «Instrucciones».")
 ws["B2"].font = f(10)
 ws["B2"].alignment = Alignment(vertical="center", indent=1)
 for col in "BCDEFG":
@@ -513,8 +548,8 @@ ws.row_dimensions[2].height = 22
 ws["C3"] = "Colores:"
 ws["C3"].font = f(9, True, GRIS_TEXTO)
 ws["C3"].alignment = Alignment(horizontal="right", vertical="center")
-for col, txt, color, borde in [("D", "Captura", DURAZNO, BORDE_CAPTURA), ("E", "Opcional / política", CREMA, BORDE_CAPTURA),
-                               ("F", "Automático (no tocar)", GRIS_CALC, BORDE_CELDA)]:
+for col, txt, color, borde in [("D", "Durazno = llenar", DURAZNO, BORDE_CAPTURA), ("E", "Claro = ya trae valor", CREMA, BORDE_CAPTURA),
+                               ("F", "Gris = automático", GRIS_CALC, BORDE_CELDA)]:
     c = ws[f"{col}3"]
     c.value = txt
     c.font = f(8, True)
@@ -545,19 +580,22 @@ r += 1
 FILA_INGRESO = r
 etiqueta(r, "Fecha de ingreso"); captura(r, "FechaIngreso", EJEMPLO["FechaIngreso"], FMT_FECHA)
 dv_fecha.add(f"D{r}")
-ayuda(r, "Día/mes/año. Ej. 15/03/2019. Si le reconocen antigüedad anterior, pon esa fecha.")
+confirmacion(r, f'=IFERROR(IF(ISNUMBER(FechaIngreso),"Se leyó: "&{fecha_txt("FechaIngreso")},""),"")')
+ayuda(r, "Día/mes/año (15/03/2019). Revisa que a la izquierda diga la fecha correcta.", "F", "G")
 ws[f"D{r}"].comment = Comment("Si le reconocen antigüedad de otra empresa del grupo, pon esa fecha. "
                               "Si el patrón anterior ya le pagó parte del aguinaldo de este año, captúralo en el Paso 3.", "Calculadora")
 r += 1
 FILA_SALIDA = r
 etiqueta(r, "Fecha de salida (último día trabajado)"); captura(r, "FechaSalida", EJEMPLO["FechaSalida"], FMT_FECHA)
 dv_fecha.add(f"D{r}")
-ayuda(r, "Día/mes/año. Es el último día que se le paga.")
+confirmacion(r, f'=IFERROR(IF(ISNUMBER(FechaSalida),"Se leyó: "&{fecha_txt("FechaSalida")},""),"")')
+ayuda(r, "El último día que trabajó (ese día sí cuenta).", "F", "G")
 r += 1
 FILA_SUELDO = r
 etiqueta(r, "Sueldo mensual bruto (base)"); captura(r, "SueldoMensual", EJEMPLO["SueldoMensual"], FMT_MONEDA_SIMPLE)
 dv_dinero.add(f"D{r}")
-ayuda(r, "Sueldo nominal del mes, sin bonos ni prestaciones. Sólo el número: 45000")
+confirmacion(r, f'=IFERROR(IF(AND(ISNUMBER(SueldoMensual),ISNUMBER(DiasMes),DiasMes>0),"= "&{pesos("SueldoMensual/DiasMes")}&" diarios",""),"")')
+ayuda(r, "Sueldo nominal del mes, sin bonos ni prestaciones. Sólo el número: 45000", "F", "G")
 r += 1
 etiqueta(r, "Tipo de salida")
 captura(r, "TipoSalida", EJEMPLO["TipoSalida"], alinear="left", ancho_doble=True)
@@ -574,7 +612,7 @@ ayuda(r, "«General» para casi todo el país. Frontera Norte sólo en esos muni
 r += 2
 banda(r, "PASO 2 ·  PRESTACIONES  (vienen con el mínimo de ley; cámbialas si la empresa da más)")
 r += 1
-etiqueta(r, "Días de aguinaldo al año"); captura(r, "DiasAguinaldo", EJEMPLO["DiasAguinaldo"], "0.##", obligatorio=False)
+etiqueta(r, "Días de aguinaldo al año"); captura(r, "DiasAguinaldo", EJEMPLO["DiasAguinaldo"], "General", obligatorio=False)
 dv_dias.add(f"D{r}")
 ayuda(r, "Ley: 15 días (art. 87 LFT). Integra al salario.")
 r += 1
@@ -587,7 +625,7 @@ etiqueta(r, "Días de vacaciones al año según la tabla (automático)")
 ayuda(r, "Se toma de la hoja «Tablas» según el año de servicio que está corriendo.")
 r += 1
 etiqueta(r, "Días de vacaciones al año, sólo si son distintos (opcional)")
-captura(r, "DiasVacManual", None, "0.##", obligatorio=False)
+captura(r, "DiasVacManual", None, "General", obligatorio=False)
 dv_dias.add(f"D{r}")
 ayuda(r, "Déjala vacía (o en 0) para usar la tabla. Si escribes un número, se usa ese.")
 r += 1
@@ -600,11 +638,11 @@ ayuda(r, "Vales de despensa, fondo de ahorro (parte de la empresa), etc. Se suma
 r += 2
 banda(r, "PASO 3 ·  PENDIENTES DE PAGO, BONO Y DESCUENTOS")
 r += 1
-etiqueta(r, "Días que trabajó y todavía no se le pagan"); captura(r, "DiasSueldoPend", EJEMPLO["DiasSueldoPend"], "0.##")
+etiqueta(r, "Días que trabajó y todavía no se le pagan"); captura(r, "DiasSueldoPend", EJEMPLO["DiasSueldoPend"], "General")
 dv_dias.add(f"D{r}")
 ayuda(r, "Ej. los días de la quincena en curso. Si ya se le pagó todo, pon 0.")
 r += 1
-etiqueta(r, "Saldo de vacaciones ya ganadas y no tomadas (días)"); captura(r, "DiasVacPend", EJEMPLO["DiasVacPend"], "0.##")
+etiqueta(r, "Saldo de vacaciones ya ganadas y no tomadas (días)"); captura(r, "DiasVacPend", EJEMPLO["DiasVacPend"], "General")
 dv_dias.add(f"D{r}")
 ayuda(r, "Lo que tiene pendiente de aniversarios YA cumplidos (según el control de vacaciones). El año que está corriendo se calcula solo.")
 r += 1
@@ -612,12 +650,12 @@ etiqueta(r, "¿La prima vacacional de ese saldo ya se pagó?"); captura(r, "PVSa
 lista("Lista_SiNo", "¿Prima vacacional del saldo ya pagada?").add(f"D{r}")
 ayuda(r, "Sí sólo si la empresa ya pagó la prima de esos días (por ejemplo, en el aniversario). Evita pagarla doble.")
 r += 1
-etiqueta(r, "Días de vacaciones tomados por adelantado (opcional)"); captura(r, "DiasVacTomados", EJEMPLO["DiasVacTomados"], "0.##", obligatorio=False)
+etiqueta(r, "Días de vacaciones tomados por adelantado (opcional)"); captura(r, "DiasVacTomados", EJEMPLO["DiasVacTomados"], "General", obligatorio=False)
 dv_dias.add(f"D{r}")
 ayuda(r, "Sólo si ya usó todo su saldo y tomó días del año en curso que aún no ganaba. Se restan del concepto 3.")
 r += 1
 etiqueta(r, "Días de aguinaldo de este año ya pagados (opcional)")
-captura(r, "AguinaldoPagadoDias", EJEMPLO["AguinaldoPagadoDias"], "0.##", obligatorio=False)
+captura(r, "AguinaldoPagadoDias", EJEMPLO["AguinaldoPagadoDias"], "General", obligatorio=False)
 dv_dias.add(f"D{r}")
 ayuda(r, "Ej. si sale en diciembre y ya cobró su aguinaldo, o si recibió un anticipo. Si no, déjalo en 0.")
 r += 1
@@ -633,11 +671,11 @@ ayuda(r, "Se restan al final, después del ISR. Si no hay, pon 0.")
 r += 2
 banda(r, "PASO 4 ·  POLÍTICA DE PAGO GSK  (normalmente no se toca)", CARBON)
 r += 1
-etiqueta(r, "Meses de indemnización (TRL)"); captura(r, "MesesIndem", 4, "0.##", obligatorio=False)
+etiqueta(r, "Meses de indemnización (TRL)"); captura(r, "MesesIndem", 4, "General", obligatorio=False)
 dv_pos.add(f"D{r}")
 ayuda(r, "Ley: 3 meses (art. 123 constitucional; arts. 48 y 50 LFT). GSK paga 4 meses de salario integrado.")
 r += 1
-etiqueta(r, "Días de indemnización por cada año de servicio"); captura(r, "DiasPorAnio", 20, "0.##", obligatorio=False)
+etiqueta(r, "Días de indemnización por cada año de servicio"); captura(r, "DiasPorAnio", 20, "General", obligatorio=False)
 dv_pos.add(f"D{r}")
 ayuda(r, "GSK paga 20 días de salario integrado por año (con fracción). Es política: la ley sólo lo exige en ciertos casos (arts. 49 a 52).")
 r += 1
@@ -645,7 +683,7 @@ etiqueta(r, "¿Poner tope a la indemnización?"); captura(r, "ToparIndem", "Sí"
 lista("Lista_SiNo", "¿Topar la indemnización?").add(f"D{r}")
 ayuda(r, "Sí = la indemnización no puede pasar del número de años de salario integrado de abajo.")
 r += 1
-etiqueta(r, "Tope: años de salario integrado"); captura(r, "AniosTopeIndem", 2, "0.##", obligatorio=False)
+etiqueta(r, "Tope: años de salario integrado"); captura(r, "AniosTopeIndem", 2, "General", obligatorio=False)
 dv_pos.add(f"D{r}")
 ayuda(r, "Viene en 2 años (2 × 365 días de salario integrado). Muévelo si la política es otra.")
 r += 1
@@ -655,7 +693,7 @@ ws[f"D{r}"].font = f(9, True, "000000")
 lista("Lista_Cobertura", "Conceptos que cubre el tope").add(f"D{r}")
 ayuda(r, "El finiquito (1 a 6) nunca se topa: ya lo ganó.", "F", "G")
 r += 1
-etiqueta(r, "Días de prima de antigüedad por año"); captura(r, "DiasPrimaAnt", 12, "0.##", obligatorio=False)
+etiqueta(r, "Días de prima de antigüedad por año"); captura(r, "DiasPrimaAnt", 12, "General", obligatorio=False)
 dv_pos.add(f"D{r}")
 ayuda(r, "Ley: 12 días por año de servicio (art. 162 LFT).")
 r += 1
@@ -663,7 +701,7 @@ etiqueta(r, "¿Topar el salario de la prima de antigüedad?"); captura(r, "Topar
 lista("Lista_SiNo", "¿Topar la prima de antigüedad?").add(f"D{r}")
 ayuda(r, "Sí = como dice la ley: el salario diario no pasa del tope de abajo.")
 r += 1
-etiqueta(r, "Tope de la prima: veces el salario mínimo"); captura(r, "VecesTope", 2, "0.##", obligatorio=False)
+etiqueta(r, "Tope de la prima: veces el salario mínimo"); captura(r, "VecesTope", 2, "General", obligatorio=False)
 dv_pos.add(f"D{r}")
 ayuda(r, "Ley: 2 salarios mínimos diarios (arts. 485 y 486 LFT).")
 r += 1
@@ -671,11 +709,11 @@ etiqueta(r, "Salario para la prima de antigüedad"); captura(r, "BasePrimaAnt", 
 lista("Lista_Base", "Salario para prima de antigüedad").add(f"D{r}")
 ayuda(r, "Integrado (con aguinaldo y prima vacacional) o Base (sólo sueldo). Luego se aplica el tope.")
 r += 1
-etiqueta(r, "Años mínimos para pagar prima de antigüedad en renuncia"); captura(r, "AntMinRenuncia", 15, "0.##", obligatorio=False)
+etiqueta(r, "Años mínimos para pagar prima de antigüedad en renuncia"); captura(r, "AntMinRenuncia", 15, "General", obligatorio=False)
 dv_pos.add(f"D{r}")
 ayuda(r, "Ley: 15 años (art. 162 LFT). Sólo aplica en renuncia voluntaria.")
 r += 1
-etiqueta(r, "Días por mes"); captura(r, "DiasMes", 30, "0.##", obligatorio=False)
+etiqueta(r, "Días por mes"); captura(r, "DiasMes", 30, "General", obligatorio=False)
 dv_pos.add(f"D{r}")
 ayuda(r, "Sueldo mensual ÷ 30 = salario diario (art. 89 LFT). Normalmente 30.")
 
@@ -689,8 +727,8 @@ def encabezado_tabla(fila, textos):
         c.value = txt
         c.font = f(10, True, BLANCO)
         c.fill = relleno(CARBON)
-        c.alignment = Alignment(horizontal="center" if col != "G" else "left", vertical="center",
-                                indent=1 if col == "G" else 0, wrap_text=True)
+        c.alignment = Alignment(horizontal={"G": "left", "E": "right", "F": "right"}.get(col, "center"), vertical="center",
+                                indent={"G": 2, "E": 1, "F": 1}.get(col, 0), wrap_text=True)
     ws.row_dimensions[fila].height = 22
 
 
@@ -707,7 +745,7 @@ def subtitulo(fila, texto):
 
 def concepto(fila, numero, texto, d, e, fimp, explicacion, fmt_d=FMT_DIAS, fmt_e=FMT_MONEDA, alto=30):
     ws[f"B{fila}"] = numero
-    ws[f"B{fila}"].font = f(10, True, NARANJA)
+    ws[f"B{fila}"].font = f(10, True, NARANJA_OSCURO)
     ws[f"B{fila}"].alignment = Alignment(horizontal="center", vertical="center")
     ws[f"C{fila}"] = texto
     ws[f"C{fila}"].font = f(10, True)
@@ -717,10 +755,10 @@ def concepto(fila, numero, texto, d, e, fimp, explicacion, fmt_d=FMT_DIAS, fmt_e
         c.value = val
         c.number_format = fmt
         c.font = f(10, col == "F")
-        c.alignment = Alignment(horizontal="center" if col == "D" else "right", vertical="center")
-    ws[f"G{fila}"] = explicacion
+        c.alignment = Alignment(horizontal="center" if col == "D" else "right", vertical="center", indent=0 if col == "D" else 1)
+    ws[f"G{fila}"] = seguro_txt(explicacion)
     ws[f"G{fila}"].font = f(9, color=GRIS_TEXTO)
-    ws[f"G{fila}"].alignment = Alignment(vertical="center", wrap_text=True, indent=1)
+    ws[f"G{fila}"].alignment = Alignment(vertical="center", wrap_text=True, indent=2)
     for col in "BCDEFG":
         ws[f"{col}{fila}"].border = Border(bottom=delgado)
     ws.row_dimensions[fila].height = alto
@@ -753,19 +791,19 @@ def gran_total(fila, texto, formula, nombre, color, nota=None):
     c.value = formula
     c.number_format = FMT_MONEDA
     c.font = f(14, True, BLANCO)
-    c.fill = relleno(NARANJA_INTENSO if color == NARANJA else NEGRO_GSK)
-    c.alignment = Alignment(horizontal="right", vertical="center")
+    c.fill = relleno(color)
+    c.alignment = Alignment(horizontal="right", vertical="center", indent=1)
     nombrar(nombre, HOJA, abs_ref("F", fila))
     if nota:
-        ws[f"G{fila}"] = nota
+        ws[f"G{fila}"] = seguro_txt(nota)
         ws[f"G{fila}"].font = f(10, True, NARANJA_OSCURO)
-        ws[f"G{fila}"].alignment = Alignment(vertical="center", indent=1, wrap_text=True)
+        ws[f"G{fila}"].alignment = Alignment(vertical="center", indent=2, wrap_text=True)
     ws.row_dimensions[fila].height = 30
 
 
 r += 2
 FILA_DESGLOSE = r
-banda(r, "DESGLOSE DE LA LIQUIDACIÓN  (importes brutos)", NARANJA, 13, 26)
+banda(r, '="DESGLOSE DE LA LIQUIDACIÓN  ·  "&IF(Nombre="","(sin nombre)",Nombre)&"  (importes brutos)"', NARANJA, 13, 26)
 r += 1
 encabezado_tabla(r, ["#", "Concepto", "Días", "Salario diario", "Importe", "Cómo se calcula"])
 r += 1
@@ -774,7 +812,7 @@ r += 1
 f_sueldo = r
 concepto(r, 1, "Sueldo pendiente de pago",
          f"=IF({OK},DiasSueldoPend,0)", f"=IF({OK},SalarioDiario,0)", f"=ROUND(D{r}*E{r},2)",
-         f'=IF({OK},{num_txt("DiasSueldoPend")}&" días trabajados no pagados × salario diario","")')
+         f'=IF({OK},{num_txt("DiasSueldoPend")}&IF(DiasSueldoPend=1," día trabajado no pagado"," días trabajados no pagados")&" × salario diario","")')
 r += 1
 f_agui = r
 concepto(r, 2, "Aguinaldo proporcional",
@@ -915,9 +953,9 @@ def renglon_isr(fila, texto, formula, explicacion, nombre=None, negrita=False, a
     c.number_format = FMT_MONEDA
     c.font = f(11 if negrita else 10, negrita)
     c.alignment = Alignment(horizontal="right", vertical="center")
-    ws[f"G{fila}"] = explicacion
+    ws[f"G{fila}"] = seguro_txt(explicacion)
     ws[f"G{fila}"].font = f(9, color=GRIS_TEXTO)
-    ws[f"G{fila}"].alignment = Alignment(vertical="center", wrap_text=True, indent=1)
+    ws[f"G{fila}"].alignment = Alignment(vertical="center", wrap_text=True, indent=2)
     for col in "BCDEFG":
         ws[f"{col}{fila}"].border = Border(bottom=delgado)
     if nombre:
@@ -976,10 +1014,10 @@ r += 1
 
 def fila_apoyo(fila, texto, nombre, formula, fmt, explicacion, negrita=False):
     etiqueta(fila, texto, negrita)
-    calculo(fila, nombre, formula, fmt, negrita=negrita)
+    calculo(fila, nombre, guardar(formula, nombre, fmt), fmt, negrita=negrita)
     ws.merge_cells(f"E{fila}:G{fila}")
     c = ws[f"E{fila}"]
-    c.value = explicacion
+    c.value = seguro_txt(explicacion)
     c.font = f(9, color=GRIS_TEXTO, italic=not str(explicacion).startswith("="))
     c.alignment = Alignment(vertical="center", wrap_text=True, indent=1)
     ws.row_dimensions[fila].height = 18
@@ -995,17 +1033,29 @@ def sub_apoyo(fila, texto):
 
 sub_apoyo(r, "Revisión de datos")
 r += 1
+fila_apoyo(r, "¿Las opciones de las listas son válidas?", "ListasOK",
+           '=IF(AND(ISNUMBER(MATCH(TipoSalida,Lista_Tipo,0)),ISNUMBER(MATCH(ZonaSM,Lista_Zona,0)),ISNUMBER(MATCH(ToparIndem,Lista_SiNo,0)),ISNUMBER(MATCH(CoberturaTope,Lista_Cobertura,0)),ISNUMBER(MATCH(ToparPrimaAnt,Lista_SiNo,0)),ISNUMBER(MATCH(BasePrimaAnt,Lista_Base,0)),ISNUMBER(MATCH(PVSaldoPagada,Lista_SiNo,0))),"Sí","No")', None, "Cada menú (tipo de salida, zona, Sí/No, cobertura, salario) debe tener una opción de su lista.")
+r += 1
+fila_apoyo(r, "¿Los números son números (sin letras)?", "TextoOK",
+           '=IF(COUNTA(FechaIngreso,FechaSalida,SueldoMensual,DiasAguinaldo,PctPrimaVac,DiasVacManual,OtrasPrestInteg,DiasSueldoPend,DiasVacPend,DiasVacTomados,AguinaldoPagadoDias,Bono,OtrasDeducciones,MesesIndem,DiasPorAnio,AniosTopeIndem,DiasPrimaAnt,VecesTope,AntMinRenuncia,DiasMes)=COUNT(FechaIngreso,FechaSalida,SueldoMensual,DiasAguinaldo,PctPrimaVac,DiasVacManual,OtrasPrestInteg,DiasSueldoPend,DiasVacPend,DiasVacTomados,AguinaldoPagadoDias,Bono,OtrasDeducciones,MesesIndem,DiasPorAnio,AniosTopeIndem,DiasPrimaAnt,VecesTope,AntMinRenuncia,DiasMes),"Sí","No")', None, "Una celda con letras o espacios donde va un número no se puede calcular.")
+r += 1
+fila_apoyo(r, "¿Sin números negativos?", "NegOK",
+           '=IF(MIN(FechaIngreso,FechaSalida,SueldoMensual,DiasAguinaldo,PctPrimaVac,DiasVacManual,OtrasPrestInteg,DiasSueldoPend,DiasVacPend,DiasVacTomados,AguinaldoPagadoDias,Bono,OtrasDeducciones,MesesIndem,DiasPorAnio,AniosTopeIndem,DiasPrimaAnt,VecesTope,AntMinRenuncia,DiasMes)>=0,"Sí","No")', None, "Ningún dato de captura puede ser negativo.")
+r += 1
+fila_apoyo(r, "¿Están llenos los Pasos 2 y 4?", "PoliticaOK",
+           '=IF(AND(COUNT(DiasAguinaldo,PctPrimaVac,MesesIndem,DiasPorAnio,AniosTopeIndem,DiasPrimaAnt,VecesTope,AntMinRenuncia,DiasMes)=9,DiasMes>0),"Sí","No")', None, "Aguinaldo, prima vacacional y la política GSK no pueden quedar vacíos.")
+r += 1
 fila_apoyo(r, "¿Están completos los datos para calcular?", "DatosOK",
-           "=IF(AND(ISNUMBER(FechaIngreso),ISNUMBER(FechaSalida),ISNUMBER(SueldoMensual),ISNUMBER(DiasMes)),"
-           "IF(AND(FechaSalida>=FechaIngreso,SueldoMensual>0,DiasMes>0,COUNTIF(Lista_Tipo,TipoSalida)>0),\"Sí\",\"No\"),\"No\")",
-           None, "Necesita fechas de ingreso y salida (igual o posterior), sueldo mensual y tipo de salida.")
+           "=IF(AND(ISNUMBER(FechaIngreso),ISNUMBER(FechaSalida),ISNUMBER(SueldoMensual)),"
+           "IF(AND(FechaSalida>=FechaIngreso,SueldoMensual>0,ListasOK=\"Sí\",TextoOK=\"Sí\",NegOK=\"Sí\",PoliticaOK=\"Sí\"),\"Sí\",\"No\"),\"No\")",
+           None, "Si dice No, todo da 0 y el mensaje de arriba dice qué falta.", negrita=True)
 r += 1
 fila_apoyo(r, "¿Se paga indemnización (conceptos 7 y 8)?", "AplicaIndem",
-           "=IF(TipoSalida=INDEX(Lista_Tipo,1),\"Sí\",\"No\")", None,
+           "=IF(AND(DatosOK=\"Sí\",TipoSalida=INDEX(Lista_Tipo,1)),\"Sí\",\"No\")", None,
            "Sólo en «Liquidación (la empresa termina)».")
 r += 1
 fila_apoyo(r, "¿Se paga prima de antigüedad (concepto 9)?", "AplicaPrimaAnt",
-           "=IF(TipoSalida=INDEX(Lista_Tipo,2),IF(AniosCompletos>=AntMinRenuncia,\"Sí\",\"No\"),IF(COUNTIF(Lista_Tipo,TipoSalida)>0,\"Sí\",\"No\"))", None,
+           "=IF(DatosOK<>\"Sí\",\"No\",IF(TipoSalida=INDEX(Lista_Tipo,2),IF(AniosCompletos>=AntMinRenuncia,\"Sí\",\"No\"),\"Sí\"))", None,
            "En despido (con o sin causa) siempre; en renuncia sólo con 15 años cumplidos o más (art. 162 LFT).")
 
 r += 2
@@ -1043,16 +1093,16 @@ r += 2
 sub_apoyo(r, "Vacaciones")
 r += 1
 fila_apoyo(r, "Días de vacaciones de la tabla para este año de servicio", "DiasVacTabla",
-           f"=IF({OK},IFERROR(IF(INDEX(Vac_Empresa,MATCH(AnioServicioActual,Vac_Desde,1))=\"\","
-           f"INDEX(Vac_Ley,MATCH(AnioServicioActual,Vac_Desde,1)),INDEX(Vac_Empresa,MATCH(AnioServicioActual,Vac_Desde,1))),0),0)",
-           "0.##", "Columna «Días que da la empresa» de la hoja Tablas.")
+           f"=IF({OK},IFERROR(IF(ISNUMBER(INDEX(Vac_Empresa,MATCH(AnioServicioActual,Vac_Desde,1))),"
+           f"INDEX(Vac_Empresa,MATCH(AnioServicioActual,Vac_Desde,1)),INDEX(Vac_Ley,MATCH(AnioServicioActual,Vac_Desde,1))),0),0)",
+           "General", "Columna «Días que da la empresa» de la hoja Tablas.")
 r += 1
 fila_apoyo(r, "Días de vacaciones según la ley (referencia)", "DiasVacLey",
-           f"=IF({OK},IFERROR(INDEX(Vac_Ley,MATCH(AnioServicioActual,Vac_Desde,1)),0),0)", "0.##",
+           f"=IF({OK},IFERROR(INDEX(Vac_Ley,MATCH(AnioServicioActual,Vac_Desde,1)),0),0)", "General",
            "Columna «Días por ley» de la hoja Tablas (art. 76 LFT).")
 r += 1
 fila_apoyo(r, "Días de vacaciones al año que se usan", "DiasVacAnio",
-           "=IF(AND(ISNUMBER(DiasVacManual),DiasVacManual>0),DiasVacManual,DiasVacTabla)", "0.##",
+           "=IF(AND(ISNUMBER(DiasVacManual),DiasVacManual>0),DiasVacManual,DiasVacTabla)", "General",
            "Los de la tabla, salvo que hayas escrito otro número en el Paso 2.", negrita=True)
 r += 1
 fila_apoyo(r, "Días de prima vacacional al año", "DiasPrimaVacAnio",
@@ -1069,11 +1119,11 @@ r += 1
 
 def fila_integ(fila, texto, nombre, f_diario, f_mensual, explicacion, negrita=False):
     etiqueta(fila, texto, negrita)
-    calculo(fila, nombre, f_diario, FMT_MONEDA_SIMPLE, "D", negrita)
-    calculo(fila, None, f_mensual, FMT_MONEDA_SIMPLE, "E", negrita)
+    calculo(fila, nombre, guardar(f_diario, nombre, FMT_MONEDA_SIMPLE), FMT_MONEDA_SIMPLE, "D", negrita)
+    calculo(fila, None, guardar(f_mensual, None, FMT_MONEDA_SIMPLE), FMT_MONEDA_SIMPLE, "E", negrita)
     ws.merge_cells(f"F{fila}:G{fila}")
     c = ws[f"F{fila}"]
-    c.value = explicacion
+    c.value = seguro_txt(explicacion)
     c.font = f(9, color=GRIS_TEXTO, italic=not str(explicacion).startswith("="))
     c.alignment = Alignment(vertical="center", wrap_text=True, indent=1)
     ws.row_dimensions[fila].height = 18
@@ -1118,7 +1168,8 @@ r += 2
 sub_apoyo(r, "Prima de antigüedad")
 r += 1
 fila_apoyo(r, "Salario mínimo: vigente desde", "FechaSM",
-           f"=IF({OK},SUMPRODUCT(MAX((SM_Desde<=FechaSalida)*(SM_General<>\"\")*SM_Desde)),\"\")", FMT_FECHA,
+           f"=IF({OK},SUMPRODUCT(MAX((SM_Desde<=FechaSalida)*IF(ZonaSM=INDEX(Lista_Zona,2),1,0)*ISNUMBER(SM_Frontera)*SM_Desde)"
+           f"+MAX((SM_Desde<=FechaSalida)*IF(ZonaSM=INDEX(Lista_Zona,2),0,1)*ISNUMBER(SM_General)*SM_Desde)),0)", FMT_FECHA,
            "El más reciente capturado en «Tablas» a la fecha de salida.")
 r += 1
 fila_apoyo(r, "Salario mínimo diario aplicable", "SalMinAplicable",
@@ -1149,7 +1200,7 @@ r += 2
 sub_apoyo(r, "ISR (impuesto sobre la renta)")
 r += 1
 fila_apoyo(r, "UMA: vigente desde", "FechaUMA",
-           f"=IF({OK},SUMPRODUCT(MAX((UMA_Desde<=FechaSalida)*(UMA_Valor<>\"\")*UMA_Desde)),\"\")", FMT_FECHA,
+           f"=IF({OK},SUMPRODUCT(MAX((UMA_Desde<=FechaSalida)*ISNUMBER(UMA_Valor)*UMA_Desde)),0)", FMT_FECHA,
            "La UMA cambia cada 1 de febrero (hoja «Tablas»).")
 r += 1
 fila_apoyo(r, "UMA diaria aplicable", "UMAAplicable",
@@ -1206,7 +1257,7 @@ fila_apoyo(r, "ISR de indemnización y prima de antigüedad", "ISRSeparacion",
 f_fin = r
 
 # Valor de la tabla de vacaciones mostrado en el Paso 2
-calculo(fila_vac_tabla, None, "=DiasVacTabla", "0.##", negrita=True)
+calculo(fila_vac_tabla, None, "=DiasVacTabla", "General", negrita=True)
 
 # --- RESULTADO (arriba) ------------------------------------------------------------------
 fr = FILA_RES + 1
@@ -1230,15 +1281,15 @@ def tile_valor(fila, col, formula, tam=12, color_txt=NEGRO_GSK, fondo=GRIS_CALC)
 
 ws[f"C{fr}"] = "=IF(Nombre=\"\",\"(sin nombre)\",Nombre)"
 ws[f"C{fr}"].font = f(12, True)
-ws[f"C{fr}"].alignment = Alignment(vertical="bottom", indent=1)
+ws[f"C{fr}"].alignment = Alignment(vertical="bottom", indent=1, shrink_to_fit=True)
 tile_label(fr, "D", "Finiquito")
 tile_label(fr, "E", "Indemnización y prima de antigüedad")
 tile_label(fr, "F", "TOTAL BRUTO", NEGRO_GSK)
 tile_label(fr, "G", "NETO A RECIBIR (estimado)", NARANJA_OSCURO)
 ws.row_dimensions[fr].height = 26
 fr += 1
-ws[f"C{fr}"] = (f'=IF({OK},TipoSalida&"  ·  "&AniosCompletos&IF(AniosCompletos=1," año"," años")&" y "'
-                f'&DiasDesdeAniv&IF(DiasDesdeAniv=1," día"," días")&" de antigüedad","")')
+ws[f"C{fr}"] = seguro_txt(f'=IF({OK},TipoSalida&"  ·  "&AniosCompletos&IF(AniosCompletos=1," año"," años")&" y "'
+                          f'&DiasDesdeAniv&IF(DiasDesdeAniv=1," día"," días")&" de antigüedad","")')
 ws[f"C{fr}"].font = f(9, color=GRIS_TEXTO)
 ws[f"C{fr}"].alignment = Alignment(vertical="top", wrap_text=True, indent=1)
 tile_valor(fr, "D", "=TotalFiniquito")
@@ -1247,39 +1298,57 @@ tile_valor(fr, "F", "=TotalBruto", 13, BLANCO, NEGRO_GSK)
 tile_valor(fr, "G", "=TotalNeto", 20, BLANCO, NARANJA)
 ws.row_dimensions[fr].height = 34
 fr += 1
+ws[f"C{fr}"] = seguro_txt(f'=IF({OK},"Salario diario integrado: "&{pesos("SalarioIntegrado")}&" ("&{pesos("SalarioIntegrado*DiasMes")}&" al mes)","")')
+ws[f"C{fr}"].font = f(9, True)
+ws[f"C{fr}"].alignment = Alignment(vertical="bottom", indent=1, shrink_to_fit=True)
 tile_label(fr, "D", "Ajuste por tope")
 tile_label(fr, "E", "ISR estimado")
 tile_label(fr, "F", "Otros descuentos")
-ws[f"G{fr}"] = f'=IF(AND({OK},SueldoMensual>0),"Neto = "&FIXED(TotalNeto/SueldoMensual,1)&" meses de sueldo base","")'
+ws[f"G{fr}"] = seguro_txt(f'=IF(AND({OK},SueldoMensual>0),"Neto = "&FIXED(TotalNeto/SueldoMensual,1)&" meses de sueldo base","")')
 ws[f"G{fr}"].font = f(9, True, NARANJA_OSCURO)
 ws[f"G{fr}"].alignment = Alignment(horizontal="center", vertical="bottom")
 ws.row_dimensions[fr].height = 18
 fr += 1
+ws[f"C{fr}"] = seguro_txt(f'=IF({OK},IF(ToparIndem="Sí","Tope de indemnización: "&{num_txt("AniosTopeIndem")}&" años = "&{pesos("TopeIndemMonto")},"Indemnización sin tope"),"")')
+ws[f"C{fr}"].font = f(9, color=GRIS_TEXTO)
+ws[f"C{fr}"].alignment = Alignment(vertical="center", indent=1, shrink_to_fit=True)
 tile_valor(fr, "D", "=AjusteTope", 11)
 tile_valor(fr, "E", "=-ISRTotal", 11)
 tile_valor(fr, "F", "=-DescuentosTotal", 11)
-ws[f"G{fr}"] = f'=IF({OK},"Total bruto "&{pesos("TotalBruto")}&" − ISR "&{pesos("ISRTotal")}&IF(DescuentosTotal>0," − descuentos "&{pesos("DescuentosTotal")},""),"")'
+ws[f"G{fr}"] = seguro_txt(f'=IF({OK},"Total bruto "&{pesos("TotalBruto")}&" − ISR "&{pesos("ISRTotal")}&IF(DescuentosTotal>0," − descuentos "&{pesos("DescuentosTotal")},""),"")')
 ws[f"G{fr}"].font = f(9, color=GRIS_TEXTO)
 ws[f"G{fr}"].alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
 ws.row_dimensions[fr].height = 24
 fr += 1
 FILA_ESTADO = fr
-estado = (
-    '=IF(NOT(ISNUMBER(FechaIngreso)),"⚠ Falta la fecha de ingreso (Paso 1).",'
-    'IF(NOT(ISNUMBER(FechaSalida)),"⚠ Falta la fecha de salida (Paso 1).",'
-    'IF(FechaSalida<FechaIngreso,"⚠ La fecha de salida es anterior a la de ingreso. Revísalas.",'
-    'IF(OR(NOT(ISNUMBER(SueldoMensual)),SueldoMensual<=0),"⚠ Falta el sueldo mensual (Paso 1).",'
-    'IF(COUNTIF(Lista_Tipo,TipoSalida)=0,"⚠ Elige el tipo de salida de la lista (Paso 1).",'
-    'IF(OR(NOT(ISNUMBER(DiasMes)),DiasMes<=0),"⚠ Falta «Días por mes» (Paso 4). Normalmente es 30.",'
-    'IF(SalMinAplicable=0,"⚠ No hay salario mínimo capturado para esa fecha (hoja Tablas).",'
-    'IF(YEAR(FechaSM)<YEAR(FechaSalida),"⚠ Falta capturar el salario mínimo "&YEAR(FechaSalida)&" en la hoja Tablas; se usó el de "&YEAR(FechaSM)&".",'
-    'IF(UMAAplicable=0,"⚠ No hay UMA capturada para esa fecha (hoja Tablas); el ISR no es confiable.",'
-    'IF(AND(YEAR(FechaUMA)<YEAR(FechaSalida),MONTH(FechaSalida)>1),"⚠ Falta capturar la UMA "&YEAR(FechaSalida)&" en la hoja Tablas; se usó la de "&YEAR(FechaUMA)&".",'
-    'IF(YEAR(FechaSalida)<ISR_AnioTarifa,"⚠ La tarifa de ISR de «Tablas» rige desde "&ISR_AnioTarifa&"; para una salida de "&YEAR(FechaSalida)&" el ISR es sólo aproximado.",'
-    'IF(DiasVacAnio*DiasVacProp/365<DiasVacTomados,"⚠ Tomó más vacaciones de las que lleva ganadas este año; las proporcionales quedan en 0.",'
-    'IF(OR(DiasAguinaldo<15,PctPrimaVac<0.25,DiasVacAnio<DiasVacLey),"⚠ Hay prestaciones por debajo de la ley (aguinaldo 15 días, prima vacacional 25%, tabla de vacaciones). Revisa el Paso 2.",'
-    '"✓ Listo. Revisa el desglose más abajo.")))))))))))))'
-)
+AVISOS = [
+    ('NOT(ISNUMBER(FechaIngreso))', '"⚠ Falta la fecha de ingreso (Paso 1)."'),
+    ('NOT(ISNUMBER(FechaSalida))', '"⚠ Falta la fecha de salida (Paso 1)."'),
+    ('FechaSalida<FechaIngreso', '"⚠ La fecha de salida es anterior a la de ingreso. Revísalas."'),
+    ('OR(NOT(ISNUMBER(SueldoMensual)),SueldoMensual<=0)', '"⚠ Falta el sueldo mensual (Paso 1)."'),
+    ('ISNA(MATCH(TipoSalida,Lista_Tipo,0))', '"⚠ Elige el tipo de salida con la flechita de la lista (Paso 1)."'),
+    ('ListasOK<>"Sí"', '"⚠ Hay una opción escrita a mano (zona, Sí/No, cobertura o salario). Elígela con la flechita de la lista."'),
+    ('TextoOK<>"Sí"', '"⚠ Hay letras, espacios o símbolos donde va un número (Pasos 2, 3 o 4). Escribe sólo números."'),
+    ('NegOK<>"Sí"', '"⚠ Hay un número negativo en los Pasos 2, 3 o 4. Si no aplica, escribe 0."'),
+    ('PoliticaOK<>"Sí"', '"⚠ Hay una celda vacía en el Paso 2 o 4. Valores normales: aguinaldo 15, prima 25%, 4 meses, 20 días, '
+                         'tope 2 años, 12 días, 2 salarios mínimos, 15 años y 30 días por mes."'),
+    ('AND(AplicaPrimaAnt="Sí",SalMinAplicable=0)', '"⚠ No hay salario mínimo capturado para esa fecha y zona (hoja Tablas)."'),
+    ('AND(AplicaPrimaAnt="Sí",YEAR(FechaSM)<YEAR(FechaSalida))',
+     '"⚠ Falta capturar el salario mínimo "&YEAR(FechaSalida)&" en la hoja Tablas; se usó el de "&YEAR(FechaSM)&"."'),
+    ('UMAAplicable=0', '"⚠ No hay UMA capturada para esa fecha (hoja Tablas); el ISR no es confiable."'),
+    ('AND(YEAR(FechaUMA)<YEAR(FechaSalida),MONTH(FechaSalida)>1)',
+     '"⚠ Falta capturar la UMA "&YEAR(FechaSalida)&" en la hoja Tablas; se usó la de "&YEAR(FechaUMA)&"."'),
+    ('YEAR(FechaSalida)<ISR_AnioTarifa',
+     '"⚠ La tarifa de ISR de «Tablas» rige desde "&ISR_AnioTarifa&"; para una salida de "&YEAR(FechaSalida)&" el ISR es sólo aproximado."'),
+    ('DiasVacAnio*DiasVacProp/365<DiasVacTomados', '"⚠ Tomó más vacaciones de las que lleva ganadas este año; las proporcionales quedan en 0."'),
+    ('OR(DiasAguinaldo<15,PctPrimaVac<0.25,DiasVacAnio<DiasVacLey)',
+     '"⚠ Hay prestaciones por debajo de la ley (aguinaldo 15 días, prima vacacional 25%, tabla de vacaciones). Revisa el Paso 2."'),
+    (f'Nombre="{EJEMPLO["Nombre"]}"', '"⚠ Son datos de EJEMPLO: escribe encima los del colaborador (Pasos 1 y 3)."'),
+]
+estado = '"✓ Listo. Revisa el desglose más abajo."'
+for cond, msg in reversed(AVISOS):
+    estado = f"IF({cond},{msg},{estado})"
+estado = f'=IFERROR({estado},"⚠ Revisa los datos: hay un valor que no se puede calcular.")'
 ws.merge_cells(f"C{fr}:G{fr}")
 ws[f"C{fr}"] = estado
 ws[f"C{fr}"].font = f(10, True)
@@ -1324,8 +1393,10 @@ ws.row_breaks.append(Break(id=FILA_DESGLOSE - 1))
 ws.row_breaks.append(Break(id=FILA_APOYO - 1))
 ws.oddFooter.left.text = "Calculadora de liquidación · Confidencial"
 ws.oddFooter.left.size = 8
+ws.oddFooter.left.font = "Arial"
 ws.oddFooter.right.text = "Página &P de &N"
 ws.oddFooter.right.size = 8
+ws.oddFooter.right.font = "Arial"
 
 ws.protection.sheet = True
 ws.sheet_view.selection[0].activeCell = f"D{FILA_RES + 8}"
@@ -1381,21 +1452,22 @@ def renglon_instr(c_txt, d_txt, numero=None, alto=None):
     fila += 1
 
 
-bloque_titulo("EN 4 PASOS")
-renglon_instr("Abre la pestaña «Calculadora»", "Todo se hace en esa hoja. Viene con un ejemplo: escribe encima los datos reales.", 1)
-renglon_instr("Llena las celdas color durazno", "Nombre, fecha de ingreso, fecha de salida, sueldo mensual y tipo de salida (Paso 1). "
-              "Luego los días pendientes, el bono y otros descuentos (Paso 3). Si algo no aplica, pon 0.", 2)
-renglon_instr("Revisa las celdas color durazno claro", "Aguinaldo y prima vacacional (Paso 2) vienen con el mínimo de ley; cámbialos si la empresa da más. "
-              "La política GSK (Paso 4: 4 meses + 20 días por año, tope de 2 años de salario integrado, prima de antigüedad de ley) "
-              "normalmente no se toca.", 3)
-renglon_instr("Lee el resultado", "Arriba, en RESULTADO, está el total bruto, el ISR y el NETO A RECIBIR, y un mensaje: verde = todo bien; "
-              "rojo = te dice qué falta. Abajo está el desglose de cada concepto y del ISR. Para imprimir: Ctrl + P.", 4)
-
+bloque_titulo("CÓMO SE USA  (todo se hace en la pestaña «Calculadora»)")
+renglon_instr("Paso 1 · Datos del colaborador", "Nombre, fecha de ingreso, fecha de salida, sueldo mensual y tipo de salida (celdas durazno). "
+              "Junto a cada fecha aparece cómo la leyó Excel («Se leyó: 15 de marzo de 2019»): revisa que sea la correcta.", 1)
+renglon_instr("Paso 2 · Prestaciones", "Aguinaldo y prima vacacional ya traen el mínimo de ley; cámbialos sólo si la empresa da más. "
+              "Las vacaciones salen solas de la tabla de la ley.", 2)
+renglon_instr("Paso 3 · Pendientes, bono y descuentos", "Días no pagados, saldo de vacaciones, bono y otros descuentos. Vienen en 0: "
+              "escribe sólo lo que aplique.", 3)
+renglon_instr("Paso 4 · Política GSK", "4 meses + 20 días por año, tope de 2 años de salario integrado y prima de antigüedad de ley "
+              "(12 días por año, topada a 2 salarios mínimos). Normalmente no se toca.", 4)
+renglon_instr("Resultado", "Arriba, en RESULTADO, está el total bruto, el ISR y el NETO A RECIBIR, con un mensaje: verde = todo bien; "
+              "rojo = te dice qué falta o qué revisar. Abajo está el desglose de cada concepto y del ISR. Para imprimir: Ctrl + P.", "✓")
 fila += 1
 bloque_titulo("COLORES")
 for color, borde, txt, desc in [
-    (DURAZNO, BORDE_CAPTURA, "Durazno", "Captura obligatoria: datos del colaborador."),
-    (CREMA, BORDE_CAPTURA, "Durazno claro", "Opcional o política: ya trae un valor; cámbialo sólo si es distinto."),
+    (DURAZNO, BORDE_CAPTURA, "Durazno", "Llenar: datos del colaborador (Paso 1) y pendientes y bono (Paso 3)."),
+    (CREMA, BORDE_CAPTURA, "Claro", "Ya trae un valor (ley o política GSK); cámbialo sólo si es distinto."),
     (GRIS_CALC, BORDE_CELDA, "Gris", "Automático: es una fórmula. No se escribe ahí (la hoja está protegida para evitar accidentes)."),
 ]:
     wsI[f"C{fila}"] = txt
@@ -1448,6 +1520,7 @@ for t, d in [
 ]:
     renglon_instr(t, d)
 
+wsI.row_breaks.append(Break(id=fila))
 fila += 1
 bloque_titulo("QUÉ SE PAGA SEGÚN EL TIPO DE SALIDA")
 for col, txt in zip("CD", ["Tipo de salida", "Conceptos que se pagan"]):
@@ -1463,6 +1536,23 @@ for t, d in [
     renglon_instr(t, d)
 
 fila += 1
+bloque_titulo("ANTES DE PAGAR, REVISA (no lo calcula esta hoja)")
+for t in [
+    "• Fondo de ahorro: saldo del trabajador y de la empresa.",
+    "• PTU pendiente: se paga en mayo aunque ya no trabaje en la empresa (arts. 117 a 122 LFT).",
+    "• Comisiones, incentivos u horas extra ya devengados y no pagados.",
+    "• Retenciones obligatorias: pensión alimenticia, crédito INFONAVIT o FONACOT, préstamos (captúralos en «Otros descuentos»).",
+    "• Rescisión por causa imputable a la empresa (art. 51): elige «Liquidación». La regla de 15 años sólo aplica en renuncia voluntaria.",
+    "• El convenio va por escrito, con el desglose de conceptos, y se ratifica ante el Centro de Conciliación o el Tribunal (art. 33 LFT).",
+]:
+    wsI.merge_cells(f"B{fila}:D{fila}")
+    wsI[f"B{fila}"] = t
+    wsI[f"B{fila}"].font = f(10)
+    wsI[f"B{fila}"].alignment = Alignment(vertical="center", wrap_text=True, indent=1)
+    wsI.row_dimensions[fila].height = 22
+    fila += 1
+
+fila += 1
 bloque_titulo("MANTENIMIENTO (una vez al año) Y AVISOS")
 for t in [
     "• Cada diciembre/enero: captura el nuevo salario mínimo en la hoja «Tablas» (ya hay renglones listos para 2027 a 2030). "
@@ -1473,7 +1563,8 @@ for t in [
     "• Si la empresa da más días de vacaciones que la ley, cámbialos una sola vez en la columna «Días que da la empresa» de «Tablas».",
     "• Las hojas están protegidas SIN contraseña sólo para que no se borren fórmulas por accidente. "
     "Si necesitas cambiar algo: Revisar → Desproteger hoja.",
-    "• Para calcular a varias personas: clic derecho en la pestaña «Calculadora» → Mover o copiar → Crear una copia.",
+    "• Para calcular a otra persona, guarda una copia del ARCHIVO (Archivo → Guardar como; en Google Sheets: Archivo → Crear una copia) "
+    "y úsala. No dupliques la pestaña: en Google Sheets la copia seguiría leyendo los datos de la original.",
 ]:
     wsI.merge_cells(f"B{fila}:D{fila}")
     wsI[f"B{fila}"] = t
