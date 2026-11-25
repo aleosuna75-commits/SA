@@ -1,19 +1,19 @@
 {
- "corrida_utc": "2026-11-24T07:21:22Z",
+ "corrida_utc": "2026-11-25T07:21:35Z",
  "pasos": {
   "datos": {
    "ok": true,
    "codigo": 0,
    "nuevos_jugados": 0,
    "reprogramados": 0,
-   "nuevos_en_calendario": 8,
-   "momios_actualizados": 0,
+   "nuevos_en_calendario": 0,
+   "momios_actualizados": 2,
    "tabla_coincide_con_espn": true,
-   "segundos": 7.8
+   "segundos": 7.2
   },
   "variables": {
    "ok": true,
-   "segundos": 6.6
+   "segundos": 6.8
   },
   "mejora": {
    "ok": true,
@@ -23,10 +23,10 @@
   "pronostico": {
    "ok": true,
    "salida": [
-    "/home/user/SA/ligamx/salidas/actual.json  231 KB  modelo=ensamble  pendientes=8  sellos nuevos=8  50.7 s",
-    "campeón: Cruz Azul 0.264, Chivas 0.209, América 0.208, Toluca 0.182, Pachuca 0.059"
+    "/home/user/SA/ligamx/salidas/actual.json  231 KB  modelo=ensamble  pendientes=8  sellos nuevos=5  50.8 s",
+    "campeón: Cruz Azul 0.264, América 0.209, Chivas 0.208, Toluca 0.183, Pachuca 0.059"
    ],
-   "segundos": 52.7
+   "segundos": 52.5
   },
   "vivo": {
    "ok": true,
@@ -39,101 +39,20 @@
     "visitante": "Atlas"
    },
    "incrustado": true,
-   "segundos": 3.1
+   "segundos": 3.5
   },
   "pagina": {
    "ok": true,
    "salida": [
-    "listo en 0.34 s"
+    "listo en 0.35 s"
    ],
-   "segundos": 0.5
+   "segundos": 0.4
   }
  },
  "errores": [],
  "nuevos_jugados": [],
  "reprogramados": [],
- "nuevos_en_calendario": [
-  {
-   "id": "401931986",
-   "fecha_local": "2026-11-25",
-   "torneo": "Apertura 2026",
-   "fase": "cuartos",
-   "local": "Toluca",
-   "visitante": "Atlas",
-   "estado": "programado",
-   "fecha_utc": "2026-11-26T01:00Z"
-  },
-  {
-   "id": "401931998",
-   "fecha_local": "2026-11-25",
-   "torneo": "Apertura 2026",
-   "fase": "cuartos",
-   "local": "Monterrey",
-   "visitante": "América",
-   "estado": "programado",
-   "fecha_utc": "2026-11-26T03:10Z"
-  },
-  {
-   "id": "401931982",
-   "fecha_local": "2026-11-26",
-   "torneo": "Apertura 2026",
-   "fase": "cuartos",
-   "local": "Pachuca",
-   "visitante": "Chivas",
-   "estado": "programado",
-   "fecha_utc": "2026-11-27T01:00Z"
-  },
-  {
-   "id": "401931995",
-   "fecha_local": "2026-11-26",
-   "torneo": "Apertura 2026",
-   "fase": "cuartos",
-   "local": "León",
-   "visitante": "Cruz Azul",
-   "estado": "programado",
-   "fecha_utc": "2026-11-27T03:10Z"
-  },
-  {
-   "id": "401931997",
-   "fecha_local": "2026-11-28",
-   "torneo": "Apertura 2026",
-   "fase": "cuartos",
-   "local": "Atlas",
-   "visitante": "Toluca",
-   "estado": "programado",
-   "fecha_utc": "2026-11-29T01:00Z"
-  },
-  {
-   "id": "401931996",
-   "fecha_local": "2026-11-28",
-   "torneo": "Apertura 2026",
-   "fase": "cuartos",
-   "local": "América",
-   "visitante": "Monterrey",
-   "estado": "programado",
-   "fecha_utc": "2026-11-29T03:10Z"
-  },
-  {
-   "id": "401931983",
-   "fecha_local": "2026-11-29",
-   "torneo": "Apertura 2026",
-   "fase": "cuartos",
-   "local": "Chivas",
-   "visitante": "Pachuca",
-   "estado": "programado",
-   "fecha_utc": "2026-11-30T01:07Z"
-  },
-  {
-   "id": "401932000",
-   "fecha_local": "2026-11-29",
-   "torneo": "Apertura 2026",
-   "fase": "cuartos",
-   "local": "Cruz Azul",
-   "visitante": "León",
-   "estado": "programado",
-   "fecha_utc": "2026-11-30T03:00Z"
-  }
- ],
+ "nuevos_en_calendario": [],
  "proximo_partido": {
   "id": "401931986",
   "fecha_utc": "2026-11-26T01:00Z",
@@ -146,7 +65,15 @@
   "visitante": "Atlas",
   "estadio": "Estadio Nemesio Díez Riega",
   "ciudad": "Toluca",
-  "momios": null
+  "momios": {
+   "ml_l": 1.444,
+   "ml_e": 4.9,
+   "ml_v": 6.0,
+   "total_linea": 3.5,
+   "over": 2.2,
+   "under": 1.625,
+   "proveedor": "DraftKings"
+  }
  },
  "vivo": {
   "estado": "sin_partidos",
@@ -160,23 +87,23 @@
   "incrustado": true
  },
  "modelo": "ensamble",
- "corte_local": "2026-11-24 01:21",
+ "corte_local": "2026-11-25 01:21",
  "campeon_top": [
   [
    "Cruz Azul",
-   0.2635
-  ],
-  [
-   "Chivas",
-   0.2092
+   0.2638
   ],
   [
    "América",
-   0.2083
+   0.2089
+  ],
+  [
+   "Chivas",
+   0.2081
   ],
   [
    "Toluca",
-   0.1822
+   0.1826
   ],
   [
    "Pachuca",
@@ -227,9 +154,9 @@
    }
   }
  },
- "huella": "7bf34ce22fd5254ec5053a482e395d1c",
+ "huella": "fed7f7a742af3abc08baa3aaf3c61d26",
  "publicar": false,
- "huella_publicada": "7bf34ce22fd5254ec5053a482e395d1c",
- "segundos": 70.6,
- "publicado_utc": "2026-11-24T07:39:55Z"
+ "huella_publicada": "fed7f7a742af3abc08baa3aaf3c61d26",
+ "segundos": 70.4,
+ "publicado_utc": "2026-11-25T07:23:01Z"
 }

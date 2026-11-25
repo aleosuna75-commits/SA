@@ -1,6 +1,6 @@
 {
  "torneo": "Apertura 2026",
- "generado_utc": "2026-11-24T07:21:29Z",
+ "generado_utc": "2026-11-25T07:21:42Z",
  "fuente": "ESPN scoreboard mex.1",
  "partidos": [
   {
@@ -15,7 +15,15 @@
    "visitante": "Atlas",
    "estadio": "Estadio Nemesio Díez Riega",
    "ciudad": "Toluca",
-   "momios": null
+   "momios": {
+    "ml_l": 1.444,
+    "ml_e": 4.9,
+    "ml_v": 6.0,
+    "total_linea": 3.5,
+    "over": 2.2,
+    "under": 1.625,
+    "proveedor": "DraftKings"
+   }
   },
   {
    "id": "401931998",
@@ -30,11 +38,11 @@
    "estadio": "Estadio BBVA",
    "ciudad": "Guadalupe",
    "momios": {
-    "ml_l": 2.35,
+    "ml_l": 2.3,
     "ml_e": 3.3,
-    "ml_v": 2.9,
+    "ml_v": 3.1,
     "total_linea": 2.5,
-    "over": 1.833,
+    "over": 1.87,
     "under": 1.87,
     "proveedor": "DraftKings"
    }
