@@ -48,15 +48,7 @@
 - [x] 8. Automatización: `pipeline.py auto` + `modelo/mejora.py ciclo` + tarea programada diaria (runbook abajo).
 
 ## En curso
-**Bajas para las idas de cuartos (25-nov-2026, desde 07:25 UTC).** Corrida diaria hecha (V31, `vivo/actual` 112).
-Tarea de continuidad ACTIVADA. Falta (si la sesión se corta, retomar aquí):
-1. Workflow `notas/workflows/12_bajas_cuartos_ida.js` (corrida `wf_5e46607d-0c6`, args con lo que había el 23-nov):
-   dos investigadores (idas del miércoles y del jueves) y un verificador por grupo que relee cada fuente.
-2. Unir el resultado en `config/actualidad.json` (formato de `equipos.<equipo>.lesionados`; suspendidos con tipo
-   `suspension`; quitar a los de `ya_no_son_baja`; anotar la Disciplinaria en la nota del equipo), `python3 -m
-   produccion.exportar` (millón) + `python3 web/construir.py`, pruebas, republicar, `pipeline.py publicado`.
-   Debe quedar ANTES del «armar» de las 00:40 UTC del 26-nov.
-3. Bitácora, commit y push; desactivar la continuidad y dejar esta sección en «Nada pendiente».
+Nada pendiente (25-nov-2026, 07:55 UTC). Tarea de continuidad desactivada.
 
 ### Último cierre (24-nov): horarios de cuartos sin ESPN
 Workflow `notas/workflows/11_horarios_cuartos_prensa.js` (corrida `wf_3c93cecd-d99`, 4 agentes, 1.2 M de tokens). Mientras
@@ -117,10 +109,12 @@ Falta que el usuario confirme que la página se movió sola en su teléfono: des
 en la base quedaron aceptadas.
 
 ## Pendientes de mejora
-- [ ] **Liguilla (del workflow 10, 23-nov):** (a) martes 24: reporte de la Comisión Disciplinaria de la J17 (fmf.mx):
-  si Hugo González (Toluca) o Salcedo (Monterrey) reciben más de un partido, agregarlos como `suspension` para la
-  vuelta; (b) antes de cada ida revisar las dudas de `config/actualidad.json` y repetir las bajas antes de semifinales
-  (sólo los 4 vivos); (c) escudo de Mazatlán en `web/medios.json` (sale con iniciales en la página del torneo
+- [ ] **Liguilla (del workflow 10, 23-nov):** (a) el reporte de la Comisión Disciplinaria de la J17 seguía sin salir el
+  25-nov (fmf.mx llega a la J13): antes de las vueltas, si Hugo González (Toluca) o Salcedo (Monterrey) reciben más de
+  un partido, agregarlos como `suspension` para la vuelta (el sistema sólo deduce un partido); (b) bajas de las idas
+  HECHAS el 25-nov (workflow 12, con verificador); repetir antes de las vueltas si hay tiempo y antes de semifinales
+  (sólo los 4 vivos; guion `notas/workflows/12_bajas_cuartos_ida.js`). Al unir: un suspendido que el sistema ya deduce
+  NO va en `lesionados` (la página lo mostraría dos veces), va en la nota; (c) escudo de Mazatlán en `web/medios.json` (sale con iniciales en la página del torneo
   terminado); (d) un corte retrospectivo de una final decidida en tiempo extra o penales para ejercitar ese camino del
   simulador; (e) en cortes retrospectivos ESPN ya lista las rondas siguientes con sus equipos reales (V2-9): quitarlas
   para ensayos realistas; (f) la regla de doble amarilla en `config/torneo.json` es ambigua (V3-7, no cambia la tabla).
@@ -316,3 +310,4 @@ en la base quedaron aceptadas.
 - 2026-11-23 23:20 UTC · Revisión del calendario de cuartos (17:00 de México): **ESPN todavía no lista los cuartos**; se reprogramó la revisión para las 03:04 UTC (`trig_01S7b84Hb1QZfhXAShdyukJS`) y la corrida diaria de las 07:20 UTC también lo revisa. **El contenedor se había reiniciado:** faltaban scipy, pyarrow y scikit-learn (la primera corrida de `auto` falló), las predicciones de `modelo/pred/` y WebKit. Se reinstalaron; las predicciones se regeneraron con el nuevo `modelo/restaurar_pred.py` y reproducen al dígito `registro.json` (`ensamble.parquet` idéntico byte por byte); `mejora.ciclo` ahora regenera solo el DESARROLLO que falte. Pruebas: pytest 213 + 2 saltadas, página 651 revisiones en Chromium y 651 en WebKit. V28 publicada (sin cambios de pronóstico), `vivo/actual` en versión 109 (`sin_partidos`).
 - 2026-11-24 05:00 UTC · **Horarios de cuartos en la página sin esperar a ESPN.** La liga publicó el lunes 23 los días y horas (Excélsior y Bolavip coinciden; ESPN sigue sin listarlos a las 04:50 UTC). Se guardaron en `config/torneo.json` → `liguilla.horarios_cuartos` y el workflow 11 hizo que exportar, la página y `vivo.py plan` los usen mientras ESPN no publique cada pierna. Ida: mié 25 Toluca–Atlas 19:00 y Monterrey–América 21:10; jue 26 Pachuca–Chivas 19:00 y León–Cruz Azul 21:10. Vuelta: sáb 28 Atlas–Toluca 19:00 y América–Monterrey 21:10; dom 29 Chivas–Pachuca 19:07 y Cruz Azul–León 21:00. Avanzan (P): Cruz Azul 82%, Toluca 72%, América 71%, Chivas 64%. V29 publicada; `vivo/actual` en versión 110. Vivo de las dos noches de ida ya programado; «¿ya lista ESPN los cuartos?» a las 11:30 UTC.
 - 2026-11-24 07:40 UTC · Corrida diaria: **ESPN ya lista los 8 partidos de cuartos** (ids 401931982 a 401932000), con las mismas horas que la prensa; `pipeline.py auto` los selló (8 sellos nuevos) con mercados y combinadas, y las piernas pasaron a `horario_origen` «calendario». Combinada de la ronda (ida, segura): 45.4%. Se programó el vivo de las vueltas (sáb 28 y dom 29) y se borró el reintento de las 11:30. Con 8 pendientes de liguilla y ninguno de fase regular, `test_los_pendientes_tienen_variables` fallaba (el promedio de 0 filas es NaN): ahora la parte de fase regular sólo corre si hay filas, y se agregó la revisión de los pendientes de liguilla. pytest 224 + 1 saltada; página 742 revisiones en Chromium y 742 en WebKit. **V30 publicada**, `vivo/actual` en versión 111.
+- 2026-11-25 07:55 UTC · Corrida diaria (V31: sólo momios; 5 sellos nuevos por momios) y **bajas de las idas de cuartos** con el workflow 12 (`wf_5e46607d-0c6`: 2 investigadores + 2 verificadores que releyeron cada fuente, 0.57 M de tokens). Novedades: Toluca con Helinho, Pereira, Romero y Gutiérrez en duda (no jugaron la J17) y Mohamed se va al terminar la liguilla; Monterrey con Andrada (portero) en duda y Medina y Djurdjevic fuera; América con Henry Martín en duda (cuádriceps) y Brian Rodríguez ya disponible; Pachuca con Carlos Sánchez fuera. Sin reporte de la Disciplinaria de la J17. Gauthier (León) quedó como duda: FutMercado (23-nov) lo da fuera y FotMob (25-nov) ya no. Página 742 revisiones en Chromium y 742 en WebKit; **V32 publicada**; `vivo/actual` en versión 113.
