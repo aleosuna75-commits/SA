@@ -67,7 +67,7 @@ FMT_MONEDA_SIMPLE = '"$"#,##0.00'
 FMT_DIAS = '#,##0.00;-#,##0.00;"–"'
 FMT_ENTERO = '#,##0'
 FMT_FECHA = '[$-80A]dd/mmm/yyyy'   # mes abreviado siempre en español
-FMT_PCT = '0%'
+FMT_PCT = '0.0%'
 FMT_PCT2 = '0.00%'
 FMT_FACTOR = '0.0000'
 FMT_ANIOS = '0.0000'
@@ -149,8 +149,8 @@ LISTA_COBERTURA = ["Indemnización (7 y 8)", "Indemnización y prima de antigüe
 # Ejemplo precargado (se sobrescribe con los datos reales)
 EJEMPLO = {
     "Nombre": "Colaborador de Ejemplo",
-    "NumEmpleado": "000123",
-    "Puesto": "Representante Médico",
+    "NumEmpleado": None,
+    "Puesto": None,
     "FechaIngreso": dt.date(2019, 3, 15),
     "FechaSalida": dt.date(2026, 11, 30),
     "SueldoMensual": 45000,
@@ -196,6 +196,8 @@ SIN_GUARDA = {"DatosOK", "ListasOK", "TextoOK", "NegOK", "PoliticaOK", "AplicaIn
 
 def guardar(formula, nombre, fmt):
     """Si faltan datos, los cálculos de apoyo dan 0 (y nunca un error)."""
+    if nombre in {"DatosOK", "ListasOK", "TextoOK", "NegOK", "PoliticaOK"}:
+        return f'=IFERROR({formula[1:]},"No")'
     if not (isinstance(formula, str) and formula.startswith("=")) or nombre in SIN_GUARDA:
         return formula
     if fmt is None:
@@ -337,6 +339,7 @@ nombrar("SM_Frontera", "Tablas", f"$E${sm_ini}:$E${sm_fin}")
 
 # --- UMA --------------------------------------------------------------------------------
 r += 1
+wsT.row_breaks.append(Break(id=r - 1))
 titulo_tabla(wsT, r, "UMA DIARIA  (partes exentas de ISR, LISR art. 93 fracciones XIII y XIV)")
 r += 1
 encabezados(wsT, r, "BCDEF", ["Año", "Vigente desde", "UMA diaria", "", "Fuente"])
@@ -355,7 +358,6 @@ nombrar("UMA_Valor", "Tablas", f"$D${uma_ini}:$D${uma_fin}")
 
 # --- Tarifa ISR -------------------------------------------------------------------------
 r += 1
-wsT.row_breaks.append(Break(id=r))
 titulo_tabla(wsT, r, "TARIFA MENSUAL DE ISR 2026  (LISR art. 96; ISR del finiquito y tasa del último sueldo para la indemnización)")
 r += 1
 encabezados(wsT, r, "BCDEF", ["Límite inferior", "Límite superior", "Cuota fija", "% sobre el excedente\ndel límite inferior", "Fuente"])
@@ -404,6 +406,15 @@ for nombre_lista, valores in [("Lista_Tipo", LISTA_TIPO), ("Lista_Zona", LISTA_Z
     nombrar(nombre_lista, "Tablas", f"$H${ini}:$H${ini + len(valores) - 1}")
     fila_lista = ini + len(valores) + 1
 
+dv_tablas = DataValidation(type="decimal", operator="greaterThanOrEqual", formula1="0", allow_blank=True)
+dv_tablas.errorTitle = "Valor no válido"
+dv_tablas.error = "Escribe sólo el número, sin letras ni espacios (ej. 315.04 o 16%)."
+dv_tablas.showErrorMessage = True
+wsT.add_data_validation(dv_tablas)
+for rango in [f"E{vac_ini}:E{vac_fin}", f"D{sm_ini}:E{sm_fin}", f"D{uma_ini}:D{uma_fin}", f"B{isr_ini}:B{isr_ini + len(TARIFA_ISR) - 1}",
+              f"D{isr_ini}:E{isr_ini + len(TARIFA_ISR) - 1}", f"C{isr_ini}:C{isr_ini + len(TARIFA_ISR) - 2}",
+              f"D{isr_ini + len(TARIFA_ISR)}", f"B{isr_fin}", f"D{isr_fin}"]:
+    dv_tablas.add(rango)
 wsT.protection.sheet = True
 wsT.freeze_panes = "A4"
 wsT.print_area = f"A1:H{isr_fin}"
@@ -437,7 +448,8 @@ def banda(fila, texto, color=NARANJA, tam=12, alto=24, color_txt=BLANCO, desde="
 
 
 def ayuda(fila, texto, desde="E", hasta="G"):
-    ws.merge_cells(f"{desde}{fila}:{hasta}{fila}")
+    if desde != hasta:
+        ws.merge_cells(f"{desde}{fila}:{hasta}{fila}")
     c = ws[f"{desde}{fila}"]
     c.value = texto
     c.font = f(9, italic=True, color=GRIS_TEXTO)
@@ -480,9 +492,10 @@ def fecha_txt(x):
 
 
 def confirmacion(fila, formula):
+    ws.merge_cells(f"E{fila}:F{fila}")
     c = ws[f"E{fila}"]
     c.value = formula
-    c.font = f(9, True, VERDE_OK_TXT)
+    c.font = f(10, True, VERDE_OK_TXT)
     c.alignment = Alignment(horizontal="left", vertical="center", indent=1, shrink_to_fit=True)
 
 
@@ -550,7 +563,7 @@ ws.row_dimensions[2].height = 22
 ws["C3"] = "Colores:"
 ws["C3"].font = f(9, True, GRIS_TEXTO)
 ws["C3"].alignment = Alignment(horizontal="right", vertical="center")
-for col, txt, color, borde in [("D", "Durazno = llenar", DURAZNO, BORDE_CAPTURA), ("E", "Claro = ya trae valor", CREMA, BORDE_CAPTURA),
+for col, txt, color, borde in [("D", "Durazno = llenar", DURAZNO, BORDE_CAPTURA), ("E", "Claro = opcional", CREMA, BORDE_CAPTURA),
                                ("F", "Gris = automático", GRIS_CALC, BORDE_CELDA)]:
     c = ws[f"{col}3"]
     c.value = txt
@@ -583,7 +596,7 @@ FILA_INGRESO = r
 etiqueta(r, "Fecha de ingreso"); captura(r, "FechaIngreso", EJEMPLO["FechaIngreso"], FMT_FECHA)
 dv_fecha.add(f"D{r}")
 confirmacion(r, f'=IFERROR(IF(ISNUMBER(FechaIngreso),"Se leyó: "&{fecha_txt("FechaIngreso")},""),"")')
-ayuda(r, "Día/mes/año (15/03/2019). Revisa que a la izquierda diga la fecha correcta.", "F", "G")
+ayuda(r, "Día/mes/año (15/03/2019). Revisa que en verde diga la fecha correcta.", "G", "G")
 ws[f"D{r}"].comment = Comment("Si le reconocen antigüedad de otra empresa del grupo, pon esa fecha. "
                               "Si el patrón anterior ya le pagó parte del aguinaldo de este año, captúralo en el Paso 3.", "Calculadora")
 r += 1
@@ -591,13 +604,13 @@ FILA_SALIDA = r
 etiqueta(r, "Fecha de salida (último día trabajado)"); captura(r, "FechaSalida", EJEMPLO["FechaSalida"], FMT_FECHA)
 dv_fecha.add(f"D{r}")
 confirmacion(r, f'=IFERROR(IF(ISNUMBER(FechaSalida),"Se leyó: "&{fecha_txt("FechaSalida")},""),"")')
-ayuda(r, "El último día que trabajó (ese día sí cuenta).", "F", "G")
+ayuda(r, "El último día que trabajó (ese día sí cuenta).", "G", "G")
 r += 1
 FILA_SUELDO = r
 etiqueta(r, "Sueldo mensual bruto (base)"); captura(r, "SueldoMensual", EJEMPLO["SueldoMensual"], FMT_MONEDA_SIMPLE)
 dv_dinero.add(f"D{r}")
 confirmacion(r, f'=IFERROR(IF(AND(ISNUMBER(SueldoMensual),ISNUMBER(DiasMes),DiasMes>0),"= "&{pesos("SueldoMensual/DiasMes")}&" diarios",""),"")')
-ayuda(r, "Sueldo nominal del mes, sin bonos ni prestaciones. Sólo el número: 45000", "F", "G")
+ayuda(r, "Sueldo nominal del MES, sin bonos ni prestaciones. Sólo el número: 45000", "G", "G")
 r += 1
 etiqueta(r, "Tipo de salida")
 captura(r, "TipoSalida", EJEMPLO["TipoSalida"], alinear="left", ancho_doble=True)
@@ -665,6 +678,13 @@ etiqueta(r, "Bono a pagar en la liquidación ($)"); captura(r, "Bono", EJEMPLO["
 dv_dinero.add(f"D{r}")
 ayuda(r, "Se paga completo, pero NO se suma al salario integrado. Si no hay, pon 0.")
 r += 1
+etiqueta(r, "Sueldo del mes ya pagado en nómina (para el ISR)")
+captura(r, "SueldoYaPagadoMes",
+        "=IFERROR(ROUND(SueldoMensual/DiasMes*MAX(0,MIN(DAY(FechaSalida),30,FechaSalida-FechaIngreso+1)-DiasSueldoPend),2),0)",
+        FMT_MONEDA_SIMPLE, obligatorio=False)
+dv_dinero.add(f"D{r}")
+ayuda(r, "Viene calculado: días del mes de salida ya pagados × salario diario. Cámbialo si en ese mes se pagó otra cantidad gravada.")
+r += 1
 etiqueta(r, "Otros descuentos ($): préstamos, anticipos, etc."); captura(r, "OtrasDeducciones", EJEMPLO["OtrasDeducciones"], FMT_MONEDA_SIMPLE)
 dv_dinero.add(f"D{r}")
 ayuda(r, "Se restan al final, después del ISR. Si no hay, pon 0.")
@@ -716,7 +736,7 @@ dv_pos.add(f"D{r}")
 ayuda(r, "Ley: 15 años (art. 162 LFT). Sólo aplica en renuncia voluntaria.")
 r += 1
 etiqueta(r, "Días por mes"); captura(r, "DiasMes", 30, "General", obligatorio=False)
-dv_pos.add(f"D{r}")
+validacion("decimal", "between", "1", "31", "Días por mes", "Escribe un número entre 1 y 31. Normalmente 30.").add(f"D{r}")
 ayuda(r, "Sueldo mensual ÷ 30 = salario diario (art. 89 LFT). Normalmente 30.")
 
 # --- DESGLOSE ---------------------------------------------------------------------------
@@ -819,14 +839,14 @@ r += 1
 f_agui = r
 concepto(r, 2, "Aguinaldo proporcional",
          f"=IF({OK},MAX(0,DiasAguinaldo*DiasAnioCal/365-AguinaldoPagadoDias),0)", f"=IF({OK},SalarioDiario,0)", f"=ROUND(D{r}*E{r},2)",
-         f'=IF({OK},{num_txt("DiasAguinaldo")}&" días de aguinaldo × "&FIXED(DiasAnioCal,0)&" días trabajados en "&YEAR(FechaSalida)&" ÷ 365"'
+         f'=IF({OK},{num_txt("DiasAguinaldo")}&" días de aguinaldo × "&FIXED(DiasAnioCal,0)&IF(DiasAnioCal=1," día trabajado en "," días trabajados en ")&YEAR(FechaSalida)&" ÷ 365"'
          f'&IF(AguinaldoPagadoDias>0," − "&{num_txt("AguinaldoPagadoDias")}&" días ya pagados","")'
          f'&IF(DiasAguinaldo*DiasAnioCal/365<AguinaldoPagadoDias," (ya se pagó más de lo ganado: queda en 0)",""),"")')
 r += 1
 f_vacprop = r
 concepto(r, 3, "Vacaciones proporcionales del año de servicio en curso",
          f"=IF({OK},MAX(0,DiasVacAnio*DiasVacProp/365-DiasVacTomados),0)", f"=IF({OK},SalarioDiario,0)", f"=ROUND(D{r}*E{r},2)",
-         f'=IF({OK},{num_txt("DiasVacAnio")}&" días de vacaciones × "&FIXED(DiasVacProp,0)&IF(DiasDesdeAniv=0," días (cumplió el año completo)"," días desde el último aniversario")&" ÷ 365"'
+         f'=IF({OK},{num_txt("DiasVacAnio")}&" días de vacaciones × "&FIXED(DiasVacProp,0)&IF(DiasDesdeAniv=0," días (cumplió el año completo)",IF(DiasVacProp=1," día desde el último aniversario"," días desde el último aniversario"))&" ÷ 365"'
          f'&IF(DiasVacTomados>0," − "&{num_txt("DiasVacTomados")}&" días tomados por adelantado","")'
          f'&IF(DiasVacAnio*DiasVacProp/365<DiasVacTomados," (tomó más de lo ganado: se paga 0)",""),"")')
 r += 1
@@ -838,7 +858,7 @@ r += 1
 f_pv = r
 concepto(r, 5, "Prima vacacional",
          f"=IF({OK},(D{f_vacprop}+IF(PVSaldoPagada=\"Sí\",0,D{f_vacpend}))*PctPrimaVac,0)", f"=IF({OK},SalarioDiario,0)", f"=ROUND(D{r}*E{r},2)",
-         f'=IF({OK},FIXED(PctPrimaVac*100,0)&"% × "&{num_txt(f"(D{f_vacprop}+IF(PVSaldoPagada=\"Sí\",0,D{f_vacpend}))")}'
+         f'=IF({OK},{num_txt("PctPrimaVac*100")}&"% × "&{num_txt(f"(D{f_vacprop}+IF(PVSaldoPagada=\"Sí\",0,D{f_vacpend}))")}'
          f'&IF(PVSaldoPagada="Sí"," días del concepto 3 (la prima del saldo ya se pagó)"," días de vacaciones a pagar (conceptos 3 y 4)"),"")')
 r += 1
 f_bono = r
@@ -912,7 +932,8 @@ fila_isr(r, "a", "Sueldo pendiente y vacaciones (1, 3 y 4)",
 r += 1
 f_isr2 = r
 fila_isr(r, "b", "Aguinaldo (2)", f"=F{f_agui}", f"=MIN(D{r},ExentoAguinaldo)",
-         f'=IF({OK},"Exento hasta 30 UMA = "&{pesos("ExentoAguinaldo")}&" (LISR art. 93 fr. XIV).","")')
+         f'=IF({OK},IF(AguinaldoPagadoDias>0,"Exento: 30 UMA ("&{pesos("30*UMAAplicable")}&") − aguinaldo ya pagado este año ("&{pesos("AguinaldoPagadoDias*SalarioDiario")}&") = "&{pesos("ExentoAguinaldo")},'
+         f'"Exento hasta 30 UMA = "&{pesos("ExentoAguinaldo")})&" (LISR art. 93 fr. XIV).","")')
 r += 1
 f_isr3 = r
 fila_isr(r, "c", "Prima vacacional (5)", f"=F{f_pv}", f"=MIN(D{r},ExentoPrimaVac)",
@@ -968,14 +989,15 @@ def renglon_isr(fila, texto, formula, explicacion, nombre=None, negrita=False, a
 f_isr_ord = r
 renglon_isr(r, "ISR de los pagos ordinarios (a, b, c y d)", "=ISROrdinario",
             f'=IF({OK},"Tarifa mensual del art. 96 LISR sobre "&{pesos("GravadoOrdinario")}&" gravados"'
+            f'&IF(SueldoYaPagadoMes>0," (se suman a "&{pesos("SueldoYaPagadoMes")}&" de sueldo ya pagado en el mes, cuyo ISR ya se retuvo)","")'
             f'&IF(SubsidioEmpleo>0," − subsidio para el empleo de "&{pesos("SubsidioEmpleo")},"")&".","")',
             "ISROrdinarioRenglon")
 r += 1
 f_isr_sep = r
 renglon_isr(r, "ISR de la indemnización y prima de antigüedad (e)", "=ISRSeparacion",
             f'=IF({OK},IF(GravadoSeparacion=0,"Todo exento: no paga ISR.",IF(SepATarifa="Sí",'
-            f'"Es menor a un sueldo mensual: se calcula con la tarifa, sumada a los pagos ordinarios (art. 96 LISR).",'
-            f'{pesos("GravadoSeparacion")}&" gravados × "&FIXED(TasaArt95*100,2)&"% "'
+            f'"La parte gravada ("&{pesos("GravadoSeparacion")}&") es menor que un sueldo mensual ("&{pesos("SueldoMensual")}&"): se suma a los pagos del mes y se calcula con la tarifa (art. 96, 6º párrafo, LISR).",'
+            f'{pesos("GravadoSeparacion")}&" gravados × "&FIXED(TasaArt96*100,2)&"% "'
             f'&"(ISR de un sueldo mensual ÷ sueldo mensual, art. 96 LISR).")),"")', "ISRSepRenglon")
 r += 1
 f_isr_tot = r
@@ -993,15 +1015,15 @@ gran_total(r, "NETO A RECIBIR  (estimado)", f"=TotalBruto-ISRTotal-DescuentosTot
 r += 2
 notas = [
     "Notas:",
-    "• El ISR es una ESTIMACIÓN de la retención con la tarifa 2026. La nómina real puede variar si en el mismo mes ya se pagó otro sueldo "
-    "o si en el año ya se usó la exención de prima vacacional; el ISR definitivo se ajusta en la declaración anual de la persona.",
+    '="• El ISR es una ESTIMACIÓN de la retención con la tarifa de «Tablas» (vigente desde "&ISR_AnioTarifa&"). Puede variar si la nómina del mes '
+    'pagó otros conceptos, si en el año ya se usó la exención de prima vacacional, o por el ajuste de la declaración anual de la persona."',
     "• Salario diario integrado (SDI) = sueldo diario + parte proporcional de aguinaldo y prima vacacional (+ otras prestaciones fijas si se capturaron). El bono no integra (política).",
     "• Los conceptos 8 y 9 usan la antigüedad con decimales (los días del año incompleto también cuentan).",
     "• El tope de indemnización sólo reduce los conceptos 7 y 8 (o 7 a 9 si así se eligió); el finiquito nunca se topa.",
 ]
 for t in notas:
     ws.merge_cells(f"B{r}:G{r}")
-    ws[f"B{r}"] = t
+    ws[f"B{r}"] = seguro_txt(t)
     ws[f"B{r}"].font = f(9, t == "Notas:", GRIS_TEXTO, italic=t != "Notas:")
     ws[f"B{r}"].alignment = Alignment(vertical="center", wrap_text=True, indent=1)
     ws.row_dimensions[r].height = 26 if len(t) > 140 else 16
@@ -1039,17 +1061,17 @@ fila_apoyo(r, "¿Las opciones de las listas son válidas?", "ListasOK",
            '=IF(AND(ISNUMBER(MATCH(TipoSalida,Lista_Tipo,0)),ISNUMBER(MATCH(ZonaSM,Lista_Zona,0)),ISNUMBER(MATCH(ToparIndem,Lista_SiNo,0)),ISNUMBER(MATCH(CoberturaTope,Lista_Cobertura,0)),ISNUMBER(MATCH(ToparPrimaAnt,Lista_SiNo,0)),ISNUMBER(MATCH(BasePrimaAnt,Lista_Base,0)),ISNUMBER(MATCH(PVSaldoPagada,Lista_SiNo,0))),"Sí","No")', None, "Cada menú (tipo de salida, zona, Sí/No, cobertura, salario) debe tener una opción de su lista.")
 r += 1
 fila_apoyo(r, "¿Los números son números (sin letras)?", "TextoOK",
-           '=IF(COUNTA(FechaIngreso,FechaSalida,SueldoMensual,DiasAguinaldo,PctPrimaVac,DiasVacManual,OtrasPrestInteg,DiasSueldoPend,DiasVacPend,DiasVacTomados,AguinaldoPagadoDias,Bono,OtrasDeducciones,MesesIndem,DiasPorAnio,AniosTopeIndem,DiasPrimaAnt,VecesTope,AntMinRenuncia,DiasMes)=COUNT(FechaIngreso,FechaSalida,SueldoMensual,DiasAguinaldo,PctPrimaVac,DiasVacManual,OtrasPrestInteg,DiasSueldoPend,DiasVacPend,DiasVacTomados,AguinaldoPagadoDias,Bono,OtrasDeducciones,MesesIndem,DiasPorAnio,AniosTopeIndem,DiasPrimaAnt,VecesTope,AntMinRenuncia,DiasMes),"Sí","No")', None, "Una celda con letras o espacios donde va un número no se puede calcular.")
+           '=IF(COUNTA(FechaIngreso,FechaSalida,SueldoMensual,DiasAguinaldo,PctPrimaVac,DiasVacManual,OtrasPrestInteg,DiasSueldoPend,DiasVacPend,DiasVacTomados,AguinaldoPagadoDias,SueldoYaPagadoMes,Bono,OtrasDeducciones,MesesIndem,DiasPorAnio,AniosTopeIndem,DiasPrimaAnt,VecesTope,AntMinRenuncia,DiasMes)=COUNT(FechaIngreso,FechaSalida,SueldoMensual,DiasAguinaldo,PctPrimaVac,DiasVacManual,OtrasPrestInteg,DiasSueldoPend,DiasVacPend,DiasVacTomados,AguinaldoPagadoDias,SueldoYaPagadoMes,Bono,OtrasDeducciones,MesesIndem,DiasPorAnio,AniosTopeIndem,DiasPrimaAnt,VecesTope,AntMinRenuncia,DiasMes),"Sí","No")', None, "Una celda con letras o espacios donde va un número no se puede calcular.")
 r += 1
 fila_apoyo(r, "¿Sin números negativos?", "NegOK",
-           '=IF(MIN(FechaIngreso,FechaSalida,SueldoMensual,DiasAguinaldo,PctPrimaVac,DiasVacManual,OtrasPrestInteg,DiasSueldoPend,DiasVacPend,DiasVacTomados,AguinaldoPagadoDias,Bono,OtrasDeducciones,MesesIndem,DiasPorAnio,AniosTopeIndem,DiasPrimaAnt,VecesTope,AntMinRenuncia,DiasMes)>=0,"Sí","No")', None, "Ningún dato de captura puede ser negativo.")
+           '=IF(MIN(FechaIngreso,FechaSalida,SueldoMensual,DiasAguinaldo,PctPrimaVac,DiasVacManual,OtrasPrestInteg,DiasSueldoPend,DiasVacPend,DiasVacTomados,AguinaldoPagadoDias,SueldoYaPagadoMes,Bono,OtrasDeducciones,MesesIndem,DiasPorAnio,AniosTopeIndem,DiasPrimaAnt,VecesTope,AntMinRenuncia,DiasMes)>=0,"Sí","No")', None, "Ningún dato de captura puede ser negativo.")
 r += 1
 fila_apoyo(r, "¿Están llenos los Pasos 2 y 4?", "PoliticaOK",
            '=IF(AND(COUNT(DiasAguinaldo,PctPrimaVac,MesesIndem,DiasPorAnio,AniosTopeIndem,DiasPrimaAnt,VecesTope,AntMinRenuncia,DiasMes)=9,DiasMes>0),"Sí","No")', None, "Aguinaldo, prima vacacional y la política GSK no pueden quedar vacíos.")
 r += 1
 fila_apoyo(r, "¿Están completos los datos para calcular?", "DatosOK",
            "=IF(AND(ISNUMBER(FechaIngreso),ISNUMBER(FechaSalida),ISNUMBER(SueldoMensual)),"
-           "IF(AND(FechaSalida>=FechaIngreso,SueldoMensual>0,ListasOK=\"Sí\",TextoOK=\"Sí\",NegOK=\"Sí\",PoliticaOK=\"Sí\"),\"Sí\",\"No\"),\"No\")",
+           "IF(AND(FechaSalida>=FechaIngreso,FechaIngreso>=DATE(1950,1,1),FechaIngreso=INT(FechaIngreso),FechaSalida=INT(FechaSalida),SueldoMensual>0,ListasOK=\"Sí\",TextoOK=\"Sí\",NegOK=\"Sí\",PoliticaOK=\"Sí\"),\"Sí\",\"No\"),\"No\")",
            None, "Si dice No, todo da 0 y el mensaje de arriba dice qué falta.", negrita=True)
 r += 1
 fila_apoyo(r, "¿Se paga indemnización (conceptos 7 y 8)?", "AplicaIndem",
@@ -1067,7 +1089,8 @@ fila_apoyo(r, "Días de servicio (del ingreso a la salida, ambos cuentan)", "Dia
            f"=IF({OK},FechaSalida-FechaIngreso+1,0)", FMT_ENTERO, "Fecha de salida − fecha de ingreso + 1")
 r += 1
 fila_apoyo(r, "Años completos cumplidos", "AniosCompletos",
-           f"=IF({OK},DATEDIF(FechaIngreso,FechaSalida+1,\"y\"),0)", FMT_ENTERO, "Aniversarios cumplidos al último día trabajado.")
+           f"=IF({OK},DATEDIF(FechaIngreso,FechaSalida+1,\"y\")+IF(EDATE(FechaIngreso,12*(DATEDIF(FechaIngreso,FechaSalida+1,\"y\")+1))<=FechaSalida+1,1,0),0)",
+           FMT_ENTERO, "Aniversarios cumplidos al último día trabajado (si entró un 29 de febrero, el aniversario es el 28).")
 r += 1
 fila_apoyo(r, "Último aniversario", "UltimoAniv",
            f"=IF({OK},EDATE(FechaIngreso,12*AniosCompletos),\"\")", FMT_FECHA, "Fecha de ingreso + años completos.")
@@ -1138,7 +1161,7 @@ fila_integ(r, "+ Parte proporcional de aguinaldo", "IntegAguinaldo", "=SalarioDi
            f'="Salario diario × "&{num_txt("DiasAguinaldo")}&" días ÷ 365"')
 r += 1
 fila_integ(r, "+ Parte proporcional de prima vacacional", "IntegPrimaVac", "=SalarioDiario*DiasPrimaVacAnio/365", f"=D{r}*DiasMes",
-           f'="Salario diario × "&{num_txt("DiasVacAnio")}&" días × "&FIXED(PctPrimaVac*100,0)&"% ÷ 365"')
+           f'="Salario diario × "&{num_txt("DiasVacAnio")}&" días × "&{num_txt("PctPrimaVac*100")}&"% ÷ 365"')
 r += 1
 fila_integ(r, "+ Otras prestaciones fijas que integran", "IntegOtras", "=OtrasPrestInteg/DiasMes", f"=D{r}*DiasMes",
            '=IF(OtrasPrestInteg>0,"Monto mensual del Paso 2 ÷ "&' + num_txt("DiasMes") + '&" días","No capturaste otras prestaciones (Paso 2).")')
@@ -1150,7 +1173,7 @@ for col in "DE":
 r += 1
 fila_apoyo(r, "Factor de integración (aguinaldo y prima vacacional)", "FactorIntegracion",
            "=1+DiasAguinaldo/365+DiasPrimaVacAnio/365", FMT_FACTOR,
-           f'="1 + "&{num_txt("DiasAguinaldo")}&"/365 + ("&{num_txt("DiasVacAnio")}&" × "&FIXED(PctPrimaVac*100,0)&"%)/365"')
+           f'="1 + "&{num_txt("DiasAguinaldo")}&"/365 + ("&{num_txt("DiasVacAnio")}&" × "&{num_txt("PctPrimaVac*100")}&"%)/365"')
 
 r += 2
 sub_apoyo(r, "Tope de la indemnización")
@@ -1231,9 +1254,9 @@ fila_apoyo(r, "Gravado de indemnización y prima de antigüedad (e)", "GravadoSe
 r += 1
 fila_apoyo(r, "ISR de un sueldo mensual (tarifa art. 96)", "ISRSueldoMensual",
            f"=IF({OK},ROUND({isr_tarifa('SueldoMensual')},2),0)", FMT_MONEDA_SIMPLE,
-           "Tarifa mensual de la hoja «Tablas» aplicada al último sueldo mensual ordinario.")
+           "Se toma el sueldo base como último sueldo mensual ordinario; si cada mes cobra otros pagos fijos gravados, la tasa real es algo mayor.")
 r += 1
-fila_apoyo(r, "Tasa del art. 96 (6º párrafo) para la indemnización", "TasaArt95",
+fila_apoyo(r, "Tasa del art. 96 (6º párrafo) para la indemnización", "TasaArt96",
            "=IF(SueldoMensual>0,ISRSueldoMensual/SueldoMensual,0)", "0.00%",
            "ISR de un sueldo mensual ÷ sueldo mensual. Se aplica a la indemnización gravada.")
 r += 1
@@ -1241,20 +1264,29 @@ fila_apoyo(r, "¿La indemnización gravada va con la tarifa?", "SepATarifa",
            "=IF(AND(GravadoSeparacion>0,GravadoSeparacion<SueldoMensual),\"Sí\",\"No\")", None,
            "Sí cuando es menor a un sueldo mensual: entonces se calcula con la tarifa, sumada a los pagos ordinarios.")
 r += 1
+fila_apoyo(r, "ISR del mes con el finiquito (tarifa)", "ISRMesTotal",
+           f"=IF({OK},ROUND({isr_tarifa('(GravadoOrdinario+SueldoYaPagadoMes)')},2),0)", FMT_MONEDA_SIMPLE,
+           "Tarifa mensual sobre lo gravado del finiquito + el sueldo de ese mes ya pagado en nómina.")
+r += 1
+fila_apoyo(r, "ISR que ya se retuvo del sueldo pagado en el mes", "ISRYaRetenido",
+           f"=IF({OK},ROUND({isr_tarifa('SueldoYaPagadoMes')},2),0)", FMT_MONEDA_SIMPLE,
+           "Tarifa mensual sobre el sueldo del mes ya pagado (estimado).")
+r += 1
 fila_apoyo(r, "ISR de los pagos ordinarios con tarifa (antes de subsidio)", "ISRTarifaOrd",
-           f"=IF({OK},ROUND({isr_tarifa('GravadoOrdinario')},2),0)", FMT_MONEDA_SIMPLE,
-           "Cuota fija + % sobre el excedente del límite inferior (tarifa mensual).")
+           "=MAX(0,ISRMesTotal-ISRYaRetenido)", FMT_MONEDA_SIMPLE,
+           "Lo que sube el ISR del mes por el finiquito.")
 r += 1
 fila_apoyo(r, "Subsidio para el empleo", "SubsidioEmpleo",
-           f"=IF(AND({OK},GravadoOrdinario>0,GravadoOrdinario<=SubsidioLimite),MIN(ISRTarifaOrd,ROUND(UMAAplicable*30.4*SubsidioPct,2)),0)",
-           FMT_MONEDA_SIMPLE, "Sólo si los pagos ordinarios gravados no pasan del límite de la hoja «Tablas».")
+           f"=IF(AND({OK},GravadoOrdinario>0,GravadoOrdinario+SueldoYaPagadoMes+IF(SepATarifa=\"Sí\",GravadoSeparacion,0)<=SubsidioLimite),"
+           f"MIN(ISRTarifaOrd,ROUND(UMAAplicable*SubsidioPct*MIN(DiasSueldoPend,30.4),2)),0)",
+           FMT_MONEDA_SIMPLE, "Sólo si el ingreso gravado del mes no pasa del límite de «Tablas»; proporcional a los días de sueldo del finiquito.")
 r += 1
 fila_apoyo(r, "ISR de los pagos ordinarios", "ISROrdinario", "=MAX(0,ISRTarifaOrd-SubsidioEmpleo)", FMT_MONEDA_SIMPLE,
            "ISR con tarifa − subsidio.", negrita=True)
 r += 1
 fila_apoyo(r, "ISR de indemnización y prima de antigüedad", "ISRSeparacion",
            f"=IF(OR(NOT({OK}),GravadoSeparacion=0),0,IF(SepATarifa=\"Sí\","
-           f"ROUND({isr_tarifa('(GravadoOrdinario+GravadoSeparacion)')},2)-ISRTarifaOrd,ROUND(GravadoSeparacion*TasaArt95,2)))",
+           f"ROUND({isr_tarifa('(GravadoOrdinario+SueldoYaPagadoMes+GravadoSeparacion)')},2)-ISRMesTotal,ROUND(GravadoSeparacion*TasaArt96,2)))",
            FMT_MONEDA_SIMPLE, "Gravado × tasa; o, si es menor a un sueldo mensual, lo que sube la tarifa al sumarlo.", negrita=True)
 f_fin = r
 
@@ -1303,7 +1335,7 @@ fr += 1
 ws[f"C{fr}"] = seguro_txt(f'=IF({OK},"Salario diario integrado: "&{pesos("SalarioIntegrado")}&" ("&{pesos("SalarioIntegrado*DiasMes")}&" al mes)","")')
 ws[f"C{fr}"].font = f(9, True)
 ws[f"C{fr}"].alignment = Alignment(vertical="bottom", indent=1, shrink_to_fit=True)
-tile_label(fr, "D", "Ajuste por tope")
+tile_label(fr, "D", "Tope (ya incluido)")
 tile_label(fr, "E", "ISR estimado")
 tile_label(fr, "F", "Otros descuentos")
 ws[f"G{fr}"] = seguro_txt(f'=IF(AND({OK},SueldoMensual>0),"Neto = "&FIXED(TotalNeto/SueldoMensual,1)&" meses de sueldo base","")')
@@ -1324,28 +1356,44 @@ ws.row_dimensions[fr].height = 24
 fr += 1
 FILA_ESTADO = fr
 AVISOS = [
-    ('NOT(ISNUMBER(FechaIngreso))', '"⚠ Falta la fecha de ingreso (Paso 1)."'),
-    ('NOT(ISNUMBER(FechaSalida))', '"⚠ Falta la fecha de salida (Paso 1)."'),
+    ('ISBLANK(FechaIngreso)', '"⚠ Falta la fecha de ingreso (Paso 1)."'),
+    ('NOT(ISNUMBER(FechaIngreso))', '"⚠ Excel no reconoce la fecha de ingreso (quedó como texto). Bórrala y escríbela como 15/03/2019 o 2019-03-15."'),
+    ('ISBLANK(FechaSalida)', '"⚠ Falta la fecha de salida (Paso 1)."'),
+    ('NOT(ISNUMBER(FechaSalida))', '"⚠ Excel no reconoce la fecha de salida (quedó como texto). Bórrala y escríbela como 30/11/2026 o 2026-11-30."'),
     ('FechaSalida<FechaIngreso', '"⚠ La fecha de salida es anterior a la de ingreso. Revísalas."'),
-    ('OR(NOT(ISNUMBER(SueldoMensual)),SueldoMensual<=0)', '"⚠ Falta el sueldo mensual (Paso 1)."'),
+    ('OR(FechaIngreso<>INT(FechaIngreso),FechaSalida<>INT(FechaSalida))', '"⚠ Una fecha trae hora (por ejemplo =AHORA() o copiada de un sistema). Escribe sólo la fecha."'),
+    ('FechaIngreso<DATE(1950,1,1)', '"⚠ La fecha de ingreso es anterior a 1950. Revísala (Paso 1)."'),
+    ('ISBLANK(SueldoMensual)', '"⚠ Falta el sueldo mensual (Paso 1)."'),
+    ('NOT(ISNUMBER(SueldoMensual))', '"⚠ El sueldo mensual tiene letras o símbolos: escribe sólo el número (ej. 45000)."'),
+    ('SueldoMensual<=0', '"⚠ El sueldo mensual debe ser mayor a 0 (Paso 1)."'),
     ('ISNA(MATCH(TipoSalida,Lista_Tipo,0))', '"⚠ Elige el tipo de salida con la flechita de la lista (Paso 1)."'),
     ('ListasOK<>"Sí"', '"⚠ Hay una opción escrita a mano (zona, Sí/No, cobertura o salario). Elígela con la flechita de la lista."'),
     ('TextoOK<>"Sí"', '"⚠ Hay letras, espacios o símbolos donde va un número (Pasos 2, 3 o 4). Escribe sólo números."'),
     ('NegOK<>"Sí"', '"⚠ Hay un número negativo en los Pasos 2, 3 o 4. Si no aplica, escribe 0."'),
+    ('AND(ISNUMBER(DiasMes),DiasMes<=0)', '"⚠ «Días por mes» (Paso 4) debe ser mayor a 0; normalmente es 30."'),
     ('PoliticaOK<>"Sí"', '"⚠ Hay una celda vacía en el Paso 2 o 4. Valores normales: aguinaldo 15, prima 25%, 4 meses, 20 días, '
                          'tope 2 años, 12 días, 2 salarios mínimos, 15 años y 30 días por mes."'),
     ('AND(AplicaPrimaAnt="Sí",SalMinAplicable=0)', '"⚠ No hay salario mínimo capturado para esa fecha y zona (hoja Tablas)."'),
     ('AND(AplicaPrimaAnt="Sí",YEAR(FechaSM)<YEAR(FechaSalida))',
      '"⚠ Falta capturar el salario mínimo "&YEAR(FechaSalida)&" en la hoja Tablas; se usó el de "&YEAR(FechaSM)&"."'),
     ('UMAAplicable=0', '"⚠ No hay UMA capturada para esa fecha (hoja Tablas); el ISR no es confiable."'),
+    ('OR(COUNT(ISR_LimInf)<ROWS(ISR_LimInf),COUNT(ISR_Cuota)<ROWS(ISR_Cuota),COUNT(ISR_Tasa)<ROWS(ISR_Tasa),'
+     'COUNT(SubsidioPct,SubsidioLimite,ISR_AnioTarifa)<3,COUNTA(Vac_Empresa)<>COUNT(Vac_Empresa))',
+     '"⚠ En la hoja «Tablas» hay una celda de la tarifa de ISR, del subsidio o de vacaciones vacía o con letras. Corrígela."'),
     ('AND(YEAR(FechaUMA)<YEAR(FechaSalida),MONTH(FechaSalida)>1)',
      '"⚠ Falta capturar la UMA "&YEAR(FechaSalida)&" en la hoja Tablas; se usó la de "&YEAR(FechaUMA)&"."'),
     ('YEAR(FechaSalida)<ISR_AnioTarifa',
      '"⚠ La tarifa de ISR de «Tablas» rige desde "&ISR_AnioTarifa&"; para una salida de "&YEAR(FechaSalida)&" el ISR es sólo aproximado."'),
+    ('AND(SalMinAplicable>0,SueldoMensual<SalMinAplicable*DiasMes)',
+     '"⚠ El sueldo mensual es menor a un mes de salario mínimo ("&FIXED(SalMinAplicable*DiasMes,2)&"). ¿Escribiste el sueldo DIARIO? Debe ser el MENSUAL (Paso 1)."'),
+    ('PctPrimaVac>1', '"⚠ La prima vacacional dice "&FIXED(PctPrimaVac*100,0)&"%. ¿Quisiste escribir 25%? Revisa el Paso 2."'),
+    ('AND(ToparIndem="Sí",AniosTopeIndem=0)', '"⚠ El tope de indemnización está en 0 años: los conceptos 7 y 8 quedan en 0. Si no quieres tope, elige «No» en el Paso 4."'),
+    ('TotalNeto<0', '"⚠ Los descuentos son mayores que lo que se le paga: el neto sale negativo. Revisa «Otros descuentos» (Paso 3)."'),
     ('DiasVacAnio*DiasVacProp/365<DiasVacTomados', '"⚠ Tomó más vacaciones de las que lleva ganadas este año; las proporcionales quedan en 0."'),
     ('OR(DiasAguinaldo<15,PctPrimaVac<0.25,DiasVacAnio<DiasVacLey)',
      '"⚠ Hay prestaciones por debajo de la ley (aguinaldo 15 días, prima vacacional 25%, tabla de vacaciones). Revisa el Paso 2."'),
-    (f'Nombre="{EJEMPLO["Nombre"]}"', '"⚠ Son datos de EJEMPLO: escribe encima los del colaborador (Pasos 1 y 3)."'),
+    (f'OR(Nombre="{EJEMPLO["Nombre"]}",AND(FechaIngreso=DATE(2019,3,15),SueldoMensual={EJEMPLO["SueldoMensual"]}))',
+     '"⚠ Hay datos del EJEMPLO (nombre, fecha de ingreso o sueldo): escribe encima los del colaborador (Paso 1)."'),
 ]
 estado = '"✓ Listo. Revisa el desglose más abajo."'
 for cond, msg in reversed(AVISOS):
@@ -1458,9 +1506,10 @@ bloque_titulo("CÓMO SE USA  (todo se hace en la pestaña «Calculadora»)")
 renglon_instr("Paso 1 · Datos del colaborador", "Nombre, fecha de ingreso, fecha de salida, sueldo mensual y tipo de salida (celdas durazno). "
               "Junto a cada fecha aparece cómo la leyó Excel («Se leyó: 15 de marzo de 2019»): revisa que sea la correcta.", 1)
 renglon_instr("Paso 2 · Prestaciones", "Aguinaldo y prima vacacional ya traen el mínimo de ley; cámbialos sólo si la empresa da más. "
-              "Las vacaciones salen solas de la tabla de la ley.", 2)
+              "Las vacaciones salen solas de la tabla de la ley. Si hay otras prestaciones fijas que integran (vales, fondo de ahorro), "
+              "captura su monto mensual.", 2)
 renglon_instr("Paso 3 · Pendientes, bono y descuentos", "Días no pagados, saldo de vacaciones, bono y otros descuentos. Vienen en 0: "
-              "escribe sólo lo que aplique.", 3)
+              "escribe sólo lo que aplique. «Sueldo de este mes ya pagado» viene calculado y sólo sirve para estimar bien el ISR.", 3)
 renglon_instr("Paso 4 · Política GSK", "4 meses + 20 días por año, tope de 2 años de salario integrado y prima de antigüedad de ley "
               "(12 días por año, topada a 2 salarios mínimos). Normalmente no se toca.", 4)
 renglon_instr("Resultado", "Arriba, en RESULTADO, está el total bruto, el ISR y el NETO A RECIBIR, con un mensaje: verde = todo bien; "
@@ -1516,8 +1565,9 @@ bloque_titulo("CÓMO SE ESTIMA EL ISR (BRUTO → NETO)")
 for t, d in [
     ("Partes exentas", "Aguinaldo: hasta 30 UMA. Prima vacacional: hasta 15 UMA. Indemnización y prima de antigüedad: hasta 90 UMA por cada "
      "año de servicio (la fracción de más de 6 meses cuenta como año). Sueldo, vacaciones y bono: todo gravado (LISR art. 93)."),
-    ("Pagos ordinarios", "A la parte gravada de sueldo, vacaciones, aguinaldo, prima vacacional y bono se le aplica la tarifa mensual 2026 del art. 96 "
-     "(hoja «Tablas»), como un pago del mes. Si esa suma no pasa de $11,492.66, se resta el subsidio para el empleo."),
+    ("Pagos ordinarios", "La parte gravada de sueldo, vacaciones, aguinaldo, prima vacacional y bono se suma al sueldo de ese mes ya pagado en nómina "
+     "y se aplica la tarifa mensual del art. 96 (hoja «Tablas»); se descuenta el ISR que ya se retuvo de ese sueldo. Si el ingreso del mes no pasa del "
+     "límite del subsidio para el empleo (hoja «Tablas»), se resta el subsidio proporcional a los días de sueldo del finiquito."),
     ("Indemnización y prima de antigüedad", "A su parte gravada se le aplica la tasa del último sueldo: ISR de un sueldo mensual ÷ sueldo mensual "
      "(art. 96, 6º párrafo, LISR). Si la parte gravada es menor a un sueldo mensual, se calcula con la tarifa, sumada a los pagos ordinarios."),
     ("Es una estimación", "La retención real de nómina puede variar (sueldos ya pagados en el mes, subsidio para el empleo en sueldos bajos, "
@@ -1525,7 +1575,6 @@ for t, d in [
 ]:
     renglon_instr(t, d)
 
-wsI.row_breaks.append(Break(id=fila))
 fila += 1
 bloque_titulo("QUÉ SE PAGA SEGÚN EL TIPO DE SALIDA")
 for col, txt in zip("CD", ["Tipo de salida", "Conceptos que se pagan"]):
