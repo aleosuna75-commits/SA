@@ -285,6 +285,7 @@ def celda_fuente(ws, ref, valor):
     c = ws[ref]
     c.value = valor
     c.font = f(8, italic=True, color=GRIS_TEXTO)
+    c.alignment = Alignment(wrap_text=True, vertical="center")
     c.border = BORDE_CELDA
     c.protection = Protection(locked=False)
 
@@ -354,7 +355,8 @@ nombrar("UMA_Valor", "Tablas", f"$D${uma_ini}:$D${uma_fin}")
 
 # --- Tarifa ISR -------------------------------------------------------------------------
 r += 1
-titulo_tabla(wsT, r, "TARIFA MENSUAL DE ISR  (LISR art. 96; se usa para el ISR del finiquito y la tasa del art. 95)")
+wsT.row_breaks.append(Break(id=r))
+titulo_tabla(wsT, r, "TARIFA MENSUAL DE ISR 2026  (LISR art. 96; ISR del finiquito y tasa del último sueldo para la indemnización)")
 r += 1
 encabezados(wsT, r, "BCDEF", ["Límite inferior", "Límite superior", "Cuota fija", "% sobre el excedente\ndel límite inferior", "Fuente"])
 r += 1
@@ -1490,11 +1492,14 @@ for t, d in [
     ("Salario diario integrado (SDI)", "Salario diario × factor de integración: el sueldo más la parte proporcional diaria del aguinaldo y de la "
      "prima vacacional (arts. 84 y 89 LFT). Se usa para la indemnización (conceptos 7 y 8). El bono NO integra."),
     ("1. Sueldo pendiente", "Días trabajados que todavía no se pagan × salario diario."),
-    ("2. Aguinaldo proporcional", "Días de aguinaldo × días trabajados en el año de la salida ÷ 365 × salario diario (art. 87 LFT)."),
+    ("2. Aguinaldo proporcional", "Días de aguinaldo × días trabajados en el año de la salida ÷ 365 × salario diario, menos los días de "
+     "aguinaldo de ese año que ya se le pagaron (art. 87 LFT)."),
     ("3. Vacaciones proporcionales", "Días de vacaciones del año de servicio que está corriendo × días desde el último aniversario ÷ 365, "
-     "menos los que ya tomó (art. 79 LFT). Los días por año salen de la tabla de la ley (art. 76, reforma 2023)."),
-    ("4. Vacaciones pendientes", "Vacaciones de años anteriores que no tomó × salario diario."),
-    ("5. Prima vacacional", "% de prima vacacional × (días de vacaciones de los conceptos 3 y 4) × salario diario (art. 80 LFT)."),
+     "menos los días que tomó por adelantado (art. 79 LFT). Si sale el día antes de su aniversario, se paga el año completo. "
+     "Los días por año salen de la tabla de la ley (art. 76, reforma 2023)."),
+    ("4. Saldo de vacaciones", "Vacaciones ya ganadas en aniversarios cumplidos y no tomadas (según el control de vacaciones) × salario diario."),
+    ("5. Prima vacacional", "% de prima vacacional × (días de vacaciones de los conceptos 3 y 4) × salario diario (art. 80 LFT). "
+     "Si la prima del saldo ya se pagó, sólo se paga la del concepto 3."),
     ("6. Bono", "Monto capturado; se paga completo y no forma parte del salario integrado (decisión de política)."),
     ("7. Indemnización (TRL)", "Meses de indemnización × 30 días × SDI. La ley marca 3 meses (art. 50); GSK paga 4."),
     ("8. 20 días por año", "20 días × antigüedad en años con decimales × SDI."),
