@@ -470,7 +470,7 @@ async function revisaSegunDatos(ctx, url, etiqueta, movil, opciones, extra) {
       etq + 'fase regular terminada: tabla final (sin la proyección), «Hasta dónde llega cada uno» sólo con los ' + cl.length + ' clasificados y sin columna «Liguilla», los ' + fuera.length + ' que no clasificaron por su nombre y nada en futuro', JSON.stringify(rc).slice(0, 400) + (viejo ? ' · «' + viejo[0] + '»' : ''));
   } else revisa(!rc.final && /Así se espera que termine/.test(rc.finalTxt) && rc.cols.includes('Liguilla') && /Así va hoy/.test(rc.tabla), etq + 'fase regular en juego: tabla de hoy, tabla final proyectada y probabilidad de clasificar', JSON.stringify(rc).slice(0, 300));
   await revisaConexion(pg, etq);
-  await revisaLiguillaE(pg, d, t, etq, fin);
+  await revisaLiguillaE(pg, d, t, etq, fin, extra.ahora ? Date.parse(extra.ahora) : Date.now());
   await revisaHorarios(pg, d, t, sueltas, etq, movil, texto);
   const desb = await desbordes(pg), mala = palabrasMalas(texto), resp = await pg.evaluate(() => document.querySelectorAll('.respaldo').length);
   revisa(desb.sw <= desb.ancho + 1 && desb.malos.length === 0, etq + 'sin desplazamiento horizontal ni elementos fuera de la pantalla', desb.sw + ' ' + desb.malos.join(' | '));
@@ -533,7 +533,7 @@ async function revisaHorarios(pg, d, t, sueltas, etq, movil, texto) {
 }
 /* Lo que encontró el ensayo de la liguilla con el Clausura 2026 (workflow 10, encargo E). Las expectativas salen de los datos
    incrustados; la página sólo da formato. */
-async function revisaLiguillaE(pg, d, t, etq, fin) {
+async function revisaLiguillaE(pg, d, t, etq, fin, relojMs) {   /* relojMs: el reloj de la página, no el de la máquina */
   const r = await pg.evaluate(() => {
     const T = e => (e ? e.textContent : '').replace(/\s+/g, ' ').trim(), q = s => document.querySelector(s);
     const lum = c => { const m = /rgba?\(([\d.]+), ([\d.]+), ([\d.]+)/.exec(c) || [0, 0, 0, 0]; const f = v => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); }; return 0.2126 * f(+m[1]) + 0.7152 * f(+m[2]) + 0.0722 * f(+m[3]); };
@@ -572,7 +572,6 @@ async function revisaLiguillaE(pg, d, t, etq, fin) {
   if (conSerie.length) {
     const mal = conSerie.filter(p => { const c = r.series.find(x => x.id === String(p.id)); return !c || c.t !== p.serie.texto || !/90 minutos/.test(c.h5); }).map(p => p.id);
     revisa(mal.length === 0, etq + 'las ' + conSerie.length + ' tarjetas de liguilla dicen la serie (global y lo que necesita cada uno) y que su 1X2 es a 90 minutos', JSON.stringify(mal));
-    const relojMs = extra.ahora ? Date.parse(extra.ahora) : Date.now();      /* el reloj de la página, no el de la máquina */
     const prox = d.pendientes.filter(p => Date.parse(p.fecha_utc) > relojMs)[0];
     if (prox && prox.serie && prox.serie.texto) revisa(r.sigue.includes(prox.serie.texto), etq + 'la franja «Próximo partido» dice de qué serie es y cómo va', r.sigue);
   }
