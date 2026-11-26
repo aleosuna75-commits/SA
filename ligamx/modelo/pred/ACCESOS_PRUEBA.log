@@ -191,3 +191,10 @@
 2026-11-23T23:05:07Z	accion=evaluar	quien=restaurar_pred	modelo=mercado_abre_shin	periodo=prueba	granularidad=dia	partidos=490	parcial=False	pid=1769	argv=/home/user/SA/ligamx/modelo/restaurar_pred.py correr --prueba poisson_simple mercado_cierre_shin mercado_abre_shin
 2026-11-23T23:05:09Z	accion=evaluar	quien=restaurar_pred	modelo=ajuste	periodo=prueba	granularidad=dia	partidos=490	parcial=False	pid=1467	argv=/home/user/SA/ligamx/modelo/restaurar_pred.py correr --prueba ensamble ajuste
 2026-11-24T03:47:25Z	accion=leer	quien=exportar.ultimos_resultados	modelo=ensamble	granularidad=dia	pid=7914	argv=/home/user/SA/ligamx/produccion/exportar.py --corte 2026-05-01T00:00 --n-sim 100000 --sin-sello --salida /tmp/claude-0/-home-user-SA/2bd39326-8617-5400-b04f-4c3059628357/scratchpad/horarios/V1/retro_cl26.json
+2026-11-26T05:23:46Z	accion=evaluar	quien=mejora.ciclo	modelo=ensamble	periodo=prueba	granularidad=dia	partidos=492	parcial=False	pid=3906	argv=pipeline.py auto
+2026-11-26T05:23:56Z	accion=evaluar	quien=mejora.ciclo	modelo=ajuste	periodo=prueba	granularidad=dia	partidos=492	parcial=False	pid=3906	argv=pipeline.py auto
+2026-11-26T05:24:06Z	accion=evaluar	quien=mejora.ciclo	modelo=elo	periodo=prueba	granularidad=dia	partidos=492	parcial=False	pid=3906	argv=pipeline.py auto
+2026-11-26T05:24:07Z	accion=evaluar	quien=mejora.ciclo	modelo=dc2	periodo=prueba	granularidad=dia	partidos=492	parcial=False	pid=3906	argv=pipeline.py auto
+2026-11-26T05:24:09Z	accion=evaluar	quien=mejora.ciclo	modelo=dc	periodo=prueba	granularidad=dia	partidos=492	parcial=False	pid=3906	argv=pipeline.py auto
+2026-11-26T05:24:12Z	accion=evaluar	quien=mejora.ciclo	modelo=tiros	periodo=prueba	granularidad=dia	partidos=492	parcial=False	pid=3906	argv=pipeline.py auto
+2026-11-26T05:24:14Z	accion=lectura_pareadas	quien=mejora.adoptar	modelo=ensamble	pid=3906	argv=pipeline.py auto

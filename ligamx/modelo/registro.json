@@ -1,5 +1,5 @@
 {
- "actualizado": "2026-11-23",
+ "actualizado": "2026-11-26",
  "protocolo": {
   "metrica": "log-loss 1X2 a 90 minutos",
   "walk_forward": "por bloques (cortes lunes y viernes 00:00 CDMX)",
@@ -81,12 +81,12 @@
     "error_calibracion": 0.017
    },
    "prueba_dia": {
-    "n": 490,
-    "logloss": 1.0228,
-    "ee_logloss": 0.0199,
-    "rps": 0.2114,
-    "brier": 0.6127,
-    "logv_marcador": -2.9839,
+    "n": 492,
+    "logloss": 1.0221,
+    "ee_logloss": 0.0193,
+    "rps": 0.211,
+    "brier": 0.6122,
+    "logv_marcador": -2.9819,
     "acierto": 0.498
    }
   }
@@ -141,12 +141,12 @@
      "error_calibracion": 0.011
     },
     "prueba_dia": {
-     "n": 490,
-     "logloss": 1.0267,
-     "ee_logloss": 0.0211,
-     "rps": 0.2123,
-     "brier": 0.6152,
-     "logv_marcador": -2.9998,
+     "n": 492,
+     "logloss": 1.026,
+     "ee_logloss": 0.0206,
+     "rps": 0.2118,
+     "brier": 0.6147,
+     "logv_marcador": -2.9985,
      "acierto": 0.488
     }
    },
@@ -180,12 +180,12 @@
      "error_calibracion": 0.011
     },
     "prueba_dia": {
-     "n": 490,
-     "logloss": 1.0232,
-     "ee_logloss": 0.019,
-     "rps": 0.2118,
-     "brier": 0.613,
-     "logv_marcador": -2.9834,
+     "n": 492,
+     "logloss": 1.0226,
+     "ee_logloss": 0.0184,
+     "rps": 0.2113,
+     "brier": 0.6125,
+     "logv_marcador": -2.9808,
      "acierto": 0.504
     }
    },
@@ -266,12 +266,12 @@
      "error_calibracion": 0.012
     },
     "prueba_dia": {
-     "n": 490,
-     "logloss": 1.0249,
-     "ee_logloss": 0.0177,
-     "rps": 0.2121,
-     "brier": 0.614,
-     "logv_marcador": -2.9991,
+     "n": 492,
+     "logloss": 1.0243,
+     "ee_logloss": 0.0172,
+     "rps": 0.2117,
+     "brier": 0.6135,
+     "logv_marcador": -2.9978,
      "acierto": 0.488
     }
    },
@@ -352,12 +352,12 @@
      "error_calibracion": 0.014
     },
     "prueba_dia": {
-     "n": 490,
-     "logloss": 1.0268,
-     "ee_logloss": 0.018,
-     "rps": 0.2129,
-     "brier": 0.6152,
-     "logv_marcador": -2.9996,
+     "n": 492,
+     "logloss": 1.0262,
+     "ee_logloss": 0.0175,
+     "rps": 0.2124,
+     "brier": 0.6147,
+     "logv_marcador": -2.998,
      "acierto": 0.48
     }
    },
@@ -438,12 +438,12 @@
      "error_calibracion": 0.017
     },
     "prueba_dia": {
-     "n": 490,
-     "logloss": 1.0271,
-     "ee_logloss": 0.0161,
-     "rps": 0.213,
-     "brier": 0.6156,
-     "logv_marcador": -2.9966,
+     "n": 492,
+     "logloss": 1.0267,
+     "ee_logloss": 0.0158,
+     "rps": 0.2126,
+     "brier": 0.6152,
+     "logv_marcador": -2.9951,
      "acierto": 0.482
     }
    },
@@ -810,79 +810,79 @@
   }
  ],
  "ultimo_ciclo": {
-  "fecha": "2026-11-23",
+  "fecha": "2026-11-26",
   "produccion": "ensamble",
   "adoptado": null,
   "tabla": [
    {
     "modelo": "ensamble",
     "rol": "producción",
-    "n": 3471,
-    "logloss": 1.025,
-    "logv_marcador": -2.8831
+    "n": 3473,
+    "logloss": 1.0249,
+    "logv_marcador": -2.8828
    },
    {
     "modelo": "ajuste",
     "rol": "retador",
-    "n": 3471,
-    "logloss": 1.0231,
-    "logv_marcador": -2.8889,
+    "n": 3473,
+    "logloss": 1.023,
+    "logv_marcador": -2.8888,
     "d_logloss_vs_produccion": -0.0019,
     "ee": 0.001,
-    "z": -2.0,
-    "d_ultimos_bloques": 0.0082,
+    "z": -1.96,
+    "d_ultimos_bloques": 0.0105,
     "cumple_regla": false
    },
    {
     "modelo": "elo",
     "rol": "retador",
-    "n": 3471,
-    "logloss": 1.0304,
-    "logv_marcador": -2.8917,
+    "n": 3473,
+    "logloss": 1.0303,
+    "logv_marcador": -2.8914,
     "d_logloss_vs_produccion": 0.0054,
     "ee": 0.001,
-    "z": 5.52,
-    "d_ultimos_bloques": -0.0013,
+    "z": 5.4,
+    "d_ultimos_bloques": -0.0034,
     "cumple_regla": false
    },
    {
     "modelo": "dc2",
     "rol": "retador",
-    "n": 3471,
-    "logloss": 1.0285,
-    "logv_marcador": -2.8933,
+    "n": 3473,
+    "logloss": 1.0284,
+    "logv_marcador": -2.8932,
     "d_logloss_vs_produccion": 0.0035,
     "ee": 0.0011,
-    "z": 3.24,
-    "d_ultimos_bloques": 0.0031,
+    "z": 3.28,
+    "d_ultimos_bloques": 0.002,
     "cumple_regla": false
    },
    {
     "modelo": "dc",
     "rol": "retador",
-    "n": 3471,
-    "logloss": 1.0293,
-    "logv_marcador": -2.8939,
+    "n": 3473,
+    "logloss": 1.0292,
+    "logv_marcador": -2.8937,
     "d_logloss_vs_produccion": 0.0043,
     "ee": 0.0009,
-    "z": 4.58,
-    "d_ultimos_bloques": 0.0059,
+    "z": 4.66,
+    "d_ultimos_bloques": 0.0054,
     "cumple_regla": false
    },
    {
     "modelo": "tiros",
     "rol": "retador",
-    "n": 3471,
+    "n": 3473,
     "logloss": 1.0312,
-    "logv_marcador": -2.8924,
+    "logv_marcador": -2.8923,
     "d_logloss_vs_produccion": 0.0062,
     "ee": 0.0013,
-    "z": 4.68,
-    "d_ultimos_bloques": 0.0064,
+    "z": 4.72,
+    "d_ultimos_bloques": 0.0073,
     "cumple_regla": false
    }
   ],
-  "partidos_fuera_de_muestra": 3471,
-  "ultimo_bloque": "2026-11-20"
+  "partidos_fuera_de_muestra": 3473,
+  "ultimo_bloque": "2026-11-23"
  }
 }

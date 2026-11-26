@@ -74,12 +74,12 @@
    "error_calibracion": 0.017
   },
   "prueba_dia": {
-   "n": 490,
-   "logloss": 1.0228,
-   "ee_logloss": 0.0199,
-   "rps": 0.2114,
-   "brier": 0.6127,
-   "logv_marcador": -2.9839,
+   "n": 492,
+   "logloss": 1.0221,
+   "ee_logloss": 0.0193,
+   "rps": 0.211,
+   "brier": 0.6122,
+   "logv_marcador": -2.9819,
    "acierto": 0.498
   }
  },
@@ -109,18 +109,6 @@
     "d_logv_marcador": 0.0128,
     "ee_logv_marcador": 0.0024
    },
-   "cerebro_original_limpio": {
-    "n": 2981,
-    "d_logloss": -0.0116,
-    "ee": 0.0027,
-    "ic95": [
-     -0.017,
-     -0.0064
-    ],
-    "z": -4.3,
-    "d_logv_marcador": 0.0987,
-    "ee_logv_marcador": 0.0082
-   },
    "mercado_cierre_shin": {
     "n": 1671,
     "d_logloss": 0.013,
@@ -136,62 +124,50 @@
   },
   "prueba": {
    "dc": {
-    "n": 490,
-    "d_logloss": -0.004,
-    "ee": 0.0032,
+    "n": 492,
+    "d_logloss": -0.0041,
+    "ee": 0.0031,
     "ic95": [
-     -0.0102,
-     0.0023
+     -0.0104,
+     0.0022
     ],
-    "z": -1.2,
-    "d_logv_marcador": 0.0157,
-    "ee_logv_marcador": 0.0044
+    "z": -1.3,
+    "d_logv_marcador": 0.0161,
+    "ee_logv_marcador": 0.0045
    },
    "poisson_simple": {
-    "n": 480,
+    "n": 490,
     "d_logloss": -0.0051,
     "ee": 0.0031,
     "ic95": [
-     -0.0111,
-     0.001
+     -0.011,
+     0.0008
     ],
     "z": -1.7,
-    "d_logv_marcador": 0.0191,
+    "d_logv_marcador": 0.018,
     "ee_logv_marcador": 0.0048
    },
-   "cerebro_original_limpio": {
-    "n": 480,
-    "d_logloss": -0.01,
-    "ee": 0.0069,
-    "ic95": [
-     -0.0231,
-     0.0041
-    ],
-    "z": -1.4,
-    "d_logv_marcador": 0.134,
-    "ee_logv_marcador": 0.0192
-   },
    "mercado_cierre_shin": {
-    "n": 476,
-    "d_logloss": 0.019,
-    "ee": 0.0073,
+    "n": 486,
+    "d_logloss": 0.0182,
+    "ee": 0.0072,
     "ic95": [
-     0.0053,
-     0.0331
+     0.0041,
+     0.0327
     ],
-    "z": 2.6,
+    "z": 2.5,
     "d_logv_marcador": null,
     "ee_logv_marcador": null
    },
    "mercado_abre_shin": {
-    "n": 313,
-    "d_logloss": 0.0038,
-    "ee": 0.0073,
+    "n": 323,
+    "d_logloss": 0.0024,
+    "ee": 0.0075,
     "ic95": [
-     -0.0107,
-     0.0182
+     -0.012,
+     0.0173
     ],
-    "z": 0.5,
+    "z": 0.3,
     "d_logv_marcador": null,
     "ee_logv_marcador": null
    }
@@ -207,10 +183,10 @@
  "api": "modelo.pronostico.Pronosticador",
  "modelo_anterior": "ajuste",
  "ultimo_ciclo": {
-  "fecha": "2026-11-23",
+  "fecha": "2026-11-26",
   "produccion": "ensamble",
   "adoptado": null,
-  "partidos_fuera_de_muestra": 3471,
-  "ultimo_bloque": "2026-11-20"
+  "partidos_fuera_de_muestra": 3473,
+  "ultimo_bloque": "2026-11-23"
  }
 }

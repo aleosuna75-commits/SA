@@ -1,162 +1,260 @@
 {
- "corrida_utc": "2026-11-25T07:41:07Z",
+ "corrida_utc": "2026-11-26T05:23:29Z",
  "pasos": {
   "datos": {
    "ok": true,
    "codigo": 0,
-   "nuevos_jugados": 0,
+   "nuevos_jugados": 2,
    "reprogramados": 0,
    "nuevos_en_calendario": 0,
-   "momios_actualizados": 0,
+   "momios_actualizados": 2,
    "tabla_coincide_con_espn": true,
-   "segundos": 6.0
+   "segundos": 6.2
   },
   "variables": {
    "ok": true,
-   "segundos": 5.1
+   "segundos": 4.9
   },
   "mejora": {
    "ok": true,
-   "omitido": "sin partidos nuevos",
-   "segundos": 0.0
+   "adoptado": null,
+   "segundos": 34.4
   },
   "pronostico": {
    "ok": true,
    "salida": [
-    "/home/user/SA/ligamx/salidas/actual.json  236 KB  modelo=ensamble  pendientes=8  sellos nuevos=0  53.4 s",
-    "campeón: Cruz Azul 0.264, América 0.209, Chivas 0.208, Toluca 0.183, Pachuca 0.059"
+    "/home/user/SA/ligamx/salidas/actual.json  202 KB  modelo=ensamble  pendientes=6  sellos nuevos=6  52.1 s",
+    "campeón: Cruz Azul 0.254, América 0.224, Toluca 0.221, Chivas 0.197, Pachuca 0.056"
    ],
-   "segundos": 54.7
+   "segundos": 53.4
   },
   "vivo": {
    "ok": true,
-   "estado": "sin_partidos",
-   "partidos": 0,
+   "estado": "terminado_hoy",
+   "partidos": 2,
    "siguiente": {
-    "id": 401931986,
-    "inicio_utc": "2026-11-26T01:00:00Z",
-    "local": "Toluca",
-    "visitante": "Atlas"
+    "id": 401931982,
+    "inicio_utc": "2026-11-27T01:00:00Z",
+    "local": "Pachuca",
+    "visitante": "Chivas"
    },
    "incrustado": true,
-   "segundos": 2.4
+   "segundos": 17.5
   },
   "pagina": {
    "ok": true,
    "salida": [
-    "listo en 0.02 s"
+    "listo en 0.36 s"
    ],
-   "segundos": 0.1
+   "segundos": 0.4
   }
  },
  "errores": [],
- "nuevos_jugados": [],
+ "nuevos_jugados": [
+  {
+   "id": "401931986",
+   "fecha_local": "2026-11-25",
+   "torneo": "Apertura 2026",
+   "fase": "cuartos",
+   "local": "Toluca",
+   "visitante": "Atlas",
+   "gl": 2,
+   "gv": 0,
+   "tiene_stats": true,
+   "tiene_eventos": true
+  },
+  {
+   "id": "401931998",
+   "fecha_local": "2026-11-25",
+   "torneo": "Apertura 2026",
+   "fase": "cuartos",
+   "local": "Monterrey",
+   "visitante": "América",
+   "gl": 0,
+   "gv": 0,
+   "tiene_stats": true,
+   "tiene_eventos": true
+  }
+ ],
  "reprogramados": [],
  "nuevos_en_calendario": [],
  "proximo_partido": {
-  "id": "401931986",
-  "fecha_utc": "2026-11-26T01:00Z",
-  "fecha_local": "2026-11-25",
+  "id": "401931982",
+  "fecha_utc": "2026-11-27T01:00Z",
+  "fecha_local": "2026-11-26",
   "hora_local": "19:00",
   "fase": "cuartos",
   "pierna": "1",
   "estado": "programado",
-  "local": "Toluca",
-  "visitante": "Atlas",
-  "estadio": "Estadio Nemesio Díez Riega",
-  "ciudad": "Toluca",
+  "local": "Pachuca",
+  "visitante": "Chivas",
+  "estadio": "Estadio Hidalgo",
+  "ciudad": "Pachuca",
   "momios": {
-   "ml_l": 1.444,
-   "ml_e": 4.9,
-   "ml_v": 6.0,
-   "total_linea": 3.5,
-   "over": 2.2,
-   "under": 1.625,
+   "ml_l": 2.75,
+   "ml_e": 3.2,
+   "ml_v": 2.6,
+   "total_linea": 2.5,
+   "over": 1.909,
+   "under": 1.833,
    "proveedor": "DraftKings"
   }
  },
+ "mejora": {
+  "produccion": "ensamble",
+  "adoptado": null,
+  "tabla": [
+   {
+    "modelo": "ensamble",
+    "rol": "producción",
+    "n": 3473,
+    "logloss": 1.0249,
+    "logv_marcador": -2.8828
+   },
+   {
+    "modelo": "ajuste",
+    "rol": "retador",
+    "n": 3473,
+    "logloss": 1.023,
+    "logv_marcador": -2.8888,
+    "d_logloss_vs_produccion": -0.0019,
+    "ee": 0.001,
+    "z": -1.96,
+    "d_ultimos_bloques": 0.0105,
+    "cumple_regla": false
+   },
+   {
+    "modelo": "elo",
+    "rol": "retador",
+    "n": 3473,
+    "logloss": 1.0303,
+    "logv_marcador": -2.8914,
+    "d_logloss_vs_produccion": 0.0054,
+    "ee": 0.001,
+    "z": 5.4,
+    "d_ultimos_bloques": -0.0034,
+    "cumple_regla": false
+   },
+   {
+    "modelo": "dc2",
+    "rol": "retador",
+    "n": 3473,
+    "logloss": 1.0284,
+    "logv_marcador": -2.8932,
+    "d_logloss_vs_produccion": 0.0035,
+    "ee": 0.0011,
+    "z": 3.28,
+    "d_ultimos_bloques": 0.002,
+    "cumple_regla": false
+   },
+   {
+    "modelo": "dc",
+    "rol": "retador",
+    "n": 3473,
+    "logloss": 1.0292,
+    "logv_marcador": -2.8937,
+    "d_logloss_vs_produccion": 0.0043,
+    "ee": 0.0009,
+    "z": 4.66,
+    "d_ultimos_bloques": 0.0054,
+    "cumple_regla": false
+   },
+   {
+    "modelo": "tiros",
+    "rol": "retador",
+    "n": 3473,
+    "logloss": 1.0312,
+    "logv_marcador": -2.8923,
+    "d_logloss_vs_produccion": 0.0062,
+    "ee": 0.0013,
+    "z": 4.72,
+    "d_ultimos_bloques": 0.0073,
+    "cumple_regla": false
+   }
+  ]
+ },
  "vivo": {
-  "estado": "sin_partidos",
-  "partidos": 0,
+  "estado": "terminado_hoy",
+  "partidos": 2,
   "siguiente": {
-   "id": 401931986,
-   "inicio_utc": "2026-11-26T01:00:00Z",
-   "local": "Toluca",
-   "visitante": "Atlas"
+   "id": 401931982,
+   "inicio_utc": "2026-11-27T01:00:00Z",
+   "local": "Pachuca",
+   "visitante": "Chivas"
   },
   "incrustado": true
  },
  "modelo": "ensamble",
- "corte_local": "2026-11-25 01:41",
+ "corte_local": "2026-11-25 23:24",
  "campeon_top": [
   [
    "Cruz Azul",
-   0.2638
+   0.2538
   ],
   [
    "América",
-   0.2089
-  ],
-  [
-   "Chivas",
-   0.2081
+   0.2242
   ],
   [
    "Toluca",
-   0.1826
+   0.2213
+  ],
+  [
+   "Chivas",
+   0.1974
   ],
   [
    "Pachuca",
-   0.0585
+   0.0555
   ]
  ],
  "liguilla_en_curso": true,
- "pendientes": 8,
+ "pendientes": 6,
  "desempeno": {
-  "n_calificados": 10,
+  "n_calificados": 12,
   "acumulado": {
-   "n": 10,
-   "aciertos_1x2": 4,
-   "acierto_1x2": 0.4,
-   "marcadores_exactos": 1,
-   "marcador_exacto": 0.1,
-   "logloss": 1.0376,
-   "ee_logloss": 0.0855,
-   "brier": 0.6224,
-   "rps": 0.2071,
-   "prob_media_del_pick": 0.4289,
+   "n": 12,
+   "aciertos_1x2": 5,
+   "acierto_1x2": 0.4167,
+   "marcadores_exactos": 2,
+   "marcador_exacto": 0.1667,
+   "logloss": 1.0064,
+   "ee_logloss": 0.095,
+   "brier": 0.5984,
+   "rps": 0.1885,
+   "prob_media_del_pick": 0.4467,
    "logloss_referencia_tercios": 1.0986,
    "combinadas": {
     "segura": {
-     "n": 10,
-     "completas": 3,
-     "frecuencia": 0.3,
-     "prob_anunciada": 0.4747,
-     "picks_acertados_media": 3.2,
+     "n": 12,
+     "completas": 4,
+     "frecuencia": 0.3333,
+     "prob_anunciada": 0.4831,
+     "picks_acertados_media": 3.1667,
      "picks_por_combinada": 4
     },
     "equilibrada": {
-     "n": 10,
-     "completas": 4,
-     "frecuencia": 0.4,
-     "prob_anunciada": 0.3212,
-     "picks_acertados_media": 2.4,
+     "n": 12,
+     "completas": 5,
+     "frecuencia": 0.4167,
+     "prob_anunciada": 0.3113,
+     "picks_acertados_media": 2.5,
      "picks_por_combinada": 4
     },
     "atrevida": {
-     "n": 10,
+     "n": 12,
      "completas": 1,
-     "frecuencia": 0.1,
-     "prob_anunciada": 0.2346,
-     "picks_acertados_media": 1.7,
+     "frecuencia": 0.0833,
+     "prob_anunciada": 0.2333,
+     "picks_acertados_media": 1.5833,
      "picks_por_combinada": 4
     }
    }
   }
  },
- "huella": "e619563baffdb3f3789fad49e04f3173",
+ "huella": "d3e3b2bd6653d61d46f4a5fab4423dfb",
  "publicar": false,
- "huella_publicada": "e619563baffdb3f3789fad49e04f3173",
- "segundos": 68.3,
- "publicado_utc": "2026-11-25T07:52:05Z"
+ "huella_publicada": "d3e3b2bd6653d61d46f4a5fab4423dfb",
+ "segundos": 116.8,
+ "publicado_utc": "2026-11-26T05:25:52Z"
 }

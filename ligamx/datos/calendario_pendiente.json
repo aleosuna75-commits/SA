@@ -1,52 +1,8 @@
 {
  "torneo": "Apertura 2026",
- "generado_utc": "2026-11-25T07:21:42Z",
+ "generado_utc": "2026-11-26T05:23:34Z",
  "fuente": "ESPN scoreboard mex.1",
  "partidos": [
-  {
-   "id": "401931986",
-   "fecha_utc": "2026-11-26T01:00Z",
-   "fecha_local": "2026-11-25",
-   "hora_local": "19:00",
-   "fase": "cuartos",
-   "pierna": "1",
-   "estado": "programado",
-   "local": "Toluca",
-   "visitante": "Atlas",
-   "estadio": "Estadio Nemesio Díez Riega",
-   "ciudad": "Toluca",
-   "momios": {
-    "ml_l": 1.444,
-    "ml_e": 4.9,
-    "ml_v": 6.0,
-    "total_linea": 3.5,
-    "over": 2.2,
-    "under": 1.625,
-    "proveedor": "DraftKings"
-   }
-  },
-  {
-   "id": "401931998",
-   "fecha_utc": "2026-11-26T03:10Z",
-   "fecha_local": "2026-11-25",
-   "hora_local": "21:10",
-   "fase": "cuartos",
-   "pierna": "1",
-   "estado": "programado",
-   "local": "Monterrey",
-   "visitante": "América",
-   "estadio": "Estadio BBVA",
-   "ciudad": "Guadalupe",
-   "momios": {
-    "ml_l": 2.3,
-    "ml_e": 3.3,
-    "ml_v": 3.1,
-    "total_linea": 2.5,
-    "over": 1.87,
-    "under": 1.87,
-    "proveedor": "DraftKings"
-   }
-  },
   {
    "id": "401931982",
    "fecha_utc": "2026-11-27T01:00Z",
@@ -59,7 +15,15 @@
    "visitante": "Chivas",
    "estadio": "Estadio Hidalgo",
    "ciudad": "Pachuca",
-   "momios": null
+   "momios": {
+    "ml_l": 2.75,
+    "ml_e": 3.2,
+    "ml_v": 2.6,
+    "total_linea": 2.5,
+    "over": 1.909,
+    "under": 1.833,
+    "proveedor": "DraftKings"
+   }
   },
   {
    "id": "401931995",
@@ -74,11 +38,11 @@
    "estadio": "Estadio León",
    "ciudad": "León de los Aldamas",
    "momios": {
-    "ml_l": 3.1,
-    "ml_e": 3.45,
+    "ml_l": 3.15,
+    "ml_e": 3.5,
     "ml_v": 2.2,
     "total_linea": 2.5,
-    "over": 1.69,
+    "over": 1.714,
     "under": 2.05,
     "proveedor": "DraftKings"
    }
