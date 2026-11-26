@@ -1,6 +1,6 @@
 # Cobertura de la base histórica de Liga MX (ESPN)
 
-Generado automáticamente por `espn_descarga.py` el 2026-11-25 (no editar a mano: se reescribe en cada `tablas` / `actualizar`; los veredictos de la conciliación viven en `conciliacion_veredictos.json`).
+Generado automáticamente por `espn_descarga.py` el 2026-11-26 (no editar a mano: se reescribe en cada `tablas` / `actualizar`; los veredictos de la conciliación viven en `conciliacion_veredictos.json`).
 
 - Fuente: API pública de ESPN, liga `mex.1` (scoreboard por año + summary por partido).
 - Partidos en `partidos.csv`: **8775** (8696 jugados) de 2001-07-21 a 2026-11-29; 51 torneos.

@@ -1,6 +1,6 @@
 {
- "generado_utc": "2026-11-26T05:24:29.468154+00:00",
- "n_sellos": 114,
+ "generado_utc": "2026-11-26T07:21:34.487209+00:00",
+ "n_sellos": 115,
  "n_partidos_sellados": 18,
  "n_calificados": 12,
  "primer_sello_utc": "2026-11-10T09:57:18.747707+00:00",
@@ -128,7 +128,7 @@
  "contra_mercado": {
   "n": 11,
   "n_sin_mercado": 1,
-  "n_sellados_con_mercado": 13,
+  "n_sellados_con_mercado": 14,
   "primer_sello_con_mercado_utc": "2026-11-16T07:45:52.665105+00:00",
   "desde_local": "2026-11-16",
   "metodo": "shin",
