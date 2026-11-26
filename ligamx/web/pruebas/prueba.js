@@ -572,7 +572,8 @@ async function revisaLiguillaE(pg, d, t, etq, fin) {
   if (conSerie.length) {
     const mal = conSerie.filter(p => { const c = r.series.find(x => x.id === String(p.id)); return !c || c.t !== p.serie.texto || !/90 minutos/.test(c.h5); }).map(p => p.id);
     revisa(mal.length === 0, etq + 'las ' + conSerie.length + ' tarjetas de liguilla dicen la serie (global y lo que necesita cada uno) y que su 1X2 es a 90 minutos', JSON.stringify(mal));
-    const prox = d.pendientes.filter(p => Date.parse(p.fecha_utc) > Date.now())[0];
+    const relojMs = extra.ahora ? Date.parse(extra.ahora) : Date.now();      /* el reloj de la página, no el de la máquina */
+    const prox = d.pendientes.filter(p => Date.parse(p.fecha_utc) > relojMs)[0];
     if (prox && prox.serie && prox.serie.texto) revisa(r.sigue.includes(prox.serie.texto), etq + 'la franja «Próximo partido» dice de qué serie es y cómo va', r.sigue);
   }
   /* detalle de una serie con una pierna jugada: la pastilla «Resultado» se lee */
