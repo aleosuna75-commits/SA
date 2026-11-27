@@ -1,0 +1,28 @@
+{
+ "slug": "qatar2026",
+ "meeting_key": 1301,
+ "pasos": {
+  "post_fp1": {
+   "hecho": "2026-11-27T15:52:37Z",
+   "corte": "2026-11-27T17:00:00Z",
+   "modelo": "Ridge",
+   "top10": [
+    "ANT",
+    "RUS",
+    "NOR",
+    "VER",
+    "HAD",
+    "LEC",
+    "PIA",
+    "HAM",
+    "LIN",
+    "GAS"
+   ],
+   "top10_carrera": null,
+   "archivos": [
+    "gp.json",
+    "historial.json"
+   ]
+  }
+ }
+}

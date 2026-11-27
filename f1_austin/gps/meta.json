@@ -1,6 +1,6 @@
 {
- "actualizado": "2026-11-22T08:00:47Z",
- "actual": "lasvegas2026",
+ "actualizado": "2026-11-27T15:44:45Z",
+ "actual": "qatar2026",
  "gps": [
   {
    "slug": "mexico2026",
@@ -254,7 +254,7 @@
    "circuito": "Circuito Internacional de Lusail",
    "ciudad": "Lusail, Qatar",
    "fecha_texto": "Domingo 29 de noviembre de 2026",
-   "estado": "proximo",
+   "estado": "en_curso",
    "fases": [
     {
      "clave": "fp1",
@@ -264,7 +264,7 @@
      "fin_utc": "2026-11-27T14:30:00Z",
      "fecha_local": "Viernes 27 de noviembre",
      "hora_local": "4:30 PM",
-     "estado": "proximo"
+     "estado": "terminado"
     },
     {
      "clave": "fp2",
@@ -312,8 +312,13 @@
    "pais": "Qatar",
    "qualy_texto": "Sábado 28 de noviembre de 2026, 9:00 PM (hora local, UTC+3)",
    "carrera_texto": "Domingo 29 de noviembre de 2026, 7:00 PM (hora local, UTC+3)",
-   "pasos": {},
-   "docs": {}
+   "pasos": {
+    "post_fp1": "2026-11-27T15:52:37Z"
+   },
+   "docs": {
+    "gp": "gp/qatar2026",
+    "historial": "historial/qatar2026"
+   }
   },
   {
    "slug": "abudhabi2026",

@@ -1,0 +1,30 @@
+{
+ "actualizado": "2026-11-27T15:52:37Z",
+ "fases": [
+  {
+   "fase": "FP1",
+   "actualizado": "2026-11-27T15:52:37Z",
+   "qualy": {
+    "top10": [
+     "ANT",
+     "RUS",
+     "NOR",
+     "VER",
+     "HAD",
+     "LEC",
+     "PIA",
+     "HAM",
+     "LIN",
+     "GAS"
+    ],
+    "pole": "ANT",
+    "modelo": "Ridge"
+   },
+   "carrera": null,
+   "cambios": {
+    "qualy": [],
+    "carrera": []
+   }
+  }
+ ]
+}
