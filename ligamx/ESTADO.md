@@ -48,15 +48,7 @@
 - [x] 8. Automatización: `pipeline.py auto` + `modelo/mejora.py ciclo` + tarea programada diaria (runbook abajo).
 
 ## En curso
-**Bajas para las vueltas de cuartos (27-nov-2026, desde 07:25 UTC).** Corrida diaria hecha (V36, `vivo/actual` 154).
-Tarea de continuidad ACTIVADA. Falta (si la sesión se corta, retomar aquí):
-1. Workflow `notas/workflows/13_bajas_cuartos_vuelta.js` (corrida `wf_fd0287d7-438`): dos investigadores (vueltas del
-   sábado y del domingo) y un verificador por grupo; también Disciplinaria (J17 e idas: Chávez, Idrissi).
-2. Unir en `config/actualidad.json` como el 25-nov (un suspendido que el sistema ya deduce NO va en `lesionados`; si
-   la Disciplinaria da más de un partido a alguien, ése sí va como `suspension` porque el sistema sólo deduce uno),
-   `pipeline.py auto`, pruebas de página, republicar, `pipeline.py publicado`, `vivo/actual`. Antes del «armar» del
-   sábado (29-nov 00:40 UTC).
-3. Bitácora, commit y push; desactivar la continuidad y dejar esta sección en «Nada pendiente».
+Nada pendiente (27-nov-2026, 08:00 UTC). Tarea de continuidad desactivada.
 
 ### Último cierre (24-nov): horarios de cuartos sin ESPN
 Workflow `notas/workflows/11_horarios_cuartos_prensa.js` (corrida `wf_3c93cecd-d99`, 4 agentes, 1.2 M de tokens). Mientras
@@ -324,3 +316,4 @@ en la base quedaron aceptadas.
 - 2026-11-26 07:25 UTC · Corrida diaria: sin partidos nuevos (1 momio actualizado, 1 sello nuevo); V34 publicada; `vivo/actual` en versión 132. El vivo de esta noche (Pachuca–Chivas 01:00 UTC, León–Cruz Azul 03:10 UTC) ya estaba programado.
 - 2026-11-27 05:25 UTC · **Idas de cuartos del jueves en vivo** (Pachuca 2-1 Chivas, León 0-4 Cruz Azul): 20 eventos (17 a 36) escritos en `vivo/actual` (versiones 133 a 152), sin rechazos; un **gol anulado** real (Pachuca 1-1 → 0-1 al 40', bien corregido) y expulsión de Idrissi (Pachuca) al 90'+3' tras marcar el 2-1. Cierre a mano en cuanto se apagó `observar` (se borró el «cierre» de las 05:40): `pipeline.py auto` (2 partidos nuevos, ciclo sin cambio de modelo, 4 sellos nuevos), `vivo/actual` en versión 153, **V35 publicada**. Contra lo sellado: Pachuca–Chivas, ganador acertado (Pachuca 40.7%) y marcador no (1-1 pronosticado), segura fallida en «Pachuca o empate al descanso» (0-1 al medio); León–Cruz Azul, ganador acertado y segura completa (4 de 4). **La combinada de la ronda (idas, 45.4%) pegó completa.** Avanzan: Cruz Azul 99.97%, Toluca 88.6%, América 79.8% y Pachuca 53.7% (Chivas 46.3%). Campeón: Cruz Azul 34.8%, América 21.2%, Toluca 20.2%, Chivas 12.8%, Pachuca 7.9%. Acumulado (14 sellos calificados): 7 ganadores, 2 marcadores exactos, log-loss 0.983; combinadas seguras completas 5 de 14.
 - 2026-11-27 07:25 UTC · Corrida diaria: sin partidos nuevos (1 momio, 1 sello nuevo); V36 publicada; `vivo/actual` en versión 154. Lanzado el workflow 13 (bajas para las vueltas).
+- 2026-11-27 08:00 UTC · **Bajas para las vueltas** con el workflow 13 (`wf_fd0287d7-438`, 2 investigadores + 2 verificadores, 0.61 M de tokens). Suspendidos para la vuelta (los deduce el sistema; van en la nota, no en `lesionados`): Ricardo Chávez (Monterrey) e Idrissi (Pachuca, que intentaría apelar). Monterrey además sin Andrada (artroscopia de menisco) ni Djurdjevic, con Cuypers, Rossi, Aguirre y Medina en duda; Atlas con Valenzuela en duda (salió lesionado de la ida); Pachuca suma a Micolta (cruzado) y Domínguez (fractura); Cruz Azul con Amaury García en duda; Toluca recupera a Hugo González, Pereira y Gutiérrez; América a Henry Martín. Duk (Atlas) se conservó con la fuente del 25-nov (el verificador lo había quitado sólo por fecha). Sin reporte de la Disciplinaria. Página 746 revisiones en Chromium y 746 en WebKit; **V37 publicada**; `vivo/actual` en versión 155.
