@@ -1,52 +1,8 @@
 {
  "torneo": "Apertura 2026",
- "generado_utc": "2026-11-26T07:21:10Z",
+ "generado_utc": "2026-11-27T05:16:16Z",
  "fuente": "ESPN scoreboard mex.1",
  "partidos": [
-  {
-   "id": "401931982",
-   "fecha_utc": "2026-11-27T01:00Z",
-   "fecha_local": "2026-11-26",
-   "hora_local": "19:00",
-   "fase": "cuartos",
-   "pierna": "1",
-   "estado": "programado",
-   "local": "Pachuca",
-   "visitante": "Chivas",
-   "estadio": "Estadio Hidalgo",
-   "ciudad": "Pachuca",
-   "momios": {
-    "ml_l": 2.75,
-    "ml_e": 3.2,
-    "ml_v": 2.6,
-    "total_linea": 2.5,
-    "over": 1.909,
-    "under": 1.833,
-    "proveedor": "DraftKings"
-   }
-  },
-  {
-   "id": "401931995",
-   "fecha_utc": "2026-11-27T03:10Z",
-   "fecha_local": "2026-11-26",
-   "hora_local": "21:10",
-   "fase": "cuartos",
-   "pierna": "1",
-   "estado": "programado",
-   "local": "León",
-   "visitante": "Cruz Azul",
-   "estadio": "Estadio León",
-   "ciudad": "León de los Aldamas",
-   "momios": {
-    "ml_l": 3.15,
-    "ml_e": 3.5,
-    "ml_v": 2.2,
-    "total_linea": 2.5,
-    "over": 1.714,
-    "under": 2.05,
-    "proveedor": "DraftKings"
-   }
-  },
   {
    "id": "401931997",
    "fecha_utc": "2026-11-29T01:00Z",
@@ -74,12 +30,12 @@
    "estadio": "Estadio Banorte",
    "ciudad": "Mexico City",
    "momios": {
-    "ml_l": 2.6,
-    "ml_e": 2.65,
+    "ml_l": 2.3,
+    "ml_e": 3.0,
     "ml_v": 3.3,
     "total_linea": 2.5,
     "over": 1.769,
-    "under": 1.952,
+    "under": 1.909,
     "proveedor": "DraftKings"
    }
   },

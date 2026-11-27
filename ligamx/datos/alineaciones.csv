@@ -305963,3 +305963,87 @@ partido_id,equipo,jugador_id,jugador,titular,posicion,minuto_entra,minuto_sale,f
 401931998,América,212824,Alejandro Zendejas,1,RM,,77,4-1-3-2
 401931998,América,167195,Miguel Borja,1,CF-L,,,4-1-3-2
 401931998,América,129421,Érick Sánchez,1,CF-R,,45,4-1-3-2
+401931982,Pachuca,259439,Carlos Moreno,1,G,,,4-2-3-1
+401931982,Pachuca,268843,Sergio Barreto,1,CD-L,,,4-2-3-1
+401931982,Pachuca,194921,Eduardo Bauermann,1,CD-R,,,4-2-3-1
+401931982,Pachuca,228355,Francisco Venegas,1,LB,,76,4-2-3-1
+401931982,Pachuca,364454,Jorge Berlanga,1,RB,,89,4-2-3-1
+401931982,Pachuca,176489,Rodolfo Pizarro,1,AM,,90,4-2-3-1
+401931982,Pachuca,326072,Alan Bautista,1,LM,,64,4-2-3-1
+401931982,Pachuca,233978,Christian Rivera,1,RM,,,4-2-3-1
+401931982,Pachuca,127570,Salomón Rondón,1,F,,,4-2-3-1
+401931982,Pachuca,229552,Oussama Idrissi,1,AM-L,,,4-2-3-1
+401931982,Pachuca,160562,Javier Vallejo,1,AM-R,,76,4-2-3-1
+401931982,Pachuca,291607,Illian Hernandez,0,,,,4-2-3-1
+401931982,Pachuca,313058,Jose Eulogio Téllez,0,,,,4-2-3-1
+401931982,Pachuca,302128,Mauricio Isais,0,,76,,4-2-3-1
+401931982,Pachuca,333706,Adrián Alcaraz,0,,,,4-2-3-1
+401931982,Pachuca,3129848,Thomas Alexander Contreras Hernández,0,,,,4-2-3-1
+401931982,Pachuca,408143,Sergio Rodríguez,0,,,,4-2-3-1
+401931982,Pachuca,347613,Pedro Budib,0,,89,,4-2-3-1
+401931982,Pachuca,417623,Cristóbal Hernández,0,,90,,4-2-3-1
+401931982,Pachuca,357437,Sebastian Santos,0,,76,,4-2-3-1
+401931982,Pachuca,195349,Kenedy,0,,64,,4-2-3-1
+401931982,Chivas,290899,Raúl Rangel,1,G,,,3-4-2-1
+401931982,Chivas,290889,Diego Campillo,1,CD,,,3-4-2-1
+401931982,Chivas,37249,José Castillo,1,CD-L,,,3-4-2-1
+401931982,Chivas,133111,Daniel Aguirre,1,CD-R,,,3-4-2-1
+401931982,Chivas,190901,Omar Govea,1,CM-L,,71,3-4-2-1
+401931982,Chivas,131697,Fernando Gonzalez,1,CM-R,,,3-4-2-1
+401931982,Chivas,297284,Bryan González,1,LM,,,3-4-2-1
+401931982,Chivas,271844,Richard Ledezma,1,RM,,62,3-4-2-1
+401931982,Chivas,118717,Santiago Sandoval,1,F,,62,3-4-2-1
+401931982,Chivas,260173,Efrain Álvarez,1,CF-L,,62,3-4-2-1
+401931982,Chivas,194308,Roberto Alvarado,1,CF-R,,84,3-4-2-1
+401931982,Chivas,303577,Brian Gutiérrez,0,,62,,3-4-2-1
+401931982,Chivas,228352,Ricardo Marín,0,,62,,3-4-2-1
+401931982,Chivas,151850,Ángel Sepúlveda,0,,62,,3-4-2-1
+401931982,Chivas,194182,Óscar Whalley,0,,,,3-4-2-1
+401931982,Chivas,387984,Hugo Camberos,0,,,,3-4-2-1
+401931982,Chivas,277191,Jordan Carillo,0,,,,3-4-2-1
+401931982,Chivas,147715,Luis Gabriel Rey,0,,,,3-4-2-1
+401931982,Chivas,3313,Miguel Gómez,0,,71,,3-4-2-1
+401931982,Chivas,276398,Kevin Castañeda,0,,84,,3-4-2-1
+401931982,Chivas,96526,Jonathan Pérez,0,,,,3-4-2-1
+401931995,León,335959,Oscar García,1,G,,,4-2-3-1
+401931995,León,88781,Juan Guevara,1,CD-L,,,4-2-3-1
+401931995,León,235956,Jhohan Romaña,1,CD-R,,,4-2-3-1
+401931995,León,190559,Sebastian Vegas,1,LB,,,4-2-3-1
+401931995,León,195695,Iván Moreno,1,RB,,64,4-2-3-1
+401931995,León,317509,Daniel Arcila,1,AM,,,4-2-3-1
+401931995,León,199163,Rodrigo Echeverría,1,LM,,75,4-2-3-1
+401931995,León,386922,Luis Valadez,1,RM,,45,4-2-3-1
+401931995,León,248826,Diber Cambindo,1,F,,,4-2-3-1
+401931995,León,195326,Ismael Díaz,1,AM-L,,45,4-2-3-1
+401931995,León,259697,Fernando Beltrán,1,AM-R,,45,4-2-3-1
+401931995,León,215619,Paul Saracho,0,,,,4-2-3-1
+401931995,León,399013,Christopher Mora,0,,,,4-2-3-1
+401931995,León,3118754,Irving Omar Martínez Gutiérrez,0,,,,4-2-3-1
+401931995,León,372142,Jesús Lara,0,,,,4-2-3-1
+401931995,León,308096,Edgar Guerra,0,,64,,4-2-3-1
+401931995,León,356574,Juan Domínguez,0,,45,,4-2-3-1
+401931995,León,251543,José Rodríguez,0,,45,,4-2-3-1
+401931995,León,201538,José Alvarado,0,,45,,4-2-3-1
+401931995,León,222189,Bryan Colula,0,,,,4-2-3-1
+401931995,León,235451,Jordi Cortizo,0,,75,,4-2-3-1
+401931995,Cruz Azul,224752,Andrés Gudiño,1,G,,,4-2-3-1
+401931995,Cruz Azul,318342,Jesús Orozco,1,CD-L,,78,4-2-3-1
+401931995,Cruz Azul,270229,Willer Ditta,1,CD-R,,,4-2-3-1
+401931995,Cruz Azul,136124,Omar Campos,1,LB,,,4-2-3-1
+401931995,Cruz Azul,285862,Ángel Márquez,1,RB,,65,4-2-3-1
+401931995,Cruz Azul,239990,Carlos Rodríguez,1,AM,,65,4-2-3-1
+401931995,Cruz Azul,276942,Érik Lira,1,LM,,65,4-2-3-1
+401931995,Cruz Azul,192166,Gonzalo Piovi,1,RM,,,4-2-3-1
+401931995,Cruz Azul,207549,Nicolás Ibáñez,1,F,,65,4-2-3-1
+401931995,Cruz Azul,219001,Agustín Palavecino,1,AM-L,,,4-2-3-1
+401931995,Cruz Azul,277270,José Paradela,1,AM-R,,,4-2-3-1
+401931995,Cruz Azul,257640,Rodolfo Rotondi,0,,65,,4-2-3-1
+401931995,Cruz Azul,228300,Osinachi Ebere,0,,,,4-2-3-1
+401931995,Cruz Azul,215512,Juan José Calero,0,,,,4-2-3-1
+401931995,Cruz Azul,336641,Andres Montaño,0,,65,,4-2-3-1
+401931995,Cruz Azul,346805,Ralph Orquin,0,,78,,4-2-3-1
+401931995,Cruz Azul,303844,Luka Romero,0,,,,4-2-3-1
+401931995,Cruz Azul,266587,Kevin Mier,0,,,,4-2-3-1
+401931995,Cruz Azul,115447,Gabriel Fernandez,0,,65,,4-2-3-1
+401931995,Cruz Azul,215785,Alan Mozo,0,,65,,4-2-3-1
+401931995,Cruz Azul,304424,Alán Montes,0,,,,4-2-3-1

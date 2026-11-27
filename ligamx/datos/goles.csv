@@ -23677,3 +23677,10 @@ partido_id,minuto,anadido,periodo,equipo,jugador,tipo,subtipo,jugador_id,asisten
 401877046,89,0,2,Necaxa,Julián Carranza,penal,,262566,
 401931986,15,0,1,Toluca,Helinho,gol,,266679,Nicolás Castro
 401931986,54,0,2,Toluca,Helinho,penal,,266679,
+401931982,6,0,1,Chivas,Eduardo Bauermann,autogol,,194921,
+401931982,48,0,2,Pachuca,Oussama Idrissi,gol,,229552,Salomón Rondón
+401931982,90,2,2,Pachuca,Oussama Idrissi,gol,,229552,Sergio Barreto
+401931995,8,0,1,Cruz Azul,José Paradela,gol,,277270,Agustín Palavecino
+401931995,30,0,1,Cruz Azul,Nicolás Ibáñez,gol,,207549,Carlos Rodríguez
+401931995,66,0,2,Cruz Azul,José Paradela,gol,,277270,Agustín Palavecino
+401931995,73,0,2,Cruz Azul,Gabriel Fernandez,gol,,115447,

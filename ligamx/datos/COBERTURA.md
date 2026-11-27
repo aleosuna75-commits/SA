@@ -3,9 +3,9 @@
 Generado automáticamente por `espn_descarga.py` el 2026-11-26 (no editar a mano: se reescribe en cada `tablas` / `actualizar`; los veredictos de la conciliación viven en `conciliacion_veredictos.json`).
 
 - Fuente: API pública de ESPN, liga `mex.1` (scoreboard por año + summary por partido).
-- Partidos en `partidos.csv`: **8775** (8696 jugados) de 2001-07-21 a 2026-11-29; 51 torneos.
+- Partidos en `partidos.csv`: **8775** (8698 jugados) de 2001-07-21 a 2026-11-29; 51 torneos.
 - ESPN no tiene eventos de Liga MX anteriores al Invierno 2001 (probado 1996-2000: vacío).
-- Partidos jugados con algún bloque de detalle (stats, eventos o alineaciones): 8680 (100%).
+- Partidos jugados con algún bloque de detalle (stats, eventos o alineaciones): 8682 (100%).
 
 ## 1. Cobertura por torneo
 
@@ -63,7 +63,7 @@ Porcentajes sobre partidos **jugados**. `stats` = boxscore real; `eventos` = gol
 | Clausura 2025 | 170 | 170 | 153 | 17 | 98% | 100% | 96% | 100% | 100% | 100% | 98% | 100% | 100% |
 | Apertura 2025 | 170 | 170 | 153 | 17 | 100% | 100% | 99% | 100% | 98% | 100% | 100% | 99% | 100% |
 | Clausura 2026 | 167 | 167 | 153 | 14 | 100% | 100% | 99% | 100% | 100% | 100% | 100% | 92% | 100% |
-| Apertura 2026 | 161 | 155 | 153 | 2 | 100% | 100% | 100% | 100% | 100% | 100% | 100% | 1% | 55% |
+| Apertura 2026 | 161 | 157 | 153 | 4 | 100% | 100% | 100% | 100% | 100% | 100% | 100% | 1% | 55% |
 
 ## 2. Desde qué torneo es confiable cada bloque
 
@@ -71,13 +71,13 @@ Regla: primer torneo a partir del cual TODOS los torneos siguientes (con partido
 
 | Bloque | ≥ 95% desde | ≥ 80% desde | Cobertura en ese tramo (≥95%) |
 |---|---|---|---|
-| Estadísticas (tiros, córners, faltas, tarjetas...) | Clausura 2025 | Clausura 2020 | 659 de 662 (100%) |
-| Posesión | Clausura 2025 | Clausura 2020 | 658 de 662 (99%) |
-| Goles con minuto | Apertura 2001 | Apertura 2001 | 8671 de 8696 (100%) |
-| Marcador de medio tiempo | Apertura 2001 | Apertura 2001 | 8676 de 8696 (100%) |
-| Tarjetas con minuto | Clausura 2025 | Clausura 2020 | 654 de 662 (99%) |
-| Alineaciones (11 titulares) | Apertura 2012 | Apertura 2012 | 4792 de 4811 (100%) |
-| Momios 1X2 | Clausura 2025 | Clausura 2021 | 658 de 662 (99%) |
+| Estadísticas (tiros, córners, faltas, tarjetas...) | Clausura 2025 | Clausura 2020 | 661 de 664 (100%) |
+| Posesión | Clausura 2025 | Clausura 2020 | 660 de 664 (99%) |
+| Goles con minuto | Apertura 2001 | Apertura 2001 | 8673 de 8698 (100%) |
+| Marcador de medio tiempo | Apertura 2001 | Apertura 2001 | 8678 de 8698 (100%) |
+| Tarjetas con minuto | Clausura 2025 | Clausura 2020 | 656 de 664 (99%) |
+| Alineaciones (11 titulares) | Apertura 2012 | Apertura 2012 | 4794 de 4813 (100%) |
+| Momios 1X2 | Clausura 2025 | Clausura 2021 | 660 de 664 (99%) |
 | Asistencia | nunca | nunca |  |
 | Árbitro | nunca | nunca |  |
 

@@ -198,3 +198,10 @@
 2026-11-26T05:24:09Z	accion=evaluar	quien=mejora.ciclo	modelo=dc	periodo=prueba	granularidad=dia	partidos=492	parcial=False	pid=3906	argv=pipeline.py auto
 2026-11-26T05:24:12Z	accion=evaluar	quien=mejora.ciclo	modelo=tiros	periodo=prueba	granularidad=dia	partidos=492	parcial=False	pid=3906	argv=pipeline.py auto
 2026-11-26T05:24:14Z	accion=lectura_pareadas	quien=mejora.adoptar	modelo=ensamble	pid=3906	argv=pipeline.py auto
+2026-11-27T05:16:30Z	accion=evaluar	quien=mejora.ciclo	modelo=ensamble	periodo=prueba	granularidad=dia	partidos=494	parcial=False	pid=3960	argv=pipeline.py auto
+2026-11-27T05:16:41Z	accion=evaluar	quien=mejora.ciclo	modelo=ajuste	periodo=prueba	granularidad=dia	partidos=494	parcial=False	pid=3960	argv=pipeline.py auto
+2026-11-27T05:16:51Z	accion=evaluar	quien=mejora.ciclo	modelo=elo	periodo=prueba	granularidad=dia	partidos=494	parcial=False	pid=3960	argv=pipeline.py auto
+2026-11-27T05:16:52Z	accion=evaluar	quien=mejora.ciclo	modelo=dc2	periodo=prueba	granularidad=dia	partidos=494	parcial=False	pid=3960	argv=pipeline.py auto
+2026-11-27T05:16:55Z	accion=evaluar	quien=mejora.ciclo	modelo=dc	periodo=prueba	granularidad=dia	partidos=494	parcial=False	pid=3960	argv=pipeline.py auto
+2026-11-27T05:16:57Z	accion=evaluar	quien=mejora.ciclo	modelo=tiros	periodo=prueba	granularidad=dia	partidos=494	parcial=False	pid=3960	argv=pipeline.py auto
+2026-11-27T05:17:00Z	accion=lectura_pareadas	quien=mejora.adoptar	modelo=ensamble	pid=3960	argv=pipeline.py auto
