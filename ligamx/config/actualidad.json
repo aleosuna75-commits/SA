@@ -1,80 +1,87 @@
 {
- "actualizado_utc": "2026-11-25T07:39:29Z",
- "alcance": "Ida de cuartos de final del Apertura 2026 (25 y 26-nov-2026): los 8 clasificados, revisados el 25-nov con verificación de cada fuente (workflow 12). Los 10 eliminados conservan, marcada como tal, la actualización del 18-nov para la Jornada 17.",
+ "actualizado_utc": "2026-11-27T07:43:13Z",
+ "alcance": "Vuelta de cuartos de final del Apertura 2026 (28 y 29-nov-2026): los 8 clasificados, revisados el 27-nov con verificación de cada fuente (workflow 13). Los 10 eliminados conservan, marcada como tal, la actualización del 18-nov para la Jornada 17.",
  "equipos": {
   "Chivas": {
    "tecnico": "Gabriel Milito",
    "lesionados": [
     {
      "jugador": "Luis Romo",
-     "motivo": "Sobrecarga muscular en el entrenamiento del viernes; no jugó la J17 ante Cruz Azul. Milito espera que en cuatro días esté «en condiciones de jugar o de ser opción para jugar». Sigue en duda para la ida y no está descartado",
+     "motivo": "Sobrecarga muscular (Fox: molestias que arrastra desde la semana pasada). No viajó a Hidalgo ni estuvo en la ida. El cuerpo técnico espera recuperarlo para la vuelta, pero no está confirmado.",
      "tipo": "duda",
-     "fuente": "https://www.elfutbolero.com.mx/ligamx/chivas/luis-romo-causa-baja-en-chivas-para-enfrentar-a-pachuca-pero-milito-tiene-un-punto-a-favor-20261125.html",
-     "fecha_fuente": "2026-11-24"
+     "fuente": "https://www.foxdeportes.com/liga-mx/nota/chivas-iniciara-incompleto-el-camino-por-el-titulo",
+     "fecha_fuente": "2026-11-26"
+    },
+    {
+     "jugador": "Miguel Tapias",
+     "motivo": "Sigue en rehabilitación, según SI citado por NNC. No está en la convocatoria de la ida.",
+     "tipo": "lesion",
+     "fuente": "https://nnc.mx/articulo/chivas-sin-romo-y-cruz-azul-completo-la-liguilla-sigue-hoy-en-pachuca-y-leon",
+     "fecha_fuente": "2026-11-26"
     }
    ],
-   "nota": "Información razonable (22 al 24-nov). La única duda es Romo. La página del partido en FotMob (25-nov) dice que Chivas no tiene jugadores no disponibles. Falta la convocatoria oficial para la ida. La rehabilitación de Miguel Tapias solo la reporta SI (21-nov); ver «no_confirmado». Ningún suspendido. Ya disponibles: José Castillo (Salió con calambres ante Cruz Azul (J17). Milito dijo que no tiene lesión y que «va a estar disponible». SI (24-nov) lo pone en el once probable; 2026-11-24); Richard Ledezma (Salió del partido ante León (J16) con una molestia en el tobillo. Juanfutbol lo da disponible y SI (24-nov) lo pone en el once probable de la ida; 2026-11-22); Daniel Aguirre (Salió del partido ante León (J16) con una sobrecarga muscular. Juanfutbol lo da disponible y SI (24-nov) lo pone en el once probable de la ida; 2026-11-22); Rubén «Oso» González (Salió del partido ante León (J16) con calambres. Juanfutbol lo da disponible; 2026-11-22)."
+   "nota": "Información razonable de los días 25 y 26 de noviembre: convocatoria oficial de la ida, crónicas de ClaroSports y TUDN. No hay suspendidos (Excélsior 23-nov) y nadie de Chivas fue expulsado en la ida. TUDN sólo reporta a Romo como lesionado. No hay parte médico ni convocatoria del 27-nov, así que Romo sigue en duda. Milito vio amarilla por reclamar a la cuarta árbitra; Nación Fútbol habla sólo de una multa sin suspensión, aunque aclara que no es oficial. Amonestados de Chivas en la ida: Ledezma, Govea, Castillo y Bryan González. Ya disponibles: Miguel Gómez (SI (25-nov) y NNC (26-nov) lo daban fuera por una recaída muscular, pero estuvo en la banca de la ida y entró al 71' por Omar Govea. Al 82' lo atendió el cuerpo médico; según ClaroSports, «las cosas no pasaron a algo peor»; 2026-11-26); José Castillo (SI (25-nov) lo puso en duda por cansancio y calambres tras salir ante Cruz Azul. Estuvo entre los 22 convocados, fue titular en la ida y vio amarilla al 45+3' (ClaroSports); 2026-11-26)."
   },
   "Cruz Azul": {
    "tecnico": "Joel Huiqui",
    "lesionados": [
     {
      "jugador": "Amaury Morales",
-     "motivo": "Rotura de ligamento cruzado de la rodilla, sufrida en un entrenamiento en junio; regreso proyectado para los primeros meses de 2027 (FotMob, 25-nov: inicios de enero de 2027)",
+     "motivo": "Lesión de la rodilla derecha, rotura del ligamento cruzado anterior según Nación Fútbol y 365Scores; fuera el resto del torneo",
      "tipo": "lesion",
-     "fuente": "https://juanfutbol.com/liga-mx/milito-y-chivas-recuperan-piezas-mientras-cruz-azul-pierde-a-tres-las-bajas-del-duelo-por-el-liderato",
-     "fecha_fuente": "2026-11-22"
+     "fuente": "https://www.si.com/es-us/lesionados-y-suspendidos-de-cruz-azul-para-enfrentarse-a-leon-26-11-2026",
+     "fecha_fuente": "2026-11-25"
     },
     {
      "jugador": "Mateo Levy",
-     "motivo": "Lesión de menisco de la rodilla derecha (operado, según SI del 21-nov). Su reincorporación «se proyectaba para principios de diciembre, después del cierre de la fase regular»",
+     "motivo": "Operado del menisco de la rodilla derecha a inicios de septiembre; no estará en esta Liguilla",
      "tipo": "lesion",
-     "fuente": "https://juanfutbol.com/liga-mx/milito-y-chivas-recuperan-piezas-mientras-cruz-azul-pierde-a-tres-las-bajas-del-duelo-por-el-liderato",
-     "fecha_fuente": "2026-11-22"
+     "fuente": "https://www.nacionfutbol.com.mx/liga-mx/cruz-azul/cruz-azul-va-a-leon-sin-suspendidos-y-la-deuda-pendiente-que-tiene-en-liga-mx-20261126.html",
+     "fecha_fuente": "2026-11-25"
     },
     {
      "jugador": "Cristian Jiménez",
-     "motivo": "Rotura de ligamentos, operado y en recuperación; regreso proyectado para los primeros meses de 2027",
+     "motivo": "Se recupera de una cirugía de ligamento cruzado; no estará en esta Liguilla",
      "tipo": "lesion",
-     "fuente": "https://juanfutbol.com/liga-mx/milito-y-chivas-recuperan-piezas-mientras-cruz-azul-pierde-a-tres-las-bajas-del-duelo-por-el-liderato",
-     "fecha_fuente": "2026-11-22"
+     "fuente": "https://www.nacionfutbol.com.mx/liga-mx/cruz-azul/cruz-azul-va-a-leon-sin-suspendidos-y-la-deuda-pendiente-que-tiene-en-liga-mx-20261126.html",
+     "fecha_fuente": "2026-11-25"
+    },
+    {
+     "jugador": "Amaury García",
+     "motivo": "Molestias musculares. Lo descartaron para el XI de la ida, según el periodista Gerardo González, y no aparece en los cambios. Vamos Azul dice que falta ver cómo se recupera para la vuelta.",
+     "tipo": "duda",
+     "fuente": "https://vamoscruzazul.bolavip.com/noticias/dura-baja-en-cruz-azul-amaury-garcia-se-pierde-el-juego-de-ida-vs.-leon-por-molestias-musculares-a2aoX7G3LuMS",
+     "fecha_fuente": "2026-11-26"
     }
    ],
-   "nota": "Información buena para las bajas largas: juanfutbol (22-nov), SI (21-nov) y FotMob (25-nov) coinciden. José Paradela llegaba con 4 amarillas, pero Soy Referee y Excélsior (23-nov) solo reportan dos suspendidos para la ida (Hugo González y Carlos Salcedo), y Paradela no está entre ellos. No hay convocatoria oficial. Ningún suspendido. Ya disponibles: Willer Ditta (Fue baja en la J15 por una fisura en un dedo del pie izquierdo (TUDN, sin fecha), y se esperaba que volviera para la J16. Ya no figura entre las bajas (juanfutbol, 22-nov) y SI lo pone en el once probable de la ida; 2026-11-24)."
+   "nota": "Información buena, del 25 y 26 de noviembre. No hay suspendidos; en la ida vieron amarilla Jeremy Márquez (36') y Piovi (44'). Al minuto 63, el portero Andrés Gudiño «presenta molestias y queda tendido sobre el césped» (ClaroSports), pero siguió jugando; Récord no lo menciona y no hay parte médico. Montaño entró al 68-69' por Erik Lira."
   },
   "América": {
    "tecnico": "Guillermo Almada",
    "lesionados": [
     {
      "jugador": "Raphael Veiga",
-     "motivo": "Operado del hombro; hace la rehabilitación en Brasil y está fuera el resto del torneo",
+     "motivo": "Sigue la rehabilitación en Brasil tras una cirugía de hombro. No se espera que esté para la vuelta.",
      "tipo": "lesion",
-     "fuente": "https://www.cronica.com.mx/deportes/2026/11/24/monterrey-vs-america-bajas-de-rayados-y-las-aguilas-para-la-ida-de-cuartos-de-final-de-la-liga-mx/",
-     "fecha_fuente": "2026-11-24"
+     "fuente": "https://www.tvazteca.com/aztecadeportes/liga-mx/quienes-no-jugaran-la-vuelta-de-club-america-vs-rayados-de-monterrey-por-lesion-o-expulsion/",
+     "fecha_fuente": "2026-11-26"
     },
     {
      "jugador": "Víctor Dávila",
-     "motivo": "Rotura del ligamento cruzado anterior de la rodilla derecha; baja de larga duración",
+     "motivo": "Se recupera de una lesión de rodilla.",
      "tipo": "lesion",
-     "fuente": "https://www.cronica.com.mx/deportes/2026/11/24/monterrey-vs-america-bajas-de-rayados-y-las-aguilas-para-la-ida-de-cuartos-de-final-de-la-liga-mx/",
-     "fecha_fuente": "2026-11-24"
+     "fuente": "https://www.tvazteca.com/aztecadeportes/liga-mx/quienes-no-jugaran-la-vuelta-de-club-america-vs-rayados-de-monterrey-por-lesion-o-expulsion/",
+     "fecha_fuente": "2026-11-26"
     },
     {
      "jugador": "José Raúl Zúñiga",
-     "motivo": "Se recupera de una operación de cartílago en la rodilla; fuera del registro del torneo",
+     "motivo": "Se recupera de una lesión de rodilla.",
      "tipo": "lesion",
-     "fuente": "https://www.cronica.com.mx/deportes/2026/11/24/monterrey-vs-america-bajas-de-rayados-y-las-aguilas-para-la-ida-de-cuartos-de-final-de-la-liga-mx/",
-     "fecha_fuente": "2026-11-24"
-    },
-    {
-     "jugador": "Henry Martín",
-     "motivo": "Molestia en el cuádriceps en la práctica del martes 24. Viaja a Monterrey, pero podría no jugar y se decidirá en el último momento; Miguel Borja es su relevo natural",
-     "tipo": "duda",
-     "fuente": "https://www.elfutbolero.com.mx/ligamx/club-america/henry-martin-se-resiente-a-un-dia-de-rayados-su-relevo-borja-anoto-en-cada-partido-que-fue-titular-20261124.html",
-     "fecha_fuente": "2026-11-24"
+     "fuente": "https://www.tvazteca.com/aztecadeportes/liga-mx/quienes-no-jugaran-la-vuelta-de-club-america-vs-rayados-de-monterrey-por-lesion-o-expulsion/",
+     "fecha_fuente": "2026-11-26"
     }
    ],
-   "nota": "Información completa y reciente: Crónica, Excélsior, El Futbolero, La Opinión y Águilas Monumental (24-nov) y SI (25-nov). No hay suspendidos. La única duda real es Henry Martín. Ya disponibles: Brian Rodríguez (Tras su lesión en el bíceps femoral izquierdo, el cuerpo médico le dio el visto bueno para viajar. Podría tener minutos, pero no tiene asegurada la titularidad porque aún no está recuperado del todo (Águilas Monumental); 2026-11-25); Kevin Álvarez (Descansó en la J17 para no ver la quinta amarilla; disponible; 2026-11-25); Erick Sánchez (Cumplió en la J17 su suspensión por acumulación de tarjetas; disponible; 2026-11-25); Dagoberto Espinoza (Vuelve después de que lo cuidaran por un golpe en el ojo en el amistoso contra New York Red Bulls; 2026-11-25)."
+   "nota": "Información razonablemente completa. TV Azteca y Consulta Monterrey (ambos del 26-nov) coinciden en las tres bajas. Falta saber cómo está Israel Reyes tras el choque de cabeza del 90' de la ida, y la titularidad de Henry Martín es una previsión de la prensa. Ya disponibles: Henry Martín (No jugó la ida. Claro Sports lo atribuye a un cuadro gripal y Bolavip y El Futbolero a una molestia muscular en el cuádriceps. Claro Sports (26-nov) dice que apunta a volver a la titularidad y Bolavip (26-nov) que «seguramente» será titular. No está confirmado oficialmente; 2026-11-26); Brian Rodríguez (TV Azteca lo da por recuperado. En la ida entró al 46' por Erick Sánchez; 2026-11-26); Erick Sánchez (TV Azteca lo da por recuperado. Fue titular en la ida, vio amarilla al 44' y salió al descanso; 2026-11-26)."
   },
   "Atlas": {
    "tecnico": "Hernán Crespo",
@@ -87,129 +94,129 @@
      "fecha_fuente": "2026-11-25"
     },
     {
-     "jugador": "Paulo Ramírez",
-     "motivo": "Viene de una lesión; «será decisión de último momento». Es la única duda que reporta Informador",
+     "jugador": "Milton Valenzuela",
+     "motivo": "Dejó la ida por una lesión muscular. Se lesionó hacia el 55' y lo cambiaron al 57' por Jorge Rodríguez. Claro Sports lo da en duda para la vuelta y pone a Jorge Rodríguez como lateral en el once probable. Ninguna fuente dice qué músculo es.",
      "tipo": "duda",
-     "fuente": "https://www.informador.mx/deportes/atlas-quiere-la-revancha-y-dar-el-primer-paso-a-semifinales-contra-toluca-20261124-0101.html",
-     "fecha_fuente": "2026-11-24"
+     "fuente": "https://www.clarosports.com/futbol/liga-mx/atlas-vs-toluca-liguilla-del-apertura-2026-horario-alineaciones-y-donde-ver-los-cuartos-de-final-de-la-liga-mx/",
+     "fecha_fuente": "2026-11-26"
     }
    ],
-   "nota": "Hay poca información, aunque es reciente: Informador (24-nov) y FotMob (25-nov). El club no ha publicado parte médico ni convocatoria para cuartos. Ninguna fuente reciente aclara si Adonis Frías está disponible."
+   "nota": "Información parcial. La única fuente reciente sobre bajas es la previa de Claro Sports del 26-nov, que solo menciona a Valenzuela. No hay convocatoria oficial. Duk se descartó porque no hay ninguna fuente del 25-nov en adelante (ver no_confirmado)."
   },
   "Toluca": {
    "tecnico": "Antonio Mohamed",
    "lesionados": [
     {
      "jugador": "Marcel Ruiz",
-     "motivo": "Latingoles dice que «mantiene problemas físicos»; FotMob lo lista con lesión de rodilla. Fue operado del ligamento cruzado en junio y el club lo dio por baja para todo el Apertura 2026",
+     "motivo": "La previa de la ida dice que «mantiene problemas físicos». No da más detalle.",
      "tipo": "lesion",
      "fuente": "https://latingoles.com/ultimo-desafio-el-argentino-mohamed-inicia-su-despedida-del-toluca-ante-atlas/",
      "fecha_fuente": "2026-11-25"
     },
     {
      "jugador": "Iván López",
-     "motivo": "Latingoles dice que «mantiene problemas físicos»; FotMob lo marca lesionado y en duda, sin fecha de regreso",
-     "tipo": "duda",
-     "fuente": "https://latingoles.com/ultimo-desafio-el-argentino-mohamed-inicia-su-despedida-del-toluca-ante-atlas/",
-     "fecha_fuente": "2026-11-25"
-    },
-    {
-     "jugador": "Helinho",
-     "motivo": "No jugó la J17 ante Pachuca (motivo no publicado). Mohamed quiere recuperarlo («Esperemos que estén todos para el miércoles», MVT 22-nov); jugará según cómo evolucione",
-     "tipo": "duda",
-     "fuente": "https://latingoles.com/ultimo-desafio-el-argentino-mohamed-inicia-su-despedida-del-toluca-ante-atlas/",
-     "fecha_fuente": "2026-11-25"
-    },
-    {
-     "jugador": "Federico Pereira",
-     "motivo": "No jugó la J17 ante Pachuca (motivo no publicado); Mohamed quiere recuperarlo y jugará según cómo evolucione",
-     "tipo": "duda",
-     "fuente": "https://latingoles.com/ultimo-desafio-el-argentino-mohamed-inicia-su-despedida-del-toluca-ante-atlas/",
-     "fecha_fuente": "2026-11-25"
-    },
-    {
-     "jugador": "Franco Romero",
-     "motivo": "No jugó la J17 ante Pachuca (motivo no publicado); Mohamed quiere recuperarlo y jugará según cómo evolucione",
-     "tipo": "duda",
-     "fuente": "https://latingoles.com/ultimo-desafio-el-argentino-mohamed-inicia-su-despedida-del-toluca-ante-atlas/",
-     "fecha_fuente": "2026-11-25"
-    },
-    {
-     "jugador": "Erick Gutiérrez",
-     "motivo": "No jugó la J17 ante Pachuca (motivo no publicado); Mohamed quiere recuperarlo y jugará según cómo evolucione",
+     "motivo": "La previa de la ida dice que «mantiene problemas físicos». No da más detalle.",
      "tipo": "duda",
      "fuente": "https://latingoles.com/ultimo-desafio-el-argentino-mohamed-inicia-su-despedida-del-toluca-ante-atlas/",
      "fecha_fuente": "2026-11-25"
     }
    ],
-   "nota": "el club anunció el 24-nov que se irá al terminar la Liguilla y la Copa Intercontinental; dirige la ida ante Atlas. Verificado con fuentes del 22 al 25-nov (Excélsior, Latingoles, MVT, Informador, FotMob). Solo Hugo González es baja segura. No hay convocatoria oficial y no se sabe si los cuatro ausentes de la J17 se recuperaron ni por qué faltaron. Disciplinaria: al 25-nov no hay reporte oficial de la J17 (fmf.mx llega a la J13); la prensa sólo da la suspensión de la ida. Suspendido para la ida: Hugo González (portero) (Roja directa al 89' ante Pachuca en la J17: cometió un penal que cortó una ocasión manifiesta de gol. Se pierde la ida y Luis García Palomera estará en la portería; https://www.excelsior.com.mx/deportes/jugadores-suspendidos-que-no-estaran-cuartos-final-ida, 2026-11-23); el sistema ya lo deduce de las tarjetas y la página lo muestra en «Suspendidos», por eso no va en esta lista."
+   "nota": "Información moderada. No hay parte médico ni convocatoria para la vuelta. Lo de Marcel Ruiz e Iván López sale solo de una previa del 25-nov (Latingoles). Lo de Pereira y Gutiérrez es lo que dijo Mohamed tras la ida (Récord), no una convocatoria. El portero Luis García recibió un golpe al 90+1 de la ida y no hay seguimiento. Ya disponibles: Hugo González (Portero. Tenía un partido de suspensión por la roja de la J17 ante Pachuca y lo cumplió en la ida, donde jugó Luis García. Está habilitado para la vuelta en el Estadio Jalisco; 2026-11-25); Helinho (Se perdió la última jornada y era duda. Fue titular en la ida y anotó los dos goles (14' y 53' de penal). Salió ovacionado hacia el 78' para que entrara Jorge Díaz, sin lesión reportada; 2026-11-25); Franco Romero (Se perdió la última jornada (Latingoles, 25-nov). Fue titular en la ida y Claro Sports lo pone en el once probable de la vuelta; 2026-11-26); Federico Pereira (No jugó la ida por lesión. Mohamed dijo tras el partido: «Ya tendremos a Fede Pereira recuperado» para la vuelta. Es un anuncio del técnico, no una convocatoria; 2026-11-25); Erick Gutiérrez (No jugó la ida por lesión. Mohamed dijo tras el partido: «…a Guti también» lo tendrá recuperado para la vuelta. Es un anuncio del técnico, no una convocatoria; 2026-11-25). Disciplinaria: al 27-nov no hay reporte oficial de la J17 ni de las idas (fmf.mx llega a la J13); lo de las suspensiones sale de la prensa."
   },
   "Monterrey": {
    "tecnico": "Matías Almeyda",
    "lesionados": [
     {
-     "jugador": "Stefan Medina",
-     "motivo": "Sigue fuera por problemas físicos (Crónica: descartado; SI: molestias musculares, «prácticamente descartado»)",
+     "jugador": "Esteban Andrada",
+     "motivo": "Portero. Le hicieron una artroscopia para reparar una lesión de menisco en la rodilla derecha (Excélsior, citando a Rayados). TV Azteca lo da fuera de lo que queda del Apertura. Luis Cárdenas seguirá en la portería.",
      "tipo": "lesion",
-     "fuente": "https://www.telediario.mx/liga-mx/club-monterrey/rayados-tiene-entrenamiento-nocturno-previo-al-juego-ante-america",
-     "fecha_fuente": "2026-11-24"
+     "fuente": "https://www.nacionfutbol.com.mx/liga-mx/rayados-recupera-a-salcedo-para-el-banorte-pero-almeyda-tendria-3-bajas-20261127.html",
+     "fecha_fuente": "2026-11-26"
     },
     {
      "jugador": "Uros Djurdjevic",
-     "motivo": "Sigue recuperándose de una lesión y no estaría considerado (Crónica: tobillo derecho; SI: aductor izquierdo)",
+     "motivo": "Molestia en el tobillo derecho desde un amistoso ante Toluca. No juega desde inicios de octubre. TV Azteca lo pone entre los dudosos y otras previas lo dan como baja.",
      "tipo": "lesion",
-     "fuente": "https://www.cronica.com.mx/deportes/2026/11/24/monterrey-vs-america-bajas-de-rayados-y-las-aguilas-para-la-ida-de-cuartos-de-final-de-la-liga-mx/",
-     "fecha_fuente": "2026-11-24"
+     "fuente": "https://www.nacionfutbol.com.mx/liga-mx/rayados-recupera-a-salcedo-para-el-banorte-pero-almeyda-tendria-3-bajas-20261127.html",
+     "fecha_fuente": "2026-11-26"
     },
     {
-     "jugador": "Esteban Andrada (portero)",
-     "motivo": "Problemas de menisco y líquido en la rodilla derecha; «apunta a perderse» la ida y Luis «Mochis» Cárdenas sería el titular",
+     "jugador": "Hugo Cuypers",
+     "motivo": "Molestia en el muslo derecho, según Milenio. Lo atendieron en la cancha, salió al 81-82' de la ida y no entrenó con el grupo en El Barrial. Almeyda iba a definir el once y la convocatoria el viernes 27, antes de viajar.",
      "tipo": "duda",
-     "fuente": "https://www.telediario.mx/liga-mx/club-monterrey/rayados-tiene-entrenamiento-nocturno-previo-al-juego-ante-america",
-     "fecha_fuente": "2026-11-24"
+     "fuente": "https://www.nacionfutbol.com.mx/liga-mx/rayados-recupera-a-salcedo-para-el-banorte-pero-almeyda-tendria-3-bajas-20261127.html",
+     "fecha_fuente": "2026-11-26"
+    },
+    {
+     "jugador": "Diego Rossi",
+     "motivo": "Se perdió la ida por no estar recuperado de una molestia muscular. Milenio habla de un problema en la espalda baja y TV Azteca de una molestia en el muslo derecho. No entrenó con el grupo y El Norte ve pocas posibilidades de que juegue.",
+     "tipo": "duda",
+     "fuente": "https://www.nacionfutbol.com.mx/liga-mx/rayados-recupera-a-salcedo-para-el-banorte-pero-almeyda-tendria-3-bajas-20261127.html",
+     "fecha_fuente": "2026-11-26"
+    },
+    {
+     "jugador": "Érick Aguirre",
+     "motivo": "No entrenó con el grupo junto con Cuypers y Rossi (El Porvenir). No se publicó la lesión. El Norte ve pocas posibilidades de que juegue.",
+     "tipo": "duda",
+     "fuente": "https://www.nacionfutbol.com.mx/liga-mx/rayados-recupera-a-salcedo-para-el-banorte-pero-almeyda-tendria-3-bajas-20261127.html",
+     "fecha_fuente": "2026-11-26"
+    },
+    {
+     "jugador": "Stefan Medina",
+     "motivo": "Problemas físicos sin diagnóstico publicado. Ya se había perdido la ida por eso. TV Azteca lo da en duda para la vuelta.",
+     "tipo": "duda",
+     "fuente": "https://www.tvazteca.com/aztecadeportes/liga-mx/quienes-no-jugaran-la-vuelta-de-club-america-vs-rayados-de-monterrey-por-lesion-o-expulsion/",
+     "fecha_fuente": "2026-11-26"
     }
    ],
-   "nota": "Información completa y reciente: Telediario (24-nov, después del último entrenamiento), Crónica y Excélsior (23 y 24-nov) y SI (25-nov). La decisión sobre Andrada no es oficial. Ya disponibles: Diego Rossi (Disponible: su salida ante Pumas fue preventiva. Crónica todavía lo tenía en duda, pero también recogía la versión de que el cambio fue por precaución; 2026-11-24); Ricardo Chávez (Vuelve tras cumplir su partido de suspensión y podría recuperar el lateral derecho; 2026-11-24). Disciplinaria: al 25-nov no hay reporte oficial de la J17 (fmf.mx llega a la J13); la prensa sólo da la suspensión de la ida. Suspendido para la ida: Carlos Salcedo (Doble amarilla ante Pumas en la J17 (la segunda al 58'); se pierde la ida. Según Excélsior, Alonso Aceves es el favorito para reemplazarlo; https://www.excelsior.com.mx/deportes/jugadores-suspendidos-que-no-estaran-cuartos-final-ida, 2026-11-23); el sistema ya lo deduce de las tarjetas y la página lo muestra en «Suspendidos», por eso no va en esta lista."
+   "nota": "Información completa y reciente. Las fuentes son Nación Fútbol (26-nov, 21:46, citando a El Norte, Milenio y El Porvenir), TV Azteca y Consulta Monterrey (26-nov). No encontré la convocatoria que Almeyda iba a definir el viernes 27, así que Cuypers, Rossi y Aguirre siguen pendientes. No hay noticias de Fidel Ambriz después del choque de cabeza del final de la ida. Ya disponibles: Carlos Salcedo (Lo expulsaron por doble amarilla (58') ante Pumas en la J17. Cumplió el partido de suspensión en la ida y vuelve para la vuelta; 2026-11-26). Disciplinaria: al 27-nov no hay reporte oficial de la J17 ni de las idas (fmf.mx llega a la J13); lo de las suspensiones sale de la prensa. Suspendido para la vuelta: Ricardo Chávez (Expulsado en la ida: amarilla al 9' que pasó a roja directa al 10-11' tras revisión del VAR, por juego brusco grave (entrada con los tacos a la rodilla de Óscar Perea). Se pierde la vuelta salvo que prospere una apelación, que la fuente ve con pocas posibilidades; https://www.nacionfutbol.com.mx/liga-mx/almeyda-pierde-a-ricardo-chavez-para-la-vuelta-y-analistas-arbitrales-respaldan-la-decision-de-caceres-20261126.html, 2026-11-26); el sistema ya lo deduce de las tarjetas y la página lo muestra en «Suspendidos», por eso no va en esta lista."
   },
   "León": {
    "tecnico": "Javier Gandolfi",
    "lesionados": [
     {
      "jugador": "Valentín Gauthier",
-     "motivo": "Fuentes encontradas: FutMercado (23-nov) lo da fuera el resto del torneo por una cirugía de tobillo de agosto; FotMob (25-nov) ya no lo marca lesionado. Sin parte médico del club",
-     "tipo": "duda",
-     "fuente": "https://futmercado.com/lesiones/",
-     "fecha_fuente": "2026-11-23"
+     "motivo": "Descartado; Nación Fútbol dice que lo operaron del tobillo por un edema óseo",
+     "tipo": "lesion",
+     "fuente": "https://www.365scores.com/es/news/leon-vs-cruz-azul-posibles-alineaciones/",
+     "fecha_fuente": "2026-11-26"
     },
     {
      "jugador": "Ángel Estrada",
-     "motivo": "Fractura de tibia derecha en un entrenamiento, según el reporte médico del club del 31-mar-2026; fue operado y no juega desde marzo. FotMob lo marca como dudoso y sin fecha de regreso. No es titular",
+     "motivo": "En duda por molestias físicas (365Scores). No aparece en la alineación ni en los cambios de la ida.",
      "tipo": "duda",
-     "fuente": "https://www.fotmob.com/teams/1841/squad/club-leon",
-     "fecha_fuente": "2026-11-25"
+     "fuente": "https://www.365scores.com/es/news/leon-vs-cruz-azul-posibles-alineaciones/",
+     "fecha_fuente": "2026-11-26"
     }
    ],
-   "nota": "Información pobre. No hay parte médico ni convocatoria de León del 22-nov en adelante. La única baja es un suplente con una lesión larga (FotMob, 25-nov). Ninguna fuente reporta suspendidos. Saqué de «ya_no_son_baja» a Iván Rodríguez y a Juan José Guevara porque ninguna fuente los dio nunca como baja; ver «no_confirmado»."
+   "nota": "Información de las previas y crónicas del 25 y 26 de noviembre. No hay suspendidos; en la ida sólo vio amarilla Valadez. Ninguna crónica (ClaroSports, Récord, SoyFiera) reporta lesiones de León. Gandolfi dijo que hablará con los jugadores en los próximos días para ver quién está al cien por ciento; todavía no hay convocatoria para la vuelta. Ya disponibles: Luis Valadez (Nación Fútbol (25-nov) y NNC (26-nov) lo daban como baja por una lesión en el pie, pero fue titular en la ida. Vio amarilla al 5' y salió al 46' por José Rodríguez; ninguna crónica menciona lesión; 2026-11-26)."
   },
   "Pachuca": {
    "tecnico": "Benjamín Mora",
    "lesionados": [
     {
      "jugador": "Carlos Sánchez",
-     "motivo": "Lesión de menisco, registrada por FotMob el 5-nov; no juega desde el 27-sep. Regreso estimado a inicios de enero de 2027",
+     "motivo": "Lesión de meniscos; vuelve a principios de enero de 2027. No estuvo entre los convocados de la ida.",
      "tipo": "lesion",
-     "fuente": "https://www.fotmob.com/matches/chivas-vs-pachuca/20ys6s",
+     "fuente": "https://bolavip.com/mx/ligamx/alineaciones-de-pachuca-y-chivas-por-la-liga-mx-formaciones-probables",
+     "fecha_fuente": "2026-11-26"
+    },
+    {
+     "jugador": "Andrés Micolta",
+     "motivo": "Rotura del ligamento cruzado anterior sufrida ante Cruz Azul; unos seis meses fuera y descartado para el resto del torneo",
+     "tipo": "lesion",
+     "fuente": "https://www.si.com/es-us/pronostico-pachuca-vs-chivas-probabilidades-estadisticas-bajas-y-prediccion-ia-26-11-2026",
      "fecha_fuente": "2026-11-25"
     },
     {
      "jugador": "Alexéi Domínguez",
-     "motivo": "Fractura de pie. FotMob lo marca como dudoso y sin fecha de regreso. Antecedente: Futbol Total (21-oct) informó que lo reoperaron del quinto metatarsiano tras una recaída y lo dio fuera el resto del Apertura, con al menos 6 semanas más de baja",
-     "tipo": "duda",
-     "fuente": "https://www.fotmob.com/teams/7848/squad/pachuca",
+     "motivo": "Fractura del quinto metatarsiano (SI también menciona el tobillo); baja para la recta final del Apertura 2026. No estuvo entre los convocados de la ida.",
+     "tipo": "lesion",
+     "fuente": "https://www.si.com/es-us/pronostico-pachuca-vs-chivas-probabilidades-estadisticas-bajas-y-prediccion-ia-26-11-2026",
      "fecha_fuente": "2026-11-25"
     }
    ],
-   "nota": "Información pobre: las dos bajas salen solo de FotMob (página del partido, plantilla y ficha del jugador, consultadas el 25-nov). No hay parte médico del club ni nota de prensa del 22-nov en adelante. Ninguno de los dos es titular reciente. No hay suspendidos (Soy Referee y Excélsior, 23-nov)."
+   "nota": "Datos de las previas del 25 y 26 de noviembre y de las crónicas de la ida. Ninguna crónica reporta lesiones de Pachuca en la ida. La lista de 21 de ClaroSports no incluye a Sánchez, Micolta ni Domínguez, lo que respalda sus bajas. Las previas no coinciden del todo: la nota de lesionados de SI (25-nov) dice que Pachuca no tenía lesionados, y Rotowire (5-nov) reportaba a Domínguez entrenando con normalidad. Mora no ha dicho quién sustituye a Idrissi. Disciplinaria: al 27-nov no hay reporte oficial de la J17 ni de las idas (fmf.mx llega a la J13); lo de las suspensiones sale de la prensa. Suspendido para la vuelta: Oussama Idrissi (Segunda amarilla al 90+2' de la ida (ClaroSports) por hacer gestos a la banca de Chivas tras su gol del 2-1. Se pierde la vuelta. 365Scores (27-nov) habla de una fecha de suspensión, pero no hay resolución oficial. TUDN dice que la directiva intentará apelar; https://www.clarosports.com/futbol/liga-mx/pachuca-vs-chivas-en-vivo-cuartos-de-final-del-apertura-2026-resultado-y-goles-del-partido-de-ida-hoy-26-de-noviembre/, 2026-11-26); el sistema ya lo deduce de las tarjetas y la página lo muestra en «Suspendidos», por eso no va en esta lista."
   },
   "Tijuana": {
    "tecnico": "Sebastián Abreu",
@@ -467,13 +474,14 @@
   "El sistema muestra todavía «a una amarilla de la suspensión» para la ida (Carlos Rodríguez, Paradela, Ángel Márquez, Kevin Álvarez, Capasso, Franco Romero, Óliver Torres, Vegas, Jesús Lara, Pizarro, Idrissi), pero el Reglamento de Sanciones (art. 15) cancela las amarillas al terminar la fase de calificación: en la ida nadie está apercibido."
  ],
  "no_confirmado": [
-  "Comisión Disciplinaria de la J17: sin reporte oficial al 25-nov (fmf.mx llega a la J13; ligamx.net/cancha/sanciones dio error 500). Sólo se sabe que Hugo González (Toluca) y Carlos Salcedo (Monterrey) se pierden la ida; si reciben más de un partido se sabrá antes de la vuelta.",
+  "Comisión Disciplinaria: sin reporte oficial de la J17 ni de las idas al 27-nov (fmf.mx llega a la J13). Según la prensa, Hugo González (Toluca) y Carlos Salcedo (Monterrey) cumplieron su partido en la ida; Ricardo Chávez (Monterrey) e Idrissi (Pachuca), expulsados en las idas, se pierden la vuelta (Pachuca intentaría apelar lo de Idrissi).",
   "Pachuca: Rodolfo Pizarro salió al 90' ante Toluca (ESPN: entró Cristóbal Hernández); una transmisión en vivo de Mediotiempo habló de lesión y ninguna otra fuente lo confirma. Tampoco hay nota de bajas de Pachuca tras la J17: Carlos Sánchez y Alexéi Domínguez salen sólo de FotMob (18-nov) y de su ausencia en la J17.",
   "Monterrey: Érick Aguirre salió de cambio al 38' ante Pumas (entró Óliver Torres; ESPN y Claro Sports); ninguna fuente explica si fue lesión. No se incluye.",
   "Chivas: Miguel Tapias no estuvo entre los convocados de la J17 y FutMercado lo da «en rehabilitación» con fecha 16-oct; Juanfutbol (22-nov) dice que Chivas recuperó a sus lesionados. No se incluye.",
   "FutMercado (23-nov) arrastra entradas con fecha 16-oct de jugadores que sí estuvieron en la J17 según ESPN (Chivas: Campillo, Bryan González, Miguel Gómez; Cruz Azul: Orquin, Paradela, Rotondi; América: Cristián Borja; Monterrey: Orellano). Esas entradas no se usaron.",
   "Las fichas de FotMob y FutMercado no traen fecha por jugador: se fechan con el día de consulta. Lo no confirmado de la Jornada 17 (equipos ya eliminados) queda en la versión del 18-nov del historial de git.",
-  "Revisión del 25-nov (verificadores del workflow 12): CORRECCIONES HECHAS AL RELEER LAS FUENTES: (a) Helinho, Pereira, Romero y Gutiérrez: Ovaciones (24-nov) no dice que Mohamed espere tenerlos para la ida ni explica por qué faltaron; solo dice que «esperaba recuperar» a los cuatro. Cambié la fuente a Latingoles (25-nov): «su participación dependerá de cómo evolucionen». La cita «Esperemos que estén todos para el miércoles» es de MVT (22-nov). (b) Henry Martín: Excélsior no menciona a Borja como relevo. Cambié la fuente a El Futbolero (24-nov), que sí lo dice y además recoge, vía AS México, que León Lecanda (ESPN) informó que Henry «no vería minutos, al menos en la ida». (c) Kevin Álvarez y Erick Sánchez: Crónica no explica por qué faltaron (dice solo que «no participaron» ante Tigres). Los motivos (descanso para no ver la quinta amarilla; suspensión por acumulación) vienen de SI (25-nov), así que cambié la fuente. (d) Brian Rodríguez: «bíceps femoral» no aparece en La Opinión, que solo dice que «dejó atrás sus dolencias físicas»; lo dice SI (bíceps femoral izquierdo, visto bueno médico para viajar). Cambié la fuente a SI. Águilas Monumental (24-nov) advierte que «aún no se recupera por completo», así que su regreso es parcial. (e) Ricardo Chávez: ninguna fuente dice que su suspensión fuera «por acumulación de tarjetas»; solo que «ya cumplió con su partido de suspensión». Lo quité. (f) Carlos Salcedo: Crónica solo dice «tarjeta roja». Cambié la fuente a Excélsior (23-nov), que detalla la doble amarilla (segunda al 58'). (g) Duk: | Qué descarté o corregí y por qué: 1) Iván Rodríguez y Juan José Guevara (León): los saqué de «ya_no_son_baja». Ninguna fuente los dio nunca como baja o duda. Solo no aparecen en el once de la J17 (AM, 21-nov), lo que puede ser rotación; Guevara suma 16 titularidades en la temporada. La plantilla de León en FotMob (25-nov) no los marca lesionados y el once probable de SI (24-nov) los incluye. No hay nada que confirmar ni descartar. 2) Ángel Estrada (León): corregí el motivo. La lesión es una fractura de tibia derecha del 31-mar-2026 (reporte médico del club citado por Rotowire; FotMob la registra el 31-mar) y no juega desde marzo. Descarté el dato de FutMercado de que estaba lesionado «desde el 16-oct», que no coincide. La página del partido en FotMob mezcla su equipo, pero la plantilla de FotMob confirma que es de León. 3) Cristian Jiménez (Cruz Azul): quité «(cruzado)»; juanfutbol y SI solo dicen rotura de ligamentos u operación de ligamentos. 4) Amaury Morales: quité «rodilla derecha». Juanfutbol dice ligamento cruzado roto en un entrenamiento en junio y SI dice LCA de la rodilla, sin lado. 5) Disciplinaria: la nota de El Futbolero sobre Salcedo se publicó el 21-nov a las 21:05, no el 22-nov. Por eso no doy como confirmados su «1 partido por doble amarilla» ni «tercera expulsión del torneo»; esa nota dice además que «no se había publicado ninguna resolución». Quité el dato sobre los ids de noticias 2311 a 2314 en fmf.mx porque no lo pude verificar. Sigue sin publicarse el r"
+  "Revisión del 25-nov (verificadores del workflow 12): CORRECCIONES HECHAS AL RELEER LAS FUENTES: (a) Helinho, Pereira, Romero y Gutiérrez: Ovaciones (24-nov) no dice que Mohamed espere tenerlos para la ida ni explica por qué faltaron; solo dice que «esperaba recuperar» a los cuatro. Cambié la fuente a Latingoles (25-nov): «su participación dependerá de cómo evolucionen». La cita «Esperemos que estén todos para el miércoles» es de MVT (22-nov). (b) Henry Martín: Excélsior no menciona a Borja como relevo. Cambié la fuente a El Futbolero (24-nov), que sí lo dice y además recoge, vía AS México, que León Lecanda (ESPN) informó que Henry «no vería minutos, al menos en la ida». (c) Kevin Álvarez y Erick Sánchez: Crónica no explica por qué faltaron (dice solo que «no participaron» ante Tigres). Los motivos (descanso para no ver la quinta amarilla; suspensión por acumulación) vienen de SI (25-nov), así que cambié la fuente. (d) Brian Rodríguez: «bíceps femoral» no aparece en La Opinión, que solo dice que «dejó atrás sus dolencias físicas»; lo dice SI (bíceps femoral izquierdo, visto bueno médico para viajar). Cambié la fuente a SI. Águilas Monumental (24-nov) advierte que «aún no se recupera por completo», así que su regreso es parcial. (e) Ricardo Chávez: ninguna fuente dice que su suspensión fuera «por acumulación de tarjetas»; solo que «ya cumplió con su partido de suspensión». Lo quité. (f) Carlos Salcedo: Crónica solo dice «tarjeta roja». Cambié la fuente a Excélsior (23-nov), que detalla la doble amarilla (segunda al 58'). (g) Duk: | Qué descarté o corregí y por qué: 1) Iván Rodríguez y Juan José Guevara (León): los saqué de «ya_no_son_baja». Ninguna fuente los dio nunca como baja o duda. Solo no aparecen en el once de la J17 (AM, 21-nov), lo que puede ser rotación; Guevara suma 16 titularidades en la temporada. La plantilla de León en FotMob (25-nov) no los marca lesionados y el once probable de SI (24-nov) los incluye. No hay nada que confirmar ni descartar. 2) Ángel Estrada (León): corregí el motivo. La lesión es una fractura de tibia derecha del 31-mar-2026 (reporte médico del club citado por Rotowire; FotMob la registra el 31-mar) y no juega desde marzo. Descarté el dato de FutMercado de que estaba lesionado «desde el 16-oct», que no coincide. La página del partido en FotMob mezcla su equipo, pero la plantilla de FotMob confirma que es de León. 3) Cristian Jiménez (Cruz Azul): quité «(cruzado)»; juanfutbol y SI solo dicen rotura de ligamentos u operación de ligamentos. 4) Amaury Morales: quité «rodilla derecha». Juanfutbol dice ligamento cruzado roto en un entrenamiento en junio y SI dice LCA de la rodilla, sin lado. 5) Disciplinaria: la nota de El Futbolero sobre Salcedo se publicó el 21-nov a las 21:05, no el 22-nov. Por eso no doy como confirmados su «1 partido por doble amarilla» ni «tercera expulsión del torneo»; esa nota dice además que «no se había publicado ninguna resolución». Quité el dato sobre los ids de noticias 2311 a 2314 en fmf.mx porque no lo pude verificar. Sigue sin publicarse el r",
+  "Revisión del 27-nov (verificadores del workflow 13): QUÉ SE DESCARTÓ O CORRIGIÓ. 1) Duk (Atlas): DESCARTADO como baja. La fuente citada (Fox Sports, 20-sep) no carga porque el host foxsports.com.mx no está permitido en la red de esta sesión. Las alternativas que encontré (Claro Sports, Excélsior, Récord, Mediotiempo) son todas de septiembre y confirman una rotura del tendón rotuliano de la rodilla izquierda, la operación y un plazo de 6 a 8 meses. No hay ninguna nota del 25-nov en adelante, así que no cumple la regla de fecha. Casi con seguridad sigue fuera; se puede reincorporar si se acepta una fuente de septiembre. 2) Milton Valenzuela: corregido. Ninguna fuente dice «muslo izquierdo»: Claro Sports solo habla de «lesión muscular» y Telediario de una lesión al 55'. El cambio al 57' por Jorge Rodríguez sale de Récord. 3) Marcel Ruiz: corregido. Latingoles (25-nov) solo dice que «mantiene problemas físicos» y no menciona ni el ligamento cruzado ni la operación de junio ni el plazo de 7 a 8 meses. Esos datos salen de fuentes viejas: rotura del ligamento cruzado de la rodilla derecha el 11-mar-2026 y operación confirmada el 9-jun (Diario de Yucatán, que dice que se pierde el Apertura 2026). Un blog de apuestas (Novibet, 26-nov) también lo da fuera por el ligamento, pero no es un medio serio. 4) Federico Pereira y Erick Gutiérrez: Milenio devuelve 403. Lo sustituí por Récord (25-nov), que cita a Mohamed: «Ya tendremos a Fede Pereira recuperado, a Guti también». Doy por hecho que «Guti» es Erick Gutiérrez; el texto no da el nombre  | Qué descarté o corregí al releer las fuentes:\n\n1) Estadio Deportes (nota «¿Le quitarán la roja a Idrissi?», 27-nov) devuelve 403 y no se pudo leer. Descarté lo que salía sólo de ella: la opinión del expárbitro García Orozco. En su lugar cito a TUDN (la directiva intentará apelar) y a 365Scores (27-nov, una fecha de suspensión, según la prensa).\n\n2) Idrissi: la nota de ClaroSports sobre Mora no da el minuto de la roja y dice que fue «por insultar a jugadores de Chivas». El 90+2' y la segunda amarilla por gestos a la banca vienen de la crónica en vivo de ClaroSports, que ahora es la fuente principal. El minuto sigue variando según el medio: El Futbolero pone el gol al 90+3', fomoera titula 90+5' y el proyecto tenía 90+3'.\n\n3) Alexéi Domínguez: ninguna fuente dice «recaída y nueva cirugía», así que lo quité. SI (25-nov) sólo dice fractura del quinto metatarsiano y tobillo, y baja para la recta final. NNC dice fractura y Bolavip, ausencia. Ojo: Rotowire (5-nov) lo daba entrenando completo y disponible. No figuró en la convocatoria de la ida, así que lo dejo como baja.\n\n4) Quité la frase «365Scores sólo menciona a Carlos Sánchez»: no di con esa nota ni venía con URL. La discrepancia real es otra: la nota de lesionados de SI (25-nov) dice que Pachuca no tenía lesionados, mientras que el pronóstico de SI, Bolavip y NNC sí listan a Micolta, Domínguez y Carlos Sánchez.\n\n5) Gudiño: ClaroSports no habla de «mareos», sino de que al 63' «presenta molestias y queda tendido sobre el césped»"
  ],
  "fuentes": [
   {
@@ -1090,6 +1098,211 @@
    "url": "https://www.ligamx.net/cancha/centronoticias",
    "titulo": "Liga MX: centro de noticias (lo último es del 23-nov; sin reporte disciplinario)",
    "fecha": "2026-11-25"
+  },
+  {
+   "url": "https://www.clarosports.com/futbol/liga-mx/atlas-vs-toluca-liguilla-del-apertura-2026-horario-alineaciones-y-donde-ver-los-cuartos-de-final-de-la-liga-mx/",
+   "titulo": "Claro Sports: ¿Cuándo es el Atlas vs Toluca, vuelta de cuartos del Apertura 2026? (Valenzuela en duda; onces probables)",
+   "fecha": "2026-11-26"
+  },
+  {
+   "url": "https://www.telediario.mx/liga-mx/club-toluca/helinho-demuestra-fair-play-en-el-toluca-vs-atlas-de-la-liguilla",
+   "titulo": "Telediario: Helinho demuestra fair play (Valenzuela se lesiona al 55')",
+   "fecha": "2026-11-26"
+  },
+  {
+   "url": "https://www.record.com.mx/futbol/partido/toluca-atlas-12365947/cobertura-en-vivo",
+   "titulo": "Récord: Toluca vs Atlas en vivo, ida de cuartos (cambios y tarjetas)",
+   "fecha": "2026-11-25"
+  },
+  {
+   "url": "https://www.infobae.com/mexico/deportes/2026/11/26/toluca-vs-atlas-en-vivo-sigue-los-cuartos-de-final-de-ida-de-la-liguilla-2026/",
+   "titulo": "Infobae: Con doblete de Helinho, Toluca se lleva la ventaja ante Atlas",
+   "fecha": "2026-11-25"
+  },
+  {
+   "url": "https://juanfutbol.com/liga-mx/por-que-no-juega-hugo-gonzalez-en-toluca-vs-atlas-por-los-cuartos-de-final-del-apertura-2026",
+   "titulo": "Juanfutbol: Por qué no juega Hugo González en Toluca vs Atlas",
+   "fecha": "2026-11-25"
+  },
+  {
+   "url": "https://www.record.com.mx/historia/es-un-ciclo-cumplido-mohamed-habla-de-su-salida-de-toluca-y-la-ventaja-ante-atlas-2026112605404040984",
+   "titulo": "Récord: 'Es un ciclo cumplido': Mohamed habla de su salida y de la ventaja ante Atlas (recupera a Pereira y a 'Guti')",
+   "fecha": "2026-11-25"
+  },
+  {
+   "url": "https://www.clarosports.com/futbol/liga-mx/toluca-prepara-cambios-en-su-alineacion-para-enfrentar-al-atlas-en-la-ida-de-los-cuartos-de-final-del-apertura-2026/",
+   "titulo": "Claro Sports: Toluca prepara cambios en su alineación para la ida (once con Romero y Helinho)",
+   "fecha": "2026-11-25"
+  },
+  {
+   "url": "https://www.tvazteca.com/aztecadeportes/liga-mx/quienes-no-jugaran-la-vuelta-de-club-america-vs-rayados-de-monterrey-por-lesion-o-expulsion/",
+   "titulo": "TV Azteca: Quiénes no jugarán la vuelta de América vs Rayados por lesión o expulsión",
+   "fecha": "2026-11-26"
+  },
+  {
+   "url": "https://consultamonterrey.mx/deportes/america-vs-rayados-bajas-lesion-expulsion-vuelta/",
+   "titulo": "Consulta Monterrey: América vs Rayados, bajas por lesión y expulsión para la vuelta",
+   "fecha": "2026-11-26"
+  },
+  {
+   "url": "https://www.clarosports.com/us/america-vs-monterrey-las-claves-que-pueden-definir-la-vuelta-y-donde-ver-en-ee-uu/",
+   "titulo": "Claro Sports US: América vs Monterrey, las claves de la vuelta (Henry Martín, cuadro gripal)",
+   "fecha": "2026-11-26"
+  },
+  {
+   "url": "https://americamonumental.bolavip.com/ligamx/las-rotaciones-que-prepara-guillermo-almada-para-los-cuartos-de-final-de-vuelta-ante-monterrey",
+   "titulo": "Bolavip (Águilas Monumental): Las rotaciones que prepara Almada para la vuelta",
+   "fecha": "2026-11-26"
+  },
+  {
+   "url": "https://www.record.com.mx/futbol/partido/monterrey-cf-america-12365948/cobertura-en-vivo",
+   "titulo": "Récord: Monterrey vs América en vivo, ida de cuartos (cambios y tarjetas)",
+   "fecha": "2026-11-25"
+  },
+  {
+   "url": "https://clarosports.com/futbol/liga-mx/monterrey-vs-america-en-vivo-cuartos-de-final-del-apertura-2026-resultado-y-goles-del-partido-de-ida-hoy-25-de-noviembre",
+   "titulo": "Claro Sports: Monterrey vs América en vivo, ida (roja a Chávez, salida de Cuypers, choque Reyes-Ambriz)",
+   "fecha": "2026-11-25"
+  },
+  {
+   "url": "https://www.nacionfutbol.com.mx/liga-mx/rayados-recupera-a-salcedo-para-el-banorte-pero-almeyda-tendria-3-bajas-20261127.html",
+   "titulo": "Nación Fútbol: Rayados recupera a Salcedo para el Banorte, pero Almeyda tendría 3 bajas",
+   "fecha": "2026-11-26"
+  },
+  {
+   "url": "https://www.nacionfutbol.com.mx/liga-mx/almeyda-pierde-a-ricardo-chavez-para-la-vuelta-y-analistas-arbitrales-respaldan-la-decision-de-caceres-20261126.html",
+   "titulo": "Nación Fútbol: Almeyda pierde a Ricardo Chávez para la vuelta",
+   "fecha": "2026-11-26"
+  },
+  {
+   "url": "https://www.clarosports.com/futbol/liga-mx/matias-almeyda-modifica-su-alineacion-ante-america-rayados-enfrenta-la-liguilla-con-bajas-importantes/",
+   "titulo": "Claro Sports: Almeyda modifica su alineación ante América (Chávez cumplió su suspensión; Salcedo suspendido)",
+   "fecha": "2026-11-25"
+  },
+  {
+   "url": "https://www.mediotiempo.com/futbol/liga-mx/multaran-walter-erviti-rayados-criticas-arbitro-ida-cuartos-america",
+   "titulo": "Mediotiempo: Multarán a Walter Erviti y Rayados por críticas al árbitro",
+   "fecha": "2026-11-26"
+  },
+  {
+   "url": "https://www.fmf.mx/justicia-deportiva/comision-disciplinaria",
+   "titulo": "FMF: Comisión Disciplinaria (último reporte de la Liga BBVA MX: J13)",
+   "fecha": "2026-11-27"
+  },
+  {
+   "url": "https://www.foxdeportes.com/liga-mx/nota/chivas-iniciara-incompleto-el-camino-por-el-titulo",
+   "titulo": "Chivas iniciará incompleto el camino por el título (Fox Deportes)",
+   "fecha": "2026-11-26"
+  },
+  {
+   "url": "https://www.chivasdecorazon.com.mx/es/noticias/41861/Quines-son-los-convocados-de-Chivas-para-los-Cuartos-de-final-de-Ida-ante-Pachuca",
+   "titulo": "¿Quiénes son los convocados de Chivas para los Cuartos de final de Ida ante Pachuca? (Chivas oficial)",
+   "fecha": "2026-11-26"
+  },
+  {
+   "url": "https://nnc.mx/articulo/chivas-sin-romo-y-cruz-azul-completo-la-liguilla-sigue-hoy-en-pachuca-y-leon",
+   "titulo": "Chivas sin Romo y Cruz Azul completo: la Liguilla sigue hoy en Pachuca y León (NNC)",
+   "fecha": "2026-11-26"
+  },
+  {
+   "url": "https://www.si.com/es-us/pronostico-pachuca-vs-chivas-probabilidades-estadisticas-bajas-y-prediccion-ia-26-11-2026",
+   "titulo": "Pronóstico Pachuca vs Chivas: bajas (SI en español)",
+   "fecha": "2026-11-25"
+  },
+  {
+   "url": "https://www.si.com/es-us/lesionados-y-suspendidos-para-el-partido-pachuca-vs-chivas-26-11-2026",
+   "titulo": "Lesionados y suspendidos para el partido Pachuca vs Chivas (SI)",
+   "fecha": "2026-11-25"
+  },
+  {
+   "url": "https://bolavip.com/mx/ligamx/alineaciones-de-pachuca-y-chivas-por-la-liga-mx-formaciones-probables",
+   "titulo": "Alineaciones de Pachuca y Chivas: formaciones probables (Bolavip)",
+   "fecha": "2026-11-26"
+  },
+  {
+   "url": "https://www.clarosports.com/futbol/liga-mx/pachuca-vs-chivas-en-vivo-cuartos-de-final-del-apertura-2026-resultado-y-goles-del-partido-de-ida-hoy-26-de-noviembre/",
+   "titulo": "Pachuca vs Chivas: crónica y alineaciones de la ida (ClaroSports)",
+   "fecha": "2026-11-26"
+  },
+  {
+   "url": "https://www.tudn.com/futbol/liga-mx/pachuca-vs-chivas-en-vivo-ida-de-cuartos-de-final-apertura-2026-de-liga-mx-minuto-a-minuto-del-partido",
+   "titulo": "Pachuca vs. Chivas minuto a minuto, ida de cuartos (TUDN)",
+   "fecha": "2026-11-26"
+  },
+  {
+   "url": "https://www.clarosports.com/futbol/liga-mx/benjamin-mora-lamenta-la-baja-de-idrissi-y-manda-un-mensaje-a-chivas-para-la-vuelta/",
+   "titulo": "Benjamín Mora lamenta la baja de Idrissi (ClaroSports)",
+   "fecha": "2026-11-26"
+  },
+  {
+   "url": "https://www.tudn.com/futbol/liga-mx/pachuca-vs-chivas-directiva-de-los-tuzos-apelaran-la-expulsion-de-oussama-idrissi",
+   "titulo": "Pachuca vs. Chivas: directiva de los Tuzos apelará la expulsión de Idrissi (TUDN)",
+   "fecha": "sin fecha visible (posterior a la ida del 26-nov)"
+  },
+  {
+   "url": "https://www.365scores.com/es/news/por-que-expulsaron-idrissi-vs-chivas/",
+   "titulo": "¿Por qué expulsaron a Oussama Idrissi en Pachuca vs Chivas? Se pierde la vuelta (365Scores)",
+   "fecha": "2026-11-27"
+  },
+  {
+   "url": "https://www.elfutbolero.com.mx/ligamx/idrissi-firma-doblete-y-es-expulsado-ante-chivas-fernando-guerrero-cuestiona-al-curro-20261127.html",
+   "titulo": "Idrissi firma doblete y es expulsado ante Chivas (El Futbolero)",
+   "fecha": "2026-11-26"
+  },
+  {
+   "url": "https://www.nacionfutbol.com.mx/liga-mx/chivas/milito-tuvo-tenso-cruce-con-katia-itzel-garcia-y-la-sancion-que-le-espera-al-dt-de-chivas-20261127.html",
+   "titulo": "Milito tuvo tenso cruce con Katia Itzel García y la sanción que le espera (Nación Fútbol)",
+   "fecha": "2026-11-26"
+  },
+  {
+   "url": "https://www.si.com/es-us/lesionados-y-suspendidos-de-cruz-azul-para-enfrentarse-a-leon-26-11-2026",
+   "titulo": "Lesionados y suspendidos de Cruz Azul para enfrentarse a León (SI)",
+   "fecha": "2026-11-25"
+  },
+  {
+   "url": "https://www.nacionfutbol.com.mx/liga-mx/cruz-azul/cruz-azul-va-a-leon-sin-suspendidos-y-la-deuda-pendiente-que-tiene-en-liga-mx-20261126.html",
+   "titulo": "Cruz Azul va a León sin suspendidos (Nación Fútbol)",
+   "fecha": "2026-11-25"
+  },
+  {
+   "url": "https://vamoscruzazul.bolavip.com/noticias/dura-baja-en-cruz-azul-amaury-garcia-se-pierde-el-juego-de-ida-vs.-leon-por-molestias-musculares-a2aoX7G3LuMS",
+   "titulo": "Amaury García se pierde la ida vs. León por molestias musculares (Vamos Azul)",
+   "fecha": "2026-11-26"
+  },
+  {
+   "url": "https://www.365scores.com/es/news/leon-vs-cruz-azul-posibles-alineaciones/",
+   "titulo": "León vs Cruz Azul: posibles alineaciones y bajas (365Scores)",
+   "fecha": "2026-11-26"
+  },
+  {
+   "url": "https://365scores.com/es/news/leon-vs-cruz-azul-alineaciones-ida",
+   "titulo": "León vs Cruz Azul: XI confirmados de la ida (365Scores)",
+   "fecha": "2026-11-26"
+  },
+  {
+   "url": "https://www.clarosports.com/futbol/liga-mx/leon-vs-cruz-azul-en-vivo-cuartos-de-final-del-apertura-2026-resultado-y-goles-del-partido-de-ida-hoy-26-de-noviembre/",
+   "titulo": "León vs Cruz Azul: crónica de la ida (ClaroSports)",
+   "fecha": "2026-11-26"
+  },
+  {
+   "url": "https://www.record.com.mx/futbol/partido/leon-cruz-azul-12365949/cobertura-en-vivo",
+   "titulo": "León vs Cruz Azul EN VIVO, ida de cuartos (Récord)",
+   "fecha": "2026-11-26"
+  },
+  {
+   "url": "https://www.soyfiera.com/news/2026/11/26/ahogan-a-la-fiera-leon-cae-goleado-ante-cruz-azul-en-la-ida-de-4tos-de-final-30079.html",
+   "titulo": "'Ahogan' a la Fiera: León cae goleado ante Cruz Azul (SoyFiera)",
+   "fecha": "2026-11-26"
+  },
+  {
+   "url": "https://www.clarosports.com/futbol/liga-mx/gandolfi-reconoce-que-leon-nunca-pudo-competir-ante-cruz-azul-y-habla-de-una-remontada-imposible/",
+   "titulo": "Gandolfi reconoce que León nunca pudo competir ante Cruz Azul (ClaroSports)",
+   "fecha": "2026-11-26"
+  },
+  {
+   "url": "https://www.elfutbolero.com.mx/ligamx/rayados-pierde-a-ricardo-chavez-para-la-vuelta-pero-almeyda-recupera-a-su-jugador-de-confianza-20261126.html",
+   "titulo": "Rayados pierde a Ricardo Chávez para la vuelta, pero recupera a Salcedo (El Futbolero)",
+   "fecha": "2026-11-26"
   }
  ]
 }
