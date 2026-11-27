@@ -1,5 +1,5 @@
 {
- "actualizado": "2026-11-27T16:08:37Z",
+ "actualizado": "2026-11-27T18:52:23Z",
  "fases": [
   {
    "fase": "FP1",
@@ -40,6 +40,104 @@
    "cambios": {
     "qualy": [],
     "carrera": []
+   }
+  },
+  {
+   "fase": "FP2",
+   "actualizado": "2026-11-27T18:52:23Z",
+   "qualy": {
+    "top10": [
+     "ANT",
+     "RUS",
+     "NOR",
+     "VER",
+     "PIA",
+     "HAM",
+     "LEC",
+     "HAD",
+     "LAW",
+     "LIN"
+    ],
+    "pole": "ANT",
+    "modelo": "Random Forest"
+   },
+   "carrera": {
+    "top10": [
+     "ANT",
+     "RUS",
+     "NOR",
+     "VER",
+     "PIA",
+     "HAM",
+     "LEC",
+     "HAD",
+     "LAW",
+     "LIN"
+    ],
+    "ganador": "ANT",
+    "preliminar": true,
+    "parrilla_fuente": "pronóstico de qualy (FP2)"
+   },
+   "cambios": {
+    "qualy": [
+     {
+      "acr": "PIA",
+      "de": 7,
+      "a": 5
+     },
+     {
+      "acr": "HAM",
+      "de": 8,
+      "a": 6
+     },
+     {
+      "acr": "LEC",
+      "de": 6,
+      "a": 7
+     },
+     {
+      "acr": "HAD",
+      "de": 5,
+      "a": 8
+     },
+     {
+      "acr": "LAW",
+      "de": 11,
+      "a": 9
+     },
+     {
+      "acr": "LIN",
+      "de": 9,
+      "a": 10
+     },
+     {
+      "acr": "GAS",
+      "de": 10,
+      "a": 11
+     }
+    ],
+    "carrera": [
+     {
+      "acr": "PIA",
+      "de": 7,
+      "a": 5
+     },
+     {
+      "acr": "HAM",
+      "de": 8,
+      "a": 6
+     },
+     {
+      "acr": "LEC",
+      "de": 6,
+      "a": 7
+     },
+     {
+      "acr": "HAD",
+      "de": 5,
+      "a": 8
+     }
+    ]
    }
   }
  ]

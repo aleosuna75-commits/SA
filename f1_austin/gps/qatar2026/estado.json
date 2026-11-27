@@ -35,6 +35,40 @@
     "carrera.json",
     "historial.json"
    ]
+  },
+  "pre_qualy": {
+   "hecho": "2026-11-27T18:52:23Z",
+   "corte": "2026-11-28T14:30:00Z",
+   "modelo": "Random Forest",
+   "top10": [
+    "ANT",
+    "RUS",
+    "NOR",
+    "VER",
+    "PIA",
+    "HAM",
+    "LEC",
+    "HAD",
+    "LAW",
+    "LIN"
+   ],
+   "top10_carrera": [
+    "ANT",
+    "RUS",
+    "NOR",
+    "VER",
+    "PIA",
+    "HAM",
+    "LEC",
+    "HAD",
+    "LAW",
+    "LIN"
+   ],
+   "archivos": [
+    "gp.json",
+    "carrera.json",
+    "historial.json"
+   ]
   }
  }
 }
