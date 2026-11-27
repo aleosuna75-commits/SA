@@ -1,6 +1,6 @@
 {
  "torneo": "Apertura 2026",
- "generado_utc": "2026-11-27T05:16:16Z",
+ "generado_utc": "2026-11-27T07:21:13Z",
  "fuente": "ESPN scoreboard mex.1",
  "partidos": [
   {
@@ -51,7 +51,15 @@
    "visitante": "Pachuca",
    "estadio": "Estadio Akron",
    "ciudad": "Guadalajara",
-   "momios": null
+   "momios": {
+    "ml_l": 1.645,
+    "ml_e": 3.95,
+    "ml_v": 4.7,
+    "total_linea": 2.5,
+    "over": 1.571,
+    "under": 2.25,
+    "proveedor": "DraftKings"
+   }
   },
   {
    "id": "401932000",

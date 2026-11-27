@@ -1,32 +1,32 @@
 {
- "corrida_utc": "2026-11-27T05:16:11Z",
+ "corrida_utc": "2026-11-27T07:21:06Z",
  "pasos": {
   "datos": {
    "ok": true,
    "codigo": 0,
-   "nuevos_jugados": 2,
+   "nuevos_jugados": 0,
    "reprogramados": 0,
    "nuevos_en_calendario": 0,
    "momios_actualizados": 1,
    "tabla_coincide_con_espn": true,
-   "segundos": 6.5
+   "segundos": 7.8
   },
   "variables": {
    "ok": true,
-   "segundos": 5.6
+   "segundos": 7.8
   },
   "mejora": {
    "ok": true,
-   "adoptado": null,
-   "segundos": 37.4
+   "omitido": "sin partidos nuevos",
+   "segundos": 0.0
   },
   "pronostico": {
    "ok": true,
    "salida": [
-    "/home/user/SA/ligamx/salidas/actual.json  171 KB  modelo=ensamble  pendientes=4  sellos nuevos=4  53.4 s",
+    "/home/user/SA/ligamx/salidas/actual.json  171 KB  modelo=ensamble  pendientes=4  sellos nuevos=1  53.3 s",
     "campeón: Cruz Azul 0.348, América 0.212, Toluca 0.202, Chivas 0.128, Pachuca 0.079"
    ],
-   "segundos": 55.0
+   "segundos": 55.1
   },
   "vivo": {
    "ok": true,
@@ -39,43 +39,18 @@
     "visitante": "Toluca"
    },
    "incrustado": true,
-   "segundos": 20.4
+   "segundos": 23.5
   },
   "pagina": {
    "ok": true,
    "salida": [
-    "listo en 0.35 s"
+    "listo en 0.32 s"
    ],
    "segundos": 0.4
   }
  },
  "errores": [],
- "nuevos_jugados": [
-  {
-   "id": "401931982",
-   "fecha_local": "2026-11-26",
-   "torneo": "Apertura 2026",
-   "fase": "cuartos",
-   "local": "Pachuca",
-   "visitante": "Chivas",
-   "gl": 2,
-   "gv": 1,
-   "tiene_stats": true,
-   "tiene_eventos": true
-  },
-  {
-   "id": "401931995",
-   "fecha_local": "2026-11-26",
-   "torneo": "Apertura 2026",
-   "fase": "cuartos",
-   "local": "León",
-   "visitante": "Cruz Azul",
-   "gl": 0,
-   "gv": 4,
-   "tiene_stats": true,
-   "tiene_eventos": true
-  }
- ],
+ "nuevos_jugados": [],
  "reprogramados": [],
  "nuevos_en_calendario": [],
  "proximo_partido": {
@@ -92,79 +67,6 @@
   "ciudad": "Guadalajara",
   "momios": null
  },
- "mejora": {
-  "produccion": "ensamble",
-  "adoptado": null,
-  "tabla": [
-   {
-    "modelo": "ensamble",
-    "rol": "producción",
-    "n": 3475,
-    "logloss": 1.0248,
-    "logv_marcador": -2.8831
-   },
-   {
-    "modelo": "ajuste",
-    "rol": "retador",
-    "n": 3475,
-    "logloss": 1.0229,
-    "logv_marcador": -2.8891,
-    "d_logloss_vs_produccion": -0.0019,
-    "ee": 0.001,
-    "z": -1.94,
-    "d_ultimos_bloques": 0.0116,
-    "cumple_regla": false
-   },
-   {
-    "modelo": "elo",
-    "rol": "retador",
-    "n": 3475,
-    "logloss": 1.0302,
-    "logv_marcador": -2.8916,
-    "d_logloss_vs_produccion": 0.0054,
-    "ee": 0.001,
-    "z": 5.38,
-    "d_ultimos_bloques": -0.0048,
-    "cumple_regla": false
-   },
-   {
-    "modelo": "dc2",
-    "rol": "retador",
-    "n": 3475,
-    "logloss": 1.0283,
-    "logv_marcador": -2.8934,
-    "d_logloss_vs_produccion": 0.0035,
-    "ee": 0.0011,
-    "z": 3.28,
-    "d_ultimos_bloques": 0.002,
-    "cumple_regla": false
-   },
-   {
-    "modelo": "dc",
-    "rol": "retador",
-    "n": 3475,
-    "logloss": 1.0291,
-    "logv_marcador": -2.8939,
-    "d_logloss_vs_produccion": 0.0043,
-    "ee": 0.0009,
-    "z": 4.66,
-    "d_ultimos_bloques": 0.0054,
-    "cumple_regla": false
-   },
-   {
-    "modelo": "tiros",
-    "rol": "retador",
-    "n": 3475,
-    "logloss": 1.0311,
-    "logv_marcador": -2.8925,
-    "d_logloss_vs_produccion": 0.0062,
-    "ee": 0.0013,
-    "z": 4.73,
-    "d_ultimos_bloques": 0.0077,
-    "cumple_regla": false
-   }
-  ]
- },
  "vivo": {
   "estado": "terminado_hoy",
   "partidos": 2,
@@ -177,7 +79,7 @@
   "incrustado": true
  },
  "modelo": "ensamble",
- "corte_local": "2026-11-26 23:17",
+ "corte_local": "2026-11-27 01:21",
  "campeon_top": [
   [
    "Cruz Azul",
@@ -244,9 +146,9 @@
    }
   }
  },
- "huella": "a21a0fb668192cb8eb629752e8e4aa08",
+ "huella": "f73f161b93df5d82dadea2c0621c5547",
  "publicar": false,
- "huella_publicada": "a21a0fb668192cb8eb629752e8e4aa08",
- "segundos": 125.3,
- "publicado_utc": "2026-11-27T05:18:44Z"
+ "huella_publicada": "f73f161b93df5d82dadea2c0621c5547",
+ "segundos": 94.6,
+ "publicado_utc": "2026-11-27T07:22:53Z"
 }
