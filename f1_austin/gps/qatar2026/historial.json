@@ -1,9 +1,9 @@
 {
- "actualizado": "2026-11-27T15:52:37Z",
+ "actualizado": "2026-11-27T16:08:37Z",
  "fases": [
   {
    "fase": "FP1",
-   "actualizado": "2026-11-27T15:52:37Z",
+   "actualizado": "2026-11-27T16:08:37Z",
    "qualy": {
     "top10": [
      "ANT",
@@ -20,7 +20,23 @@
     "pole": "ANT",
     "modelo": "Ridge"
    },
-   "carrera": null,
+   "carrera": {
+    "top10": [
+     "ANT",
+     "RUS",
+     "NOR",
+     "VER",
+     "HAD",
+     "LEC",
+     "PIA",
+     "HAM",
+     "LAW",
+     "LIN"
+    ],
+    "ganador": "ANT",
+    "preliminar": true,
+    "parrilla_fuente": "pronóstico de qualy (FP1)"
+   },
    "cambios": {
     "qualy": [],
     "carrera": []

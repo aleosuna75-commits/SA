@@ -3,7 +3,7 @@
  "meeting_key": 1301,
  "pasos": {
   "post_fp1": {
-   "hecho": "2026-11-27T15:52:37Z",
+   "hecho": "2026-11-27T16:08:37Z",
    "corte": "2026-11-27T17:00:00Z",
    "modelo": "Ridge",
    "top10": [
@@ -18,9 +18,21 @@
     "LIN",
     "GAS"
    ],
-   "top10_carrera": null,
+   "top10_carrera": [
+    "ANT",
+    "RUS",
+    "NOR",
+    "VER",
+    "HAD",
+    "LEC",
+    "PIA",
+    "HAM",
+    "LAW",
+    "LIN"
+   ],
    "archivos": [
     "gp.json",
+    "carrera.json",
     "historial.json"
    ]
   }
