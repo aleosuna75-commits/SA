@@ -1,5 +1,5 @@
 {
- "actualizado": "2026-11-28T14:19:35.521Z",
+ "actualizado": "2026-11-28T14:19:55.537Z",
  "estado": "pendiente",
  "segmento": 0,
  "reloj": null,
@@ -338,8 +338,8 @@
  "colector": {
   "conectado": true,
   "reconexiones": 0,
-  "ultimo_dato": "2026-11-28T14:19:32.516Z",
-  "mensajes": 4,
+  "ultimo_dato": "2026-11-28T14:19:47.522Z",
+  "mensajes": 6,
   "errores": 0,
   "version": "1.1"
  }
