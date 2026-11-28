@@ -1,5 +1,5 @@
 {
- "corrida_utc": "2026-11-27T07:44:58Z",
+ "corrida_utc": "2026-11-28T07:20:55Z",
  "pasos": {
   "datos": {
    "ok": true,
@@ -7,13 +7,13 @@
    "nuevos_jugados": 0,
    "reprogramados": 0,
    "nuevos_en_calendario": 0,
-   "momios_actualizados": 0,
+   "momios_actualizados": 3,
    "tabla_coincide_con_espn": true,
-   "segundos": 5.8
+   "segundos": 6.8
   },
   "variables": {
    "ok": true,
-   "segundos": 6.2
+   "segundos": 7.6
   },
   "mejora": {
    "ok": true,
@@ -23,15 +23,15 @@
   "pronostico": {
    "ok": true,
    "salida": [
-    "/home/user/SA/ligamx/salidas/actual.json  172 KB  modelo=ensamble  pendientes=4  sellos nuevos=0  62.0 s",
+    "/home/user/SA/ligamx/salidas/actual.json  172 KB  modelo=ensamble  pendientes=4  sellos nuevos=3  53.5 s",
     "campeón: Cruz Azul 0.348, América 0.212, Toluca 0.202, Chivas 0.128, Pachuca 0.079"
    ],
-   "segundos": 63.4
+   "segundos": 56.0
   },
   "vivo": {
    "ok": true,
-   "estado": "terminado_hoy",
-   "partidos": 2,
+   "estado": "sin_partidos",
+   "partidos": 0,
    "siguiente": {
     "id": 401931997,
     "inicio_utc": "2026-11-29T01:00:00Z",
@@ -39,12 +39,12 @@
     "visitante": "Toluca"
    },
    "incrustado": true,
-   "segundos": 20.2
+   "segundos": 2.9
   },
   "pagina": {
    "ok": true,
    "salida": [
-    "listo en 0.02 s"
+    "listo en 0.07 s"
    ],
    "segundos": 0.1
   }
@@ -65,11 +65,19 @@
   "visitante": "Toluca",
   "estadio": "Estadio Jalisco",
   "ciudad": "Guadalajara",
-  "momios": null
+  "momios": {
+   "ml_l": 2.9,
+   "ml_e": 3.8,
+   "ml_v": 2.25,
+   "total_linea": 3.5,
+   "over": 2.15,
+   "under": 1.645,
+   "proveedor": "DraftKings"
+  }
  },
  "vivo": {
-  "estado": "terminado_hoy",
-  "partidos": 2,
+  "estado": "sin_partidos",
+  "partidos": 0,
   "siguiente": {
    "id": 401931997,
    "inicio_utc": "2026-11-29T01:00:00Z",
@@ -79,15 +87,15 @@
   "incrustado": true
  },
  "modelo": "ensamble",
- "corte_local": "2026-11-27 01:45",
+ "corte_local": "2026-11-28 01:21",
  "campeon_top": [
   [
    "Cruz Azul",
-   0.3478
+   0.348
   ],
   [
    "América",
-   0.2121
+   0.212
   ],
   [
    "Toluca",
@@ -95,7 +103,7 @@
   ],
   [
    "Chivas",
-   0.1284
+   0.1283
   ],
   [
    "Pachuca",
@@ -146,9 +154,9 @@
    }
   }
  },
- "huella": "be4de790fd1a0732961b7c43b3a23986",
+ "huella": "ce7c94669146d8f8e4aa8924cef8f7d4",
  "publicar": false,
- "huella_publicada": "be4de790fd1a0732961b7c43b3a23986",
- "segundos": 95.6,
- "publicado_utc": "2026-11-27T07:57:05Z"
+ "huella_publicada": "ce7c94669146d8f8e4aa8924cef8f7d4",
+ "segundos": 73.4,
+ "publicado_utc": "2026-11-28T07:22:18Z"
 }

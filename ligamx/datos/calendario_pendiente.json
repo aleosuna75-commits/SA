@@ -1,6 +1,6 @@
 {
  "torneo": "Apertura 2026",
- "generado_utc": "2026-11-27T07:21:13Z",
+ "generado_utc": "2026-11-28T07:21:01Z",
  "fuente": "ESPN scoreboard mex.1",
  "partidos": [
   {
@@ -15,7 +15,15 @@
    "visitante": "Toluca",
    "estadio": "Estadio Jalisco",
    "ciudad": "Guadalajara",
-   "momios": null
+   "momios": {
+    "ml_l": 2.9,
+    "ml_e": 3.8,
+    "ml_v": 2.25,
+    "total_linea": 3.5,
+    "over": 2.15,
+    "under": 1.645,
+    "proveedor": "DraftKings"
+   }
   },
   {
    "id": "401931996",
@@ -30,12 +38,12 @@
    "estadio": "Estadio Banorte",
    "ciudad": "Mexico City",
    "momios": {
-    "ml_l": 2.3,
-    "ml_e": 3.0,
-    "ml_v": 3.3,
+    "ml_l": 2.1,
+    "ml_e": 3.2,
+    "ml_v": 3.7,
     "total_linea": 2.5,
     "over": 1.769,
-    "under": 1.909,
+    "under": 1.952,
     "proveedor": "DraftKings"
    }
   },
@@ -52,12 +60,12 @@
    "estadio": "Estadio Akron",
    "ciudad": "Guadalajara",
    "momios": {
-    "ml_l": 1.645,
+    "ml_l": 1.625,
     "ml_e": 3.95,
-    "ml_v": 4.7,
+    "ml_v": 4.9,
     "total_linea": 2.5,
-    "over": 1.571,
-    "under": 2.25,
+    "over": 1.625,
+    "under": 2.15,
     "proveedor": "DraftKings"
    }
   },
